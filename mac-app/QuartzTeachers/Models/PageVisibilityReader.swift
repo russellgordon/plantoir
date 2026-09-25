@@ -86,7 +86,8 @@ nonisolated enum PageVisibilityReader {
 
         /// There IS a fence, and what follows it is not something this reader
         /// should answer about — an opening fence with no closing one, or a
-        /// block indented with tabs, which the build itself cannot parse.
+        /// block indented with tabs, which the build itself cannot parse (and,
+        /// since #246, hides and names rather than stopping on).
         case unreadable
     }
 
@@ -485,7 +486,8 @@ nonisolated enum PageVisibilityReader {
     /// PyYAML folds the two into the multi-line plain scalar "false false" — a
     /// string that is not "false", so the page is PUBLISHED while the teacher
     /// is told it was hidden. When the orphan is a MAPPING, a column-0 comment
-    /// or a column-0 sequence the page stops building instead. All measured
+    /// or a column-0 sequence the build cannot parse the page instead — which
+    /// stopped the build until #246 and hides the page since. All measured
     /// 2026-09-19, python-frontmatter 1.3.0 / PyYAML 6.0.3 / CPython 3.11.15,
     /// then js-yaml on `JSON_SCHEMA` and `patches/publish.ts`.
     ///
@@ -501,9 +503,10 @@ nonisolated enum PageVisibilityReader {
     /// `keyValueWasEmpty` covers the one continuation that is NOT indented: a
     /// block sequence at column 0 under a key with no value of its own.
     /// Measured, `publish:` over `- a` is the list `['a']` and the page is
-    /// published, and leaving the `- a` after a hide stops the build. A
-    /// sequence under a key that HAS a value is a page that does not build
-    /// either way, so there is nothing to rescue and sweeping a teacher's list
+    /// published, and leaving the `- a` after a hide makes a block the build
+    /// cannot parse (it stopped the build until #246, and hides the page and
+    /// names it since). A sequence under a key that HAS a value is a page the
+    /// build cannot parse either way, so there is nothing to rescue and sweeping a teacher's list
     /// on that guess would be the larger mistake.
     ///
     /// Ask it BEFORE the key's line is rewritten: the rewrite always puts a
@@ -577,7 +580,8 @@ nonisolated enum PageVisibilityReader {
     /// line, because that is what makes the line a mapping at all. Measured:
     /// `publish:false` is one plain scalar, so a page whose whole frontmatter
     /// is that line arrives at Quartz with no keys and is PUBLISHED — and a
-    /// page with another key beside it stops the build. Either way it is not
+    /// page with another key beside it cannot be parsed at all (it stopped
+    /// the build until #246; since then the build hides it). Either way it is not
     /// this page's flag, and reading it as one called a live page hidden.
     static func valuePart(ofKey key: String, inLine line: String) -> String? {
         var rest: Substring = Substring(line)
@@ -652,8 +656,10 @@ nonisolated enum PageVisibilityReader {
             inside.append(lines[position])
         }
         // A tab used as INDENTATION is the one thing YAML forbids outright:
-        // the build's own parser throws on it and stops the whole build, so
-        // there is no site verdict to mirror.
+        // the build's own parser throws on it. Until #246 that stopped the
+        // whole build; since #246 the build hides the page and names it, so
+        // the site's verdict is hidden and reporting it visible is the mild
+        // direction, announced by the build's own finding.
         for line in inside {
             if PageFrontmatter.trimmingCarriageReturn(line).hasPrefix("\t") {
                 return .unreadable

@@ -62,12 +62,14 @@ struct PagesDatedByTheBuild: Equatable {
     /// other readers look at.
     nonisolated static func reports(in text: String) -> [PagesDatedByTheBuild] {
         var found: [PagesDatedByTheBuild] = []
-        for rawLine in SiteHealthFinding.linesOf(text) {
-            let line: String = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard line.hasPrefix(markerPrefix) else {
+        for line in SiteHealthFinding.linesOf(text) {
+            // From the prefix onward, for the reason
+            // `SiteHealthFinding.findings(in:)` gives: a marker glued to the
+            // tail of somebody else's half line must still be read (#153).
+            guard let prefixRange = line.range(of: markerPrefix) else {
                 continue
             }
-            let payload: String = String(line.dropFirst(markerPrefix.count))
+            let payload: String = String(line[prefixRange.upperBound...])
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             guard let data = payload.data(using: .utf8),
                   let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -84,8 +86,10 @@ struct PagesDatedByTheBuild: Equatable {
 
     /// Whether a line is this machine-readable one, so the console can keep it
     /// out of what a teacher reads (rule 1: a raw JSON blob is machinery).
+    ///
+    /// A line CARRYING the prefix anywhere, hidden whole — the same rule as
+    /// `SiteHealthFinding.isMarkerLine`, and for the same reason (#153).
     nonisolated static func isMarkerLine(_ line: String) -> Bool {
-        return line.trimmingCharacters(in: .whitespacesAndNewlines)
-            .hasPrefix(markerPrefix)
+        return line.contains(markerPrefix)
     }
 }

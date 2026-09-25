@@ -88,13 +88,21 @@ ensure_build_root() {
 # The app trims the file when it grows; nothing here needs to. Carries a
 # course code and nothing else — never a path, never a credential.
 #
-# One line can be lost: the app rewrites the whole file when it adds a line of
-# its own, so an append landing between its read and its write disappears.
-# That is one line, once, and worth less than the locking it would take.
+# The append waits for the lock the app holds on the Logs FOLDER while it
+# trims the file (GitHub #238), so a line added here can never land in the
+# instant the app replaces the file with a shorter copy and vanish with the old
+# one. `lockf -k` on the folder takes the same lock the app's `flock` does and
+# creates no file. Where there is no lockf, or the volume refuses locks, the
+# line is appended unlocked rather than dropped.
 note_on_the_trail() {
   local trail="${HOME%/}/Library/Logs/Plantoir"
   mkdir -p "$trail" 2>/dev/null || return 0
-  printf '%s · %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" >> "$trail/activity.txt" 2>/dev/null || true
+  local trail_line
+  trail_line="$(date '+%Y-%m-%d %H:%M:%S') · $1"
+  if [ -x /usr/bin/lockf ] && /usr/bin/lockf -k "$trail" /bin/sh -c 'printf "%s\n" "$1" >> "$2/activity.txt"' note "$trail_line" "$trail" 2>/dev/null; then
+    return 0
+  fi
+  printf '%s\n' "$trail_line" >> "$trail/activity.txt" 2>/dev/null || true
 }
 
 # Points courses/<CODE>/.merged_output at this course's folder under
@@ -356,7 +364,8 @@ Notes:
 - --target chooses where the built site goes: netlify (the default) or cloudflare.
 - With --to-folder <path>, the site is published to <path>/section<N> on THIS
   computer instead of Netlify — an incremental copy (only changed files move),
-  for teachers who upload to their own web host (e.g. over SFTP).
+  for teachers who upload to their own web host (e.g. over SFTP). A relative
+  <path> is taken from this working folder.
 - The Netlify Personal Access Token (PAT) is stored in the macOS Keychain and injected securely at runtime.
   Netlify and Cloudflare tokens live under separate Keychain entries, so keeping both is fine.
 - A Cloudflare token needs one permission: Account - Cloudflare Pages - Edit.
@@ -712,6 +721,21 @@ fi
 # deleted from the folder. Each section lands in its own subfolder so
 # sections can never overwrite one another. Netlify is not involved.
 if [[ -n "$TO_FOLDER" ]]; then
+  # A relative folder is taken from THIS working folder (line 5 already
+  # cd'd here), and made a full path before anything reads it. Three
+  # things go wrong with a relative one, all measured (GitHub issue #227):
+  #   * rsync reads anything with a colon before its first slash as a
+  #     REMOTE host: "out 26:27" became host "out 26", and "localhost:site"
+  #     opened an ssh connection to this Mac — with a real host name it
+  #     would copy the site to another machine. Both printed "Published".
+  #   * mkdir reads a name starting with "-" as an option.
+  #   * PUBLISHED_FOLDER= must be a path the app can open, and the app's
+  #     own current folder is "/", not this one.
+  # A full path starts with "/", so none of the three can happen to it.
+  case "$TO_FOLDER" in
+    /*) ;;
+    *) TO_FOLDER="$(pwd)/${TO_FOLDER}" ;;
+  esac
   TARGET_DIR="${TO_FOLDER%/}/section${SECTION_NUM}"
   mkdir -p "$TARGET_DIR" || {
     echo "❌ Cannot create the publish folder:"
@@ -832,7 +856,25 @@ if [[ -n "$TO_FOLDER" ]]; then
   echo "📦 Publishing ${COURSE_CODE} section ${SECTION_NUM} to a folder…"
   # -a preserves what matters, --delete mirrors removals, and the
   # itemized output is counted so the teacher sees how little moved.
-  CHANGED_COUNT="$(rsync -a --delete --itemize-changes "${PUBLIC_DIR_HOST}/" "${TARGET_DIR}/" | grep -c '^[<>ch.]f' || true)"
+  #
+  # rsync's OWN exit status decides, not the count. It used to be piped
+  # straight into `grep -c … || true`, which threw the status away: a copy
+  # that failed outright, or finished only in part (exit 23, 24 — a page
+  # that could not be written, or a stale page --delete could not remove),
+  # printed "Published" and PUBLISHED_FOLDER= all the same. A partial copy
+  # is a FAILURE here on purpose: the page left behind may be one the
+  # teacher took down. No PUBLISHED_FOLDER= line follows a failure, so the
+  # app offers no folder to open. The sentence below is matched by the
+  # app (app-rules.json -> failureExplanations), so keep its first line.
+  _rsync_rc=0
+  _rsync_said="$(rsync -a --delete --itemize-changes "${PUBLIC_DIR_HOST}/" "${TARGET_DIR}/")" || _rsync_rc=$?
+  if [[ $_rsync_rc -ne 0 ]]; then
+    echo "❌ Not every page could be copied into the publishing folder, so it is not up to date."
+    echo "   Folder: ${TARGET_DIR}"
+    echo "   (copy error ${_rsync_rc})"
+    exit 1
+  fi
+  CHANGED_COUNT="$(printf '%s\n' "$_rsync_said" | grep -c '^[<>ch.]f' || true)"
   echo "✅ Published: ${CHANGED_COUNT} file(s) updated."
   echo "   Folder: ${TARGET_DIR}"
   echo "   Upload that folder to your web host however you prefer (e.g. SFTP)."
@@ -1334,7 +1376,7 @@ _colima_growth_flags() {
 
 _download() {
   local url="$1" destination="$2" label="$3"
-  echo "📦 Getting ${label}…"
+  echo "📦 Downloading ${label}…"
   if ! curl -fsSL --retry 3 -o "$destination" "$url"; then
     echo "❌ Could not download ${label}."
     echo "   An internet connection is needed for this one-time setup."
@@ -1354,19 +1396,19 @@ ensure_local_tools() {
 
   if ! command -v limactl >/dev/null 2>&1; then
     local lima_tgz="$TOOLS_DIR/lima.tar.gz"
-    _download "https://github.com/lima-vm/lima/releases/download/v${LIMA_VERSION}/lima-${LIMA_VERSION}-Darwin-${lima_arch}.tar.gz" "$lima_tgz" "the virtual machine manager"
+    _download "https://github.com/lima-vm/lima/releases/download/v${LIMA_VERSION}/lima-${LIMA_VERSION}-Darwin-${lima_arch}.tar.gz" "$lima_tgz" "what your website builder needs (1 of 4)"
     tar xzf "$lima_tgz" -C "$TOOLS_DIR"
     rm -f "$lima_tgz"
   fi
 
   if ! command -v colima >/dev/null 2>&1; then
-    _download "https://github.com/abiosoft/colima/releases/download/${COLIMA_VERSION}/colima-Darwin-${arch}" "$TOOLS_DIR/bin/colima" "the container runtime"
+    _download "https://github.com/abiosoft/colima/releases/download/${COLIMA_VERSION}/colima-Darwin-${arch}" "$TOOLS_DIR/bin/colima" "what your website builder needs (2 of 4)"
     chmod +x "$TOOLS_DIR/bin/colima"
   fi
 
   if ! command -v docker >/dev/null 2>&1; then
     local docker_tgz="$TOOLS_DIR/docker.tar.gz"
-    _download "https://download.docker.com/mac/static/stable/${docker_arch}/docker-${DOCKER_CLI_VERSION}.tgz" "$docker_tgz" "the container tools"
+    _download "https://download.docker.com/mac/static/stable/${docker_arch}/docker-${DOCKER_CLI_VERSION}.tgz" "$docker_tgz" "what your website builder needs (3 of 4)"
     tar xzf "$docker_tgz" -C "$TOOLS_DIR"
     mv -f "$TOOLS_DIR/docker/docker" "$TOOLS_DIR/bin/docker"
     rm -rf "$TOOLS_DIR/docker" "$docker_tgz"
@@ -1385,7 +1427,7 @@ ensure_buildx() {
   arch="$(uname -m)"
   if [[ "$arch" == "arm64" ]]; then buildx_arch="arm64"; else buildx_arch="amd64"; fi
   mkdir -p "$HOME/.docker/cli-plugins"
-  _download "https://github.com/docker/buildx/releases/download/${BUILDX_VERSION}/buildx-${BUILDX_VERSION}.darwin-${buildx_arch}" "$HOME/.docker/cli-plugins/docker-buildx" "the image builder"
+  _download "https://github.com/docker/buildx/releases/download/${BUILDX_VERSION}/buildx-${BUILDX_VERSION}.darwin-${buildx_arch}" "$HOME/.docker/cli-plugins/docker-buildx" "what your website builder needs (4 of 4)"
   chmod +x "$HOME/.docker/cli-plugins/docker-buildx"
 }
 
@@ -1397,6 +1439,11 @@ ensure_container_runtime() {
     return 0
   fi
 
+  # Set when this run starts the builder's virtual machine; preview.sh's
+  # reach check reads it (GitHub #234). The same line is in all three
+  # launchers so that their copies of this function stay identical.
+  THIS_RUN_STARTED_THE_BUILDER=1
+
   # "Setting up this Mac" is a progress marker the app matches word for word
   # (contracts/app-rules.json → milestones); keep those four words. It is not
   # "a one-time step": quitting Plantoir stops this machinery when nothing else
@@ -1405,8 +1452,10 @@ ensure_container_runtime() {
   ensure_local_tools
 
   if [[ ! -d "$HOME/.colima/default" ]]; then
-    echo "🚀 First start: building the virtual machine ($(_colima_cpus) CPUs · $(_colima_memory_gb) GB RAM)."
-    echo "   Its disk image (~600 MB) is downloaded once; this can take several minutes."
+    # What is being set up here is Colima's Linux virtual machine; the
+    # teacher is told only what it is FOR (GitHub #263, rule 1).
+    echo "🚀 First start: setting up your website builder ($(_colima_cpus) CPUs · $(_colima_memory_gb) GB of memory)."
+    echo "   About 600 MB is downloaded once; this can take several minutes."
     # vz is macOS's own virtualization — no extra software needed, unlike
     # the qemu default.
     colima start --cpu "$(_colima_cpus)" --memory "$(_colima_memory_gb)" --vm-type vz
@@ -1417,24 +1466,35 @@ ensure_container_runtime() {
     colima start $(_colima_growth_flags)
   fi
 
-  echo "⏳ Waiting for the container runtime to be ready…"
+  # The app's friendlyPhase matches "Waiting for the website builder" (#263).
+  echo "⏳ Waiting for the website builder to be ready…"
   _wait_for_docker 30 && return 0
 
   # Colima can report the VM as running while its Docker daemon is dead
   # (common after sleep or an unclean shutdown); a plain start no-ops in
   # that state. Force a clean restart and wait again.
-  echo "🔁 Docker isn't responding yet — restarting Colima…"
-  echo "   (Colima is shared by any other Colima-based toolchains on this Mac;"
-  echo "    their containers restart automatically afterwards if configured to.)"
+  #
+  # For a developer: Colima is shared by any other Colima-based toolchains on
+  # this Mac, so this restart takes their containers down too; they come back
+  # afterwards only if configured to. This used to be printed; since #263 the
+  # console speaks to a teacher, who has nothing else using it
+  # (documentation/03-launcher-scripts.md).
+  echo "🔁 The website builder isn't answering yet — restarting it…"
   colima stop --force >/dev/null 2>&1 || true
   colima start >/dev/null 2>&1 || true
   _wait_for_docker 60 && return 0
 
-  echo "❌ Colima did not become ready."
-  echo "   Try running 'colima stop --force && colima start' by hand, then re-run this script."
+  # For a developer, the by-hand recovery is
+  #   colima stop --force && colima start
+  # then re-run this launcher. A teacher is told to restart, which is what
+  # cleared the wedged builder in #225.
+  echo "❌ The website builder did not start."
+  echo "   Restart this Mac, then try again."
   exit 1
 }
 
+# Set by ensure_container_runtime when this run starts the builder (#234).
+THIS_RUN_STARTED_THE_BUILDER=""
 ensure_container_runtime
 # ====================================================================
 

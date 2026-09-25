@@ -80,7 +80,7 @@ A representative example:
 | `front_page_heading` | string | setup (a club only, #267) | setup only | The heading a new numbered course's section front pages are created with, above the embed of the newest page: a club writes `Most Recent Meeting`. **Absent means nothing is recorded**: the course's front pages keep whatever heading they have (`Most Recent Class` for a course set up before #267, or whatever it was edited to — CODING's reads `Most Recent Meeting`), and Course Settings' locked row says it was not recorded rather than naming a default. Read only when a course is created; the assistant's repointing finds the embed by the class page it names, never by the heading, so it never reads or writes this. Not switchable afterwards; Course Settings shows it locked. |
 | `class_noun` | string (`class` or `meeting`) | setup (a club only, #267) | both apps | What the assistant calls one page when it talks to the teacher: a club writes `meeting`. **Absent and unknown mean `class`.** A closed pair, not free text, because the sentences carry articles and plurals. The build never reads it, and it moves no byte of what the assistant's model is shown. Not switchable afterwards; Course Settings shows it locked. |
 | `excluded_items` | object with `shared` and/or `per_section` arrays | Course Settings | build | Folder and file names the teacher removed in Settings, kept out of previews and deploys. **Authoritative at build time**: preflight drops an excluded name it finds back in the folder lists rather than re-adding it, and never un-hides it. Keyed by scope because the same bare name can legitimately exist in both, and the two are found by different scans. An exclusion does NOT expire when the folder is deleted and re-created — discovery is name-based, so the build cannot tell "the folder I excluded" from "the new folder I just made". |
-| `graded_folders` | array of strings | setup, and the Marks checklist in Course Settings | build, both apps | The folders whose work counts for marks, which is what makes an expectation "assessed" on the coverage map. **Absent is not empty.** Absent means the teacher has never been asked, so the historical rule applies (any folder whose name contains `task`) and an existing course keeps exactly the marks it had; `[]` means they were asked and cleared it. Seeding existing courses would not have been safe — the mathematics skeleton ships `Thinking Tasks`, which the old rule counted and a pool of `["Tasks"]` does not. **The first tick FREEZES the pool**: the moment a teacher touches the checklist, the key is written with everything the course was already counting, and the historical rule stops applying to it. **A REMOVAL does not** — taking a folder out of the course in Settings is not an answer to the marks question, so a never-asked course is left with the key ABSENT rather than frozen to the historical answer minus that folder (which, on the ordinary course whose only marked folder is `Tasks`, would be `[]`: nothing counting for marks, permanently, from a gesture the teacher was told would do one narrow thing). The rule, its second exception and what it deliberately leaves unpinned are `gradedFolders.removingAFolder`, seven cases, run on both platforms (six since 2026-09-18, the seventh since 2026-09-19). The second exception — a name the checklist STILL OFFERS keeps its place — is asked CASE-INSENSITIVELY, the way the build asks it, since 2026-09-19 ([#172](https://github.com/russellgordon/plantoir/issues/172), raised from Windows): the checklist returns names as they are spelled on disk, so an exact test drops a pooled `Tasks` when `Portfolios/tasks` survives while the build goes on counting that folder. What remains unpinned is the DROP's own comparison, which the mac makes exactly and Windows with `OrdinalIgnoreCase`. Which is why what the checklist OFFERS matters as much as what it writes — the build matches a folder at any depth, so the apps offer the two folder lists plus every folder found inside the course, four levels deep. That rule, its skip list and what it deliberately leaves out are in [`contracts/shared-rules.json`](../contracts/shared-rules.json) → `gradedFolders.choices`, and both apps run its 14 cases. Two parts of it are easy to leave out and cost a teacher their marks: a folder named in `excluded_items` is NOT offered (it is still on disk, so the walk hands back a folder they just removed unless it is told not to), and each folder's children are sorted ORDINALLY and case-insensitively — see [`04-course-setup.md`](04-course-setup.md) for the measured table of which comparison, because the natural call on each platform is a different one. |
+| `graded_folders` | array of strings | setup, and the Marks checklist in Course Settings | build, both apps | The folders whose work counts for marks, which is what makes an expectation "assessed" on the coverage map. **Absent is not empty.** Absent means the teacher has never been asked, so the historical rule applies (any folder whose name contains `task`) and an existing course keeps exactly the marks it had; `[]` means they were asked and cleared it. Seeding existing courses would not have been safe — the mathematics skeleton ships `Thinking Tasks`, which the old rule counted and a pool of `["Tasks"]` does not. **The first tick FREEZES the pool**: the moment a teacher touches the checklist, the key is written with everything the course was already counting, and the historical rule stops applying to it. **A REMOVAL does not** — taking a folder out of the course in Settings is not an answer to the marks question, so a never-asked course is left with the key ABSENT rather than frozen to the historical answer minus that folder (which, on the ordinary course whose only marked folder is `Tasks`, would be `[]`: nothing counting for marks, permanently, from a gesture the teacher was told would do one narrow thing). The rule, its second exception and what it deliberately leaves unpinned are `gradedFolders.removingAFolder`, seven cases, run on both platforms (six since 2026-09-18, the seventh since 2026-09-19). The second exception — a name the checklist STILL OFFERS keeps its place — is asked CASE-INSENSITIVELY, the way the build asks it, since 2026-09-19 ([#172](https://github.com/russellgordon/plantoir/issues/172), raised from Windows): the checklist returns names as they are spelled on disk, so an exact test drops a pooled `Tasks` when `Portfolios/tasks` survives while the build goes on counting that folder. What remains unpinned is the DROP's own comparison, which the mac makes exactly and Windows with `OrdinalIgnoreCase`. **A re-run of `setup.sh` / `setup.ps1` writes a saved pool back exactly as it was** (a saved `null` as `[]`, an absent key left absent, and only entries that cannot name a folder — null, blank, non-string, an exact repeat — removed) — it used to re-check the pool against the top-level folder lists and emptied every pool naming a folder found inside another; `gradedFolders.rerunningSetup`, eleven cases ([#192](https://github.com/russellgordon/plantoir/issues/192)). Which is why what the checklist OFFERS matters as much as what it writes — the build matches a folder at any depth, so the apps offer the two folder lists plus every folder found inside the course, four levels deep. That rule, its skip list and what it deliberately leaves out are in [`contracts/shared-rules.json`](../contracts/shared-rules.json) → `gradedFolders.choices`, and both apps run its 14 cases. Two parts of it are easy to leave out and cost a teacher their marks: a folder named in `excluded_items` is NOT offered (it is still on disk, so the walk hands back a folder they just removed unless it is told not to), and each folder's children are sorted ORDINALLY and case-insensitively — see [`04-course-setup.md`](04-course-setup.md) for the measured table of which comparison, because the natural call on each platform is a different one. |
 | `include_coverage_notes` | bool (default `true`) | setup | build | Whether that page carries its explanatory sections ("What counts", "Reading it honestly") or the map alone. |
 | `kept_for_reference` | bool (default `false`) | app (Keep a Copy for Reference…, Import Courses for Reference…) | the app, `scripts/reference_course.py`, `deploy.sh`, `deploy.py` | `true` marks a REFERENCE COURSE: last year's course, or a course full of example content, kept in this year's sidebar to be read and never deployed. **Absent means false** — the only safe direction, since the reverse would make a live course silently undeployable. See "Reference courses" below. |
 | `reference_school_year` | integer or null | app (Keep a Copy for Reference…, Import Courses for Reference…, Set School Year…) | the app (sidebar grouping, the MCP course listing) | Which school year a reference course was taught in, as the calendar year it STARTED in: `2025` means 2025–26. The label is derived, never stored. Absent, null, or anything that is not a whole number within the offered range reads as **Other**. |
@@ -91,7 +91,7 @@ A representative example:
 | Key | Type | Written by | Read by | Meaning |
 |---|---|---|---|---|
 | `deploy_target` | string (default `netlify`) | app only (Course Settings → Publishing; the wizard preserves it but never writes it) | the app, which translates it into the launcher's `--target cloudflare` / `--to-folder <path>` flags — neither the launcher nor `deploy.py` reads the key | Where this course's sections publish: `netlify`, `cloudflare_pages`, or `local_folder`. Absent means `netlify`, so every existing course keeps working untouched. See [deployment](07-deployment.md). |
-| `deploy_folder_path` | string | app (Publishing, folder mode) | the app, which passes it as `--to-folder <path>`; the launcher does the host-side copy from that flag | Only for `local_folder`: the folder sections are mirrored into, one `sectionN` subfolder each. Validated live in the app — a missing, unwritable, or file-not-folder path blocks Save rather than failing at publish time. |
+| `deploy_folder_path` | string | app (Publishing, folder mode) | the app, which passes it as `--to-folder <path>`; the launcher does the host-side copy from that flag | Only for `local_folder`: the folder sections are mirrored into, one `sectionN` subfolder each. Validated live in the app — a missing, unwritable, file-not-folder or **not-a-full-path** path blocks Save rather than failing at publish time (the last since #227: a partial path was checked against the app's current folder and published into the working folder). The app hands the launcher the path trimmed of surrounding spaces. |
 | `scheduled_deploy_may_run_late_days` | integer (default `7`; only `1`, `3`, `7` or `14` mean themselves) | app (Course Settings → Deploying). **Not the wizard**, deliberately: a course that has never been deployed cannot be scheduled at all, so the question would have no consequence at the moment it is asked | the app, at the moment a scheduled deploy FIRES — read straight out of this file by a process with no `CourseConfiguration` loaded, so changing the setting after scheduling changes what a job already set will do. Nothing in `scripts/` reads it | How late a deploy set to happen on its own may still go ahead. The Mac may have been off or asleep at the chosen time; past this window the run stands down, deploys nothing and tells the teacher. **Absent means 7, and so does anything that is not one of the four offered values** — an older build's number, a value hand-edited in — because honouring a stored `0` would stand every scheduled deploy down. There is deliberately no "always". See [deployment](07-deployment.md) → "A scheduled deploy that outlived its course", and `contracts/shared-rules.json` → `scheduledDeployCancellation`. |
 | `additional_deploy_targets` | array of `{type, path}` objects | app (Publishing, "Also publish to, for redundancy") | the app — currently config/UI only; nothing yet triggers a second deploy from it (see below) | Extra destinations this course ALSO publishes to, beyond `deploy_target` (the primary), for redundancy against one host having a bad day. `type` uses the same spellings as `deploy_target`; `path` is only present for a `local_folder` entry. **Absent entirely** (never written as `[]`) for the overwhelming majority of courses that have not opted in, so an untouched course writes the exact same file it always has. At most one entry per known type, and never a type that is already the primary — `CourseConfiguration.deployTarget`'s own setter enforces this, dropping a type from this list the moment it becomes the primary. |
 
@@ -212,7 +212,9 @@ labelled "0000–01" built out of a value that coerced to zero.
 the config it owns, then copies through every key already in the saved file
 that it did not write — the app's publishing choice, and anything a future
 version adds. Without that, re-running the wizard on an existing course would
-silently drop settings made in the app.
+silently drop settings made in the app. `graded_folders` is treated the same
+way even though the wizard writes it: a saved pool goes back unchanged, because
+a re-run never asks the marks question (`gradedFolders.rerunningSetup`, #192).
 
 The Cloudflare **account ID** is deliberately *not* here: it identifies the
 teacher rather than the course, so it lives in the app's own settings (and,
@@ -330,7 +332,11 @@ tag such as
 inside double quotes, an indented key, a value that starts with a character
 YAML reserves (`%`, `@`, a backtick, `- `) or carries its own `key: value`, and
 frontmatter the build cannot parse at all — tab indentation or an unclosed
-fence, which stop the whole build so there is no site verdict to mirror).
+quote, which until #246 stopped the whole build and since #246 (2026-09-25)
+the build HIDES and names in a folder-problem finding; so the site's verdict
+is hidden, each app's reporting of visible is the mild direction, and the
+finding tells the teacher — see `05-build-pipeline.md` → "A page whose
+settings cannot be read is hidden (#246)").
 
 Two shapes are NOT `cannotTell` and are worth naming, because both were read
 the dangerous way round before they were measured:
@@ -338,7 +344,9 @@ the dangerous way round before they were measured:
 * **`publish:false`, with no space after the colon, is not a key at all.** YAML
   needs a space, a tab or the end of the line after the colon to make a mapping
   — so that line is one plain scalar, the page reaches Quartz with no keys, and
-  it is PUBLISHED. (With another key beside it the same line stops the build.)
+  it is PUBLISHED. (With another key beside it the same line cannot be parsed
+  at all: that stopped the build until #246, and since #246 the build hides
+  the page and names it.)
   Reading everything after the first colon called this page hidden.
 * **YAML's whitespace is a space and a tab, and nothing else.** The
   non-breaking space Option-Space types on a Mac is not whitespace to YAML, so
@@ -452,7 +460,8 @@ separately from the reader:
   which cannot be copied to another key's line at all; that, and a DRAFT value
   the reader cannot read, are written as HELD BACK — and the continuation
   lines are taken WITH the key, because an indented scalar left behind lands
-  under whatever key follows and stops the build. A key with nothing after it
+  under whatever key follows and makes a block the build cannot parse — which
+  stopped the build until #246, and since #246 hides the page and names it. A key with nothing after it
   is the one exception: that is a null, which PUBLISHES the page, so the copy
   keeps it a null rather than deciding for the teacher. A page wrongly held back is
   one a teacher notices and fixes; a page wrongly published is one nobody
@@ -641,13 +650,14 @@ separately from the reader:
     steps over blank lines but not comments, unlike every other stepping in
     this family. Measured consequence: `publish: false` / `# note` /
     `  false` is a page the build cannot parse, and `_is_draft` calls it
-    hidden. **Left alone deliberately.** It is not unreachable —
-    `process_frontmatter` CATCHES the YAML error, prints `⚠️ Could not read
-    frontmatter from …` and leaves the file byte-identical
-    (`build_site.py:1976-1979`), so such a page reaches the merged tree with
-    its comments intact and `_is_draft` reads raw text. But every page that
-    can reach it is a page that stops the Quartz build anyway, so the gap has
-    no teacher behind it; and `scripts/build_site.py` is inside
+    hidden. **Left alone deliberately.** Since #246 it is unreachable from
+    the build: `process_frontmatter` catches the reader's error and rewrites
+    the build's copy to `publish: false` over the page's body, so `_is_draft`
+    never meets the original block. (Before #246 it left the copy
+    byte-identical after printing the reader's message, such a page reached
+    the merged tree with its comments intact, and every page that could reach
+    it stopped the Quartz build anyway — so the gap never had a teacher behind
+    it); and `scripts/build_site.py` is inside
     `.githooks/pre-commit`'s publishing closure, which engages `RELEASING.md`'s
     rule that a release changing the publishing path needs a full
     `verify-deploy` run. Twenty minutes and three credentials for a two-line
@@ -692,7 +702,8 @@ separately from the reader:
   * `CourseRestorer.settingPerSectionKeys` swaps this section's key line for
     the backup's without either side's continuation lines — measured, a live
     `publishForSection1:` / `  a: 1` whose backup had no such key is left as
-    `  a: 1` alone and the build stops.
+    `  a: 1` alone and the build stops (since #246: the build hides the page
+    and names it as unreadable).
     [Issue #182](https://github.com/russellgordon/plantoir/issues/182).
   * **`setting`'s own INSERT branch** — the third branch of the very function
     the sweep was added to, and the surprising one. It CREATES an orphan

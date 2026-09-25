@@ -7,6 +7,93 @@
       "where" : "Beside the section's built site: .merged_output/section<N>/, the folder that holds public/."
     },
     "note" : "Whether a deploy has to build first. Getting this wrong in one direction wastes minutes; in the other it publishes yesterday's site.",
+    "previewBuild" : {
+      "cases" : [
+        {
+          "expectPreview" : false,
+          "name" : "a production build",
+          "pages" : {
+            "index.html" : "<html><body>Welcome</body></html>",
+            "notes/day-1.html" : "<html><body>Day 1</body></html>"
+          }
+        },
+        {
+          "expectPreview" : true,
+          "name" : "a preview's build",
+          "pages" : {
+            "index.html" : "<script>new WebSocket('ws://localhost:9081')</script>",
+            "notes/day-1.html" : "<script>new WebSocket('ws://localhost:9081')</script>"
+          }
+        },
+        {
+          "expectPreview" : true,
+          "name" : "a clean front page in front of a preview's page (#136)",
+          "pages" : {
+            "index.html" : "<html><body>Welcome</body></html>",
+            "notes/day-1.html" : "<script>new WebSocket('ws://localhost:9081')</script>"
+          }
+        },
+        {
+          "expectPreview" : true,
+          "name" : "a preview's page deep in the tree",
+          "pages" : {
+            "a/b/c/page.html" : "<script>new WebSocket('ws://localhost:9083')</script>",
+            "index.html" : "<html><body>Welcome</body></html>"
+          }
+        },
+        {
+          "expectPreview" : true,
+          "name" : "a preview's page in a hidden folder",
+          "pages" : {
+            ".cache/page.html" : "<script>new WebSocket('ws://localhost:9081')</script>",
+            "index.html" : "<html><body>Welcome</body></html>"
+          }
+        },
+        {
+          "expectPreview" : false,
+          "name" : "the address only in files that are not pages",
+          "pages" : {
+            "index.html" : "<html><body>Welcome</body></html>",
+            "postscript.js" : "new WebSocket('ws://localhost:9081')",
+            "static/contentIndex.json" : "{\"socket\": \"ws://localhost:9081\"}"
+          }
+        },
+        {
+          "expectPreview" : false,
+          "name" : "a near miss: an address with no port",
+          "pages" : {
+            "index.html" : "<a href=\"ws://localhost/\">a local socket</a>"
+          }
+        },
+        {
+          "expectPreview" : false,
+          "name" : "a page that cannot be read is passed over",
+          "pages" : {
+            "index.html" : "<html><body>Welcome</body></html>",
+            "locked.html" : "<script>new WebSocket('ws://localhost:9081')</script>"
+          },
+          "unreadable" : [
+            "locked.html"
+          ]
+        },
+        {
+          "expectPreview" : true,
+          "name" : "a readable preview's page still counts beside one that cannot be read",
+          "pages" : {
+            "index.html" : "<html><body>Welcome</body></html>",
+            "locked.html" : "<html><body>Locked</body></html>",
+            "notes/day-1.html" : "<script>new WebSocket('ws://localhost:9081')</script>"
+          },
+          "unreadable" : [
+            "locked.html"
+          ]
+        }
+      ],
+      "note" : "One rule for 'this built site is a preview's', read by every checker: BuildFreshness in each app, the mac's scheduled publish (its own shell check, because the app is closed when it runs), deploy.sh (three times), deploy.py and deploy.ps1. Serve mode bakes the live-reload client into EVERY page and the built tree is replaced file by file, so a clean front page in front of a preview's pages is a real state — deploy.sh found it on 2026-09-05 and has read the whole tree since, as has deploy.py. The apps read the front page alone until issue #136: they called that state deploy-fresh, skipped their build, and the LAUNCHER then rebuilt under the destination's leg — the build's milestones missing from the panel, and on the mac a question the build asked overnight reported as the destination's. A reader narrower than the launchers is the fault, whichever side it is on. Each case is a tree under the section's public/ folder; `unreadable` names pages that exist but cannot be opened.",
+      "notShared" : "Three things are deliberately NOT cases. (1) A front page that is MISSING or cannot be READ: the apps rebuild (`rules` → 'the built index cannot be read'), while the launchers stop at the copy instead — a different rule, pinned where it lives. (2) A page that is not valid UTF-8: measured 2026-09-25 on macOS 26.6, /usr/bin/grep 2.6.0-FreeBSD under a UTF-8 locale does NOT find the signature on a line that also holds an invalid byte (exit 1), and under LC_ALL=C it does (exit 0), so deploy.sh run from a Terminal can call such a page clean while the apps (bytes), the scheduled check (LC_ALL=C) and deploy.py (errors='ignore') call it a preview's. The error is in the SAFE direction — the app rebuilds first — and Quartz only writes UTF-8, so it is written down rather than pinned. (3) Upper-case .HTML, and a public/ that is ITSELF a symbolic link (neither FileManager's enumerator nor grep -r descends into one; a link further up, such as the mac's .merged_output, is followed by both — measured): Quartz produces neither. deploy.ps1 also matches the signature without regard to case (Select-String's default), which no case here can tell apart.",
+      "signature" : "ws://localhost:",
+      "where" : "Every file whose name ends .html anywhere under the section's built public/ folder, hidden folders included, compared as bytes; the front page first, so a real preview's build answers from one file. A page that cannot be opened is passed over, as every launcher does."
+    },
     "rules" : [
       {
         "expectRebuild" : true,
@@ -19,7 +106,7 @@
       {
         "expectRebuild" : true,
         "when" : "the built site was made by a PREVIEW",
-        "why" : "**The one that is not obvious.** Serve mode bakes a live-reload client pointed at ws://localhost into every page. Publishing that makes visitors' browsers ask about 'access to other apps and services on this device' — so a preview build is never deploy-fresh, however recent it is. Detected by the built index.html containing 'ws://localhost:'."
+        "why" : "**The one that is not obvious.** Serve mode bakes a live-reload client pointed at ws://localhost into every page. Publishing that makes visitors' browsers ask about 'access to other apps and services on this device' — so a preview build is never deploy-fresh, however recent it is. Detected by ANY built page containing the signature — `previewBuild`, which every checker reads (issue #136; the front page alone until then)."
       },
       {
         "expectRebuild" : false,
@@ -36,7 +123,7 @@
         "why" : "Issue #265. A build reads the settings and the pages when it starts and writes index.html minutes later, so a Save made while a publish was building is OLDER than index.html. Compared with index.html alone it looked built: the next Publish sent the same old site, said it had succeeded, and settingsSavedWhilePublishing told the teacher to do exactly that. So the time compared with is the START of the build that made the site on disk — read from buildStartedMarker when it is there, and the earlier of it and index.html's time when both are (an earlier time only ever costs a rebuild that was not needed; a later one sends a stale site). With no marker (a site built before this existed) index.html's time is used, as before. Rejected: comparing the build's copy of course_config.json with the course's (the plan review's A3) — the build copies the settings some seconds AFTER it reads them, so a Save in between matches the copy and is still missed, and it would not catch a PAGE saved during the build, which this does."
       }
     ],
-    "theLaunchersMustDoThisToo" : "These rules were implemented in the APPS only, and that left a hole for two years' worth of command-line use. `deploy.py` refuses a preview build for the Netlify and Cloudflare destinations, but publishing TO A FOLDER is handled entirely host-side by `deploy.sh` / `deploy.ps1` — it never enters the container, so `deploy.py` never runs. From the command line, `./preview.sh CODE N` followed by `./deploy.sh CODE N --to-folder …` therefore published the live-reload client: measured 2026-09-05 as 230 of 244 files. The apps were never exposed, because BuildFreshness forces a rebuild first, which is why three destinations tested clean in August. Both launchers now make the same check and rebuild. THREE things are needed, and each was discovered by getting it wrong. (1) The CHECK must read every HTML page, not just index.html: serve mode bakes the client into all of them and the tree is replaced file by file, so a clean front page in front of stale preview pages is a real state that front-page detection cannot see and publishes untouched. (2) The rebuild must STOP a preview that is still serving that section: the preview's sync watcher mirrors the serve build to the host every second and overwrites the rebuild within a second of it finishing. This was first blamed on bind-mount lag, which was wrong — a rebuild takes about 3 seconds and the tree is clean the moment it returns; the cause was always the race. (3) The WAIT after the rebuild must also cover every HTML page, for the same reason as (1)."
+    "theLaunchersMustDoThisToo" : "These rules were implemented in the APPS only, and that left a hole for two years' worth of command-line use. `deploy.py` refuses a preview build for the Netlify and Cloudflare destinations, but publishing TO A FOLDER is handled entirely host-side by `deploy.sh` / `deploy.ps1` — it never enters the container, so `deploy.py` never runs. From the command line, `./preview.sh CODE N` followed by `./deploy.sh CODE N --to-folder …` therefore published the live-reload client: measured 2026-09-05 as 230 of 244 files. The apps were never exposed, because BuildFreshness forces a rebuild first, which is why three destinations tested clean in August. That held for a whole preview's build, whose front page carries the client too; the MIXED state in (1) below reached the apps until issue #136, because they read the front page alone. They now read the same tree as the launchers — `previewBuild`. Both launchers now make the same check and rebuild. THREE things are needed, and each was discovered by getting it wrong. (1) The CHECK must read every HTML page, not just index.html: serve mode bakes the client into all of them and the tree is replaced file by file, so a clean front page in front of stale preview pages is a real state that front-page detection cannot see and publishes untouched. (2) The rebuild must STOP a preview that is still serving that section: the preview's sync watcher mirrors the serve build to the host every second and overwrites the rebuild within a second of it finishing. This was first blamed on bind-mount lag, which was wrong — a rebuild takes about 3 seconds and the tree is clean the moment it returns; the cause was always the race. (3) The WAIT after the rebuild must also cover every HTML page, for the same reason as (1)."
   },
   "configurationRules" : {
     "cloudflareAccountID" : [
@@ -110,6 +197,26 @@
         "expectProblem" : null,
         "input" : "@FOLDER@",
         "why" : "@FOLDER@ is replaced with a real, writable folder."
+      },
+      {
+        "expectProblem" : "That isn’t a full folder location — use Choose… to pick the folder.",
+        "input" : ".",
+        "why" : "GitHub issue #227. A partial path is refused BEFORE the folder is looked for, and this is the case that proves the order: '.' exists wherever the check happens to run, so a check that looked first would answer nil or 'can't be written' depending on the app's current folder - which is not the working folder the publish runs from. Validated in one folder and published into another is the hole."
+      },
+      {
+        "expectProblem" : "That isn’t a full folder location — use Choose… to pick the folder.",
+        "input" : "out 26:27/section1",
+        "why" : "The issue's own shape: a typed folder name with a colon in it. The mac's publishing step read 'out 26' as another COMPUTER and said Published over an empty folder; the launcher now takes a partial path from the working folder, and the app refuses one outright, so the teacher sees why before anything runs."
+      },
+      {
+        "expectProblem" : "That isn’t a full folder location — use Choose… to pick the folder.",
+        "input" : "~/Sites",
+        "why" : "The app does not expand ~ - a shell does, and the app starts no shell for the folder - so this is a partial path like any other. Windows substitutes nothing; its own full-path test refuses it too."
+      },
+      {
+        "expectProblem" : null,
+        "input" : "  @FOLDER@  ",
+        "why" : "Spaces around a full path are trimmed before it is checked, and the launcher is handed the SAME trimmed path (deployArguments -> 'A local folder is handed over without the spaces around it'), so the folder checked is the folder published into."
       }
     ],
     "note" : "What a teacher is told about what they typed. Both apps ask the same questions and must give the same answers; the exact sentences are the product's, so they are asserted by equality rather than by 'contains'."
@@ -380,6 +487,24 @@
       {
         "cloudflareAccountID" : "",
         "configuration" : {
+          "course_code" : "SPH3U",
+          "deploy_folder_path" : "  /Users/teacher/Sites/sph3u  ",
+          "deploy_target" : "local_folder"
+        },
+        "course" : "SPH3U",
+        "expectArguments" : [
+          "SPH3U",
+          "1",
+          "--to-folder",
+          "/Users/teacher/Sites/sph3u"
+        ],
+        "name" : "A local folder is handed over without the spaces around it",
+        "section" : 1,
+        "why" : "GitHub issue #227. The folder is checked with the spaces around it trimmed (configurationRules.deployFolder), and the settings form saves what was typed, spaces and all. Handed over verbatim, a LEADING space makes the path a partial one to the launcher, which publishes into a folder inside the working folder, and a TRAILING space names a different folder altogether - either way, checked in one place and published into another."
+      },
+      {
+        "cloudflareAccountID" : "",
+        "configuration" : {
           "course_code" : "ICS3U"
         },
         "course" : "ICS3U",
@@ -454,6 +579,11 @@
         "why" : "The launcher's refusal, lifted out of the log and into the sentence the teacher reads. It matters most for a deploy set to happen on its own: that one runs with the app closed, and without this the app shows the generic 'did not finish' while the real reason sits in a file nobody opens. NO NEW EXIT CODE was added for it - deploy.sh states its own invariant, that exit 3 means 'a question nobody was there to answer' and nothing else, and every other exit is 0 or 1 - so this is matched on OUTPUT, which is how every other launcher failure already becomes a sentence. The line is LIFTED rather than rewritten: the launcher's output already is a sentence a teacher can act on, and a second explanation of one rule is how one rule comes to be said two ways."
       },
       {
+        "expect" : "Plantoir could not copy every page into your publishing folder, so it is not up to date. Try publishing again; if the same thing happens, one of your pages may not open or the folder may not be taking new files.",
+        "output" : "📦 Publishing ICS4U section 1 to a folder…\n❌ Not every page could be copied into the publishing folder, so it is not up to date.\n   Folder: /Users/teacher/Sites/ics4u/section1\n   (copy error 23)\nrsync(19876): error: ./stale/x.html: unlinkat: Permission denied\nrsync(19876): error: ./stale: unlinkat: Directory not empty",
+        "why" : "GitHub issue #227. deploy.sh used to throw the copy's exit status away and say Published over an empty or stale folder; it now fails, INCLUDING when the copy finished only in part (exit 23), because the page left behind may be one the teacher took down. Its line carries the copy's error number, which means nothing to a teacher, so it is matched on the launcher's own words and replaced. The output is the one measured from the real launcher with a stale folder --delete could not remove; scripts/test_deploy_folder_target.py checks that the launcher's cross line is still carried by exactly one case here, so rewording it cannot silently drop this sentence."
+      },
+      {
         "expect" : "Netlify is limiting how often websites can be deployed right now. Try deploying again in about a minute.",
         "output" : "Netlify API error 429: rate limited\nWindow resets at: 12:04 (in ~59s).",
         "why" : "Under 90 seconds reads as 'about a minute' rather than '1 minutes'."
@@ -497,6 +627,21 @@
         "expect" : "This section has no front page, so there is no website to publish. Put the front page back, then publish again.",
         "output" : "❌ Nothing to publish for ICS3U Section 1: it has no front page, so no website was produced.\nBuilt site not found at /courses/ICS3U/.merged_output/section1/public",
         "why" : "Order, pinned. A publish runs the build and then the deploy on ONE transcript, so a missing front page puts both lines in the output. The specific reason must win: \"hasn't been built yet\" is the wrong thing to say to somebody who has just watched it build."
+      },
+      {
+        "expect" : "The settings at the top of this section's front page could not be read, so there is no website to publish. Open the front page in Obsidian, fix its settings near line 3, then publish again.",
+        "output" : "❌ Nothing to publish for ICS3U Section 1: the settings at the top of its front page could not be read (near line 3), so the website was left without one.\n   Open the front page in Obsidian, fix those lines, then build again.",
+        "why" : "#246. A front page whose settings the build cannot read is HIDDEN, like every such page, so the section produces no website - but the page is THERE, so the missing front page's \"Put the front page back\" would send a teacher to restore a page they can see, and its repair would find the page and say it was already put right. The build says which it was in its own words, and the line the reader stopped near travels with it. The output is exactly what build_site._nothing_to_publish prints; scripts/test_unreadable_page_settings.py holds the two together."
+      },
+      {
+        "expect" : "The settings at the top of this section's front page could not be read, so there is no website to publish. Open the front page in Obsidian, fix its settings, then publish again.",
+        "output" : "❌ Nothing to publish for ICS3U Section 1: the settings at the top of its front page could not be read, so the website was left without one.\n   Open the front page in Obsidian, fix those lines, then build again.",
+        "why" : "The same, when the reader cannot say which line - a date that cannot be, a key that is a number, a date or yes/no. No line number is invented."
+      },
+      {
+        "expect" : "The settings at the top of this section's front page could not be read, so there is no website to publish. Open the front page in Obsidian, fix its settings near line 3, then publish again.",
+        "output" : "❌ Nothing to publish for ICS3U Section 1: the settings at the top of its front page could not be read (near line 3), so the website was left without one.\n   Open the front page in Obsidian, fix those lines, then build again.\nBuilt site not found at /courses/ICS3U/.merged_output/section1/public",
+        "why" : "Order, pinned, as for the missing front page: the deploy's line follows the build's on one transcript, and the build's reason must win."
       },
       {
         "expect" : "Part of this course folder is a link to another folder, and Windows won't let the website builder follow it. Replace the link with the real folder (the details above name which one), then try again.",
@@ -2246,6 +2391,123 @@
         "whyTheLauncherIsAsked" : "Measured 2026-09-25 (plan review): killing the host side of `docker exec` leaves the process running inside the workspace, parented to the engine's shim. That is how a preview is left behind when the app is force-quit, a Terminal window is closed or an assistant's client exits. Counted as an open preview it would refuse every remake of that folder for ever, with nothing a teacher could close; the stop rule's own sweep (section processes reclaimed) exists because this happens. The host launcher is matched on the two words after preview.sh — the course, in either case, and the section — because a command-line run names the launcher by a relative path; a --stop or --build-only run is not a preview; and this run, its ancestors and its descendants are left out (a login shell wrapping it carries the same words). A process table that cannot be read counts as the launcher running: a refused remake is recoverable, a killed preview is what #94 is."
       },
       "why" : "GitHub #94. Removing a workspace ends everything running inside it, and until this every one of those places stopped it without looking (setup.sh 8, preview.sh 5, deploy.sh 7, plus the three that retired the old shared workspace with -f). A preview open in one window died when another launcher in the same folder remade the workspace — after an update changed the recipe, once per folder for the builds mount, on a publish whose connection had gone stale — and a build or a publish half-way through was killed. The look is the app's own quit rule (documentation/09-mac-app.md: a workspace listing more than its first process is busy, and one that cannot be asked counts as busy), so the app and the launchers agree on what 'running' means. Measured on the development Mac 2026-09-25: an idle workspace lists exactly one process (tail -f /dev/null), `docker top` prints whole command lines, one look costs 23 ms, and a STOPPED workspace cannot be asked at all (exit 1) — hence 'stopped' is checked first. By id: two launchers started together can both find the old workspace idle, and a stop by NAME from the slower one would land on the new workspace the faster one has just made."
+    },
+    "whenThisMacCannotReachTheBuilder" : {
+      "attempts" : 20,
+      "attemptsWhenThisRunStartedTheBuilder" : 60,
+      "cases" : [
+        {
+          "outcome" : "announces",
+          "pauses" : 0,
+          "probes" : 1,
+          "refusedFirst" : 0,
+          "thenCurlExits" : 52,
+          "thisRunStartedTheBuilder" : false,
+          "why" : "A healthy Mac: the forward is there and nothing is served inside yet."
+        },
+        {
+          "outcome" : "announces",
+          "pauses" : 2,
+          "probes" : 3,
+          "refusedFirst" : 2,
+          "saysTries" : 3,
+          "thenCurlExits" : 52,
+          "thisRunStartedTheBuilder" : false,
+          "why" : "A forward that arrives late is waited for, and the console says how many tries it took."
+        },
+        {
+          "outcome" : "announces",
+          "pauses" : 0,
+          "probes" : 1,
+          "refusedFirst" : 0,
+          "thenCurlExits" : 0,
+          "thisRunStartedTheBuilder" : false,
+          "why" : "Something answered with a page: reachable."
+        },
+        {
+          "outcome" : "announces",
+          "pauses" : 0,
+          "probes" : 1,
+          "refusedFirst" : 0,
+          "thenCurlExits" : 28,
+          "thisRunStartedTheBuilder" : false,
+          "why" : "A connection that hangs is not a refusal. Fails open; the check after the build is the backstop."
+        },
+        {
+          "outcome" : "announces",
+          "pauses" : 0,
+          "probes" : 1,
+          "refusedFirst" : 0,
+          "thenCurlExits" : 127,
+          "thisRunStartedTheBuilder" : false,
+          "why" : "No curl on this Mac: the question cannot be put, so nothing is refused over it."
+        },
+        {
+          "outcome" : "announces",
+          "pauses" : 0,
+          "probes" : 1,
+          "refusedFirst" : 0,
+          "thenCurlExits" : 6,
+          "thisRunStartedTheBuilder" : false,
+          "why" : "Any other failure is not proof of a missing forward."
+        },
+        {
+          "outcome" : "refuses",
+          "pauses" : 19,
+          "probes" : 20,
+          "refusedFirst" : 20,
+          "thenCurlExits" : null,
+          "thisRunStartedTheBuilder" : false,
+          "why" : "The fault from #225: the builder is running and this Mac has no way through to it. Stopped in about ten seconds, before building."
+        },
+        {
+          "outcome" : "announces",
+          "pauses" : 20,
+          "probes" : 21,
+          "refusedFirst" : 20,
+          "saysTries" : 21,
+          "thenCurlExits" : 52,
+          "thisRunStartedTheBuilder" : true,
+          "why" : "A run that started the builder's virtual machine allows it longer to hand over its first address - the case nobody has timed."
+        },
+        {
+          "outcome" : "refuses",
+          "pauses" : 59,
+          "probes" : 60,
+          "refusedFirst" : 60,
+          "thenCurlExits" : null,
+          "thisRunStartedTheBuilder" : true,
+          "why" : "Even a newly started builder that never hands over an address is stopped, after about thirty seconds."
+        },
+        {
+          "buildOnly" : true,
+          "outcome" : "asksNothing",
+          "pauses" : 0,
+          "probes" : 0,
+          "refusedFirst" : 60,
+          "thenCurlExits" : null,
+          "thisRunStartedTheBuilder" : false,
+          "why" : "A build for publishing opens no preview, so it is never asked and never refused - a publish runs this first."
+        }
+      ],
+      "exitCode" : 1,
+      "measured" : "Development Mac (Apple silicon, Colima vz aarch64), 2026-09-25: a connection to a forwarded port with nothing serving inside answers curl exit 52 in 0.01-0.03 s; to a port nothing listens on, exit 7 in 0.01 s; lsof -iTCP:<port> -sTCP:LISTEN takes 0.228 s. All 48 host ports published by six running workspaces had a listener. #225's own numbers: the listener appears 0.10-0.24 s after the builder is created or started, 0.15 s under load. NOT measured: the first address after the builder's virtual machine starts cold - hence the longer bound when this run started it, and the console line that reports the tries a slow reach took.",
+      "pauseSeconds" : 0.5,
+      "probe" : "preview.sh only, after the address is known and BEFORE it is announced or anything is built: a connection to 127.0.0.1 at the announced HOST port (never the port inside the builder), made with curl's own settings file ignored (-q, first) and no proxy (--noproxy '*'), at most one second each (--max-time 1). Only 'connection refused' (curl exit 7) counts as the builder being out of reach; every other answer - 0, an empty reply (52, what a healthy Mac gives, since nothing is served yet), a timeout (28), no curl at all (127), anything - goes ahead exactly as before. A build for publishing (--build-only) announces nothing and asks nothing. A run that needed more than one try prints reachedAfterRetrying in the console (not on the trail).",
+      "reachedAfterRetrying" : "Reaching your website builder took {tries} tries.",
+      "rejected" : [
+        "lsof as the probe: ten times slower, and run as the teacher it sees only the teacher's own programs - a listener owned by root (:88, kdc) is invisible to lsof and answers curl, so a forwarder owned by anybody else would read as missing and refuse a healthy Mac.",
+        "A check in setup.sh, at the builder's creation: it would not have fired on the night (all three previews met a builder that was already running), and setup is exactly the cold start nobody has timed.",
+        "A single probe: the cold start is unmeasured, so one refusal is not proof.",
+        "Asking inside the builder first: before the build nothing is served inside, so it proves nothing; that question stays whenThePreviewNeverAppears', after the build.",
+        "Checking the live-reload port as well: a Mac that refuses new forwards refuses both, and stopping a preview over live-reload alone would be a heavier answer than the fault.",
+        "Skipping the check when this run started the builder: the fault is an old virtual machine refusing new forwards, but one broken from birth would then build for minutes first; the longer bound catches both."
+      ],
+      "sentence" : [
+        "This Mac cannot reach your website builder, so Plantoir stopped before building the preview.",
+        "Nothing is wrong with your pages. Restarting your Mac puts it right."
+      ],
+      "why" : "GitHub #234, split out of #225. On 2026-09-19 a Mac whose builder had stopped handing new addresses through to it (the forward command failed with exit 255; only a restart cured it) built a preview for about two minutes (109 s measured), and the app then waited 45 s more before whenThePreviewNeverAppears said this Mac could not reach it. Asked before the build, the same fault is found in about ten seconds with nothing built. The sentence reuses the vocabulary of whenThePreviewNeverAppears' thisMacCannotReachIt, because it is the same fault found earlier and the remedy is the same one watched working. Written on the trail as a launcher line of the existing 'preview did not appear' event (shared-rules.json -> activityTrail.mustRecord, launcherLineWhenThisMacCannotReachTheBuilder), not as a new event. No failureExplanations case and no app alert: the launcher's own sentence is what a teacher reads, as for whenNoBlockIsFree. Windows' preview.ps1 serves on the PC itself, with no forward to lose, so these cases describe the mac launcher only. No machinery words (rule 1)."
     },
     "why" : "Quartz's live-reload websocket needs its own port (--wsPort = port + 1000). Without it, two previews collide on the websocket even when their site ports differ — which looks like one preview randomly failing to refresh rather than like a port clash."
   },

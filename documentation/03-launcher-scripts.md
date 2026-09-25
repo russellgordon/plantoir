@@ -79,7 +79,10 @@ and a terminal teacher should open. It asks the container for that mapping
 twice, and if both answers are empty it says it could not find out where the
 preview will be and stops before building (exit 1) — since #235 it never
 announces the container's own port in its place, which is right only for the
-first folder on a Mac. `--build-only` asks nothing and is never stopped there,
+first folder on a Mac. Since #234 it then connects to that address before
+building, and stops in about ten seconds if this Mac cannot reach it (see
+"Before building, preview.sh makes sure this Mac can reach the builder"
+below). `--build-only` asks neither question and is never stopped there,
 so a publish is unaffected. The old shared `teaching-quartz`
 container is retired automatically the first time a per-folder container is
 created. The macOS app stops a folder's container (a fast `docker stop`,
@@ -414,17 +417,39 @@ command line. The bash launchers:
    6 CPUs and 12 GB. Deliberately not the whole machine: the teacher is using
    it while a site builds.
    What it prints differs by path: a VM being created for the first time
-   prints "🚀 First start: building the virtual machine…", an existing one
+   prints "🚀 First start: setting up your website builder…" (before GitHub
+   #263, "building the virtual machine…" with its disk image), an existing one
    "▶️  Starting the website builder…" (before 2026-09-23, "Starting Colima…";
-   GitHub #228). The app's `ScriptRunner.friendlyPhase` labels only the SECOND
+   GitHub #228). The downloads in step 2 print "📦 Downloading what your
+   website builder needs (N of 4)…", where N is the TOOL's fixed number —
+   Lima 1, Colima 2, the Docker CLI 3, buildx 4 — not a running count, so a
+   Mac missing only buildx reads "(4 of 4)"; it said "Getting the container
+   runtime…" and the like until #263. The app's `ScriptRunner.friendlyPhase` labels only the SECOND
    "Starting up (first time can take a few minutes)…", so that label shows on
    exactly the start that is not the first. Known and left alone: it is shown
    only when a runner has no milestones, which no launcher run lacks.
-4. Poll `docker info` for up to a minute. If the VM claims to be running but
+4. Poll `docker info` for at least a minute — 30 tries, two seconds apart,
+   each try also waiting for `docker info` itself ("⏳ Waiting for the website
+   builder to be ready…" — `friendlyPhase`'s "Starting up…" marker, which
+   moved with the text in #263). If the VM claims to be running but
    the daemon never answers (a known Colima state after the Mac sleeps or
    shuts down uncleanly, where a plain `colima start` no-ops), force a clean
-   `colima stop --force && colima start` cycle and wait again before giving
-   up with manual-recovery instructions.
+   `colima stop --force && colima start` cycle ("🔁 The website builder isn't
+   answering yet — restarting it…") and wait at least two minutes more (60 tries) before
+   giving up with "❌ The website builder did not start." and "Restart this
+   Mac, then try again." The by-hand recovery a developer would use —
+   `colima stop --force && colima start`, then re-run the launcher — is a
+   COMMENT beside that line since #263, not output: a teacher cannot act on a
+   `colima` command, and a restart is what cleared the wedged builder in
+   GitHub #225.
+
+   Every line this step and steps 2–3 print — the whole block from
+   `_download()` to the bare `ensure_container_runtime` call, byte-identical
+   in `setup.sh`, `preview.sh` and `deploy.sh` — is pinned by
+   `AppRulesContractTests.testTheFirstRunLinesNameNoMachinery`: no Colima,
+   Lima, Docker, buildx, container, image, script or toolchain on a printed
+   line, and the three copies still identical. The rest of each launcher still
+   names the machinery in places; that is its own follow-up issue.
 
 One consequence worth knowing: Colima's VM mounts the teacher's home
 directory by default, so the working folder containing `courses/` must live
@@ -439,6 +464,17 @@ when needed but never shut it down, and the only disruptive action — the
 force-restart in step 4 — happens exclusively when the Docker daemon is
 already dead, i.e. when no Colima-based tool is functional anyway
 (containers with restart policies come back automatically afterwards).
+Until GitHub #263 the launchers PRINTED that last point — "(Colima is shared
+by any other Colima-based toolchains on this Mac; their containers restart
+automatically afterwards if configured to.)" — beside the restart. It is a
+comment now, and that is a trade-off, not a free improvement: the one reader
+the printed note served was a DEVELOPER at the command line whose other
+Colima containers (a Supabase stack, say) the force-cycle was about to take
+down, and a comment is invisible at run time. It went because the console
+is read by teachers, who have nothing else using Colima and for whom every
+word of it was machinery (`CLAUDE.md` rule 1). Do not restore it as output
+without a way to print it only to a developer.
+
 Whichever toolchain creates the VM first determines its CPU/RAM size, so the
 launchers may find a VM somebody else built. `_colima_growth_flags` handles
 that under two rules: it only ever asks for MORE (a VM another toolchain
@@ -842,8 +878,9 @@ untouched; then ends both and lets the section's own remake go ahead.
 - A preview started through the assistant over MCP may meet its client's own
   tool timeout during a ten-minute wait for a build.
 - Work that hangs inside the workspace costs a ten-minute wait and a refusal,
-  every time, until the workspace is stopped (quitting Plantoir, or a
-  restart).
+  every time, until this Mac is restarted. Quitting Plantoir does NOT clear
+  it: the quit path stops a workspace only when it is idle, and one with hung
+  work in it counts as busy and is left running (documentation/09-mac-app.md).
 
 **What was rejected, and why:**
 
@@ -1096,6 +1133,108 @@ nobody can ever close. The one thing that side does owe is the new
   websocket on port + 1000 (`--wsPort`) — the reason the container
   publishes both ranges. The reachable HOST address is the folder's
   probed block; `preview.sh` prints it.
+
+#### Before building, preview.sh makes sure this Mac can reach the builder (#234)
+
+Between finding the address and announcing it, `preview.sh`
+(`announce_the_preview_address` → `this_mac_can_reach_the_builder`) opens a
+connection to `127.0.0.1:<the announced HOST port>` —
+`curl -q -s -o /dev/null --noproxy '*' --max-time 1`. Nothing is served inside
+the builder yet, so a healthy Mac answers with an empty reply (curl exit 52)
+and the preview goes on exactly as before. **Only a refused connection (exit
+7) on every try stops it**: 20 tries 0.5 s apart, about ten seconds, or 60
+tries (about thirty) when THIS run started the builder's virtual machine. It
+then prints `previewPorts.whenThisMacCannotReachTheBuilder.sentence`, writes
+`launcherLineWhenThisMacCannotReachTheBuilder` on the trail under the existing
+"preview did not appear" event, and exits 1 before building. The numbers and
+ten cases are in `contracts/app-rules.json` →
+`previewPorts.whenThisMacCannotReachTheBuilder`; `scripts/test_preview_reach.py`
+runs every case against the launcher's own functions, with docker, curl and
+sleep stubbed.
+
+**Why.** The fault is #225's (see `09-mac-app.md` → "A preview that never
+appears"): a Mac whose builder has stopped handing NEW addresses through
+(`ssh … -O forward` exit 255, fixed only by a restart) built a preview for
+about two minutes (109 s on the Mac that met it) and the app then waited 45 s
+more before its alert. Asked before the build, the same fault is found in
+about ten seconds with nothing built. The app needed no change: an exit 1 with
+no address announced is #235's shape, so the run ends with the launcher's
+sentence in the window and `PreviewReachability` never starts a wait.
+
+**It fails OPEN, deliberately.** Every answer but 7 goes ahead — a page (0), an
+empty reply (52), a timeout (28), no curl at all (127), anything —
+because none of them proves the forward is missing, and #225's check after the
+build is still there behind it. A listener that is NOT the forwarder (another
+program took the port after the workspace was made) also goes ahead; **do not
+tighten this to require a real page**: nothing is served before the build, so
+that would refuse every healthy Mac.
+
+**Why a connection and not `lsof`.** Measured on the development Mac
+(Apple silicon, Colima vz aarch64, 2026-09-25): curl to a forwarded port with
+nothing inside answers 52 in 0.01–0.03 s; to a port nothing listens on, 7 in
+0.01 s; `lsof -iTCP:<port> -sTCP:LISTEN` takes 0.228 s. Worse, `lsof` run as
+the teacher sees only the teacher's own programs: a root-owned listener (:88,
+`kdc`) is invisible to it and answers curl. A forwarder owned by anybody else
+would read as missing and refuse a healthy Mac. All 48 host ports published by
+six running workspaces had a listener. `-q` comes first so the teacher's
+`~/.curlrc` is never read, and `--noproxy '*'` so a proxy setting cannot
+answer for this Mac.
+
+**The retry is a bounded re-asking of the real question, not a settle-delay.**
+A healthy Mac answers on the first try; #225 measured the listener appearing
+0.10–0.24 s after the builder is created or started (0.15 s under load). The
+bound is for the one case **nobody has measured: the first address after the
+builder's virtual machine starts cold.** That is not rare — since #220,
+quitting Plantoir stops the VM when nothing else uses it, so it is the first
+preview of most days — which is why a run that started the VM
+(`ensure_container_runtime` sets `THIS_RUN_STARTED_THE_BUILDER` on every
+path past its "already running" return) allows 60 tries. The assignment, and
+the `""` before the call, are in all THREE launchers' copies, although only
+`preview.sh` reads the flag: the first-run code from `_download()` to the
+`ensure_container_runtime` call is one text in all three, and #263's test
+holds it identical — a line in one copy only would turn that red. Measuring it would have meant a throwaway second Colima
+profile on Russell's Mac; the director ruled that out, so the number stays
+unmeasured. Instead, **a run that needed more than one try says so in the
+console** (`reachedAfterRetrying`, "…took N tries"), so the next transcript a
+teacher sends carries the figure the bound rests on.
+
+**No gate exercises the probe against a real forward.** Every `preview.sh`
+that `verify.sh` runs is `--build-only` (or `--stop`), and `--build-only`
+returns before the question is asked; `scripts/test_preview_reach.py` stubs
+curl. A serving preview was checked by hand in the implementation review
+(2026-09-25): `./preview.sh EXC2O 1 --image quartz-teacher:dev-test
+--non-interactive` against a real Colima forward announced
+`http://localhost:8241/` on the first try, with no "took N tries" line. Five
+real Colima forwards with nothing inside answered curl 52 in 0.031–0.035 s;
+a listener that accepts and closes answers 56, one that never answers 28 —
+both go ahead.
+
+**Rejected:**
+- *`lsof` as the probe* — above: slower, and blind to listeners the teacher
+  does not own.
+- *A check in `setup.sh`, at the builder's creation* (the issue title's literal
+  reading) — it would not have fired on the night: all three previews met a
+  builder that was already running, and `run_container_with_mount()` is reached
+  only on create or recreate. Setup is also exactly the unmeasured cold start.
+- *One probe* — the cold start is unmeasured, so one refusal is not proof.
+- *Skipping the check when this run started the VM* (the fault is an OLD VM
+  refusing NEW forwards) — a VM broken from birth would then build for minutes
+  first; the longer bound covers both.
+- *Asking inside the builder first* — before the build nothing is served
+  there, so it proves nothing; that stays #225's question, after the build.
+- *Checking the live-reload port (+1000) too* — a Mac that refuses new forwards
+  refuses both, and stopping a preview over live-reload alone is a heavier
+  answer than the fault.
+- *A `failureExplanations` case or an app alert* — as for #280's
+  `whenNoBlockIsFree`, the launcher's own sentence is what a teacher reads, and
+  a case would turn Windows' suite red for a failure its app cannot produce.
+- *Putting it in the shared PREVIEW PORT BLOCK* — only `preview.sh` announces
+  an address; the block is left byte-identical across the three launchers.
+
+**Windows** has nothing to mirror: `preview.ps1` serves on the PC itself, so
+there is no forward to lose. If a preview there ever sits behind a forward
+(WSL2's relay has the same failure class), probe with a CONNECTION, not a
+listener list.
 
 ### `deploy.sh`
 
@@ -1386,8 +1525,11 @@ deployed"; three things belong here, beside the launchers themselves:
 
 - **It is in the launcher because the FOLDER destination never reaches the
   container.** That branch copies with `rsync` on the host and exits 0 before
-  `deploy.py` is entered, so a refusal written only in the shared Python would
-  not run on it. Measured with the guard removed: the launcher published the
+  `deploy.py` is entered — or, since #227, exits 1 when the copy did not
+  finish, and makes a relative `--to-folder` a full path from the working
+  folder first (see [`07-deployment.md`](07-deployment.md) → "A relative
+  folder, and a copy that did not finish") — so a refusal written only in the
+  shared Python would not run on it. Measured with the guard removed: the launcher published the
   frozen course and reported `✅ Published: 1 file(s) updated.`
 - **Plain shell, not `python3`.** Nothing on that path needs a host
   interpreter today, and the launchers' whole first-run promise is that a

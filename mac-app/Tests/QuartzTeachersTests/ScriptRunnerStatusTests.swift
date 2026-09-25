@@ -32,6 +32,16 @@ final class ScriptRunnerStatusTests: XCTestCase {
         XCTAssertEqual(runner.friendlyPhase, "Starting up (first time can take a few minutes)…")
     }
 
+    /// The wait that follows a start: until GitHub #263 the launchers said
+    /// "Waiting for the container runtime", and the marker moved with them.
+    @MainActor
+    func testWaitingForTheWebsiteBuilderIsAPhase() {
+        let runner: ScriptRunner = ScriptRunner()
+        runner.receiveOutput( "▶️  Starting the website builder…\n")
+        runner.receiveOutput( "⏳ Waiting for the website builder to be ready…\n")
+        XCTAssertEqual(runner.friendlyPhase, "Starting up…")
+    }
+
     @MainActor
     func testDefaultPhaseIsWorking() {
         let runner: ScriptRunner = ScriptRunner()

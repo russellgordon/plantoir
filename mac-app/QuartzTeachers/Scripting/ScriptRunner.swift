@@ -737,15 +737,10 @@ class ScriptRunner {
                 continue
             }
             healthFindings.append(finding)
-            // A sentence a teacher would recognise, carrying the stable check
-            // NAME in brackets. Both halves earn their place: rule 5 says a
-            // trail line must read as something that happened rather than as a
-            // function name, while the name is what somebody reading the trail
-            // months later can match against the contract — the product
-            // wording will have been reworded by then.
+            // The sentence and why it is shaped so: `trailSentence`, which the
+            // scheduled run writes too.
             ActivityTrail.note(
-                .folderProblemFound,
-                "found a problem with this course's folders (\(finding.name))",
+                .folderProblemFound, finding.trailSentence,
                 course: finding.course, section: finding.section
             )
         }
@@ -889,7 +884,17 @@ class ScriptRunner {
     }
 
     /// Prompt shapes the toolchain's scripts actually use.
+    ///
+    /// Never a marker line (#153): half a health payload cut after
+    /// `"sentence":` ends in a colon, and would otherwise be offered to the
+    /// teacher as something to answer, raw JSON and all.
     static func looksLikeQuestion(_ line: String) -> Bool {
+        if SiteHealthFinding.isMarkerLine(line) || PagesDatedByTheBuild.isMarkerLine(line) {
+            return false
+        }
+        if WorkspaceInUseReport.isMarkerLine(line) {
+            return false
+        }
         if line.hasSuffix(":") || line.hasSuffix("?") || line.hasSuffix(">") {
             return true
         }
@@ -1236,7 +1241,9 @@ class ScriptRunner {
             // The launchers print "▶️  Starting the website builder…" here;
             // it said "Starting Colima…" until 2026-09-23 (GitHub #228).
             ("Starting the website builder", "Starting up (first time can take a few minutes)…"),
-            ("Waiting for the container runtime", "Starting up…"),
+            // "⏳ Waiting for the website builder to be ready…"; it said
+            // "Waiting for the container runtime…" until GitHub #263.
+            ("Waiting for the website builder", "Starting up…"),
             ("delta deploy", "Deploying your site…"),
             ("Uploaded", "Deploying your site…"),
             ("Deploying", "Deploying your site…"),

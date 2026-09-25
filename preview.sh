@@ -393,13 +393,21 @@ ensure_build_root() {
 # The app trims the file when it grows; nothing here needs to. Carries a
 # course code and nothing else — never a path, never a credential.
 #
-# One line can be lost: the app rewrites the whole file when it adds a line of
-# its own, so an append landing between its read and its write disappears.
-# That is one line, once, and worth less than the locking it would take.
+# The append waits for the lock the app holds on the Logs FOLDER while it
+# trims the file (GitHub #238), so a line added here can never land in the
+# instant the app replaces the file with a shorter copy and vanish with the old
+# one. `lockf -k` on the folder takes the same lock the app's `flock` does and
+# creates no file. Where there is no lockf, or the volume refuses locks, the
+# line is appended unlocked rather than dropped.
 note_on_the_trail() {
   local trail="${HOME%/}/Library/Logs/Plantoir"
   mkdir -p "$trail" 2>/dev/null || return 0
-  printf '%s · %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" >> "$trail/activity.txt" 2>/dev/null || true
+  local trail_line
+  trail_line="$(date '+%Y-%m-%d %H:%M:%S') · $1"
+  if [ -x /usr/bin/lockf ] && /usr/bin/lockf -k "$trail" /bin/sh -c 'printf "%s\n" "$1" >> "$2/activity.txt"' note "$trail_line" "$trail" 2>/dev/null; then
+    return 0
+  fi
+  printf '%s\n' "$trail_line" >> "$trail/activity.txt" 2>/dev/null || true
 }
 
 # Points courses/<CODE>/.merged_output at this course's folder under
@@ -762,7 +770,7 @@ _colima_growth_flags() {
 
 _download() {
   local url="$1" destination="$2" label="$3"
-  echo "📦 Getting ${label}…"
+  echo "📦 Downloading ${label}…"
   if ! curl -fsSL --retry 3 -o "$destination" "$url"; then
     echo "❌ Could not download ${label}."
     echo "   An internet connection is needed for this one-time setup."
@@ -782,19 +790,19 @@ ensure_local_tools() {
 
   if ! command -v limactl >/dev/null 2>&1; then
     local lima_tgz="$TOOLS_DIR/lima.tar.gz"
-    _download "https://github.com/lima-vm/lima/releases/download/v${LIMA_VERSION}/lima-${LIMA_VERSION}-Darwin-${lima_arch}.tar.gz" "$lima_tgz" "the virtual machine manager"
+    _download "https://github.com/lima-vm/lima/releases/download/v${LIMA_VERSION}/lima-${LIMA_VERSION}-Darwin-${lima_arch}.tar.gz" "$lima_tgz" "what your website builder needs (1 of 4)"
     tar xzf "$lima_tgz" -C "$TOOLS_DIR"
     rm -f "$lima_tgz"
   fi
 
   if ! command -v colima >/dev/null 2>&1; then
-    _download "https://github.com/abiosoft/colima/releases/download/${COLIMA_VERSION}/colima-Darwin-${arch}" "$TOOLS_DIR/bin/colima" "the container runtime"
+    _download "https://github.com/abiosoft/colima/releases/download/${COLIMA_VERSION}/colima-Darwin-${arch}" "$TOOLS_DIR/bin/colima" "what your website builder needs (2 of 4)"
     chmod +x "$TOOLS_DIR/bin/colima"
   fi
 
   if ! command -v docker >/dev/null 2>&1; then
     local docker_tgz="$TOOLS_DIR/docker.tar.gz"
-    _download "https://download.docker.com/mac/static/stable/${docker_arch}/docker-${DOCKER_CLI_VERSION}.tgz" "$docker_tgz" "the container tools"
+    _download "https://download.docker.com/mac/static/stable/${docker_arch}/docker-${DOCKER_CLI_VERSION}.tgz" "$docker_tgz" "what your website builder needs (3 of 4)"
     tar xzf "$docker_tgz" -C "$TOOLS_DIR"
     mv -f "$TOOLS_DIR/docker/docker" "$TOOLS_DIR/bin/docker"
     rm -rf "$TOOLS_DIR/docker" "$docker_tgz"
@@ -813,7 +821,7 @@ ensure_buildx() {
   arch="$(uname -m)"
   if [[ "$arch" == "arm64" ]]; then buildx_arch="arm64"; else buildx_arch="amd64"; fi
   mkdir -p "$HOME/.docker/cli-plugins"
-  _download "https://github.com/docker/buildx/releases/download/${BUILDX_VERSION}/buildx-${BUILDX_VERSION}.darwin-${buildx_arch}" "$HOME/.docker/cli-plugins/docker-buildx" "the image builder"
+  _download "https://github.com/docker/buildx/releases/download/${BUILDX_VERSION}/buildx-${BUILDX_VERSION}.darwin-${buildx_arch}" "$HOME/.docker/cli-plugins/docker-buildx" "what your website builder needs (4 of 4)"
   chmod +x "$HOME/.docker/cli-plugins/docker-buildx"
 }
 
@@ -825,6 +833,11 @@ ensure_container_runtime() {
     return 0
   fi
 
+  # Set when this run starts the builder's virtual machine; preview.sh's
+  # reach check reads it (GitHub #234). The same line is in all three
+  # launchers so that their copies of this function stay identical.
+  THIS_RUN_STARTED_THE_BUILDER=1
+
   # "Setting up this Mac" is a progress marker the app matches word for word
   # (contracts/app-rules.json → milestones); keep those four words. It is not
   # "a one-time step": quitting Plantoir stops this machinery when nothing else
@@ -833,8 +846,10 @@ ensure_container_runtime() {
   ensure_local_tools
 
   if [[ ! -d "$HOME/.colima/default" ]]; then
-    echo "🚀 First start: building the virtual machine ($(_colima_cpus) CPUs · $(_colima_memory_gb) GB RAM)."
-    echo "   Its disk image (~600 MB) is downloaded once; this can take several minutes."
+    # What is being set up here is Colima's Linux virtual machine; the
+    # teacher is told only what it is FOR (GitHub #263, rule 1).
+    echo "🚀 First start: setting up your website builder ($(_colima_cpus) CPUs · $(_colima_memory_gb) GB of memory)."
+    echo "   About 600 MB is downloaded once; this can take several minutes."
     # vz is macOS's own virtualization — no extra software needed, unlike
     # the qemu default.
     colima start --cpu "$(_colima_cpus)" --memory "$(_colima_memory_gb)" --vm-type vz
@@ -845,24 +860,35 @@ ensure_container_runtime() {
     colima start $(_colima_growth_flags)
   fi
 
-  echo "⏳ Waiting for the container runtime to be ready…"
+  # The app's friendlyPhase matches "Waiting for the website builder" (#263).
+  echo "⏳ Waiting for the website builder to be ready…"
   _wait_for_docker 30 && return 0
 
   # Colima can report the VM as running while its Docker daemon is dead
   # (common after sleep or an unclean shutdown); a plain start no-ops in
   # that state. Force a clean restart and wait again.
-  echo "🔁 Docker isn't responding yet — restarting Colima…"
-  echo "   (Colima is shared by any other Colima-based toolchains on this Mac;"
-  echo "    their containers restart automatically afterwards if configured to.)"
+  #
+  # For a developer: Colima is shared by any other Colima-based toolchains on
+  # this Mac, so this restart takes their containers down too; they come back
+  # afterwards only if configured to. This used to be printed; since #263 the
+  # console speaks to a teacher, who has nothing else using it
+  # (documentation/03-launcher-scripts.md).
+  echo "🔁 The website builder isn't answering yet — restarting it…"
   colima stop --force >/dev/null 2>&1 || true
   colima start >/dev/null 2>&1 || true
   _wait_for_docker 60 && return 0
 
-  echo "❌ Colima did not become ready."
-  echo "   Try running 'colima stop --force && colima start' by hand, then re-run this script."
+  # For a developer, the by-hand recovery is
+  #   colima stop --force && colima start
+  # then re-run this launcher. A teacher is told to restart, which is what
+  # cleared the wedged builder in #225.
+  echo "❌ The website builder did not start."
+  echo "   Restart this Mac, then try again."
   exit 1
 }
 
+# Set by ensure_container_runtime when this run starts the builder (#234).
+THIS_RUN_STARTED_THE_BUILDER=""
 ensure_container_runtime
 CURRENT_CONTEXT=$(docker context show 2>/dev/null || echo "unknown")
 HOST_ARCH=$(docker info --format '{{.Architecture}}' 2>/dev/null || echo "unknown")
@@ -1726,6 +1752,70 @@ say_the_preview_address_is_unknown() {
   echo "   before building it. Nothing has been lost — try the preview again."
 }
 
+# Before building, make sure this Mac can reach the address it is about to
+# announce (GitHub #234). The fault this catches was met on 2026-09-19
+# (#225): a Mac whose builder had stopped handing NEW addresses through to
+# the Mac — fixed only by restarting it — built a preview for about two
+# minutes, and the app then waited 45 seconds more before saying the Mac could
+# not reach it. Here it is found in about ten seconds, before anything is
+# built. documentation/03-launcher-scripts.md -> "Before building, preview.sh
+# makes sure this Mac can reach the builder" has the measurements and the
+# designs rejected.
+#
+# The question is a CONNECTION to the announced port, not a listing of
+# listening ports: `lsof` run as the teacher sees only the teacher's own
+# programs, so a forwarder owned by anybody else would read as missing
+# (measured: a root-owned listener on :88 is invisible to lsof and answers
+# curl). Nothing is served inside yet, so a healthy Mac answers with an empty
+# reply (curl exit 52) in about 0.02 s; a Mac with no forward refuses the
+# connection (exit 7). ONLY a refusal counts as absent — every other answer,
+# including no curl at all, goes ahead exactly as before, and #225's check
+# after the build stays the backstop. A listener that is NOT the forwarder
+# (another program took the port) also goes ahead; do not tighten this to
+# require a real page, since nothing is being served yet.
+#
+# The retry is a bounded, deliberately paced re-asking of the real question,
+# not a wait for something to settle: a healthy Mac answers on the first try,
+# and the bound exists for the first address after the builder's virtual
+# machine starts, which nobody has timed. That start is the first preview of
+# most days (quitting Plantoir stops it when nothing else uses it), so a run
+# that started it allows three times as long — and a run that needed more than
+# one try says so, so the number that bound rests on arrives with the next
+# report. The numbers are pinned in contracts/app-rules.json ->
+# previewPorts.whenThisMacCannotReachTheBuilder.
+PREVIEW_REACH_ATTEMPTS=20
+PREVIEW_REACH_ATTEMPTS_WHEN_THIS_RUN_STARTED_THE_BUILDER=60
+PREVIEW_REACH_PAUSE_SECONDS=0.5
+this_mac_can_reach_the_builder() {
+  local port="$1"
+  local attempts="$PREVIEW_REACH_ATTEMPTS"
+  if [[ -n "${THIS_RUN_STARTED_THE_BUILDER:-}" ]]; then
+    attempts="$PREVIEW_REACH_ATTEMPTS_WHEN_THIS_RUN_STARTED_THE_BUILDER"
+  fi
+  local attempt=1
+  local answer
+  while [ "$attempt" -le "$attempts" ]; do
+    answer=0
+    curl -q -s -o /dev/null --noproxy '*' --max-time 1 "http://127.0.0.1:${port}/" || answer=$?
+    if [ "$answer" -ne 7 ]; then
+      if [ "$attempt" -gt 1 ]; then
+        echo "   Reaching your website builder took ${attempt} tries."
+      fi
+      return 0
+    fi
+    attempt=$((attempt + 1))
+    if [ "$attempt" -le "$attempts" ]; then
+      sleep "$PREVIEW_REACH_PAUSE_SECONDS"
+    fi
+  done
+  return 1
+}
+
+say_this_mac_cannot_reach_the_builder() {
+  echo "❌ This Mac cannot reach your website builder, so Plantoir stopped before building the preview."
+  echo "   Nothing is wrong with your pages. Restarting your Mac puts it right."
+}
+
 announce_the_preview_address() {
   if [[ -n "$BUILD_ONLY" ]]; then
     return 0
@@ -1741,6 +1831,13 @@ announce_the_preview_address() {
     # the reason is in a transcript nobody opens. The words are pinned —
     # contracts/shared-rules.json -> activityTrail.mustRecord."preview did not appear".launcherLine
     note_on_the_trail "${COURSE}/${SECTION} · the preview stopped before building — Plantoir could not find out where it would be"
+    return 1
+  fi
+  if ! this_mac_can_reach_the_builder "$host_port"; then
+    say_this_mac_cannot_reach_the_builder
+    # Rule 5, words pinned in contracts/shared-rules.json ->
+    # activityTrail.mustRecord."preview did not appear".launcherLineWhenThisMacCannotReachTheBuilder
+    note_on_the_trail "${COURSE}/${SECTION} · the preview stopped before building — this Mac could not reach the website builder"
     return 1
   fi
   echo "🌐 Preview will be available at: http://localhost:${host_port}/"

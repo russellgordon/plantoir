@@ -116,7 +116,7 @@
         "why": "The assistant's whole reply was the teacher's own sentence, handed back. Measured on 2026-09-19 (issue #215): \"hide unit 4, day 20\" came back word for word, date line and all, with no tool chosen - and that echo was then kept in the conversation, so the model copied the pattern it could see and the NEXT request echoed too, including one the same model answers correctly every time in a fresh window. One unrecognised phrase made the window useless until it was closed and reopened. The app now refuses that turn, says so plainly, and winds the turn back out of the conversation - and this line is what says it happened: a teacher's side of it is the assistant saying it did not follow, which is indistinguishable from an ordinary misroute, so a report of \"it stopped understanding me\" would otherwise have nothing to look at. Separate from 'assistant answer was cut off', whose NAME would be false here - that answer never finished and this one did - and a line describing something other than what happened is worse than no line, because it will be believed. Separate from 'assistant could not answer', which is for an engine that FAILED; here the engine answered perfectly and the app refused the answer. The WIND-BACK is as much of the fact as the refusal: the conversation after this turn is not the one before it, and nothing else on the trail would say so."
       },
       {
-        "carries": "this window's course and section, the course the model named instead - AS THE MODEL SPELT IT - and the tool it had chosen. Never the teacher's sentence and never the argument values, which are their page titles.",
+        "carries": "this window's course and section, the course the model named instead - AS THE MODEL SPELT IT - and the tool it had chosen. Never the teacher's sentence and never the argument values, which are their page titles. Since issue #167 the same event is written, with no model involved, when a 'what does <page> link to?' question matched in code names another course ('... in SPH3U section 1 link to?' in an ICS3U window): the line then carries both codes - the other one as the TEACHER typed it - and says it was matched in code, not sent to the model, and that nothing was read (AssistAgent.linksQuestionNamedAnotherCourseLine). Never the page title.",
         "event": "assistant was asked about another course",
         "why": "An assistant window is opened for one section of one course. The SECTION is simply taken back from whatever the model answered, but the COURSE is not: taking it back too means 'publish MCV4U's class', typed in an ICS3U window, quietly succeeding on ICS3U - a failure that reports success, which is the one kind a teacher cannot catch. So the turn is refused and nothing runs, and this line is what says so. The pair of course codes IS the evidence: a teacher's side of this is the assistant declining something they thought they had asked plainly, which is indistinguishable from a misroute, and only the pair tells the guard doing its job apart from a model slip being refused at the teacher's expense. Any differing code is refused, including one naming no course in the folder - binding a typo to this window is the very fault being fixed - and the teacher is told which of the two happened, because one of them can be opened in the sidebar and the other cannot. Separate from 'assistant chose a tool', which carries argument NAMES and never values, so it cannot say WHICH course was named; and from 'assistant answer was cut off', where the answer never finished. Here the answer was perfect and the app refused it. One deliberate divergence, and it is a rule rather than an oversight: the SENTENCE a teacher reads names the other course the way the working folder spells it (a teacher told to open 'mcv4u' is sent looking for something their sidebar does not show), while this LINE keeps the spelling the model actually wrote. The trail is evidence about the MODEL, so a code it spelt oddly is worth keeping as it spelt it; normalising the line would throw away the only record that it did."
       },
@@ -188,7 +188,7 @@
       {
         "carries": "which course and section, and a sentence naming what happened with the stable check NAME in brackets — 'found a problem with this course’s folders (curriculumCoverageFoundNothing)'. Never the product wording, which changes, and never anything written on a page",
         "event": "folder problem found",
-        "why": "A teacher who reports 'it stopped showing my curriculum map last month' leaves nothing to look at otherwise: the finding is printed into a build console that is gone by then, and the condition itself is invisible on disk — a renamed folder looks exactly like a folder that was always called that. Recording the check NAME rather than the sentence is deliberate: the sentence is product wording and will be reworded, while the name is what a person searching the trail six months later can match against the contract."
+        "why": "A teacher who reports 'it stopped showing my curriculum map last month' leaves nothing to look at otherwise: the finding is printed into a build console that is gone by then, and the condition itself is invisible on disk — a renamed folder looks exactly like a folder that was always called that. Recording the check NAME rather than the sentence is deliberate: the sentence is product wording and will be reworded, while the name is what a person searching the trail six months later can match against the contract. A scheduled publish's findings are recorded too, dated to the RUN rather than to when somebody next opened the section - or a problem found at half six is filed under the morning somebody looked, and a teacher who never opens that section gets no line at all (the reasoning of scheduledPublishStopped.trail; #153). Who writes it is platform-local: the mac's scheduled run is Plantoir itself and writes the line at the end of the run, from its own log; Windows writes it when the app reads the run's record, dated to that record's write time. Since #246 it also covers a PAGE whose settings the build could not read (pageSettingsUnreadable), not only a folder: the name is kept because the event is the site-health family and renaming it would cost both platforms, and the line still carries the check's name only - never which pages, which are the teacher's own names."
       },
       {
         "carries": "which section, and which destinations it was published to",
@@ -254,11 +254,13 @@
         "why": "The count is the point. Stopping a preview, closing a window or cancelling a publish asks the launcher to end whatever that section still has running, and nothing else on the trail can tell “there was nothing left to stop” from “a build was still going and was ended” — which are the two competing explanations when a teacher reports that their publish stopped halfway. Recorded from 2026-09-05, when the sweep began ending a mid-flight BUILD and its driver rather than only a preview server: that is a change in what a teacher can lose, and it had no line describing it. The launcher prints the number and the app used to discard it."
       },
       {
-        "carries": "which course and section, how long the preview had been saying nothing, and WHICH of the THREE things was true - the website builder was serving the site and this Mac could not reach it, nothing was serving it at all, or the builder could not be asked and Plantoir does not know. Or, with no silence waited out and nobody asked, that its website started and no address for it was ever announced, so there was nothing to open (GitHub #235 - the line that replaced trying a guessed address). Or, written by a launcher before anything was built, that every address Plantoir can use for a preview was taken, so no workspace could be made for the folder - with the course and section when the launcher has them (preview and publish) and the word setup when it does not (GitHub #280, launcherLineWhenEveryAddressIsTaken)",
+        "carries": "which course and section, how long the preview had been saying nothing, and WHICH of the THREE things was true - the website builder was serving the site and this Mac could not reach it, nothing was serving it at all, or the builder could not be asked and Plantoir does not know. Or, with no silence waited out and nobody asked, that its website started and no address for it was ever announced, so there was nothing to open (GitHub #235 - the line that replaced trying a guessed address). Or, written by a launcher before anything was built, that every address Plantoir can use for a preview was taken, so no workspace could be made for the folder - with the course and section when the launcher has them (preview and publish) and the word setup when it does not (GitHub #280, launcherLineWhenEveryAddressIsTaken). Or, written by preview.sh before anything was built, that this Mac could not reach the website builder, so the preview was stopped rather than built into an address nobody could open (GitHub #234, launcherLineWhenThisMacCannotReachTheBuilder)",
         "event": "preview did not appear",
         "launcherLine": "{course}/{section} · the preview stopped before building — Plantoir could not find out where it would be",
         "launcherLineWhenEveryAddressIsTaken": "{course}/{section} · stopped before starting — every address Plantoir can use for a preview was taken",
         "launcherLineWhenEveryAddressIsTakenWhy": "GitHub #280. Written by setup.sh, preview.sh and deploy.sh alike, from the one function they share (the PREVIEW PORT BLOCK), when all forty blocks in contracts/app-rules.json -> previewPorts are taken; the console says previewPorts.whenNoBlockIsFree.sentence. Filed under THIS event rather than a new one by the director's ruling: it is the same outcome for a teacher - a preview (or a publish) that never appeared - and a new event would be one more name for Windows to implement with nothing new to say. {course}/{section} is the literal word setup when setup.sh makes the workspace, because it has no course yet. A walk that FOUND a block beyond the first six writes nothing: the announced address already carries the port. scripts/test_port_blocks.py checks the launchers against this field.",
+        "launcherLineWhenThisMacCannotReachTheBuilder": "{course}/{section} · the preview stopped before building — this Mac could not reach the website builder",
+        "launcherLineWhenThisMacCannotReachTheBuilderWhy": "GitHub #234. Written by preview.sh alone, before the build, when a connection to the address it was about to announce is refused on every try (contracts/app-rules.json -> previewPorts.whenThisMacCannotReachTheBuilder); the console says that key's sentence. The same fault #225's thisMacCannotReachIt names after a build, found two minutes sooner, so it is filed under THIS event, like #280's line, rather than a new one. It names no port (a review asked for 'address' over 'port', and the port is in the console transcript already; the sibling lines name none). A preview that reached the builder on a later try writes nothing here - the console says how many tries it took. scripts/test_preview_reach.py checks the launcher against this field.",
         "launcherLineWhy": "GitHub #235's review. The ending a teacher will actually meet when no address can be found is preview.sh's refusal (it asks for the published port twice and stops before building), not the app's no-address stop, which is a defence that is practically unreachable while the two ship together. Without its own line the trail said only that preview.sh failed. Written by the launcher through note_on_the_trail, with the course/section prefix the app's own lines for this event carry, so one search finds both; the words are pinned here because the app never writes this one and scripts/test_preview_address.py checks the launcher against this field.",
         "why": "The failure that left NOTHING behind, which is exactly the report that arrived on 2026-09-19 (GitHub issue #225). A teacher pressed Preview three times in four minutes on a Mac that had stopped passing new addresses through from the builder; the website was built and served every time and never appeared; and the trail recorded only that a task started and was stopped on purpose - so an evening of a broken Mac reads, months later, as somebody changing their mind three times. WHICH of them it was is the whole value of the line, because the first two are one sentence apart when a teacher describes it (\"the preview never came up\") and a world apart in what to do: one is their pages, one is their Mac. The seconds are recorded rather than the total run because the run is not the fault - a first preview legitimately takes minutes, and what cannot be explained is a run that announced its server and then said nothing. DELIBERATELY WITHOUT `appliesOn`, and the red Windows suite that follows is the request rather than damage: Windows has its own wait for a preview to appear and owes the same line, so this is an obligation and not a permanent platform difference - the two cases appliesOn exists for. The `windows` issue opened with this work says so, and the choice on that side is theirs: record it, or hold it open by name in NamedGapLedger with the issue and milestone that own it. What Windows is NOT exposed to is the CAUSE - there is no container in their preview path, so the question this line's second half answers (can the builder see its own site?) has no counterpart there and they should not build one. What they owe is the bounded quiet time and the line."
       },
@@ -274,7 +276,7 @@
         "appliesOnWhy": "Owed on both platforms for the same reason as the other two, and RECORDED on both as of 2026-09-09: the mac when Russell asked for it, Windows the same day (GitHub issue #130). This said \"Windows records neither today\" until that landed; nothing reads appliesOnWhy, so only a reader would have been misled, which is the quiet way a contract stops being true. scheduledPublishStopped.platformDifferences is where the two are compared."
       },
       {
-        "carries": "the course code, the section number, and which destination stopped",
+        "carries": "the course code, the section number, and which destination stopped \u2014 or, when the BUILD failed before any destination was reached, that the pages could not be built, because no destination was (widened 2026-09-25, #137)",
         "event": "scheduled publish did not finish",
         "why": "The same silence as \u201cneeded an answer\u201d, from a different cause \u2014 a revoked token, a network that was down, a build that failed. It is a SEPARATE event because the other one's own wording says a question went unasked, and filing a revoked token under it would make the trail say something untrue about the one run a teacher is trying to understand. Both matter for the same reason: a scheduled publish that did not happen is invisible unless something writes it down.",
         "appliesOnWhy": "Added on the mac 2026-09-09, when Russell widened the readout to ANY failed scheduled publish rather than only an unanswered question, and adopted by Windows the same day (GitHub issue #130) — so nothing is owed and neither suite is red on this list. The earlier wording said Windows records only the question case and that its suite was red until it caught up; that was true for about six hours and is kept here only as the reason this sentence changed."
@@ -342,9 +344,14 @@
         "why": "Added 2026-09-24 with issue #195's fix review. 'I set it for Friday and it never went' is otherwise answered only by the refusal that was on screen at the time, which nobody quotes a week later. The two ways it fails leave DIFFERENT things behind, and the line has to say which: when the new deploy's files could not be WRITTEN, the old deploy's plist is still on disk (the failed write is atomic and everything before it writes elsewhere), so it is handed back to macOS and the line says it still stands - saying 'turned off' there would be false, because the old job would still fire; when macOS REFUSED the new one after its plist was written, the old one's plist has been overwritten, so it is gone, and 'scheduled deploy turned off' says so beside this line - including when the old one was set for the same minute, which the card rightly leaves unsaid but whose loss is still a loss."
       },
       {
-        "carries": "the folder it was given, the code and school year it shows, how many sections came across, and which course it was copied from",
+        "carries": "the folder it was given, the code and school year it shows, how many sections came across, and which course it was copied from - and, only when the copy was made without any (#255), the Obsidian add-ons left behind by FOLDER name, or that the add-ons folder or the settings folder was a link or could not be read, or that Obsidian Publish's site setting stayed behind (referenceCourses.obsidianAddOns). A course with none leaves a line byte-identical to before. Never anything read from inside an add-on",
         "event": "course kept for reference",
-        "why": "A reference course is a course that appeared in the sidebar without the teacher creating one, and which can never be deployed. Without this line a report of 'where did ICS3U-2025 come from' or 'why will this one not publish' has nothing anywhere behind it. It names the FOLDER and the displayed code separately because they deliberately differ, and that difference is the first thing somebody reading a report will want to check. The source path never appears raw - a course is named, not a path - and the contents of a page never appear at all."
+        "why": "A reference course is a course that appeared in the sidebar without the teacher creating one, and which can never be deployed. Without this line a report of 'where did ICS3U-2025 come from' or 'why will this one not publish' has nothing anywhere behind it. It names the FOLDER and the displayed code separately because they deliberately differ, and that difference is the first thing somebody reading a report will want to check. The source path never appears raw - a course is named, not a path - and the contents of a page never appear at all. A copy that was NOT made writes 'course could not be kept for reference' instead (#287), never both."
+      },
+      {
+        "carries": "which course it was copied from, the folder it was to be given, and why - being made in another window or another copy of Plantoir (#245), a folder of that name already there, or the copy could not be made (the system's reason, which may name a file; never a page's contents). The reason is the sentence the sheet showed the teacher",
+        "event": "course could not be kept for reference",
+        "why": "Added 2026-09-25 for issue #287. Keep a Copy for Reference is a button a teacher pressed and saw refused, and until then no failure of it wrote anything: the trail showed nothing had happened, so 'it said no' had nothing behind it. Written once, around the whole act, so a way to fail added later is covered without anyone remembering. Its OWN event rather than 'course could not be imported for reference', because nothing was imported and that line names a source folder this act does not have - a failure line carrying the other act's name misleads whoever reads it back. Not written for the sheet's own refusals of a name or a school year: those grey the Keep a Copy button out with a sentence, and a disabled button is not a press."
       },
       {
         "carries": "the code the teacher reads, the folder it lives in, and the school year before and after",
@@ -357,22 +364,30 @@
         "why": "Written ONLY when a pass actually did something, so a folder in a steady state leaves no lines at all. It is the answer to the one report this feature can produce that would otherwise be unexplainable: 'my reference course let me edit a page'. A count of 37 after a restore is a backup coming back unlocked, because a zip carries the mode and not the flag; a handful that would not stay locked, over and over, is usually a folder kept in a cloud drive whose file provider clears the locked bit while a file uploads - but the LINE says only the count, deliberately, because a volume with no support for the flag at all produces the same count and naming a cause would be a confident wrong diagnosis. Neither is a failure to put in front of the teacher, and neither is retried after a delay - the next pass is the mechanism."
       },
       {
-        "carries": "the NAME of the folder it was read from, the folder it was given here, the code and school year it shows, and how many sections came across",
+        "carries": "the NAME of the folder it was read from, the folder it was given here, the code and school year it shows, and how many sections came across - and, for a course in the MODERN layout only and only when there were any (#255), the Obsidian add-ons left behind by FOLDER name (or that a folder was a link, could not be read, or Obsidian Publish's site setting stayed behind). The two older layouts say theirs on their own second line, so this line adds nothing for them; a course with none leaves a line byte-identical to before. Never anything read from inside an add-on",
         "event": "course imported for reference",
         "why": "The folder it was READ from is the half a copy does not have, and it is the answer to 'where did this ICS4U come from' - a folder somewhere else on this Mac, which the teacher may have moved or deleted since. Named rather than written as a path, the same way every other line here names a course rather than a path. The contents of a page never appear."
       },
       {
         "carries": "the class folder's NAME, the folder it was given here, the shared folder its pages and pictures came from and HOW that folder was found (by its name, chosen by hand, or none), how many of the shared folders and pages the class used were brought across out of how many and the names of any that are missing, how many of the class's links the shared folder's real entries REPLACED, how many things were left out as a LOSS with each one's path (a link below the top or inside a shared entry, a name the course uses for itself), how many Obsidian add-on entries were left behind, and whether an empty Media folder was made - names and paths only, never what is written on a page",
         "event": "course imported from the older layout",
-        "why": "Written right after 'course imported for reference' for a class kept in the older folder-per-class layout (#254). The shared pictures of such a course come from a SECOND folder, found by its name or chosen by hand, and a class whose shared folder was not found still imports - so 'where are this course's pictures' is the question a report about one will ask, and only this line answers it. Names only; never what is written on a page, and never anything read from the add-ons that were left out."
+        "why": "Written right after 'course imported for reference' for a class kept in the older folder-per-class layout (#254). The shared pictures of such a course come from a SECOND folder, found by its name or chosen by hand, and a class whose shared folder was not found still imports - so 'where are this course's pictures' is the question a report about one will ask, and only this line answers it. Names only; never what is written on a page, and never anything read from the add-ons that were left out.",
+        "appliesOn": [
+          "mac"
+        ],
+        "appliesOnWhy": "PERMANENT and deliberate - the ordinary use of appliesOn, not the softening contracts/README.md rejects. Russell decided on 2026-09-25 (GitHub issue #257) that the Windows app does not get the import of the 2023-24 folder-per-class layout: only he kept courses that way, and only on a Mac. An event cannot be recorded where the import it describes does not exist. If Windows ever builds that import, drop this appliesOn rather than adding a windows twin."
       },
       {
         "carries": "where the pages were read from (a path from the home folder, redacted on the way in) and the Finder shortcut's name when one was followed, the section and HOW it was told (its front page's link text, its folder's name, or being the only one) with any disagreement between the front page and the name, the course pages folder the files came from (source-<code>) and how many files, the word its class pages use and how many placeholder pages (Thread 2, Day x) were set aside, then as TWO separate clauses what was LEFT BEHIND by kind with counts - the website's own program files, the folders skipped without being looked inside, the links replaced by what they showed, the editing folders and the other sections by name, anything in the course pages folder no link showed, the Obsidian add-on entries - and what was LOST, by name (a link that showed somewhere unexpected also says where it pointed, from the home folder), or 'nothing lost'; and whether an empty Media folder was made",
         "event": "course imported from a class website folder",
-        "why": "Written right after 'course imported for reference' for a class kept in the 2024-25 layout, a whole website folder per class (#256). S1's and S2's copies of the pages DIFFER (335 entries, measured), so 'which copy did this come from, and what did not come' is a real question about one of these, and only this line answers it; left behind and lost are separate clauses so machinery is never read as a loss or a loss as machinery. Names and counts only, never what is written on a page."
+        "why": "Written right after 'course imported for reference' for a class kept in the 2024-25 layout, a whole website folder per class (#256). S1's and S2's copies of the pages DIFFER (335 entries, measured), so 'which copy did this come from, and what did not come' is a real question about one of these, and only this line answers it; left behind and lost are separate clauses so machinery is never read as a loss or a loss as machinery. Names and counts only, never what is written on a page.",
+        "appliesOn": [
+          "mac"
+        ],
+        "appliesOnWhy": "PERMANENT and deliberate, for the same reason as the event above: Russell decided on 2026-09-25 (GitHub issue #258) that the Windows app does not get the import of the 2024-25 layout, a whole website folder per class. That issue stays open for the OTHER half, which Windows owes regardless and which this does not excuse: Copy a Page strips the old section-2 keys (the Copy a Page rule in this file, from #256). If Windows ever builds this import, drop this appliesOn rather than adding a windows twin."
       },
       {
-        "carries": "which course did not come across, and why - already being imported in another window or another copy of Plantoir (#245), what an earlier unfinished attempt left behind could not be cleared away (#245), could not be read, no room on the disk. Written when the copy fails and when an import is refused before it starts; the shelf refusal (already kept for reference under that school year) and a folder of that name already existing are said on the sheet and do NOT write this line today",
+        "carries": "which course did not come across, and why, as the sentence the summary showed - already kept for reference under that school year (the shelf rule, which also refuses a second course of the same code in one run) or a folder of that name already there (both #287), already being imported in another window or another copy of Plantoir (#245), what an earlier unfinished attempt left behind could not be cleared away (#245), could not be read, no room on the disk. Written for EVERY course the summary lists as not imported - refused before it starts or failed part way; never for a course the teacher stopped",
         "event": "course could not be imported for reference",
         "why": "Written per COURSE, because a run of four that imports three is the ordinary shape of this and 'the import failed' is exactly the report that cannot be looked into. Without it, a teacher who ticked four courses and found three has nothing to point at, and the one that is missing is the one they will ask about."
       },
@@ -432,6 +447,11 @@
           "mac"
         ],
         "appliesOnWhy": "PERMANENT, the same case as 'website builder stopped': Windows builds natively and has no workspace to remake (app-rules.json -> previewPorts.whenTheWorkspaceIsInUse.appliesOnWhy)."
+      },
+      {
+        "carries": "the course and the section, and which of: told with a notification; not sent because notifications are turned off; not sent because permission was never given; could not be sent; and, when a teacher first schedules from the app, that the permission question was put and what the answer was. NEVER the notification's text.",
+        "event": "scheduled publish notification",
+        "why": "Added with #212. 'I never got told' is answerable only if the trail says whether the notification went out, or that notifications were off for the app — from the teacher's side a notification that was blocked and one that was never sent look identical. The question's own line is written BEFORE the answer, because a question that is ignored, or arrives under a Focus, may never be answered. See scheduledPublishStopped.notification."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty.",
@@ -946,6 +966,85 @@
           "why": "The walk returns names as they are spelled ON DISK, so `Portfolios/tasks` is offered as `tasks`. An exact 'still offered' test reads that as 'no longer offered' and drops `Tasks` from the pool, while `build_site.py` lowercases both sides and goes on counting that folder — marks off the coverage map because of a capital letter. The DROP's own comparison stays unpinned; what this case pins is that the STILL-OFFERED question is asked the way the build asks it." }
       ]
     },
+    "rerunningSetup": {
+      "rule": "A run of course setup that finds a saved `graded_folders` writes it back AS IT WAS: a list keeps the same names, in the same spelling and the same order, whatever the folder lists the run ends with and whatever is on disk. A saved null is written as an empty list, and a course that never had the key still has none. Entries that cannot name a folder — null, a blank string, a non-string, an exact repeat — are still removed from a saved list; nothing else is. Only a NEW course — no saved configuration at all — has its pool worked out from the payload or skeleton and reconciled against its folder lists. Each case is a saved `course_config.json` fragment (`saved`; `{}` means the key is absent), the folder lists the run ENDS with, what is on disk, and the `graded_folders` fragment written back (`expect`; `{}` means absent), with every prompt accepted as it stood.",
+      "why": "GitHub issue #192. A re-run of `./setup.sh` / `setup.ps1` on an existing course used to pass a saved pool back through the new-course reconciliation, which keeps only names on the TOP-LEVEL copy lists. That rule dates from 2026-08-24, two weeks before the Marks checklist began offering folders found INSIDE other folders (`gradedFolders.choices`, 2026-09-09), and nobody changed the re-run. MEASURED by driving the real wizard with every prompt accepted and no folder removed: a pool of [\"Tasks\"] for `Portfolios/Tasks` or `section1/Tasks` — exactly what the checklist writes when a teacher ticks those rows — came back `[]`: asked, nothing counts, and the historical rule never applies again. The re-run does not ask the marks question and has no way to remove a folder, so it does not own the answer.\n\nNothing was lost by dropping the reconciliation. Counting pages with the build's own `_is_graded_path` over the same shapes, the reconciled pool counted the same pages or FEWER in every one, never more: a name that names no folder counts no page whether it is written or not, and a respelling counts the same because the build lowercases both sides. A name taken off a copy list at a prompt is not a removal either: `build_site.preflight_update_course_config` finds the folder on disk and puts it straight back on the list (measured: shared_folders ['Concepts'] became ['Concepts', 'Tasks'] in one call), so dropping it from the pool stopped counting a folder that was still published.\n\nA name that names no folder is not invisible, though, and the 'a name that names nothing is kept' case says so rather than hiding it: the published Curriculum Coverage page lists every pooled name in its sentence about which folders count, and Course Settings' last-folder guard counts it, so the last LIVE folder can be unticked without the block. Both could already happen through the apps' own exact-match removal (`removingAFolder`'s 'DELIBERATELY NOT PINNED' paragraph), and a clean-up by existence here would make the command line disagree with both apps about the same file.\n\nREJECTED: reconciling against the checklist's own walk (a THIRD implementation of depth, skip list, hidden folders, links and section scope, to drop only names that count nothing); reconciling against every folder at any depth (a new walk rule of its own, the same payoff); keeping the respelling while dropping unmatched names (marks-neutral, and a pool one tool rewrites and the others do not is a file two apps can disagree about); and telling an app's new-course run from a command-line re-run so the old check stayed on the app path (both apps already narrow their own pool before they write, so the check there caught only names that count nothing). The apps run no case: neither ever re-runs setup on an existing course. `scripts/test_graded_folders_rerun.py` drives the real wizard in-process for every case, on the mac host in verify.sh's first step and on Windows through PythonToolchainTests.",
+      "cases": [
+        { "name": "a folder ticked inside another survives a re-run",
+          "saved": { "graded_folders": ["Tasks"] },
+          "sharedFolders": ["Concepts", "Portfolios"], "perSectionFolders": ["All Classes"],
+          "directories": ["Concepts", "Portfolios", "Portfolios/Tasks", "section1/All Classes"],
+          "expect": { "graded_folders": ["Tasks"] },
+          "why": "What the Marks checklist writes when a teacher ticks the Tasks row found inside Portfolios (gradedFolders.choices). The old re-run wrote []." },
+
+        { "name": "a folder ticked inside a section folder survives a re-run",
+          "saved": { "graded_folders": ["Tasks"] },
+          "sharedFolders": ["Concepts"], "perSectionFolders": ["All Classes"],
+          "directories": ["Concepts", "section1/All Classes", "section1/Tasks"],
+          "expect": { "graded_folders": ["Tasks"] } },
+
+        { "name": "the name a removal kept survives a re-run",
+          "saved": { "graded_folders": ["Tasks"], "excluded_items": { "shared": ["Tasks"] } },
+          "sharedFolders": ["Concepts", "Portfolios"], "perSectionFolders": ["All Classes"],
+          "directories": ["Concepts", "Tasks", "Portfolios", "Portfolios/Tasks", "section1/All Classes"],
+          "expect": { "graded_folders": ["Tasks"] },
+          "why": "The issue as it was reported: removing the top-level Tasks keeps the name because Portfolios/Tasks still counts under it (removingAFolder), and the next re-run took it away." },
+
+        { "name": "a name taken off a copy list at a prompt stays in the pool",
+          "saved": { "graded_folders": ["Tasks"] },
+          "sharedFolders": ["Concepts"], "perSectionFolders": ["All Classes"],
+          "directories": ["Concepts", "Tasks", "section1/All Classes"],
+          "expect": { "graded_folders": ["Tasks"] },
+          "why": "Not a removal: the next build's preflight finds Tasks on disk and publishes it again, so a pool without it would stop counting a published folder." },
+
+        { "name": "the teacher's own spelling is kept",
+          "saved": { "graded_folders": ["Tasks"] },
+          "sharedFolders": ["Concepts", "tasks"], "perSectionFolders": ["All Classes"],
+          "directories": ["Concepts", "tasks", "section1/All Classes"],
+          "expect": { "graded_folders": ["Tasks"] },
+          "why": "The build compares names without regard to case, so the respelling the old re-run wrote counted exactly the same pages; it only rewrote what the teacher chose." },
+
+        { "name": "several names keep their order",
+          "saved": { "graded_folders": ["Tests", "Tasks"] },
+          "sharedFolders": ["Concepts", "Tasks", "Tests"], "perSectionFolders": ["All Classes"],
+          "directories": ["Concepts", "Tasks", "Tests", "section1/All Classes"],
+          "expect": { "graded_folders": ["Tests", "Tasks"] } },
+
+        { "name": "a course never asked stays never asked",
+          "saved": {},
+          "sharedFolders": ["Concepts", "Tasks"], "perSectionFolders": ["All Classes"],
+          "directories": ["Concepts", "Tasks", "section1/All Classes"],
+          "expect": {},
+          "why": "An absent key is what keeps the historical rule (absentIsNotEmpty); a re-run that wrote one would switch the course off it for good." },
+
+        { "name": "an empty pool stays empty",
+          "saved": { "graded_folders": [] },
+          "sharedFolders": ["Concepts", "Tasks"], "perSectionFolders": ["All Classes"],
+          "directories": ["Concepts", "Tasks", "section1/All Classes"],
+          "expect": { "graded_folders": [] } },
+
+        { "name": "a saved null is written as an empty pool",
+          "saved": { "graded_folders": null },
+          "sharedFolders": ["Concepts", "Tasks"], "perSectionFolders": ["All Classes"],
+          "directories": ["Concepts", "Tasks", "section1/All Classes"],
+          "expect": { "graded_folders": [] },
+          "why": "Records what the re-run has always done rather than a decision: the build reads null and [] alike as asked-and-cleared (the 'explicit null' case below), while the mac app reads a null as never asked. That disagreement belongs to the apps and is left as it was; this case only stops the re-run changing it unnoticed." },
+
+        { "name": "a name that names no folder anywhere is kept",
+          "saved": { "graded_folders": ["Tasks", "Thinking Tasks"] },
+          "sharedFolders": ["Concepts", "Tasks"], "perSectionFolders": ["All Classes"],
+          "directories": ["Concepts", "Tasks", "section1/All Classes"],
+          "expect": { "graded_folders": ["Tasks", "Thinking Tasks"] },
+          "why": "It counts no page, but it is not invisible: the Curriculum Coverage page names it, and Course Settings' last-folder guard counts it. Pinned so that nobody adds a clean-up by existence here that the two apps, which keep such a name, would disagree with." },
+
+        { "name": "entries that cannot name a folder are cleaned out, and every real name kept",
+          "saved": { "graded_folders": ["Tests", null, "", "  ", 7, "Tasks", "Tests", "Unit Tasks"] },
+          "sharedFolders": ["Concepts", "Tasks", "Tests"], "perSectionFolders": ["All Classes"],
+          "directories": ["Concepts", "Tasks", "Tests", "section1/All Classes"],
+          "expect": { "graded_folders": ["Tests", "Tasks", "Unit Tasks"] },
+          "why": "Only a hand edit writes these. The old re-run cleaned them on its way through the new-course reconciliation, and 'written back as it was' is about the teacher's NAMES, not about keeping junk: null, a blank string, a non-string and an exact repeat are dropped, while the first spelling of each real name, its order, and a name with no folder (Unit Tasks) all stay." }
+      ]
+    },
     "cases": [
       { "name": "not configured: the historical substring rule", "configured": false, "graded": [], "path": "Tasks/Culminating.md", "expect": true },
       { "name": "not configured: a folder that merely contains the word", "configured": false, "graded": [], "path": "Thinking Tasks/Problem 3.md", "expect": true,
@@ -1088,11 +1187,12 @@
   },
   "scheduledPublishStopped": {
     "note": "What a teacher is told when a publish that was set to happen on its own did not get through. It usually runs at half six with the app closed, so the LAUNCHER writes a record and the APP reads it \u2014 that handover is the feature. Without it the run is indistinguishable from one that was never scheduled, which is exactly the shape of \"my site did not update on Tuesday and I do not know why\". (This said the app reads the record \"the next time it opens\" until 2026-09-19; see whenItIsShown, which is what made that false.)",
-    "whenItIsShown": "On the section that is SHOWING, without the teacher navigating anywhere, as soon as the run writes its record \u2014 and the section's sentence and the sidebar's warning appear at the same moment, because both follow one counter. Waiting for the section to be reopened is the fault GitHub issue #216 closed on the mac on 2026-09-19: a teacher who stayed on the section while the run finished was told nothing until they clicked away and back. Two things make it work and both matter to whoever implements it elsewhere. The app watches the RECORD FOLDER, one watch for the whole app rather than one per view, since the folder is per user rather than per working folder. And the wrapper must land its record in ONE step: a folder watch sees an entry arrive but not a second line appended to a file already there, so a record written with two echoes arrived as one event carrying an empty file \u2014 measured on the mac, 0 of 40 \u2014 and the line that completed it produced no event at all. The mac assembles the record in a temporary file BESIDE the folder and moves it in (40 of 40), and separately watches any record that is there but cannot be read yet, which is what covers a job whose wrapper was written by an older build.",
+    "whenItIsShown": "On the section that is SHOWING, without the teacher navigating anywhere, as soon as the run writes its record \u2014 and the section's sentence and the sidebar's warning appear at the same moment, because both follow one counter. Waiting for the section to be reopened is the fault GitHub issue #216 closed on the mac on 2026-09-19: a teacher who stayed on the section while the run finished was told nothing until they clicked away and back. Two things make it work and both matter to whoever implements it elsewhere. The app watches the RECORD FOLDER, one watch for the whole app rather than one per view, since the folder is per user rather than per working folder. And the wrapper must land its record in ONE step: a folder watch sees an entry arrive but not a second line appended to a file already there, so a record written with two echoes arrived as one event carrying an empty file \u2014 measured on the mac, 0 of 40 \u2014 and the line that completed it produced no event at all. The mac assembles the record in a temporary file BESIDE the folder and moves it in (40 of 40), and separately watches any record that is there but cannot be read yet, which is what covers a job whose wrapper was written by an older build. And since #212 (2026-09-25), as a system notification sent by the run itself when it finishes, so a teacher who has not opened the app at all is told too — see `notification`.",
     "kinds": {
       "neededAnAnswer": "The launcher exited 3: a question was put to nobody. deploy.py's NEEDS_AN_ANSWER, distinct from 1 precisely so a caller can tell the two apart and say something useful.",
       "buildNeededAnAnswer": "The BUILD stopped for a question, before any destination was reached. PROPOSED FROM WINDOWS 2026-09-09 (GitHub issue #132) and adopted on the mac the same day; the mac's suite was red on this key until it was, which is the mechanism working rather than damage. A scheduled publish builds before it publishes, and the build launcher asks questions of its own \u2014 the 'Open' course-code guard on both platforms, plus a section-not-listed warning that only preview.ps1 has \u2014 so under --non-interactive it refuses with the same exit 3 having contacted nothing. It is a SEPARATE kind rather than neededAnAnswer with an empty destination because the sentence differs: there is no destination to name, and telling a teacher that publishing to Netlify needed an answer when Netlify was never reached sends them to look in the wrong place. REJECTED: filling the destination slot with the section's first configured destination, which reads correctly and is false.",
-      "didNotFinish": "Any other non-zero exit \u2014 a revoked token, a network that was down, a build that failed.",
+      "buildDidNotFinish": "The BUILD failed for any reason but a question \u2014 any non-zero exit other than 3 \u2014 before any destination was reached, so nothing was published anywhere. Decided by Russell 2026-09-23 (GitHub issue #137) and adopted on the mac 2026-09-25; WINDOWS IS RED on `kinds` and `sentences` until it adopts it, which is the mechanism working rather than damage. It is SEPARATE from didNotFinish for buildNeededAnAnswer's reason: didNotFinish's sentence names a DESTINATION that stopped, and none was contacted. Until #137 the mac filled that slot with a phrase that is not a destination at all, and Windows with every configured destination joined \u2014 so a teacher read that publishing to Netlify stopped when Netlify was never reached, which is the shape recorded as REJECTED under buildNeededAnAnswer. And the sentence sends the teacher to PREVIEW rather than Publish, because previewing is what rebuilds the pages and shows why they would not build. Which LEG and which exit code give which kind is whichKind, below. REJECTED: merging the two build kinds into one (it loses buildNeededAnAnswer's promise that answering the question once lets the section publish on its own after that); rewording didNotFinish to cover both (a sentence that fits both a revoked token and a page that would not build names neither the place nor the fix); and telling the two apart by what the record's destination line says (meaning inferred from a display string, which could then never be reworded).",
+      "didNotFinish": "Any other non-zero exit from a DESTINATION \u2014 a revoked token, a network that was down. Until 2026-09-25 this also covered a build that failed, which is buildDidNotFinish now (#137). One build failure can still land here: a build that fails INSIDE a destination's own rebuild reaches the wrapper as that destination's exit 1, because the exit code is all a wrapper has. deploy.py rebuilds for production whenever the built site's baseUrl is not the destination's address (a first publish to an address, or after it changes), and deploy.py and deploy.sh both rebuild a site still carrying the preview's live-reload client \u2014 the second reachable in a scheduled run only while the wrapper's own is-the-site-stale check is narrower than the launchers' (GitHub issue #136).",
       "succeeded": "It worked. Recorded for the same reason the failures are: a scheduled publish that leaves no trace cannot be told from one that never happened, so without it the trail can answer \u201cwhy did my site not update?\u201d and cannot answer \u201cdid it?\u201d",
       "tooLateToRun": "The day it was set for had gone by, by more than the course allows (scheduledDeployCancellation.howLateIsTooLate), so the run STOOD DOWN: it deployed nothing, cleared the job away, and said so. Added on the mac 2026-09-20 with the fix for a scheduled deploy outliving its course. It is a SEPARATE kind for the reason buildNeededAnAnswer is one, and the reason is already recorded there: didNotFinish's sentence names a DESTINATION that stopped, and here there was none, so filling that slot in would read correctly and be false. It is not a failure either - nothing was attempted and nothing went wrong - and the sentence has to say that, or a teacher goes looking for a fault there was not. WINDOWS MAY NOT NEED IT: their task is created with /SC ONCE, which has no annual recurrence to close, so this kind is owed there only if their task is set to run after a MISSED start. Say which, rather than adopting or declining it silently.",
       "courseWasBusy": "Another program on this computer was still BUILDING or PUBLISHING the course after the run had waited ten minutes for it (#156; shared-rules workLeases.declining), so the run STOOD DOWN: it deployed nothing, cleared the job away so it cannot recur, and said so. A SEPARATE kind for tooLateToRun's reason - nothing was attempted, so there is no destination for a sentence to name - and it earns the attention badge for the same reason: the site the teacher expected is not there. Added on the mac 2026-09-25. Windows owes it once its scheduled publish reads leases (it writes none today, and takes none)."
@@ -1100,20 +1200,328 @@
     "sentences": {
       "neededAnAnswer": "{course} Section {section} was set to publish on its own, and it stopped because publishing to {destination} needed an answer nobody was there to give. Publish this section once yourself, answer the question, and it can publish on its own after that.",
       "buildNeededAnAnswer": "{course} Section {section} was set to publish on its own, and it stopped before it started, because building the pages needed an answer nobody was there to give. Preview this section once yourself, answer the question, and it can publish on its own after that.",
+      "buildDidNotFinish": "{course} Section {section} was set to publish on its own, and it stopped before it started \u2014 the pages could not be built, so nothing went up anywhere. Preview this section once yourself, and the reason will be in that section's window.",
       "didNotFinish": "{course} Section {section} was set to publish on its own, and it did not finish \u2014 publishing to {destination} stopped, so nothing went up there. Publish it yourself to see what happens.",
       "succeeded": "{course} Section {section} published on its own to {destination}. Your students have the new pages.",
       "tooLateToRun": "{course} Section {section} was set to deploy on its own, but this computer wasn’t awake at that time and too long has passed since. Plantoir left the site as it was. Deploy it yourself when you’re ready, or schedule another from the section’s menu.",
       "courseWasBusy": "{course} Section {section} was set to deploy on its own, but the course was still being built somewhere else on this computer after ten minutes of waiting, so Plantoir left the site as it was rather than build it twice at once. Deploy it yourself when that has finished, or schedule another from the section’s menu."
     },
+    "whichKind": {
+      "note": "Which LEG stopped, and with which exit code, decides the kind \u2014 the code alone does not, because the build and the destinations both use 3 for a question and anything else for a failure (#132, #137). Exit 3 is tested BEFORE the general non-zero branch, since 3 is non-zero too. A build that stopped for ANY reason publishes nothing and names nothing. How a runner plays a case: run the REAL generated scheduled wrapper, with stand-in launchers, against one configured destination. For a `build` row the build launcher exits `exitCode`; for a `destination` row the build exits 0 and the one destination exits `exitCode`; for `none` everything exits 0. A wrapper that builds only when the site looks stale (the mac's) must be given a folder that looks stale. Then read the record: its kind must be `kind`; the teacher's sentence for it must contain the record's destination exactly when `namesADestination` is true; and the run must count as published \u2014 every destination leg ran and exited 0 \u2014 exactly when `anythingPublished` is true. Added 2026-09-25 with #137, because the decision asked for a case that names the exit code and the expected kind, so that a wrapper filing a failed build against every configured destination is caught by data rather than by a teacher.",
+      "cases": [
+        {
+          "leg": "build",
+          "exitCode": 3,
+          "kind": "buildNeededAnAnswer",
+          "namesADestination": false,
+          "anythingPublished": false,
+          "why": "The build's own question (#132): the build launcher refused a question under --non-interactive, so nothing was reached and there is nothing to name."
+        },
+        {
+          "leg": "build",
+          "exitCode": 1,
+          "kind": "buildDidNotFinish",
+          "namesADestination": false,
+          "anythingPublished": false,
+          "why": "The case #137 is about: the pages could not be built. Nothing was contacted, so no destination is named, and the teacher is sent to Preview."
+        },
+        {
+          "leg": "build",
+          "exitCode": 127,
+          "kind": "buildDidNotFinish",
+          "namesADestination": false,
+          "anythingPublished": false,
+          "why": "ANY code but 3 is this kind, not only 1: a build launcher that could not be run at all exits with a different code, and so does one stopped by a signal. A wrapper that tests for 1 rather than for not-3 records nothing here, and this case is what catches it."
+        },
+        {
+          "leg": "destination",
+          "exitCode": 3,
+          "kind": "neededAnAnswer",
+          "namesADestination": true,
+          "anythingPublished": false,
+          "why": "The build succeeded and the destination asked a question nobody was there to answer; the destination is named, because it was reached."
+        },
+        {
+          "leg": "destination",
+          "exitCode": 1,
+          "kind": "didNotFinish",
+          "namesADestination": true,
+          "anythingPublished": false,
+          "why": "The build succeeded and the destination failed for an ordinary reason; the destination is named, because it was reached."
+        },
+        {
+          "leg": "none",
+          "exitCode": 0,
+          "kind": "succeeded",
+          "namesADestination": true,
+          "anythingPublished": true,
+          "why": "Every leg exited 0. The destination named is where the pages WENT."
+        }
+      ]
+    },
     "firstDestinationWins": "The record is per SECTION and keeps the FIRST destination that stopped. A course can publish to several places and only one may have gone wrong, so \"it published to the folder and not to Netlify\" is the shape of the report; overwriting would tell the teacher about the last thing that went wrong rather than the first.",
     "attention": "Every FAILURE asks for the teacher's attention and gets a warning beside their section in the list as well as the sentence inside it \u2014 a teacher who does not know WHICH section failed cannot open the right one. So does a run that STOOD DOWN (tooLateToRun), which is not a failure at all: nothing was attempted and nothing went wrong, and it still deserves the badge, because the site the teacher was expecting is not there either way and silence is what this whole key exists to break. The test is not \"did something break\" but \"is the site other than the teacher expects\". A SUCCESS is news rather than a problem: it gets the sentence and no badge, because a badge on every section that published fine overnight is a badge nobody reads by Wednesday.",
     "clearedBy": "A scheduled run that got ALL the way through \u2014 every destination, exit zero \u2014 OR the teacher dismissing it. Both, and the second is a decision rather than a convenience: clearing only on a successful run leaves the message standing after somebody has already fixed the problem by hand, and the next scheduled run that would clear it could be a week away.",
-    "trail": "One line per RUN, dated to when the RUN wrote its record rather than to when the app read it — or an overnight problem is filed under the morning somebody noticed it. There are FOUR events, and not one per kind: the three outcomes of a run that HAPPENED share three of them (activityTrail.mustRecord: scheduled publish needed an answer, did not finish, finished), and a build that stopped for a question files under the first, because a question going unasked is what happened and an event of its own would put a distinction on the trail that means nothing to the person reading it. The fourth belongs to the kind where the run did not happen at all: tooLateToRun writes `scheduled deploy turned off`, the same event and the same words a REMOVAL writes, because the same thing happened to the teacher's alarm and the reason is what differs. (This said THREE events until 2026-09-20.) The line carries the course, the section, and which destination stopped — or, for a run that got through, where it WENT. NEVER the question's own text: that comes from a launcher's console, and a line naming a credential prompt would put a teacher's own words on the trail. An earlier draft had the app note the line when a teacher opened the section and mark the record as noted; rewriting the record changed its modification date, which is what the notice shows, so the teacher saw the morning they looked rather than the half six the run stopped at — and a teacher who never opened that section, who is exactly the one who reports that their site did not update, got no line at all. WHO writes it is platform-local and cannot be otherwise: see platformDifferences.",
+    "trail": "One line per RUN, dated to when the RUN wrote its record rather than to when the app read it — or an overnight problem is filed under the morning somebody noticed it. There are FOUR events, and not one per kind: the three outcomes of a run that HAPPENED share three of them (activityTrail.mustRecord: scheduled publish needed an answer, did not finish, finished), and a build that stopped for a question files under the first, because a question going unasked is what happened and an event of its own would put a distinction on the trail that means nothing to the person reading it. A build that failed outright (buildDidNotFinish) files under the second, `scheduled publish did not finish`, for the same reason, with a line that names no destination because none was reached (added 2026-09-25, #137). The fourth belongs to the kind where the run did not happen at all: tooLateToRun writes `scheduled deploy turned off`, the same event and the same words a REMOVAL writes, because the same thing happened to the teacher's alarm and the reason is what differs. (This said THREE events until 2026-09-20.) The line carries the course, the section, and which destination stopped — or, for a run that got through, where it WENT. NEVER the question's own text: that comes from a launcher's console, and a line naming a credential prompt would put a teacher's own words on the trail. An earlier draft had the app note the line when a teacher opened the section and mark the record as noted; rewriting the record changed its modification date, which is what the notice shows, so the teacher saw the morning they looked rather than the half six the run stopped at — and a teacher who never opened that section, who is exactly the one who reports that their site did not update, got no line at all. WHO writes it is platform-local and cannot be otherwise: see platformDifferences.",
+    "notification": {
+      "note": "Added 2026-09-25 with GitHub issue #212. A publish set for half six runs with nobody looking, and until this the only places it said how it went were the section's band and the sidebar's warning — both inside an app the teacher may not open before class. So when a run finishes, WHATEVER happened, the teacher is sent ONE system notification (a macOS notification; a toast on Windows) that waits for them in the system's own list. Its text is the section's own sentence (`sentences.<kind>`, filled in exactly as the band fills it) with nothing added — no title of the app's own, since the system heads it with the app's name and every sentence already begins with the course and the section, which is also what survives a banner cut short. A SUCCESS is announced too, every time: Russell's decision, 2026-09-25 — the band carries it and `attention` gives it no badge, so without the notification a success reaches nobody who has not opened that section. One notification per SECTION, keyed so that a later run of the same section REPLACES it (a teacher is not handed last week's news beside this week's), and dismissing the section's band WITHDRAWS it, so the two never disagree about whether it is still news. The RUN never asks for permission — a question at half six is a question to nobody — and a run that may not post writes why on the trail instead. The question is put the first time a teacher schedules a publish from the app's own window or its own assistant, never from an outside assistant (which has no window to explain it) and never at launch (most teachers never schedule anything). How a runner plays the cases: with a stand-in for the system's notifications that records what it was asked, keeps what is on show by identifier (a post replaces, a withdraw removes), and never reaches the real system. A platform whose notifications need no prompt (Windows toasts) plays only the rows whose `permission` is `allowed` or `notAllowed`; the `notAskedYet` rows carry `onlyWhereThereIsAPrompt` and exist only where there is a question to ask. `trailSays` is the line after the course/section prefix the trail already puts on every line of this kind.",
+      "announcing": {
+        "note": "Play each row once for EVERY key of `kinds` when `record` is `everyKind` (so a kind added later is covered without touching this list), and once with no record when it is `none`. Write the record, set the stand-in's permission, run the announcement, and check: whether a notification was posted, that its text is exactly the kind's sentence, whether permission was asked (never, from a run), and the trail line.",
+        "cases": [
+          {
+            "name": "allowed: every kind is announced",
+            "record": "everyKind",
+            "permission": "allowed",
+            "postFails": false,
+            "posts": true,
+            "asksForPermission": false,
+            "trailSays": "told the teacher how a scheduled publish went, with a notification",
+            "why": "A success as much as a failure: the silence is the complaint whatever the outcome."
+          },
+          {
+            "name": "turned off: nothing posted, and the trail says why",
+            "record": "everyKind",
+            "permission": "notAllowed",
+            "postFails": false,
+            "posts": false,
+            "asksForPermission": false,
+            "trailSays": "did not send a notification about a scheduled publish, because notifications are turned off for Plantoir",
+            "why": "From the teacher's side a blocked notification and one never sent look the same; the line is what tells them apart."
+          },
+          {
+            "name": "never asked: the run does not ask",
+            "record": "everyKind",
+            "permission": "notAskedYet",
+            "onlyWhereThereIsAPrompt": true,
+            "postFails": false,
+            "posts": false,
+            "asksForPermission": false,
+            "trailSays": "did not send a notification about a scheduled publish, because Plantoir has not been given permission to send them yet",
+            "why": "A question put by a run at half six is put to nobody, and the process is about to exit."
+          },
+          {
+            "name": "the system refused the post",
+            "record": "everyKind",
+            "permission": "allowed",
+            "postFails": true,
+            "posts": false,
+            "asksForPermission": false,
+            "trailSays": "a notification about a scheduled publish could not be sent",
+            "why": "The post was attempted and did not land — including a system that never answered before the run's ceiling. Never silent, and never a reason for the run itself to fail."
+          },
+          {
+            "name": "no record: nothing to say",
+            "record": "none",
+            "permission": "allowed",
+            "postFails": false,
+            "posts": false,
+            "asksForPermission": false,
+            "trailSays": null,
+            "why": "A run that wrote no record (a job scheduled before sections were named) has nothing the band would say, so nothing is announced and no line is written."
+          }
+        ]
+      },
+      "onShow": {
+        "note": "What stays on show after a sequence of posts and dismissals. Each step is `post` (a run of that section finished with that kind) or `dismiss` (the teacher dismissed that section's band). `stillShown` lists what the stand-in holds afterwards, in any order, with the kind whose sentence it carries.",
+        "cases": [
+          {
+            "name": "a later run of the same section replaces the earlier one",
+            "steps": [
+              {
+                "post": {
+                  "course": "ICS4U",
+                  "section": 1,
+                  "kind": "succeeded"
+                }
+              },
+              {
+                "post": {
+                  "course": "ICS4U",
+                  "section": 1,
+                  "kind": "didNotFinish"
+                }
+              }
+            ],
+            "stillShown": [
+              {
+                "course": "ICS4U",
+                "section": 1,
+                "kind": "didNotFinish"
+              }
+            ]
+          },
+          {
+            "name": "section 1 and section 11 are different sections",
+            "steps": [
+              {
+                "post": {
+                  "course": "ICS4U",
+                  "section": 1,
+                  "kind": "succeeded"
+                }
+              },
+              {
+                "post": {
+                  "course": "ICS4U",
+                  "section": 11,
+                  "kind": "succeeded"
+                }
+              }
+            ],
+            "stillShown": [
+              {
+                "course": "ICS4U",
+                "section": 1,
+                "kind": "succeeded"
+              },
+              {
+                "course": "ICS4U",
+                "section": 11,
+                "kind": "succeeded"
+              }
+            ],
+            "why": "Catches a key built so that one section's is the prefix of another's."
+          },
+          {
+            "name": "the same section number in two courses",
+            "steps": [
+              {
+                "post": {
+                  "course": "ICS4U",
+                  "section": 1,
+                  "kind": "succeeded"
+                }
+              },
+              {
+                "post": {
+                  "course": "ICS3U",
+                  "section": 1,
+                  "kind": "tooLateToRun"
+                }
+              }
+            ],
+            "stillShown": [
+              {
+                "course": "ICS4U",
+                "section": 1,
+                "kind": "succeeded"
+              },
+              {
+                "course": "ICS3U",
+                "section": 1,
+                "kind": "tooLateToRun"
+              }
+            ]
+          },
+          {
+            "name": "dismissing the band withdraws that section's notification and no other",
+            "steps": [
+              {
+                "post": {
+                  "course": "ICS4U",
+                  "section": 1,
+                  "kind": "didNotFinish"
+                }
+              },
+              {
+                "post": {
+                  "course": "ICS4U",
+                  "section": 11,
+                  "kind": "succeeded"
+                }
+              },
+              {
+                "dismiss": {
+                  "course": "ICS4U",
+                  "section": 1
+                }
+              }
+            ],
+            "stillShown": [
+              {
+                "course": "ICS4U",
+                "section": 11,
+                "kind": "succeeded"
+              }
+            ]
+          }
+        ]
+      },
+      "asking": {
+        "note": "Where the permission question may be put. `from` is what scheduled the publish: `window` (the scheduling sheet), `appAssistant` (the app's own assistant), `outsideAssistant` (an assistant in another program, over MCP) or `scheduledRun` (the run itself, finishing). The question is put only when `permission` is `notAskedYet` — a teacher who said no is not asked again, and the switch is in the system's own settings.",
+        "cases": [
+          {
+            "from": "window",
+            "permission": "notAskedYet",
+            "onlyWhereThereIsAPrompt": true,
+            "asks": true,
+            "trailSays": [
+              "asked whether Plantoir may send a notification when a scheduled publish finishes",
+              "the teacher allowed notifications about scheduled publishes"
+            ],
+            "answer": "allowed",
+            "why": "The first time a teacher schedules, from the one place they can see why they are being asked. The first line is written before the answer, because a question that is ignored, or arrives under a Focus, may never be answered."
+          },
+          {
+            "from": "window",
+            "permission": "notAskedYet",
+            "onlyWhereThereIsAPrompt": true,
+            "asks": true,
+            "trailSays": [
+              "asked whether Plantoir may send a notification when a scheduled publish finishes",
+              "the teacher did not allow notifications about scheduled publishes"
+            ],
+            "answer": "notAllowed"
+          },
+          {
+            "from": "window",
+            "permission": "allowed",
+            "asks": false,
+            "trailSays": []
+          },
+          {
+            "from": "window",
+            "permission": "notAllowed",
+            "asks": false,
+            "trailSays": [],
+            "why": "Said no once; the question is not put again."
+          },
+          {
+            "from": "appAssistant",
+            "permission": "notAskedYet",
+            "onlyWhereThereIsAPrompt": true,
+            "asks": true,
+            "answer": "allowed",
+            "trailSays": [
+              "asked whether Plantoir may send a notification when a scheduled publish finishes",
+              "the teacher allowed notifications about scheduled publishes"
+            ]
+          },
+          {
+            "from": "outsideAssistant",
+            "permission": "notAskedYet",
+            "onlyWhereThereIsAPrompt": true,
+            "asks": false,
+            "trailSays": [],
+            "why": "KNOWN LIMIT: a teacher who only ever schedules from an outside assistant is never asked, so never notified, and every run's line says permission was not given yet. The outside assistant's process has no window, so the question would appear with nothing on screen to explain it."
+          },
+          {
+            "from": "scheduledRun",
+            "permission": "notAskedYet",
+            "onlyWhereThereIsAPrompt": true,
+            "asks": false,
+            "trailSays": [
+              "did not send a notification about a scheduled publish, because Plantoir has not been given permission to send them yet"
+            ]
+          }
+        ]
+      }
+    },
     "platformDifferences": {
-      "asOf": "2026-09-09",
-      "windows": "Records EVERY outcome \u2014 all four kinds \u2014 and can be dismissed by the teacher, both as of 2026-09-09 (GitHub issue #130). ScheduledPublishOutcome, plus the readout in SectionDetailView.",
-      "mac": "The same: every outcome, and dismissible. Decided by Russell on 2026-09-09 \u2014 a teacher should learn their overnight publish did not happen whatever the reason, because the SILENCE is the complaint rather than the cause \u2014 and landed on both platforms that day, this side in issue #132's work and Windows in issue #130's.",
-      "owed": "NOTHING is owed on what is recorded or how it clears: both widenings and the buildNeededAnAnswer kind are on both platforms as of 2026-09-09, which is why this key no longer lists them. ONE difference remains and it is deliberate, because it cannot be otherwise: WHO writes the trail line. The mac's launchd agent runs Plantoir, so the RUN writes it as the trail key describes, while Windows' Task Scheduler runs plain PowerShell with no app process alive \u2014 so that side sweeps every record when the app next opens, dating each line from the record rather than from the reading. Writing it from the wrapper's own shell was REJECTED there: it would put the trail's line format in a second home, in generated PowerShell, where nothing tests it and the redaction rules do not reach. The property the contract actually asks for is kept either way \u2014 a teacher who never opens the failed section still gets the line, and that teacher is precisely the one who writes in to say their site did not update."
+      "asOf": "2026-09-25",
+      "windows": "Records every outcome of a run that HAPPENED \u2014 neededAnAnswer, buildNeededAnAnswer, didNotFinish and succeeded \u2014 and lets the teacher dismiss it, both since 2026-09-09 (GitHub issue #130); ScheduledPublishOutcome, plus the readout in SectionDetailView. It has NOT got the three kinds added on the mac since: tooLateToRun (2026-09-20, owed only if their task runs a missed start late \u2014 see that kind), courseWasBusy (2026-09-25, #156, owed once their scheduled publish reads leases) and buildDidNotFinish (2026-09-25, #137). A build that fails outright there is recorded as didNotFinish with every configured destination joined, which is the shape #137 replaced.",
+      "mac": "Every kind above, and dismissible. Russell decided on 2026-09-09 that a teacher should learn their overnight publish did not happen whatever the reason, because the SILENCE is the complaint rather than the cause, and that landed on both platforms the same day. buildDidNotFinish landed here 2026-09-25 (#137). A section scheduled BEFORE that keeps the wrapper it was given, so its one remaining run still records a failed build as didNotFinish and shows the old sentence once; that was accepted, as it was for #132.",
+      "owed": "By Windows: buildDidNotFinish, and whichKind.cases run against its own wrapper (#137); tooLateToRun and courseWasBusy on the conditions their kinds give. Nothing is owed by the mac. ONE difference remains and it is deliberate, because it cannot be otherwise: WHO writes the trail line. The mac's launchd agent runs Plantoir, so the RUN writes it as the trail key describes, while Windows' Task Scheduler runs plain PowerShell with no app process alive \u2014 so that side sweeps every record when the app next opens, dating each line from the record rather than from the reading. Writing it from the wrapper's own shell was REJECTED there: it would put the trail's line format in a second home, in generated PowerShell, where nothing tests it and the redaction rules do not reach. The property the contract actually asks for is kept either way \u2014 a teacher who never opens the failed section still gets the line, and that teacher is precisely the one who writes in to say their site did not update. ALSO owed by Windows since #212 (2026-09-25): the `notification` rules — every kind announced with its own sentence, one per section replaced by the next, withdrawn on dismissal, the run never asking, and `scheduled publish notification` on the trail. The rule is theirs to MATCH; the delivery is theirs to design, because their run is PowerShell under Task Scheduler with no app process, so a toast has to be attributed to Plantoir's own application identity, and a toast needs no permission prompt (so only the `allowed` and `notAllowed` rows apply there). Their trail lines for it are written the way their other scheduled-publish lines are, by the sweep when the app next opens."
     },
     "whereTheRecordLives": "Platform-local and deliberately NOT shared: %LOCALAPPDATA%\\Plantoir\\scheduled\\unanswered on Windows, ~/Library/Application Support/Plantoir/scheduled/stopped on the mac. What is shared is the BEHAVIOUR above; a path is not a rule. The mac's folder says `stopped` rather than `unanswered` because that side records more than unanswered questions; Windows records more than that too and KEPT the old name deliberately, because a task scheduled before 2026-09-09 points at a wrapper script already on disk that writes the old path, and nothing rewrites that wrapper until the section is scheduled again — so renaming buys a better name and costs a second directory read for ever, on pain of the first overnight run after an update going silent. The record says what it is on its own first line."
   },
@@ -1516,7 +1924,7 @@
     "note": "How the build tells the app which of the teacher's pages it rewrote with their class's date (#275, #276), so the app can put their names on the activity trail. The rewriting rule itself is class-planning.json's; this is only the line that reports it.",
     "marker": {
       "prefix": "PLANTOIR_DATED:",
-      "rule": "One line on stdout, printed only when at least one page was rewritten: the prefix followed by a single-line JSON object carrying course (the course code), section (a number) and pages (each rewritten page's place in the course folder, without .md, e.g. \"section1/index\" or \"Exercises/Using Aggregate Functions\"). A plain sentence for a person reading the console is printed just before it. The apps keep the marker line itself out of the console a teacher reads, as they do PLANTOIR_HEALTH: lines.",
+      "rule": "One line on stdout, printed only when at least one page was rewritten: the prefix followed by a single-line JSON object carrying course (the course code), section (a number) and pages (each rewritten page's place in the course folder, without .md, e.g. \"section1/index\" or \"Exercises/Using Aggregate Functions\"). A plain sentence for a person reading the console is printed just before it. The apps keep the marker line itself out of the console a teacher reads, as they do PLANTOIR_HEALTH: lines - a line carrying it anywhere, hidden whole, including while it is still arriving, and read from the prefix onward (siteHealth.marker.rule).",
       "examples": [
         "PLANTOIR_DATED: {\"course\": \"ICS4U\", \"section\": 1, \"pages\": [\"section1/index\", \"Exercises/Using Aggregate Functions\"]}"
       ],
@@ -1536,14 +1944,44 @@
     "scheduledDeployPublishesAnyway": "A scheduled deploy NEVER refuses on a health finding. A slightly inaccurate curriculum map is a paper cut; a site update a teacher was counting on that silently did not happen is not. The finding is recorded and surfaced afterwards instead.",
     "marker": {
       "prefix": "PLANTOIR_HEALTH:",
-      "examples": ["PLANTOIR_HEALTH: {\"name\": \"curriculumCoverageFoundNothing\", \"sentence\": \"The curriculum map for ICS3U Section 1 could not be built.\", \"detail\": \"Plantoir looks for a folder whose name mentions the curriculum, holding one page per expectation. It could not find one, so the Curriculum Coverage page has been left out of this build. If you renamed or moved that folder, the map will come back as soon as it can find it again.\", \"fixable\": false, \"course\": \"ICS3U\", \"section\": 1}", "PLANTOIR_HEALTH: {\"name\": \"mediaFolderMissing\", \"sentence\": \"The Media folder for ICS3U is not there.\", \"detail\": \"Images and files you have added to pages live in a folder called Media, beside your course. Plantoir could not find it, so anything on a page that points into it will be missing from the built site.\", \"fixable\": true, \"course\": \"ICS3U\", \"section\": 1}"],
-      "rule": "One line per finding on stdout, the prefix followed by a single-line JSON object carrying name, sentence, detail, fixable, course and section. The apps parse these lines out of the console transcript they are already reading; the teacher-facing SENTENCE travels in the line rather than being re-authored on each platform, so the two apps cannot word the same problem differently.",
-      "why": "A progress marker is matched loosely and getting one wrong is silent (see app-rules.json markerOrigins). A prefixed JSON line is unambiguous, survives being interleaved with ordinary build output, and carries structure a sentence cannot."
+      "examples": ["PLANTOIR_HEALTH: {\"name\": \"curriculumCoverageFoundNothing\", \"sentence\": \"The curriculum map for ICS3U Section 1 could not be built.\", \"detail\": \"Plantoir looks for a folder whose name mentions the curriculum, holding one page per expectation. It could not find one, so the Curriculum Coverage page has been left out of this build. If you renamed or moved that folder, the map will come back as soon as it can find it again.\", \"fixable\": false, \"course\": \"ICS3U\", \"section\": 1}", "PLANTOIR_HEALTH: {\"name\": \"mediaFolderMissing\", \"sentence\": \"The Media folder for ICS3U is not there.\", \"detail\": \"Images and files you have added to pages live in a folder called Media, beside your course. Plantoir could not find it, so anything on a page that points into it will be missing from the built site.\", \"fixable\": true, \"course\": \"ICS3U\", \"section\": 1}", "PLANTOIR_HEALTH: {\"name\": \"pageSettingsUnreadable\", \"sentence\": \"Plantoir could not read the settings of 2 pages in ICS3U Section 1, so they are hidden from students until they are fixed.\", \"detail\": \"A page whose settings cannot be read might be one you meant to keep from students, so Plantoir hides it rather than risk showing it. To show a page again, correct the lines at the top of it in Obsidian and build again: “Concepts/Arrays” (near line 4), “section1/Unit 1/Day 3”.\", \"fixable\": false, \"course\": \"ICS3U\", \"section\": 1}"],
+      "rule": "One line per finding on stdout, the prefix followed by a single-line JSON object carrying name, sentence, detail, fixable, course and section. The apps parse these lines out of the console transcript they are already reading; the teacher-facing SENTENCE travels in the line rather than being re-authored on each platform, so the two apps cannot word the same problem differently. A line CARRYING the prefix anywhere is machinery: it is kept out of the console a teacher reads WHOLE - what precedes a glued marker is half a line of progress chatter, not a sentence - including while it is still arriving, before its newline; and its finding is read from the prefix onward, so a marker glued to the tail of somebody else's half line is still found (#153: the mac had dropped it, finding and all, while showing the raw JSON). consoleCases below are the cases.",
+      "why": "A progress marker is matched loosely and getting one wrong is silent (see app-rules.json markerOrigins). A prefixed JSON line is unambiguous, survives being interleaved with ordinary build output, and carries structure a sentence cannot.",
+      "consoleCases": {
+        "howToRunACase": "Feed each case's chunks, in order, to ONE fresh console reader - the object that both reads findings out of arriving output and builds the transcript a teacher sees (the mac's ScriptRunner.receiveOutput) - exactly as a terminal would hand them over: a chunk is NOT a line, and a chunk boundary can fall anywhere. expectShown is the console's text once every chunk has arrived, as lines (joined with a newline, no trailing one). expectShownAfterEachChunk, where a case carries it, is the same thing read after EACH chunk, one entry per chunk - it is what pins a marker still arriving, which a check made only at the end cannot see. expectFindings is the names of the findings read, in order. The marker string is examples[1] verbatim, so the parse half is the toolchain's real output; 'a marker still arriving' cuts it after its first 60 characters, which ends in a colon.",
+        "cases": [
+          {
+            "name": "a marker on its own line",
+            "chunks": ["⚠️  The Media folder for ICS3U is not there.\r\n", "PLANTOIR_HEALTH: {\"name\": \"mediaFolderMissing\", \"sentence\": \"The Media folder for ICS3U is not there.\", \"detail\": \"Images and files you have added to pages live in a folder called Media, beside your course. Plantoir could not find it, so anything on a page that points into it will be missing from the built site.\", \"fixable\": true, \"course\": \"ICS3U\", \"section\": 1}\r\n"],
+            "expectShown": ["⚠️  The Media folder for ICS3U is not there."],
+            "expectFindings": ["mediaFolderMissing"]
+          },
+          {
+            "name": "a marker glued to the tail of a partial line",
+            "chunks": ["Building…", "PLANTOIR_HEALTH: {\"name\": \"mediaFolderMissing\", \"sentence\": \"The Media folder for ICS3U is not there.\", \"detail\": \"Images and files you have added to pages live in a folder called Media, beside your course. Plantoir could not find it, so anything on a page that points into it will be missing from the built site.\", \"fixable\": true, \"course\": \"ICS3U\", \"section\": 1}\r\n", "done\r\n"],
+            "expectShown": ["done"],
+            "expectFindings": ["mediaFolderMissing"]
+          },
+          {
+            "name": "a marker still arriving",
+            "chunks": ["ok\r\n", "PLANTOIR_HEALTH: {\"name\": \"mediaFolderMissing\", \"sentence\": ", "\"The Media folder for ICS3U is not there.\", \"detail\": \"Images and files you have added to pages live in a folder called Media, beside your course. Plantoir could not find it, so anything on a page that points into it will be missing from the built site.\", \"fixable\": true, \"course\": \"ICS3U\", \"section\": 1}\r\n"],
+            "expectShown": ["ok"],
+            "expectShownAfterEachChunk": [["ok"], ["ok"], ["ok"]],
+            "expectFindings": ["mediaFolderMissing"]
+          },
+          {
+            "name": "plain newline endings",
+            "chunks": ["⚠️  The Media folder for ICS3U is not there.\n", "PLANTOIR_HEALTH: {\"name\": \"mediaFolderMissing\", \"sentence\": \"The Media folder for ICS3U is not there.\", \"detail\": \"Images and files you have added to pages live in a folder called Media, beside your course. Plantoir could not find it, so anything on a page that points into it will be missing from the built site.\", \"fixable\": true, \"course\": \"ICS3U\", \"section\": 1}\n"],
+            "expectShown": ["⚠️  The Media folder for ICS3U is not there."],
+            "expectFindings": ["mediaFolderMissing"]
+          }
+        ]
+      }
     },
     "repair": {
       "note": "What Plantoir offers to put right, and what it says afterwards. Only two of the checks are repairable, and the line is the point: a fix must restore the FEATURE, not merely satisfy the check.",
       "neverOffered": {
-        "checks": ["curriculumCoverageFoundNothing", "courseTeachesNothing", "handWrittenCoveragePage", "noGradedFolders"],
+        "checks": ["curriculumCoverageFoundNothing", "courseTeachesNothing", "handWrittenCoveragePage", "noGradedFolders", "pageSettingsUnreadable"],
         "why": "Recreating an empty curriculum folder would silence \"the curriculum map could not be built\" and leave the map missing, because the folder only counts once it holds a page named for an expectation code. A button that makes a warning go away without fixing anything is worse than no button: the teacher then believes it is dealt with. Decide from the check's NAME, not from the `fixable` flag alone — the flag means \"this kind of thing is repairable\", while what has to be true is that THIS app has a repair for it."
       },
       "offered": {
@@ -1648,6 +2086,199 @@
         "detail": "The curriculum map marks an expectation as evaluated when a page in your graded folders addresses it. None of those folders were found, so every expectation is shown as not yet evaluated. You can choose which folders count in Course Settings.",
         "fixable": false,
         "why": "When no folders count for marks or the configured folders are missing, the curriculum map shows zero evaluated expectations. Telling the teacher lets them choose which folders count in Course Settings rather than wondering why no expectations show as evaluated."
+      },
+      {
+        "name": "pageSettingsUnreadable",
+        "sentence": "Plantoir could not read the settings of “{page}” in {course} Section {section}, so it is hidden from students until they are fixed.",
+        "sentenceForSeveral": "Plantoir could not read the settings of {count} pages in {course} Section {section}, so they are hidden from students until they are fixed.",
+        "detail": "A page whose settings cannot be read might be one you meant to keep from students, so Plantoir hides it rather than risk showing it. To show a page again, correct the lines at the top of it in Obsidian and build again: {pages}.",
+        "pageWithLine": "“{page}” (near line {line})",
+        "pageWithoutLine": "“{page}”",
+        "andMore": "and {count} more",
+        "frontPage": "One of them is the front page of {course} Section {section}, so until it is fixed the website has no front page and cannot be published.",
+        "fixable": false,
+        "fill": "{page} is the page's place in the course folder without .md (section1/index for a section's front page), {line} the line of the PAGE the reader stopped near, counted from the opening --- as line 1, {count} how many. `sentence` when there is one page and `sentenceForSeveral` otherwise; `detail` names at most ten pages, each through `pageWithLine` or `pageWithoutLine`, joined with \", \", then `andMore` with the number left over; `frontPage` is added to the end of the detail, after a space, when the section's front page is one of them. Every value is filled in ONE pass, so a page a teacher named \"{course} notes\" is named as it is. ONE finding per section build, never one per page: both apps key a finding on name, course and section, so two per-page findings would collide.",
+        "why": "Russell, 2026-09-21 (#246, option B): a page that wrongly DISAPPEARS is noticed and harmless; one that wrongly APPEARS cannot be undone. Before, a page whose settings the build could not read was PUBLISHED whenever Quartz could read what PyYAML could not (a yes/no, number or date used as a key, U+2028, an impossible date) - even one hidden by publishForSection1: false, which is what the app writes - and for 14 of the 18 known shapes it STOPPED the whole build with a developer's error. The build now hides such a page in its own copy only, keeps its body, and names it here; the teacher's file is not touched. Not repairable: rewriting a teacher's settings means guessing what they meant. `contracts/shared-rules.json` -> `unreadablePageSettings` holds the cases, and documentation/05-build-pipeline.md the measurements and what was rejected."
+      }
+    ]
+  },
+  "unreadablePageSettings": {
+    "note": "What the build does with a page whose settings block it cannot read (#246). The words a teacher reads are siteHealth.checks[pageSettingsUnreadable]; these are the cases, run by scripts/test_unreadable_page_settings.py through the real build_site.process_frontmatter and by scripts/check_visibility_against_the_site.py down the rest of the chain to the site.",
+    "rule": "A page whose settings block the build cannot read is treated as HIDDEN in every section, whatever it says, and named in ONE site-health finding per section build, with the line the reader stopped near where it can tell. Only the build's copy is changed - its settings become publish: false and its body is kept - and the teacher's file is never touched. A copy that cannot be rewritten is removed, and a build that can do neither stops rather than produce a site that might show it. An unreadable FRONT PAGE is hidden too, so the section has no website: the last built one is cleared, as for a missing front page, and a publish says why in its own words (app-rules.json -> failureExplanations) rather than the missing front page's. Nothing new goes on the trail: the finding reaches it through the existing `folder problem found` line, which carries the check's name and never a page's.",
+    "why": "Russell, 2026-09-21, option B: a page that wrongly DISAPPEARS is noticed and harmless; one that wrongly APPEARS cannot be undone. Before, such a page was PUBLISHED whenever Quartz could read what the build could not - even one hidden by publishForSection1: false, which is what the app writes - and for most shapes the whole build STOPPED instead, withholding every other update including a scheduled publish a teacher was counting on.",
+    "measured": "python-frontmatter 1.3.0 / PyYAML 6.0.3 / gray-matter with js-yaml JSON_SCHEMA, in the image, 2026-09-25. Of the shapes in copyingAPageBetweenCourses.builderAgreement, 18 are refused by the build's reader when it opens the page as a file: 14 of them Quartz could not read either, so the whole build stopped, and 4 (a date that cannot be, the 29th of February with a colon in its offset, `yes` as a key, U+2028) Quartz read, publishing the page unless it also carried a plain publish: false. A 19th, the lone carriage return, raises only when the block is handed over as text; the build opens pages with universal newlines and reads it (the case above). 0 of 14,699 real and shipped pages are refused today, so no existing site changes on the first build after the update. For the shapes that carry a position, the line is counted from it: of those, most point AT the wrong line and the rest one or two lines past it, so the words say NEAR line N.",
+    "rejected": [
+      "Deleting the page from the build instead of hiding it: a missing front page is a different state, with a repair that would find the page and say it was already put right.",
+      "A rule in Quartz's publish filter: Quartz cannot read 14 of the 18 shapes at all.",
+      "Stopping the build, which is what happened before for most shapes: one typo withheld every other update, including a scheduled publish (siteHealth.scheduledDeployPublishesAnyway).",
+      "One finding per page: both apps key a finding on name, course and section, so they would collide.",
+      "Printing the reader's own message: it quotes the page's words into a console that goes into problem reports.",
+      "Making the apps' readers call such a page hidden: it would need a twin of the build's reader in Swift and C#, and the one direction left (the app says shown, the site hides it) is the mild one, and is announced by the finding."
+    ],
+    "notCoveredHere": "A block whose END the build cannot find - a closing fence that is indented, or one never closed - is #188's. It cannot be told from a page that begins with a line across the page (the case above), and 0 of the 14,699 pages are either shape.",
+    "howToRunACase": "Write `page` byte for byte as a page of the build's content, call process_frontmatter on it for `section`, and read what it became. expectHidden is what the site does with the result (build_site._is_draft over the processed text, which check_visibility_against_the_site.py holds to the site). expectReadable false means the page is recorded as unreadable with expectLine (null when the reader names none), its body below the settings is unchanged, and nothing printed carries the reader's message or the page's settings.",
+    "cases": [
+      {
+        "name": "readable, shown in this section",
+        "page": "---\npublishForSection1: true\ntitle: Arrays\n---\nBody\n",
+        "section": 1,
+        "expectReadable": true,
+        "expectHidden": false,
+        "expectLine": null,
+        "why": "The ordinary page. Nothing about it changes."
+      },
+      {
+        "name": "readable, hidden in this section",
+        "page": "---\npublishForSection1: false\ntitle: Arrays\n---\nBody\n",
+        "section": 1,
+        "expectReadable": true,
+        "expectHidden": true,
+        "expectLine": null,
+        "why": "What the app writes for a course-level page a teacher hid in section 1."
+      },
+      {
+        "name": "readable, hidden in ANOTHER section",
+        "page": "---\npublishForSection2: false\ntitle: Arrays\n---\nBody\n",
+        "section": 1,
+        "expectReadable": true,
+        "expectHidden": false,
+        "expectLine": null,
+        "why": "Hidden in section 2 is shown in section 1. The rule below must not widen a per-section hide of a page it CAN read."
+      },
+      {
+        "name": "readable, says nothing about being shown",
+        "page": "---\ntitle: Arrays\n---\nBody\n",
+        "section": 1,
+        "expectReadable": true,
+        "expectHidden": false,
+        "expectLine": null,
+        "why": "A page with no visibility key is shown."
+      },
+      {
+        "name": "an EMPTY settings block",
+        "page": "---\n---\n# Learning Goals\n",
+        "section": 1,
+        "expectReadable": true,
+        "expectHidden": false,
+        "expectLine": null,
+        "why": "25 real pages open this way (measured 2026-09-25 across the example content, skeletons and two real working folders). The reader reads it as no keys, so the page is shown - and must stay shown."
+      },
+      {
+        "name": "a page that begins with a line across the page",
+        "page": "---\n\nSome text after a horizontal rule.\n",
+        "section": 1,
+        "expectReadable": true,
+        "expectHidden": false,
+        "expectLine": null,
+        "why": "One fence and no second one is not a settings block at all, so there is nothing to fail to read. This is also why a block whose END cannot be found (#188) is left out: it cannot be told from this."
+      },
+      {
+        "name": "the 29th of February, written with an offset the reader does not take as a date",
+        "page": "---\npublishForSection1: true\ncreated: 2026-02-29T07:00:00.000-0400\n---\nBody\n",
+        "section": 1,
+        "expectReadable": true,
+        "expectHidden": false,
+        "expectLine": null,
+        "why": "On a real page of Russell's. With no colon in the offset the reader takes it as words, not a date, so it is read and the page is shown."
+      },
+      {
+        "name": "a lone carriage return",
+        "page": "---\npublishForSection1: true\ntitle: Notes\r---\rpublish: false\n---\nBody\n",
+        "section": 1,
+        "expectReadable": true,
+        "expectHidden": false,
+        "expectLine": null,
+        "why": "Read, not refused - measured, and against the plan's count. The build opens a page with universal newlines, so the carriage returns become line ends, the block ends at the first `---`, and the reader sees only publishForSection1 and title. Handed to the reader as TEXT, as copyingAPageBetweenCourses.builderAgreement measures it, the same block raises; the build never hands it over that way."
+      },
+      {
+        "name": "unreadable, hidden only in this section (the headline: it used to be PUBLISHED)",
+        "page": "---\npublishForSection1: false\nyes: value\n---\nBody\n",
+        "section": 1,
+        "expectReadable": false,
+        "expectHidden": true,
+        "expectLine": null,
+        "why": "`yes` used as a key is a yes/no to the reader, and a key must be words, so the reader refuses the block. Quartz read the same block, found no plain `publish: false`, and PUBLISHED a page the teacher had hidden. The reader names no line for this shape."
+      },
+      {
+        "name": "unreadable, marked shown (what option B costs)",
+        "page": "---\npublishForSection1: true\nyes: value\n---\nBody\n",
+        "section": 1,
+        "expectReadable": false,
+        "expectHidden": true,
+        "expectLine": null,
+        "why": "Hidden although the teacher said shown: the build cannot tell which it said, and a page that wrongly disappears is noticed and harmless. The finding names it."
+      },
+      {
+        "name": "unreadable, hidden only in ANOTHER section",
+        "page": "---\npublishForSection2: false\n2025-01-01: x\n---\nBody\n",
+        "section": 1,
+        "expectReadable": false,
+        "expectHidden": true,
+        "expectLine": null,
+        "why": "A date used as a key. Hidden in every section once unreadable, including the one it was shown in - the build cannot read which section the hide was for."
+      },
+      {
+        "name": "a quote inside a quoted value (the build used to STOP)",
+        "page": "---\npublishForSection1: true\ntitle: \"a\"b\"\n---\nBody\n",
+        "section": 1,
+        "expectReadable": false,
+        "expectHidden": true,
+        "expectLine": 3,
+        "why": "One of the 14 shapes Quartz could not read either, so the whole build stopped with a developer's error. Now it builds, with this page hidden and named near the line that is wrong."
+      },
+      {
+        "name": "a date that cannot be",
+        "page": "---\npublishForSection1: true\ncreated: 2025-09-93\n---\nBody\n",
+        "section": 1,
+        "expectReadable": false,
+        "expectHidden": true,
+        "expectLine": null,
+        "why": "A teacher's typo: the reader takes it as a date and cannot make one. It names no line."
+      },
+      {
+        "name": "U+2028 inside a value",
+        "page": "---\npublishForSection1: true\ntitle: a\u2028b\npublish: true\n---\nBody\n",
+        "section": 1,
+        "expectReadable": false,
+        "expectHidden": true,
+        "expectLine": 4,
+        "why": "The reader counts U+2028 as a line break, which an editor does not show as one, so its OWN line number says 5, two lines past the one the teacher sees. Counted from where the reader stopped instead, it says 4: the line after, because the reader only gives up at the next key. Near, not at - which is what the words say."
+      },
+      {
+        "name": "a vertical tab inside a value",
+        "page": "---\npublishForSection1: true\ntitle: a\u000bb\n---\nBody\n",
+        "section": 1,
+        "expectReadable": false,
+        "expectHidden": true,
+        "expectLine": 3,
+        "why": "Refused before the reader looks at the structure at all, with a position but no line - which is counted the same way."
+      },
+      {
+        "name": "a tab-indented line (the build used to STOP)",
+        "page": "---\npublishForSection1: true\ntitle: x\n\tpublish: true\n---\nBody\n",
+        "section": 1,
+        "expectReadable": false,
+        "expectHidden": true,
+        "expectLine": 4,
+        "why": "A tab is not indentation to the reader, nor to Quartz, which stopped the whole build on it."
+      },
+      {
+        "name": "an unclosed quote",
+        "page": "---\npublishForSection1: true\ntitle: \"unclosed\npublish: true\n---\nBody\n",
+        "section": 1,
+        "expectReadable": false,
+        "expectHidden": true,
+        "expectLine": 5,
+        "why": "The reader runs on to the end of the block looking for the closing quote and stops at the closing fence, two lines past the quote - which is why the words say NEAR line N."
+      },
+      {
+        "name": "Windows line endings",
+        "page": "---\r\npublishForSection1: false\r\nyes: value\r\n---\r\nBody\r\nmore\r\n",
+        "section": 1,
+        "expectReadable": false,
+        "expectHidden": true,
+        "expectLine": null,
+        "why": "The body below the settings keeps its own line endings: only the settings are replaced."
       }
     ]
   },
@@ -1697,7 +2328,7 @@
     "gatedTests": "Each platform's GATED test compares its constant to this key, which pins the constant rather than the rendered button. Only the UI suites see the button itself, and both are opt-in and part of no gate — QuartzTeachersUITests on the mac, [UiFact] under PLANTOIR_UI_TESTS=1 on Windows. Said plainly because the first version of this entry called Windows' arrangement the weakest place a shared sentence can live while the mac had the same arrangement and one fewer test.",
     "skeletonToggle": {
       "rule": "A skeleton is OFFERED for a course code when a family exists for its prefix AND the teacher is not taking the example content written for that code. One question, in one function — SkeletonCatalog.hasSkeleton(forCode:takingExampleContent:) on the mac, SkeletonCatalog.HasSkeleton on Windows — because three surfaces ask it: the toggle's own visibility, what the structure editor adopts, and the use_skeleton key in course_config.json. A code with ready-made pages therefore has a skeleton too, and gets it the moment those pages are turned down.\n\nAnd then: the structure editor must show what will actually be created, in BOTH directions. Turning \"Start from a <subject> skeleton\" ON adopts that subject's five lists. Turning it OFF puts the defaults back — the LCS variants for the two SHARED lists when the terminology switch is on, the plain defaults for the two per-section lists, which have no LCS variant — for each list still EQUAL to what the adoption put there, and leaves every other list exactly as the teacher left it. The marks pool is the one exception to that last clause, and why is in (4) below: a pool the teacher ticked is kept, but narrowed to the folders the course will actually have, since a pool naming a folder that has just left the editor is a silent loss of marks rather than a choice. With no adoption to compare against, nothing changes at all.\n\nThe example-content toggle moves the editor exactly as the skeleton toggle does, in both directions: turning example content OFF adopts (the skeleton it has just revealed), turning it back ON restores. A teacher who changes their mind must get the file they would have got without changing it.",
-      "why": "Russell's decision for Windows, 2026-09-06, copied to the mac 2026-09-18 (issue #77). A one-way adoption was this feature's bug in miniature: a teacher who typed SNC4M, watched Investigations and Concepts appear and then turned the toggle off was shown — and got — the science skeleton's folders with none of its pages, while the file said use_skeleton: false. A wizard that lies about what it is about to make is a worse product than one that never asked.\n\nFour consequences, each deliberate. (1) A list is recognised as untouched by VALUE, not by a dirty flag: a list edited and then edited BACK to exactly what the adoption set is restored along with the untouched ones, and that is intended — a teacher cannot see the difference between a list they never touched and one they have put back, so neither can the rule. (2) The LCS switch REWRITES the two shared lists, so flipping it after an adoption leaves them unequal to the snapshot and they stay as the switch left them, while the per-section lists still go back. (3) With no snapshot — the toggle turned off before any code was typed, or on a code whose skeleton was never adopted — NOTHING changes, rather than the defaults being forced over lists the teacher may have edited first. (4) The marks pool can never name a folder that has just left the editor, and that takes TWO rules rather than one: a pool still equal to the adoption's is RE-INFERRED over the restored folders, and a pool the teacher has ticked themselves is kept but NARROWED to the folders the course will actually have. Miss the second and a teacher who adopted the mathematics skeleton, unticked Tasks and then declined the skeleton is shown a checklist with nothing ticked while the wizard writes graded_folders naming Thinking Tasks, a folder the course does not have — and the two apps then write DIFFERENT files for the same clicks, which is what this contract exists to stop. (setup_course.py reconciles the key again when it reads it, so no teacher ends up with a broken course; that is a second net, not a reason for either wizard to write something untrue.) The two apps reach the same answer from opposite ends: the mac narrows the pool inside the restore, Windows leaves it and narrows on every read (CurrentGradedFolders) and again when the file is written.\n\nRejected: tracking a dirty flag per list (a flag has to be got right in every editing path, and gets one wrong the first time a list is changed from somewhere new, where value equality cannot); and a further rule for the narrow hole value equality leaves, which would have made the two apps differ for a case no teacher can tell apart.\n\nA fifth consequence, added 2026-09-21 with the first half of the rule above (GitHub issue #248). Both apps asked \"is there example content for this code?\" rather than \"is the teacher taking it?\", so for all 38 codes with a payload the toggle was never shown, nothing was ever adopted, and use_skeleton was written false whatever the teacher chose. MEASURED by driving the real scripts/setup_course.py through a pty: ICS4U created that way holds 18 .md files; the same code with use_skeleton true holds 47, and the tree and the config are byte-identical to what ICS2O — same family, no payload — has always got. The Python needed no change at all, find_skeleton_dir having never looked at payloads; the whole fault was the two apps, which is exactly the shape of drift this file exists to catch, and it stood for five weeks (091a23dc, 2026-08-13) because nothing here asked the question in the teacher's terms. REJECTED while fixing it: a third \"empty folders\" sentence covering all three situations at once, which would have reworded what ~1,900 codes read; and anything retroactive for courses already created this way — Russell's call, 2026-09-21, having deleted and remade the one course it affected.\n\nA sixth consequence, 2026-09-22 (GitHub issue #251), and it REVERSES a rejection recorded here the day before. #248 also rejected a curriculum-pages toggle for a skeleton that ships a Curriculum folder, on the ground that the fixed and control runs produce identical trees, so adding one would make a payload code behave unlike its own family. Half of that is still right: for the ~1,900 codes with no payload there is nothing to include, and the toggle decides nothing. It was wrong for the 38 that HAVE one — the expectations written for their code exist, the teacher declined the lessons rather than the curriculum, and behaving like its own family is precisely what makes their course wrong. So a payload code that declines its ready-made pages now gets the subject's skeleton WITH the payload's curriculum expectations installed into it, and the three curriculum answers written as they are for a payload course. MEASURED: ICS4U went from 2 curriculum pages — a generic index and a placeholder expectation called A1.1 reading \"DELETE THIS PAGE\" — to 61, MCMPR11 to 59 British Columbia standards with no A1.1 among them, and ICS2O, which has no payload, stayed at 2. The key that says so is expectSavedIncludeCurriculumPages on the payload cases below.",
+      "why": "Russell's decision for Windows, 2026-09-06, copied to the mac 2026-09-18 (issue #77). A one-way adoption was this feature's bug in miniature: a teacher who typed SNC4M, watched Investigations and Concepts appear and then turned the toggle off was shown — and got — the science skeleton's folders with none of its pages, while the file said use_skeleton: false. A wizard that lies about what it is about to make is a worse product than one that never asked.\n\nFour consequences, each deliberate. (1) A list is recognised as untouched by VALUE, not by a dirty flag: a list edited and then edited BACK to exactly what the adoption set is restored along with the untouched ones, and that is intended — a teacher cannot see the difference between a list they never touched and one they have put back, so neither can the rule. (2) The LCS switch REWRITES the two shared lists, so flipping it after an adoption leaves them unequal to the snapshot and they stay as the switch left them, while the per-section lists still go back. (3) With no snapshot — the toggle turned off before any code was typed, or on a code whose skeleton was never adopted — NOTHING changes, rather than the defaults being forced over lists the teacher may have edited first. (4) The marks pool can never name a folder that has just left the editor, and that takes TWO rules rather than one: a pool still equal to the adoption's is RE-INFERRED over the restored folders, and a pool the teacher has ticked themselves is kept but NARROWED to the folders the course will actually have. Miss the second and a teacher who adopted the mathematics skeleton, unticked Tasks and then declined the skeleton is shown a checklist with nothing ticked while the wizard writes graded_folders naming Thinking Tasks, a folder the course does not have — and the two apps then write DIFFERENT files for the same clicks, which is what this contract exists to stop. (The wizard's pool is the only net: since GitHub issue #192 setup_course.py writes a saved pool back as it was rather than reconciling it again — gradedFolders.rerunningSetup — so a wizard that wrote something untrue would leave it in the file.) The two apps reach the same answer from opposite ends: the mac narrows the pool inside the restore, Windows leaves it and narrows on every read (CurrentGradedFolders) and again when the file is written.\n\nRejected: tracking a dirty flag per list (a flag has to be got right in every editing path, and gets one wrong the first time a list is changed from somewhere new, where value equality cannot); and a further rule for the narrow hole value equality leaves, which would have made the two apps differ for a case no teacher can tell apart.\n\nA fifth consequence, added 2026-09-21 with the first half of the rule above (GitHub issue #248). Both apps asked \"is there example content for this code?\" rather than \"is the teacher taking it?\", so for all 38 codes with a payload the toggle was never shown, nothing was ever adopted, and use_skeleton was written false whatever the teacher chose. MEASURED by driving the real scripts/setup_course.py through a pty: ICS4U created that way holds 18 .md files; the same code with use_skeleton true holds 47, and the tree and the config are byte-identical to what ICS2O — same family, no payload — has always got. The Python needed no change at all, find_skeleton_dir having never looked at payloads; the whole fault was the two apps, which is exactly the shape of drift this file exists to catch, and it stood for five weeks (091a23dc, 2026-08-13) because nothing here asked the question in the teacher's terms. REJECTED while fixing it: a third \"empty folders\" sentence covering all three situations at once, which would have reworded what ~1,900 codes read; and anything retroactive for courses already created this way — Russell's call, 2026-09-21, having deleted and remade the one course it affected.\n\nA sixth consequence, 2026-09-22 (GitHub issue #251), and it REVERSES a rejection recorded here the day before. #248 also rejected a curriculum-pages toggle for a skeleton that ships a Curriculum folder, on the ground that the fixed and control runs produce identical trees, so adding one would make a payload code behave unlike its own family. Half of that is still right: for the ~1,900 codes with no payload there is nothing to include, and the toggle decides nothing. It was wrong for the 38 that HAVE one — the expectations written for their code exist, the teacher declined the lessons rather than the curriculum, and behaving like its own family is precisely what makes their course wrong. So a payload code that declines its ready-made pages now gets the subject's skeleton WITH the payload's curriculum expectations installed into it, and the three curriculum answers written as they are for a payload course. MEASURED: ICS4U went from 2 curriculum pages — a generic index and a placeholder expectation called A1.1 reading \"DELETE THIS PAGE\" — to 61, MCMPR11 to 59 British Columbia standards with no A1.1 among them, and ICS2O, which has no payload, stayed at 2. The key that says so is expectSavedIncludeCurriculumPages on the payload cases below.",
       "whoRunsIt": "The mac runs every case below in SharedRulesContractTests as of 2026-09-18; WizardStructureTests covers what the cases cannot reach — the pieces the rule is assembled from, and a scan proving the toggle is WIRED, since a control with no handler was the original bug and no test that calls the handler itself can see one. Nothing on Windows reads this key yet — their suite stays GREEN until it is wired in, and as of 2026-09-21 their behaviour is NO LONGER the one described here: SkeletonCatalog.HasSkeleton returns false for any code with example content, and their own SkeletonCatalogTests.HasSkeletonReturnsFalseWhenExampleContentExists asserts that against itself and passes. So what Windows owes is the behaviour AND the test, and the seam to run the cases against (their restore lives inside the private NewCourseDialog.RestoreGenericStructure). The line that WILL go red on their side is ContractTests.SharedRules_ActivityTrailEvents_Exist, over the \"course created\" event added to activityTrail.mustRecord in the same piece — deliberately, because an unrun case is a request nobody reads and a red suite naming the issue is one somebody answers.",
       "courseCode": "SNC4M",
       "otherCourseCode": "AMU3M",
@@ -2262,8 +2893,8 @@
       "why": "The folder's own name is the part a teacher is looking for; 'Macintosh HD › Users › …' is the same for every folder they own. Found 2026-09-05 with an iCloud Drive folder, whose real path runs through ~/Library/Mobile Documents/com~apple~CloudDocs and was cut off in the folder picker before reaching the folder's name. Wherever the bar appears — the window's own bar and the picker's — the same rule. THE MECHANISM WAS ADDED 2026-09-09 (issue #148), after Russell asked for Finder's answer rather than an ellipsis, and the two platforms deliberately differ the way specialNames.platformWording does: each app does what its own PLATFORM'S CONTROL does, because this bar exists to be RECOGNISED rather than learned (the mac's half was measured against the real Finder; the Windows half is BreadcrumbBar's documented behaviour, and File Explorer's address bar was NOT examined — the claim is about the control, not about Explorer). Windows' BreadcrumbBar “displays each node in a horizontal line” and, per Microsoft's page, “if the app is resized so that there is not enough space to show all the nodes, the breadcrumbs collapse and an ellipsis replaces the leftmost nodes” — right there, wrong on a Mac. Finder was MEASURED at five window widths before the mac's half was written, and two of the things it does are deliberately not copied: it shrinks the middle names before dropping them, which is per-crumb width negotiation for a state a teacher passes through rather than sits in; and at its narrowest it clips the TAIL, losing the folder's own name, which is precisely what the rule above forbids. So the mac collapses like Finder and, when even icons and chevrons do not fit, falls back to its own end-anchored scroll rather than to Finder's clipping. A hidden name is not a lost one: every crumb keeps its tooltip, its double-click and its context menu, so hovering an icon still says which folder it is."
     },
     "fitsInTheSpace": {
-      "rule": "A path that FITS the space starts beside the label that introduces it, never at the far end of it.",
-      "why": "The other half of tooLongForTheSpace, and it was missing for four days — the first rule BROKE it. Anchoring the crumbs at the trailing edge (2026-09-05) stopped a long path being cut off before the folder's own name; the mac's bar is a horizontal scroll view, a scroll view fills whatever width it is given, and with the content anchored trailing a two-crumb path then sat at the opposite end of the window from “Working folder:”, with the width of a window in between. Reported from a screenshot 2026-09-09 (issue #145). The two rules are one rule seen from each end: crumbs are read left to right FROM the label, and what is sacrificed when there is not enough room is the START of the path, never its end. **Windows already has both halves and owes nothing** — a BreadcrumbBar “displays each node in a horizontal line” and, in Microsoft's own words, “if the app is resized so that there is not enough space to show all the nodes, the breadcrumbs collapse and an ellipsis replaces the leftmost nodes” (learn.microsoft.com, BreadcrumbBar). That is the platform's control being right rather than a decision anyone made, so a surface that ever replaced it with a hand-rolled ScrollViewer of crumbs would meet exactly this. The mac's fix, the shape of the mistake it is an instance of, and the measurements pinning it are in documentation/10-local-ai-assistant.md."
+      "rule": "A path that FITS the space starts beside the label that introduces it, never at the far end of it. 'The space' is the room the window gives the bar: no fixed width narrower than that decides that a path does not fit.",
+      "why": "The other half of tooLongForTheSpace, and it was missing for four days — the first rule BROKE it. Anchoring the crumbs at the trailing edge (2026-09-05) stopped a long path being cut off before the folder's own name; the mac's bar is a horizontal scroll view, a scroll view fills whatever width it is given, and with the content anchored trailing a two-crumb path then sat at the opposite end of the window from “Working folder:”, with the width of a window in between. Reported from a screenshot 2026-09-09 (issue #145). The two rules are one rule seen from each end: crumbs are read left to right FROM the label, and what is sacrificed when there is not enough room is the START of the path, never its end. **Windows' own control has both halves** — a BreadcrumbBar “displays each node in a horizontal line” and, in Microsoft's own words, “if the app is resized so that there is not enough space to show all the nodes, the breadcrumbs collapse and an ellipsis replaces the leftmost nodes” (learn.microsoft.com, BreadcrumbBar). That is the platform's control being right rather than a decision anyone made, so a surface that ever replaced it with a hand-rolled ScrollViewer of crumbs would meet exactly this. The mac's fix, the shape of the mistake it is an instance of, and the measurements pinning it are in documentation/10-local-ai-assistant.md. THE SECOND SENTENCE OF THE RULE WAS ADDED 2026-09-25 (issue #295), and it is what Windows now owes: the folder picker's bar, under a folder just chosen, was held to 520 points on BOTH platforms — on the mac by a limit added 2026-08-09, when the bar was a scroll view that filled any width and needed holding in, and left behind when #145 and #148 made it ask only for the room its crumbs need. So an ordinary Desktop path, which needs about 554 points, lost every ancestor's name at every window size, however much room the window had. The mac dropped the limit; Windows' picker carries the same one (MaxWidth=\"520\" on its BreadcrumbBar), and there it ellipsises the leftmost crumbs at 520 whatever the window's width. The reasoning and the measurements are in documentation/09-mac-app.md."
     },
     "icons": {
       "rule": "Each crumb shows the folder's real icon from the host file manager.",
@@ -4480,6 +5111,7 @@
       "neverDeployed": "{course} is kept for reference. Preview it to read its pages; it is never deployed.",
       "copyAlreadyBeingMade": "A copy called {folder} is already being made in another window, or in another copy of Plantoir.",
       "copyIsASnapshot": "This records {course} as it is today. You can keep teaching it as usual \u2014 nothing here changes. To take a fresher copy later, delete this one first, then copy again.",
+      "keepACopyLeavesAddOnsBehind": "The copy is made without {course}'s Obsidian add-ons and their settings, so nothing in them can publish it. {course} keeps them.",
       "codeAlreadyInThatYear": "You already have a {code} kept for reference from {year}. Choose a different school year.",
       "codeAlreadyWithNoYear": "You already have a {code} kept for reference with no school year. Choose a school year for this one.",
       "groupTitle": "Reference Courses",
@@ -4512,7 +5144,7 @@
         },
         {
           "name": ".obsidian",
-          "why": "Obsidian writes workspace.json the moment a vault is opened, and opening the course in Obsidian is the whole point of keeping it. The folder and everything under it - plugins, themes, snippets - are outside the lock."
+          "why": "Obsidian writes workspace.json the moment a vault is opened, and opening the course in Obsidian is the whole point of keeping it. The folder and everything under it - themes, snippets, the workspace, and the add-ons of a course kept before #255 - are outside the lock."
         },
         {
           "name": ".merged_output",
@@ -4574,6 +5206,386 @@
         "why": "Everything that finds a course walks courses/ — discovery, the launchers, the build output link, the backups list. A second home would be a second answer to 'where are the courses', and the marker gives the same separation for one key."
       }
     ],
+    "obsidianAddOns": {
+      "note": "#255 (2026-09-25). EVERY route that makes a reference course - Keep a Copy for Reference..., and Import Courses for Reference... reading a modern working folder, the older folder-per-class layout (importing.olderLayout) or the 2024-25 website-folder-per-class layout (importing.quartzCheckoutLayout) - leaves the same three entries of the course's .obsidian behind and brings the rest. Before #255 only the two older layouts did; a modern import and Keep a Copy brought plugins/ and community-plugins.json across whole.",
+      "rule": "Anchored at the course's OWN top-level .obsidian (content/.obsidian in the 2024-25 layout) and compared as a PATH, never matched as a name: a teacher's own folder of pages called plugins, anywhere in the course, comes across. Each entry is skipped WITHOUT being looked inside - before it is so much as lstat-ed - so nothing inside an add-on can refuse a course (an unreadable folder in there is not an unreadable folder of the course). On the two MODERN routes a .obsidian that is itself a LINK does not come at all: it is never copied as a link, because the reference course would then be reading - and the reading-view default WRITING into - the live settings it points at. The older layout already leaves every link out, and the 2024-25 layout judges every link at the top of content/ on its own, so neither needs that half. Keep a Copy of a LIVE course follows the same rule (Russell, 2026-09-25): the copy is never published, so an add-on in it is only ever a way to publish it outside the refusals, and the course being taught keeps its add-ons untouched.",
+      "leftBehindInsideObsidian": [
+        {
+          "path": "plugins",
+          "why": "Every community add-on: its code and its settings. An add-on runs code with network access, and a publishing add-on keeps its credential in its own data.json - every real 2023-24 class folder carries digitalgarden/data.json with a non-empty githubToken (importing.olderLayout.placement.whyTheAddOnsStayBehind). Copied, the credential lands in the working folder and in every backup and archive zip, and once Obsidian trusts the vault's add-ons it is a publish command outside all fifteen of Plantoir's refusals."
+        },
+        {
+          "path": "community-plugins.json",
+          "why": "The list of add-ons Obsidian switches on. Nothing to switch on without plugins/, and a list naming an add-on that is not there is only clutter."
+        },
+        {
+          "path": "publish.json",
+          "why": "Core Obsidian Publish's connection to a LIVE site - {siteId, host, included, excluded}. MEASURED in Obsidian 1.13.6's own bundle: a core add-on's loadData is vault.readConfigJson(id), which reads <configDir>/<id>.json. With the teacher signed in to Obsidian, a copied publish.json is one click from publishing the reference course over the site it came from. Core Sync is NOT here: its remote is kept in Obsidian's own storage keyed by the vault (IndexedDB '<appId>-sync', measured in the same bundle), so a copied folder carries nothing of it. 0 publish.json files in Russell's 2023-24 folders and 0 in the 2025-26 backup."
+        }
+      ],
+      "kept": [
+        {
+          "what": "app.json",
+          "why": "Editor and appearance settings, the teacher's own; ReferenceReadingView writes defaultViewMode here after the copy."
+        },
+        {
+          "what": "appearance.json, themes/, snippets/",
+          "why": "How the vault looks. CSS cannot publish anything, and a theme is CSS."
+        },
+        {
+          "what": "core-plugins.json",
+          "why": "Which of Obsidian's own features are on. It holds switches (\"sync\": true, \"publish\": false in Russell's four), never an account or a site - the site lives in publish.json, left behind above."
+        },
+        {
+          "what": "workspace.json and its conflicted copies",
+          "why": "Every path in workspace.json is vault-relative (importing.leftBehind.kept). The conflicted copies - 63 of them in MPM2DE's .obsidian, 'workspace (<name>'s conflicted copy <date>).json' - are a sync provider's clutter, not a danger, and matching them would mean matching every provider's naming in every language. They come (Russell, 2026-09-25)."
+        },
+        {
+          "what": "graph.json, hotkeys.json, bookmarks.json, anything else",
+          "why": "Folder state and preferences. Nothing in them runs code or reaches a website."
+        }
+      ],
+      "hasAddOnsWhen": "The sheets say it, and the modern trail lines name it, ONLY when there is something: plugins/ holds at least one entry whose name does not start with '.', or plugins/ is itself a link, or plugins/ is a folder that could not be listed, or .obsidian is itself a link, or publish.json is there. An empty plugins/ and a community-plugins.json of [] - Russell's own ICS3U, measured - say NOTHING: telling a teacher their add-ons were left behind when they had none is false. Add-ons are named by FOLDER name only; nothing inside an add-on is ever opened, and nothing read from one is ever written down.",
+      "whereItIsSaid": "Import sheet, under the list and in the summary: wording.addOnsAreLeftBehind when a MODERN course in the list has add-ons - true of every route, so it is said INSTEAD of wording.olderLayoutAddOnsAreLeftBehind, which beside a modern course with an add-on would read as if that one's add-ons came; otherwise the older sentence for any older-layout class, as before; otherwise nothing. Keep a Copy sheet, in the calm note before the copy is made: referenceCourses.wording.keepACopyLeavesAddOnsBehind, only when the live course has add-ons. The trail: 'course kept for reference' and, for a modern course, 'course imported for reference' end with what was left behind when there was anything, and are byte-identical to before when there was not. The older layouts keep counting theirs on their own second line, which is why the shared import line adds nothing for them.",
+      "treeEntries": "The grammar of importing.olderLayout.treeEntries: a plain string is a file (content 'something'), except a path ending course_config.json, which is written as settings naming the folder as its course_code with section_numbers [1]; one ending '/' is an empty folder; {\"file\": path, \"text\": \"...\"} is a file with that content; {\"link\": path, \"to\": \"<path in the tree>\"} is a link to that path. Each case is built at a root, and its course is root/<course>. On Windows a directory link can be a junction (a symlink needs Developer Mode); any reparse point must be treated as a link - never followed, never copied.",
+      "cases": [
+        {
+          "name": "a publishing add-on, with everything else Obsidian keeps beside it",
+          "course": "courses/ICS3U",
+          "tree": [
+            "courses/ICS3U/course_config.json",
+            "courses/ICS3U/section1/index.md",
+            {
+              "file": "courses/ICS3U/.obsidian/app.json",
+              "text": "{}"
+            },
+            "courses/ICS3U/.obsidian/appearance.json",
+            "courses/ICS3U/.obsidian/workspace.json",
+            "courses/ICS3U/.obsidian/snippets/x.css",
+            "courses/ICS3U/.obsidian/themes/T/theme.css",
+            "courses/ICS3U/.obsidian/plugins/digitalgarden/main.js",
+            {
+              "file": "courses/ICS3U/.obsidian/plugins/digitalgarden/data.json",
+              "text": "{\"githubToken\": \"not-a-real-credential\"}"
+            },
+            {
+              "file": "courses/ICS3U/.obsidian/community-plugins.json",
+              "text": "[\"digitalgarden\"]"
+            }
+          ],
+          "expectAbsent": [
+            ".obsidian/plugins",
+            ".obsidian/community-plugins.json"
+          ],
+          "expectUnchanged": [
+            ".obsidian/appearance.json",
+            ".obsidian/workspace.json",
+            ".obsidian/snippets/x.css",
+            ".obsidian/themes/T/theme.css",
+            "section1/index.md"
+          ],
+          "expectFound": {
+            "addOnNames": [
+              "digitalgarden"
+            ],
+            "addOnsFolderIsALink": false,
+            "settingsFolderIsALink": false,
+            "publishSiteIsSet": false
+          },
+          "expectSaid": true
+        },
+        {
+          "name": "a course Plantoir made: no add-ons, and nothing said",
+          "course": "courses/ICS4U",
+          "tree": [
+            "courses/ICS4U/course_config.json",
+            "courses/ICS4U/section1/index.md",
+            "courses/ICS4U/.obsidian/app.json",
+            "courses/ICS4U/.obsidian/appearance.json",
+            "courses/ICS4U/.obsidian/core-plugins.json",
+            "courses/ICS4U/.obsidian/workspace.json",
+            "courses/ICS4U/.obsidian/themes/Minimal/theme.css"
+          ],
+          "expectAbsent": [],
+          "expectUnchanged": [
+            ".obsidian/appearance.json",
+            ".obsidian/core-plugins.json",
+            ".obsidian/workspace.json",
+            ".obsidian/themes/Minimal/theme.css",
+            "section1/index.md"
+          ],
+          "expectFound": {
+            "addOnNames": [],
+            "addOnsFolderIsALink": false,
+            "settingsFolderIsALink": false,
+            "publishSiteIsSet": false
+          },
+          "expectSaid": false
+        },
+        {
+          "name": "Russell's ICS3U as measured: an empty add-ons folder and an empty list",
+          "course": "courses/ICS3U",
+          "tree": [
+            "courses/ICS3U/course_config.json",
+            "courses/ICS3U/section1/index.md",
+            "courses/ICS3U/.obsidian/app.json",
+            "courses/ICS3U/.obsidian/core-plugins.json",
+            "courses/ICS3U/.obsidian/snippets/one.css",
+            "courses/ICS3U/.obsidian/plugins/",
+            {
+              "file": "courses/ICS3U/.obsidian/community-plugins.json",
+              "text": "[]"
+            }
+          ],
+          "expectAbsent": [
+            ".obsidian/plugins",
+            ".obsidian/community-plugins.json"
+          ],
+          "expectUnchanged": [
+            ".obsidian/core-plugins.json",
+            ".obsidian/snippets/one.css",
+            "section1/index.md"
+          ],
+          "expectFound": {
+            "addOnNames": [],
+            "addOnsFolderIsALink": false,
+            "settingsFolderIsALink": false,
+            "publishSiteIsSet": false
+          },
+          "expectSaid": false
+        },
+        {
+          "name": "a teacher's own pages called plugins come: the rule is a place, not a name",
+          "course": "courses/ICS3U",
+          "tree": [
+            "courses/ICS3U/course_config.json",
+            "courses/ICS3U/.obsidian/app.json",
+            "courses/ICS3U/plugins/Plugin Notes.md",
+            "courses/ICS3U/Unit 1/plugins/notes.md",
+            "courses/ICS3U/Unit 1/community-plugins.json",
+            "courses/ICS3U/Unit 1/publish.json",
+            "courses/ICS3U/section1/plugins/index.md"
+          ],
+          "expectAbsent": [],
+          "expectUnchanged": [
+            "plugins/Plugin Notes.md",
+            "Unit 1/plugins/notes.md",
+            "Unit 1/community-plugins.json",
+            "Unit 1/publish.json",
+            "section1/plugins/index.md"
+          ],
+          "expectFound": {
+            "addOnNames": [],
+            "addOnsFolderIsALink": false,
+            "settingsFolderIsALink": false,
+            "publishSiteIsSet": false
+          },
+          "expectSaid": false
+        },
+        {
+          "name": "the add-ons folder is a link: left behind, never followed, and said",
+          "course": "courses/ICS3U",
+          "tree": [
+            "courses/ICS3U/course_config.json",
+            "courses/ICS3U/section1/index.md",
+            "courses/ICS3U/.obsidian/app.json",
+            "Shared Add-ons/digitalgarden/main.js",
+            {
+              "link": "courses/ICS3U/.obsidian/plugins",
+              "to": "Shared Add-ons"
+            }
+          ],
+          "expectAbsent": [
+            ".obsidian/plugins"
+          ],
+          "expectUnchanged": [
+            "section1/index.md"
+          ],
+          "expectFound": {
+            "addOnNames": [],
+            "addOnsFolderIsALink": true,
+            "settingsFolderIsALink": false,
+            "publishSiteIsSet": false
+          },
+          "expectSaid": true
+        },
+        {
+          "name": "a sync provider's conflicted copies of the workspace come along",
+          "course": "courses/MPM2DE",
+          "tree": [
+            "courses/MPM2DE/course_config.json",
+            "courses/MPM2DE/section1/index.md",
+            "courses/MPM2DE/.obsidian/app.json",
+            "courses/MPM2DE/.obsidian/workspace.json",
+            "courses/MPM2DE/.obsidian/workspace (Jimmy Frickey's conflicted copy 2025-09-08).json"
+          ],
+          "expectAbsent": [],
+          "expectUnchanged": [
+            ".obsidian/workspace.json",
+            ".obsidian/workspace (Jimmy Frickey's conflicted copy 2025-09-08).json"
+          ],
+          "expectFound": {
+            "addOnNames": [],
+            "addOnsFolderIsALink": false,
+            "settingsFolderIsALink": false,
+            "publishSiteIsSet": false
+          },
+          "expectSaid": false
+        },
+        {
+          "name": "the settings folder itself is a link: not copied, and the live settings are not written through it",
+          "course": "courses/ICS3U",
+          "tree": [
+            "courses/ICS3U/course_config.json",
+            "courses/ICS3U/section1/index.md",
+            {
+              "file": "Shared Settings/app.json",
+              "text": "{}"
+            },
+            "Shared Settings/plugins/digitalgarden/main.js",
+            {
+              "file": "Shared Settings/community-plugins.json",
+              "text": "[\"digitalgarden\"]"
+            },
+            {
+              "link": "courses/ICS3U/.obsidian",
+              "to": "Shared Settings"
+            }
+          ],
+          "expectAbsent": [
+            ".obsidian/plugins",
+            ".obsidian/community-plugins.json"
+          ],
+          "expectNotALink": [
+            ".obsidian"
+          ],
+          "expectUnchanged": [
+            "section1/index.md"
+          ],
+          "expectFound": {
+            "addOnNames": [],
+            "addOnsFolderIsALink": false,
+            "settingsFolderIsALink": true,
+            "publishSiteIsSet": false
+          },
+          "expectSaid": true
+        },
+        {
+          "name": "the settings folder itself is a link and holds no app.json: not copied, and no settings file is made in the live folder",
+          "course": "courses/ICS3U",
+          "tree": [
+            "courses/ICS3U/course_config.json",
+            "courses/ICS3U/section1/index.md",
+            "Shared Settings/plugins/digitalgarden/main.js",
+            {
+              "file": "Shared Settings/community-plugins.json",
+              "text": "[\"digitalgarden\"]"
+            },
+            {
+              "link": "courses/ICS3U/.obsidian",
+              "to": "Shared Settings"
+            }
+          ],
+          "expectAbsent": [
+            ".obsidian/plugins",
+            ".obsidian/community-plugins.json"
+          ],
+          "expectNotALink": [
+            ".obsidian"
+          ],
+          "expectUnchanged": [
+            "section1/index.md"
+          ],
+          "expectFound": {
+            "addOnNames": [],
+            "addOnsFolderIsALink": false,
+            "settingsFolderIsALink": true,
+            "publishSiteIsSet": false
+          },
+          "expectSaid": true
+        },
+        {
+          "name": "core Obsidian Publish connected to a live site: its setting stays behind",
+          "course": "courses/ICS4U",
+          "tree": [
+            "courses/ICS4U/course_config.json",
+            "courses/ICS4U/section1/index.md",
+            "courses/ICS4U/.obsidian/app.json",
+            {
+              "file": "courses/ICS4U/.obsidian/core-plugins.json",
+              "text": "{\"publish\": true}"
+            },
+            {
+              "file": "courses/ICS4U/.obsidian/publish.json",
+              "text": "{\"siteId\": \"not-a-real-site\", \"host\": \"publish.example.org\"}"
+            }
+          ],
+          "expectAbsent": [
+            ".obsidian/publish.json"
+          ],
+          "expectUnchanged": [
+            ".obsidian/core-plugins.json",
+            "section1/index.md"
+          ],
+          "expectFound": {
+            "addOnNames": [],
+            "addOnsFolderIsALink": false,
+            "settingsFolderIsALink": false,
+            "publishSiteIsSet": true
+          },
+          "expectSaid": true
+        }
+      ],
+      "howToRunACase": "Build the tree, then make a reference course from root/<course> BOTH ways - Keep a Copy (the course as a live one) and a modern import (choosing root, a working folder holding courses/) - into a different working folder. Every expectAbsent path is not in the made course (not as a file, a folder or a link); every expectUnchanged path is byte-identical to its source; every expectNotALink path is not a link; the ENTIRE source tree, links' targets included, is byte-identical afterwards; what was found is expectFound; the sheet's note is said exactly when expectSaid. Two things are Swift-only because they are platform mechanics rather than data: a folder inside an add-on that nobody can read does not refuse the course on any of the four routes, and the sheet's size leaves the add-ons out.",
+      "knownLimits": [
+        {
+          "what": "A vault inside the course",
+          "why": "The rule is anchored at the course's own top-level .obsidian, so a nested one (section1/.obsidian/plugins) comes across whole. MEASURED: the 2025-26 backup holds exactly four .obsidian folders, found case-insensitively and at any depth, all at a course's top; the 2023-24 class folders are routed through importing.olderLayout. None is met today."
+        },
+        {
+          "what": "Another spelling of the folder names",
+          "why": "Compared exactly: .Obsidian/Plugins would come across although APFS would let Obsidian load it. The same measurement found only the lower-case spelling; matching case-insensitively was weighed and left for when a real folder needs it, because a rule that is exactly the file system's spelling is the one both platforms can run as data."
+        },
+        {
+          "what": "A renamed settings folder",
+          "why": "Obsidian can be told to keep a vault's settings in a folder other than .obsidian ('Override config folder'). Such a folder is copied as the teacher's own. Not met in any folder measured."
+        }
+      ],
+      "rejected": [
+        {
+          "what": "An allow-list of 'harmless' add-ons (Excalidraw, Dataview)",
+          "why": "Any add-on runs arbitrary code with network access. Plantoir cannot judge third-party code, and the list would rot the day an add-on it named shipped an update."
+        },
+        {
+          "what": "Copying the add-ons but stripping credentials from data.json",
+          "why": "Every add-on names its settings differently - githubToken is one of thousands - so which key is a credential cannot be known."
+        },
+        {
+          "what": "Copying plugins/ but not community-plugins.json, so the add-ons arrive switched off",
+          "why": "The credential still lands in the folder and in every zip, and one toggle in Obsidian switches the add-on back on."
+        },
+        {
+          "what": "Walking the add-ons and filtering them out afterwards",
+          "why": "The walk would still go inside plugins/, so an unreadable folder in an add-on would refuse the whole course for something never going to be copied. This is what the two older layouts did until #255; they skip now."
+        },
+        {
+          "what": "Adding plugins to the by-name list (importing.leftBehind.names)",
+          "why": "That list matches at every depth, so it would drop a teacher's own folder of pages called plugins anywhere in the course (case 4)."
+        },
+        {
+          "what": "A different rule for Keep a Copy of a live course",
+          "why": "The copy is a reference course and is never published, whoever installed the add-on; the live course keeps its add-ons untouched. Russell, 2026-09-25."
+        },
+        {
+          "what": "Leaving the conflicted workspace copies behind",
+          "why": "Clutter, not danger, and matching a sync provider's naming means matching every provider in every language. Russell, 2026-09-25: they come."
+        },
+        {
+          "what": "Leaving the modern route as it was because Plantoir-made courses carry no add-ons",
+          "why": "True today, and exactly the quiet difference between routes that nobody chose: a teacher who installs one add-on in a live course would have it copied into every reference copy of it."
+        }
+      ]
+    },
     "importing": {
       "note": "The SECOND way a reference course is made: the teacher points at the folder they kept last year's classes in and ticks the courses they want. It is the same act as 'Keep a Copy for Reference…' with a different source, and it ends in the same code — cut loose from last year's websites, marked, filed under a school year, left with nowhere to deploy to, locked. Everything in the referenceCourses block above therefore applies to an imported course without exception: the same marker, the same neutralisation, the same fifteen refusals, the same lock.",
       "theSourceIsNeverWritten": {
@@ -4665,7 +5677,7 @@
         ]
       },
       "leftBehind": {
-        "rule": "Composed from the lists that already exist rather than written out again: what an archive leaves behind, plus what a reference copy leaves behind, plus what only an import meets. A name in the list is skipped WITHOUT being looked inside. On this route a symlink is copied as a link and never followed - the only one a modern course holds is .merged_output, which is left behind by name anyway; changing that here was rejected (olderLayout.rejected). The older-layout route never copies a link at all: olderLayout.placement.whyNoLinkComesAcross.",
+        "rule": "Composed from the lists that already exist rather than written out again: what an archive leaves behind, plus what a reference copy leaves behind, plus what only an import meets. A name in the list is skipped WITHOUT being looked inside, at any depth. The Obsidian add-ons are NOT on this list, because they are a place rather than a name: referenceCourses.obsidianAddOns. On this route a symlink is copied as a link and never followed - the only one a modern course holds is .merged_output, which is left behind by name anyway; changing that here was rejected (olderLayout.rejected). The older-layout route never copies a link at all: olderLayout.placement.whyNoLinkComesAcross.",
         "why": "On a folder made by an older Plantoir, .merged_output is a real directory holding last year's entire built website - measured at 1.9 GB per course against 489 MB of course, four fifths of what is on disk. Walking it to not copy it would cost more time than copying the course. On a folder made by a current Plantoir it is a symlink pointing out of the working folder, and following it would copy the built site back into the course it came from.",
         "names": [
           {"name": ".merged_output", "why": "Last year's built website. Rebuilt on demand; a real directory in an old folder, a symlink in a new one, skipped either way."},
@@ -4688,7 +5700,7 @@
           {"what": ".internal/activity", "why": "Leases name processes on whichever machine wrote them, so a copied one names a process that was never doing anything here."}
         ],
         "kept": [
-          {"what": ".obsidian", "why": "The course may be opened in Obsidian, and Plantoir opens the course folder AS a vault. Without it the vault opens with first-run prompts, none of the teacher's plugins or appearance, and none of the folder state that makes last year's material navigable. 312 KB against a 489 MB course. Its workspace.json was MEASURED on a real imported course rather than assumed: every path in it is vault-relative (main/left/right/left-ribbon/active/lastOpenFiles), with no absolute path and no mention of the old folder, so it resolves inside the new course as it stands. Nothing needs stripping and nothing needs registering - the app opens a vault by path and registers nothing itself. This is the MODERN route; a class in the older folder-per-class layout comes WITHOUT .obsidian/plugins and community-plugins.json, because every real one carries a publishing add-on holding a live credential (olderLayout.placement.whyTheAddOnsStayBehind)."},
+          {"what": ".obsidian", "why": "The course may be opened in Obsidian, and Plantoir opens the course folder AS a vault. Without it the vault opens with first-run prompts, none of the teacher's appearance, and none of the folder state that makes last year's material navigable. 312 KB against a 489 MB course. Its workspace.json was MEASURED on a real imported course rather than assumed: every path in it is vault-relative (main/left/right/left-ribbon/active/lastOpenFiles), with no absolute path and no mention of the old folder, so it resolves inside the new course as it stands. Nothing needs stripping and nothing needs registering - the app opens a vault by path and registers nothing itself. Since #255 it comes WITHOUT its add-ons on this route too - plugins/, community-plugins.json and publish.json, the rule every route keeps (referenceCourses.obsidianAddOns) - and not at all when .obsidian is itself a link. Until then only the older folder-per-class layout left them behind."},
           {"what": "the site markers", "why": "Copied, then renamed aside by the same neutralisation route 1 uses. The file holds the site id and the admin address, which a teacher may still want."},
           {"what": "every page's own visibility", "why": "A reference course is a faithful record of what students actually saw. The frontmatter of a page is NEVER rewritten on import - the build already reads the older draft: true/false correctly."}
         ]
@@ -5195,7 +6207,7 @@
           "whyThreadFoldersSitAtSection1": "Home.md embeds ![[Thread 4/Day 15]] - a PATH link, which Quartz resolves from the content root. The build copies each per_section_folders entry to content/<name>, so section1/Thread 4/ becomes content/Thread 4/ and the link resolves as it did in the class folder. Measured, simulating Quartz v4.5.0's shortest resolution over the planned content root: ICS3U S1 + shared, 1,586 of 1,587 links and embeds resolve (the one is an absolute path to a folder that no longer exists); without the shared folder, 57 of 186. Nesting them under section1/All Classes/ was REJECTED: it breaks every one of those path embeds.",
           "whyTheFrontPageIsRenamed": "With no section1/index.md the build writes no index.html and the preview's watcher waits for it forever. 0 links in the real pages name Home, so nothing points at the old name.",
           "whyNoLinkComesAcross": "A reference course must hold no link: the lock cannot lock through one, the census does not count one (so a course holding a live link into iCloud reported 'everything that should be locked is'), and the preview cannot follow one out of courses/. MEASURED, before this change: the copier copied a symlink AS a link, dangling or not, and counted it as a file - pointed at an ICD2O class, today's route would have made a reference course whose shared content was live links into iCloud. The planner leaves every link out and the copier REFUSES one on this route as well, so a future planner bug fails loudly.",
-          "whyTheAddOnsStayBehind": "MEASURED (key names only, never a value): every real class folder carries .obsidian/plugins/digitalgarden/data.json with a non-empty githubToken, and community-plugins.json enables that add-on. Copied, the credential would land in the working folder, travel into every backup and archive zip of the course, and - once Obsidian trusts the vault's add-ons - give a publish command outside all fifteen of Plantoir's refusals. The rest of .obsidian (appearance, app.json, themes) comes, so the course opens normally and ReferenceReadingView still sets reading view. The shared folder's own .obsidian never comes.",
+          "whyTheAddOnsStayBehind": "MEASURED (key names only, never a value): every real class folder carries .obsidian/plugins/digitalgarden/data.json with a non-empty githubToken, and community-plugins.json enables that add-on. Copied, the credential would land in the working folder, travel into every backup and archive zip of the course, and - once Obsidian trusts the vault's add-ons - give a publish command outside all fifteen of Plantoir's refusals. The rest of .obsidian (appearance, app.json, themes) comes, so the course opens normally and ReferenceReadingView still sets reading view. The shared folder's own .obsidian never comes. Since #255 this is the rule EVERY route keeps (referenceCourses.obsidianAddOns), which also leaves publish.json, and the add-ons are skipped by the walk rather than filtered after it, so an unreadable folder inside one no longer refuses the class.",
           "cases": [
             {
               "name": "a class with a shared folder, add-ons, a shared FILE and a link inside a shared folder",
@@ -6576,7 +7588,7 @@
           ]
         },
         "placement": {
-          "rule": "Read ONLY from the website folder pointed at (or the one its shortcut leads to): its own source-<code>/s1 and source-<code>/shared, BY NAME, walked with lstat and never followed. s1/* goes to section1/ unchanged (index.md is already the front page, so nothing is renamed; All Classes lands at section1/All Classes, the modern layout's own place); shared/* goes to the course root, Media included; content/.obsidian comes WITHOUT plugins/ and community-plugins.json. A real entry at the top of content/ other than .obsidian, source-* and vault-* (0 measured) comes to the root as shared. The links at the top of content/ are a MANIFEST: each link's TEXT, worked out against content/ as a path, must be source-<code>/shared/<its own name> or source-<code>/s1/<its own name>, and that entry must be there - then it is 'replaced by what it showed', machinery; otherwise it is a LOSS. Also a loss, and named: a link anywhere inside the pages or inside .obsidian (outside plugins/), a shared entry with the same name as one of the section's own (nameTheSectionUses - the build would put both at content/<name>), a shared entry named index.md, section1 or course_config.json (nameTheCourseUses), and no s1/index.md (noFrontPage). Settings: course_code, course_name '<CODE> S1', one section, shared_folders (top folders except Media and dot-folders), shared_files (top regular files except dot-files), per_section_folders and per_section_files (s1's top folders, and its files except index.md), expandable, hidden [Media], include_curriculum_coverage false, show_section_marker section1 false - #254's - and unit_word when unitWord finds one. An empty Media is made when shared/ has none. Every page is byte-identical.",
+          "rule": "Read ONLY from the website folder pointed at (or the one its shortcut leads to): its own source-<code>/s1 and source-<code>/shared, BY NAME, walked with lstat and never followed. s1/* goes to section1/ unchanged (index.md is already the front page, so nothing is renamed; All Classes lands at section1/All Classes, the modern layout's own place); shared/* goes to the course root, Media included; content/.obsidian comes WITHOUT plugins/, community-plugins.json and publish.json (referenceCourses.obsidianAddOns, the rule every route keeps; skipped, never walked). A real entry at the top of content/ other than .obsidian, source-* and vault-* (0 measured) comes to the root as shared. The links at the top of content/ are a MANIFEST: each link's TEXT, worked out against content/ as a path, must be source-<code>/shared/<its own name> or source-<code>/s1/<its own name>, and that entry must be there - then it is 'replaced by what it showed', machinery; otherwise it is a LOSS. Also a loss, and named: a link anywhere inside the pages or inside .obsidian (outside plugins/), a shared entry with the same name as one of the section's own (nameTheSectionUses - the build would put both at content/<name>), a shared entry named index.md, section1 or course_config.json (nameTheCourseUses), and no s1/index.md (noFrontPage). Settings: course_code, course_name '<CODE> S1', one section, shared_folders (top folders except Media and dot-folders), shared_files (top regular files except dot-files), per_section_folders and per_section_files (s1's top folders, and its files except index.md), expandable, hidden [Media], include_curriculum_coverage false, show_section_marker section1 false - #254's - and unit_word when unitWord finds one. An empty Media is made when shared/ has none. Every page is byte-identical.",
           "whyTheCopyInThisFolder": "S1's and S2's copies of source-ics3u DIFFER (335 entries, measured by SHA-1). S2's publish script (synclink) rsyncs S1's content into S2 before each S2 publish and re-points the section links, so each copy is exactly what that website folder's site was last built from; S1's is where both sections were edited and carries 2025-26 changes. Russell, 2026-09-23: the folder pointed at, its own copy.",
           "whyNoLinkComesAcross": "As olderLayout.placement.whyNoLinkComesAcross, and here the links would even resolve: that is exactly why the copier still never copies one. The pages are selected by name; a link is a manifest entry and nothing more.",
           "whyUnitWord": "The build's post-pass (_sync_non_class_pages_created) restamps the created date of every page it does not recognise as a class page by class_page_pattern(unit_word). With the key absent the word is Unit, no page of these is a class page, and every lesson in the preview gets the same date. So the import writes unit_word when the class folder's pages agree on one word.",
@@ -6605,7 +7617,7 @@
               },
               {
                 "kind": "addOns",
-                "what": ".obsidian/plugins and .obsidian/community-plugins.json, one each (0 in Russell's folders: core plugins only)"
+                "what": ".obsidian/plugins, .obsidian/community-plugins.json and .obsidian/publish.json, one each, never looked inside (0 in Russell's folders: core plugins only)"
               }
             ]
           },
@@ -7004,6 +8016,7 @@
         "olderLayoutLeftOut": "{count} of its files and folders were not brought across: {names}.",
         "olderLayoutChooseOneCourseAtATime": "{folder} holds courses rather than classes. Choose the Class Website folder inside one of them, or one class folder.",
         "olderLayoutAddOnsAreLeftBehind": "Obsidian add-ons and their settings are not brought across from older class folders, so nothing in them can publish these pages.",
+        "addOnsAreLeftBehind": "Obsidian add-ons and their settings are not brought across, so nothing in them can publish these pages.",
         "checkoutLayoutReadFrom": "Pages and pictures from {place}.",
         "checkoutLayoutReadThroughShortcut": "{shortcut} is a shortcut. Its pages and pictures are read from {place}.",
         "checkoutLayoutOnlyPagesComeAcross": "From a class website folder, only the pages and pictures of its first section come across. The files that built the website, the extra folders kept for editing, and the other sections' pages stay where they are.",
@@ -7233,7 +8246,7 @@
       }
     ],
     "builderAgreement": {
-      "note": "Whether the WEBSITE BUILDER would read the composed page's settings block the same way the app does. A composed text that fails this is NOT COPIED, whatever the app's own reader says - the two shapes below were reproduced end to end with the copy certified hidden here and PUBLISHED there.",
+      "note": "Whether the WEBSITE BUILDER would read the composed page's settings block the same way the app does. A composed text that fails this is NOT COPIED, whatever the app's own reader says - the two shapes below were reproduced end to end with the copy certified hidden here and PUBLISHED there. Since #246 (2026-09-25) the builder HIDES a page whose settings it cannot read and names it in a folder-problem finding, where before it published such a page or stopped the whole build - so the cases below that say \"reads no keys\" or \"PUBLISHED\" describe what happened BEFORE #246 (unreadablePageSettings has what happens now). The copy is STILL refused: a copy that arrives hidden by accident, and named as a problem on every build, is not a clean copy. Whether this guard can now be relaxed is a follow-up, not part of #246.",
       "cases": [
         {
           "name": "an ordinary composed page",
@@ -7289,7 +8302,7 @@
       },
       {
         "name": "a YAML-1.1 bool word as a KEY",
-        "why": "`yes:` loads as a True KEY rather than a string, and build_site.py then raises on it. When the build cannot parse the block it reads NO keys, so the page is PUBLISHED everywhere.",
+        "why": "`yes:` loads as a True KEY rather than a string, and build_site.py then raises on it. Before #246, when the build could not parse the block it read NO keys, so the page was PUBLISHED everywhere; since #246 it is hidden everywhere and named (unreadablePageSettings) - still not the page the teacher copied.",
         "text": "---\npublishForSection1: false\nyes: value\npublish: false\n---\nBody\n",
         "builderAgrees": false
       },
@@ -7335,7 +8348,7 @@
       },
       {
         "name": "an indented continuation of a plain scalar that contains a colon",
-        "why": "PyYAML raises on it, and when the build cannot parse the block it reads NO keys, so the page is published whatever the copy wrote. 30 of the 36 failures the grammar fuzz found were of this kind - which is why the test is a WHITELIST of shapes rather than a list of forbidden ones.",
+        "why": "PyYAML raises on it, and before #246, when the build could not parse the block it read NO keys, so the page was published (or the build stopped) whatever the copy wrote; since #246 it is hidden and named instead. 30 of the 36 failures the grammar fuzz found were of this kind - which is why the test is a WHITELIST of shapes rather than a list of forbidden ones.",
         "text": "---\npublishForSection1: false\ndescription: A long note\n  about time: 10am\npublish: false\n---\nBody\n",
         "builderAgrees": false
       },
@@ -9137,6 +10150,24 @@
         {"name": "WHY the claim is this program's BUILD moment and not the earliest of its leases: a publish set for later took build and publish at t2 while the window's preview (t1) was up - it does not wait for previews - and the window's Deploy (build t3) must decline. Claimed from its preview (t1) instead, the window would read t2 as LATER and go ahead: two builds at once", "asker": "aBuild", "me": {"pid": 100, "claim": {"moment": "2026-09-25T06:30:00.3000000Z", "pid": 100}}, "others": [{"course": "ICS3U", "kind": "build", "pid": 4321, "moment": "2026-09-25T06:30:00.2000000Z", "alive": true}, {"course": "ICS3U", "kind": "publish", "pid": 4321, "moment": "2026-09-25T06:30:00.2000000Z", "alive": true}], "expect": "declined"},
         {"name": "a build lease with NO name line (or an empty one) is treated as gone, even with a live owner - neither app writes one, Windows' reader calls fewer than two lines stale, and judged on its id alone it could hold a course for the whole life of whatever was handed that id (#156; an import lease with no name is judged as Plantoir's instead - liveness)", "asker": "aBuild", "me": {"pid": 100, "claim": null}, "others": [{"course": "ICS3U", "kind": "build", "pid": 4321, "moment": "2026-09-25T06:30:00.4000000Z", "alive": true, "nameLine": false}], "expect": "allowed"}
       ]
+    }
+  },
+  "folderPublishTarget": {
+    "note": "GitHub issue #227. Where a publish to a folder on this computer actually lands, and what a copy that did not finish is allowed to say. Run by scripts/test_deploy_folder_target.py against the real deploy.sh, started from a copy in a scratch working folder whose own name has a colon in it. @WF@ is replaced with that working folder as `/bin/pwd -P` spells it (the launcher's own spelling of it) and @ELSEWHERE@ with a writable scratch folder outside it, spelt the same way. Cases with `appliesOn: [\"mac\"]` (the per-case convention workLeases.liveness uses) use a colon, which NTFS does not allow in a folder name and which Windows reads as a drive letter ('a:b' is 'b' on drive A:), so they are the bash launcher's alone; the rest are portable in meaning, with Windows' separator. Windows' deploy.ps1 has no colon hole - robocopy has no remote syntax - but it does have the relative half; see documentation/07-deployment.md -> 'A relative folder, and a copy that did not finish'.",
+    "rule": "A relative --to-folder is taken from the working folder and made a full path before anything reads it, so nothing can take it for a remote computer or an option, and the folder the launcher names afterwards is one the app can open. A copy into the folder that did not finish - including one that finished only in part - is a failure: the launcher exits 1, says so in words the app lifts (app-rules.json -> failureExplanations), and prints no PUBLISHED_FOLDER= line, so nothing afterwards names the folder as published.",
+    "cases": [
+      {"toFolder": "out 26:27", "expectTarget": "@WF@/out 26:27/section1", "appliesOn": ["mac"], "appliesOnWhy": "A colon: NTFS does not allow one in a folder name and Windows reads a letter before it as a drive, so this shape cannot reach deploy.ps1. The mac here means the bash launcher (Linux too, where it runs).", "why": "The issue's shape. Before: the copying program read 'out 26' as another computer, copied nothing and exited non-zero, and the launcher said Published over an empty folder (measured: exit 0, 0 files)."},
+      {"toFolder": "localhost:site", "expectTarget": "@WF@/localhost:site/section1", "appliesOn": ["mac"], "appliesOnWhy": "A colon: NTFS does not allow one in a folder name and Windows reads a letter before it as a drive, so this shape cannot reach deploy.ps1. The mac here means the bash launcher (Linux too, where it runs).", "why": "The dangerous one. Before: the copy OPENED A CONNECTION to this Mac over ssh (refused only because Remote Login was off). With it on, or with a real computer's name, the site would have gone to another machine over the teacher's own keys while the launcher named a local folder."},
+      {"toFolder": "a:b", "expectTarget": "@WF@/a:b/section1", "appliesOn": ["mac"], "appliesOnWhy": "A colon: NTFS does not allow one in a folder name and Windows reads a letter before it as a drive, so this shape cannot reach deploy.ps1. The mac here means the bash launcher (Linux too, where it runs).", "why": "The shortest shape of the same thing: a colon before the first slash."},
+      {"toFolder": "-x", "expectTarget": "@WF@/-x/section1", "why": "Before: the folder could not even be made, because a name starting with '-' was read as an option. Made full, it cannot be."},
+      {"toFolder": "sub/site", "expectTarget": "@WF@/sub/site/section1", "why": "A plain partial path, always taken from the working folder (the launcher changes into it first). What changes is that PUBLISHED_FOLDER= now names the full path, which the app can open - a partial one would have been opened relative to the APP's current folder, '/'."},
+      {"toFolder": "@ELSEWHERE@/c:d/", "expectTarget": "@ELSEWHERE@/c:d/section1", "appliesOn": ["mac"], "appliesOnWhy": "A colon: NTFS does not allow one in a folder name and Windows reads a letter before it as a drive, so this shape cannot reach deploy.ps1. The mac here means the bash launcher (Linux too, where it runs).", "why": "A full path is left as it is apart from its trailing slash - a colon AFTER the first slash was always read as part of a local folder."}
+    ],
+    "partialCopy": {
+      "setUp": "A full --to-folder whose section folder already holds a folder of stale pages that cannot be removed (its permissions forbid it), so the copy's --delete fails part way while every new page still lands.",
+      "expectExit": 1,
+      "expectNoLineStartingWith": ["PUBLISHED_FOLDER=", "✅ Published"],
+      "why": "Before: the copy's own exit status (23, 'finished in part') went into a pipe whose status was thrown away, so the launcher said Published and named the folder. A partial copy is a failure deliberately: the page left behind may be one the teacher took down. Not measured: network shares and iCloud Drive, where a copy can fail to set a file's attributes and report the same 'finished in part' - see documentation/07-deployment.md."
     }
   }
 }

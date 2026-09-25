@@ -54,6 +54,10 @@ def graded_folders_for(manifest: dict, shared_folders: list, per_section_folders
     what tells the build to keep applying the historical rule — see
     contracts/shared-rules.json -> gradedFolders.absentIsNotEmpty.
 
+    This reconciles a NEW course's pool only. A pool already saved in
+    course_config.json is never passed through here: a re-run writes it back
+    as it was (gradedFolders.rerunningSetup, #192).
+
     Whatever the source, the result is RECONCILED against the folder lists the
     course actually ends with: a declared name the teacher removed in the
     wizard is dropped, and a pool left with nothing is returned as `[]` — the
@@ -83,6 +87,30 @@ def graded_folders_for(manifest: dict, shared_folders: list, per_section_folders
         if name and "task" in str(name).lower() and str(name) not in found:
             found.append(str(name))
     return found
+
+
+def saved_pool_without_malformed_entries(saved_pool: list) -> list:
+    """
+    A saved `graded_folders` list as a re-run writes it back (#192): every
+    real folder name kept exactly as written — same spelling, same order,
+    whether or not a folder of that name exists — with only the entries that
+    cannot name a folder removed: null, an empty or blank string, anything
+    that is not a string, and an exact repeat of a name already kept.
+
+    Those only arise from a hand edit, and the re-run's old path (through
+    graded_folders_for) cleaned them, so it still does. See
+    contracts/shared-rules.json -> gradedFolders.rerunningSetup.
+    """
+    kept_names: list = []
+    for entry in saved_pool:
+        if not isinstance(entry, str):
+            continue
+        if entry.strip() == "":
+            continue
+        if entry in kept_names:
+            continue
+        kept_names.append(entry)
+    return kept_names
 
 
 def _cmd_example(script_base: str, course, section, host_os: str) -> str:
@@ -1929,7 +1957,8 @@ def per_section_frontmatter(text: str, section_numbers: list) -> str:
         # A value written BELOW the key, indented under it, belongs to the key
         # — and cannot be copied onto another key's line. Those lines are
         # taken too: leaving them behind orphans an indented scalar under
-        # whatever key happens to follow, which stops the build.
+        # whatever key happens to follow, which the build cannot parse (it
+        # stopped the build until #246, and hides the page and names it since).
         #
         # Blank lines and COMMENTS AT ANY INDENT are stepped over rather than
         # stopping the scan, because YAML steps over them: `draft:` then a
@@ -2972,12 +3001,26 @@ def setup_course(no_backup: bool = False):
     # a NEW course because there are no marks to lose; an EXISTING course
     # deliberately has no such key if never configured, which is what tells
     # the build to keep applying the historical rule.
+    #
+    # A SAVED pool is written back exactly as it was (#192). This run does not
+    # ask the marks question and offers no way to remove a folder, so it does
+    # not own the answer. It used to re-check the pool against the top-level
+    # folder lists only, which emptied every pool naming a folder the Marks
+    # checklist found INSIDE another one (Portfolios/Tasks, section1/Tasks) —
+    # with every prompt accepted. A name taken off a list at a prompt is not a
+    # removal either: the next build's preflight finds the folder on disk and
+    # publishes it again. A saved null is written as [] (as before); a key
+    # that was never there stays absent. Entries that name no folder at all —
+    # null, an empty string, a non-string, an exact repeat — are still cleaned
+    # out, as the old path did; every real name is kept exactly as written. See contracts/shared-rules.json ->
+    # gradedFolders.rerunningSetup, and documentation/04-course-setup.md.
     if saved_config:
         if "graded_folders" in saved_config:
-            config["graded_folders"] = graded_folders_for(
-                {"graded_folders": saved_config["graded_folders"]},
-                shared_folders, per_section_folders
-            )
+            saved_pool = saved_config["graded_folders"]
+            if isinstance(saved_pool, list):
+                config["graded_folders"] = saved_pool_without_malformed_entries(saved_pool)
+            else:
+                config["graded_folders"] = []
     else:
         config["graded_folders"] = graded_folders_for(
             example_manifest if prepopulate_example else (skeleton_manifest or {}),

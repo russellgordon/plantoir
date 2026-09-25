@@ -177,7 +177,11 @@ nonisolated enum ActivityTrail {
         /// that recorded only the release could not answer the question anyone
         /// actually reads it for.
         case sectionKeptItsWebsiteOnRollover = "section kept its website"
-        /// A folder a feature depends on was missing, renamed or emptied.
+        /// A folder a feature depends on was missing, renamed or emptied — or,
+        /// since #246, a PAGE whose settings the build could not read and so
+        /// hid (`pageSettingsUnreadable`). The name is kept because the event
+        /// is the site-health family; the line still names the check, never
+        /// the pages, which are the teacher's own names.
         /// Carries the check's NAME, never its wording: the sentence is
         /// product wording and will be reworded, while the name is what
         /// somebody reading the trail months later can match against the
@@ -185,6 +189,12 @@ nonisolated enum ActivityTrail {
         /// is long gone by the time it is reported, and the condition is
         /// invisible on disk — a renamed folder looks exactly like a folder
         /// that was always called that.
+        ///
+        /// Two writers, one sentence (`SiteHealthFinding.trailSentence`): a
+        /// build the app runs, as its output arrives; and a SCHEDULED publish,
+        /// from its own log at the end of the run
+        /// (`ScheduledDeploy.recordFolderProblems`, #153) — dated to the run,
+        /// not to whenever somebody next opens the section.
         case folderProblemFound = "folder problem found"
         /// A folder a feature depends on was put back, at the teacher's
         /// request. Separate from `folderProblemFound` because it is a
@@ -310,6 +320,12 @@ nonisolated enum ActivityTrail {
         /// token under it would make the trail say something untrue about the
         /// one run a teacher is trying to understand. Both are the same
         /// silence from the teacher's side; only one of them is a question.
+        ///
+        /// A BUILD that failed outright files here too
+        /// (`ScheduledPublishOutcome.Kind.buildDidNotFinish`, #137), with a
+        /// line that says the pages could not be built and names no
+        /// destination, because none was reached — the way
+        /// `buildNeededAnAnswer` files under the event above.
         case scheduledPublishDidNotFinish = "scheduled publish did not finish"
 
         /// A publish set to happen on its own went out.
@@ -475,7 +491,12 @@ nonisolated enum ActivityTrail {
         /// could be made for the folder — from a preview, a publish, or
         /// setup (which files it under the word "setup", having no course
         /// yet). Deliberately not a new event: to a teacher it is the same
-        /// outcome, a preview that never appeared.
+        /// outcome, a preview that never appeared. Since issue #234
+        /// `preview.sh` writes it on a third ending, in words pinned as
+        /// `launcherLineWhenThisMacCannotReachTheBuilder`: before building,
+        /// a connection to the address it was about to announce was refused
+        /// on every try, so it stopped rather than build a preview this Mac
+        /// could not open — the fault #225 names after a build, found first.
         ///
         /// This is the line whose absence produced the report it exists for
         /// (issue #225). A teacher built three previews in four minutes, none
@@ -573,8 +594,23 @@ nonisolated enum ActivityTrail {
 
         /// A course was kept for reference: which folder it was given, the
         /// code and school year it shows, how many sections came across, and
-        /// which course it was copied from. Never the contents of a page.
+        /// which course it was copied from. Since #255 it also names the
+        /// Obsidian add-ons the copy was made without, by folder name — only
+        /// when there were any, so a course with none leaves the same line as
+        /// before (`ObsidianAddOns.trailClause`). Never the contents of a
+        /// page, and never anything read from inside an add-on.
         case courseKeptForReference = "course kept for reference"
+
+        /// "Keep a Copy for Reference…" was pressed and no copy was made
+        /// (#287): which course it was copied from, the folder it was to be
+        /// given, and why — being made in another window or copy of Plantoir,
+        /// a folder of that name already there, or the copy could not be
+        /// made (the system's reason, which may name a file; never a page's
+        /// contents). Its own event rather than the import's, because
+        /// nothing was imported. A disabled button writes nothing — the sheet
+        /// refuses a name or a school year by greying Keep a Copy out, and
+        /// that is not a press.
+        case courseCouldNotBeKeptForReference = "course could not be kept for reference"
 
         /// A reference course's pages were locked again, with the count —
         /// because a backup came back unlocked, or a folder that syncs
@@ -589,7 +625,10 @@ nonisolated enum ActivityTrail {
         /// here, the code and school year it shows, and how many sections
         /// came across. The folder it was READ from is the half a copy does
         /// not have, and it is the answer to "where did this ICS4U come
-        /// from". Never the contents of a page.
+        /// from". For a MODERN course it also names the Obsidian add-ons left
+        /// behind, by folder name and only when there were any (#255); the
+        /// older layouts say theirs on their own second line. Never the
+        /// contents of a page.
         case courseImportedForReference = "course imported for reference"
 
         /// A class kept in the OLDER layout (a folder per class, #254) came
@@ -629,13 +668,15 @@ nonisolated enum ActivityTrail {
         case courseImportedFromAClassWebsiteFolder = "course imported from a class website folder"
 
         /// One course of an import did not come across, and the rest did.
-        /// Carries which course and why — already being imported in another
-        /// window or another copy of Plantoir, or something an earlier
-        /// unfinished attempt left behind could not be cleared (both #245,
-        /// written before anything is copied), a folder that could not be
-        /// read, a disk that filled. The shelf refusal and a folder of that
-        /// name already existing are said on the sheet and do not write this
-        /// line. Written per COURSE, because "the import
+        /// Carries which course and why, as the sentence the summary showed —
+        /// already on the shelf under that school year (also a second course
+        /// of the same code in one run), a folder of that name already there
+        /// (both #287), already being imported in another window or another
+        /// copy of Plantoir, or something an earlier unfinished attempt left
+        /// behind could not be cleared (both #245), a folder that could not
+        /// be read, a disk that filled. Written for EVERY course the summary
+        /// lists as not imported; never for one the teacher stopped. Written
+        /// per COURSE, because "the import
         /// failed" is exactly the report that cannot be looked into: a run of
         /// four courses that imports three is the ordinary shape of this.
         case courseCouldNotBeImportedForReference = "course could not be imported for reference"
@@ -717,6 +758,18 @@ nonisolated enum ActivityTrail {
         /// running writes nothing. Mac only, permanently: Windows builds
         /// natively and has no workspace.
         case workspaceWasInUse = "workspace was in use"
+
+        /// Whether the teacher was told, with a macOS notification, how a
+        /// scheduled publish went (#212) — or why not: notifications turned
+        /// off for Plantoir, never allowed yet, or macOS would not take it.
+        /// Also the question, when a teacher first schedules from the window,
+        /// and their answer. Carries the course and the section, and NEVER the
+        /// notification's text.
+        ///
+        /// "I never got told" is answerable only if the trail says whether the
+        /// notice went out: a notification that was sent and one that was
+        /// blocked look identical from the teacher's side.
+        case scheduledPublishNotification = "scheduled publish notification"
     }
 
     // MARK: - Stored properties

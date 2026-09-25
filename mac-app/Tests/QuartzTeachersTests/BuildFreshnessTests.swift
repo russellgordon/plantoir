@@ -80,13 +80,14 @@ final class BuildFreshnessTests: XCTestCase {
             .write(to: builtIndexURL)
         try setModificationDate(Date(timeIntervalSinceNow: 300), of: builtIndexURL)
 
-        XCTAssertTrue(BuildFreshness.builtForPreview(builtIndexURL))
+        let builtPublicURL: URL = builtIndexURL.deletingLastPathComponent()
+        XCTAssertTrue(BuildFreshness.builtForPreview(publicDirectory: builtPublicURL))
         XCTAssertTrue(BuildFreshness.needsRebuild(course: course, sectionNumber: 1),
                       "A preview's build is never deploy-fresh, however new it is")
 
         try Data("a clean production page".utf8).write(to: builtIndexURL)
         try setModificationDate(Date(timeIntervalSinceNow: 300), of: builtIndexURL)
-        XCTAssertFalse(BuildFreshness.builtForPreview(builtIndexURL))
+        XCTAssertFalse(BuildFreshness.builtForPreview(publicDirectory: builtPublicURL))
         XCTAssertFalse(BuildFreshness.needsRebuild(course: course, sectionNumber: 1),
                        "A clean production build newer than the content is current")
     }
@@ -252,5 +253,121 @@ final class BuildFreshnessTests: XCTestCase {
             }
         }
         XCTAssertTrue(ruleNamed, "The contract names the rule these tests pin")
+    }
+
+    // MARK: - Every page, not the front page alone (issue #136)
+
+    /// The contract's cases for "this built site is a preview's":
+    /// `app-rules.json` → `buildFreshness.previewBuild`. Shared with
+    /// `ScheduledPublishOutcomeTests`, which runs the overnight check against
+    /// the same list.
+    static func previewBuildRule() throws -> [String: Any] {
+        let contractURL: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("contracts/app-rules.json")
+        let data: Data = try Data(contentsOf: contractURL)
+        let rules: [String: Any] = try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let freshness: [String: Any] = try XCTUnwrap(rules["buildFreshness"] as? [String: Any])
+        return try XCTUnwrap(freshness["previewBuild"] as? [String: Any])
+    }
+
+    /// Writes one case's pages under `publicURL` and makes the ones it names
+    /// unreadable. Returns those, so the caller can make them readable again
+    /// and the temporary folder can be removed.
+    static func writePages(of testCase: [String: Any], into publicURL: URL) throws -> [URL] {
+        let pages: [String: String] = try XCTUnwrap(testCase["pages"] as? [String: String])
+        for (relativePath, text) in pages {
+            let pageURL: URL = publicURL.appendingPathComponent(relativePath)
+            try FileManager.default.createDirectory(
+                at: pageURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try Data(text.utf8).write(to: pageURL)
+        }
+        var lockedURLs: [URL] = []
+        let unreadable: [String] = testCase["unreadable"] as? [String] ?? []
+        for relativePath in unreadable {
+            let pageURL: URL = publicURL.appendingPathComponent(relativePath)
+            try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: pageURL.path)
+            lockedURLs.append(pageURL)
+        }
+        return lockedURLs
+    }
+
+    /// Gives back what `writePages` took away, so the folder can be removed.
+    static func makeReadable(_ urls: [URL]) {
+        for url in urls {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: url.path)
+        }
+    }
+
+    /// Every case in the contract, against the app's own check.
+    @MainActor
+    func testEveryPreviewBuildCaseInTheContract() throws {
+        let rule: [String: Any] = try BuildFreshnessTests.previewBuildRule()
+        let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
+        XCTAssertFalse(cases.isEmpty)
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let expectPreview: Bool = try XCTUnwrap(testCase["expectPreview"] as? Bool)
+            let publicURL: URL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("cq4t-preview-\(UUID().uuidString)")
+                .appendingPathComponent("public")
+            let lockedURLs: [URL] = try BuildFreshnessTests.writePages(of: testCase, into: publicURL)
+            defer {
+                BuildFreshnessTests.makeReadable(lockedURLs)
+                try? FileManager.default.removeItem(at: publicURL.deletingLastPathComponent())
+            }
+            XCTAssertEqual(BuildFreshness.builtForPreview(publicDirectory: publicURL), expectPreview, name)
+        }
+    }
+
+    /// The signature the app looks for is the one the contract gives, so
+    /// the launchers and the app cannot drift apart on the string itself.
+    @MainActor
+    func testTheSignatureIsTheContracts() throws {
+        let rule: [String: Any] = try BuildFreshnessTests.previewBuildRule()
+        XCTAssertEqual(rule["signature"] as? String, BuildFreshness.liveReloadSignature)
+    }
+
+    /// The state issue #136 is about, as a course sees it: a clean front page
+    /// newer than every edit, with a preview's page behind it. Laid out the
+    /// way the app lays it out — `.merged_output` a link into a builds folder
+    /// elsewhere — so the walk is shown to follow that link.
+    @MainActor
+    func testACleanFrontPageInFrontOfAPreviewPageIsNotDeployFresh() throws {
+        let course: Course = try makeCourse(withBuiltSite: false)
+        let buildsURL: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("cq4t-builds-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: buildsURL) }
+        let publicURL: URL = buildsURL.appendingPathComponent("section1/public")
+        try FileManager.default.createDirectory(
+            at: publicURL.appendingPathComponent("notes"),
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createSymbolicLink(
+            at: course.directoryURL.appendingPathComponent(".merged_output"),
+            withDestinationURL: buildsURL
+        )
+        let indexURL: URL = publicURL.appendingPathComponent("index.html")
+        let notesURL: URL = publicURL.appendingPathComponent("notes/day-1.html")
+        try Data("<html><body>Welcome</body></html>".utf8).write(to: indexURL)
+        try Data("<html><body>Day 1</body></html>".utf8).write(to: notesURL)
+
+        try backdateEverything(in: course.directoryURL, to: Date(timeIntervalSinceNow: -600))
+        try setModificationDate(Date(timeIntervalSinceNow: -60), of: indexURL)
+        XCTAssertFalse(
+            BuildFreshness.needsRebuild(course: course, sectionNumber: 1),
+            "A clean site newer than every edit is current — the walk must not make every publish rebuild"
+        )
+
+        try Data("<script>new WebSocket('ws://localhost:9081')</script>".utf8).write(to: notesURL)
+        XCTAssertTrue(
+            BuildFreshness.needsRebuild(course: course, sectionNumber: 1),
+            "A preview's page behind a clean front page is still a preview's build"
+        )
     }
 }

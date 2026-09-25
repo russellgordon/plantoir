@@ -24,6 +24,7 @@ final class SidebarRestorationProbeTests: XCTestCase {
         await settle()
 
         // Collapsed baseline: the course row shows, its sections do not.
+        try AccessibilityInspector.skipUnlessTheWindowCanBeRead(workspace.window)
         var labels: [String] = AccessibilityInspector.collectAllLabels()
         XCTAssertTrue(labels.contains("EXC2O"))
         XCTAssertFalse(labels.contains("Section 1"),
@@ -34,6 +35,7 @@ final class SidebarRestorationProbeTests: XCTestCase {
         workspace.expandedCourseCodes = ["EXC2O"]
         await settle()
 
+        try AccessibilityInspector.skipUnlessTheWindowCanBeRead(workspace.window)
         labels = AccessibilityInspector.collectAllLabels()
         XCTAssertTrue(labels.contains("Section 1"),
                       "Setting the model's expansion must unfold the group; labels: \(labels.prefix(40))")
@@ -56,6 +58,7 @@ final class SidebarRestorationProbeTests: XCTestCase {
         workspace.workspaceURL = nil
         workspace.expandedCourseCodes = []
         await settle()
+        try AccessibilityInspector.skipUnlessTheWindowCanBeRead(workspace.window)
         var labels: [String] = AccessibilityInspector.collectAllLabels()
         XCTAssertFalse(labels.contains("EXC2O"), "Sidebar should be gone")
 
@@ -64,6 +67,7 @@ final class SidebarRestorationProbeTests: XCTestCase {
         workspace.expandedCourseCodes = ["EXC2O"]
         await settle()
 
+        try AccessibilityInspector.skipUnlessTheWindowCanBeRead(workspace.window)
         labels = AccessibilityInspector.collectAllLabels()
         XCTAssertTrue(labels.contains("EXC2O"), "Sidebar should be back")
         XCTAssertTrue(labels.contains("Section 1"),

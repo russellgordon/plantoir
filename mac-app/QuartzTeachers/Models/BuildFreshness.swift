@@ -26,8 +26,9 @@ enum BuildFreshness {
         // A preview's build is never deploy-fresh: serve mode bakes a
         // live-reload client pointed at ws://localhost into every page,
         // and publishing that makes browsers ask visitors about
-        // "access to other apps and services on this device".
-        if builtForPreview(indexURL) {
+        // "access to other apps and services on this device". Every page,
+        // not the front page alone (issue #136) — see `builtForPreview`.
+        if builtForPreview(publicDirectory: builtPublicURL(course: course, sectionNumber: sectionNumber)) {
             return true
         }
         guard let contentDate = newestContentDate(course: course) else {
@@ -71,22 +72,76 @@ enum BuildFreshness {
     /// The marker's file name, as `build_site.py` writes it.
     static let buildStartedMarkerName: String = ".build-started"
 
-    /// True when the built page carries the preview server's
-    /// live-reload client.
-    static func builtForPreview(_ builtIndexURL: URL) -> Bool {
-        guard let html = try? String(contentsOf: builtIndexURL, encoding: .utf8) else {
+    /// What the preview server's live-reload client carries, and what marks
+    /// a built site as a preview's. `contracts/app-rules.json` →
+    /// `buildFreshness.previewBuild.signature`.
+    static let liveReloadSignature: String = "ws://localhost:"
+
+    /// True when any page of the built site carries the preview server's
+    /// live-reload client — or when the front page cannot be read, since a
+    /// site whose front page is missing is rebuilt rather than trusted.
+    ///
+    /// EVERY page, not the front page alone (issue #136). Serve mode bakes
+    /// the client into all of them and the built tree is replaced file by
+    /// file, so a clean front page in front of a preview's pages is a real
+    /// state. Reading only the front page called it fresh, the Publish
+    /// button skipped its build, and the launcher then rebuilt it under the
+    /// destination's leg instead — which reads the whole tree, as `deploy.py`
+    /// and `deploy.ps1` do. One rule for all of them:
+    /// `contracts/app-rules.json` → `buildFreshness.previewBuild`.
+    ///
+    /// Pages are compared as BYTES, never decoded: one page that is not valid
+    /// UTF-8 would otherwise force a rebuild on every publish, and no launcher
+    /// decodes either. A page that cannot be opened is passed over, as the
+    /// launchers pass it over. The front page is read first, so a real
+    /// preview's build answers from one file; a clean site is read to the end
+    /// (measured 12 ms for an 864-file section on an M4 Pro, warm).
+    static func builtForPreview(publicDirectory: URL) -> Bool {
+        let signatureBytes: Data = Data(liveReloadSignature.utf8)
+        let indexURL: URL = publicDirectory.appendingPathComponent("index.html")
+        guard let frontPage = try? Data(contentsOf: indexURL) else {
             // Unreadable: rebuild rather than trust it.
             return true
         }
-        return html.contains("ws://localhost:")
+        if frontPage.range(of: signatureBytes) != nil {
+            return true
+        }
+
+        // No `.skipsHiddenFiles`: `grep -r` and `rglob` both look inside
+        // hidden folders, and a reader narrower than the launchers is the
+        // fault this exists to close.
+        guard let enumerator = FileManager.default.enumerator(
+            at: publicDirectory,
+            includingPropertiesForKeys: nil,
+            options: []
+        ) else {
+            return false
+        }
+        for case let fileURL as URL in enumerator {
+            if fileURL.pathExtension != "html" {
+                continue
+            }
+            guard let page = try? Data(contentsOf: fileURL) else {
+                continue
+            }
+            if page.range(of: signatureBytes) != nil {
+                return true
+            }
+        }
+        return false
     }
 
-    /// Where the section's built landing page lives.
-    static func builtIndexURL(course: Course, sectionNumber: Int) -> URL {
+    /// Where the section's built website lives: the folder that is published.
+    static func builtPublicURL(course: Course, sectionNumber: Int) -> URL {
         return course.directoryURL
             .appendingPathComponent(".merged_output")
             .appendingPathComponent("section\(sectionNumber)")
             .appendingPathComponent("public")
+    }
+
+    /// Where the section's built landing page lives.
+    static func builtIndexURL(course: Course, sectionNumber: Int) -> URL {
+        return builtPublicURL(course: course, sectionNumber: sectionNumber)
             .appendingPathComponent("index.html")
     }
 

@@ -62,6 +62,7 @@ class SiteHealthTests(unittest.TestCase):
             {"media_target_exists": False},
             {"section_index_exists": False},
             {"hand_written_coverage_page": True},
+            {"unreadable_pages": [{"page": "Concepts/Arrays", "line": 4}]},
         ):
             broken = dict(HEALTHY)
             broken.update(facts)
@@ -202,7 +203,9 @@ class TheContractsExampleLinesAreRealOutput(unittest.TestCase):
     def test_the_examples_match_what_this_module_emits(self):
         facts = {"coverage_wanted": True, "curriculum_found": False,
                  "class_pages_found": True, "media_target_exists": False,
-                 "section_index_exists": True, "hand_written_coverage_page": False}
+                 "section_index_exists": True, "hand_written_coverage_page": False,
+                 "unreadable_pages": [{"page": "Concepts/Arrays", "line": 4},
+                                      {"page": "section1/Unit 1/Day 3", "line": None}]}
         lines = []
         site_health.announce(site_health.findings(facts, "ICS3U", 1), printer=lines.append)
         emitted = [line for line in lines if line.startswith(site_health.marker_prefix())]
@@ -226,6 +229,100 @@ class TheContractsExampleLinesAreRealOutput(unittest.TestCase):
             self.assertIsInstance(payload["fixable"], bool)
             self.assertIsInstance(payload["course"], str)
             self.assertIsInstance(payload["section"], int)
+
+
+class UnreadablePageSettingsTests(unittest.TestCase):
+    """
+    `pageSettingsUnreadable` (#246): ONE finding per section build naming every
+    page the build hid because it could not read its settings. The words are
+    the contract's; these check how they are put together.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        repo_contracts = Path(__file__).resolve().parent.parent / "contracts"
+        if repo_contracts.is_dir():
+            toolchain_paths.CONTRACTS_DIR = repo_contracts
+        contracts.reset_cache()
+        for entry in contracts.section("shared-rules", "siteHealth", "checks"):
+            if entry["name"] == "pageSettingsUnreadable":
+                cls.entry = entry
+
+    def found(self, pages, front_page=False):
+        facts = dict(HEALTHY)
+        facts["unreadable_pages"] = pages
+        facts["front_page_unreadable"] = front_page
+        found = site_health.findings(facts, "ICS3U", 1)
+        self.assertEqual(_names(found), ["pageSettingsUnreadable"], "one finding, never one per page")
+        return found[0]
+
+    def expected(self, key, **fill):
+        return site_health.filled(self.entry[key], dict({"course": "ICS3U", "section": "1"}, **fill))
+
+    def test_one_page_is_named_in_the_sentence(self):
+        item = self.found([{"page": "Concepts/Arrays", "line": 4}])
+        self.assertEqual(item.sentence, self.expected("sentence", page="Concepts/Arrays"))
+        self.assertIn(self.expected("pageWithLine", page="Concepts/Arrays", line="4"), item.detail)
+        self.assertFalse(item.fixable)
+
+    def test_a_page_with_no_line_is_named_without_one(self):
+        item = self.found([{"page": "Concepts/Arrays", "line": None}])
+        self.assertIn(self.expected("pageWithoutLine", page="Concepts/Arrays"), item.detail)
+        self.assertNotIn(self.expected("pageWithLine", page="Concepts/Arrays", line="None"), item.detail)
+
+    def test_several_pages_are_counted_in_the_sentence(self):
+        item = self.found([{"page": "A", "line": 2}, {"page": "B", "line": None}])
+        self.assertEqual(item.sentence, self.expected("sentenceForSeveral", count="2"))
+        self.assertIn(self.expected("pageWithLine", page="A", line="2") + ", "
+                      + self.expected("pageWithoutLine", page="B"), item.detail)
+
+    def test_eleven_pages_name_ten_and_count_the_rest(self):
+        pages = [{"page": f"Page {number:02d}", "line": None} for number in range(11)]
+        item = self.found(pages)
+        for number in range(10):
+            self.assertIn(f"Page {number:02d}", item.detail)
+        self.assertNotIn("Page 10", item.detail)
+        self.assertIn(self.expected("andMore", count="1"), item.detail)
+
+    def test_the_front_page_says_what_it_costs(self):
+        item = self.found([{"page": "section1/index", "line": 3}], front_page=True)
+        self.assertTrue(item.detail.endswith(self.expected("frontPage")))
+        self.assertNotIn(self.expected("frontPage"),
+                         self.found([{"page": "Concepts/Arrays", "line": 3}]).detail)
+
+    def test_nothing_is_left_unfilled_and_the_detail_is_one_line(self):
+        item = self.found([{"page": "A", "line": 2}, {"page": "B", "line": None}], front_page=True)
+        for text in (item.sentence, item.detail):
+            self.assertNotIn("{", text)
+            self.assertNotIn("}", text)
+            self.assertNotIn("\n", text)
+
+    def test_a_page_named_with_braces_is_named_as_it_is(self):
+        """A teacher can name a page "{course} notes"; one pass never re-reads
+        what it has just put in, so it is not expanded into the course code."""
+        item = self.found([{"page": "{course} notes", "line": None}])
+        self.assertIn("{course} notes", item.sentence)
+        self.assertIn("{course} notes", item.detail)
+        self.assertNotIn("ICS3U notes", item.sentence + item.detail)
+        several = self.found([{"page": "{section}", "line": 2}, {"page": "{pages}", "line": None}])
+        self.assertIn("{section}", several.detail)
+        self.assertIn("{pages}", several.detail)
+        # Placeholders filled AFTER the page name are the ones a replacement
+        # made one after another would expand: {pages} in the sentence, and
+        # {line} in the page's own entry.
+        self.assertIn("{pages}", self.found([{"page": "{pages}", "line": None}]).sentence)
+        named_line = self.found([{"page": "{line}", "line": 7}])
+        self.assertIn("{line}", named_line.detail)
+        self.assertNotIn(self.expected("pageWithLine", page="7", line="7"), named_line.detail)
+
+    def test_no_word_of_it_names_the_machinery(self):
+        for key, value in self.entry.items():
+            if key in ("name", "why", "fill") or not isinstance(value, str):
+                continue
+            for word in ("toolchain", "script", "docker", "container", "wsl", "python",
+                         "json", "stdout", "quartz", "repository", "config", "yaml",
+                         "frontmatter", "symlink", "vault"):
+                self.assertNotIn(word, value.lower(), f"{key} says {word!r}")
 
 
 class MarkerLineTests(unittest.TestCase):
