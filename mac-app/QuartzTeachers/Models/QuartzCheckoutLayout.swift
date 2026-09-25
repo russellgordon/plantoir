@@ -141,7 +141,8 @@ nonisolated enum QuartzCheckoutLayout {
         case anotherSectionsPages
         /// Anything else in `source-<code>` that no link showed.
         case notOnTheWebsite
-        /// `.obsidian/plugins` and `.obsidian/community-plugins.json`.
+        /// `.obsidian/plugins`, `community-plugins.json` and `publish.json`
+        /// — `ObsidianAddOns`, the same three every route leaves (#255).
         case addOns
     }
 
@@ -1088,21 +1089,20 @@ nonisolated enum QuartzCheckoutLayout {
                     ),
                     destination: name
                 ))
+                // Walked from INSIDE `.obsidian`, so the add-ons are named
+                // relative to it — and SKIPPED rather than filtered (#255), so
+                // an unreadable folder inside an add-on cannot refuse the
+                // class. `ObsidianAddOns` names the three for every route.
                 let survey: ReferenceTreeCopier.Survey = ReferenceTreeCopier.walk(
-                    courseAt: entryURL, leavingBehind: leftBehindNames
+                    courseAt: entryURL,
+                    leavingBehind: leftBehindNames,
+                    leavingBehindPaths: ObsidianAddOns.leftBehindFromTheSettingsFolder
                 )
                 for folder in survey.unreadableFolders {
                     unreadable.append(".obsidian/\(folder)")
                 }
+                leftBehind[.addOns, default: 0] += survey.pathsLeftBehind.count
                 for item in survey.items {
-                    let parts: [[UInt8]] = OlderCourseLayout.components(of: item.relativePath)
-                    let first: String = String(decoding: parts[0], as: UTF8.self)
-                    if first == "plugins" || (parts.count == 1 && first == "community-plugins.json") {
-                        if parts.count == 1 {
-                            leftBehind[.addOns, default: 0] += 1
-                        }
-                        continue
-                    }
                     if item.isSymbolicLink {
                         lost.append(Lost(path: ".obsidian/\(item.text)", reason: .link))
                         continue
