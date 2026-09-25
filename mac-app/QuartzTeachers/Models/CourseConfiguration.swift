@@ -290,6 +290,13 @@ class CourseConfiguration {
         return nil
     }
 
+    /// What a teacher is told when the publishing folder they typed is not a
+    /// full location — a name on its own, or a path that does not start at
+    /// the top of the disk. Contract data: `app-rules.json` →
+    /// `configurationRules.deployFolder`.
+    static let deployFolderIsNotAFullLocation: String =
+        "That isn’t a full folder location — use Choose… to pick the folder."
+
     /// What is wrong with a folder chosen for local-folder publishing, or
     /// nil when the folder is usable. Both the settings form and the
     /// wizard check this live — and block saving — so a deploy never
@@ -298,6 +305,18 @@ class CourseConfiguration {
         let path: String = rawPath.trimmingCharacters(in: .whitespaces)
         if path.isEmpty {
             return "Choose the folder this course deploys into."
+        }
+        // Asked BEFORE the folder is looked for, because a partial path is
+        // looked for in the wrong place: the app's own current folder is
+        // "/", so "Users/Shared" exists here, while `deploy.sh` would publish
+        // into "<working folder>/Users/Shared". A path that is validated in
+        // one folder and published into another is the hole GitHub issue
+        // #227 is about; the other half of it — a colon read as a remote
+        // host — is closed in the launcher, and is documented in
+        // documentation/07-deployment.md. `Choose…` always hands back a full
+        // path, so only a typed one can reach this.
+        if !path.hasPrefix("/") {
+            return deployFolderIsNotAFullLocation
         }
         let fileManager: FileManager = FileManager.default
         var isDirectory: ObjCBool = false
