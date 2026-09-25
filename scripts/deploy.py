@@ -194,8 +194,24 @@ def rebuild_for_production(course_code: str, section: str, host_os: str):
         subprocess.run(cmd, check=True)
         print("✅ Production build complete.")
     except (subprocess.CalledProcessError, OSError) as e:
+        if build_was_stopped_by_the_teacher(e):
+            # A Cancel reaches the build and this program together. Usually
+            # this program is still waiting on the build and hears it first,
+            # as a KeyboardInterrupt that run_until_stopped() turns into 130.
+            # When the build finishes leaving first, the same Cancel arrives
+            # here instead — and must not read as a failed build (GitHub #259).
+            sys.exit(130)
         print(f"❌ Production rebuild failed: {e}")
         sys.exit(1)
+
+
+def build_was_stopped_by_the_teacher(error) -> bool:
+    """True when the rebuild ended because of an interrupt rather than a fault:
+    build_site.py exits 130 when stopped (#223), and a build killed outright by
+    the interrupt reports -2 (the negative of SIGINT)."""
+    if not isinstance(error, subprocess.CalledProcessError):
+        return False
+    return error.returncode in (130, -2)
 
 def ensure_base_url_and_rebuild(section_dir: Path, target_domain: str, course_code: str, section: str, host_os: str):
     """
@@ -1309,5 +1325,26 @@ def main():
 
     print("\n✅ Deploy complete.")
 
+def run_until_stopped():
+    """Run main(); a Cancel in the app (its ^C) or Ctrl-C at a terminal leaves
+    quietly with exit 130 rather than a Python traceback. GitHub #259, the
+    sibling of #223 in build_site.py — see documentation/05-build-pipeline.md
+    → "Stopping a build: exit 130, and no traceback".
+
+    It wraps main() rather than living inside it because
+    test_deploy_netlify_headers.py reads main()'s own source, so main()'s
+    body has to stay where it is. One handler here covers every place a
+    publish can be waiting when the Cancel arrives: the production rebuild,
+    either question at the keyboard, an upload, and wrangler."""
+    try:
+        main()
+    except KeyboardInterrupt:
+        # 130, not 0: the status a shell gives an interrupted program, so
+        # every reader sees what it saw before this change — 0 would read as
+        # a finished publish. Print nothing: the app already says the task
+        # was cancelled.
+        sys.exit(130)
+
+
 if __name__ == "__main__":
-    main()
+    run_until_stopped()
