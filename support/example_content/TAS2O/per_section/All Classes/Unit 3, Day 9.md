@@ -10,12 +10,13 @@ tags:
 ---
 ## Agenda
 
-1. Standup
-2. Warm-up: [[Interview Question Practice]]
-3. Reporting day two: the second source, or the document that replaces
-   it
-4. Desk time: the story you cannot stand up — decided, in writing
+1. Standup — the last four sheets cut first thing, about 28 minutes
+2. [[Judging Your Own Work]], modelled: I judge my own sign against
+   the criteria out loud, weakest row first — then you judge yours
+3. Peer read: swap signs and read each other's at the agreed distance
+4. Hand in [[The Sign Shop]]: the sign, the prototype, the settings
+   log — then deliver the sign to its user
 
 ## Things to do before our next class
 
-- [ ] Source log up to date.
+- [ ] Journal: what your user said when you handed it over.

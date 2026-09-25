@@ -21,6 +21,8 @@ every later page can simply link here instead of re-explaining it.
 | [[Backing Up Your Media]] | Never losing a shoot |
 | [[Getting Unstuck]] | Being stuck well instead of spinning |
 | [[Finding Answers Online]] | Researching like a reporter |
+| [[From Sketch to Cut File]] | Turning a pencil sketch into a file the laser can cut |
+| [[Modelling in 3D]] | Turning a sketch into a part the printer can print |
 
 Skim them all early; return to each when it becomes urgent. The
 middle two you will need before anything reaches readers — nothing

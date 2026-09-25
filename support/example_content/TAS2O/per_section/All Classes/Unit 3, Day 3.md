@@ -10,16 +10,18 @@ tags:
 ---
 ## Agenda
 
-1. Standup — pitches locked
-2. Warm-up: [[One-Minute Pitch]], round two — same story, tighter
-3. Drills: [[Interview Question Practice]]
-4. Read before you report: [[Releases and Consent]] — who must say yes,
-   and how we ask
-5. Desk time: source list and interview plan for [[The Investigation]]
+1. Standup — sign-off part two at the machine, three at a time, all
+   period
+2. Warm-up: measure it — a phone, a tripod's screw, a sheet of
+   plywood, with calipers and a ruler; everyone records all three
+3. Compare numbers: why did three people get three answers for the
+   same plywood? Then name it: [[Doing the Numbers]], the millimetres
+   and inches section
+4. Practise in pairs: [[Measurement Practice]], questions 1 to 3
+5. Exit ticket (formative): convert one of your own measurements, and
+   say which unit you would design in and why
 
 ## Things to do before our next class
 
-- [ ] Skim [[The Production Pipeline]] — the investigation is your
-      first full pre-production-to-published arc; plan it like one.
-- [ ] Contact your first source and propose a time to talk.
-- [ ] Journal: the source you are nervous to approach, and why.
+- [ ] [[Measurement Practice]] question 4, on paper, before you open
+      the answer.

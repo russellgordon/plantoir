@@ -16,6 +16,7 @@ room argues on purpose, with the coverage itself as the evidence.
 | [[When Is a Photo True]] | Edits that serve truth, edits that invent it |
 | [[Free Press, School Press]] | What a school paper can and should say |
 | [[The Comment Section]] | What happens after publish — and to whom |
+| [[Made in Canada]] | Who invented the things we use — and whose knowledge counts |
 
 The ground rules come from [[Our Newsroom Standards]]: hard on the
 work, never on the person — and arrive ready to change your mind,

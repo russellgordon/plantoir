@@ -10,16 +10,19 @@ tags:
 ---
 ## Agenda
 
-1. Standup — new beat: the community
-2. New warm-up: [[One-Minute Pitch]] — every reporter pitches, timed,
-   and I hear what this room thinks a question worth chasing sounds like
-3. Compare pitches, then go deeper on [[News Values]] — why some pitches
-   pulled the whole room in
-4. Launch: [[The Investigation]] — a community story that answers a
-   real question
-5. File and log: your pitch, sharpened, into your [[Newsroom Journal]]
+1. Standup — new unit: the newsroom opens a shop
+2. Warm-up: [[Which One Doesn't Belong]] — four real objects on each
+   table: one laser-cut, one 3D-printed, one moulded, one made by hand.
+   Before anything is named, I find out what this room already knows
+   about how things are made
+3. Explore: pass the objects round and list, for each, how you think
+   it was made and what gives it away
+4. Compare lists, then name one of them: [[Laser Cutting]] — watched
+   on a scrap sheet, lid closed, from behind the line on the floor
+5. File and log: [[Newsroom Journal]] — one object you could now
+   explain to someone else
 
 ## Things to do before our next class
 
-- [ ] Read [[The Investigation]] and refine your pitch to one sentence.
-- [ ] Journal: the question your story must answer to be worth reading.
+- [ ] Read [[Laser Cutting]] once through.
+- [ ] Shop clothes next class — check the shop list in [[What to Bring]].
