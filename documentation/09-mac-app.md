@@ -1714,7 +1714,7 @@ sidebar table asks the course anything while drawn (the #266 rule above).
 Written 2026-09-25 for [issue #156](https://github.com/russellgordon/plantoir/issues/156).
 Russell's decision: **both ways** — the mac READS the leases other programs
 write and WRITES its own. The rules are `contracts/shared-rules.json` →
-`workLeases.declining` (28 cases); the format is `contracts/file-formats.json`
+`workLeases.declining` (29 cases); the format is `contracts/file-formats.json`
 → `workLease`; who counts as alive is #245's `workLeases.liveness`, above under
 "Who counts as alive". This section is why it is shaped the way it is.
 
@@ -1772,6 +1772,15 @@ another live program holds `build`, `publish` or `preview` on the course:
 Every decline writes `build declined, course busy elsewhere` on the trail, with
 what was asked for and the other program's process id — from whichever process
 declined, so an outside assistant's refusal is on the trail too.
+
+**A build, preview or publish lease with no name line is treated as gone**
+(added in the fix round after #245's `ProcessLiveness.nameToCompare`, which
+supplies "Plantoir" for a nameless IMPORT lease and nothing for any other kind).
+Neither app writes such a lease — the mac writes atomically and always writes
+line 2 — and Windows' reader already calls fewer than two lines stale; judged
+on its id alone it could hold a course for the whole life of whatever process
+was handed that id. The last case in `workLeases.declining` pins it, and the
+liveness rule says so.
 
 **Take, then check, with a tiebreak** (the plan review's H1, accepted). The
 plan had "check, then take, in one synchronous stretch", and that is false for
@@ -1929,14 +1938,18 @@ mac writes.
 **Known limits, beyond the ones above.**
 
 - A preview stop ("everything" mode, by working folder) from THIS window —
-  Stop, `onDisappear`, the assistant's stop-then-start, quit's
-  `stopSectionProcessesOnTheWayOut` — releases the window's preview lease as it
-  begins while the stop itself runs on (waited up to 20 s). An outside build
+  Stop, the preview's and the deploy's Cancel buttons, `onDisappear`, the
+  assistant's stop-then-start, quit's `stopSectionProcessesOnTheWayOut` —
+  releases the window's lease (a cancelled deploy's `build` lease goes when
+  `deployAndWait` returns, through its `defer`) as it begins while the stop itself runs on (waited up to 20 s). An outside build
   started in those seconds is told the course is free and is then ended by the
   stop. Nobody builds twice; the outside program is told its build failed and a
   retry works. The Deploy no longer has this gap (its build lease is up through
   its stop — above); the others were left, because holding the preview lease
-  until the stop returns means keeping a lease for a preview that is gone.
+  until the stop returns means keeping a lease for a preview that is gone. (An
+  option not taken, from the fix review: derive a `build` lease from
+  `PreviewStopper`'s in-process list of stops still running, which would cover
+  every path at once — the stop does end builds.)
 - A Plantoir that quits during a publish leaves its reparented `deploy.sh`
   running (quitting deliberately does not end a publish) with no live lease —
   the same shape as an outside assistant's process being KILLED, or sent
@@ -1957,7 +1970,7 @@ mac writes.
 - `CourseActivity.busyDescription` (menus, Add Section…) stays in-process on
   purpose — declining at the press is the guarantee, not the menu's grey.
 
-**Tests.** `WorkLeaseDecliningTests` (25): the contract's 28 cases through the
+**Tests.** `WorkLeaseDecliningTests` (25): the contract's 29 cases through the
 pure `WorkLeaseFiles.blocking`; the bytes written; the derivation; a real
 `/bin/sleep` as the other program (held, recycled name ignored, gone ignored);
 the race, pure and on files, and the two orders the review measured; the Deploy's claim and the window's lease ORDER (read from the source, which the suite cannot construct); every door; the scheduled wait with an injected

@@ -184,7 +184,7 @@ final class WorkLeaseDecliningTests: XCTestCase {
     func testTheDeclineRuleIsTheContracts() throws {
         let block: [String: Any] = try WorkLeaseLivenessTests.sharedRules(["workLeases", "declining"])
         let cases: [[String: Any]] = try XCTUnwrap(block["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 28, "Cases went missing from the contract.")
+        XCTAssertGreaterThanOrEqual(cases.count, 29, "Cases went missing from the contract.")
 
         var ran: Int = 0
         for item in cases {
@@ -217,12 +217,18 @@ final class WorkLeaseDecliningTests: XCTestCase {
                 let courseCode: String = try XCTUnwrap(entry["course"] as? String, name)
                 let pid: Int32 = Int32(try XCTUnwrap(entry["pid"] as? Int, name))
                 let alive: Bool = try XCTUnwrap(entry["alive"] as? Bool, name)
+                let kind: String = try XCTUnwrap(entry["kind"] as? String, name)
+                // A lease with no name line: what `heldElsewhere` asks
+                // `ProcessLiveness.nameToCompare`, which names only an import.
+                let hasANameLine: Bool = (entry["nameLine"] as? Bool) ?? true
+                let recordedName: String? = hasANameLine ? "sleep" : nil
+                let judgedName: String? = ProcessLiveness.nameToCompare(recorded: recordedName, kind: kind)
                 // What `heldElsewhere` filters, applied to the case's files.
-                if courseCode.lowercased() != "ics3u" || pid == myPID || !alive {
+                if courseCode.lowercased() != "ics3u" || pid == myPID || !alive || judgedName == nil {
                     continue
                 }
                 holdings.append(WorkLeaseFiles.Holding(
-                    kind: try XCTUnwrap(entry["kind"] as? String, name),
+                    kind: kind,
                     pid: pid,
                     moment: entry["moment"] as? String
                 ))

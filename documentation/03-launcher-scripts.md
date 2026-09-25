@@ -928,9 +928,10 @@ as well as servers, by working directory, the order around it matters:
   kills.
 - **The in-app assistant** looks before it stops a window's preview, and
   declines without stopping anything when another program is in the way.
-- **What is NOT covered:** the plain Stop button, a window closing, and the
-  assistant's stop-then-start release the window's preview lease the moment
-  the stop begins, while the stop itself runs on (waited up to 20 s). An outside
+- **What is NOT covered:** the plain Stop button, the preview's and the
+  deploy's Cancel buttons, a window closing, and the assistant's
+  stop-then-start release the window's lease (its preview lease, or for a cancelled deploy its
+  build lease) the moment the stop begins, while the stop itself runs on (waited up to 20 s). An outside
   build started in those seconds can be ended by it. Nobody builds twice — the
   outside program is told its build failed, and a retry works — and it is a
   known limit in `09-mac-app.md` rather than a guarantee.
