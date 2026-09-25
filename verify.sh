@@ -381,6 +381,28 @@ else
   echo "$_dead_heredocs"
 fi
 
+# No temporary-file template may carry anything after its X's. macOS mktemp
+# fills in only TRAILING X's: with a suffix the name is used exactly as
+# written, so the first run succeeds, and the second — or any run after one
+# that was stopped before tidying up, or a second worktree running at the same
+# time — dies with "File exists". verify.sh's prune check had exactly that
+# shape until 2026-09-25 (GitHub #273). The list is every TRACKED shell file,
+# not a hand list, because the next copy will be somewhere nobody thought to
+# look; an empty list fails rather than passing having read nothing.
+_tracked_shell_files="$(git ls-files -- '*.sh' .githooks 2>/dev/null || true)"
+if [ -z "$_tracked_shell_files" ]; then
+  fail "could not list the tracked shell files to check their temporary-file names"
+else
+  _literal_temp_names="$(git ls-files -z -- '*.sh' .githooks \
+    | xargs -0 grep -nE 'mktemp[^|;]*X{3,}[^X"[:space:])]' || true)"
+  if [ -z "$_literal_temp_names" ]; then
+    pass "every temporary-file template ends in its X's (none is used literally)"
+  else
+    fail "a temporary-file template has text after its X's, so its name is fixed"
+    echo "$_literal_temp_names"
+  fi
+fi
+
 # Nothing may have left bytecode behind. PYTHONDONTWRITEBYTECODE above stops
 # the runs in THIS script, but `scripts/` is a folder reference in the app's
 # project — whatever sits in it is copied into the bundle, mirrored into every
@@ -608,7 +630,11 @@ rm -rf "$EXPORT_TMP"
 # throwaway fixtures standing in for each case.
 echo ""
 echo "🔎 Checking that a new build removes superseded builder images…"
-PRUNE_SRC="$(mktemp "${TMPDIR:-/tmp}/verify_prune.XXXXXX.sh")"
+# The X's must END the template: macOS mktemp fills in only trailing X's, and
+# with anything after them the name is used as written — so a second run, or
+# any run after a stopped one, died here on "File exists" (GitHub #273).
+# `source` below needs no extension.
+PRUNE_SRC="$(mktemp "${TMPDIR:-/tmp}/verify_prune.XXXXXX")"
 awk '/^prune_superseded_images\(\) \{/,/^\}/' preview.sh > "$PRUNE_SRC"
 # The three launchers are standalone scripts sharing hand-copied helper blocks,
 # and the cross-check above only proves each NAME is defined — not that the
