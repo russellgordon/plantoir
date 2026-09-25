@@ -24,7 +24,7 @@
       {
         "key": "front_page_heading",
         "type": "string",
-        "why": "The heading each section's front page is created with, above the embed of the newest class (#267): a club writes \u201cMost Recent Meeting\u201d. ABSENT means \u201cMost Recent Class\u201d. Read ONLY when a course is created \u2014 the course setup writes it into a new numbered course's front pages \u2014 and never by whatever repoints the front page, which finds the embed by the class page it names, not by the heading; a teacher's own heading is therefore never fought over. Not switchable after the wizard; Course Settings shows it locked."
+        "why": "The heading each section's front page is created with, above the embed of the newest class (#267): a club writes \u201cMost Recent Meeting\u201d. ABSENT means \u201cMost Recent Class\u201d for a course being created \u2014 but for a course that already exists it means only that nothing was recorded: its pages say whatever they say (CODING's reads \u201cMost Recent Meeting\u201d), so Course Settings shows the absent key as not recorded, never as this default (shared-rules.json \u2192 wizard.clubToggle.settingsRows.frontPageHeadingNotSet). Read ONLY when a course is created \u2014 the course setup writes it into a new numbered course's front pages \u2014 and never by whatever repoints the front page, which finds the embed by the class page it names, not by the heading; a teacher's own heading is therefore never fought over. Not switchable after the wizard; Course Settings shows it locked."
       },
       {
         "key": "class_noun",
