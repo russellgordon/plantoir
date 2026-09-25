@@ -365,17 +365,20 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     ///
     /// The frame cannot know the course's own word ("Week") — this table is
     /// a pure function of the sentence — so any single word is read as the
-    /// word, except "day", which would turn "at day 5" into a UNIT. The number
+    /// word, with two exceptions. "day" would turn "at day 5" into a UNIT.
+    /// "unit" keeps the shipped near-miss: "make room for a class at Unit 3"
+    /// names no day, and has always gone to the model
+    /// (`MakeRoomForClassesTests.testNearMissesAreNotSwallowed`). The number
     /// goes into `unit`, and that is the safe slot in BOTH kinds of course:
     /// a numbered course reads a lone `unit` as its position
     /// (`ClassInsertionPlanner.numberedPosition`), and an ordinary course
     /// given a unit and no day ASKS which day rather than guessing one — so
-    /// "make room for one class at unit 5" in a Unit/Day course is a
+    /// "make room for one class at week 5" in a Unit/Day course is a
     /// question, never a rename.
     private static func makeRoomAtOneNumber(
         _ words: [String], spelled: [String: Int]
     ) -> AssistCardCommand? {
-        guard words[2] == "at", words[3] != "day" else {
+        guard words[2] == "at", words[3] != "day", words[3] != "unit" else {
             return nil
         }
         let nouns: [String: Bool] = ["class": true, "meeting": true, "classes": false, "meetings": false]
@@ -749,8 +752,9 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
                 fills: [
                     "unit": "<number> — the one number a numbered course's page names carry. "
                           + "<word> is not read: this table cannot know a course's own word, so any "
-                          + "single word except 'day' is taken, and a Unit/Day course given a unit "
-                          + "and no day asks which day rather than guessing one",
+                          + "single word except 'day' and 'unit' is taken ('at unit 3' names no day "
+                          + "and goes to the model, as it always has), and a Unit/Day course given a "
+                          + "unit and no day asks which day rather than guessing one",
                     "howMany": "<count>, as a number — words up to twelve are understood",
                 ],
                 example: "make room for one meeting at Week 5",

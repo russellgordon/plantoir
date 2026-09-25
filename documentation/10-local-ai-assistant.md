@@ -4170,7 +4170,10 @@ as my next meeting". The one-number make-room family puts the number in `unit`,
 the slot both kinds of course read safely — a numbered course reads a lone
 `unit` as its position, and a Unit/Day course given a unit and no day ASKS
 which day (`testTheOneNumberShapeInAnOrdinaryCourseAsksRatherThanGuesses`); "at
-day 5" is refused because it would land in the unit slot. A numbered course
+day 5" is refused because it would land in the unit slot, and "at unit 3" is
+refused because it is a shipped near-miss (it names no day, and has always gone
+to the model — `MakeRoomForClassesTests.testNearMissesAreNotSwallowed` caught
+the first version of this family swallowing it). A numbered course
 gets its OWN shelf (`AssistPromptShelfView.groups(naming:noun:)`): every card
 on it is matched in code except "Cancel scheduled deploy", which was already
 measured. There is deliberately no "Publish Week 2" or "Unpublish Week 2" on
