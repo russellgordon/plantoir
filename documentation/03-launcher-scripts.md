@@ -1084,6 +1084,31 @@ the shared Python and watching that case — and only that case — fail. The sa
 was done for the descendant walk. A green suite proves nothing about a case
 that cannot fail.
 
+
+**Leases and this stop (#156).** Since 2026-09-25 the mac reads and writes the
+work leases under `courses/.internal/activity/`. Because this stop ends BUILDS
+as well as servers, by working directory, the order around it matters:
+
+- **Deploy** takes its claim — its own `build` and `publish` leases, then a look
+  at everyone else's — BEFORE it runs this stop. A refusal therefore stops
+  nothing, and while the stop runs the window's `build` lease is up, so no other
+  program (an outside assistant, another copy of Plantoir, a publish set for
+  later) can be told the course is free and start a build that the stop then
+  kills.
+- **The in-app assistant** looks before it stops a window's preview, and
+  declines without stopping anything when another program is in the way.
+- **What is NOT covered:** the plain Stop button, the preview's and the
+  deploy's Cancel buttons, a window closing, and the assistant's
+  stop-then-start release the window's lease (its preview lease, or for a cancelled deploy its
+  build lease) the moment the stop begins, while the stop itself runs on (waited up to 20 s). An outside
+  build started in those seconds can be ended by it. Nobody builds twice — the
+  outside program is told its build failed, and a retry works — and it is a
+  known limit in `09-mac-app.md` rather than a guarantee.
+
+The rule and its cases are `contracts/shared-rules.json` →
+`workLeases.declining`; `09-mac-app.md` → "Two programs, one course" is the
+manual.
+
 ## A course kept for reference is refused in the launcher, early
 
 `deploy.sh` and `deploy.ps1` both read `courses/<CODE>/course_config.json`

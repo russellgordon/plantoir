@@ -967,6 +967,9 @@ side; the interesting conversations are Phase 0 and the Phase 2 protocol.
 > build); the mac has not adopted the format and still tracks activity
 > in-process, so the cross-process race this was designed to prevent is
 > unguarded there.
+> *(2026-09-25: answered by #156 — the mac adopted the format both ways, with
+> #245's fourth line; see `documentation/09-mac-app.md` → "Two programs, one
+> course".)*
 
 
 

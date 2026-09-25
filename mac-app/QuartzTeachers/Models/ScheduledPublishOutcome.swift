@@ -96,6 +96,16 @@ nonisolated enum ScheduledPublishOutcome {
         /// start, and to carry this kind only if it is.
         case tooLateToRun = "too late to run"
 
+        /// Another program on this Mac was still building or publishing the
+        /// course after the run had waited ten minutes for it, so the run
+        /// STOOD DOWN (#156): deployed nothing, cleared the job away, and said
+        /// so. Two builds of one section clear the same folder, so going
+        /// ahead would have spoiled both; standing down at once would have
+        /// cost a night's publish to a build that finishes in thirty seconds.
+        /// A separate kind for the reason `tooLateToRun` is one — nothing was
+        /// attempted, so there is no destination for a sentence to name.
+        case courseWasBusy = "course was busy"
+
         /// Whether this is something the teacher should be chased about.
         ///
         /// The test is not "did something break" but "is the site other than
@@ -111,7 +121,7 @@ nonisolated enum ScheduledPublishOutcome {
         /// nobody reads by Wednesday.
         var needsAttention: Bool {
             switch self {
-            case .neededAnAnswer, .buildNeededAnAnswer, .didNotFinish, .tooLateToRun:
+            case .neededAnAnswer, .buildNeededAnAnswer, .didNotFinish, .tooLateToRun, .courseWasBusy:
                 return true
             case .succeeded:
                 return false
@@ -383,6 +393,17 @@ nonisolated enum ScheduledPublishOutcome {
                 + ScheduledDeployCleanup.Reason.theDayItWasSetForHadGoneBy.trailPhrase,
                 course: course, section: section, at: stopped.when
             )
+        case .courseWasBusy:
+            // The same event as the branch above: the job was turned off by
+            // something other than the teacher asking. The wait itself, with
+            // the other program's process id, is its own line
+            // (`scheduledPublishWaitedForTheCourse`), written by the run.
+            ActivityTrail.note(
+                .scheduledDeployTurnedOff,
+                "turned off a scheduled deploy because the course was still being built "
+                + "somewhere else after ten minutes",
+                course: course, section: section, at: stopped.when
+            )
         }
         return true
     }
@@ -439,6 +460,13 @@ nonisolated enum ScheduledPublishOutcome {
                  + "wasn’t awake at that time and too long has passed since. Plantoir left the site "
                  + "as it was. Deploy it yourself when you’re ready, or schedule another from the "
                  + "section’s menu."
+        case .courseWasBusy:
+            // No destination, for tooLateToRun's reason. Says what was in the
+            // way without naming a program, since it may be any of three.
+            return "\(course) Section \(section) was set to deploy on its own, but the course was "
+                 + "still being built somewhere else on this computer after ten minutes of waiting, "
+                 + "so Plantoir left the site as it was rather than build it twice at once. Deploy it "
+                 + "yourself when that has finished, or schedule another from the section’s menu."
         }
     }
 }

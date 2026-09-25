@@ -668,6 +668,31 @@ nonisolated enum ActivityTrail {
         /// this line and by nothing else. There was no line for it at all
         /// before, for one delete or many.
         case backupsDeleted = "backups deleted"
+
+        /// A build of a course was declined because ANOTHER program on this
+        /// Mac holds a build, publish or preview lease on it (#156) — Preview
+        /// or Deploy in the window, the in-app assistant's rebuild or deploy,
+        /// or an outside assistant's (`--mcp-stdio`). Carries the course, the
+        /// section asked about, what was asked for, what the other holds and
+        /// its process id. Never anything on a page.
+        ///
+        /// Recorded because the other program is invisible from here: a
+        /// teacher who reports "Preview said somebody else was using it"
+        /// can be answered only by the process id — carried on the lease
+        /// file and on this line. The app's own "app opened" line names it
+        /// too when the other program is a copy of the app; the
+        /// `--mcp-stdio` and scheduled processes write no opening line.
+        case buildDeclinedBusyElsewhere = "build declined, course busy elsewhere"
+
+        /// A publish set for later found the course being built or published
+        /// by another program and WAITED (#156): it polls every fifteen
+        /// seconds for up to ten minutes. Carries the course, the section, how
+        /// long it waited, the other's process id, and whether it then went
+        /// ahead or stood down (the stand-down also leaves the section's
+        /// `courseWasBusy` record). Recorded because a publish that ran ten
+        /// minutes late, or not at all, looks from outside exactly like one
+        /// that misfired.
+        case scheduledPublishWaitedForTheCourse = "scheduled publish waited for the course"
     }
 
     // MARK: - Stored properties

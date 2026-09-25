@@ -1087,6 +1087,20 @@ struct SectionDetailView: View {
         // this, so writing it beside the lease is what makes start and
         // stop name one folder.
         folderThisSectionWorksIn = workspaceURL
+        // The BUILD is recorded first — its lease on disk before the
+        // preview's — and that order is load-bearing (#156's review, M2).
+        // The take-then-check below compares other programs' leases against
+        // this window's `build` moment, and they compare against every lease
+        // this window holds, the `preview` included. Written the other way
+        // round, an outside build could land between the two files: this
+        // window would see it as earlier than its build and decline, and the
+        // other program would see this window's preview as earlier than its
+        // build and decline too. Build first, and exactly one goes ahead.
+        previewBuildWait.begin(
+            folderPath: workspaceURL.path,
+            courseCode: course.code,
+            sectionNumber: sectionNumber
+        )
         // Each preview runs on its own port, so several windows can show
         // sections side by side without taking each other down.
         let lease: PreviewLeases.Lease
@@ -1097,12 +1111,33 @@ struct SectionDetailView: View {
                 sectionNumber: sectionNumber
             )
         } catch {
+            previewBuildWait.end()
             previewRefusalTitle = "Cannot Preview Yet"
             previewRefusal = error.localizedDescription
             return
         }
         previewLease = lease
         previewURL = nil
+        // ANOTHER program on this Mac — an assistant working from another
+        // app, another copy of Plantoir, a deploy set for later — may be
+        // building or previewing this course (#156). Asked only NOW, after
+        // this window's own build and preview leases are on disk and with
+        // nothing awaited since: only a lease taken before this window's
+        // build counts, so two programs pressing at the same instant cannot
+        // both go ahead. Nothing has been stopped or started yet, so
+        // declining costs the teacher nothing but the sentence.
+        if let holding = WorkLeaseRegistry.whatBlocksABuild(
+            folderPath: workspaceURL.path, courseCode: course.code, afterTaking: true
+        ) {
+            previewBuildWait.end()
+            releasePreviewLease()
+            WorkLeaseRegistry.noteDeclined(
+                act: "Preview", courseCode: course.code, sectionNumber: sectionNumber, holding: holding
+            )
+            previewRefusalTitle = "Cannot Preview Yet"
+            previewRefusal = AssistWording.courseIsBeingBuiltElsewhere(course: course.displayCode)
+            return
+        }
         // Every window's copy of this course, not only this window's: the
         // unsaved switches may be in another window's Course Settings.
         let anyWindowHasUnsavedSettings: Bool = course.configuration.hasUnsavedChanges
@@ -1118,11 +1153,6 @@ struct SectionDetailView: View {
                 section: sectionNumber
             )
         }
-        previewBuildWait.begin(
-            folderPath: workspaceURL.path,
-            courseCode: course.code,
-            sectionNumber: sectionNumber
-        )
         previewRunner.milestones = TaskMilestones.preview
 
         Task { @MainActor in
@@ -1350,6 +1380,36 @@ struct SectionDetailView: View {
             )
         }
 
+        // Claim the course — `beginPublish`, which puts this window's own
+        // `build` and `publish` leases on disk — and THEN look at the other
+        // programs' leases, with nothing awaited in between (#156). Both
+        // happen BEFORE the preview below is stopped, for two reasons. A
+        // refusal placed any later would end the page the teacher was reading
+        // for nothing. And the stop is `preview.sh --stop`, which finds a
+        // section's processes by working directory and so ends BUILDS as well
+        // as servers: holding the `build` lease through it means no other
+        // program can be told the course is free and start a build that this
+        // stop then kills (the review of #156, M1).
+        //
+        // ONE bracket around the whole sequence of destinations, not one per
+        // destination: from outside this window — Add Section…, and every
+        // other program — the course is "busy publishing" for the whole span.
+        if let holding = WorkLeaseRegistry.claimAPublish(
+            folderPath: workspaceURL.path, courseCode: course.code, sectionNumber: sectionNumber
+        ) {
+            WorkLeaseRegistry.noteDeclined(
+                act: "Deploy", courseCode: course.code, sectionNumber: sectionNumber, holding: holding
+            )
+            return AssistSiteWorkResult.builtElsewhere(course: course)
+        }
+        defer {
+            CourseActivity.endPublish(
+                folderPath: workspaceURL.path,
+                courseCode: course.code,
+                sectionNumber: sectionNumber
+            )
+        }
+
         // Claim the console for the deploy panel before touching the preview
         // runner below. Stopping a running preview here sets its own
         // `wasStoppedByUser`, which — until `deployRunner.run()` gives this a
@@ -1401,24 +1461,6 @@ struct SectionDetailView: View {
         }
 
         let needsBuild: Bool = BuildFreshness.needsRebuild(course: course, sectionNumber: sectionNumber)
-
-        // Let the rest of the app know this course is mid-publish (so,
-        // for example, Add Section… declines until it finishes) — ONE
-        // bracket around the whole sequence of destinations, not one per
-        // destination: from outside this window, the course is "busy
-        // publishing" for the whole span.
-        CourseActivity.beginPublish(
-            folderPath: workspaceURL.path,
-            courseCode: course.code,
-            sectionNumber: sectionNumber
-        )
-        defer {
-            CourseActivity.endPublish(
-                folderPath: workspaceURL.path,
-                courseCode: course.code,
-                sectionNumber: sectionNumber
-            )
-        }
 
         // The real progress panel takes over from here — `deployRunner.run()`
         // is about to give `deployRunner.legs` fresh runners of its own and

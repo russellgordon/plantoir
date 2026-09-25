@@ -93,6 +93,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             ScriptRunner.stopEveryLivePreview()
 
+            // This app's work leases come down with it (#156) — tidiness
+            // rather than safety: a lease whose process has gone is ignored
+            // by every reader. A publish left running is not ended here (see
+            // `stopEveryLivePreview`), and its lease goes anyway, because
+            // the process that holds it is leaving; the quit script below
+            // still refuses to rest the machine while its launcher runs.
+            WorkLeaseRegistry.releaseEverything()
+
             // Let every folder's container rest — and if that leaves the
             // shared VM with nothing running at all, let the VM rest too.
             // Sequenced in one script: the emptiness check must come after
