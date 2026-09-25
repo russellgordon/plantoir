@@ -987,7 +987,10 @@ at once.
 does it.** Right idea, wrong piece: the mac has no cross-process state of that
 kind today (`CourseActivity` and `PreviewLeases` are in-process statics), so it
 would mean inventing some during a fix meant to be small. If the host-side check
-is ever not enough, this is the next step.
+is ever not enough, this is the next step. (Since then the import has written one —
+#206 — and #245 gave every lease one shared liveness reader, `ProcessLiveness`,
+described under "Who counts as alive" below. The quit path still reads none;
+#156 is where builds and previews get theirs.)
 
 **REJECTED — blocking the quit until the containers have stopped.** Quitting
 must not wait on Docker; a teacher whose engine is wedged would get an app that
@@ -2587,16 +2590,18 @@ refusal is the safe direction: no real course code begins with a dot.
 
 A leftover that somebody is STILL WORKING ON is left alone. The import takes a
 lease naming its own process — `<FOLDER>.import.<pid>.lease` in
-`courses/.internal/activity/`, the shape `WorkLease` already uses — and the
-sweep skips a staging folder whose lease names a live process, taking the
-stale lease of one whose owner is gone. This is not a rare race: File ▸ Reload
+`courses/.internal/activity/`, the NAME shape every work lease has — and the
+sweep skips a staging folder whose lease names a LIVE owner, taking the stale
+lease of one whose owner is gone. This is not a rare race: File ▸ Reload
 Courses is offered while the import sheet is up, a second window on the same
 working folder reads it, and `Plantoir --mcp-stdio` — how a Claude Code
 session starts — reads it too. Any of those used to delete the tree under the
 running copy, and after the lock and before the rename it would have thrown
 away a finished reference course. Asked of a lease rather than of the folder's
 AGE deliberately: a threshold is a guessed duration, and the case that needs
-it most is the slow disk where the guess is wrong.
+it most is the slow disk where the guess is wrong. Who counts as a live owner,
+and what happens when two imports want the same folder, is the next section.
+XXBUTONE
 
 A leftover from an import that never finished is **swept when a working folder
 is read** (`ReferenceStaging.sweepLeftovers`): unlock, remove, one trail line
@@ -2623,6 +2628,124 @@ reported by name with what happened, and the run carries on. A folder of four
 where one clashes imports three. Only Stop ends a run early, and it has its own
 trail event rather than being recorded as a failure: a teacher who stops
 something chose to.
+
+#### Who counts as alive, and two imports of the same course at once (#245)
+
+**What a lease holds.** Since #245 the import writes Windows' `WorkLease`
+shape — process id, process name, the moment it was taken in .NET's
+round-trip form (`2026-09-25T13:59:23.8960000Z`) — plus a FOURTH line, when
+its owner started (`1790345209.217862`: seconds, a dot, microseconds padded to
+six). Windows' reader reads two lines and ignores the rest. The NAME did not
+change, on purpose: an older Plantoir reads only the name and the pid in it, so
+it still leaves a new lease's folder alone. The format is
+`contracts/file-formats.json` → `workLease`; before #245 the body was the pid
+alone, and a one-line lease is still honoured (judged on the pid) because an
+older copy of Plantoir still writes one.
+
+**Who counts as alive is ONE reader, `ProcessLiveness`**, shared with every
+other lease (#156 builds its build/preview/publish leases on it rather than
+growing a second). The rule and its eighteen cases are
+`contracts/shared-rules.json` → `workLeases.liveness`, run by
+`WorkLeaseLivenessTests` against the pure `ProcessLiveness.decide`, so a case
+needs no real process. Measured on this Mac as an ordinary user, 2026-09-25:
+
+| Asked | Answer | What it means |
+|---|---|---|
+| `kill(1, 0)` — launchd, root's | −1, `EPERM` | exists, not ours to signal. **Until #245 this read as "gone"**, so another account's live import — or one running as root — was swept. |
+| `kill(99999, 0)` | −1, `ESRCH` | the only signal answer that means no such process |
+| `kill(0, 0)` | **0** | pid 0 is "my own process group": a lease naming it read as alive for ever. Refused outright now. |
+| `proc_name(1, …)` | fails, `EPERM` | cannot name another account's process, so it is not used |
+| `sysctl(CTL_KERN, KERN_PROC, KERN_PROC_PID, pid)` | answers for ANY process: pid 1 → "launchd" and its start; 99999 → an empty answer | one call gives existence, the zombie state, the name and the start |
+| a child that has finished and not been collected | `kill` → 0; the table → zombie | a zombie is GONE; the signal alone cannot see it |
+
+So: a pid of 0 or less is not a process; `ESRCH` is gone and every other
+signal answer goes on to the table; the table's "no such process" is gone,
+a zombie is gone, a name that is not the recorded one is a recycled id (gone,
+compared without regard to case on the sixteen characters the table keeps),
+and a start that is not the recorded one is a recycled id too. **A table that
+cannot be asked is ALIVE**: the two errors are not equal — reading a live
+owner as gone removes somebody's half-made work, reading a gone one as alive
+leaves litter until the folder is next opened. Windows' `WorkLease.IsAlive`
+errs the same way.
+
+*Why the start time is in this piece and not left for later:* the change
+below makes a live lease REFUSE a second import rather than merely leave
+litter, so a recycled pid read as alive would block every retry of that course
+until the unrelated process holding the number exits — after a reboot,
+plausibly for the whole uptime. Every copy of Plantoir is called Plantoir, so
+the name check cannot tell a crashed Plantoir from a later Plantoir handed the
+same number; the start time names the exact process.
+*Rejected: the process name alone* (Windows' check) — for that reason.
+*Rejected: `flock` on the lease* — the kernel releases it at death, but nothing
+else reads a lock (older builds and Windows read names and pids), and working
+folders live on cloud-synced volumes where advisory locks are not something to
+bet a teacher's copy on.
+
+**The second edge: two imports of the same course, and the tidy-up that took
+the other one's work.** Traced on the code before #245 — and it did not need
+two processes. Two windows are ONE process with one pid, so one lease name.
+Window A checks (nobody), leases, and goes off to read the old folder. Window
+B checks, reads A's lease as a live owner, so skips the leftover removal,
+leases the same file, and later fails to make the folder A already made — and
+its catch **tidied away the staging folder, which was A's half-made copy**,
+then its release deleted the lease A still depended on. Keep a Copy for
+Reference… had the identical catch and, being synchronous, runs between the
+importer's suspension points, so it could do the same to an import of the same
+folder name. Measured on the old code: two concurrent imports of one course
+imported NEITHER, ten runs out of ten.
+
+**Now a staging folder is CLAIMED, in one act, and only its claimer ever
+removes it** (`ReferenceStaging.claim`, called by the importer and by Keep a
+Copy before anything is read; the folder exists, empty, from the claim):
+
+1. already claimed in THIS app (another window) → refused;
+2. take our lease, THEN look for another process's live lease → refused if
+   one is found;
+3. a leftover of that name — nobody live owns it — is cleared; one that will
+   not go means the import does not start (`wording.leftoverInTheWay`);
+4. make the folder EXCLUSIVELY; already there means somebody slipped in →
+   refused, nothing removed.
+
+A refused course is reported with `wording.alreadyBeingImported` — Keep a Copy
+with `referenceCourses.wording.copyAlreadyBeingMade` — and writes the "course
+could not be imported for reference" trail line, and the run carries on to the
+next course. The sentence says only that it is being imported elsewhere; it
+does not promise the course will appear, because the other import may fail or
+be stopped. The cases are `contracts/shared-rules.json` →
+`referenceCourses.importing.oneImportPerCourseAtATime.cases`, run by
+`WorkLeaseLivenessTests.testTheClaimIsTheContracts` through the REAL claim.
+
+*Why lease-then-check:* of two processes, the one that looks second always
+sees the first one's lease, so they can never both go on; at worst both step
+back and both say so. Check-then-lease has a window where both see nobody.
+*Why the in-app set is keyed by the courses folder's REAL path* (plus the
+staging name in lower case): two windows can reach one working folder through
+a link, through `/private`, or in another case on a case-insensitive disk, and
+a set that missed would let window B clear window A's copy as a leftover —
+the original fault again. Measured: `realpath` returns one string for all
+three spellings.
+
+*Rejected: the second import WAITS for the first.* A poll is a guessed
+duration by another name, and it would end in a refusal anyway — once the
+first lands, the shelf rule refuses the same code in the same school year.
+*Rejected: making the folder earlier without the in-app set* — a create cannot
+tell A's folder from a crashed leftover, and the leftover removal before it is
+what cleared A's work. *Rejected: a unique token in the lease NAME* — an older
+build parses the pid out of the name, fails on the token, skips the lease and
+would SWEEP a live import.
+
+**What is still open, said so nobody believes otherwise.** (1) A Reload
+Courses in ANOTHER process that reads the folder in the microseconds between
+a claim's lease check and its leftover removal can see no live lease on a
+folder about to be made; the import then fails and says so — never a
+half-made visible course, never the source touched. (2) An OLDER Plantoir
+(before #245) still checks, then leases, then makes the folder late, and its
+own tidy-up can still take a newer copy's work; it cannot be taught otherwise
+from here. (3) **A lease synced from ANOTHER computer** — a working folder in
+iCloud Drive or Dropbox opened on two Macs — names a pid that means nothing on
+this one, so it reads as gone and that computer's half-made folder is swept
+here, and the sweep syncs back. The lease does not cover two computers sharing
+one synced folder.
 
 #### The school year is proposed from the pages, and the newest page was rejected
 
