@@ -188,7 +188,7 @@
       {
         "carries": "which course and section, and a sentence naming what happened with the stable check NAME in brackets — 'found a problem with this course’s folders (curriculumCoverageFoundNothing)'. Never the product wording, which changes, and never anything written on a page",
         "event": "folder problem found",
-        "why": "A teacher who reports 'it stopped showing my curriculum map last month' leaves nothing to look at otherwise: the finding is printed into a build console that is gone by then, and the condition itself is invisible on disk — a renamed folder looks exactly like a folder that was always called that. Recording the check NAME rather than the sentence is deliberate: the sentence is product wording and will be reworded, while the name is what a person searching the trail six months later can match against the contract. A scheduled publish's findings are recorded too, dated to the RUN rather than to when somebody next opened the section - or a problem found at half six is filed under the morning somebody looked, and a teacher who never opens that section gets no line at all (the reasoning of scheduledPublishStopped.trail; #153). Who writes it is platform-local: the mac's scheduled run is Plantoir itself and writes the line at the end of the run, from its own log; Windows writes it when the app reads the run's record, dated to that record's write time."
+        "why": "A teacher who reports 'it stopped showing my curriculum map last month' leaves nothing to look at otherwise: the finding is printed into a build console that is gone by then, and the condition itself is invisible on disk — a renamed folder looks exactly like a folder that was always called that. Recording the check NAME rather than the sentence is deliberate: the sentence is product wording and will be reworded, while the name is what a person searching the trail six months later can match against the contract. A scheduled publish's findings are recorded too, dated to the RUN rather than to when somebody next opened the section - or a problem found at half six is filed under the morning somebody looked, and a teacher who never opens that section gets no line at all (the reasoning of scheduledPublishStopped.trail; #153). Who writes it is platform-local: the mac's scheduled run is Plantoir itself and writes the line at the end of the run, from its own log; Windows writes it when the app reads the run's record, dated to that record's write time. Since #246 it also covers a PAGE whose settings the build could not read (pageSettingsUnreadable), not only a folder: the name is kept because the event is the site-health family and renaming it would cost both platforms, and the line still carries the check's name only - never which pages, which are the teacher's own names."
       },
       {
         "carries": "which section, and which destinations it was published to",
@@ -1653,7 +1653,7 @@
     "scheduledDeployPublishesAnyway": "A scheduled deploy NEVER refuses on a health finding. A slightly inaccurate curriculum map is a paper cut; a site update a teacher was counting on that silently did not happen is not. The finding is recorded and surfaced afterwards instead.",
     "marker": {
       "prefix": "PLANTOIR_HEALTH:",
-      "examples": ["PLANTOIR_HEALTH: {\"name\": \"curriculumCoverageFoundNothing\", \"sentence\": \"The curriculum map for ICS3U Section 1 could not be built.\", \"detail\": \"Plantoir looks for a folder whose name mentions the curriculum, holding one page per expectation. It could not find one, so the Curriculum Coverage page has been left out of this build. If you renamed or moved that folder, the map will come back as soon as it can find it again.\", \"fixable\": false, \"course\": \"ICS3U\", \"section\": 1}", "PLANTOIR_HEALTH: {\"name\": \"mediaFolderMissing\", \"sentence\": \"The Media folder for ICS3U is not there.\", \"detail\": \"Images and files you have added to pages live in a folder called Media, beside your course. Plantoir could not find it, so anything on a page that points into it will be missing from the built site.\", \"fixable\": true, \"course\": \"ICS3U\", \"section\": 1}"],
+      "examples": ["PLANTOIR_HEALTH: {\"name\": \"curriculumCoverageFoundNothing\", \"sentence\": \"The curriculum map for ICS3U Section 1 could not be built.\", \"detail\": \"Plantoir looks for a folder whose name mentions the curriculum, holding one page per expectation. It could not find one, so the Curriculum Coverage page has been left out of this build. If you renamed or moved that folder, the map will come back as soon as it can find it again.\", \"fixable\": false, \"course\": \"ICS3U\", \"section\": 1}", "PLANTOIR_HEALTH: {\"name\": \"mediaFolderMissing\", \"sentence\": \"The Media folder for ICS3U is not there.\", \"detail\": \"Images and files you have added to pages live in a folder called Media, beside your course. Plantoir could not find it, so anything on a page that points into it will be missing from the built site.\", \"fixable\": true, \"course\": \"ICS3U\", \"section\": 1}", "PLANTOIR_HEALTH: {\"name\": \"pageSettingsUnreadable\", \"sentence\": \"Plantoir could not read the settings of 2 pages in ICS3U Section 1, so they are hidden from students until they are fixed.\", \"detail\": \"A page whose settings cannot be read might be one you meant to keep from students, so Plantoir hides it rather than risk showing it. To show a page again, correct the lines at the top of it in Obsidian and build again: “Concepts/Arrays” (near line 4), “section1/Unit 1/Day 3”.\", \"fixable\": false, \"course\": \"ICS3U\", \"section\": 1}"],
       "rule": "One line per finding on stdout, the prefix followed by a single-line JSON object carrying name, sentence, detail, fixable, course and section. The apps parse these lines out of the console transcript they are already reading; the teacher-facing SENTENCE travels in the line rather than being re-authored on each platform, so the two apps cannot word the same problem differently. A line CARRYING the prefix anywhere is machinery: it is kept out of the console a teacher reads WHOLE - what precedes a glued marker is half a line of progress chatter, not a sentence - including while it is still arriving, before its newline; and its finding is read from the prefix onward, so a marker glued to the tail of somebody else's half line is still found (#153: the mac had dropped it, finding and all, while showing the raw JSON). consoleCases below are the cases.",
       "why": "A progress marker is matched loosely and getting one wrong is silent (see app-rules.json markerOrigins). A prefixed JSON line is unambiguous, survives being interleaved with ordinary build output, and carries structure a sentence cannot.",
       "consoleCases": {
@@ -1690,7 +1690,7 @@
     "repair": {
       "note": "What Plantoir offers to put right, and what it says afterwards. Only two of the checks are repairable, and the line is the point: a fix must restore the FEATURE, not merely satisfy the check.",
       "neverOffered": {
-        "checks": ["curriculumCoverageFoundNothing", "courseTeachesNothing", "handWrittenCoveragePage", "noGradedFolders"],
+        "checks": ["curriculumCoverageFoundNothing", "courseTeachesNothing", "handWrittenCoveragePage", "noGradedFolders", "pageSettingsUnreadable"],
         "why": "Recreating an empty curriculum folder would silence \"the curriculum map could not be built\" and leave the map missing, because the folder only counts once it holds a page named for an expectation code. A button that makes a warning go away without fixing anything is worse than no button: the teacher then believes it is dealt with. Decide from the check's NAME, not from the `fixable` flag alone — the flag means \"this kind of thing is repairable\", while what has to be true is that THIS app has a repair for it."
       },
       "offered": {
@@ -1795,6 +1795,199 @@
         "detail": "The curriculum map marks an expectation as evaluated when a page in your graded folders addresses it. None of those folders were found, so every expectation is shown as not yet evaluated. You can choose which folders count in Course Settings.",
         "fixable": false,
         "why": "When no folders count for marks or the configured folders are missing, the curriculum map shows zero evaluated expectations. Telling the teacher lets them choose which folders count in Course Settings rather than wondering why no expectations show as evaluated."
+      },
+      {
+        "name": "pageSettingsUnreadable",
+        "sentence": "Plantoir could not read the settings of “{page}” in {course} Section {section}, so it is hidden from students until they are fixed.",
+        "sentenceForSeveral": "Plantoir could not read the settings of {count} pages in {course} Section {section}, so they are hidden from students until they are fixed.",
+        "detail": "A page whose settings cannot be read might be one you meant to keep from students, so Plantoir hides it rather than risk showing it. To show a page again, correct the lines at the top of it in Obsidian and build again: {pages}.",
+        "pageWithLine": "“{page}” (near line {line})",
+        "pageWithoutLine": "“{page}”",
+        "andMore": "and {count} more",
+        "frontPage": "One of them is the front page of {course} Section {section}, so until it is fixed the website has no front page and cannot be published.",
+        "fixable": false,
+        "fill": "{page} is the page's place in the course folder without .md (section1/index for a section's front page), {line} the line of the PAGE the reader stopped near, counted from the opening --- as line 1, {count} how many. `sentence` when there is one page and `sentenceForSeveral` otherwise; `detail` names at most ten pages, each through `pageWithLine` or `pageWithoutLine`, joined with \", \", then `andMore` with the number left over; `frontPage` is added to the end of the detail, after a space, when the section's front page is one of them. Every value is filled in ONE pass, so a page a teacher named \"{course} notes\" is named as it is. ONE finding per section build, never one per page: both apps key a finding on name, course and section, so two per-page findings would collide.",
+        "why": "Russell, 2026-09-21 (#246, option B): a page that wrongly DISAPPEARS is noticed and harmless; one that wrongly APPEARS cannot be undone. Before, a page whose settings the build could not read was PUBLISHED whenever Quartz could read what PyYAML could not (a yes/no, number or date used as a key, U+2028, an impossible date) - even one hidden by publishForSection1: false, which is what the app writes - and for 14 of the 18 known shapes it STOPPED the whole build with a developer's error. The build now hides such a page in its own copy only, keeps its body, and names it here; the teacher's file is not touched. Not repairable: rewriting a teacher's settings means guessing what they meant. `contracts/shared-rules.json` -> `unreadablePageSettings` holds the cases, and documentation/05-build-pipeline.md the measurements and what was rejected."
+      }
+    ]
+  },
+  "unreadablePageSettings": {
+    "note": "What the build does with a page whose settings block it cannot read (#246). The words a teacher reads are siteHealth.checks[pageSettingsUnreadable]; these are the cases, run by scripts/test_unreadable_page_settings.py through the real build_site.process_frontmatter and by scripts/check_visibility_against_the_site.py down the rest of the chain to the site.",
+    "rule": "A page whose settings block the build cannot read is treated as HIDDEN in every section, whatever it says, and named in ONE site-health finding per section build, with the line the reader stopped near where it can tell. Only the build's copy is changed - its settings become publish: false and its body is kept - and the teacher's file is never touched. A copy that cannot be rewritten is removed, and a build that can do neither stops rather than produce a site that might show it. An unreadable FRONT PAGE is hidden too, so the section has no website: the last built one is cleared, as for a missing front page, and a publish says why in its own words (app-rules.json -> failureExplanations) rather than the missing front page's. Nothing new goes on the trail: the finding reaches it through the existing `folder problem found` line, which carries the check's name and never a page's.",
+    "why": "Russell, 2026-09-21, option B: a page that wrongly DISAPPEARS is noticed and harmless; one that wrongly APPEARS cannot be undone. Before, such a page was PUBLISHED whenever Quartz could read what the build could not - even one hidden by publishForSection1: false, which is what the app writes - and for most shapes the whole build STOPPED instead, withholding every other update including a scheduled publish a teacher was counting on.",
+    "measured": "python-frontmatter 1.3.0 / PyYAML 6.0.3 / gray-matter with js-yaml JSON_SCHEMA, in the image, 2026-09-25. Of the shapes in copyingAPageBetweenCourses.builderAgreement, 18 are refused by the build's reader when it opens the page as a file: 14 of them Quartz could not read either, so the whole build stopped, and 4 (a date that cannot be, the 29th of February with a colon in its offset, `yes` as a key, U+2028) Quartz read, publishing the page unless it also carried a plain publish: false. A 19th, the lone carriage return, raises only when the block is handed over as text; the build opens pages with universal newlines and reads it (the case above). 0 of 14,699 real and shipped pages are refused today, so no existing site changes on the first build after the update. For the shapes that carry a position, the line is counted from it: of those, most point AT the wrong line and the rest one or two lines past it, so the words say NEAR line N.",
+    "rejected": [
+      "Deleting the page from the build instead of hiding it: a missing front page is a different state, with a repair that would find the page and say it was already put right.",
+      "A rule in Quartz's publish filter: Quartz cannot read 14 of the 18 shapes at all.",
+      "Stopping the build, which is what happened before for most shapes: one typo withheld every other update, including a scheduled publish (siteHealth.scheduledDeployPublishesAnyway).",
+      "One finding per page: both apps key a finding on name, course and section, so they would collide.",
+      "Printing the reader's own message: it quotes the page's words into a console that goes into problem reports.",
+      "Making the apps' readers call such a page hidden: it would need a twin of the build's reader in Swift and C#, and the one direction left (the app says shown, the site hides it) is the mild one, and is announced by the finding."
+    ],
+    "notCoveredHere": "A block whose END the build cannot find - a closing fence that is indented, or one never closed - is #188's. It cannot be told from a page that begins with a line across the page (the case above), and 0 of the 14,699 pages are either shape.",
+    "howToRunACase": "Write `page` byte for byte as a page of the build's content, call process_frontmatter on it for `section`, and read what it became. expectHidden is what the site does with the result (build_site._is_draft over the processed text, which check_visibility_against_the_site.py holds to the site). expectReadable false means the page is recorded as unreadable with expectLine (null when the reader names none), its body below the settings is unchanged, and nothing printed carries the reader's message or the page's settings.",
+    "cases": [
+      {
+        "name": "readable, shown in this section",
+        "page": "---\npublishForSection1: true\ntitle: Arrays\n---\nBody\n",
+        "section": 1,
+        "expectReadable": true,
+        "expectHidden": false,
+        "expectLine": null,
+        "why": "The ordinary page. Nothing about it changes."
+      },
+      {
+        "name": "readable, hidden in this section",
+        "page": "---\npublishForSection1: false\ntitle: Arrays\n---\nBody\n",
+        "section": 1,
+        "expectReadable": true,
+        "expectHidden": true,
+        "expectLine": null,
+        "why": "What the app writes for a course-level page a teacher hid in section 1."
+      },
+      {
+        "name": "readable, hidden in ANOTHER section",
+        "page": "---\npublishForSection2: false\ntitle: Arrays\n---\nBody\n",
+        "section": 1,
+        "expectReadable": true,
+        "expectHidden": false,
+        "expectLine": null,
+        "why": "Hidden in section 2 is shown in section 1. The rule below must not widen a per-section hide of a page it CAN read."
+      },
+      {
+        "name": "readable, says nothing about being shown",
+        "page": "---\ntitle: Arrays\n---\nBody\n",
+        "section": 1,
+        "expectReadable": true,
+        "expectHidden": false,
+        "expectLine": null,
+        "why": "A page with no visibility key is shown."
+      },
+      {
+        "name": "an EMPTY settings block",
+        "page": "---\n---\n# Learning Goals\n",
+        "section": 1,
+        "expectReadable": true,
+        "expectHidden": false,
+        "expectLine": null,
+        "why": "25 real pages open this way (measured 2026-09-25 across the example content, skeletons and two real working folders). The reader reads it as no keys, so the page is shown - and must stay shown."
+      },
+      {
+        "name": "a page that begins with a line across the page",
+        "page": "---\n\nSome text after a horizontal rule.\n",
+        "section": 1,
+        "expectReadable": true,
+        "expectHidden": false,
+        "expectLine": null,
+        "why": "One fence and no second one is not a settings block at all, so there is nothing to fail to read. This is also why a block whose END cannot be found (#188) is left out: it cannot be told from this."
+      },
+      {
+        "name": "the 29th of February, written with an offset the reader does not take as a date",
+        "page": "---\npublishForSection1: true\ncreated: 2026-02-29T07:00:00.000-0400\n---\nBody\n",
+        "section": 1,
+        "expectReadable": true,
+        "expectHidden": false,
+        "expectLine": null,
+        "why": "On a real page of Russell's. With no colon in the offset the reader takes it as words, not a date, so it is read and the page is shown."
+      },
+      {
+        "name": "a lone carriage return",
+        "page": "---\npublishForSection1: true\ntitle: Notes\r---\rpublish: false\n---\nBody\n",
+        "section": 1,
+        "expectReadable": true,
+        "expectHidden": false,
+        "expectLine": null,
+        "why": "Read, not refused - measured, and against the plan's count. The build opens a page with universal newlines, so the carriage returns become line ends, the block ends at the first `---`, and the reader sees only publishForSection1 and title. Handed to the reader as TEXT, as copyingAPageBetweenCourses.builderAgreement measures it, the same block raises; the build never hands it over that way."
+      },
+      {
+        "name": "unreadable, hidden only in this section (the headline: it used to be PUBLISHED)",
+        "page": "---\npublishForSection1: false\nyes: value\n---\nBody\n",
+        "section": 1,
+        "expectReadable": false,
+        "expectHidden": true,
+        "expectLine": null,
+        "why": "`yes` used as a key is a yes/no to the reader, and a key must be words, so the reader refuses the block. Quartz read the same block, found no plain `publish: false`, and PUBLISHED a page the teacher had hidden. The reader names no line for this shape."
+      },
+      {
+        "name": "unreadable, marked shown (what option B costs)",
+        "page": "---\npublishForSection1: true\nyes: value\n---\nBody\n",
+        "section": 1,
+        "expectReadable": false,
+        "expectHidden": true,
+        "expectLine": null,
+        "why": "Hidden although the teacher said shown: the build cannot tell which it said, and a page that wrongly disappears is noticed and harmless. The finding names it."
+      },
+      {
+        "name": "unreadable, hidden only in ANOTHER section",
+        "page": "---\npublishForSection2: false\n2025-01-01: x\n---\nBody\n",
+        "section": 1,
+        "expectReadable": false,
+        "expectHidden": true,
+        "expectLine": null,
+        "why": "A date used as a key. Hidden in every section once unreadable, including the one it was shown in - the build cannot read which section the hide was for."
+      },
+      {
+        "name": "a quote inside a quoted value (the build used to STOP)",
+        "page": "---\npublishForSection1: true\ntitle: \"a\"b\"\n---\nBody\n",
+        "section": 1,
+        "expectReadable": false,
+        "expectHidden": true,
+        "expectLine": 3,
+        "why": "One of the 14 shapes Quartz could not read either, so the whole build stopped with a developer's error. Now it builds, with this page hidden and named near the line that is wrong."
+      },
+      {
+        "name": "a date that cannot be",
+        "page": "---\npublishForSection1: true\ncreated: 2025-09-93\n---\nBody\n",
+        "section": 1,
+        "expectReadable": false,
+        "expectHidden": true,
+        "expectLine": null,
+        "why": "A teacher's typo: the reader takes it as a date and cannot make one. It names no line."
+      },
+      {
+        "name": "U+2028 inside a value",
+        "page": "---\npublishForSection1: true\ntitle: a\u2028b\npublish: true\n---\nBody\n",
+        "section": 1,
+        "expectReadable": false,
+        "expectHidden": true,
+        "expectLine": 4,
+        "why": "The reader counts U+2028 as a line break, which an editor does not show as one, so its OWN line number says 5, two lines past the one the teacher sees. Counted from where the reader stopped instead, it says 4: the line after, because the reader only gives up at the next key. Near, not at - which is what the words say."
+      },
+      {
+        "name": "a vertical tab inside a value",
+        "page": "---\npublishForSection1: true\ntitle: a\u000bb\n---\nBody\n",
+        "section": 1,
+        "expectReadable": false,
+        "expectHidden": true,
+        "expectLine": 3,
+        "why": "Refused before the reader looks at the structure at all, with a position but no line - which is counted the same way."
+      },
+      {
+        "name": "a tab-indented line (the build used to STOP)",
+        "page": "---\npublishForSection1: true\ntitle: x\n\tpublish: true\n---\nBody\n",
+        "section": 1,
+        "expectReadable": false,
+        "expectHidden": true,
+        "expectLine": 4,
+        "why": "A tab is not indentation to the reader, nor to Quartz, which stopped the whole build on it."
+      },
+      {
+        "name": "an unclosed quote",
+        "page": "---\npublishForSection1: true\ntitle: \"unclosed\npublish: true\n---\nBody\n",
+        "section": 1,
+        "expectReadable": false,
+        "expectHidden": true,
+        "expectLine": 5,
+        "why": "The reader runs on to the end of the block looking for the closing quote and stops at the closing fence, two lines past the quote - which is why the words say NEAR line N."
+      },
+      {
+        "name": "Windows line endings",
+        "page": "---\r\npublishForSection1: false\r\nyes: value\r\n---\r\nBody\r\nmore\r\n",
+        "section": 1,
+        "expectReadable": false,
+        "expectHidden": true,
+        "expectLine": null,
+        "why": "The body below the settings keeps its own line endings: only the settings are replaced."
       }
     ]
   },
@@ -7738,7 +7931,7 @@
       }
     ],
     "builderAgreement": {
-      "note": "Whether the WEBSITE BUILDER would read the composed page's settings block the same way the app does. A composed text that fails this is NOT COPIED, whatever the app's own reader says - the two shapes below were reproduced end to end with the copy certified hidden here and PUBLISHED there.",
+      "note": "Whether the WEBSITE BUILDER would read the composed page's settings block the same way the app does. A composed text that fails this is NOT COPIED, whatever the app's own reader says - the two shapes below were reproduced end to end with the copy certified hidden here and PUBLISHED there. Since #246 (2026-09-25) the builder HIDES a page whose settings it cannot read and names it in a folder-problem finding, where before it published such a page or stopped the whole build - so the cases below that say \"reads no keys\" or \"PUBLISHED\" describe what happened BEFORE #246 (unreadablePageSettings has what happens now). The copy is STILL refused: a copy that arrives hidden by accident, and named as a problem on every build, is not a clean copy. Whether this guard can now be relaxed is a follow-up, not part of #246.",
       "cases": [
         {
           "name": "an ordinary composed page",
@@ -7794,7 +7987,7 @@
       },
       {
         "name": "a YAML-1.1 bool word as a KEY",
-        "why": "`yes:` loads as a True KEY rather than a string, and build_site.py then raises on it. When the build cannot parse the block it reads NO keys, so the page is PUBLISHED everywhere.",
+        "why": "`yes:` loads as a True KEY rather than a string, and build_site.py then raises on it. Before #246, when the build could not parse the block it read NO keys, so the page was PUBLISHED everywhere; since #246 it is hidden everywhere and named (unreadablePageSettings) - still not the page the teacher copied.",
         "text": "---\npublishForSection1: false\nyes: value\npublish: false\n---\nBody\n",
         "builderAgrees": false
       },
@@ -7840,7 +8033,7 @@
       },
       {
         "name": "an indented continuation of a plain scalar that contains a colon",
-        "why": "PyYAML raises on it, and when the build cannot parse the block it reads NO keys, so the page is published whatever the copy wrote. 30 of the 36 failures the grammar fuzz found were of this kind - which is why the test is a WHITELIST of shapes rather than a list of forbidden ones.",
+        "why": "PyYAML raises on it, and before #246, when the build could not parse the block it read NO keys, so the page was published (or the build stopped) whatever the copy wrote; since #246 it is hidden and named instead. 30 of the 36 failures the grammar fuzz found were of this kind - which is why the test is a WHITELIST of shapes rather than a list of forbidden ones.",
         "text": "---\npublishForSection1: false\ndescription: A long note\n  about time: 10am\npublish: false\n---\nBody\n",
         "builderAgrees": false
       },

@@ -1957,7 +1957,8 @@ def per_section_frontmatter(text: str, section_numbers: list) -> str:
         # A value written BELOW the key, indented under it, belongs to the key
         # — and cannot be copied onto another key's line. Those lines are
         # taken too: leaving them behind orphans an indented scalar under
-        # whatever key happens to follow, which stops the build.
+        # whatever key happens to follow, which the build cannot parse (it
+        # stopped the build until #246, and hides the page and names it since).
         #
         # Blank lines and COMMENTS AT ANY INDENT are stepped over rather than
         # stopping the scan, because YAML steps over them: `draft:` then a

@@ -127,7 +127,8 @@ def read_scalar(raw_value, next_line=None):
             return (inside, True)
 
     # An unquoted value carrying its own `key: value` is a second mapping where
-    # YAML expects a scalar. Measured: `publish: false: true` stops the build.
+    # YAML expects a scalar. Measured: `publish: false: true` cannot be parsed
+    # (it stopped the build until #246; since then the build hides the page).
     if ": " in value or value.endswith(":"):
         return None
 

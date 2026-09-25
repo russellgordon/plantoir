@@ -226,9 +226,10 @@ table, and the rule both apps now implement, is
 `verify.sh` run.
 
 Two consequences worth knowing here. Frontmatter the round trip cannot parse —
-tab indentation, an unclosed flow collection — is NOT resolved: the function
-warns and leaves the file exactly as it found it, and Quartz's own parser then
-throws and stops the whole build. And the `pip install` in the Dockerfile pins
+tab indentation, an unclosed quote, `yes:` used as a key — is HIDDEN, in the
+build's copy only, and named (#246, below); until 2026-09-25 the function
+warned and left the copy exactly as it found it, and Quartz then either
+stopped the whole build or published the page. And the `pip install` in the Dockerfile pins
 python-frontmatter and PyYAML deliberately, because the visibility table rests
 on YAML 1.1 and a PyYAML that moved to YAML 1.2 would republish pages teachers
 had hidden with nothing failing anywhere.
@@ -246,6 +247,183 @@ renaming: Quartz's stock `ExplicitPublish` filter would have required
 including all of the curriculum pages. A missing flag should never make work
 vanish, so the patched filter keeps the forgiving default and only the word
 changes.
+
+### A page whose settings cannot be read is hidden (#246)
+
+**The rule.** When `frontmatter.load` raises on a page, `process_frontmatter`
+rewrites the BUILD'S copy to `---\npublish: false\n---` followed by the
+page's own body, byte for byte (split off by python-frontmatter's own
+`YAMLHandler().split`, which does no YAML), records the page, and prints one
+line: `🙈 Hidden from students until its settings can be read: <page> (near
+line N)`. `publish: false` is the one key every section reads as hidden, so
+the page is hidden in every section whatever it said. The teacher's own file
+is never touched — this runs on the copy in `content/`, which is deleted and
+re-copied on every build, so the rule is ALWAYS-section by construction and
+existing course folders pick it up without `--full-rebuild`; and
+`_write_the_date_back` already refuses a source it cannot parse.
+
+Then, once per section build, ONE `pageSettingsUnreadable` site-health finding
+names every such page (at most ten, then "and N more"), each with the line the
+reader stopped near where it can tell. Its words are
+`contracts/shared-rules.json` → `siteHealth.checks[pageSettingsUnreadable]`;
+the cases are `unreadablePageSettings.cases`, run by
+`scripts/test_unreadable_page_settings.py` through the real
+`process_frontmatter`, and by `check_visibility_against_the_site.py` on down
+through Quartz's own reader to the site. It is never offered a repair
+(`siteHealth.repair.neverOffered`): rewriting a teacher's settings means
+guessing what they meant. It reaches the trail through the existing `folder
+problem found` line, which carries the check's NAME and never a page's.
+
+**Why: Russell, 2026-09-21, option B.** "A page that wrongly DISAPPEARS is
+noticed and harmless; one that wrongly APPEARS cannot be undone." A page
+whose settings the build cannot read might be one the teacher meant to keep
+from students, so it is hidden rather than risked. The finding is what makes
+"noticed" true.
+
+**What happened before, measured** (python-frontmatter 1.3.0 / PyYAML 6.0.3 /
+gray-matter with js-yaml `JSON_SCHEMA`, the image's own, 2026-09-25). When
+PyYAML raised, the function printed `⚠️ Could not read frontmatter from <path>:
+<PyYAML's message>` and returned, leaving the copy untouched, so Quartz parsed
+the ORIGINAL block itself. Of the shapes in
+`copyingAPageBetweenCourses.builderAgreement`, **18** raise when the page is
+opened as a file, as the build opens it:
+
+| What Quartz then did | How many | Which |
+|---|---|---|
+| could not read it either, so `process.exit(1)`: **the whole build stopped** with a developer's error | 14 | a list whose indentation decreases, a combining mark after a colon, a vertical tab, `"a"b"`, `,comma`, a column-0 list item, an indented continuation holding a colon, `key:value`, `a: b: c`, an unclosed quote, `-- -`, `%YAML`, an undefined alias, a tab indent |
+| read it, and **published the page** unless it also carried a plain `publish: false` | 4 | a date that cannot be (`2025-09-93`), the 29th of February with a colon in its offset, `yes:` as a key, U+2028 |
+
+The headline is the second row: a page hidden only by `publishForSection1:
+false` — which is what the app writes for a course-level page — carrying
+`yes: value` was PUBLISHED (measured by `check_visibility_against_the_site.py`
+against the old `build_site.py`: "the contract says hidden and the site says
+visible").
+
+**The plan's count and the review's count were both off, and a third number
+is the true one.** The plan said 18 raising / 13 stopping / 5 read; its review
+said 19 / 15 / 4, counting "a LONE carriage return". The lone carriage return
+raises only when the block is handed to python-frontmatter as TEXT
+(`frontmatter.loads`), which is how `builderAgreement` measured it; the build
+calls `frontmatter.load` on the FILE, which opens it with universal newlines,
+so the carriage returns become line ends, the block ends at the first `---`,
+and it is READ. It is in `unreadablePageSettings.cases` as a readable case for
+that reason. Measured in the image, and `builderAgreement`'s own `why` for it
+already says the build uses universal newlines.
+
+**Incidence.** 0 of 14,699 real and shipped pages raise today (the planner's
+walk: 12,490 under `support/`, 1,620 in a real 2026-27 working folder, 589 in
+the 2023-24 iCloud courses), so no existing site changes on the first build
+after the update. 25 real pages open with an EMPTY block (`---` then `---`):
+PyYAML reads that as no keys and the page is shown, and it stays shown — it is
+a case.
+
+**"Near line N", and how it is counted.** The line is counted from the
+character INDEX PyYAML reports (`problem_mark.index`, or a `ReaderError`'s
+`position`) into the text python-frontmatter handed it, which begins with the
+newline that ends the opening fence — so newlines before the index, plus one,
+is the file's line with the opening `---` as line 1. **Not** from
+`problem_mark.line`: PyYAML counts U+2028, U+2029, U+0085 and a lone `\r` as
+line breaks, which an editor does not show, so U+2028 on line 3 reports 5 by
+its own count and 4 by the index. Of the 18 shapes, 15 carry a position: 10
+point AT the wrong line and 5 one or two past it (a key with no space after
+its colon, `-- -`, `%YAML` and U+2028 one past; an unclosed quote two past, at
+the closing fence). A date that cannot be, a key that is a number, date or
+yes/no, and the offset February 29th give none, and the words then name the
+page alone. Hence "near".
+
+**What the console no longer says.** The old line printed PyYAML's message,
+which QUOTES the page's own text (`title: A page: with a colon`) into a
+console that goes into problem reports, and said "frontmatter". The new line
+carries the page's place in the course folder (`section1/index`,
+`Concepts/Arrays`) — the name a teacher finds it by in Obsidian — and nothing
+of the reader's.
+
+**When hiding itself fails.** A copy that cannot be rewritten is REMOVED
+(named just the same); a copy that can be neither rewritten nor removed stops
+the build with a plain two-line refusal, in the manner of the hide-filter
+hardening: a build that cannot promise the page is hidden must not produce a
+site. Both are tested by making the write and the removal refuse rather than
+by file modes, because the image runs as root (which writes through any mode)
+and NTFS ignores a folder's mode — a mode-based test would have run nowhere.
+
+**An unreadable FRONT PAGE** is hidden like any other page, so Quartz emits no
+root `index.html` and there is no website. What that costs is not what any
+other hidden page costs, so it gets its own words throughout:
+
+* its own console line (`🙈 The settings at the top of the front page of … could
+  not be read, near line N, so the website has no front page until they are
+  fixed, and it cannot be published.`) and the finding's `frontPage` sentence
+  added to the detail;
+* a teacher whose site is already live keeps the OLD published site: the
+  refusal comes in the build, before the deploy, so nothing is uploaded and
+  what students see does not change until the front page is fixed;
+* the last built site is CLEARED, exactly as for a missing front page
+  (`_clear_a_site_this_build_cannot_replace` → `_clear_stale_host_site`,
+  whose 🗑️ line says the front page is hidden rather than missing), so a
+  publish cannot send out last week's pages;
+* `section_index_exists` stays TRUE — the page is there, even in the one case
+  where its copy had to be removed to hide it — so `sectionIndexMissing` does
+  not fire and its repair (which would find the page and say "already put
+  right") is not offered;
+* a publish build prints its OWN refusal (`_nothing_to_publish`), never the
+  missing front page's "no front page, so no website was produced … Put the
+  front page back", and the apps turn it into their own card:
+  `contracts/app-rules.json` → `failureExplanations`, the three cases whose
+  output says the front page's settings could not be read (with a line,
+  without, and followed by the deploy's "Built site not found", which must not
+  win). `test_unreadable_page_settings.py` checks each of those outputs
+  against what `_nothing_to_publish` prints, so the app cannot be matching a
+  line nobody prints;
+* the "📆 The front page now carries the date …" line is not said of it: only
+  the hidden copy was dated.
+
+Measured end to end on 2026-09-25 by building a copy of `courses/EXC2O` in the
+image with the new scripts: `Learning Goals` given `publishForSection1: false`
+and `yes: value` built with the page absent from `public/` and one finding;
+then `section1/index.md` given `title: "Section "1"` built with no root
+`index.html`, the previous `public/` removed, the refusal naming line 2, exit
+1, and the teacher's file unchanged but for the edit.
+
+**Rejected, so nobody proposes them again:**
+
+* **Deleting the page from the build instead of hiding it.** A missing page is
+  a different state: an unreadable `index.md` would fire `sectionIndexMissing`,
+  whose repair finds the page and says it was already put right.
+* **A rule in Quartz's publish filter (`patches/publish.ts`).** Quartz cannot
+  read 14 of the 18 shapes at all, so the hide has to happen before Quartz sees
+  the original block.
+* **Stopping the build**, which is what used to happen for most shapes. One
+  typo withheld every other update, including a scheduled publish the teacher
+  was counting on (`siteHealth.scheduledDeployPublishesAnyway`).
+* **One finding per page.** Both apps key a finding on name, course and
+  section (the mac's `SiteHealthFinding.id`, Windows'
+  `SiteHealthFinding.Identity`), so per-page findings would collide in
+  SwiftUI's `ForEach` and in Windows' de-duplication.
+* **A once-only "newly hidden since the update" list.** It needs state
+  carried across builds, and the finding already repeats on every build while
+  the page is broken.
+* **Also hiding a block whose END cannot be found** (an indented closing
+  fence, a block never closed). It cannot be told from a page that begins
+  with a horizontal rule, which is a case here; it is
+  [#188](https://github.com/russellgordon/plantoir/issues/188)'s.
+* **Making the apps' readers call such a page hidden.** They would need a twin
+  of PyYAML in Swift and C#, and #207's certifier is deliberately stricter, so
+  it would flag readable pages. The dangerous disagreement (the app says
+  hidden, the site shows it) is now impossible; the one left (the app says
+  shown, the site hides it) is the mild direction, and the finding announces
+  it.
+* **Printing PyYAML's message**, for the reason above.
+* **Filling the finding's words one placeholder after another.** Since #246 a
+  value can be a page name a teacher typed, and a page called `{pages}` or
+  `{line}` would be expanded by a later replacement. `site_health.filled` does
+  one pass, and `test_site_health.py` proves the difference by swapping the
+  sequential version back in (1 test goes red).
+
+**Consequences for the copy guard.** `CopiedPageText`'s check that the builder
+reads a copy the same way (#207, `copyingAPageBetweenCourses.builderAgreement`)
+still refuses these shapes: a copy that arrives hidden by accident, and is
+named as a problem on every build, is not a clean copy. Whether it can now be
+relaxed is a follow-up and was not done here.
 
 ### Wikilink rewriting
 
@@ -583,6 +761,12 @@ pins it. The `--mcp-stdio` process also WRITES the trail line: it runs a real
 `ScriptRunner`, and its trail store is the ordinary one. The one hole on this
 surface was the glued marker below, which was missing from the answer because
 it was never read at all.
+
+One check is about a PAGE rather than a folder: `pageSettingsUnreadable`
+names the pages the build hid because it could not read their settings (#246,
+"A page whose settings cannot be read is hidden" above). It is the LAST
+finding a build emits, so the others keep their places — the marker examples
+and #153's console cases are captured in that order.
 
 Two of the checks stay quiet unless the other half of the map exists: a
 brand-new course has an empty curriculum folder and an empty class folder on
@@ -1137,6 +1321,12 @@ variable. If a scanner or an open handle makes the removal fail, the build says
 so and carries on rather than dying; but the stale-publish risk returns for
 that run. Worth one real test on a machine with OneDrive running, and tell the
 the other side what you find.
+
+**A front page that is THERE but hidden** (#246: its settings could not be
+read) produces no website in exactly the same way, and is cleared the same
+way — but it is not missing, so it says so in its own words and never offers
+to put the page back. See "A page whose settings cannot be read is hidden
+(#246)" above.
 
 The `sectionIndexMissing` health check understated the same thing — "the site
 will open on whatever page happens to come first" is true of a PREVIEW, and for

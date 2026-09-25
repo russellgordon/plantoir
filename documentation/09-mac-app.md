@@ -3920,6 +3920,17 @@ After the page is written it is **read back from disk** and asked, for every
 section the destination has AND for one it does not, whether it is hidden. The
 test is `!= .hidden`, so a value the app cannot read counts as failure.
 
+> **Since #246 (2026-09-25) the build no longer publishes a page whose
+> settings it cannot read, nor stops on one.** It hides the page in its own
+> copy and names it in a folder-problem finding
+> (`05-build-pipeline.md` → "A page whose settings cannot be read is hidden
+> (#246)"). Every sentence below that says "`frontmatter.load` raises … and
+> the page reaches Quartz unresolved, which publishes it" describes the build
+> the guard was designed against, and is kept as the reasoning of its day.
+> The guard itself is unchanged and still refuses those copies: a copy that
+> arrives hidden by accident, and named as a problem on every build, is not a
+> clean copy. Whether it can now be relaxed is a follow-up, not part of #246.
+
 That is necessary and it is not sufficient, which is the finding worth carrying
 away. **The app's reader is not the one that decides what students see**, and
 two shapes were reproduced end to end where the two split — the copy certified
