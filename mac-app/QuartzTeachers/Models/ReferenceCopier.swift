@@ -41,6 +41,7 @@ enum ReferenceCopier {
     /// Why a copy could not be made.
     enum Problem: LocalizedError, Equatable {
         case folderAlreadyExists(String)
+        case alreadyBeingMade(String)
         case couldNotCopy(String)
 
         // MARK: - Computed properties
@@ -49,6 +50,8 @@ enum ReferenceCopier {
             switch self {
             case .folderAlreadyExists(let folderName):
                 return "There is already a course folder called \(folderName). Choose a different name."
+            case .alreadyBeingMade(let folderName):
+                return ReferenceWording.copyAlreadyBeingMade(folder: folderName)
             case .couldNotCopy(let reason):
                 return "The copy could not be made: \(reason)"
             }
@@ -107,21 +110,24 @@ enum ReferenceCopier {
         let stagingURL: URL = coursesDirectoryURL.appendingPathComponent(
             ReferenceStaging.stagingName(for: folderName)
         )
-        if !ReferenceStaging.someoneIsWorkingOn(
-            stagingURL.lastPathComponent, inCoursesDirectory: coursesDirectoryURL
-        ) {
-            ReferenceStaging.remove(at: stagingURL)
+        // CLAIMED as one act, and only a claimer removes a staging folder:
+        // an import of the same folder name, or this copy in another window,
+        // is refused here rather than having its half-made work cleared away
+        // by this one's tidy-up below (#245). `ReferenceStaging.claim` says
+        // the order and why.
+        switch ReferenceStaging.claim(folderName, inCoursesDirectory: coursesDirectoryURL) {
+        case .claimed:
+            break
+        case .someoneElseIsMakingIt:
+            throw Problem.alreadyBeingMade(folderName)
+        case .couldNotStart(let reason):
+            throw Problem.couldNotCopy(reason)
         }
-        // A second window reading this working folder sweeps leftover staging
-        // folders; this says the folder is in use so that the sweep leaves it
-        // alone. Quick here — a local clone — but "quick" is not a guarantee.
-        ReferenceStaging.takeLease(for: folderName, inCoursesDirectory: coursesDirectoryURL)
         defer {
-            ReferenceStaging.releaseLease(for: folderName, inCoursesDirectory: coursesDirectoryURL)
+            ReferenceStaging.giveBack(folderName, inCoursesDirectory: coursesDirectoryURL)
         }
 
         do {
-            try fileManager.createDirectory(at: stagingURL, withIntermediateDirectories: false)
             try ReferenceCopier.copyContents(of: course.directoryURL, into: stagingURL)
             // The lock TRAVELS through `FileManager.copyItem`, so a copy taken
             // from a course that is already frozen arrives frozen — and then
@@ -140,7 +146,8 @@ enum ReferenceCopier {
             ReferenceLock.clearLock(at: stagingURL)
         } catch {
             // Nothing is locked yet, so the half-written folder is an
-            // ordinary one and goes away cleanly.
+            // ordinary one and goes away cleanly — and it is OURS: the claim
+            // above made it, so this can never remove somebody else's.
             ReferenceStaging.remove(at: stagingURL)
             if let problem = error as? Problem {
                 throw problem

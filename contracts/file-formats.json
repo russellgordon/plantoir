@@ -1072,5 +1072,34 @@
         }
       ]
     }
+  },
+  "workLease": {
+    "note": "A work lease: a file saying which process is doing what, so other windows, other copies of Plantoir and outside assistants leave that work alone. Windows' WorkLease (Plantoir.Core/Assist/WorkLease.cs) set the shape; the mac matches it and adds a fourth line. The rules a reader applies are shared-rules.json -> workLeases. #245 wrote this block for the import's lease; #156 adds the kinds it writes (build, preview, publish) and any name cases here rather than a second block.",
+    "directory": "courses/.internal/activity/ inside the working folder. Written outside the thing it is about on purpose: removing a staging folder must not remove the claim to it.",
+    "name": "<NAME>.<kind>.<pid>.lease - NAME is the course code for build, preview, publish and assist, and the FOLDER name being made for import; kind is one word; pid is the owner's process id in decimal. Read from the END (the pid is the second-last dot-separated part, the kind the third-last), because a folder name may itself contain dots.",
+    "kinds": {
+      "import": "A reference course's staging folder is being made (the mac's import and Keep a Copy for Reference...). Written by the mac since #206; four lines since #245. Held for the whole making of the folder, released when it is renamed into place or tidied away.",
+      "build": "Written by Windows today; the mac from #156.",
+      "preview": "Written by Windows today; the mac from #156.",
+      "publish": "Written by Windows today; the mac from #156.",
+      "assist": "Written by Windows' plantoir-mcp when started with a course lock."
+    },
+    "lines": [
+      "1: the owner's process id, decimal.",
+      "2: the owner's process name as the system reports it - Plantoir for the app, its MCP server and a scheduled run, which are one program. The mac writes ProcessInfo.processName as of #245; #156 makes it the process table's own name (sysctl p_comm), because processName is argv[0]'s last part and differs through a symlink (measured: a lease written that way read its own live writer as gone).",
+      "3: the moment the lease was taken, UTC, in .NET's round-trip 'O' form - 2026-09-25T13:59:23.8960000Z (seven fractional digits). No reader parses it; it is there for parity and for a person reading the folder.",
+      "4: (mac only) when the owner STARTED, as whole seconds since 1970, a dot, and the microseconds padded to six digits - 1790345209.217862 - read from the process table. Windows' reader reads lines 1 and 2 and ignores this one."
+    ],
+    "encoding": "UTF-8, no byte-order mark, each line ending in a line feed, the last included. A reader accepts carriage returns before the line feeds. The mac writes atomically (a reader never meets half a file).",
+    "olderShapes": "The mac's import wrote ONE line - the process id - from #206 until #245, and an older copy of Plantoir still does. A reader judges such a lease as written by Plantoir - the only program that ever wrote one - rather than ignoring it, because ignoring it would sweep an older copy's live import, and rather than on the id alone, because after a restart the id of a crashed one can belong to an unrelated process for the whole uptime (shared-rules.json -> workLeases.liveness, the two 'import' cases). Windows' own reader treats fewer than two lines as stale; it does not read import leases today.",
+    "bodyCases": [
+        {"name": "the mac's four lines", "body": "4321\nPlantoir\n2026-09-25T13:59:23.8960000Z\n1790345209.217862\n", "expect": {"name": "Plantoir", "start": "1790345209.217862"}},
+        {"name": "Windows' three lines: a name and no start", "body": "4321\nPlantoir\n2026-09-25T13:59:23.8960000Z\n", "expect": {"name": "Plantoir", "start": null}},
+        {"name": "the one line the import wrote before #245: neither", "body": "4321", "expect": {"name": null, "start": null}},
+        {"name": "written on Windows with carriage returns: read the same", "body": "4321\r\nPlantoir\r\n2026-09-25T13:59:23.8960000Z\r\n1790345209.217862\r\n", "expect": {"name": "Plantoir", "start": "1790345209.217862"}},
+        {"name": "an empty name line is no name", "body": "4321\n\n2026-09-25T13:59:23.8960000Z\n1790345209.217862\n", "expect": {"name": null, "start": "1790345209.217862"}},
+        {"name": "spaces around a line are not part of it", "body": "4321\n Plantoir \n2026-09-25T13:59:23.8960000Z\n 1790345209.217862 \n", "expect": {"name": "Plantoir", "start": "1790345209.217862"}},
+        {"name": "an empty file: neither", "body": "", "expect": {"name": null, "start": null}}
+    ]
   }
 }

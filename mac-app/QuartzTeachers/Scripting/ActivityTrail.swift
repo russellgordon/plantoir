@@ -623,9 +623,13 @@ nonisolated enum ActivityTrail {
         case courseImportedFromAClassWebsiteFolder = "course imported from a class website folder"
 
         /// One course of an import did not come across, and the rest did.
-        /// Carries which course and why — a course code already kept for
-        /// reference under that school year, a folder that could not be read,
-        /// a disk that filled. Written per COURSE, because "the import
+        /// Carries which course and why — already being imported in another
+        /// window or another copy of Plantoir, or something an earlier
+        /// unfinished attempt left behind could not be cleared (both #245,
+        /// written before anything is copied), a folder that could not be
+        /// read, a disk that filled. The shelf refusal and a folder of that
+        /// name already existing are said on the sheet and do not write this
+        /// line. Written per COURSE, because "the import
         /// failed" is exactly the report that cannot be looked into: a run of
         /// four courses that imports three is the ordinary shape of this.
         case courseCouldNotBeImportedForReference = "course could not be imported for reference"
