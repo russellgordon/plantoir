@@ -621,6 +621,9 @@ enum ScheduledDeploy {
         // shell, because the app is closed when this runs and cannot be
         // asked. It has to stay in step with the Swift, so all three of its
         // parts are here — and the second is the one that matters most.
+        // Its preview check reads the same tree as the Swift's
+        // (`contracts/app-rules.json` → `buildFreshness.previewBuild`), and
+        // `ScheduledPublishOutcomeTests` runs it against every case there.
         let previewPath: String = workspaceURL.appendingPathComponent("preview.sh").path
         let builtIndexPath: String = workspaceURL
             .appendingPathComponent("courses")
@@ -629,6 +632,14 @@ enum ScheduledDeploy {
             .appendingPathComponent("section\(sectionNumber)")
             .appendingPathComponent("public")
             .appendingPathComponent("index.html")
+            .path
+        // The whole built site, for the preview check (issue #136).
+        let builtPublicPath: String = workspaceURL
+            .appendingPathComponent("courses")
+            .appendingPathComponent(courseCode)
+            .appendingPathComponent(".merged_output")
+            .appendingPathComponent("section\(sectionNumber)")
+            .appendingPathComponent("public")
             .path
         // Where the build notes when it STARTED (issue #265) — the time the
         // course's files are compared with, so a Save made while an earlier
@@ -679,7 +690,23 @@ enum ScheduledDeploy {
         // deploying that makes a visitor's browser knock on their own
         // machine. Rebuilding is the only way to be rid of it, however
         // recent the build looks.
-        lines.append("  if /usr/bin/grep -q 'ws://localhost:' \(shellQuoted(builtIndexPath)); then")
+        //
+        // EVERY page, not the front page alone (issue #136) — the same tree
+        // `BuildFreshness.builtForPreview` reads and deploy.sh greps, or a
+        // clean front page in front of a preview's pages skips this build and
+        // deploy.sh rebuilds it under the DESTINATION's leg below. The three
+        // parts of the line are each the Swift's:
+        //   `! [ -r index ]` — a front page that cannot be read is rebuilt,
+        //     which grep alone cannot say (its exit 2 reads as "no" in an if);
+        //   `-s` — any other page that cannot be read is passed over quietly:
+        //     measured, BSD grep exits 0 on a match elsewhere and 2 otherwise;
+        //   `LC_ALL=C` — a byte match. Under a UTF-8 locale macOS's grep does
+        //     not find the signature on a line that also holds a byte that is
+        //     not valid UTF-8 (measured, grep 2.6.0-FreeBSD), and the Swift
+        //     compares bytes.
+        lines.append("  if ! [ -r \(shellQuoted(builtIndexPath)) ] || LC_ALL=C /usr/bin/grep -rqs"
+            + " --include='*.html' \(shellQuoted(BuildFreshness.liveReloadSignature))"
+            + " \(shellQuoted(builtPublicPath)); then")
         lines.append("    NEEDS_BUILD=1")
         lines.append("  elif [ -z \"$(/usr/bin/find \(shellQuoted(courseDirectoryPath))"
             + " -type f -newer \"$FRESH_SINCE\" -not -path '*/.*' -print -quit)\" ]; then")
@@ -800,22 +827,22 @@ enum ScheduledDeploy {
         // not the build's own kind: deploy.sh was reached, and the question it
         // refused is one the Publish button asks.
         //
-        // ONE path through deploy.sh escapes that and is filed rather than
-        // fixed here (GitHub issue #136). Publishing to a FOLDER — and only to
+        // ONE path through deploy.sh could escape that, and no longer can
+        // from here (GitHub issue #136). Publishing to a FOLDER — and only to
         // a folder — reruns preview.sh --build-only itself when any page under
-        // the section's `public/` carries `ws://localhost:`, and passes its
-        // exit 3 straight through: a BUILD question, reported from here as
-        // though the folder had asked it. Netlify and Cloudflare go through
-        // deploy.py, whose rebuild runs build_site.py directly, asks nothing
-        // and fails with 1, so they land in `didNotFinish` honestly. It needs
-        // NEEDS_BUILD=0 above, which is BuildFreshness.needsRebuild written
-        // out in shell and looks at `index.html` ALONE, while deploy.sh greps
-        // the whole tree. So a clean front page in front of a stale preview
-        // page reaches it. Bringing the two checks into step is a change to
-        // BuildFreshness as well as to this script and belongs to its own
-        // piece of work; the exit code cannot tell the two apart, and giving
-        // the rebuild its own code is a launcher contract change Windows
-        // shares.
+        // the section's `public/` carries the live-reload client, and passes
+        // its exit 3 straight through: a BUILD question, which from here would
+        // read as though the folder had asked it. (Netlify and Cloudflare go
+        // through deploy.py, whose rebuild runs build_site.py directly, asks
+        // nothing and fails with 1, so they land in `didNotFinish` honestly.)
+        // It needs NEEDS_BUILD=0 above, and the check above now reads the same
+        // tree deploy.sh greps, so whenever deploy.sh would rebuild, this
+        // script has already built — and a build question is `buildNeeded-
+        // AnAnswer`, from the build leg. The rerun in deploy.sh stays: it is
+        // what protects `./preview.sh` then `./deploy.sh --to-folder` typed at
+        // a command line. Rejected: giving that rerun its own exit code, a
+        // launcher contract change Windows shares for a fault that was this
+        // check being narrower than the launcher's.
         //
         // The FIRST destination that stopped is the one kept: a course can
         // publish to several and only one may have gone wrong, so overwriting
