@@ -35,7 +35,7 @@ Chemical products in a workplace come with **WHMIS** labels and a
 **Safety Data Sheet** (SDS) from the supplier: what the product is, what
 it can do to you, and what to do if it does. The SDS binder for our
 acrylic, filament, and cleaners lives by the door, and we read the ones
-for our materials together on the first shop day.
+for our materials together on the day this page is introduced.
 
 ## The laser cutter
 
@@ -78,7 +78,8 @@ own, so its rules are absolute:
 
 Offcuts are sorted the day they are made: clean cardboard to paper
 recycling, plywood and acrylic scraps big enough to use again into the
-reuse bin for test cards, failed prints into the filament box, dust
+reuse bin for test cards, failed prints into the filament recycling box
+if the school has a program (the garbage if not), dust
 vacuumed rather than blown. [[The Footprint of Media]] explains why the
 sorting matters beyond keeping the floor clear.
 

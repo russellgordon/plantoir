@@ -47,6 +47,4 @@ killer question there is usually "how do you know they need that?"
 ![[A1.4]]
 
 ![[B1.1]]
-
-![[A2.2]]
 %%curriculum-end%%

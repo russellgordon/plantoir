@@ -16,8 +16,12 @@ tags:
    numbers — [[Quality Control]] for what a good test looks like
 3. **Checkpoint conference**, crew by crew: your test log, and what
    you will change
-4. File and log: [[Newsroom Journal]] — the number that surprised you
+4. Revision after feedback, begun: after your conference, model your
+   own change as v2 — log open beside the model, the change written
+   down before it is made — so tomorrow's printing can start at once
+5. File and log: [[Newsroom Journal]] — the number that surprised you
 
 ## Things to do before our next class
 
-- [ ] Your proposed change, traced to a number in your test log.
+- [ ] Your v2 file saved beside v1, never over it, with the change
+      traced to a number in your test log.

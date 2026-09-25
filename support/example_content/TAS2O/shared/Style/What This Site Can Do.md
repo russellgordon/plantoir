@@ -258,7 +258,7 @@ front of it.
 %%curriculum-start%%
 Here is a curriculum expectation, embedded live rather than copied:
 
-![[A2.6]]
+![[A2. Designing and Performing]]
 
 Change the source page and every page that embeds it updates. This is how each
 task page shows the expectations it addresses without anyone maintaining

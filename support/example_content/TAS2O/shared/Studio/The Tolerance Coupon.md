@@ -7,15 +7,17 @@ tags:
 enableToc: true
 ---
 Find out, with calipers and your fingers, how much bigger a printed hole
-must be drawn than the thing that goes in it. The class shares one
-**tolerance coupon**, printed before the unit started: a flat strip
-with a row of holes drawn at slightly different sizes, a matching peg,
-and a row of hexagonal pockets for a ¼″-20 nut. Every crew measures the
-same coupon, so the whole class designs from the same numbers — which is
-what makes it a standard rather than a guess.
+must be drawn than the thing that goes in it. The class shares two or
+three identical **tolerance coupons**, printed before the unit started
+(each is a ten- to fifteen-minute print): a flat strip with a row of
+holes drawn at slightly different sizes, a matching peg, and a row of
+hexagonal pockets for a ¼″-20 nut. Every crew measures a copy of the
+same coupon, and the class agrees one clearance from all of them, so
+everyone designs from the same number — which is what makes it a
+standard rather than a guess.
 
 > [!warning] Care notes
-> **One coupon, many hands** — it is handled over the table, never
+> **A few coupons, many hands** — each is handled over the table, never
 > dropped, and passed crew to crew in the order on the board. **Nothing
 > gets forced** — a peg pushed hard into a tight hole cracks the coupon
 > for everyone after you; the answer to "does it fit?" is found gently.
@@ -24,7 +26,8 @@ what makes it a standard rather than a guess.
 
 ## What you need
 
-- [ ] The class coupon (about ten minutes per crew)
+- [ ] One of the class coupons (about ten minutes per crew; with three
+      coupons, six crews are done in two rounds)
 - [ ] Digital calipers, zeroed with the jaws closed
 - [ ] A steel ¼″-20 nut from the parts tray
 - [ ] Your notebook, with a table ruled for drawn size, measured size,

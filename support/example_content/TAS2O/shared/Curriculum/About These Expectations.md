@@ -4,10 +4,10 @@ publish: true
 created: __CREATED__
 ---
 The expectations in this folder are reproduced from the Ontario
-curriculum for **Technology and the Skilled Trades, Grade 10, Open
-(TAS2O)**, part of *The Ontario Curriculum: Technological Education*
-(2024), published by the Ontario Ministry of Education. © King's Printer
-for Ontario, 2024. Reproduced for educational use.
+Ministry of Education's expectations document for **Technology and the
+Skilled Trades, Grade 10, Open (TAS2O), 2024**, part of the Ministry's
+Technological Education curriculum. © King's Printer for Ontario, 2024.
+Reproduced for educational use.
 
 > [!info] The official sources
 > [Technology and the Skilled Trades, Grade 10, Open (TAS2O) — Ontario Curriculum and Resources](https://www.dcp.edu.gov.on.ca/en/curriculum/technological-education/courses/tas2o)

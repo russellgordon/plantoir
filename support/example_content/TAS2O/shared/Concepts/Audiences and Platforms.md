@@ -47,6 +47,4 @@ readers gather will survive every platform shift.
 ![[A1.4]]
 
 ![[B1.1]]
-
-![[A1.3]]
 %%curriculum-end%%

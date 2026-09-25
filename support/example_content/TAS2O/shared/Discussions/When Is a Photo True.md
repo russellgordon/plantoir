@@ -32,6 +32,11 @@ Questions worth arguing about:
 5. Generative AI tools and neural filters can now remove background distractions,
    generate missing elements, or re-render lighting entirely. When does computational
    image generation cross from technical enhancement into fabricating evidence?
+   And notice what the fakes have set off: some camera and software makers
+   now attach "content credentials", a signed record of how a picture was
+   made and edited, because trust in images took a beating. Is that the
+   technology repairing a harm it caused, or a new problem? Who gets left
+   out if only credentialed photos are believed?
 6. If every option involves choices, is "the camera doesn't lie"
    ever true? Write the room's one-sentence line between choosing
    and deceiving — then test it against questions 1 to 5.

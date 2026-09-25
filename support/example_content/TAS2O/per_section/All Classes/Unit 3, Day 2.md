@@ -15,7 +15,8 @@ tags:
    corner, then rank them
 3. Compare lists, then read it together: [[Safety in the Shop]] — who
    is responsible for what, the laser's rules, the printer's rules, the
-   banned materials
+   banned materials — and the Safety Data Sheets for our acrylic and
+   filament, read together
 4. What changes from the newsroom? Back to [[Safety in the Newsroom]]
    for five minutes: which hazards are new, and which habits carry over
 5. The sign-off, part one: the quiz, marked together so everyone knows
