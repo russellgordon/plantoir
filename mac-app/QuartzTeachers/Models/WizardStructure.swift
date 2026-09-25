@@ -92,9 +92,10 @@ enum WizardStructure {
     ///   nothing ticked while the wizard writes
     ///   `graded_folders: ["Thinking Tasks"]` — a name no folder of theirs
     ///   matches, and a DIFFERENT file from the one Windows writes for the
-    ///   same clicks. (`setup_course.py` reconciles the key again when it
-    ///   reads it, so a teacher does not end up with a broken course; that is
-    ///   a second net, not a reason for the wizard to write something untrue.)
+    ///   same clicks. (Nothing narrows it after this: since GitHub issue #192
+    ///   `setup_course.py` writes a saved pool back as it was —
+    ///   `gradedFolders.rerunningSetup` — so what the wizard writes, the
+    ///   course keeps.)
     ///   Windows reaches the same answer from the other end: it leaves the
     ///   pool alone here and narrows it on every read
     ///   (`CurrentGradedFolders`) and again when the file is written.

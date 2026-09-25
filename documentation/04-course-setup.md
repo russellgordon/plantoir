@@ -273,11 +273,12 @@ mechanics; the fourth is what to know before reading a green run as coverage:
   checklist with nothing ticked while the wizard writes
   `graded_folders: ["Thinking Tasks"]` against a course with no such folder —
   and the two apps then write DIFFERENT files for the same clicks, which is
-  what the contract exists to stop. (`setup_course.py` reconciles the key
-  again when it reads it, so no teacher ends up with a broken course; that is
-  a second net, not a licence for the wizard to write something untrue. The
-  first version of the mac's restore did exactly that, and the adversarial
-  review of it found it.) The two apps reach the same answer from
+  what the contract exists to stop. (There is no second net behind the
+  wizard: since #192 `setup_course.py` writes a saved pool back exactly as it
+  was — see "A command-line re-run leaves the marks pool alone" below — so a
+  name the wizard writes untruly stays in the file. The first version of the
+  mac's restore did exactly that, and the adversarial review of it found
+  it.) The two apps reach the same answer from
   opposite ends: the mac narrows inside the restore, Windows leaves the pool
   and narrows it on every read (`CurrentGradedFolders`) and again when the
   file is written. The mac narrows ONCE MORE as the file is written, for the
@@ -1037,6 +1038,108 @@ Finder order is arguably nicer for a person reading a list. If anyone wants it,
 it is a shared change to the contract and both apps — not something to reach for
 on one side because it looked more natural there.
 
+### A command-line re-run leaves the marks pool alone (#192)
+
+**A run of `setup_course.py` that finds a saved `graded_folders` writes it back
+as it was** — same names, same spelling, same order, whatever the folder lists
+the run ends with and whatever is on disk. A saved `null` is written as `[]`
+(as it always was), and a course that never had the key still has none. The
+one cleaning left is of entries that cannot name a folder at all — null, a
+blank string, a non-string, an exact repeat — which only a hand edit writes
+and which the old path also removed (`saved_pool_without_malformed_entries`);
+every real name stays, including one with no folder behind it. Only a
+NEW course — no saved `course_config.json` at all — has its pool worked out
+from the payload or skeleton and reconciled against its folder lists by
+`graded_folders_for`. The contract is `contracts/shared-rules.json` →
+`gradedFolders.rerunningSetup`, eleven cases, run by
+`scripts/test_graded_folders_rerun.py`, which drives the real wizard in-process
+(`input` and `getch` replaced, every prompt answered with Return) — on the mac
+host in `verify.sh`'s first step and on Windows through `PythonToolchainTests`.
+Neither app runs it, because neither ever re-runs setup on an existing course.
+
+**Why.** The re-run used to pass a saved pool back through the new-course
+reconciliation, which keeps only names on the TOP-LEVEL copy lists
+(`shared_folders` + `per_section_folders`). That rule was written on
+2026-08-24, two weeks before the Marks checklist began offering folders found
+INSIDE other folders (`gradedFolders.choices`, #79/#112), and nobody changed
+the re-run. Measured on 2026-09-25 by driving the real wizard with every prompt
+accepted and no folder removed:
+
+| saved pool | lists the run ends with | on disk | written back before #192 |
+|---|---|---|---|
+| `["Tasks"]` | Concepts, Portfolios | `Portfolios/Tasks` | `[]` |
+| `["Tasks"]` | Concepts / All Classes | `section1/Tasks` | `[]` |
+| `["Tests"]` | Concepts, Tasks | `Tasks/Tests` | `[]` |
+| `["Tasks"]` | Concepts, tasks | `tasks` | `["tasks"]` (respelt) |
+| `["Tasks"]` | Concepts, Tasks | `Tasks` | `["Tasks"]` |
+
+The first three are exactly what the checklist WRITES when a teacher ticks a
+nested folder, so a teacher who ran `./setup.sh` again to change a colour lost
+every mark in those folders — `[]` is "asked, and nothing counts", and the
+historical rule never applies to the course again. The issue as reported
+(a removal's preserved entry, `removingAFolder`'s fifth case, emptied by the
+next re-run) is one road into the same fault.
+
+The re-run does not ask the marks question and has no way to remove a folder,
+so it does not own the answer. Two more measurements say nothing was lost by
+dropping the reconciliation:
+
+- **It never counted more.** Over the shapes above plus two with a name that
+  names no folder, counting pages with the build's own `_is_graded_path`, the
+  reconciled pool counted the same pages or FEWER in every shape. A respelling
+  counts the same (the build lowercases both sides); the only shapes where the
+  written value changed what counts were the FOUR that lost marks — the first
+  three rows above, and the prompt-drop shape in the next point, which wrote
+  `[]` for a folder the next build published again.
+- **A name taken off a copy list at a prompt is not a removal.** With `Tasks` on
+  disk but off `shared_folders`, one call of
+  `build_site.preflight_update_course_config` puts it straight back
+  (`['Concepts']` → `['Concepts', 'Tasks']`), and the command-line wizard writes
+  no `excluded_items`. Dropping the name from the pool stopped counting a
+  folder that was still published.
+
+**A name that names no folder is kept, and it is not invisible.** It counts no
+page, but the published Curriculum Coverage page names every pooled folder in
+its sentence about what counts (`build_site._graded_folders_in_words`), and
+Course Settings' last-folder guard counts it, so the last LIVE folder can be
+unticked without the block. `site_health` raises `noGradedFolders` only when the
+coverage map is on, curriculum pages are found and nothing in the pool matches a
+published folder — so a dead name beside a live one raises nothing. Both effects
+could already happen through the apps' own exact-match removal
+(`removingAFolder`), and the contract's tenth case pins the name being KEPT so
+that nobody adds a clean-up by existence here that the apps would disagree with.
+
+**This retires the "second net".** This page, three Swift comments and the
+`wizard.skeletonToggle` reasoning used to say `setup_course.py` "reconciles the
+key again when it reads it" behind the apps' own narrowing on a new course.
+Both apps write `course_config.json` BEFORE they drive the setup script, so an
+app-created course always takes the re-run path; there the reconciliation was a
+no-op, since each wizard narrows its pool before writing (mac
+`GradedFolderRule.reconciled`, Windows `CurrentGradedFolders`). What the net
+could still catch was a name that counts nothing. Now each wizard's narrowing
+is the only one.
+
+**REJECTED**, so they are not proposed again:
+
+- *Reconcile against the checklist's own walk* (depth four, the skip list,
+  hidden folders, links and reparse points, `sectionN` scope, `excluded_items`)
+  — a THIRD implementation of the walk, kept in step with two apps, to drop only
+  names that count nothing; with a Windows-only reparse-point caution nobody on
+  the mac can test.
+- *Reconcile against every folder at any depth* — a walk rule of its own, the
+  same payoff.
+- *Keep the respelling, drop only unmatched names* — marks-neutral, and a pool
+  one tool rewrites and the others do not is a file two apps can disagree about.
+- *Tell an app's new-course run from a command-line re-run* (an empty course
+  folder, say) so the old check stayed on the app path — a guess about intent,
+  for a net that caught nothing that counts.
+
+**Not done.** Courses already emptied by a re-run are not repaired: a re-run's
+`[]` is byte-identical to a teacher's deliberate one. And `null` still reads
+differently in the mac app (never asked) and the build (asked and cleared); the
+re-run keeps writing `[]` for it, and the ninth case records that as today's
+behaviour rather than as a decision.
+
 ### Content declares its own pool
 
 All 38 payload manifests and all 50 skeleton families now carry
@@ -1052,8 +1155,10 @@ disagree for the one that would have been broken by it.
 
 `contracts/shared-rules.json` → `gradedFolders` (10 cases for which folders
 COUNT, run by `scripts/test_graded_folders.py` in the image — neither app
-implements that rule, so neither suite runs them) and `gradedFolders.choices`
-(14 cases for what the checklist OFFERS, run by both apps). The key itself is in
+implements that rule, so neither suite runs them), `gradedFolders.choices`
+(14 cases for what the checklist OFFERS, run by both apps) and
+`gradedFolders.rerunningSetup` (11 cases for what a re-run of setup writes back,
+run by `scripts/test_graded_folders_rerun.py`). The key itself is in
 `contracts/file-formats.json`.
 
 ## “Where do the class pages live?” had four answers
