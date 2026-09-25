@@ -1967,25 +1967,98 @@ def forget_vault_sources(course_folder: Path | None = None) -> None:
 
 
 def _is_frontmatter_fence(line: str) -> bool:
-    """Three or more dashes and nothing else — the app's own fence rule
-    (`PageVisibilityReader.isFence`), so the build writes the block the apps
-    read."""
-    bare = page_visibility.trim(line)
+    """
+    The CLOSING fence: three or more dashes at COLUMN 0, with nothing after
+    them but spaces and tabs (and a Windows line ending's carriage return).
+
+    python-frontmatter's own boundary, `^-{3,}\\s*$` with `re.MULTILINE`, so
+    a line of INDENTED dashes is part of the value above it, not the end of
+    the block — `publish: false` over `  ---` is the string "false ---" and
+    the page is published. The apps' rule since #188
+    (`PageVisibilityReader.isFence`); until then this trimmed both ends, as
+    the apps did, and ended the block at the indented dashes — so a write
+    that read back wrong was dropped by `_write_date_into_the_teachers_page`
+    and the page was quietly left undated.
+    """
+    bare = line.rstrip("\r").rstrip(" \t")
     return len(bare) >= 3 and set(bare) == {"-"}
+
+
+def _is_opening_frontmatter_fence(line: str) -> bool:
+    """
+    The OPENING fence may be indented: `frontmatter.parse` strips the whole
+    document before it matches, so the indent in front of the first line is
+    gone by then (#188). A symmetric "never indented" rule was rejected — it
+    sees no block behind an indented opener, and a writer would then give the
+    page a second one, leaving the teacher's own behind it as body text.
+    """
+    return _is_frontmatter_fence(page_visibility.trim(line))
 
 
 def _frontmatter_fences(lines: list[str]):
     """(open, close) line numbers of a page's frontmatter, or None. Leading
-    blank lines are skipped, as python-frontmatter and the apps skip them."""
+    blank lines are skipped, as python-frontmatter and the apps skip them.
+    The opener may be indented and the close may not (#188)."""
     open_index = 0
     while open_index < len(lines) and page_visibility.trim(lines[open_index]) == "":
         open_index += 1
-    if open_index >= len(lines) or not _is_frontmatter_fence(lines[open_index]):
+    if open_index >= len(lines) or not _is_opening_frontmatter_fence(lines[open_index]):
         return None
     for index in range(open_index + 1, len(lines)):
         if _is_frontmatter_fence(lines[index]):
             return (open_index, index)
     return None
+
+
+def _names_a_top_level_key(line: str) -> bool:
+    """
+    Does this column-0 line name a key of the page's own mapping? The apps'
+    rule (`PageVisibilityReader.namesATopLevelKey`, #186): `? key` does; a flow
+    collection (`{a: 1}`, `[a, b]`), a sequence entry (`- a`), a bare scalar and
+    `a:1` do not; a quoted key does.
+    """
+    if line.startswith("? "):
+        return True
+    if line.startswith("{") or line.startswith("["):
+        return False
+    if line.startswith("-") and (len(line) == 1 or line[1] in " \t"):
+        return False
+    rest = line
+    quoted = False
+    if rest[:1] in ("'", '"'):
+        quote = rest[0]
+        closing = rest[1:].find(quote)
+        if closing < 0:
+            return False
+        rest = rest[1 + closing + 1:]
+        quoted = True
+    colon = rest.find(":")
+    if colon < 0:
+        return False
+    if colon == 0 and not quoted:
+        return False
+    return rest[colon + 1:colon + 2] in ("", " ", "\t")
+
+
+def _place_for_a_new_top_level_key(lines: list[str], open_index: int, close_index: int):
+    """
+    Where a brand-new key may go — the first line inside the block — or None
+    when the block has no column-0 level for one (#186): its first line, blank
+    lines and `# note`s aside, is indented or names no key. A key written
+    there anyway adopts the indented line as its value, or makes settings
+    YAML cannot read. The apps' `placeForANewTopLevelKey`.
+    """
+    position = open_index + 1
+    while position < close_index and position < len(lines):
+        bare = lines[position].rstrip("\r")
+        content = page_visibility.trim(bare)
+        if content == "" or content.startswith("#"):
+            position += 1
+            continue
+        if bare[:1] in (" ", "\t"):
+            return None
+        return open_index + 1 if _names_a_top_level_key(bare) else None
+    return open_index + 1
 
 
 def _continuation_line_indices(lines: list[str], key_index: int, close_index: int,
@@ -2058,10 +2131,11 @@ def _setting_frontmatter_value(text: str, key: str, value_text: str) -> str | No
     The LAST line naming the key is the one rewritten, because it is the one
     PyYAML keeps when a page carries the same key twice. Its continuation lines
     go with it. A missing key is inserted at the top of the block, where the
-    apps and the installer put `created`. A page with no frontmatter block
-    gets one. A `# note` at the end of the key's line stays there. A block
-    opened and never closed, or indented with a tab (which YAML refuses), is
-    not touched.
+    apps and the installer put `created` — and only into a block with a
+    column-0 level for it (#186). A page with no frontmatter block gets one. A
+    `# note` at the end of the key's line stays there. A block opened and never
+    closed (since #188 that includes one closed only by INDENTED dashes), or
+    indented with a tab (which YAML refuses), is not touched.
     """
     newline = "\r\n" if "\r\n" in text else "\n"
     lines = text.split("\n")
@@ -2070,7 +2144,7 @@ def _setting_frontmatter_value(text: str, key: str, value_text: str) -> str | No
         for line in lines:
             if page_visibility.trim(line) == "":
                 continue
-            if _is_frontmatter_fence(line):
+            if _is_opening_frontmatter_fence(line):
                 return None
             break
         return f"---{newline}{key}: {value_text}{newline}---{newline}" + text
@@ -2084,8 +2158,11 @@ def _setting_frontmatter_value(text: str, key: str, value_text: str) -> str | No
         if key_line.match(bare):
             found = index
     if found is None:
+        place = _place_for_a_new_top_level_key(lines, open_index, close_index)
+        if place is None:
+            return None
         carriage = "\r" if lines[open_index].endswith("\r") else ""
-        lines.insert(open_index + 1, f"{key}: {value_text}{carriage}")
+        lines.insert(place, f"{key}: {value_text}{carriage}")
         return "\n".join(lines)
     raw_value = key_line.match(lines[found].rstrip("\r")).group(1)
     trimmed_value = page_visibility.trim(raw_value)

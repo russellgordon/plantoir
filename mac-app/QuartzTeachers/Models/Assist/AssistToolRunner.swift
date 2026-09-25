@@ -842,9 +842,11 @@ final class AssistToolRunner {
                 planned.plan,
                 forSection: planned.located.sectionNumber,
                 in: planned.located.course,
-                summary: AssistWording.publishedTheClassOn(
-                    planned.day.text, noun: planned.located.course.configuration.classNoun
-                )
+                summary: { written in
+                    return AssistWording.publishedTheClassOn(
+                        planned.day.text, noun: planned.located.course.configuration.classNoun
+                    )
+                }
             )
         }
     }
@@ -930,8 +932,9 @@ final class AssistToolRunner {
                 planned.plan,
                 forSection: planned.located.sectionNumber,
                 in: planned.located.course,
-                summary: "Published \(planned.plan.changes.count) "
-                       + "\(planned.plan.changes.count == 1 ? "page" : "pages")."
+                summary: { written in
+                    return "Published \(written) \(written == 1 ? "page" : "pages")."
+                }
             )
         }
     }
@@ -967,8 +970,9 @@ final class AssistToolRunner {
                 planned.plan,
                 forSection: planned.located.sectionNumber,
                 in: planned.located.course,
-                summary: "Unpublished \(planned.plan.changes.count) "
-                       + "\(planned.plan.changes.count == 1 ? "page" : "pages")."
+                summary: { written in
+                    return "Unpublished \(written) \(written == 1 ? "page" : "pages")."
+                }
             )
         }
     }
@@ -1146,6 +1150,9 @@ final class AssistToolRunner {
 
         var touched: [AssistSavedFile] = []
         var changedAnything: Bool = false
+        // Pages the writer declined, at plan time or at the write (#186). A
+        // unit whose every page was declined is NOT "already hidden".
+        var leftAlone: [String] = []
         for summary in pages {
             let graph: AssistSectionGraph = AssistSectionGraph.read(
                 forSection: located.sectionNumber, in: located.course,
@@ -1163,15 +1170,23 @@ final class AssistToolRunner {
                     titles: [summary.title], onOrAfter: nil, before: nil,
                     graph: graph, classPages: classPages,
                     forSection: located.sectionNumber, in: located.course)
+            for page in plan.noRoomForAKey where !leftAlone.contains(page.displayTitle) {
+                leftAlone.append(page.displayTitle)
+            }
             if plan.changesNothing {
                 continue
             }
             do {
-                let change: AssistChange = try AssistPublishPlanner.apply(
+                let applied: (change: AssistChange, leftAlone: [String]) = try AssistPublishPlanner.apply(
                     plan, forSection: located.sectionNumber, in: located.course
                 )
-                touched = AssistToolRunner.merging(touched, with: change.files)
-                changedAnything = true
+                for title in applied.leftAlone where !leftAlone.contains(title) {
+                    leftAlone.append(title)
+                }
+                if !applied.change.files.isEmpty {
+                    touched = AssistToolRunner.merging(touched, with: applied.change.files)
+                    changedAnything = true
+                }
             } catch {
                 return AssistToolOutcome.refused(
                     "\(located.course.configuration.unitWord) \(unit) was only partly "
@@ -1182,7 +1197,16 @@ final class AssistToolRunner {
         }
 
         let done: String = publishing ? "published" : "unpublished"
+        AssistToolRunner.notePagesLeftAsTheyWere(
+            leftAlone.count, act: publishing ? "publishing pages" : "hiding pages",
+            course: located.course.code, section: located.sectionNumber
+        )
+        let aboutTheLeftAlone: String = leftAlone.isEmpty
+            ? "" : AssistPublishPlan.sayingPagesWithNoRoomForAKey(named: leftAlone)
         if !changedAnything {
+            if !leftAlone.isEmpty {
+                return AssistToolOutcome.wrote(aboutTheLeftAlone, detail: aboutTheLeftAlone)
+            }
             let unitWord: String = located.course.configuration.unitWord
             let already: String = publishing
                 ? "\(unitWord) \(unit) has already been published."
@@ -1198,7 +1222,11 @@ final class AssistToolRunner {
             files: touched
         ))
 
-        var detail: String = "\(located.course.configuration.unitWord) \(unit) was \(done)."
+        var said: String = "\(located.course.configuration.unitWord) \(unit) was \(done)."
+        if !aboutTheLeftAlone.isEmpty {
+            said += " " + aboutTheLeftAlone
+        }
+        var detail: String = said
         if backedUp {
             detail += "\n\n" + AssistToolRunner.backedUpNote
         }
@@ -1206,8 +1234,21 @@ final class AssistToolRunner {
             for: located.course, sectionNumber: located.sectionNumber
         ))
 
-        return AssistToolOutcome.wrote(
-            "\(located.course.configuration.unitWord) \(unit) was \(done).", detail: detail
+        return AssistToolOutcome.wrote(said, detail: detail)
+    }
+
+    /// The trail line for pages whose settings were left as they were
+    /// because there was no place a new line could go (#186). A count and the
+    /// act, never the pages; nothing at all when the count is 0.
+    static func notePagesLeftAsTheyWere(_ count: Int, act: String, course: String, section: Int) {
+        if count <= 0 {
+            return
+        }
+        ActivityTrail.note(
+            .pageSettingsLeftAsTheyWere,
+            ActivityTrail.pageSettingsLeftAsTheyWereLine(act: act, pages: count),
+            course: course,
+            section: section
         )
     }
 
@@ -1369,11 +1410,17 @@ final class AssistToolRunner {
     // MARK: - Writing pages
 
     /// Back the course up, write the change, remember it, rebuild the preview.
+    ///
+    /// `summary` is given how many pages' visibility was actually WRITTEN,
+    /// not how many the plan listed: a page declined at the write — edited in
+    /// Obsidian between the card and Go — is not counted as done (#186's
+    /// review, B1). When every page the teacher NAMED was declined, the
+    /// caller's sentence (which is about them) is not said at all.
     private func carryOut(
         _ plan: AssistPublishPlan,
         forSection sectionNumber: Int,
         in course: Course,
-        summary: String
+        summary: (Int) -> String
     ) async -> AssistToolOutcome {
         if plan.changesNothing {
             // Four words, when four words are the whole answer. A teacher who
@@ -1382,6 +1429,16 @@ final class AssistToolRunner {
             // changed because nothing needed to be.
             if let already = plan.nothingToDoSentence {
                 return AssistToolOutcome.wrote(already, detail: already)
+            }
+            // Nothing could be written because every page that needed it was
+            // declined: say THAT, not "nothing needed changing" (#186).
+            if !plan.noRoomForAKey.isEmpty {
+                let declined: String = AssistPublishPlan.sayingPagesWithNoRoomForAKey(plan.noRoomForAKey)
+                AssistToolRunner.notePagesLeftAsTheyWere(
+                    plan.noRoomForAKey.count, act: plan.publishes ? "publishing pages" : "hiding pages",
+                    course: course.code, section: sectionNumber
+                )
+                return AssistToolOutcome.wrote(declined, detail: plan.describe())
             }
             return AssistToolOutcome.wrote(
                 "Nothing needed changing.",
@@ -1401,8 +1458,13 @@ final class AssistToolRunner {
         _ = await stopThePreviewBeforeWriting(for: course, sectionNumber: sectionNumber)
 
         let change: AssistChange
+        var leftAlone: [String] = []
         do {
-            change = try AssistPublishPlanner.apply(plan, forSection: sectionNumber, in: course)
+            let applied: (change: AssistChange, leftAlone: [String]) = try AssistPublishPlanner.apply(
+                plan, forSection: sectionNumber, in: course
+            )
+            change = applied.change
+            leftAlone = applied.leftAlone
         } catch {
             return AssistToolOutcome.refused(
                 "Nothing was changed: \(error.localizedDescription)"
@@ -1410,7 +1472,29 @@ final class AssistToolRunner {
         }
         history.record(change)
 
+        // The plan's declined pages are already on the card (`describe`);
+        // one declined only at the write — edited in Obsidian since the card
+        // was read — is said here, because the card promised it (#186).
+        var declinedNow: [String] = []
+        for title in leftAlone {
+            var onTheCard: Bool = false
+            for page in plan.noRoomForAKey where page.displayTitle == title {
+                onTheCard = true
+            }
+            if !onTheCard {
+                declinedNow.append(title)
+            }
+        }
+        AssistToolRunner.notePagesLeftAsTheyWere(
+            plan.noRoomForAKey.count + declinedNow.count,
+            act: plan.publishes ? "publishing pages" : "hiding pages",
+            course: course.code, section: sectionNumber
+        )
+
         var detail: String = plan.describe() + "\n\nDone: \(change.description)."
+        if !declinedNow.isEmpty {
+            detail += "\n\n" + AssistPublishPlan.sayingPagesWithNoRoomForAKey(named: declinedNow)
+        }
         if backedUp {
             detail += "\n\n" + AssistToolRunner.backedUpNote
         }
@@ -1422,7 +1506,50 @@ final class AssistToolRunner {
         detail += "\n\nThis changed the teacher's files and their PREVIEW. It did not put anything in front "
                 + "of students — deploying does that, and only when they ask."
 
-        return AssistToolOutcome.wrote(summary, detail: detail)
+        return AssistToolOutcome.wrote(
+            AssistToolRunner.whatWasDone(
+                plan, declinedNow: declinedNow, summary: summary
+            ),
+            detail: detail
+        )
+    }
+
+    /// The transcript line after a publish or unpublish: the caller's sentence
+    /// about what was WRITTEN, then every page the writer declined — on the
+    /// card or at the write — named (#186). Built from the outcome, never
+    /// from the plan's count, so a declined page cannot be reported as done.
+    static func whatWasDone(
+        _ plan: AssistPublishPlan,
+        declinedNow: [String],
+        summary: (Int) -> String
+    ) -> String {
+        var declined: [String] = []
+        for page in plan.noRoomForAKey {
+            declined.append(page.displayTitle)
+        }
+        for title in declinedNow where !declined.contains(title) {
+            declined.append(title)
+        }
+        var written: Int = 0
+        for change in plan.changes where !declinedNow.contains(change.page.displayTitle) {
+            written += 1
+        }
+        var everyNamedPageDeclined: Bool = !plan.namedPages.isEmpty
+        for page in plan.namedPages where !declined.contains(page.displayTitle) {
+            everyNamedPageDeclined = false
+        }
+        var said: String = ""
+        if !everyNamedPageDeclined {
+            said = summary(written)
+        } else if written > 0 {
+            said = (plan.publishes ? "Published" : "Unpublished")
+                + " \(written) \(written == 1 ? "page" : "pages")."
+        }
+        if !declined.isEmpty {
+            let sentence: String = AssistPublishPlan.sayingPagesWithNoRoomForAKey(named: declined)
+            said = said.isEmpty ? sentence : said + " " + sentence
+        }
+        return said
     }
 
     // MARK: - Preview, undo, deploy
@@ -2677,11 +2804,9 @@ final class AssistToolRunner {
         // the reader will not guess at is one the build may well publish — a
         // key whose value continues on an indented line reaches the site as
         // the string `'false false'` — so "cannot tell" is not an excuse to
-        // carry on. It is also strictly stronger than asking `setting` whether
-        // it CHANGED anything: `changed: false` cannot tell "the page already
-        // said hidden" from "this declined to write", which is the shape
-        // issue #186 is about, and both land here as an answer that is not
-        // `.hidden`.
+        // carry on. It is also strictly stronger than asking `setting` for its
+        // outcome: `.noRoomForAKey` (#186) lands here as an answer that is not
+        // `.hidden` too, and so does anything the outcome cannot see.
         //
         // Refusing is the safe end state and that is why it is allowed to be
         // this blunt: `ClassInsertionPlanner.apply` has already written the
@@ -2696,10 +2821,11 @@ final class AssistToolRunner {
         // per-section keys and neither of which any write here can mend: a TAB
         // used as indentation anywhere in the source's frontmatter (the reader
         // answers `.unreadable`, because the build's own parser throws on it),
-        // and a frontmatter whose first line is indented, where the
-        // `publish: false` just inserted above it adopts that line as its
-        // value. Both were measured; both are pages the BUILD refuses as well,
-        // which is why stopping is the right answer rather than a shrug.
+        // and a frontmatter whose first line is indented, where `setting` now
+        // declines to write at all (#186) — it used to insert `publish: false`
+        // above that line, which adopted the line as its value. Both were
+        // measured; both are pages the BUILD cannot read as they stand, which
+        // is why stopping is the right answer rather than a shrug.
         if AssistPageVisibility.answer(
             in: copied, forSection: request.located.sectionNumber
         ) != .hidden {
@@ -3040,10 +3166,13 @@ final class AssistToolRunner {
             )
 
             let change: AssistChange
+            var leftAlone: [String] = []
             do {
-                change = try SectionReDatePlanner.apply(
+                let applied: (change: AssistChange, leftAlone: [String]) = try SectionReDatePlanner.apply(
                     asked.plan, forSection: asked.located.sectionNumber, in: asked.located.course
                 )
+                change = applied.change
+                leftAlone = applied.leftAlone
             } catch {
                 return AssistToolOutcome.refused(
                     "Nothing was changed: \(error.localizedDescription)"
@@ -3077,6 +3206,17 @@ final class AssistToolRunner {
             // it is the part a teacher has to answer, and `detail` is not shown
             // to them at all for a write.
             var said: String = teacherSummary
+            // Pages the re-date could not date, named — they are not among
+            // the classes it moved, whatever the count above says (#186).
+            if !leftAlone.isEmpty {
+                let declined: String = AssistPublishPlan.sayingPagesWhoseNewDateCouldNotBeSet(named: leftAlone)
+                said += " " + declined
+                detail += "\n\n" + declined
+                AssistToolRunner.notePagesLeftAsTheyWere(
+                    leftAlone.count, act: "re-dating classes",
+                    course: asked.located.course.code, section: asked.located.sectionNumber
+                )
+            }
             if aboutTheWebsite.isEmpty == false {
                 said += "\n\n" + aboutTheWebsite
                 detail += "\n\n" + aboutTheWebsite

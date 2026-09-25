@@ -323,6 +323,27 @@ nonisolated enum AssistWording {
              + "would throw away that newer work."
     }
 
+    /// A section restore that could not put the backup's setting back on
+    /// some shared pages, because the settings at the top of those pages are
+    /// written with no place a new line can safely go (indented, or written as
+    /// a list). Those pages were left exactly as they are — so the restore is
+    /// not "back to how it was" for them, and a sentence saying only that
+    /// would be the silence #182 closes. Past tense, said once the restore is
+    /// done, after `AssistSectionRestore.doneMessage`'s own sentence.
+    ///
+    /// Counted, not named: the restore walks every shared page without a
+    /// title to hand, and it is almost always zero.
+    static func sharedPagesWhoseSettingsCouldNotBePutBack(count: Int, section: String) -> String {
+        if count == 1 {
+            return "One shared page kept the setting it has now for Section \(section): the settings "
+                 + "at the top of it are written in a way I can’t add to, so I left that page exactly "
+                 + "as it is."
+        }
+        return "\(count) shared pages kept the settings they have now for Section \(section): the "
+             + "settings at the top of them are written in a way I can’t add to, so I left those "
+             + "pages exactly as they are."
+    }
+
     /// Why a partly-done undo is still on the list.
     static let undoIsStillAvailable: String =
         "That change is still on the list, so you can ask me to undo it again once you have "
@@ -754,6 +775,50 @@ nonisolated enum AssistWording {
         }
         return "\(listing) are \(noun.plural) of their own, so they stay as they are — publish each one "
              + "when you get to it."
+    }
+
+    /// Pages nothing could be written to, NAMED rather than counted (#186).
+    ///
+    /// The settings at the top of a page can be written in a way that leaves
+    /// no safe place for a new line: indented, or written as a list, so a line
+    /// added there either folds into the one below it or makes settings the
+    /// website builder cannot read. Measured 2026-09-25 — and in the shape
+    /// that matters most, the fold leaves the page PUBLISHED while the teacher
+    /// is told it was hidden. So nothing is written, and this is what says so.
+    ///
+    /// **One sentence for both tenses, deliberately.** It is said on a plan
+    /// card before anything is done and again in a reply afterwards, and the
+    /// page stays exactly as the teacher wrote it either way — so a sentence
+    /// in the present tense is true in both places, and two nearly identical
+    /// sentences are two sentences to keep in step. (The section restore's
+    /// own sentence, `sharedPagesWhoseSettingsCouldNotBePutBack`, is past
+    /// tense because it is only ever said afterwards, and counts rather than
+    /// names.)
+    ///
+    /// - Parameter listing: the pages, already quoted and joined, at most a
+    ///   few named — `AssistPublishPlan.listingAFew`.
+    /// - Parameter count: how many pages that listing stands for.
+    static func pagesWhoseSettingsCannotBeAddedTo(_ listing: String, count: Int) -> String {
+        if count == 1 {
+            return "I can’t add to the settings at the top of \(listing), so that page stays exactly "
+                 + "as it is. Open it in Obsidian to set it there."
+        }
+        return "I can’t add to the settings at the top of \(listing), so those pages stay exactly "
+             + "as they are. Open them in Obsidian to set them there."
+    }
+
+    /// Pages a re-date or a make-room could not give their new date (#186's
+    /// review, B3). Not `pagesWhoseSettingsCannotBeAddedTo`: that one says the
+    /// page "stays exactly as it is", and here it may just have been renamed,
+    /// moved or had its links rewritten — what was NOT done is the date, so
+    /// the sentence says the date.
+    static func pagesWhoseNewDateCouldNotBeSet(_ listing: String, count: Int) -> String {
+        if count == 1 {
+            return "I couldn’t set the new date on \(listing): the settings at the top of it are "
+                 + "written in a way I can’t add to. Open it in Obsidian to set the date there."
+        }
+        return "I couldn’t set the new dates on \(listing): the settings at the top of them are "
+             + "written in a way I can’t add to. Open them in Obsidian to set the dates there."
     }
 
     // MARK: - What publishing means here

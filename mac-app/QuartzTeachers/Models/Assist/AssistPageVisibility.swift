@@ -95,8 +95,10 @@ nonisolated enum AssistPageVisibility {
         return statedPublishing(in: pageText, forSection: sectionNumber) ?? true
     }
 
-    /// The page text with this section's visibility set, and whether that
-    /// changed anything.
+    /// The page text with this section's visibility set, and what the write
+    /// came to — `.written`, `.alreadyRight`, or `.noRoomForAKey` when the key
+    /// is missing and the page's settings have nowhere a new line can go
+    /// (`PageVisibilityReader.placeForANewTopLevelKey`, #186).
     ///
     /// A line-level edit, for the reason `PageFrontmatter` gives: the
     /// teacher's frontmatter is theirs, and round-tripping it through a YAML
@@ -120,7 +122,7 @@ nonisolated enum AssistPageVisibility {
         in pageText: String,
         forSection sectionNumber: Int,
         isSectionLocal: Bool
-    ) -> (text: String, changed: Bool) {
+    ) -> (text: String, outcome: FrontmatterWriteOutcome) {
         let key: String = publishKey(forSection: sectionNumber, isSectionLocal: isSectionLocal)
         let legacy: String = draftKey(forSection: sectionNumber, isSectionLocal: isSectionLocal)
         // Found with the READER's own key matcher, so the writer rewrites the
@@ -145,14 +147,14 @@ nonisolated enum AssistPageVisibility {
         let stated: PageVisibilityAnswer = answer(in: pageText, forSection: sectionNumber)
         let alreadySaysIt: Bool = (stated == .visible && published) || (stated == .hidden && !published)
         if alreadySaysIt && !carriesLegacyKey {
-            return (pageText, false)
+            return (pageText, .alreadyRight)
         }
 
         let line: String = key + ": " + (published ? "true" : "false")
         guard let block = PageFrontmatter.block(in: pageText) else {
             // No frontmatter at all: give the page a block of its own, the
             // way `PageFrontmatter.settingCreated` does.
-            return ("---\n" + line + "\n---\n" + pageText, true)
+            return ("---\n" + line + "\n---\n" + pageText, .written)
         }
 
         var lines: [String] = pageText.components(separatedBy: "\n")
@@ -215,7 +217,18 @@ nonisolated enum AssistPageVisibility {
                 }
             }
         } else {
-            lines.insert(line, at: block.openIndex + 1)
+            // A NEW key, and only where the block has a column-0 level for
+            // one. Measured 2026-09-25: `publish: false` written above
+            // `  false` is the string "false false" and the page stays
+            // PUBLISHED while the teacher is told it was hidden; above
+            // `  a: 1`, `{a: 1}` or `- a` it makes a block the build cannot
+            // read. So nothing is written, and the caller says so (#186).
+            guard let place = PageVisibilityReader.placeForANewTopLevelKey(
+                in: lines, openIndex: block.openIndex, closeIndex: block.closeIndex
+            ) else {
+                return (pageText, .noRoomForAKey)
+            }
+            lines.insert(line, at: place)
         }
 
         // Last first, so the earlier indices stay put.
@@ -227,7 +240,7 @@ nonisolated enum AssistPageVisibility {
         for index in doomed.reversed() {
             lines.remove(at: index)
         }
-        return (lines.joined(separator: "\n"), true)
+        return (lines.joined(separator: "\n"), .written)
     }
 
     /// The page text with every PER-SECTION key taken out of its frontmatter.
