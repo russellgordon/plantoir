@@ -126,6 +126,18 @@ struct AssistToolOutcome: Sendable, Equatable {
     static let askBeforeGoingAhead: String =
         "Nothing has been changed. Show this to the teacher and ask before going ahead."
 
+    /// A read answered IN FULL, in code: the teacher has the answer, and the
+    /// turn is over (#167).
+    ///
+    /// Only for a read the model was never asked for. A code-matched turn never
+    /// puts the teacher's sentence into the model's conversation, so handing
+    /// back would give the model a tool result with no question in front of it
+    /// — and on the smaller assistant, the lap that followed is where a
+    /// read-only question turned into a publish plan.
+    static func answered(_ summary: String, detail: String) -> AssistToolOutcome {
+        return AssistToolOutcome(summary: summary, detail: detail, shouldContinue: false)
+    }
+
     /// A write: it happened, and the turn is over.
     static func wrote(_ summary: String, detail: String) -> AssistToolOutcome {
         return AssistToolOutcome(summary: summary, detail: detail, shouldContinue: false)

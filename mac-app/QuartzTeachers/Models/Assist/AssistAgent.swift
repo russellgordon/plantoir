@@ -194,10 +194,25 @@ final class AssistAgent {
             wholeLine: true
         )
 
+        // "What does Unit 2, Day 3 in SPH3U section 1 link to?", typed in
+        // another course's window (#167). A card binds THIS window's course
+        // into its call unconditionally, so the question is refused here, in
+        // code, with the sentence a model-named course gets — nothing is read,
+        // and the model is not asked.
+        if case .anotherCourse(let named) = AssistCardCommand.linksQuestion(
+            trimmed, windowCourse: courseCode, windowSection: sectionNumber
+        ) {
+            sayALinksQuestionNamedAnotherCourse(named)
+            return
+        }
+
         // The fixed shapes never reach the model — see AssistCardCommand for
         // the measurement that decided this.
         if let command = AssistCardCommand.matching(
-            trimmed, numberedPageWord: tools.numberedPageWord(forCourse: courseCode)
+            trimmed,
+            numberedPageWord: tools.numberedPageWord(forCourse: courseCode),
+            windowCourse: courseCode,
+            windowSection: sectionNumber
         ) {
             // Built and SETTLED before the line is written, and then run
             // without being settled again. The order is the whole point: the
@@ -809,6 +824,41 @@ final class AssistAgent {
             section: sectionNumber
         )
         activity = .idle
+    }
+
+    /// A links question named another course (#167): refused in code, with
+    /// the same two sentences `sayTheRequestNamedAnotherCourse` chooses
+    /// between, and nothing read.
+    ///
+    /// Its own function rather than a call to that one, because that one's
+    /// trail line says what the MODEL chose, and here no model was asked. The
+    /// event is the same — the teacher's side of it is the same refusal.
+    private func sayALinksQuestionNamedAnotherCourse(_ otherCourse: String) {
+        var said: String = AssistWording.askedAboutACourseThatIsNotHere(
+            course: courseCode, otherCourse: otherCourse
+        )
+        if let known = tools.knownCourseCode(matching: otherCourse) {
+            said = AssistWording.askedAboutAnotherCourse(course: courseCode, otherCourse: known)
+        }
+        entries.append(Entry(speaker: .assistant, text: said))
+        ActivityTrail.note(
+            .assistantWasAskedAboutAnotherCourse,
+            AssistAgent.linksQuestionNamedAnotherCourseLine(
+                otherCourse: otherCourse, windowCourse: courseCode
+            ),
+            course: courseCode,
+            section: sectionNumber
+        )
+        activity = .idle
+    }
+
+    /// The trail's line for a links question refused because it named another
+    /// course (#167). Both codes, as the other one was TYPED — the evidence the
+    /// event's entry asks for — and never the page title.
+    static func linksQuestionNamedAnotherCourseLine(otherCourse: String, windowCourse: String) -> String {
+        return "the assistant was asked about " + otherCourse + " in this window, which is for "
+            + windowCourse + " — matched in code, not sent to the model: a question about what a "
+            + "page links to; nothing was read"
     }
 
     /// A tool's name as somebody reading the trail would say it.

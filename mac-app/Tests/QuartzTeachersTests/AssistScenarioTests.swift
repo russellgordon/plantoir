@@ -99,6 +99,17 @@ final class AssistScenarioTests: XCTestCase {
         /// is portable; exact composition is not, which is the same reason
         /// `expectTranscript` checks order rather than adjacency.
         let expectTranscriptContains: [String]?
+
+        /// How many requests the engine must have received over the whole
+        /// conversation, when the case says (#167).
+        ///
+        /// **A transcript cannot show an absence.** A turn answered in code
+        /// that wrongly handed its answer back to the model still shows the
+        /// same tool line; the only trace of the extra lap is a request the
+        /// engine received. So such a case runs against a `StubEngine` that
+        /// answers whatever it is sent, and this is asserted against its
+        /// count — a regression fails here in a second rather than hanging.
+        let expectModelRequests: Int?
     }
 
     // MARK: - Functions
@@ -134,7 +145,7 @@ final class AssistScenarioTests: XCTestCase {
         // Windows has run these since the families were first described
         // (`AssistCardCommandTests.cs`) and the mac never did — so a family
         // whose example had stopped matching would have gone red on their
-        // machine, from a file generated on this one. Six families now; the
+        // machine, from a file generated on this one. Nine families now; the
         // deploy-at-a-time one also has a table of its own, in `deployAtATime`
         // and run by `ScheduleDeployCardTests`, because one example cannot
         // describe a grammar of times.
@@ -348,7 +359,34 @@ final class AssistScenarioTests: XCTestCase {
             )
         }
 
-        let agent: AssistAgent = AssistFixture.makeAgent(tools: made.runner)
+        // "What does this page link to?" (#167) needs a page with a link on
+        // it, and the page it links to must be a DRAFT so the answer has a
+        // mark to show.
+        if pending == "read_page" {
+            try AssistFixture.write(
+                page: "Unit 1, Day 1", publish: "true", date: "2026-09-08",
+                body: "Today we use [[Unit 1, Day 2]].", in: made.course
+            )
+            try AssistFixture.write(
+                page: "Unit 1, Day 2", publish: "false", date: "2026-09-10", body: "two", in: made.course
+            )
+        }
+
+        // A case that counts the model's requests runs against an engine that
+        // answers anything, so a lap nobody should have taken is counted
+        // rather than left waiting on a connection that never opens.
+        var engine: StubEngine? = nil
+        if scenario.expectModelRequests != nil {
+            let started: StubEngine = try StubEngine()
+            started.serve(
+                #"{"choices":[{"message":{"role":"assistant","content":"Here it is."}}],"usage":{"completion_tokens":4}}"#
+            )
+            engine = started
+        }
+        defer {
+            engine?.stop()
+        }
+        let agent: AssistAgent = AssistFixture.makeAgent(tools: made.runner, engineAt: engine?.baseURL)
 
         // A conversation, not a single turn. `saying` lists what the teacher
         // types, in order, each one approved before the next — because some
@@ -389,6 +427,13 @@ final class AssistScenarioTests: XCTestCase {
         }
 
         try assertTranscript(of: agent, matches: scenario)
+
+        if let expected = scenario.expectModelRequests, let engine {
+            XCTAssertEqual(
+                engine.requestCount, expected,
+                "\(scenario.name): the model was asked \(engine.requestCount) time(s); the case says \(expected)"
+            )
+        }
     }
 
     /// Both ordered transcript checks, so a scenario can use either.
@@ -566,7 +611,8 @@ final class AssistScenarioTests: XCTestCase {
                 expectEvents: entry["expectEvents"] as? [String],
                 expectReply: entry["expectReply"] as? String,
                 expectTranscript: entry["expectTranscript"] as? [String],
-                expectTranscriptContains: entry["expectTranscriptContains"] as? [String]
+                expectTranscriptContains: entry["expectTranscriptContains"] as? [String],
+                expectModelRequests: entry["expectModelRequests"] as? Int
             ))
         }
         return read

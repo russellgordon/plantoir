@@ -55,7 +55,16 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     /// otherwise. Only the one-number make-room frame reads it: that frame
     /// matches in a numbered course alone, and only on that word or a bare
     /// number — see `makeRoomAtOneNumber`.
-    static func matching(_ message: String, numberedPageWord: String? = nil) -> AssistCardCommand? {
+    ///
+    /// `windowCourse` and `windowSection` are the window's own course and
+    /// section, read by ONE family only — "what does <page> link to?" (#167),
+    /// which accepts "in ICS3U section 1" when, and only when, it names the
+    /// window it was typed in. Without them that family matches the bare
+    /// question and nothing that names a place. See `linksQuestion`.
+    static func matching(_ message: String,
+                         numberedPageWord: String? = nil,
+                         windowCourse: String? = nil,
+                         windowSection: Int? = nil) -> AssistCardCommand? {
         let tidied: String = AssistCardCommand.tidied(message)
 
         for (phrasing, command) in fixedShapes {
@@ -75,7 +84,357 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         if let scheduled = AssistCardCommand.deployAtATime(tidied) {
             return scheduled
         }
+        let links: AssistLinksQuestion? = AssistCardCommand.linksQuestion(
+            message, windowCourse: windowCourse, windowSection: windowSection
+        )
+        if case .page(let title) = links {
+            return AssistCardCommand(
+                toolName: "read_page",
+                arguments: ["page": title, "answer": AssistCardCommand.linksAnswer]
+            )
+        }
         return AssistCardCommand.duplicateClass(tidied, original: message)
+    }
+
+    // MARK: - "What does this page link to?" (#167)
+
+    /// The value of `read_page`'s `answer` argument that asks for the page's
+    /// LINKS, answered in code, rather than for the page itself.
+    ///
+    /// **Not in the tool's schema, and it must never be.** The model is never
+    /// shown it, so the surface routing was measured against does not move by
+    /// a byte — the same arrangement as `read_remembered_timetable`'s `scope`
+    /// and `re_date_classes`' `rollover`. An MCP caller that sends it anyway
+    /// gets the code's answer, which is harmless: it is a read.
+    static let linksAnswer: String = "links"
+
+    /// "What does Unit 2, Day 3 link to?" — the page's links, answered in
+    /// code, and never sent to the model (issue #167).
+    ///
+    /// **Measured, and it is the reason this family exists**
+    /// (`research/ai-assist/link-question-results.txt`, 2026-09-25, both
+    /// tiers, the app's own flags, body and prompt). Across six courses and
+    /// fourteen dates, one greedy trial per cell, the plainest phrasing a
+    /// teacher would type — "What does Unit 2, Day 3 link to?" — reached
+    /// `read_page` **0 times in 84 on BOTH assistants**; the larger one sent
+    /// it to `check_section` every time, and on the smaller one "Which pages
+    /// does Unit 2, Day 3 link to?" became a `publish_pages` PLAN 31 times in
+    /// 84 — a write, for a read-only question. The whole family scored 153 of
+    /// 588 and 115 of 588. It is a fixed frame around a page title, the shape
+    /// #194 and #277 already moved into code, so it is answered here.
+    ///
+    /// **REJECTED: a sentence in `read_page`'s description** (the 2026-09-19
+    /// candidate on #167). It moves the tool surface both apps were measured
+    /// against, it moved OTHER probes across dates when it was tried, and on
+    /// the smaller assistant it left seven of thirteen held-out phrasings
+    /// where they were. Code cannot drift across dates.
+    ///
+    /// The frames, after the tidying every family gets, a question mark taken
+    /// off the end and "please" off either end:
+    ///
+    /// - what|which pages|what pages does <page> link to
+    /// - what does <page> point to
+    /// - where does <page> link|point to
+    /// - what links are on|in <page>
+    /// - show me|list the links on|in|from <page>
+    ///
+    /// **A place may be named, before "link to" or after it — but only THIS
+    /// window's.** "What does Unit 2, Day 3 in ICS3U section 1 link to?" in an
+    /// ICS3U section 1 window is the same question as without the place, and
+    /// it is the verbatim sentence #167 was filed about, so it is read. A
+    /// matched card binds the window's course and section into its call
+    /// unconditionally (`AssistAgent.encode`), so a place that is NOT the
+    /// window's must never be answered here as though it were — the hide
+    /// family's reason, honoured exactly:
+    ///
+    /// - another COURSE named → `.anotherCourse`, and the agent refuses with
+    ///   the sentence a model-named course already gets. Nothing is read.
+    /// - this course, another SECTION → nil: the sentence goes to the model,
+    ///   as it did before this family existed.
+    /// - a place and a second place → nil.
+    ///
+    /// **Refused, so the model keeps them** (each is a contract row): a page
+    /// named by a pronoun ("it", "that page" — the model has the
+    /// conversation), a page named by its DAY ("today's class", "my next
+    /// class" — the model reads dates; no class is resolved by day here), a
+    /// description beginning "the page", the REVERSE question "what links to
+    /// <page>" (which pages point AT it — a different question), a plural
+    /// "what do … link to", and anything after "link to" that is not this
+    /// window's place ("… link to, and publish them").
+    ///
+    /// The title is sliced from what the teacher TYPED, capitals kept, with
+    /// one pair of quotes taken off: the lookup folds case either way, and
+    /// what this protects is the title read back to them.
+    static func linksQuestion(_ message: String,
+                              windowCourse: String?,
+                              windowSection: Int?) -> AssistLinksQuestion? {
+        // The shared tidying, but on the TYPED text: capitals are kept so the
+        // title can be read back as the teacher wrote it, and matching is done
+        // on a lower-cased twin of exactly the same length.
+        var typed: String = message.trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: ".!"))
+        while typed.hasSuffix("?") {
+            typed = String(typed.dropLast()).trimmingCharacters(in: .whitespaces)
+        }
+        typed = AssistCardCommand.withoutPlease(typed)
+        let letters: [Character] = Array(typed)
+        let lowered: String = typed.lowercased()
+        // Lower-casing a handful of characters changes how many there are;
+        // slicing by position would then cut the title in the wrong place, so
+        // such a sentence goes to the model rather than being misread.
+        guard lowered.count == letters.count else {
+            return nil
+        }
+
+        var titleSlot: String? = nil
+        var tail: String = ""
+
+        let verbFrames: [(opening: String, closings: [String])] = [
+            ("what does ", [" link to", " point to"]),
+            ("which pages does ", [" link to"]),
+            ("what pages does ", [" link to"]),
+            ("where does ", [" link to", " point to"]),
+        ]
+        for frame in verbFrames where titleSlot == nil && lowered.hasPrefix(frame.opening) {
+            // The LAST "link to", so a place after it is the tail and a title
+            // is everything between the opening and it.
+            var end: Int? = nil
+            var closingLength: Int = 0
+            for closing in frame.closings {
+                guard let found = lowered.range(of: closing, options: .backwards) else {
+                    continue
+                }
+                let at: Int = lowered.distance(from: lowered.startIndex, to: found.lowerBound)
+                if end == nil || at > (end ?? 0) {
+                    end = at
+                    closingLength = closing.count
+                }
+            }
+            let start: Int = frame.opening.count
+            guard let end, start < end else {
+                return nil
+            }
+            titleSlot = String(letters[start..<end])
+            tail = String(letters[(end + closingLength)...])
+        }
+
+        let nounFrames: [String] = [
+            "what links are on ", "what links are in ",
+            "show me the links on ", "show me the links in ", "show me the links from ",
+            "list the links on ", "list the links in ", "list the links from ",
+        ]
+        for opening in nounFrames where titleSlot == nil && lowered.hasPrefix(opening) {
+            titleSlot = String(letters[opening.count...])
+        }
+
+        guard var title = titleSlot else {
+            return nil
+        }
+
+        // What follows "link to" must be nothing, or this window's place.
+        var placesNamed: Int = 0
+        let trimmedTail: String = tail.trimmingCharacters(in: .whitespaces)
+        if !trimmedTail.isEmpty {
+            guard trimmedTail.lowercased().hasPrefix("in ") else {
+                return nil
+            }
+            let place: LinksPlace = AssistCardCommand.place(
+                String(trimmedTail.dropFirst(3)),
+                windowCourse: windowCourse, windowSection: windowSection
+            )
+            switch place {
+            case .thisWindow:
+                placesNamed += 1
+            case .anotherCourse(let code):
+                return .anotherCourse(code)
+            case .anotherSection, .notAPlace:
+                return nil
+            }
+        }
+
+        // …and a place at the end of the title slot is read the same way:
+        // "What does "Unit 2, Day 3" in ICS3U section 1 link to?".
+        if let lastIn = title.lowercased().range(of: " in ", options: .backwards) {
+            let before: Int = title.lowercased().distance(
+                from: title.lowercased().startIndex, to: lastIn.lowerBound
+            )
+            let titleLetters: [Character] = Array(title)
+            if titleLetters.count == title.lowercased().count {
+                let rest: String = String(titleLetters[(before + 4)...])
+                let place: LinksPlace = AssistCardCommand.place(
+                    rest, windowCourse: windowCourse, windowSection: windowSection
+                )
+                switch place {
+                case .thisWindow:
+                    placesNamed += 1
+                    title = String(titleLetters[..<before])
+                case .anotherCourse(let code):
+                    return .anotherCourse(code)
+                case .anotherSection:
+                    return nil
+                case .notAPlace:
+                    // "Day 3 in Unit 2" — part of what the teacher calls the
+                    // page, as far as this frame can tell. The lookup decides.
+                    break
+                }
+            }
+        }
+        if placesNamed > 1 {
+            return nil
+        }
+
+        guard let page = AssistCardCommand.pageTitle(from: title) else {
+            return nil
+        }
+        return .page(page)
+    }
+
+    /// The title slot tidied into a page title, or nil when what is in it is
+    /// not a page title this family may look up.
+    private static func pageTitle(from slot: String) -> String? {
+        var title: String = slot.trimmingCharacters(in: .whitespaces)
+        while title.hasSuffix(",") {
+            title = String(title.dropLast()).trimmingCharacters(in: .whitespaces)
+        }
+        // One pair of quotes, of whichever kind a keyboard or an editor
+        // produces.
+        for (open, close) in [("\"", "\""), ("“", "”"), ("'", "'"), ("‘", "’")]
+        where title.count >= 2 && title.hasPrefix(open) && title.hasSuffix(close) {
+            title = String(title.dropFirst().dropLast()).trimmingCharacters(in: .whitespaces)
+            break
+        }
+        if title.isEmpty {
+            return nil
+        }
+
+        let folded: String = title.lowercased().replacingOccurrences(of: "’", with: "'")
+        // A pronoun: the model has the conversation, and this frame does not.
+        let pronouns: Set<String> = [
+            "it", "this", "that", "this one", "that one", "this page", "that page", "the page",
+            "these", "those", "them", "these pages", "those pages",
+        ]
+        if pronouns.contains(folded) {
+            return nil
+        }
+        // "The page called …" and its kin are a description, not a title.
+        for opening in ["the page ", "this page ", "that page "] where folded.hasPrefix(opening) {
+            return nil
+        }
+        // A page named by its DAY. Which class that is depends on the dates,
+        // which the model reads and this frame does not.
+        let days: [String] = [
+            "today", "tomorrow", "yesterday", "tonight", "monday", "tuesday", "wednesday",
+            "thursday", "friday", "saturday", "sunday",
+        ]
+        for day in days where folded.hasPrefix(day + "'s ") {
+            return nil
+        }
+        let relative: [String] = ["next ", "last ", "previous ", "first ", "upcoming "]
+        for word in relative {
+            for opening in ["", "my ", "the "] where folded.hasPrefix(opening + word) {
+                return nil
+            }
+        }
+        // A second "link to" means the sentence is two questions.
+        if folded.contains(" link to") || folded.contains(" point to") {
+            return nil
+        }
+        return title
+    }
+
+    /// What a place named in a links question refers to.
+    private static func place(_ words: String,
+                              windowCourse: String?,
+                              windowSection: Int?) -> LinksPlace {
+        var parts: [String] = []
+        for piece in words.replacingOccurrences(of: ",", with: " ").split(separator: " ") {
+            parts.append(String(piece))
+        }
+        var folded: [String] = []
+        for part in parts {
+            folded.append(part.lowercased())
+        }
+
+        var courseWord: String? = nil
+        var sectionWord: String? = nil
+        if folded == ["this", "section"] {
+            // Always this window's section, whichever it is.
+            return windowSection == nil ? .anotherSection : .thisWindow
+        } else if folded.count == 2, folded[0] == "section" {
+            sectionWord = folded[1]
+        } else if folded.count == 3, folded[1] == "section" {
+            courseWord = parts[0]
+            sectionWord = folded[2]
+        } else if folded.count == 4, folded[0] == "section", folded[2] == "of" {
+            courseWord = parts[3]
+            sectionWord = folded[1]
+        } else if folded.count == 1 {
+            // "in ICS3U" alone. Read as a course only when it is this window's
+            // or has a course code's shape; anything else — "in Unit 2" — is
+            // part of the page's name as far as this frame can tell.
+            let only: String = parts[0]
+            if let windowCourse, only.lowercased() == windowCourse.lowercased() {
+                return .thisWindow
+            }
+            if AssistCardCommand.hasACourseCodesShape(only) {
+                return .anotherCourse(only)
+            }
+            return .notAPlace
+        } else {
+            return .notAPlace
+        }
+
+        guard let sectionWord, AssistCardCommand.isPlainDigits(sectionWord),
+              let number = Int(sectionWord) else {
+            return .notAPlace
+        }
+        if let courseWord {
+            guard let windowCourse, courseWord.lowercased() == windowCourse.lowercased() else {
+                return .anotherCourse(courseWord)
+            }
+        }
+        guard let windowSection, number == windowSection else {
+            return .anotherSection
+        }
+        return .thisWindow
+    }
+
+    /// Three letters, a digit, then a letter or a digit — "ICS3U", "MPM2D",
+    /// "ENG4U". Only used to tell "in SPH3U" (a course) from "in Unit 2" (part
+    /// of a page's name) when no section follows.
+    private static func hasACourseCodesShape(_ word: String) -> Bool {
+        let characters: [Character] = Array(word)
+        guard characters.count == 5 else {
+            return false
+        }
+        for index in 0..<3 {
+            if !characters[index].isASCII || !characters[index].isLetter {
+                return false
+            }
+        }
+        guard characters[3].isASCII, characters[3].isNumber else {
+            return false
+        }
+        return characters[4].isASCII && (characters[4].isLetter || characters[4].isNumber)
+    }
+
+    /// "Please" off either end, with the comma that may come with it.
+    private static func withoutPlease(_ typed: String) -> String {
+        var text: String = typed
+        let lowered: String = text.lowercased()
+        for opening in ["please, ", "please "] where lowered.hasPrefix(opening) && lowered.count == text.count {
+            text = String(text.dropFirst(opening.count))
+            break
+        }
+        let loweredAgain: String = text.lowercased()
+        for closing in [", please", " please"] where loweredAgain.hasSuffix(closing) && loweredAgain.count == text.count {
+            text = String(text.dropLast(closing.count))
+            break
+        }
+        while text.hasSuffix("?") || text.hasSuffix(",") {
+            text = String(text.dropLast()).trimmingCharacters(in: .whitespaces)
+        }
+        return text.trimmingCharacters(in: .whitespaces)
     }
 
     /// "Deploy at 6:30 AM", and the same with a day word.
@@ -1199,7 +1558,7 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     /// them is unbounded — any unit, any count of days, any page title, any
     /// time of day. A contract that carried only the literals would say the
     /// assistant understands eleven sentences when it understands those plus
-    /// six families, and Windows would build eleven.
+    /// nine families (#167 made it nine), and Windows would build eleven.
     ///
     /// One example and one near-miss is not enough to describe a family whose
     /// variable part is a TIME, because the spellings a teacher uses are the
@@ -1351,6 +1710,27 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
                               + "the app asks which, in code, naming the two sentences this family "
                               + "accepts, and the model is never sent it. Every sentence that is "
                               + "asked about rather than answered is in deployAtATime.asked."
+            ),
+            ParsedShape(
+                shape: "[please] what|which pages|what pages does <page title> link to [in <place>] | "
+                     + "what does <page title> point to | where does <page title> link|point to | "
+                     + "what links are on|in <page title> | show me|list the links on|in|from <page title>",
+                tool: "read_page",
+                fills: [
+                    "page": "<page title>, with the capitals the teacher typed and one pair of quotes "
+                          + "taken off. A place — 'in ICS3U section 1', 'in section 1', 'in this "
+                          + "section' — may stand before 'link to' or after it, and is read only when "
+                          + "it is THIS window's; another course is refused in code, another section "
+                          + "goes to the model. Every accepted and refused spelling is in linksQuestion.",
+                    "answer": "links — never in the tool's schema, so the model is never shown it. "
+                            + "It turns read_page into the page's links, answered in full in code: "
+                            + "the turn ends there and the model is not asked.",
+                ],
+                example: "what does Unit 2, Day 3 link to?",
+                notThis: "what links to Unit 2, Day 3?",
+                becauseNotThis: "That is the REVERSE question — which pages point AT this one — and "
+                              + "answering it with the pages this one points at would be a confident "
+                              + "answer to a question nobody asked. It goes to the model."
             ),
         ]
     }
@@ -1790,4 +2170,26 @@ nonisolated private struct DayPart: Sendable, Equatable {
         }
         return nil
     }
+}
+
+/// What "what does <page> link to?" asks, when it is that question at all
+/// (issue #167).
+nonisolated enum AssistLinksQuestion: Sendable, Equatable {
+
+    /// The links on the page with this title, in this window's section.
+    case page(String)
+
+    /// The sentence named ANOTHER course. Refused in code with the sentence a
+    /// model-named course gets (`AssistWording.askedAboutAnotherCourse`), and
+    /// nothing is read: a card binds this window's course unconditionally, so
+    /// answering would read the wrong course's page and say it had not.
+    case anotherCourse(String)
+}
+
+/// A place named in a links question, measured against the window.
+nonisolated private enum LinksPlace: Sendable, Equatable {
+    case thisWindow
+    case anotherCourse(String)
+    case anotherSection
+    case notAPlace
 }

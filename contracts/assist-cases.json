@@ -524,6 +524,17 @@
         "notThis" : "deploy at 6:30",
         "shape" : "[please] deploy [it|this section] [today|tomorrow] at <time> [today|tomorrow]",
         "tool" : "schedule_deploy"
+      },
+      {
+        "becauseNotThis" : "That is the REVERSE question — which pages point AT this one — and answering it with the pages this one points at would be a confident answer to a question nobody asked. It goes to the model.",
+        "example" : "what does Unit 2, Day 3 link to?",
+        "fills" : {
+          "answer" : "links — never in the tool's schema, so the model is never shown it. It turns read_page into the page's links, answered in full in code: the turn ends there and the model is not asked.",
+          "page" : "<page title>, with the capitals the teacher typed and one pair of quotes taken off. A place — 'in ICS3U section 1', 'in section 1', 'in this section' — may stand before 'link to' or after it, and is read only when it is THIS window's; another course is refused in code, another section goes to the model. Every accepted and refused spelling is in linksQuestion."
+        },
+        "notThis" : "what links to Unit 2, Day 3?",
+        "shape" : "[please] what|which pages|what pages does <page title> link to [in <place>] | what does <page title> point to | where does <page title> link|point to | what links are on|in <page title> | show me|list the links on|in|from <page title>",
+        "tool" : "read_page"
       }
     ],
     "parsedNote" : "Families the matcher PARSES rather than compares, because the number or title in them is unbounded. They are matched in code for the same reason the literals are — the whole sentence IS the request, and reading an integer or a title off a fixed shape is not a judgement anybody needs a language model for. `notThis` is the near-miss each family must REFUSE, and it is the half that stops a family swallowing requests that belong to the model. A family carrying `inANumberedCourseWhosePagesAre` matches only in a window whose course names its pages with one number and that word (#267): a runner passes the word to its matcher for the example AND the near miss, and the family matches nothing in any other course."
@@ -1616,7 +1627,7 @@
       "tools",
       "toolSchemas"
     ],
-    "note" : "These top-level keys are written by `Plantoir --write-contracts` from the app's own types and will be overwritten: cardPhrasings, tools, toolSchemas. Every other top-level key — nearMisses, scenarios, promptHistory, deployAtATime, windowBinding, hideIsUnpublish, echoedRequest — is hand-written intent and is PRESERVED by a regeneration, so a case may be proposed from either platform. Listing them rather than naming two: the list was already two short when this was noticed, and a key nobody mentions is a key somebody deletes believing it was generated."
+    "note" : "These top-level keys are written by `Plantoir --write-contracts` from the app's own types and will be overwritten: cardPhrasings, tools, toolSchemas. Every other top-level key — nearMisses, scenarios, promptHistory, deployAtATime, windowBinding, hideIsUnpublish, echoedRequest, linksQuestion — is hand-written intent and is PRESERVED by a regeneration, so a case may be proposed from either platform. Listing them rather than naming two: the list was already two short when this was noticed, and a key nobody mentions is a key somebody deletes believing it was generated."
   },
   "hideIsUnpublish" : {
     "accepted" : [
@@ -1782,6 +1793,466 @@
         "why" : "A stray comma. The hide arm drops commas before counting words; the publish arm refuses any comma outright, which is the shipped behaviour and stays."
       }
     ]
+  },
+  "linksQuestion" : {
+    "accepted" : [
+      {
+        "expectPage" : "Unit 2, Day 3",
+        "input" : "What does Unit 2, Day 3 link to?",
+        "why" : "The plainest phrasing, and the measured one: 0 of 84 on both assistants, the larger one answering check_section every time."
+      },
+      {
+        "expectPage" : "unit 2, day 3",
+        "input" : "what does unit 2, day 3 link to",
+        "why" : "Lower case and no question mark. The title travels as typed; the lookup folds case."
+      },
+      {
+        "expectPage" : "Unit 2, Day 3",
+        "input" : "What does \"Unit 2, Day 3\" link to?",
+        "why" : "One pair of straight quotes comes off the title."
+      },
+      {
+        "expectPage" : "Unit 2, Day 3",
+        "input" : "What does “Unit 2, Day 3” link to?",
+        "why" : "Curly quotes, as an editor types them."
+      },
+      {
+        "expectPage" : "Unit 2, Day 3",
+        "input" : "What does \"Unit 2, Day 3\" in ICS3U section 1 link to?",
+        "why" : "The sentence #167 was filed about, word for word, typed in its own window: the place stands BEFORE 'link to' and is this window's, so it is read and taken off the title. Missing this was the review's blocker - the title would have been '\"Unit 2, Day 3\" in ICS3U section 1', and a confident 'no page is called that'."
+      },
+      {
+        "expectPage" : "Unit 2, Day 3",
+        "input" : "What does Unit 2, Day 3 link to in ICS3U section 1?",
+        "why" : "The same place AFTER 'link to'."
+      },
+      {
+        "expectPage" : "Unit 2, Day 3",
+        "input" : "What does Unit 2, Day 3 in ics3u section 1 link to?",
+        "why" : "The course is compared case-folded."
+      },
+      {
+        "expectPage" : "Unit 2, Day 3",
+        "input" : "What does Unit 2, Day 3 in ICS3U link to?",
+        "why" : "This window's course with no section."
+      },
+      {
+        "expectPage" : "Unit 2, Day 3",
+        "input" : "What does Unit 2, Day 3 in section 1 link to?",
+        "why" : "This window's section with no course."
+      },
+      {
+        "expectPage" : "Unit 2, Day 3",
+        "input" : "What does Unit 2, Day 3 link to in this section?",
+        "why" : "'This section' is always the window's."
+      },
+      {
+        "expectPage" : "Unit 2, Day 3",
+        "input" : "What does Unit 2, Day 3 in section 1 of ICS3U link to?",
+        "why" : "'Section N of <course>', the order a teacher also writes it in."
+      },
+      {
+        "expectPage" : "Unit 2, Day 3",
+        "input" : "Which pages does Unit 2, Day 3 link to?",
+        "why" : "On the smaller assistant this became a publish_pages PLAN 31 times in 84."
+      },
+      {
+        "expectPage" : "Unit 2, Day 3",
+        "input" : "What pages does Unit 2, Day 3 link to?",
+        "why" : "The same question with 'what'."
+      },
+      {
+        "expectPage" : "Unit 2, Day 3",
+        "input" : "What does Unit 2, Day 3 point to?",
+        "why" : "'Point to' means 'link to'."
+      },
+      {
+        "expectPage" : "Unit 2, Day 3",
+        "input" : "Where does Unit 2, Day 3 point to?",
+        "why" : "Measured 0 of 84 on both assistants."
+      },
+      {
+        "expectPage" : "Unit 2, Day 3",
+        "input" : "Where does Unit 2, Day 3 link to?",
+        "why" : "'Where does … link to' is the same question."
+      },
+      {
+        "expectPage" : "Unit 2, Day 3",
+        "input" : "What links are on Unit 2, Day 3?",
+        "why" : "Measured 0 of 84 on both assistants."
+      },
+      {
+        "expectPage" : "Unit 2, Day 3",
+        "input" : "What links are in Unit 2, Day 3 in ICS3U section 1?",
+        "why" : "The noun frame takes a place at its end too."
+      },
+      {
+        "expectPage" : "Unit 2, Day 3",
+        "input" : "Show me the links from Unit 2, Day 3",
+        "why" : "84 of 84 on the larger assistant and 0 of 84 on the smaller - answered in code so the two agree."
+      },
+      {
+        "expectPage" : "Ohm's Law",
+        "input" : "Show me the links on Ohm's Law",
+        "why" : "A title with an apostrophe."
+      },
+      {
+        "expectPage" : "Unit 2, Day 3",
+        "input" : "List the links in Unit 2, Day 3.",
+        "why" : "'List the links', with a full stop."
+      },
+      {
+        "expectPage" : "Unit 2, Day 3",
+        "input" : "Please, what does Unit 2, Day 3 link to?",
+        "why" : "'Please' in front, with its comma."
+      },
+      {
+        "expectPage" : "Unit 2, Day 3",
+        "input" : "What does Unit 2, Day 3 link to, please?",
+        "why" : "'Please' at the end, with its comma."
+      },
+      {
+        "expectPage" : "Ohm's Law and Power",
+        "input" : "What does Ohm's Law and Power link to?",
+        "why" : "A title may contain 'and'; the lookup decides whether a page is called that."
+      },
+      {
+        "expectPage" : "Day 3 in Unit 2",
+        "input" : "What does Day 3 in Unit 2 link to?",
+        "why" : "'in Unit 2' is not a place - no section, and not a course code's shape - so it stays part of the title and the lookup decides."
+      },
+      {
+        "expectPage" : "Unit 2",
+        "input" : "What does Unit 2 link to?",
+        "why" : "A folder's landing page, named the way the sidebar shows it. The lookup finds it by its folder's name."
+      },
+      {
+        "expectPage" : "Lab 1.2",
+        "input" : "What does 'Lab 1.2' link to?",
+        "why" : "Single quotes come off; the dot is part of the title - no extension rule anywhere in this family."
+      }
+    ],
+    "anotherCourse" : [
+      {
+        "expectCourse" : "SPH3U",
+        "input" : "What does \"Unit 2, Day 3\" in SPH3U section 1 link to?",
+        "why" : "The verbatim #167 sentence typed in ANOTHER course's window. A card binds this window's course unconditionally, so answering would read the ICS3U page and say it was SPH3U's. Refused in code; nothing is read."
+      },
+      {
+        "expectCourse" : "SPH3U",
+        "input" : "What does Unit 2, Day 3 link to in SPH3U section 1?",
+        "why" : "The same, with the place after 'link to'."
+      },
+      {
+        "expectCourse" : "SPH3U",
+        "input" : "What does Unit 2, Day 3 in SPH3U link to?",
+        "why" : "No section, but a course code's shape."
+      },
+      {
+        "expectCourse" : "MPM2D",
+        "input" : "What links are on Unit 2, Day 3 in MPM2D section 2?",
+        "why" : "The noun frame, another course and another section: the course decides."
+      },
+      {
+        "expectCourse" : "ENG4U",
+        "input" : "What does Unit 2, Day 3 in section 1 of ENG4U link to?",
+        "why" : "'Section N of <course>'."
+      },
+      {
+        "expectCourse" : "Robotics",
+        "input" : "What does Unit 2, Day 3 in Robotics section 1 link to?",
+        "why" : "'<word> section N' names a course whatever its shape - a club's code need not look like a credit's."
+      }
+    ],
+    "answering" : {
+      "cases" : [
+        {
+          "body" : "See [[Ohm's Law]].",
+          "expect" : [
+            {
+              "shown" : "Ohm's Law"
+            }
+          ],
+          "name" : "a published page"
+        },
+        {
+          "body" : "Next: [[Unit 1, Day 2]]",
+          "expect" : [
+            {
+              "mark" : "linkedPageIsADraft",
+              "shown" : "Unit 1, Day 2"
+            }
+          ],
+          "name" : "a draft is marked"
+        },
+        {
+          "body" : "Read [[Unit 9, Day 9]]",
+          "expect" : [
+            {
+              "mark" : "linkedPageIsMissing",
+              "shown" : "Unit 9, Day 9"
+            }
+          ],
+          "name" : "a link to no page is marked, spelt as written"
+        },
+        {
+          "body" : "![[diagram.png]] and [[Ohm's Law]]",
+          "expect" : [
+            {
+              "shown" : "Ohm's Law"
+            }
+          ],
+          "name" : "a picture that exists is not a page and is not listed"
+        },
+        {
+          "body" : "![[missing.png]]",
+          "expect" : [
+            {
+              "mark" : "linkedPageIsMissing",
+              "shown" : "missing.png"
+            }
+          ],
+          "name" : "a picture that does not exist leads nowhere"
+        },
+        {
+          "body" : "[[Lab 1.2]]",
+          "expect" : [
+            {
+              "shown" : "Lab 1.2"
+            }
+          ],
+          "name" : "a dot in a title is not an extension"
+        },
+        {
+          "body" : "Type `[[Page Name]]` to link.\n```\n[[Other Page]]\n```\n[[Ohm's Law]]",
+          "expect" : [
+            {
+              "shown" : "Ohm's Law"
+            }
+          ],
+          "name" : "links shown as examples inside code are not links"
+        },
+        {
+          "body" : "| Topic |\n|---|\n| [[Ohm's Law\\|Ohm]] |",
+          "expect" : [
+            {
+              "shown" : "Ohm's Law"
+            }
+          ],
+          "name" : "a table's escaped pipe is read without its backslash"
+        },
+        {
+          "body" : "[[Unit 2]]",
+          "expect" : [
+            {
+              "shown" : "Unit 2 Overview"
+            }
+          ],
+          "name" : "a folder's name reaches its landing page, shown by its title"
+        },
+        {
+          "body" : "[[ohm's law]] then [[Unit 1, Day 2|tomorrow]] then [[Ohm's Law]]",
+          "expect" : [
+            {
+              "shown" : "Ohm's Law"
+            },
+            {
+              "mark" : "linkedPageIsADraft",
+              "shown" : "Unit 1, Day 2"
+            }
+          ],
+          "name" : "each page once, in the order written, whatever the capitals"
+        },
+        {
+          "body" : "[[Unit 1, Day 1]] [[Lab 1.2]]",
+          "expect" : [
+            {
+              "shown" : "Lab 1.2"
+            }
+          ],
+          "name" : "a link to the page itself is not listed"
+        },
+        {
+          "body" : "No links here, only a heading link [[#Top]].",
+          "expect" : [
+
+          ],
+          "name" : "no links"
+        }
+      ],
+      "lookup" : [
+        {
+          "ask" : "Unit 1, Day 1",
+          "expect" : "found",
+          "why" : "By file name."
+        },
+        {
+          "ask" : "unit 1, day 1",
+          "expect" : "found",
+          "why" : "Whatever the capitals."
+        },
+        {
+          "ask" : "Unit 2",
+          "expect" : "found",
+          "why" : "A landing page, by its folder's name - what the sidebar shows when the page has no title of its own, and the name a teacher uses for it either way."
+        },
+        {
+          "ask" : "Unit 2 Overview",
+          "expect" : "found",
+          "why" : "By the title the sidebar shows, which is not the file's name (index)."
+        },
+        {
+          "ask" : "Review",
+          "expect" : "morePagesThanOneAreCalled",
+          "why" : "Two pages show the same title. Never a guess."
+        },
+        {
+          "ask" : "Unit 9",
+          "expect" : "noPageCalled",
+          "why" : "No page is called that. Not the model's noSuchPage sentence, which names a tool."
+        }
+      ],
+      "note" : "What the answer SAYS, given the section below. read_page with answer = \"links\" lists every link on the page once, in the order the page has them, each by the name a teacher sees for the page it reaches (its display title - the frontmatter title, or a landing page's folder name); a link to a page students cannot see (its own publish or draft key says hidden) is followed by wording.linkedPageIsADraft; a link that LEADS NOWHERE is shown as the teacher wrote it and followed by wording.linkedPageIsMissing. LEADS NOWHERE is defined once, here: a wiki-link (written [[...]] or ![[...]]) whose target is neither a page of this section - by file name without regard to case, or a folder whose landing page (index.md) is in the section - nor any file of that exact name in the course's folder. No extension rule: 'Lab 1.2' is a page and 'diagram.png' a picture because of what is on disk. A link to a picture or a handout that EXISTS is not listed - it is not a page. Links inside `code` and fenced code blocks are examples, not links. A table's escaped pipe ([[Page\\|alias]]) is read without its backslash. A link to the page itself is not listed. With nothing to list, the answer is wording.pageLinksToNothing; with the list, wording.pageLinksTo then one line per link (the mac writes '• <shown>' and ' — <mark>'; the arrangement is the platform's, the names and marks are not). The page asked about is found by file name first, then by the name the sidebar shows - a landing page by its folder's name too; none is wording.noPageCalled, and more than one by the name shown is wording.morePagesThanOneAreCalled followed by where each one is - never a guess. Every branch ENDS THE TURN: the model is not asked afterwards. Measured on the 39 example-content payloads (2026-09-25): 30,930 links and embeds read this way, each once per page, and every one resolved to a page; with code left in, 188 targets read as dead, and with the table backslash left on, 69 did.",
+      "section" : [
+        {
+          "path" : "All Classes/Unit 1, Day 1.md",
+          "publish" : true,
+          "title" : "Unit 1, Day 1"
+        },
+        {
+          "path" : "All Classes/Unit 1, Day 2.md",
+          "publish" : false,
+          "title" : "Unit 1, Day 2"
+        },
+        {
+          "path" : "All Classes/Ohm's Law.md",
+          "publish" : true,
+          "title" : "Ohm's Law"
+        },
+        {
+          "path" : "All Classes/Lab 1.2.md",
+          "publish" : true,
+          "title" : "Lab 1.2"
+        },
+        {
+          "path" : "Unit 2/index.md",
+          "publish" : true,
+          "title" : "Unit 2 Overview"
+        },
+        {
+          "path" : "Review/Review A.md",
+          "publish" : true,
+          "title" : "Review"
+        },
+        {
+          "path" : "Review/Review B.md",
+          "publish" : true,
+          "title" : "Review"
+        }
+      ],
+      "sectionFiles" : [
+        "pictures/diagram.png"
+      ]
+    },
+    "note" : "\"What does <page> link to?\" is answered in CODE, in full, and the turn ends there - the model is never asked (issue #167). Measured 2026-09-25 on both assistants with the app's own flags, request body and system prompt (research/ai-assist/link-question-results.txt): across six courses and fourteen dates, one greedy trial per cell, \"What does Unit 2, Day 3 link to?\" reached read_page 0 times in 84 on BOTH tiers, and on the smaller one \"Which pages does Unit 2, Day 3 link to?\" became a publish_pages plan 31 times in 84 - a write, for a read-only question. The whole family scored 153/588 (larger) and 115/588 (smaller). A sentence in read_page's description was REJECTED: it moves the tool surface both apps were measured against, and it moved other probes across dates when it was tried. Matching is case-folded after the tidying every family gets, with a question mark and a 'please' taken off either end; the title is sliced from what the teacher TYPED and one pair of quotes is taken off. A PLACE may be named before 'link to' or after it, at most once, and is read against the window the sentence was typed in: this window's course and section (or 'this section', or 'section N' naming this one) is accepted; ANOTHER COURSE is refused in code with the sentence a model-named course already gets (wording.askedAboutAnotherCourse when the folder has that course, wording.askedAboutACourseThatIsNotHere when it does not) and nothing is read - see anotherCourse; this course with ANOTHER SECTION goes to the model. 'in <word>' with no section is a course only when it is this window's or has a course code's shape (three letters, a digit, a letter or digit); otherwise it is part of the page's name. The call is read_page with page = the title and answer = \"links\" - an argument in NO schema, so the tool surface does not move. What the answer says is in answering. Rows are run with the window below; with no window at all, the family matches only sentences that name no place.",
+    "refused" : [
+      {
+        "input" : "What does Unit 2, Day 3 in ICS3U section 2 link to?",
+        "why" : "This course, ANOTHER section. The window binds its own section into every call, so a card would read section 1's page for a question about section 2. It goes to the model, as it did before this family existed."
+      },
+      {
+        "input" : "What does Unit 2, Day 3 in section 2 link to?",
+        "why" : "Another section, no course."
+      },
+      {
+        "input" : "What does Unit 2, Day 3 link to in section 2?",
+        "why" : "Another section, after 'link to'."
+      },
+      {
+        "input" : "What does Unit 2, Day 3 in this section link to in ICS3U section 1?",
+        "why" : "Two places. At most one is read."
+      },
+      {
+        "input" : "What links to Unit 2, Day 3?",
+        "why" : "The REVERSE question - which pages point AT this one - and the family's near miss in cardPhrasings.parsed. Answering with the pages this one points at would be a confident answer to a question nobody asked."
+      },
+      {
+        "input" : "Which pages link to Unit 2, Day 3?",
+        "why" : "The reverse question again, in the 'which pages' form."
+      },
+      {
+        "input" : "What does it link to?",
+        "why" : "A pronoun. What 'it' is lives in the conversation, which the model has and this frame does not."
+      },
+      {
+        "input" : "What does that page link to?",
+        "why" : "A pronoun phrase."
+      },
+      {
+        "input" : "What does this one link to?",
+        "why" : "A pronoun phrase."
+      },
+      {
+        "input" : "What does the page called Ohm's Law link to?",
+        "why" : "A description beginning 'the page', not a title."
+      },
+      {
+        "input" : "What does today's class link to?",
+        "why" : "A page named by its DAY. Which class that is depends on the dates, which the model reads; no class is resolved by day in this family."
+      },
+      {
+        "input" : "What does tomorrow’s class link to?",
+        "why" : "The same with a curly apostrophe."
+      },
+      {
+        "input" : "What does my next class link to?",
+        "why" : "'Next class' is a day, not a title."
+      },
+      {
+        "input" : "What does the next class link to?",
+        "why" : "The same with 'the'."
+      },
+      {
+        "input" : "What do Unit 1 and Unit 2 link to?",
+        "why" : "A plural question about two pages. 'do' is not a frame here."
+      },
+      {
+        "input" : "What would Unit 2, Day 3 link to?",
+        "why" : "A hypothetical - 'would' is not a frame here."
+      },
+      {
+        "input" : "What does Unit 2, Day 3 link to, and publish them",
+        "why" : "Something after 'link to' that is not this window's place. A card must not answer half of a sentence that also asks for a write."
+      },
+      {
+        "input" : "What does Unit 2, Day 3 link to and are they live?",
+        "why" : "A second question after 'link to'."
+      },
+      {
+        "input" : "What does Unit 2, Day 3 link to in Unit 4?",
+        "why" : "'in Unit 4' after 'link to' is not a place, and nothing but a place may follow."
+      },
+      {
+        "input" : "What does  link to?",
+        "why" : "No title at all."
+      },
+      {
+        "input" : "Does Unit 2, Day 3 link to the quiz?",
+        "why" : "A yes-or-no question about one link, not 'what does it link to'."
+      },
+      {
+        "input" : "Link Unit 2 to the coverage page",
+        "why" : "An instruction to ADD a link - a write, and not this question."
+      },
+      {
+        "input" : "What does Unit 2, Day 3 mean?",
+        "why" : "No 'link to' or 'point to', so not this question."
+      }
+    ],
+    "window" : {
+      "course" : "ICS3U",
+      "section" : 1
+    }
   },
   "nearMisses" : {
     "note" : "Must NOT match — each one only looks like a card phrasing, and answering the wrong question with total confidence is worse than routing it. Three of them - \"a new website\", \"new one please\" and \"roll this section over onto a new site\" - are the rollover's website question, and they record a KNOWN LIMIT rather than guarding a near-miss: the reply offers two sentences word for word, those exact strings are the only way back in, and a teacher who paraphrases matches nothing at all — re_date_classes is shown to no local model, so nothing catches the paraphrase and the section stays pinned to last year's website with nothing said. Both apps already pass these, so nothing goes red; they are written down so the limit is visible, and so a future looser matcher has to change this list on purpose. \"publish next monday's class\" is a different shape again: it is the near miss of a phrasing that DOES match, and it must reach the model precisely because \"next Monday\" is the one weekday word neither app will settle on its own - see schedule-rules.json, relativeDays. The two hide phrasings were added on 2026-09-19 with issue #215, when \"hide <page>\" became a phrasing answered in code: \"hide unit 4, day 21 in ICS3U\" is the one that matters, because a matched card binds THIS window's course and section into the call unconditionally and the guard against a request naming another course runs only on the model's answers - so a frame that swallowed it would act on the wrong course and report success. \"don't hide unit 2, day 3\" is the negation, the one failure that would act against the teacher. Both are in hideIsUnpublish.refused with their full reasons; they are here as well so that the near-miss walk both apps already run covers them without anything new being wired up. The three \"make room for … at period / block / section N\" phrasings were added with #267's fix round, and they are why a runner now walks this list TWICE: once in an ordinary course, and once in a club whose pages are \"Week N\" (the matcher's numbered page word). The one-number make-room frame reads the window's course, and its first version took ANY single word as a club's page word, so \"at period 3\" was planned in a club as Week 3 — renaming pages the teacher's links point at, from a sentence about something else.",
@@ -2223,9 +2694,26 @@
         "name" : "\"hide\" is answered in code and puts the unpublish plan up",
         "when" : "approve",
         "why" : "Measured on 2026-09-19 (issue #215): the smaller assistant answered \"hide unit 4, day 21\" with no tool at all - five phrasings out of five, the teacher's own sentence handed back as text - while answering the same request worded \"unpublish\" correctly every time. So the word is answered in code, and this case is what proves the whole path a card phrasing unlocks rather than just the match: the scenario runner builds the agent with NO engine behind it, so a sentence that reached the model here could not be answered at all. Approved rather than said, because confirmation before acting is on in the fixture and unpublish_pages has a plan twin, so the turn ends on a card - \"say\" would fail by construction. The three lines are the portable ones: the teacher's sentence, the question the card asks, and their Go. The outcome sentence is deliberately NOT pinned - it is built in the runner rather than being an AssistWording key on either platform, so asserting it would hold one app to the other's phrasing. ONE THING THIS CASE NEEDS THAT THE OTHERS DO NOT: a PUBLISHED \"Unit 1, Day 1\" in the fixture. `pending: unpublish_pages` has nothing to propose otherwise, so no card appears and the failure reads as the phrasing not matching when it is the fixture that is empty. Said here rather than in one platform's harness because a runner that sets up only publish_class_on and re_date_classes will meet this the day it implements the frame, and lose an afternoon to it."
+      },
+      {
+        "expectModelRequests" : 0,
+        "expectTranscriptContains" : [
+          "teacher: what does Unit 1, Day 1 link to?",
+          "tool(read_page): Unit 1, Day 2",
+          "tool(read_page): wording.linkedPageIsADraft"
+        ],
+        "given" : {
+          "pending" : "read_page",
+          "saying" : [
+            "what does Unit 1, Day 1 link to?"
+          ]
+        },
+        "name" : "what a page links to is answered in code, marks the draft, and ends the turn",
+        "when" : "say",
+        "why" : "Measured on 2026-09-25 (issue #167): \"What does Unit 2, Day 3 link to?\" reached read_page 0 times in 84 on BOTH assistants, across six courses and fourteen dates. It is answered in code now, and the half this case exists for is the END of the turn: a code-matched turn never puts the teacher's sentence into the model's conversation, so handing the answer back would give the model a tool result with no question in front of it - the lap on which the smaller assistant turned this read-only question into a publish plan. The fixture is a published \"Unit 1, Day 1\" whose body links to \"Unit 1, Day 2\", a draft. expectModelRequests counts the requests the engine received over the whole conversation; a transcript cannot show an ABSENCE, so this is the assertion that proves the model was never asked."
       }
     ],
-    "note" : "What must happen, and in what ORDER. The order is the assertion: every wrong ordering still passes a test that only checks all three events occurred. Event names are this contract's own; map them to whatever your app calls them. `given.saying` is a CONVERSATION — what the teacher types, in order, each turn settled before the next — because some behaviour exists only across turns; when it is absent a single turn is run, using whichever fixed phrasing reaches `given.pending`. `when` says what the teacher does on the LAST turn: \"approve\" presses Go on the card that is waiting (and fails if none is), \"decline\" presses Cancel, \"say\" means the last turn is ANSWERED rather than proposed, so nothing is waiting and a card there is the failure the case exists to catch; anything else is a tool name, called directly. `expectTranscriptContains` matches each named line by speaker PREFIX and sentence SUBSTRING, in order but not necessarily adjacent, and a line may satisfy more than one expectation — one reply often composes several named sentences into a single bubble. A literal line that is not a `wording.` name is matched as written, which is how a case anchors later expectations to a particular TURN."
+    "note" : "What must happen, and in what ORDER. The order is the assertion: every wrong ordering still passes a test that only checks all three events occurred. Event names are this contract's own; map them to whatever your app calls them. `given.saying` is a CONVERSATION — what the teacher types, in order, each turn settled before the next — because some behaviour exists only across turns; when it is absent a single turn is run, using whichever fixed phrasing reaches `given.pending`. `when` says what the teacher does on the LAST turn: \"approve\" presses Go on the card that is waiting (and fails if none is), \"decline\" presses Cancel, \"say\" means the last turn is ANSWERED rather than proposed, so nothing is waiting and a card there is the failure the case exists to catch; anything else is a tool name, called directly. `expectTranscriptContains` matches each named line by speaker PREFIX and sentence SUBSTRING, in order but not necessarily adjacent, and a line may satisfy more than one expectation — one reply often composes several named sentences into a single bubble. A literal line that is not a `wording.` name is matched as written, which is how a case anchors later expectations to a particular TURN. `expectModelRequests`, when present, is how many requests the engine must have received over the WHOLE conversation - 0 means the model was never asked. A transcript cannot show an absence, so a turn that must END in code (and not hand its answer back to the model for another lap) is proved by this count; the mac runs such a case against a stub engine that answers whatever it is sent, so a regression fails on the count rather than hanging."
   },
   "tools" : {
     "all" : [
