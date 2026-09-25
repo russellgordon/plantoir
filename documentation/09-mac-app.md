@@ -4940,6 +4940,291 @@ this is the app-side wiring.
   installed copy share the bundle identifier, so the answer given to one is the
   answer for both.
 
+## Updating itself: what is held, what is not, and why (#204)
+
+From v1.3.2 a released Plantoir finds and installs its own new versions, with
+**Sparkle 2.9.6**. The promises a teacher is made — ask first, check once a
+day, never install while work is under way, never refuse a quit — are
+`contracts/shared-rules.json` → `appUpdates`, which Windows adopts with
+NetSparkleUpdater (the `windows` issue drafted from #204, milestone v1.4.0).
+This section is the mac's mechanism and the reasons for it. **Slice 1** (the
+app) is described here; the release half — signing the updater's helpers in
+`publish.sh`, building and signing the feed at cut time, `website/build.py`
+copying it byte-for-byte, and the dress rehearsal in a throwaway standard
+account — is slice 2, and `RELEASING.md` says nothing about it until then.
+
+### The settled decisions, and where they live in the build
+
+The decisions on #204 (2026-09-19, and Russell's answers of 2026-09-24):
+
+1. **Ask first.** `SUEnableAutomaticChecks` on, `SUAutomaticallyUpdate` off,
+   `SUAllowsAutomaticUpdates` **off** — which the updater reads from the
+   Info.plist ONLY, computes "download automatically" false from, and uses to
+   hide the "install automatically" box; a user default or a profile cannot
+   switch it back on (`SPUUpdaterSettings.m` :302-334, confirmed by the plan
+   review). Not timidity: `RELEASING.md` has warnings a teacher MUST read, and
+   an install on quit shows nobody anything.
+2. **Every 24 hours** (`SUScheduledCheckInterval` 86400, `appUpdates.checkEverySeconds`).
+3. **2.9.6, pinned by version AND SHA-256**, fetched by
+   `mac-app/Vendor/fetch-sparkle.sh` and never committed — the llama.cpp
+   arrangement. The script refuses and installs nothing on a checksum mismatch
+   (proven: a one-byte change to the pin, exit 1), is idempotent by VERSION
+   rather than by presence, removes the two XPC services (below), and keeps
+   `generate_appcast`, `sign_update` and the licence (as `Sparkle-LICENSE`,
+   bundled as a resource — MIT; there is no credit line in any window, because
+   rule 1 keeps the updater's name out of what a teacher reads). **Why not
+   2.10.0:** it followed on 2026-09-13 with no security fix and a macOS 12
+   minimum; nothing in it is needed, and moving the pin means re-checking the
+   hook names below.
+4. **No development feed; a Debug build never updates.** `SUFeedURL` is
+   `$(PLANTOIR_UPDATE_FEED_URL)`, set in `project.yml` to `""` for Debug and
+   `https://plantoir.app/updates/macos.xml` for Release. No feed → no updater →
+   no menu item. `AppUpdatesStartTests` reads the test host's own Info.plist
+   (the Debug app: `SUFeedURL` is `""`) and pins `project.yml`'s Release value
+   against `appUpdates.feed.mac`. **A caution the Debug tests cannot cover**
+   (the plan review's L5): Xcode's Archive and Profile default to Release, so
+   a local Release build in DerivedData carries the live feed under an Apple
+   Development signature. It will find real updates; do not leave one running.
+   *Rejected:* a Debug build that carries the feed but never starts the
+   updater — a copied bundle would still carry a live feed, and "is it
+   started" cannot be read off a bundle.
+5. **The feed on plantoir.app, one file per platform** (`updates/macos.xml`,
+   later `updates/windows.xml`), never a GitHub release asset:
+   `releases/latest/download/<name>` answers 404 whenever the newest release
+   lacks that asset, and `RELEASING.md` lets one platform ship without the
+   other. **Signed** (`SURequireSignedFeed` + `SUVerifyUpdateBeforeExtraction`,
+   Russell's Q4): measured in the plan with a throwaway key, a two-byte edit to
+   the notes fails verification, so someone who got into the website still
+   could not change the notes, the warnings or the download.
+6. **One key per platform.** The mac's public key is `SUPublicEDKey` in
+   `project.yml`; the private half is the `plantoir-macos` Keychain item and is
+   never read by anything but Sparkle's own tools.
+
+**The XPC services are removed, and `SUEnableInstallerLauncherService` is not
+set.** Plantoir is not sandboxed (no `app-sandbox` entitlement), and Sparkle's
+own guidance is "do not enable this XPC Service if your application is not
+sandboxed"; its "Removing XPC Services" section says to delete them. Two fewer
+nested bundles to sign and notarize, 424 KB smaller.
+
+**The user-defaults feed is cleared at start** (the plan review's M4). Sparkle
+reads `SUFeedURL` from the user defaults BEFORE the Info.plist
+(`SPUUpdater.m` :1155-1167), so `defaults write ca.russellgordon.Plantoir
+SUFeedURL …` would point a released copy anywhere — a development feed by
+another name. `AppUpdates.start` calls `clearFeedURLFromUserDefaults()` first.
+The same mechanism is what lets a school's IT turn the daily CHECK off
+(`SUEnableAutomaticChecks` false in a profile, or with `defaults write`); the
+support page says how, and that is deliberate.
+
+### Where the updater is created — and the trap in Sparkle's own sample
+
+`AppUpdates.shared.start()` is called from ONE place:
+`applicationDidFinishLaunching`, inside the existing `!isRunningTests` guard,
+and only when `AppUpdates.shouldStart` agrees (no `--mcp-stdio`,
+`--run-scheduled-deploy` or `--write-contracts` — each read from its own
+constant — and a non-empty feed). Three independent reasons the headless
+launches never get an updater: they never reach `applicationDidFinishLaunching`
+(`serve`/`runScheduled` never return, `--write-contracts` exits — measured by
+the plan review with a SwiftUI `App` whose `init` diverts, started both from a
+shell and by launchd); `shouldStart` refuses their flags; and nothing of the
+updater is a stored property of the `App` struct. **That last one is the trap
+in Sparkle's own SwiftUI sample**, which puts `SPUStandardUpdaterController(
+startingUpdater: true, …)` on the `App`: Swift initialises stored properties
+BEFORE `init()` runs, so the updater would start inside the assistant's server
+and inside a scheduled publish before the checks that turn them away.
+`AppUpdatesStartTests.testTheUpdaterIsCreatedOnlyAfterLaunching` scans the
+product source for exactly this.
+
+"Check for Updates…" sits under "About Plantoir" (`CheckForUpdatesButton`),
+drawn only when the updater is running and greyed while an update session is
+open — including while an install is held here.
+
+### Holding an install: why the answer is KEPT, not postponed
+
+The settled rule: an update may not INSTALL while a publish, a preview being
+BUILT, or a scheduled publish is running (a preview that is merely OPEN does
+not count — Russell's Q2, the quit question's line); and quitting is never
+refused. The first design used Sparkle's install-time hook,
+`updater(_:shouldPostponeRelaunchForUpdate:untilInvokingBlock:)`. The plan
+review (H1) found why that alone breaks the second half: **once the installer
+is prepared, it installs on ANY termination of the app** — including a ⌘Q while
+the relaunch is postponed. Read in Sparkle 2.9.6's source: the installer waits
+for the host to go, and the only thing that stands it down is the reply
+`SPUUserUpdateChoiceSkip` to `showReadyToInstallAndRelaunch:`, which calls
+`cancelUpdate` (`SPUCoreBasedUpdateDriver.m` :309-320) — reachable ONLY before
+that reply has been spent on "install".
+
+So `HoldingUserDriver` wraps Sparkle's standard user driver, passes every call
+straight through, and takes over one: the "Install and Relaunch" answer comes
+to `AppUpdates.teacherAnsweredReady` first.
+
+- **Nothing under way:** the answer goes on at once.
+- **Work under way:** the answer is KEPT. The updater's own "Ready to Install"
+  window (whose button now does nothing) is closed; a NON-modal notice says
+  `UpdateWording.heldTitle` with the work named, and
+  `UpdateWording.heldExplanation`; the trail says `update held while work is
+  under way`. When the work ends, the gate is asked again and — Russell's Q3,
+  the teacher already said yes — the install goes on straight away, with
+  `update installing` naming the work it waited for. *Rejected:* asking again
+  ("Plantoir can finish updating now"), which the plan recommended and Russell
+  overruled.
+- **The waiting is event-driven, never on a clock:** `withObservationTracking`
+  on `CourseActivity.store`, `ProcessEnding.ends(of:)` for each process being
+  waited for (a `DispatchSource` process-exit event — the app's second
+  permitted use of GCD, commented as such; the first is
+  `ScheduledPublishWatcher`), and `ScheduledPublishWatcher.changes(at:)` on each
+  lease folder. Each round ARMS its watches first and asks the gate SECOND, so
+  work that ends in between is not missed.
+- **The postpone hook stays, as a second look.** Work could begin in the
+  instant between the teacher's answer and the installer's own last question;
+  the hook holds it then. That is the one state (`postponedAtInstall`) in which
+  a quit cannot be stopped from installing, because the answer has already
+  gone, and the trail says so, naming the work.
+
+**The Swift names are a trap.** The hook's Swift spelling is
+`updater(_:shouldPostponeRelaunchForUpdate:untilInvokingBlock:)`; spelled
+`…untilInvoking:` it compiles with ONE warning ("nearly matches optional
+requirement") and Sparkle never calls it — measured for the plan, and proven
+again as a must-fail here: `AppUpdatesDelegateTests.
+testTheDelegateAnswersEveryHookItRelies` asks the runtime `responds(to:)` for
+all six hooks the app relies on, and goes red on the near-miss.
+
+### Quitting with an update ready
+
+`applicationShouldTerminate` asks the quit question first (unchanged), and then
+`AppUpdates.decideAtQuit` → `UpdateGate.quitAction` (`appUpdates.atQuit.cases`):
+
+| Where the update stands | Work under way | What the quit does |
+|---|---|---|
+| none | either | nothing |
+| ready, not yet answered | no | installs as Plantoir quits, without opening again |
+| ready, not yet answered | yes | sets it aside |
+| held here | yes | sets it aside |
+| held here | no (it has just ended) | installs as Plantoir quits |
+| postponed by the installer's last look | either | installs as Plantoir quits — the one case that cannot be stopped |
+
+"Sets it aside" answers the kept reply with `.skip`, writes `update set aside`,
+and returns `.terminateLater`; the quit finishes when Sparkle reports the end
+of the session (`updater(_:didFinishUpdateCycleFor:error:)`). **That wait is
+capped at ten seconds** — a bound, not a guess: a quit during a log out holds
+up the Mac, so if the report never comes the quit goes ahead and the trail
+says the installer may not have heard. A skip in THIS reply does not mark the
+version skipped (only the update window's own Skip does), so it is offered
+again at the next check. Whether the cancel message always reaches the
+installer before the app is gone is a runtime fact about Sparkle's own
+connection, and the dress rehearsal (slice 2, V4b) measures it.
+
+**What the installer watches, for the record** (the plan review's correction):
+`Autoupdate/TerminationListener.m` is dead code, absent from the project.
+Termination is watched by the `Updater.app` agent, which looks the app up with
+`NSRunningApplication runningApplicationsWithBundleIdentifier`, filtered by
+bundle path, and sends a Quit Apple Event to EVERY match
+(`InstallerProgressAppController.m` :223-409). A headless copy — a scheduled
+publish, an assistant's server — is not an `NSRunningApplication` (measured by
+the review), so it is never sent that event. **If the scheduled run ever
+becomes an application**, it would start receiving Quit events on Install and
+Relaunch. Since #212 the run posts a notification; whether that registers it as
+an application was NOT measured in slice 1 — the rehearsal (slice 2, V3) checks
+`NSWorkspace.shared.runningApplications` while a scheduled run is posting.
+
+### What the gate reads: leases first, then a scan for what they cannot show
+
+`UpdateGate.workUnderWay` (the contract's cases run against it):
+
+1. this app's publishes, then its preview BUILDS — `QuitConfirmation`'s own
+   facts and its own words, one description of this app's work rather than two;
+2. **work leases (#156)** held by another live process, of kind `build` or
+   `publish` (not `preview`, `assist` or `import`), in every working folder
+   named — every open window's, and every folder a process of this app was
+   started for. A lease says exactly what another process is building and in
+   which course; it is read through `WorkLeaseFiles.heldElsewhere`, so a lease
+   left by a crash is ignored here as everywhere else. This is what sees an
+   assistant working from another app that is actually building, which the
+   plan could only record as a gap before #156 landed;
+3. **a scan of this app's own executable** (`SameExecutableProcesses`:
+   `proc_listallpids`, `proc_pidpath` compared after `realpath` on both sides,
+   `KERN_PROCARGS2` for the arguments) for the two things no lease shows: a
+   scheduled publish WAITING for its course (it takes its leases only once the
+   course is free, after up to ten minutes) and one set before v1.2.0 (which
+   names no course and takes none). Measured 0.6-1.0 ms per scan among about
+   700 processes; a copy started by launchd is found and classified the same as
+   one from a shell (plan and review). The scan also names the folder an
+   assistant working from another app has open, so step 2 can read its leases.
+   An assistant that holds no lease is not under way — it can stay connected
+   for days.
+
+**The scheduled job's own file is NOT a signal**, and this is why the leases
+and the scan are needed at all: the run's wrapper deletes its plist in its
+first line (`ScheduledDeploy` → "The plist is removed FIRST"), so a publish in
+progress has none, and one on disk means "set for later". *Rejected also:*
+`launchctl list` (a subprocess per question, 9 ms, and it names a job, not its
+folder); asking the process name alone (every copy is called Plantoir).
+
+**What installing does to a scheduled publish that is running** (measured in
+the plan, `sp204/swaptest`): Sparkle swaps the bundle with `RENAME_SWAP`; a
+process mid-way through a child `sleep` finished with exit 0, but everything it
+read from its bundle afterwards came from the NEW version. The scheduled run's
+launchers are the working folder's own copies, rewritten only atomically, so a
+running `bash` keeps its script. The real hazard is the RELAUNCH: the new
+version, reopening its windows, re-mirrors a changed `.toolchain/` into the
+folder a scheduled `preview.sh --build-only` may be building from. That is why
+the install waits.
+
+### What the teacher reads
+
+Ours, all in `UpdateWording`, retyped from `appUpdates.wording` and pinned
+both ways: `menuItem`, `heldTitle` with `scheduledWork`,
+`scheduledWorkUnnamed` or `elsewhereWork`, `heldExplanation`, `okButton`,
+`needsAdministratorTitle` and `needsAdministratorExplanation`. Drafts approved
+for the wording pass (Russell, Q5); `heldExplanation` was rewritten after the
+review (H1) because the draft promised "nothing changes until that is
+finished" while a quit installed anyway.
+
+**Sparkle's own windows are Sparkle's words** — "A new version of Plantoir is
+available!", its buttons, the progress and error windows — localized by it
+into 35 languages, and not changeable without a fork. None uses a word on the
+machinery list; the ones that lean technical appear only on failure ("An error
+occurred while parsing the update feed.", "The update feed is improperly
+signed…", "…extracting the archive…", "…launching the installer…"), and the
+trail's `update stopped` line is what makes each answerable.
+
+**Error 4007 is ours to say.** A teacher on a standard account is asked for an
+administrator's name and password (Sparkle swaps the app in `/Applications`,
+which only an admin can write); cancelling that aborts SILENTLY
+(`SPUUIBasedUpdateDriver.m` :482 — no window at all). `AppUpdates` shows
+`needsAdministratorTitle` / `needsAdministratorExplanation` and writes
+`update stopped` with the admin category. 4008 ("authorize later") never
+reaches `didAbortWithError` (`SPUUpdater.m` :803), so it is written from the
+end of the cycle instead.
+
+### The trail — eight events
+
+`update found` (once per version per launch, and "found" rather than
+"offered": Sparkle may hold its window back until the app is in front — the
+review's L2), `update check found nothing new` (only when the teacher asked),
+`update answered` (install, skip, or not now — "Remind Me Later" and closing
+the window are one answer to Sparkle), `update held while work is under way`,
+`update installing` (straight away, after the held work, or as Plantoir quits),
+`update set aside`, `update stopped` (a plain category and Sparkle's number,
+at most once per launch for the daily check — a Mac offline all week must not
+write seven lines) and `app updated` (the first launch of a different version,
+by its own updater — a note the old version leaves at `willInstallUpdate` — or
+by hand). All eight are in `ActivityTrail.Event` and `activityTrail.mustRecord`
+with no `appliesOn`: Windows owes every one, and `app updated` from the day it
+is read, updater or not.
+
+### What was rejected, besides the above
+
+- `shouldProceedWithUpdate` / `mayPerformUpdateCheck` as the gate: they run at
+  CHECK time, so work begun after the check is not seen (the 2026-09-19 review).
+- Keeping Plantoir running out of sight after ⌘Q until a scheduled publish
+  ends (the plan's Q1 option B): a process the teacher cannot see, holding up a
+  log out. Setting the update aside does the same job and the quit still goes.
+- A modal held notice: it would be on screen when the app quits to install.
+- A Settings switch for the daily check: the teacher decides at every offer,
+  and IT has the managed setting.
+- Forking Sparkle's strings, or a user interface of our own: a second set of
+  35 localizations to keep in step for ever.
+
 ## Reporting a problem
 
 Plantoir keeps a note of every task it runs — in
