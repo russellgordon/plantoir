@@ -4440,8 +4440,10 @@ bursts (the replica of the new writer against the launchers' real
 `note_on_the_trail`); 4 threads × 100 in
 one process, 400 of 400 (`testWritersAtTheSameInstantEachKeepTheirLine`); two
 app writers and a launcher, 900 of 900 (`testALauncherWritingAtTheSameTimeKeepsEveryLine`);
-forty trims raced against a launcher mid-append, every line kept
-(`testTheTrimNeverLosesALauncherLine`). With the OLD launcher and the new app
+twenty trims raced against a launcher mid-append, every line kept
+(`testTheTrimNeverLosesALauncherLine` — with the app's lock taken out, or the
+old writer put back, the same test at forty rounds lost 42 to 54 lines in
+every one of six runs). With the OLD launcher and the new app
 writer — the gap that remains until a working folder's launchers are
 refreshed — a line was lost in 2 runs of 10 (1,500 app + 1,500 launcher lines
 across several trims per run), because only a trim can lose one now. With the
