@@ -71,6 +71,9 @@ struct TranscriptBuilder {
         if PagesDatedByTheBuild.isMarkerLine(currentLine) {
             return ""
         }
+        if WorkspaceInUseReport.isMarkerLine(currentLine) {
+            return ""
+        }
         return currentLine
     }
 
@@ -174,6 +177,9 @@ struct TranscriptBuilder {
             return
         }
         if PagesDatedByTheBuild.isMarkerLine(line) {
+            return
+        }
+        if WorkspaceInUseReport.isMarkerLine(line) {
             return
         }
         lines.append(line)
