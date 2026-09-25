@@ -685,12 +685,15 @@ def deploy_time_asked_about(tidied):
 
     Mirrors `AssistCardCommand.morningOrEvening`: the same frame, and a time
     that is a one-digit hour 1-9 with two digits of minutes and no am or pm.
-    Such a sentence never reaches the model, so it is not a routing probe.
+    A full stop may stand for the colon ("6.30") and a comma may follow the
+    time ("6:30, please"), because both reached deploy_section 10 of 10 when
+    sent to the model. Such a sentence never reaches the model, so it is not
+    a routing probe.
     """
     frame = deploy_frame(tidied)
     if frame is None or len(frame[1]) != 1:
         return False
-    return re.fullmatch(r"[1-9]:[0-5][0-9]", frame[1][0]) is not None
+    return re.fullmatch(r"[1-9][:.][0-5][0-9],?", frame[1][0]) is not None
 
 
 def deploy_frame(tidied):
