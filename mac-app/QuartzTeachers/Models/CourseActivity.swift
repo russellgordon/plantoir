@@ -161,7 +161,9 @@ enum CourseActivity {
     /// every time it is offered.
     static func coursePublishIsRunning(folderPath: String, courseCode: String) -> Bool {
         for publish in activePublishes {
-            if publish.folderPath == folderPath && publish.courseCode == courseCode {
+            // One folder however it is spelled (#189); the code is asked first
+            // because it is the cheaper question.
+            if publish.courseCode == courseCode && FolderIdentity.isSameFolder(publish.folderPath, folderPath) {
                 return true
             }
         }
@@ -179,7 +181,7 @@ enum CourseActivity {
     static func busyDescription(folderPath: String, courseCode: String) -> String? {
         var isPreviewing: Bool = false
         for lease in PreviewLeases.active {
-            if lease.folderPath == folderPath && lease.courseCode == courseCode {
+            if lease.courseCode == courseCode && FolderIdentity.isSameFolder(lease.folderPath, folderPath) {
                 isPreviewing = true
             }
         }

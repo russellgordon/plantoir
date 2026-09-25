@@ -717,9 +717,9 @@ struct SectionDetailView: View {
                     return false
                 }
                 for lease in PreviewLeases.active {
-                    if lease.folderPath == folder.path
-                        && lease.courseCode == course.code
-                        && lease.sectionNumber == sectionNumber {
+                    if lease.courseCode == course.code
+                        && lease.sectionNumber == sectionNumber
+                        && FolderIdentity.isSameFolder(lease.folderPath, folder.path) {
                         return true
                     }
                 }

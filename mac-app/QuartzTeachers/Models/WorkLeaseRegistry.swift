@@ -42,8 +42,12 @@ enum WorkLeaseRegistry {
 
         // MARK: - Initializer
 
+        /// The folder is kept in the disk's own spelling (#189), because this
+        /// is a dictionary KEY: two spellings of one folder must be one key,
+        /// or one course would get two lease files and `buildClaim` would
+        /// miss this process's own claim.
         init(folderPath: String, courseCode: String, kind: String) {
-            self.folderPath = folderPath
+            self.folderPath = FolderIdentity.canonicalPath(folderPath)
             self.courseCode = courseCode.uppercased()
             self.kind = kind
         }

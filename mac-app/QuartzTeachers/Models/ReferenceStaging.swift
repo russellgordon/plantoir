@@ -222,15 +222,11 @@ enum ReferenceStaging {
 
     /// The key a staging folder is known by in `claimedStagingKeys`: the
     /// `courses/` folder's real path (links resolved, `/private` kept, the
-    /// disk's own spelling of each name — measured: `realpath` returns the
-    /// same string for a different-case spelling and for a path through a
-    /// link) and the staging name in lower case.
+    /// disk's own spelling of each name — `FolderIdentity.canonicalPath`,
+    /// the one answer every folder comparison uses since #189) and the
+    /// staging name in lower case.
     static func claimKey(for folderName: String, inCoursesDirectory coursesDirectoryURL: URL) -> String {
-        var coursesPath: String = coursesDirectoryURL.standardizedFileURL.path
-        var buffer: [CChar] = [CChar](repeating: 0, count: Int(PATH_MAX) + 1)
-        if realpath(coursesDirectoryURL.path, &buffer) != nil {
-            coursesPath = String(cString: buffer)
-        }
+        let coursesPath: String = FolderIdentity.canonicalPath(coursesDirectoryURL.path)
         return coursesPath + "/" + ReferenceStaging.stagingName(for: folderName).lowercased()
     }
 
