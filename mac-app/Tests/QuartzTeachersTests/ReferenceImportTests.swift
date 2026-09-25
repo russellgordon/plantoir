@@ -591,6 +591,67 @@ final class ReferenceImportTests: XCTestCase {
         XCTAssertEqual(course, "ICS3U")
     }
 
+    /// A course the shelf rule refuses leaves a line on the trail (#287),
+    /// carrying the sentence the summary showed. Before #287 only the refusals
+    /// that came after the claim wrote one, so "I ticked four and got three"
+    /// had nothing behind it when the missing one was the shelf's.
+    func testAShelfRefusalLeavesALineOnTheTrail() async throws {
+        try prepare()
+        try makeOldCourse(code: "ICS3U", sections: [1])
+        guard case .found(let source) = read(oldFolderURL) else {
+            return XCTFail("The old folder was refused.")
+        }
+
+        let outcomes: [ReferenceImporter.Outcome] = await importEverything(
+            from: source,
+            alreadyShelved: [ReferenceCourseRule.Shelved(
+                displayCode: "ICS3U", schoolYear: 2025, folderName: "ICS3U-2025"
+            )]
+        )
+
+        guard case .notImported(let course, let reason) = try XCTUnwrap(outcomes.first) else {
+            return XCTFail("A course already on the shelf was imported: \(outcomes)")
+        }
+        XCTAssertEqual(course, "ICS3U")
+        XCTAssertTrue(
+            ActivityTrail.store.activityText(includingPrompts: true).contains(
+                "could not import ICS3U for reference from \(source.rootURL.lastPathComponent) — \(reason)"
+            ),
+            "The shelf refusal left no line on the trail."
+        )
+    }
+
+    /// A folder of the proposed name already on disk — made after the sheet
+    /// read the list — refuses the course, leaves that folder alone, and
+    /// leaves a line on the trail (#287).
+    func testAFolderAlreadyThereLeavesALineOnTheTrail() async throws {
+        try prepare()
+        try makeOldCourse(code: "ICS3U", sections: [1])
+        guard case .found(let source) = read(oldFolderURL) else {
+            return XCTFail("The old folder was refused.")
+        }
+        let existingURL: URL = coursesDirectoryURL.appendingPathComponent("ICS3U-2025")
+        try FileManager.default.createDirectory(at: existingURL, withIntermediateDirectories: true)
+        let sentinel: URL = existingURL.appendingPathComponent("already-here.md")
+        try Data("somebody's own course".utf8).write(to: sentinel)
+
+        // `existingFolderNames` is empty, as it is when the folder appeared
+        // after the sheet read the list, so the proposal lands on it.
+        let outcomes: [ReferenceImporter.Outcome] = await importEverything(from: source)
+
+        guard case .notImported(let course, let reason) = try XCTUnwrap(outcomes.first) else {
+            return XCTFail("A course was imported over a folder already there: \(outcomes)")
+        }
+        XCTAssertEqual(course, "ICS3U")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: sentinel.path), "The folder already there was touched.")
+        XCTAssertTrue(
+            ActivityTrail.store.activityText(includingPrompts: true).contains(
+                "could not import ICS3U for reference from \(source.rootURL.lastPathComponent) — \(reason)"
+            ),
+            "The refusal of a folder already there left no line on the trail."
+        )
+    }
+
     /// Nothing half-made is left behind — including when the folder cannot be
     /// turned into a reference course at all.
     func testAFailureLeavesNoFolderBehind() async throws {
