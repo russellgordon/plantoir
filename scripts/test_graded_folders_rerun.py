@@ -129,7 +129,7 @@ class SetupRerunKeepsTheMarksPool(unittest.TestCase):
         return json.loads(config_path.read_text(encoding="utf-8"))
 
     def test_every_rerun_case(self):
-        self.assertGreaterEqual(len(self.cases), 10,
+        self.assertGreaterEqual(len(self.cases), 11,
                                 "the contract lost re-run cases")
         for case in self.cases:
             with self.subTest(case=case["name"]):
@@ -151,6 +151,22 @@ class SetupRerunKeepsTheMarksPool(unittest.TestCase):
                 self.assertEqual(written["shared_folders"], case["sharedFolders"])
                 self.assertEqual(written["per_section_folders"],
                                  case["perSectionFolders"])
+
+
+class SavedPoolCleaning(unittest.TestCase):
+    """The one cleaning a re-run still does, asked of the function directly."""
+
+    def test_only_entries_that_cannot_name_a_folder_are_removed(self):
+        saved_pool = ["tasks", None, "Tasks", "", "Tasks", 3, "Tests"]
+        self.assertEqual(
+            setup_course.saved_pool_without_malformed_entries(saved_pool),
+            ["tasks", "Tasks", "Tests"],
+            "two spellings of one name are two entries; only an exact repeat goes")
+
+    def test_the_saved_list_itself_is_not_changed(self):
+        saved_pool = ["Tasks", None]
+        setup_course.saved_pool_without_malformed_entries(saved_pool)
+        self.assertEqual(saved_pool, ["Tasks", None])
 
 
 if __name__ == "__main__":

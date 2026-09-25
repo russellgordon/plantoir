@@ -89,6 +89,30 @@ def graded_folders_for(manifest: dict, shared_folders: list, per_section_folders
     return found
 
 
+def saved_pool_without_malformed_entries(saved_pool: list) -> list:
+    """
+    A saved `graded_folders` list as a re-run writes it back (#192): every
+    real folder name kept exactly as written — same spelling, same order,
+    whether or not a folder of that name exists — with only the entries that
+    cannot name a folder removed: null, an empty or blank string, anything
+    that is not a string, and an exact repeat of a name already kept.
+
+    Those only arise from a hand edit, and the re-run's old path (through
+    graded_folders_for) cleaned them, so it still does. See
+    contracts/shared-rules.json -> gradedFolders.rerunningSetup.
+    """
+    kept_names: list = []
+    for entry in saved_pool:
+        if not isinstance(entry, str):
+            continue
+        if entry.strip() == "":
+            continue
+        if entry in kept_names:
+            continue
+        kept_names.append(entry)
+    return kept_names
+
+
 def _cmd_example(script_base: str, course, section, host_os: str) -> str:
     """
     Returns OS-appropriate example command for preview/deploy.
@@ -2985,13 +3009,15 @@ def setup_course(no_backup: bool = False):
     # with every prompt accepted. A name taken off a list at a prompt is not a
     # removal either: the next build's preflight finds the folder on disk and
     # publishes it again. A saved null is written as [] (as before); a key
-    # that was never there stays absent. See contracts/shared-rules.json ->
+    # that was never there stays absent. Entries that name no folder at all —
+    # null, an empty string, a non-string, an exact repeat — are still cleaned
+    # out, as the old path did; every real name is kept exactly as written. See contracts/shared-rules.json ->
     # gradedFolders.rerunningSetup, and documentation/04-course-setup.md.
     if saved_config:
         if "graded_folders" in saved_config:
             saved_pool = saved_config["graded_folders"]
             if isinstance(saved_pool, list):
-                config["graded_folders"] = list(saved_pool)
+                config["graded_folders"] = saved_pool_without_malformed_entries(saved_pool)
             else:
                 config["graded_folders"] = []
     else:

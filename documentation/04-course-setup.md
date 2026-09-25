@@ -1043,11 +1043,15 @@ on one side because it looked more natural there.
 **A run of `setup_course.py` that finds a saved `graded_folders` writes it back
 as it was** — same names, same spelling, same order, whatever the folder lists
 the run ends with and whatever is on disk. A saved `null` is written as `[]`
-(as it always was), and a course that never had the key still has none. Only a
+(as it always was), and a course that never had the key still has none. The
+one cleaning left is of entries that cannot name a folder at all — null, a
+blank string, a non-string, an exact repeat — which only a hand edit writes
+and which the old path also removed (`saved_pool_without_malformed_entries`);
+every real name stays, including one with no folder behind it. Only a
 NEW course — no saved `course_config.json` at all — has its pool worked out
 from the payload or skeleton and reconciled against its folder lists by
 `graded_folders_for`. The contract is `contracts/shared-rules.json` →
-`gradedFolders.rerunningSetup`, ten cases, run by
+`gradedFolders.rerunningSetup`, eleven cases, run by
 `scripts/test_graded_folders_rerun.py`, which drives the real wizard in-process
 (`input` and `getch` replaced, every prompt answered with Return) — on the mac
 host in `verify.sh`'s first step and on Windows through `PythonToolchainTests`.
@@ -1084,7 +1088,9 @@ dropping the reconciliation:
   names no folder, counting pages with the build's own `_is_graded_path`, the
   reconciled pool counted the same pages or FEWER in every shape. A respelling
   counts the same (the build lowercases both sides); the only shapes where the
-  written value changed what counts were the three that lost marks.
+  written value changed what counts were the FOUR that lost marks — the first
+  three rows above, and the prompt-drop shape in the next point, which wrote
+  `[]` for a folder the next build published again.
 - **A name taken off a copy list at a prompt is not a removal.** With `Tasks` on
   disk but off `shared_folders`, one call of
   `build_site.preflight_update_course_config` puts it straight back
@@ -1151,7 +1157,7 @@ disagree for the one that would have been broken by it.
 COUNT, run by `scripts/test_graded_folders.py` in the image — neither app
 implements that rule, so neither suite runs them), `gradedFolders.choices`
 (14 cases for what the checklist OFFERS, run by both apps) and
-`gradedFolders.rerunningSetup` (10 cases for what a re-run of setup writes back,
+`gradedFolders.rerunningSetup` (11 cases for what a re-run of setup writes back,
 run by `scripts/test_graded_folders_rerun.py`). The key itself is in
 `contracts/file-formats.json`.
 
