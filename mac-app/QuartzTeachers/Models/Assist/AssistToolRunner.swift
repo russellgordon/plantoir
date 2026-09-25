@@ -536,6 +536,14 @@ final class AssistToolRunner {
             forSection: located.sectionNumber, in: located.course,
             workspaceURL: workspace.workspaceURL
         )
+        // "What does Unit 2, Day 3 link to?", matched in code (#167). The
+        // argument is in no schema; without it, this function is what it was.
+        if text("answer", in: arguments) == AssistCardCommand.linksAnswer {
+            return linksOnAPage(
+                titled: title, asTyped: text(AssistCardCommand.linksAsTypedArgument, in: arguments),
+                in: graph, located: located
+            )
+        }
         guard let page = graph.page(titled: title) else {
             return AssistToolOutcome.couldNotRead(AssistToolRefusal.noSuchPage(
                 title, located.course.code, located.sectionNumber
@@ -557,6 +565,152 @@ final class AssistToolRunner {
             "Read “\(page.displayTitle)”.",
             detail: "\(page.relativePath)\n\n\(body)"
         )
+    }
+
+    /// The answer to "what does <page> link to?", given in full, in code, and
+    /// the end of the turn (#167).
+    ///
+    /// Every link is listed once, in the order the page has them, by the name
+    /// a teacher sees for the page it reaches; a link to a page students
+    /// cannot see is marked a draft, and a link that reaches NO page is marked
+    /// as leading nowhere. **What "leads nowhere" means is stated here once:**
+    /// a wiki-link whose target is neither a page of this section (by file
+    /// name, whatever the capitals, or a folder with a landing page) nor any
+    /// FILE of that name, whatever the capitals, in the course's folder — a
+    /// folder with no landing page is not a page and leads nowhere. No extension rule is
+    /// involved — "Lab 1.2" is a page and "diagram.png" a picture because of
+    /// what is on disk, not because of how they are spelt — and a link to a
+    /// picture or a handout that exists is not listed at all, since it is not
+    /// a page. Links written as examples inside code are not links
+    /// (`AssistSectionGraph.linksAsWritten`).
+    ///
+    /// **The turn ends here** (`AssistToolOutcome.answered`), in every branch.
+    /// The model was never asked; handing back would give it a tool result with
+    /// no question in front of it. The `detail` names the page all the same, so
+    /// a follow-up turn about "it" has something to refer to.
+    ///
+    /// `asTyped` is "the Water Cycle page" when the card stripped it to
+    /// "Water Cycle": only when THAT finds nothing are the phrase's other
+    /// readings tried ("The Water Cycle", "Scratch Page"), and only when none
+    /// of them finds anything is the teacher told no page is called that
+    /// (fix review F1).
+    private func linksOnAPage(titled title: String,
+                              asTyped: String,
+                              in graph: AssistSectionGraph,
+                              located: Located) -> AssistToolOutcome {
+        let course: String = located.course.code
+        let section: String = "\(located.sectionNumber)"
+        var candidates: [AssistSectionPage] = graph.pagesATeacherMayMean(title)
+        if candidates.isEmpty && !asTyped.isEmpty {
+            for alternative in AssistCardCommand.linksTitleAlternatives(asTyped: asTyped) where candidates.isEmpty {
+                candidates = graph.pagesATeacherMayMean(alternative)
+            }
+        }
+        if candidates.isEmpty {
+            let sentence: String = AssistWording.noPageCalled(page: title, course: course, section: section)
+            return AssistToolOutcome.answered(sentence, detail: sentence)
+        }
+        if candidates.count > 1 {
+            var lines: [String] = [
+                AssistWording.morePagesThanOneAreCalled(page: title, course: course, section: section),
+            ]
+            for candidate in candidates {
+                lines.append("• " + candidate.relativePath)
+            }
+            let answer: String = lines.joined(separator: "\n")
+            return AssistToolOutcome.answered(answer, detail: answer)
+        }
+        let page: AssistSectionPage = candidates[0]
+        guard let body = try? String(contentsOf: page.fileURL, encoding: .utf8) else {
+            let sentence: String = AssistWording.pageCouldNotBeRead(page: page.displayTitle)
+            return AssistToolOutcome.answered(sentence, detail: sentence)
+        }
+
+        var lines: [String] = []
+        var listedPages: Set<String> = []
+        var filesInTheCourse: Set<String>? = nil
+        for target in AssistSectionGraph.linksAsWritten(in: body) {
+            if let linked = graph.pageALinkLeadsTo(target) {
+                let identity: String = linked.fileURL.standardizedFileURL.path
+                if linked.fileURL == page.fileURL || listedPages.contains(identity) {
+                    continue
+                }
+                listedPages.insert(identity)
+                if linked.isVisibleToStudents {
+                    lines.append("• " + linked.displayTitle)
+                } else {
+                    lines.append("• " + linked.displayTitle + " — " + AssistWording.linkedPageIsADraft)
+                }
+                continue
+            }
+            // Not a page. A picture or a handout that is there is not a page
+            // either, and is not listed; anything else leads nowhere.
+            if filesInTheCourse == nil {
+                filesInTheCourse = AssistToolRunner.fileNames(under: located.course.directoryURL)
+            }
+            var named: String = target
+            if let lastSlash = target.lastIndex(of: "/") {
+                named = String(target[target.index(after: lastSlash)...])
+            }
+            if filesInTheCourse?.contains(named.lowercased()) == true {
+                continue
+            }
+            lines.append("• " + target + " — " + AssistWording.linkedPageIsMissing)
+        }
+
+        if lines.isEmpty {
+            let sentence: String = AssistWording.pageLinksToNothing(page: page.displayTitle)
+            return AssistToolOutcome.answered(sentence, detail: sentence)
+        }
+        let answer: String = AssistWording.pageLinksTo(page: page.displayTitle) + "\n"
+            + lines.joined(separator: "\n")
+        return AssistToolOutcome.answered(answer, detail: page.relativePath + "\n\n" + answer)
+    }
+
+    /// Whether this section has a page a teacher may mean by `title` — asked by
+    /// `AssistAgent` before answering "What does The Water Cycle link to?" in
+    /// code, since the matcher cannot see the pages (fix review F2).
+    func sectionHasAPage(called title: String, course code: String, section number: Int) -> Bool {
+        var course: Course? = nil
+        for candidate in workspace.courses where candidate.code.lowercased() == code.lowercased() {
+            course = candidate
+        }
+        guard let course else {
+            return false
+        }
+        let graph: AssistSectionGraph = AssistSectionGraph.read(
+            forSection: number, in: course, workspaceURL: workspace.workspaceURL
+        )
+        return !graph.pagesATeacherMayMean(title).isEmpty
+    }
+
+    /// Every FILE name under a folder, lower-cased — what a link that is not a
+    /// page is checked against before it is called one that leads nowhere.
+    ///
+    /// Files only, never folders: "[[Unit 3]]" written for a folder with no
+    /// landing page reaches nothing on the site, so it must be marked, not
+    /// dropped as though it were a picture (the implementation review's R2).
+    /// Compared without regard to case, as the site resolves a link.
+    private static func fileNames(under folder: URL) -> Set<String> {
+        var names: Set<String> = []
+        guard let enumerator = FileManager.default.enumerator(
+            at: folder, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles]
+        ) else {
+            return names
+        }
+        while let entry = enumerator.nextObject() as? URL {
+            let name: String = entry.lastPathComponent
+            if name == "node_modules" {
+                enumerator.skipDescendants()
+                continue
+            }
+            let values: URLResourceValues? = try? entry.resourceValues(forKeys: [.isDirectoryKey])
+            if values?.isDirectory == true {
+                continue
+            }
+            names.insert(name.lowercased())
+        }
+        return names
     }
 
     private func checkSection(_ arguments: [String: Any]) -> AssistToolOutcome {

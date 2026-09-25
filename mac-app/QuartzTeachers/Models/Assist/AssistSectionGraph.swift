@@ -292,6 +292,61 @@ nonisolated struct AssistSectionGraph {
         return pagesByTitle[tidied]
     }
 
+    /// The page a link leads to, the way the site resolves it: by file name,
+    /// whatever the capitals — and, failing that, a folder named that whose
+    /// landing page (`index.md`) is in this section, since "[[Unit 2]]"
+    /// written for a folder reaches its landing page on the site (#167).
+    func pageALinkLeadsTo(_ target: String) -> AssistSectionPage? {
+        if let page = page(titled: target) {
+            return page
+        }
+        let wanted: String = normalized(target)
+        if wanted.isEmpty {
+            return nil
+        }
+        for page in pages where page.isFolderIndex {
+            let folder: String = page.fileURL.deletingLastPathComponent().lastPathComponent
+            if folder.lowercased() == wanted {
+                return page
+            }
+        }
+        return nil
+    }
+
+    /// Every page a teacher may mean by `title` — by file name first, because
+    /// that is how links find a page; then by the name the sidebar SHOWS, which
+    /// is how a teacher finds it, including a folder's landing page named by its
+    /// folder (#167).
+    ///
+    /// One page is the answer. Two or more by the name the sidebar shows is a
+    /// question back to the teacher, never a guess. Two FILES with one name — a
+    /// section's own page and a course-wide page — still resolve to the first in
+    /// path order, the rule `init` already applies to every link; that is a
+    /// known limit, not something this answers.
+    func pagesATeacherMayMean(_ title: String) -> [AssistSectionPage] {
+        if let page = page(titled: title) {
+            return [page]
+        }
+        let wanted: String = title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if wanted.isEmpty {
+            return []
+        }
+        var found: [AssistSectionPage] = []
+        for page in pages {
+            var matches: Bool = page.displayTitle.lowercased() == wanted
+            if page.isFolderIndex {
+                let folder: String = page.fileURL.deletingLastPathComponent().lastPathComponent
+                if folder.lowercased() == wanted {
+                    matches = true
+                }
+            }
+            if matches {
+                found.append(page)
+            }
+        }
+        return found
+    }
+
     /// The pages these ones link to, and the pages THOSE link to, and so on —
     /// stopping at any class page a link lands on.
     ///
@@ -430,6 +485,89 @@ nonisolated struct AssistSectionGraph {
             targets.append(target)
         }
         return targets
+    }
+
+    /// Every wiki-link on a page as the teacher WROTE it — capitals kept, each
+    /// once, in the order they appear — for the answer to "what does this page
+    /// link to?" (#167).
+    ///
+    /// The pattern is `WikiLinkRewriter`'s, so a link here is a link there, and
+    /// a picture or a page EMBEDDED with `![[…]]` is included — whether it is a
+    /// page is decided by what it resolves to, not by how it was written. Two
+    /// things differ from `linkTargets`, and both were MEASURED across the 39
+    /// example-content payloads before being chosen (2026-09-25): read this
+    /// way, 30,930 links and embeds (each counted once per page) and every one
+    /// resolved to a page — no dead link reported where there is none.
+    ///
+    /// - A link inside `code` or a fenced code block is an EXAMPLE of a link,
+    ///   not a link: the Scavenger Hunt pages show `[[Page Name]]` to teach the
+    ///   syntax. Read with the code left in, 188 targets came back as links to
+    ///   pages that do not exist.
+    /// - A link inside a table escapes its pipe, `[[Ohm's Law\|Ohm]]`, which
+    ///   leaves the target ending in a backslash. Read with the backslash left
+    ///   on, 69 real links came back dead.
+    ///
+    /// `linkTargets` keeps its own reading because publishing follows it, and
+    /// changing what publishing follows is a change of its own.
+    static func linksAsWritten(in text: String) -> [String] {
+        guard let expression = try? NSRegularExpression(pattern: WikiLinkRewriter.pattern) else {
+            return []
+        }
+        let readable: String = AssistSectionGraph.withoutCode(text)
+        let whole: NSRange = NSRange(readable.startIndex..<readable.endIndex, in: readable)
+        var written: [String] = []
+        var seen: Set<String> = []
+        for match in expression.matches(in: readable, range: whole) {
+            guard let targetRange = Range(match.range(at: 2), in: readable) else {
+                continue
+            }
+            var target: String = String(readable[targetRange]).trimmingCharacters(in: .whitespaces)
+            while target.hasSuffix("\\") {
+                target = String(target.dropLast()).trimmingCharacters(in: .whitespaces)
+            }
+            if target.lowercased().hasSuffix(".md") {
+                target = String(target.dropLast(3))
+            }
+            let key: String = normalized(target)
+            if key.isEmpty || seen.contains(key) {
+                continue
+            }
+            seen.insert(key)
+            written.append(target)
+        }
+        return written
+    }
+
+    /// A page's text with its code taken out — fenced blocks and inline code
+    /// spans — so a link shown as an example is not read as a link.
+    static func withoutCode(_ text: String) -> String {
+        var lines: [String] = []
+        var insideAFence: Bool = false
+        for line in text.components(separatedBy: "\n") {
+            let opening: String = line.trimmingCharacters(in: .whitespaces)
+            if opening.hasPrefix("```") || opening.hasPrefix("~~~") {
+                insideAFence = !insideAFence
+                lines.append("")
+                continue
+            }
+            if insideAFence {
+                lines.append("")
+                continue
+            }
+            var kept: String = ""
+            var insideASpan: Bool = false
+            for character in line {
+                if character == "`" {
+                    insideASpan = !insideASpan
+                    continue
+                }
+                if !insideASpan {
+                    kept.append(character)
+                }
+            }
+            lines.append(kept)
+        }
+        return lines.joined(separator: "\n")
     }
 
     /// A link target or a teacher's page name reduced to the form the index

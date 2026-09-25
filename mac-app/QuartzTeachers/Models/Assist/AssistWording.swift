@@ -1151,6 +1151,55 @@ nonisolated enum AssistWording {
              + "This window is for \(course)."
     }
 
+    // MARK: - What a page links to (#167)
+
+    /// The first line of the answer to "what does <page> link to?" — the list
+    /// of the pages it links to follows it, one to a line.
+    ///
+    /// Answered in code and never by the model, so this is the whole reply a
+    /// teacher reads. `page` is the name the sidebar shows, never a file name.
+    static func pageLinksTo(page: String) -> String {
+        return "“\(page)” links to:"
+    }
+
+    /// The same question, about a page with no links on it.
+    static func pageLinksToNothing(page: String) -> String {
+        return "“\(page)” doesn’t link to any other page."
+    }
+
+    /// Written after a linked page students cannot see yet.
+    ///
+    /// No placeholder, so the scenario that pins it can name it. "Draft" is
+    /// the word the window already uses for a page that is not published.
+    static let linkedPageIsADraft: String = "a draft, so students can’t open it yet"
+
+    /// Written after a link that reaches no page at all — the link as the
+    /// teacher wrote it goes in front, so they can find it on the page.
+    static let linkedPageIsMissing: String = "no page is called this, so the link leads nowhere"
+
+    /// No page in the section is called what the teacher asked about.
+    ///
+    /// **Not `AssistToolRefusal.noSuchPage`**, which ends by telling the MODEL
+    /// to use `list_pages`. This sentence goes straight to the teacher, so it
+    /// names nothing of the machinery and says what they can do instead.
+    static func noPageCalled(page: String, course: String, section: String) -> String {
+        return "No page in \(course) Section \(section) is called “\(page)”. "
+             + "Check the name as the sidebar shows it and ask again."
+    }
+
+    /// More than one page goes by the name the teacher asked about — two
+    /// folders' landing pages called the same thing, say. The pages follow,
+    /// one to a line, by where they are; the app does not choose between them.
+    static func morePagesThanOneAreCalled(page: String, course: String, section: String) -> String {
+        return "More than one page in \(course) Section \(section) is called “\(page)”, so I "
+             + "haven’t chosen one. Ask again using the name at the end of one of these:"
+    }
+
+    /// The page was found and could not be opened.
+    static func pageCouldNotBeRead(page: String) -> String {
+        return "“\(page)” could not be opened, so I can’t say what it links to."
+    }
+
     // MARK: - Shared fragments
 
     /// One phrasing for "go and look at what happened", because it was two:
