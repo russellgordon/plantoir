@@ -975,7 +975,7 @@ class CourseConfiguration {
     ///
     /// ONE rule, read by the three toggles, the config keys and the
     /// coverage rule below, so that the surfaces cannot drift apart — the
-    /// same reason `SkeletonCatalog.hasSkeleton(forCode:takingExampleContent:)`
+    /// same reason `SkeletonCatalog.hasSkeleton(forCode:takingExampleContent:numbered:)`
     /// exists, and `skeletonIsOffered` is that function's own answer rather
     /// than a second copy of its rule.
     static func curriculumPagesOffered(

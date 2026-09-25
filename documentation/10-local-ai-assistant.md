@@ -2067,7 +2067,7 @@ because the next change to that default in the Python would move Windows and
 not the mac.
 
 The mac writes each of these as `capabilityExists && teacherSaidYes` — for
-`use_skeleton`, `hasSkeleton(forCode:takingExampleContent:) && startsFromSkeleton`
+`use_skeleton`, `hasSkeleton(forCode:takingExampleContent:numbered:) && startsFromSkeleton`
 — so a stale `true` in an old config can never mean anything. The capability
 half took the second argument on 2026-09-21
 ([#248](https://github.com/russellgordon/plantoir/issues/248)): it used to ask
