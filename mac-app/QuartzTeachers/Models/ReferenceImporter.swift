@@ -164,22 +164,39 @@ enum ReferenceImporter {
             let stagingURL: URL = coursesDirectoryURL.appendingPathComponent(
                 ReferenceStaging.stagingName(for: folderName)
             )
-            // Any leftover of that name is one nobody is working on: a live
-            // owner would have made the folder name unavailable earlier, and
-            // a stale one is exactly what the sweep takes.
-            if !ReferenceStaging.someoneIsWorkingOn(
-                stagingURL.lastPathComponent, inCoursesDirectory: coursesDirectoryURL
-            ) {
-                ReferenceStaging.remove(at: stagingURL)
-            }
-            // Said before the first byte, so a Reload Courses, a second
-            // window or an `--mcp-stdio` session started mid-copy leaves this
-            // folder alone instead of sweeping it out from under us.
-            ReferenceStaging.takeLease(for: folderName, inCoursesDirectory: coursesDirectoryURL)
-            defer {
-                ReferenceStaging.releaseLease(
-                    for: folderName, inCoursesDirectory: coursesDirectoryURL
+            // CLAIMED as one act: the folder is made, empty, before the first
+            // `await`, and only a claimer ever removes a staging folder. Two
+            // windows are one process with one process id, and until #245 the
+            // second of them read the first one's lease as a live owner, went
+            // on, failed to make the folder that was already there — and its
+            // own tidy-up removed the FIRST window's half-made copy.
+            // `ReferenceStaging.claim` says the order and why.
+            let claim: ReferenceStaging.Claim = ReferenceStaging.claim(
+                folderName, inCoursesDirectory: coursesDirectoryURL
+            )
+            switch claim {
+            case .claimed:
+                break
+            case .someoneElseIsMakingIt:
+                ReferenceImporter.noteNotImported(
+                    displayCode,
+                    from: sourceFolderURL,
+                    because: ReferenceImportWording.alreadyBeingImported
                 )
+                outcomes.append(.notImported(
+                    course: displayCode, reason: ReferenceImportWording.alreadyBeingImported
+                ))
+                continue
+            case .couldNotStart(let reason):
+                ReferenceImporter.noteNotImported(displayCode, from: sourceFolderURL, because: reason)
+                outcomes.append(.notImported(course: displayCode, reason: reason))
+                continue
+            }
+            // Given back however this course ends — imported, failed or
+            // stopped — and only AFTER the catch blocks below have tidied
+            // away what was ours, so a sweep can never land in between.
+            defer {
+                ReferenceStaging.giveBack(folderName, inCoursesDirectory: coursesDirectoryURL)
             }
 
             do {
@@ -293,16 +310,23 @@ enum ReferenceImporter {
                     stagingURL, course: displayCode, broughtInFrom: sourceFolderURL
                 )
                 let reason: String = error.localizedDescription
-                ActivityTrail.note(
-                    .courseCouldNotBeImportedForReference,
-                    "could not import \(displayCode) for reference "
-                    + "from \(sourceFolderURL.lastPathComponent) — \(reason)"
-                )
+                ReferenceImporter.noteNotImported(displayCode, from: sourceFolderURL, because: reason)
                 outcomes.append(.notImported(course: displayCode, reason: reason))
             }
         }
 
         return outcomes
+    }
+
+    /// The trail line for a course that did not come across, and why — the
+    /// same line whether the copy failed part way or never started because
+    /// the course is being imported somewhere else right now.
+    private static func noteNotImported(_ course: String, from sourceFolderURL: URL, because reason: String) {
+        ActivityTrail.note(
+            .courseCouldNotBeImportedForReference,
+            "could not import \(course) for reference "
+            + "from \(sourceFolderURL.lastPathComponent) — \(reason)"
+        )
     }
 
     /// The trail line for a course that came across — what a teacher would
@@ -492,7 +516,8 @@ enum ReferenceImporter {
             totalBytes: survey.byteCount
         ))
 
-        try fileManager.createDirectory(at: stagingURL, withIntermediateDirectories: false)
+        // The staging folder is already there, empty: making it was part of
+        // the claim (`ReferenceStaging.claim`), so it is ours to fill.
 
         let totalBytes: Int64 = survey.byteCount
         try await ReferenceTreeCopier.copy(
@@ -558,7 +583,6 @@ enum ReferenceImporter {
         courseCount: Int,
         progress: @escaping @Sendable @MainActor (Progress) -> Void
     ) async throws -> (made: ReferenceCopier.Made, plan: OlderCourseLayout.Plan) {
-        let fileManager: FileManager = FileManager.default
         let displayCode: String = request.course.courseCode
         let shared: OlderCourseLayout.SharedContent? = request.course.olderLayout?.shared
 
@@ -580,7 +604,8 @@ enum ReferenceImporter {
             totalBytes: plan.byteCount
         ))
 
-        try fileManager.createDirectory(at: stagingURL, withIntermediateDirectories: false)
+        // The staging folder is already there, empty: making it was part of
+        // the claim (`ReferenceStaging.claim`), so it is ours to fill.
 
         let totalBytes: Int64 = plan.byteCount
         try await ReferenceTreeCopier.copy(
@@ -670,7 +695,6 @@ enum ReferenceImporter {
         courseCount: Int,
         progress: @escaping @Sendable @MainActor (Progress) -> Void
     ) async throws -> (made: ReferenceCopier.Made, plan: QuartzCheckoutLayout.Plan) {
-        let fileManager: FileManager = FileManager.default
         let displayCode: String = request.course.courseCode
 
         let plan: QuartzCheckoutLayout.Plan = await ReferenceImporter.planWebsiteOffTheMainActor(
@@ -688,7 +712,8 @@ enum ReferenceImporter {
             totalBytes: plan.byteCount
         ))
 
-        try fileManager.createDirectory(at: stagingURL, withIntermediateDirectories: false)
+        // The staging folder is already there, empty: making it was part of
+        // the claim (`ReferenceStaging.claim`), so it is ours to fill.
 
         let totalBytes: Int64 = plan.byteCount
         try await ReferenceTreeCopier.copy(

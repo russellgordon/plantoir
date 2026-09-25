@@ -95,6 +95,14 @@ nonisolated enum ReferenceWording {
              + "then copy again."
     }
 
+    /// Keep a Copy for Reference… refused because a copy of the same name
+    /// is being made right now — in another window, or by another copy of
+    /// Plantoir (#245). Nothing of the other one was touched.
+    static func copyAlreadyBeingMade(folder: String) -> String {
+        return "A copy called \(folder) is already being made in another window, or in another "
+             + "copy of Plantoir."
+    }
+
     // MARK: - The pages being locked
 
     /// The calm note, said when a copy is made and again before the teacher
