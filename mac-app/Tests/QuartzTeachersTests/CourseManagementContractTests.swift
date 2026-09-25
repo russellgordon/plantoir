@@ -221,6 +221,36 @@ final class CourseManagementContractTests: XCTestCase {
         }
     }
 
+    /// Putting one section's per-section keys back from a backup, carried and
+    /// dropped WITH the lines each key owns (GitHub #182), and a page with no
+    /// room for a new key left exactly as it is and counted (#186's shape).
+    ///
+    /// Compared as BYTES, whole file, for the reason the adding-keys cases
+    /// give above. Windows' restore does not read this list yet; it is owed
+    /// with #177.
+    func testRestoringOneSectionsKeysIsWhatTheContractSays() throws {
+        let backups: [String: Any] = try CourseManagementContractTests.section("backups")
+        let group: [String: Any] = try XCTUnwrap(backups["restoringOneSectionsKeys"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(group["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 6, "backups.restoringOneSectionsKeys has shrunk")
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let sectionNumber: Int = try XCTUnwrap(testCase["section"] as? Int)
+            let live: String = try XCTUnwrap(testCase["live"] as? String)
+            let backup: String = try XCTUnwrap(testCase["backup"] as? String)
+            let after: String = try XCTUnwrap(testCase["after"] as? String)
+            let notPutBack: Bool = try XCTUnwrap(testCase["expectCouldNotBePutBack"] as? Bool)
+            let restored: (text: String, couldNotBePutBack: Bool) = CourseRestorer.settingPerSectionKeys(
+                sectionNumber, in: live, asIn: backup
+            )
+            XCTAssertEqual(
+                Data(restored.text.utf8), Data(after.utf8),
+                "\(name): wrote \(restored.text.debugDescription)"
+            )
+            XCTAssertEqual(restored.couldNotBePutBack, notPutBack, name)
+        }
+    }
+
     // MARK: - What a course code says about the grade
 
     func testTheGradeLabelsAreWhatTheContractSays() throws {

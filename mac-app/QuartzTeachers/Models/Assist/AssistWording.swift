@@ -323,6 +323,27 @@ nonisolated enum AssistWording {
              + "would throw away that newer work."
     }
 
+    /// A section restore that could not put the backup's setting back on
+    /// some shared pages, because the settings at the top of those pages are
+    /// written with no place a new line can safely go (indented, or written as
+    /// a list). Those pages were left exactly as they are — so the restore is
+    /// not "back to how it was" for them, and a sentence saying only that
+    /// would be the silence #182 closes. Past tense, said once the restore is
+    /// done, after `AssistSectionRestore.doneMessage`'s own sentence.
+    ///
+    /// Counted, not named: the restore walks every shared page without a
+    /// title to hand, and it is almost always zero.
+    static func sharedPagesWhoseSettingsCouldNotBePutBack(count: Int, section: String) -> String {
+        if count == 1 {
+            return "One shared page kept the setting it has now for Section \(section): the settings "
+                 + "at the top of it are written in a way I can’t add to, so I left that page exactly "
+                 + "as it is."
+        }
+        return "\(count) shared pages kept the settings they have now for Section \(section): the "
+             + "settings at the top of them are written in a way I can’t add to, so I left those "
+             + "pages exactly as they are."
+    }
+
     /// Why a partly-done undo is still on the list.
     static let undoIsStillAvailable: String =
         "That change is still on the list, so you can ask me to undo it again once you have "

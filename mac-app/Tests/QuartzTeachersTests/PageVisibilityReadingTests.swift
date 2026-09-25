@@ -845,6 +845,94 @@ final class PageVisibilityReadingTests: XCTestCase {
         XCTAssertTrue(PageVisibilityReader.isOpeningFence("  ---"), "An opening fence may be")
     }
 
+    // MARK: - The walk a REMOVAL takes, and where a new key may go (#182, #186)
+
+    /// The rewriting writer's walk and the REMOVING one differ on exactly one
+    /// line, and it is worth pinning which.
+    ///
+    /// `continuationLineIndices` answers "which lines are this key's value",
+    /// so an indented `# note` with no value under it stays where the teacher
+    /// wrote it. `linesOwnedByKey` answers "which lines go when this key's own
+    /// line goes", so the same note travels with it — because once the key is
+    /// gone the note attaches to whatever arrives in its place. Measured: a
+    /// restore that left such a note behind folded it into the restored block
+    /// scalar and published a page the backup had held back.
+    func testLinesOwnedByAKeyAreItsContinuationPlusATrailingIndentedNote() {
+        let rows: [(lines: [String], wasEmpty: Bool, continuation: [Int], owned: [Int])] = [
+            (["publish: >-", "  false", "title: x"], false, [1], [1]),
+            (["publish:", "  false", "title: x"], true, [1], [1]),
+            (["publish: true", "  # note", "title: x"], false, [], [1]),
+            (["publish:", "- a", "title: x"], true, [1], [1]),
+            (["publish: true", "- a", "title: x"], false, [], []),
+            (["publish: true", "title: x"], false, [], []),
+            (["publish:", "  # note", "  false", "title: x"], true, [1, 2], [1, 2]),
+            (["publish: true", "# note", "  false", "title: x"], false, [1, 2], [1, 2]),
+        ]
+        for row in rows {
+            XCTAssertEqual(
+                PageVisibilityReader.continuationLineIndices(
+                    belowKeyAt: 0, in: row.lines, closeIndex: row.lines.count,
+                    keyValueWasEmpty: row.wasEmpty
+                ),
+                row.continuation, "\(row.lines)"
+            )
+            XCTAssertEqual(
+                PageVisibilityReader.linesOwnedByKey(
+                    belowKeyAt: 0, in: row.lines, closeIndex: row.lines.count,
+                    keyValueWasEmpty: row.wasEmpty
+                ),
+                row.owned,
+                "\(row.lines) — the two walks agree everywhere but an indented note with no value under it"
+            )
+        }
+    }
+
+    /// Where a brand-new key may go: the first line inside the block, and
+    /// only when the block's own first line — blank lines and notes aside —
+    /// names a top-level key. Otherwise nowhere (nil).
+    ///
+    /// Measured 2026-09-25 on the real chain for the refusals that matter: a
+    /// key written above `  false` folds into "false false" (a page asked to
+    /// be hidden stays published), and above `  a: 1`, `{a: 1}` or `- a` it
+    /// makes a block the build cannot read. The accepted rows are the guard
+    /// — `tags:` over `  - a` is the commonest page there is.
+    /// [Issue #186](https://github.com/russellgordon/plantoir/issues/186).
+    func testANewKeyGoesOnlyWhereTheBlockHasAColumn0Level() {
+        let rows: [(inside: [String], place: Int?)] = [
+            (["  a: 1"], nil),
+            (["  false"], nil),
+            (["{a: 1}"], nil),
+            (["[a, b]"], nil),
+            (["- a"], nil),
+            (["just text"], nil),
+            (["a:1"], nil),
+            (["# note", "  a: 1"], nil),
+            (["", "\t- a"], nil),
+            ([], 1),
+            (["  # note"], 1),
+            (["", "# note"], 1),
+            (["title: x"], 1),
+            (["\"a b\": 1"], 1),
+            (["'a': 1"], 1),
+            (["? complex", ": v"], 1),
+            (["tags:", "  - a"], 1),
+            (["", "title: x", "  continued"], 1),
+            (["tags: [a,", " b]"], 1),
+        ]
+        for row in rows {
+            var lines: [String] = ["---"]
+            lines.append(contentsOf: row.inside)
+            lines.append("---")
+            XCTAssertEqual(
+                PageVisibilityReader.placeForANewTopLevelKey(
+                    in: lines, openIndex: 0, closeIndex: lines.count - 1
+                ),
+                row.place,
+                "\(row.inside)"
+            )
+        }
+    }
+
     /// Reading does not depend on where the page lives — the build consults
     /// all four keys on every page it copies. This was the mac's own blind
     /// spot until 2026-09-18.

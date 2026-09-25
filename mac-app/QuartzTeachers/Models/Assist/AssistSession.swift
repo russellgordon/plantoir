@@ -617,8 +617,9 @@ final class AssistSession {
     func restoreSection() {
         let saidSoFar: Int = agent?.entries.count ?? 0
         let backupURL: URL? = toolRunner?.conversationBackupURL
+        var settingsNotPutBack: Int = 0
         do {
-            try AssistSectionRestore.restore(
+            settingsNotPutBack = try AssistSectionRestore.restore(
                 backupURL: backupURL,
                 courseCode: courseCode,
                 sectionNumber: sectionNumber,
@@ -641,9 +642,13 @@ final class AssistSession {
         AssistSectionRestore.noteRestored(
             courseCode: courseCode, sectionNumber: sectionNumber, backupURL: backupURL
         )
+        AssistSectionRestore.notePagesNotPutBack(
+            settingsNotPutBack, courseCode: courseCode, sectionNumber: sectionNumber
+        )
         restoreNotes.append(RestoreNote(
             text: AssistSectionRestore.doneMessage(
-                courseCode: courseCode, sectionNumber: sectionNumber
+                courseCode: courseCode, sectionNumber: sectionNumber,
+                settingsNotPutBack: settingsNotPutBack
             ),
             isProblem: false,
             saidSoFar: saidSoFar

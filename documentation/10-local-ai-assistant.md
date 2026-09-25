@@ -3487,6 +3487,22 @@ survives untouched where a course still uses it, a key the conversation ADDED
 is removed again, and every other section's keys plus the whole page body stay
 byte for byte.
 
+**"The keys" means each key WITH the lines it owns (#182, 2026-09-25).** A
+value can live on the lines below its key (`publishForSection1: >-` over
+`  false`), and a restore that carried or dropped key lines alone published
+pages the backup held back and made blocks the build cannot read — measured,
+and in `documentation/08-course-config-reference.md` with what was rejected.
+One page shape cannot take a key back at all — a block with no column-0 line
+for a new key, #186's shape — and that page is left exactly as it is and
+COUNTED: `CourseRestorer.restoreSection` returns the count,
+`AssistSectionRestore.doneMessage` adds
+`AssistWording.sharedPagesWhoseSettingsCouldNotBePutBack` after its own
+sentence, and the trail records `page settings left as they were` with the
+count and never the pages. Counted rather than named because the walk has no
+page titles to hand and it is almost always zero; Windows owes the count, the
+sentence and the line (the `windows` issue from #182). The whole-file cases
+are `course-management.json` → `backups.restoringOneSectionsKeys`.
+
 The first of those is worth saying out loud now that an ordinary edit
 MIGRATES that spelling (`AssistPageVisibility.setting`, issue #107): a restore
 still does not, and that is the point. A restore's job is to put back what the

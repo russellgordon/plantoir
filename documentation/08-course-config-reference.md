@@ -529,9 +529,13 @@ separately from the reader:
   is strict on Windows and, since the mac's `PageFrontmatter.block` was
   loosened for the reason above, lenient on the mac — so a restore reaches
   different pages on the two platforms, which is
-  [issue #177](https://github.com/russellgordon/plantoir/issues/177) and needs
-  a decision. The trap to avoid is reading "one fence finder" and making the
-  MAC strict, which puts the second-block bug straight back.
+  [issue #177](https://github.com/russellgordon/plantoir/issues/177). Russell
+  decided it on 2026-09-19: the restore uses the SHARED finder, on both
+  platforms. The mac's has since #140; since #182 (2026-09-25) it also carries
+  and drops each key WITH the lines it owns (below), and Windows owes both in
+  one change (the `windows` issue from #182). The trap to avoid is reading
+  "one fence finder" and making the MAC strict, which puts the second-block bug
+  straight back.
 
 * **A writer must take a value's CONTINUATION lines with the key.**
   Replacing a key's line alone orphans the indented line below it onto the new
@@ -735,8 +739,8 @@ separately from the reader:
   the build does changes.
 
   **Three of this app's own write paths orphaned a continuation** (the first
-  is fixed; the others stand), and they are named here rather than left to be
-  discovered:
+  two are fixed; the third is #186's), and they are named here rather than
+  left to be discovered:
 
   * ~~`SectionAdder.extendFrontmatter` inserts the new section's
     `createdSection<N>` / `publishForSection<N>` pair after the last
@@ -753,11 +757,34 @@ separately from the reader:
     `SectionAdder.cs:222-234`, which still inserts after the key line; the
     seventh `addingKeysToAPage` case is what closes it there (the `windows`
     issue from #175 carries it).
-  * `CourseRestorer.settingPerSectionKeys` swaps this section's key line for
-    the backup's without either side's continuation lines — measured, a live
-    `publishForSection1:` / `  a: 1` whose backup had no such key is left as
-    `  a: 1` alone and the build stops (since #246: the build hides the page
-    and names it as unreadable).
+  * ~~`CourseRestorer.settingPerSectionKeys` swaps this section's key line for
+    the backup's without either side's continuation lines~~ — **fixed
+    2026-09-25 by #182.** Measured before the fix, on #246's build: a live
+    `publishForSection1:` / `  a: 1` whose backup had no such key was left as
+    `  a: 1` alone, a block the build cannot read, so the page went HIDDEN in
+    every section; a backup's `publishForSection1: >-` / `  false` (hidden)
+    came back as `publishForSection1: >-` alone — empty, PUBLISHED; and a
+    live `draftSection1: >-` / `  # note` left its note to join a restored
+    `|-` scalar (`"false\n# note"`, PUBLISHED). Both halves of the swap now
+    walk `PageVisibilityReader.linesOwnedByKey` — `continuationLineIndices`
+    with ONE clause changed: an indented line counts even when it is a
+    `# note`, because a note under a key that is REMOVED attaches to whatever
+    arrives in its place. Separate function, not a flag: the reason they
+    differ is a sentence, and a flag on this family is how "step over comments
+    only when indented" diverged three times. Restored lines now go after the
+    last line any per-section key OWNS: placed after the last line that
+    merely NAMED one, restoring section 1 onto a page whose last key was
+    section 2's `publishForSection2: >-` / `  false` split section 2's key
+    from its value and PUBLISHED section 2 (a finding of #182's plan, not of
+    the issue). And when this section has no line on the live page and the
+    block has no column-0 level for a new key (#186's shape — `---` /
+    `  a: 1` / `---`), the page is left exactly as it is and COUNTED:
+    `restoreSection` returns the count, the transcript adds
+    `AssistWording.sharedPagesWhoseSettingsCouldNotBePutBack`, and the trail
+    gets `page settings left as they were`. Six whole-file cases, byte-compared
+    by the mac and judged on the site per section by
+    `check_visibility_against_the_site.py`: `course-management.json` →
+    `backups.restoringOneSectionsKeys`.
     [Issue #182](https://github.com/russellgordon/plantoir/issues/182).
   * **`setting`'s own INSERT branch** — the third branch of the very function
     the sweep was added to, and the surprising one. It CREATES an orphan
@@ -770,10 +797,10 @@ separately from the reader:
     a mechanical one.
     [Issue #186](https://github.com/russellgordon/plantoir/issues/186).
 
-  All three are pre-existing, all three are shared with Windows (which inserts
-  at `open + 1` too), and none is worsened by this piece. The first two are not
-  reached by the fixed reader or writer at all — neither calls `setting`. The
-  rule above is the app's rule; these three are where it is not yet kept.
+  All three were pre-existing and all three are shared with Windows (which
+  inserts at `open + 1` too). The first two are not reached by the fixed
+  reader or writer at all — neither calls `setting`. The rule above is the
+  app's rule; the third is where it is not yet kept.
 
   **The same rule for the DATE and TITLE writers (#199, 2026-09-25, mac).**
   `PageFrontmatter.settingCreated` (every re-date, move, insert and the
