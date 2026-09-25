@@ -991,9 +991,10 @@ nonisolated struct ReferenceImportSource: Sendable {
     }
 
     /// A path with one trailing slash, so `/a/bc` is not read as being inside
-    /// `/a/b`.
+    /// `/a/b` — in the disk's own spelling (`FolderIdentity`, #189), so the
+    /// open folder chosen again in another case is still recognised.
     private static func pathWithSlash(_ url: URL) -> String {
-        var path: String = url.resolvingSymlinksInPath().standardizedFileURL.path
+        var path: String = FolderIdentity.canonicalPath(url.standardizedFileURL.path)
         if !path.hasSuffix("/") {
             path += "/"
         }

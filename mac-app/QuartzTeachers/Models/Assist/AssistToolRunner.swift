@@ -1410,10 +1410,16 @@ final class AssistToolRunner {
         return sectionWindow(for: course, sectionNumber: sectionNumber) != nil
     }
 
-    /// An already-open window's model working in this folder, if one exists.
+    /// An already-open window's model working in this folder, if one exists
+    /// — however either of them spells the folder (`FolderIdentity`, #189).
     static func openWindowModel(forFolderPath path: String) -> WorkspaceModel? {
-        for model in WorkspaceModel.windowModels where model.workspaceURL?.path == path {
-            return model
+        for model in WorkspaceModel.windowModels {
+            guard let openPath = model.workspaceURL?.path else {
+                continue
+            }
+            if FolderIdentity.isSameFolder(openPath, path) {
+                return model
+            }
         }
         return nil
     }

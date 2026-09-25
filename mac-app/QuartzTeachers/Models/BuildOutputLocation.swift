@@ -119,18 +119,15 @@ nonisolated enum BuildOutputLocation {
 
     /// The eight hex characters that stand for one working folder.
     ///
-    /// The launchers derive the same value with `pwd -P | shasum -a 256`, so
-    /// the trailing newline is part of the hashed input here too, and the path
-    /// is resolved with POSIX `realpath` rather than Foundation's
-    /// `resolvingSymlinksInPath()` — the latter strips the `/private` prefix
-    /// from `/var` and `/tmp` paths where `pwd -P` keeps it, and the two sides
-    /// would hash different strings.
+    /// The launchers derive the same value with `/bin/pwd -P | shasum -a 256`
+    /// after moving into `$(/bin/pwd -P)`, so the trailing newline is part of
+    /// the hashed input here too, and the path is the disk's own spelling of
+    /// the folder from `FolderIdentity.canonicalPath` — the same function
+    /// every comparison of two folder paths uses (#189), so the folder a
+    /// workspace is named after and the folder a window is "in" can never be
+    /// two different answers. Change one and you change the other.
     static func folderIdentifier(forWorkingFolder path: String) -> String {
-        var physical: String = path
-        if let resolved = realpath(path, nil) {
-            physical = String(cString: resolved)
-            free(resolved)
-        }
+        let physical: String = FolderIdentity.canonicalPath(path)
         let hashed: SHA256.Digest = SHA256.hash(data: Data((physical + "\n").utf8))
         var hex: String = ""
         for byte in hashed {
@@ -420,11 +417,7 @@ nonisolated enum BuildOutputLocation {
         let builds: URL = buildsFolder(forWorkingFolder: workingFolderURL)
         try FileManager.default.createDirectory(at: builds, withIntermediateDirectories: true)
         let marker: URL = builds.appendingPathComponent(workingFolderMarkerName)
-        var physical: String = workingFolderURL.path
-        if let resolved = realpath(workingFolderURL.path, nil) {
-            physical = String(cString: resolved)
-            free(resolved)
-        }
+        let physical: String = FolderIdentity.canonicalPath(workingFolderURL.path)
         try (physical + "\n").write(to: marker, atomically: true, encoding: .utf8)
     }
 

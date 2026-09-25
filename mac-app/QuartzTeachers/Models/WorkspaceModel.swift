@@ -108,14 +108,14 @@ class WorkspaceModel {
         at url: URL,
         in models: [WorkspaceModel] = windowModels
     ) -> Int {
-        let writtenPath: String = url.standardizedFileURL.resolvingSymlinksInPath().path
+        let writtenPath: String = FolderIdentity.canonicalPath(url.standardizedFileURL.path)
         var reloadedCount: Int = 0
         for model in models {
             for course in model.courses {
                 if course.configuration === writer {
                     continue
                 }
-                let coursePath: String = course.configFileURL.standardizedFileURL.resolvingSymlinksInPath().path
+                let coursePath: String = FolderIdentity.canonicalPath(course.configFileURL.standardizedFileURL.path)
                 if coursePath != writtenPath {
                     continue
                 }
@@ -143,10 +143,10 @@ class WorkspaceModel {
         configFileURL url: URL,
         in models: [WorkspaceModel] = windowModels
     ) -> Bool {
-        let wantedPath: String = url.standardizedFileURL.resolvingSymlinksInPath().path
+        let wantedPath: String = FolderIdentity.canonicalPath(url.standardizedFileURL.path)
         for model in models {
             for course in model.courses {
-                let coursePath: String = course.configFileURL.standardizedFileURL.resolvingSymlinksInPath().path
+                let coursePath: String = FolderIdentity.canonicalPath(course.configFileURL.standardizedFileURL.path)
                 if coursePath != wantedPath {
                     continue
                 }
@@ -193,9 +193,21 @@ class WorkspaceModel {
     }
 
     /// True while some open window is working in this folder.
+    ///
+    /// **However either of them is spelled** (GitHub #189). This gates
+    /// stopping the folder's workspace, and the workspace is named by
+    /// `BuildOutputLocation.folderIdentifier`, which folds case, Unicode form,
+    /// links and the firmlink through `FolderIdentity.canonicalPath` — so a
+    /// plain `==` here would call the open folder, re-chosen in another
+    /// spelling, a DIFFERENT folder and stop the workspace it is using. The
+    /// hash and this comparison are the same function on purpose: change
+    /// one and you change the other.
     static func folderIsInUse(_ path: String) -> Bool {
         for model in windowModels {
-            if model.workspaceURL?.path == path {
+            guard let openPath = model.workspaceURL?.path else {
+                continue
+            }
+            if FolderIdentity.isSameFolder(openPath, path) {
                 return true
             }
         }
@@ -702,8 +714,14 @@ class WorkspaceModel {
         // Choosing the folder this window already shows is not a new
         // choice — a teacher who does that with the notice showing would
         // otherwise find their courses hidden behind the picker.
-        noticeCloudSync(folderWasChosen: previousPath != url.path)
-        if let previousPath, previousPath != url.path {
+        // Compared as one folder however it is spelled (#189): a teacher
+        // re-choosing the open folder in another case is not choosing a new one.
+        var isTheSameFolder: Bool = false
+        if let previousPath {
+            isTheSameFolder = FolderIdentity.isSameFolder(previousPath, url.path)
+        }
+        noticeCloudSync(folderWasChosen: !isTheSameFolder)
+        if let previousPath, !isTheSameFolder {
             WorkspaceModel.releaseFolderIfUnused(previousPath)
         }
     }
@@ -718,14 +736,16 @@ class WorkspaceModel {
     /// restored, and moving them here would give a restored window a trail
     /// line saying the teacher had opened something.
     private func pointAtFolder(_ url: URL) {
-        // Plain `.path`, which is the same comparison `chooseWorkspace`
-        // already makes to decide whether the cloud-sync note is a question
-        // or a notice and whether the folder being left may rest. Two
-        // spellings of one folder would read as DIFFERENT and merely
-        // over-clear — a selection that could have stayed is dropped, and
-        // the teacher is looking at the sidebar either way. The reverse,
-        // two different folders reading as the same, cannot happen.
-        let isADifferentFolder: Bool = workspaceURL?.path != url.path
+        // The same comparison `chooseWorkspace` makes to decide whether the
+        // cloud-sync note is a question or a notice and whether the folder
+        // being left may rest: one folder however it is spelled (#189), so
+        // re-choosing the open folder in another case keeps its selection.
+        // Two different folders cannot read as the same — the disk is asked
+        // for each one's own name.
+        var isADifferentFolder: Bool = true
+        if let currentPath = workspaceURL?.path {
+            isADifferentFolder = !FolderIdentity.isSameFolder(currentPath, url.path)
+        }
         if isADifferentFolder {
             forgetWhatBelongedToTheOldFolder()
         }
@@ -892,7 +912,8 @@ class WorkspaceModel {
         // or "Got It" here leaves it there until relaunch, against the
         // once-per-folder rule.
         for other in WorkspaceModel.windowModels {
-            if other !== self && other.workspaceURL?.path == workspaceURL.path {
+            if other !== self, let theirPath = other.workspaceURL?.path,
+               FolderIdentity.isSameFolder(theirPath, workspaceURL.path) {
                 other.needsCloudSyncDecision = false
                 other.isShowingCloudSyncNotice = false
             }
@@ -914,7 +935,7 @@ class WorkspaceModel {
         if !WorkspaceModel.folderExists(atPath: path) {
             return
         }
-        if workspaceURL?.path == path {
+        if let currentPath = workspaceURL?.path, FolderIdentity.isSameFolder(currentPath, path) {
             return
         }
         // The same funnel the picker goes through, so the letting-go cannot
@@ -1398,7 +1419,7 @@ class WorkspaceModel {
             return false
         }
         for lease in PreviewLeases.active {
-            if lease.folderPath == workspaceURL.path && lease.courseCode == code {
+            if lease.courseCode == code && FolderIdentity.isSameFolder(lease.folderPath, workspaceURL.path) {
                 return true
             }
         }
@@ -1813,7 +1834,7 @@ class WorkspaceModel {
         besides origin: WorkspaceModel,
         in models: [WorkspaceModel] = windowModels
     ) -> Int {
-        let deletedFrom: String = coursesDirectoryURL.standardizedFileURL.resolvingSymlinksInPath().path
+        let deletedFrom: String = FolderIdentity.canonicalPath(coursesDirectoryURL.standardizedFileURL.path)
         var followed: Int = 0
         for model in models {
             if model === origin {
@@ -1822,7 +1843,7 @@ class WorkspaceModel {
             guard let theirs = model.coursesDirectoryURL else {
                 continue
             }
-            if theirs.standardizedFileURL.resolvingSymlinksInPath().path != deletedFrom {
+            if FolderIdentity.canonicalPath(theirs.standardizedFileURL.path) != deletedFrom {
                 continue
             }
             model.backupItems = WorkspaceModel.findBackupItems(in: theirs)
@@ -1860,11 +1881,12 @@ class WorkspaceModel {
     ///
     /// Compared as RESOLVED paths: the runner names its backup from the
     /// folder it was given, the list from what the folder enumerates, and
-    /// `/var` against `/private/var` is the same file spelt twice.
+    /// `/var` against `/private/var` is the same file spelt twice — as are
+    /// two cases or two Unicode forms of one name (`FolderIdentity`, #189).
     static func heldBackupPaths() -> Set<String> {
         var heldPaths: Set<String> = []
         for heldURL in AssistActivity.backupsAnOpenConversationHolds() {
-            heldPaths.insert(heldURL.standardizedFileURL.resolvingSymlinksInPath().path)
+            heldPaths.insert(FolderIdentity.canonicalPath(heldURL.standardizedFileURL.path))
         }
         return heldPaths
     }
@@ -1903,7 +1925,7 @@ class WorkspaceModel {
 
     /// A backup's path in the form `heldBackupPaths` uses.
     static func comparablePath(of item: BackupItem) -> String {
-        return item.fileURL.standardizedFileURL.resolvingSymlinksInPath().path
+        return FolderIdentity.canonicalPath(item.fileURL.standardizedFileURL.path)
     }
 
     /// The delete-several confirmation's message (the plan review's L3).
