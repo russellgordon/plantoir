@@ -504,7 +504,9 @@ mac records it as "pages dated by the build" (`PagesDatedByTheBuild`,
 nothing changed. A SCHEDULED publish records the same line from its own log:
 `ScheduledDeploy.recordFolderProblems` already reads that run's part of the log
 (from `logSizeBeforeRunning`) for `PLANTOIR_HEALTH:` lines, and now hands it to
-`notePagesDatedByTheBuild` too. The first version left it out, saying the app
+`notePagesDatedByTheBuild` too — and, since #153, to `noteFolderProblems`,
+which leaves that run's `folder problem found` lines (Stage 3.5 → "The
+overnight path's trail line"). The first version left it out, saying the app
 was not reading that console — wrong, since the scheduled run IS Plantoir
 (`--run-scheduled-deploy`) and reads its log in-process; and a scheduled publish
 is often the first build after a class goes visible, so the likeliest to rewrite
@@ -570,6 +572,18 @@ tail it reports back, which is a second surface and was leaking until
 question to ask of a new one is not whether it shows the transcript but whether
 it shows a LINE.
 
+**The mac's assistant surface was CHECKED on 2026-09-25 (#153), and narrates
+no line.** The in-app assistant and `Plantoir --mcp-stdio` build their answers
+from `AssistWording` plus `SiteHealthFinding.appending` — each finding's
+sentence and detail, read from the runner's findings, never from its
+transcript — and `AssistMCPServer` sends no progress notifications. Nothing in
+`Models/Assist/` or `Views/Assist/` reads `displayText` or `recentText`.
+`SiteHealthFindingTests.testTheAssistantsAnswerCarriesAGluedFindingAndNoMachinery`
+pins it. The `--mcp-stdio` process also WRITES the trail line: it runs a real
+`ScriptRunner`, and its trail store is the ordinary one. The one hole on this
+surface was the glued marker below, which was missing from the answer because
+it was never read at all.
+
 Two of the checks stay quiet unless the other half of the map exists: a
 brand-new course has an empty curriculum folder and an empty class folder on
 day one, and warning about both would nag every build of a course nobody has
@@ -633,15 +647,94 @@ unambiguous and carries structure a sentence cannot.
   `documentation/09-mac-app.md` → "Where the address comes from".) On any real build they are
   long past that window by the end. Collect them as output arrives. The mac test
   floods 400 lines after the finding to prove the point.
-- **Hide the marker line from the console a teacher reads.** A raw JSON blob is
-  machinery (rule 1). The human sentence is printed separately, so nothing is
-  lost. The mac drops it in `TranscriptBuilder`, and reads findings from the raw
-  text BEFORE handing it there.
+- **Hide the marker line from the console a teacher reads — a line CARRYING
+  it, whole, and while it is still arriving.** A raw JSON blob is machinery
+  (rule 1). The human sentence is printed separately, so nothing is lost. The
+  mac drops it in `TranscriptBuilder`, and reads findings from the raw text
+  BEFORE handing it there. Until #153 (2026-09-25) the mac tested only the
+  START of a line, and two leaks followed, both MEASURED by compiling the real
+  `TranscriptBuilder`, `SiteHealthFinding` and `PagesDatedByTheBuild`
+  standalone: fed `"Building…"`, then the marker and `\r\n`, then `"done"`,
+  the console showed `Building…PLANTOIR_HEALTH: {"name": …}` and
+  `findings(in:)` returned **0** — the finding was DROPPED, so no dialog, no
+  trail line and nothing in the assistant's answer; and fed `"ok\r\n"` then
+  the first 60 characters of a marker, both `displayText` and `recentText`
+  ended in the half payload until its newline arrived. Now `isMarkerLine` is
+  `contains`, the parse reads from the prefix onward (`range(of:)`), and the
+  line under construction is hidden while it carries a marker
+  (`visibleCurrentLine`) — which is Windows' own rule, adopted
+  (`CarriesTheHealthMarker`, `VisibleCurrentLine`, `IndexOf`). The same
+  applies to `PLANTOIR_DATED:`, whose trail read is unaffected because it
+  reads the raw text, never the transcript. The prompt check also refuses a
+  marker line: half a payload cut after `"sentence":` ends in a colon, which
+  it would otherwise have offered as a question — `looksLikeQuestion`
+  answers false for any marker line, pinned by
+  `SiteHealthFindingTests.testHalfAMarkerIsNeverAQuestion`. The cases are
+  `contracts/shared-rules.json` → `siteHealth.marker.consoleCases`.
+
+  How a glue could arise: `site_health.py` prints each line whole, so it takes
+  something ELSE writing half a line into the same terminal first (stderr
+  chatter with no newline). Not observed on a real build; the leak and the
+  drop were measured on the code. Parsing from the prefix also means an escape
+  sequence left in front of a marker no longer hides it, since findings are
+  parsed from the raw line, where #235's per-line colour stripping does not
+  apply.
+
+  **Residuals, named rather than fixed** (all the same on Windows): a chunk
+  ending in the middle of the PREFIX (`…PLANTOIR_HE`) shows that fragment
+  for one refresh — it is not JSON, and a rule hiding every line ending in a
+  prefix of the prefix would hide ordinary text ending in "P"; two markers
+  glued on ONE line parse as neither, because the JSON parse from the first
+  prefix fails — it needs a missing newline between two `print`s, so it is
+  theoretical; and the chatter in front of a glued marker leaves the problem
+  report as well as the console (`writeRecordOfRun` reads `displayText`).
+  **Rejected:** keeping that chatter by cutting the line at the prefix. It
+  would differ from Windows, and half a line is not a sentence anybody needs.
 - **Show it once.** The mac holds findings in view state rather than reading them
   off the runner at render time, so a teacher who dismisses the dialog and
   carries on editing does not meet it again on the next redraw. A healthy course
   must see nothing at all — the failure mode for this whole feature is nagging,
   and a warning dismissed by habit is dismissed when it matters.
+
+### The overnight path's trail line (#153)
+
+A scheduled publish runs with the app closed, so its findings reach a teacher
+through a record the app reads later (`findingsSentinelURL`, consumed by
+`takeFolderProblems`). Until 2026-09-25 that was ALL they did on the mac: no
+`folder problem found` line was written anywhere on that path — not by the
+run, and not when the record was read — so the case the check exists for left
+no trace on the trail.
+
+Now `ScheduledDeploy.recordFolderProblems`, in the `--run-scheduled-deploy`
+process at the end of the run, hands the run's part of the log to
+`noteFolderProblems`, which writes one line per DISTINCT finding in the same
+words the console path writes (`SiteHealthFinding.trailSentence`, one home for
+two writers). `takeFolderProblems` notes nothing, so one run's finding is one
+trail line whether or not anybody opens the section. The line is stamped when
+the run FINISHES rather than when the build printed it — minutes apart, the
+same as the dated-pages line. A log found shorter than its offset (rotated
+mid-run) is read whole, so an older night's findings are noted again; the
+record has always had the same edge.
+
+The sentence's apostrophe changed with it: the mac wrote `course's`, while
+`activityTrail.mustRecord` → "folder problem found" → `carries` and Windows'
+`TrailSentence` both say `course’s`. The mac is the one that moved;
+`testTheTrailSentenceIsTheContractsOwn` reads the example out of `carries`.
+Older trail files keep the straight form, which nothing parses.
+
+**Rejected:** (a) writing the line in `takeFolderProblems`, when the section is
+opened — Windows' shape (`ScheduledHealthFindings.Take`, dated to the record's
+write time). On the mac it would date nothing better and leave NO line for a
+teacher who never opens that section: the argument
+`scheduledPublishStopped.trail` already won. (b) #84's per-run capture of the
+output in place of the byte offset — launchd owns the child's stdout, so a
+capture means either a pipe that must be drained (the thing that wedged the
+Windows assistant's server) or a change to the generated agent, which reaches
+only jobs scheduled after an upgrade; the offset is tested, handles rotation,
+and the dated-pages reader shares its text. The log split is on scalars now
+(`linesOf`) — hardening only, since launchd hands the child a plain file and
+the launchers ask for a terminal only when they have one, so the log has
+`\n` endings today.
 
 ### Offering to put it right
 
