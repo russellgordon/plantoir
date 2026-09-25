@@ -1481,7 +1481,10 @@ So: `courses/<CODE>/.merged_output` is a **symlink** to
 launchers bind-mount that builds folder into the container **at the same
 absolute path**, unconditionally, so the link resolves identically inside and
 out and all six readers keep working untouched. The folder id is the same
-`pwd -P | shasum -a 256 | cut -c1-8` that already names the folder's container,
+`/bin/pwd -P | shasum -a 256 | cut -c1-8` that already names the folder's
+container — the disk's own spelling of the folder, so a folder reached in
+another case or Unicode form is still one folder (#189; [03](03-launcher-scripts.md)
+→ "One folder, one spelling") —
 so a folder's container and its builds folder cannot disagree about which
 folder they belong to. It has to be under `$HOME` because the Colima VM mounts
 only the home folder.
