@@ -159,12 +159,29 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         guard frame.timeWords.count == 1 else {
             return nil
         }
-        let clock: String = frame.timeWords[0]
-        guard let colon = clock.firstIndex(of: ":") else {
+        // Two near-spellings are ASKED about too, rather than sent to the
+        // model, because both still deployed on the spot there: "deploy at
+        // 6.30" (a full stop between the hour and the minutes) and "deploy at
+        // 6:30, please" (a comma after the time, left behind when the frame
+        // takes "please" off). Measured on the smaller assistant, ten trials
+        // each: deploy_section 10 of 10 for both. Asking costs nothing —
+        // nothing is set, and the answers are rebuilt below in the one
+        // canonical "6:30 am" form the family accepts, so neither spelling
+        // is ever offered back. This widens what is ASKED only: "deploy at
+        // 6.30 pm" is still not answered in code.
+        var written: String = frame.timeWords[0]
+        if written.hasSuffix(",") {
+            written = String(written.dropLast())
+        }
+        var separator: String.Index? = written.firstIndex(of: ":")
+        if separator == nil {
+            separator = written.firstIndex(of: ".")
+        }
+        guard let separator else {
             return nil
         }
-        let hourText: String = String(clock[clock.startIndex..<colon])
-        let minuteText: String = String(clock[clock.index(after: colon)...])
+        let hourText: String = String(written[written.startIndex..<separator])
+        let minuteText: String = String(written[written.index(after: separator)...])
         guard AssistCardCommand.isPlainDigits(hourText),
               AssistCardCommand.isPlainDigits(minuteText),
               hourText.count == 1,
@@ -173,6 +190,8 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
               let minute = Int(minuteText), minute <= 59 else {
             return nil
         }
+        // Always written with a colon, whatever separator the teacher typed.
+        let clock: String = hourText + ":" + minuteText
 
         var opening: String = "deploy at "
         if let dayWord = frame.dayWord {
@@ -1181,8 +1200,8 @@ nonisolated struct AssistTimeQuestion: Sendable, Equatable {
 
     // MARK: - Stored properties
 
-    /// The time as the teacher wrote it, which is already its one spelling:
-    /// "6:30".
+    /// The time in its one spelling, "6:30" — written with a colon even
+    /// when the teacher typed "6.30".
     let clock: String
 
     /// The sentence that means the morning: "deploy tomorrow at 6:30 am".
