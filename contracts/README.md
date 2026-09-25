@@ -770,6 +770,7 @@ still has twenty-nine top-level keys — `rerunningSetup` sits inside
 `gradedFolders`, beside `removingAFolder`. Re-take it at the merge if anything
 else landed first.
 Re-taken at the merge into `dev`: **188** lists on the merged tree, `activityTrail.mustRecord` **76**.
+Re-taken at the merge into `dev`: **188** lists on the merged tree, `activityTrail.mustRecord` **76**.
 
 **Re-take it rather than trusting this paragraph** — a census nobody can repeat
 is a number that rots. A case list is *an array of objects reached through

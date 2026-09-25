@@ -497,7 +497,7 @@ _colima_growth_flags() {
 
 _download() {
   local url="$1" destination="$2" label="$3"
-  echo "📦 Getting ${label}…"
+  echo "📦 Downloading ${label}…"
   if ! curl -fsSL --retry 3 -o "$destination" "$url"; then
     echo "❌ Could not download ${label}."
     echo "   An internet connection is needed for this one-time setup."
@@ -517,19 +517,19 @@ ensure_local_tools() {
 
   if ! command -v limactl >/dev/null 2>&1; then
     local lima_tgz="$TOOLS_DIR/lima.tar.gz"
-    _download "https://github.com/lima-vm/lima/releases/download/v${LIMA_VERSION}/lima-${LIMA_VERSION}-Darwin-${lima_arch}.tar.gz" "$lima_tgz" "the virtual machine manager"
+    _download "https://github.com/lima-vm/lima/releases/download/v${LIMA_VERSION}/lima-${LIMA_VERSION}-Darwin-${lima_arch}.tar.gz" "$lima_tgz" "what your website builder needs (1 of 4)"
     tar xzf "$lima_tgz" -C "$TOOLS_DIR"
     rm -f "$lima_tgz"
   fi
 
   if ! command -v colima >/dev/null 2>&1; then
-    _download "https://github.com/abiosoft/colima/releases/download/${COLIMA_VERSION}/colima-Darwin-${arch}" "$TOOLS_DIR/bin/colima" "the container runtime"
+    _download "https://github.com/abiosoft/colima/releases/download/${COLIMA_VERSION}/colima-Darwin-${arch}" "$TOOLS_DIR/bin/colima" "what your website builder needs (2 of 4)"
     chmod +x "$TOOLS_DIR/bin/colima"
   fi
 
   if ! command -v docker >/dev/null 2>&1; then
     local docker_tgz="$TOOLS_DIR/docker.tar.gz"
-    _download "https://download.docker.com/mac/static/stable/${docker_arch}/docker-${DOCKER_CLI_VERSION}.tgz" "$docker_tgz" "the container tools"
+    _download "https://download.docker.com/mac/static/stable/${docker_arch}/docker-${DOCKER_CLI_VERSION}.tgz" "$docker_tgz" "what your website builder needs (3 of 4)"
     tar xzf "$docker_tgz" -C "$TOOLS_DIR"
     mv -f "$TOOLS_DIR/docker/docker" "$TOOLS_DIR/bin/docker"
     rm -rf "$TOOLS_DIR/docker" "$docker_tgz"
@@ -548,7 +548,7 @@ ensure_buildx() {
   arch="$(uname -m)"
   if [[ "$arch" == "arm64" ]]; then buildx_arch="arm64"; else buildx_arch="amd64"; fi
   mkdir -p "$HOME/.docker/cli-plugins"
-  _download "https://github.com/docker/buildx/releases/download/${BUILDX_VERSION}/buildx-${BUILDX_VERSION}.darwin-${buildx_arch}" "$HOME/.docker/cli-plugins/docker-buildx" "the image builder"
+  _download "https://github.com/docker/buildx/releases/download/${BUILDX_VERSION}/buildx-${BUILDX_VERSION}.darwin-${buildx_arch}" "$HOME/.docker/cli-plugins/docker-buildx" "what your website builder needs (4 of 4)"
   chmod +x "$HOME/.docker/cli-plugins/docker-buildx"
 }
 
@@ -568,8 +568,10 @@ ensure_container_runtime() {
   ensure_local_tools
 
   if [[ ! -d "$HOME/.colima/default" ]]; then
-    echo "🚀 First start: building the virtual machine ($(_colima_cpus) CPUs · $(_colima_memory_gb) GB RAM)."
-    echo "   Its disk image (~600 MB) is downloaded once; this can take several minutes."
+    # What is being set up here is Colima's Linux virtual machine; the
+    # teacher is told only what it is FOR (GitHub #263, rule 1).
+    echo "🚀 First start: setting up your website builder ($(_colima_cpus) CPUs · $(_colima_memory_gb) GB of memory)."
+    echo "   About 600 MB is downloaded once; this can take several minutes."
     # vz is macOS's own virtualization — no extra software needed, unlike
     # the qemu default.
     colima start --cpu "$(_colima_cpus)" --memory "$(_colima_memory_gb)" --vm-type vz
@@ -580,21 +582,30 @@ ensure_container_runtime() {
     colima start $(_colima_growth_flags)
   fi
 
-  echo "⏳ Waiting for the container runtime to be ready…"
+  # The app's friendlyPhase matches "Waiting for the website builder" (#263).
+  echo "⏳ Waiting for the website builder to be ready…"
   _wait_for_docker 30 && return 0
 
   # Colima can report the VM as running while its Docker daemon is dead
   # (common after sleep or an unclean shutdown); a plain start no-ops in
   # that state. Force a clean restart and wait again.
-  echo "🔁 Docker isn't responding yet — restarting Colima…"
-  echo "   (Colima is shared by any other Colima-based toolchains on this Mac;"
-  echo "    their containers restart automatically afterwards if configured to.)"
+  #
+  # For a developer: Colima is shared by any other Colima-based toolchains on
+  # this Mac, so this restart takes their containers down too; they come back
+  # afterwards only if configured to. This used to be printed; since #263 the
+  # console speaks to a teacher, who has nothing else using it
+  # (documentation/03-launcher-scripts.md).
+  echo "🔁 The website builder isn't answering yet — restarting it…"
   colima stop --force >/dev/null 2>&1 || true
   colima start >/dev/null 2>&1 || true
   _wait_for_docker 60 && return 0
 
-  echo "❌ Colima did not become ready."
-  echo "   Try running 'colima stop --force && colima start' by hand, then re-run this script."
+  # For a developer, the by-hand recovery is
+  #   colima stop --force && colima start
+  # then re-run this launcher. A teacher is told to restart, which is what
+  # cleared the wedged builder in #225.
+  echo "❌ The website builder did not start."
+  echo "   Restart this Mac, then try again."
   exit 1
 }
 

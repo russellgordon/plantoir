@@ -919,8 +919,8 @@ longer exists:
 **UNMEASURED, and do not quote a number for it:** how long a warm `colima
 start` takes end to end. 5.0 s from the hostagent to the host-side docker
 socket on an existing VM, but `docker info` readiness is later, and measuring it
-means stopping the shared VM (rule 7). The launcher polls `docker info` for up
-to 30 s and then force-cycles. Measure it on a spare Mac with `time (colima stop
+means stopping the shared VM (rule 7). The launcher polls `docker info` 30 times,
+two seconds apart (at least a minute), and then force-cycles. Measure it on a spare Mac with `time (colima stop
 && colima start && until docker info >/dev/null 2>&1; do :; done)` before
 putting a figure anywhere.
 
@@ -952,20 +952,62 @@ the machinery (rule 1). They now print "🐳 Setting up this Mac…" and
 - **No duration is claimed**, because the warm start is unmeasured (above).
   REJECTED: the issue's own suggestion "this takes a moment the first time each
   day" — after #220 the machine can stop and start several times a day.
-- **The word "Colima" has NOT left the console, nor has the rest of the
-  machinery.** `colima start` writes its own `INFO[…] starting colima` lines
-  into the details a teacher can open, and `ensure_container_runtime` still
-  prints "Waiting for the container runtime to be ready…", "Docker isn't
-  responding yet — restarting Colima…", the "(Colima is shared …)" note, and
-  "Colima did not become ready." with its "Try running 'colima stop --force &&
-  colima start' by hand, then re-run this script."; `ensure_local_tools`,
-  which it calls, prints "Getting the container runtime…", "the container
-  tools" and "the image builder" on a first run. All outside #228's two lines;
-  the director files them as ONE follow-up issue (this paragraph should then
-  carry its number). "Waiting for the container runtime" is also a
-  `friendlyPhase` marker, so moving it means moving that too. The test above
-  checks a marker only on `echo` lines: a first version checked the whole
-  file and was satisfied by the comment that names the marker beside the echo.
+- **The rest of the first-run block followed as GitHub #263 (2026-09-25).**
+  #228 changed two lines; the rest of `ensure_container_runtime` and the
+  `ensure_local_tools` downloads it calls still printed "the container
+  runtime", "Docker isn't responding yet — restarting Colima…", a note that
+  Colima is shared, and "Colima did not become ready." with a `colima` command
+  to type. The whole block from `_download()` to the bare
+  `ensure_container_runtime` call — byte-identical in the three launchers —
+  now speaks of "your website builder": the downloads are "what your website
+  builder needs (N of 4)", the first start is "setting up your website
+  builder" (#228 had left "building the virtual machine" and its "disk image"
+  standing; #263 reworded that too), the wait, the restart and the failure all
+  name the builder, and the failure's advice is "Restart this Mac, then try
+  again." — by then the launcher has already force-cycled, and a restart is
+  what cleared the wedged builder in #225. The shared-Colima note and the
+  `colima stop --force && colima start` recovery became comments for a
+  developer; losing the printed note is a trade-off, written up in
+  [`03-launcher-scripts.md`](03-launcher-scripts.md) beside "Colima is treated
+  as shared infrastructure".
+  - **`friendlyPhase` moved with the text**: its marker "Waiting for the
+    container runtime" is now "Waiting for the website builder" (same label,
+    "Starting up…"), pinned by
+    `ScriptRunnerStatusTests.testWaitingForTheWebsiteBuilderIsAPhase`. Without
+    the move the phase would have stayed on the previous marker's label,
+    silently. No alias for the old text, for #228's reason.
+  - **Pinned by `AppRulesContractTests.testTheFirstRunLinesNameNoMachinery`**:
+    it extracts that block from each launcher, asserts the three copies are
+    identical, and scans what is PRINTED — `echo` lines and each `_download`
+    label, with `$( … )` removed first so `$(_colima_cpus)` does not count as
+    the word — for toolchain, script, Docker, container, Colima, Lima, buildx,
+    BuildKit, "virtual machine" and image, whole words, any case. It also
+    requires at least ten printed lines, so an extraction that finds nothing
+    cannot pass. Proven by copy-and-restore: the old label back in
+    `preview.sh` and a comment changed in `deploy.sh` gave 3 failures (one
+    word, two identity), the old marker back in `ScriptRunner.swift` a 4th.
+    The #228 test still checks a marker only on `echo` lines: a first version
+    checked the whole file and was satisfied by the comment that names the
+    marker beside the echo.
+  - **No contract keys.** These are mac-only launcher lines with no Windows
+    counterpart, and `contracts/app-rules.json` → `markerOrigins` →
+    `knownDivergence.note` already rules launcher text "the platform's text
+    rather than the product's". None is a milestone marker, so the generated
+    `milestones` did not move. REJECTED: an authored `launcherWording` key —
+    Windows has nothing to match and no reader for it.
+  - **What is still there.** Colima's own `INFO[…] starting colima` lines,
+    kept on Russell's ruling: REJECTED, filtering them in the app (a new
+    cross-platform line filter where `transcriptStripping` strips only control
+    characters, and it would blank them from the problem report that most
+    needs them), and piping `colima start` through `sed` (`pipefail`
+    interplay, lost diagnostics). And, outside the block, dozens of `echo`
+    lines across the three launchers — "🔌 Docker context", "Using image",
+    the container create/recreate lines, "the toolchain's build recipe", and
+    two milestone markers, "Starting container if needed" and "Ensuring
+    container is running", which are a contract change of their own. They are
+    ONE follow-up issue, listed line by line; a whole-launcher scan belongs to
+    it (REJECTED here: a whole-file ratchet with an allow-list, which would
+    freeze the list rather than empty it).
 
 **REJECTED — write the tools folder into `~/.zprofile` at install.** Plantoir
 editing a teacher's shell profile is exactly the machinery the product hides, it

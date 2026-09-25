@@ -1233,7 +1233,9 @@ class ScriptRunner {
             // The launchers print "▶️  Starting the website builder…" here;
             // it said "Starting Colima…" until 2026-09-23 (GitHub #228).
             ("Starting the website builder", "Starting up (first time can take a few minutes)…"),
-            ("Waiting for the container runtime", "Starting up…"),
+            // "⏳ Waiting for the website builder to be ready…"; it said
+            // "Waiting for the container runtime…" until GitHub #263.
+            ("Waiting for the website builder", "Starting up…"),
             ("delta deploy", "Deploying your site…"),
             ("Uploaded", "Deploying your site…"),
             ("Deploying", "Deploying your site…"),
