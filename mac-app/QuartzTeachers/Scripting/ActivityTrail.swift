@@ -609,6 +609,18 @@ nonisolated enum ActivityTrail {
         /// one thing about a frozen course a teacher can still change.
         /// Carries the code they read, the folder, and both years.
         case referenceCourseSchoolYearChanged = "reference course school year changed"
+
+        /// Backups were deleted — one from the sidebar, or several from All
+        /// Backups (#242). Carries the course code or codes, how many, what
+        /// they took when every size is known, each file's NAME (a course code,
+        /// a moment and who made it — never anything on a page), and any the
+        /// open assistant conversation still needed and so kept.
+        ///
+        /// A teacher's own backups are never pruned, so a backup that is gone
+        /// was deleted by a person — and "my backup is gone" is answered by
+        /// this line and by nothing else. There was no line for it at all
+        /// before, for one delete or many.
+        case backupsDeleted = "backups deleted"
     }
 
     // MARK: - Stored properties
