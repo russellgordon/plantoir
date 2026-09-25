@@ -744,18 +744,104 @@
         "expectSayEvening" : "deploy at 9:59 pm",
         "expectSayMorning" : "deploy at 9:59 am",
         "input" : "deploy at 9:59.",
-        "why" : "The highest one-digit hour, with a trailing full stop. From 10 up, an hour with no am or pm is read as 24-hour time and is in accepted."
+        "why" : "The highest one-digit hour, with a trailing full stop. From 10 up, a COLON time with no am or pm is read as 24-hour time and is in accepted; a dotted 10 to 12 is asked (below)."
+      },
+      {
+        "expectClock" : "10:30",
+        "expectEveningWhen" : "22:30",
+        "expectMorningWhen" : "10:30",
+        "expectSayEvening" : "deploy at 10:30 pm",
+        "expectSayMorning" : "deploy at 10:30 am",
+        "input" : "deploy at 10.30",
+        "why" : "A dotted two-digit hour 10 to 12, with no am or pm (#277). Sent to the model it reached deploy_section 10 of 10 (the #194 fix review: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, 10 trials). Asked rather than read as 24-hour time, because '10.30' is how a teacher writes half past ten at night as often as in the morning; a COLON 10:30 is still accepted as the morning, which is why the two spellings differ."
+      },
+      {
+        "expectClock" : "11:45",
+        "expectEveningWhen" : "23:45",
+        "expectMorningWhen" : "11:45",
+        "expectSayEvening" : "deploy at 11:45 pm",
+        "expectSayMorning" : "deploy at 11:45 am",
+        "input" : "deploy at 11.45",
+        "why" : "The same shape as 'deploy at 10.30'; deploy_section 10 of 10 when sent to the model (the #194 fix review: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, 10 trials)."
+      },
+      {
+        "expectClock" : "12:30",
+        "expectEveningWhen" : "12:30",
+        "expectMorningWhen" : "00:30",
+        "expectSayEvening" : "deploy at 12:30 pm",
+        "expectSayMorning" : "deploy at 12:30 am",
+        "input" : "deploy at 12.30",
+        "why" : "The top of the dotted 10-to-12 range. Asked like the others: the morning answer is 12:30 am, just after midnight, and the evening one 12:30 pm, just after noon. Not measured on the model; the same shape as 'deploy at 10.30'."
+      },
+      {
+        "expectClock" : "10:30",
+        "expectEveningWhen" : "22:30",
+        "expectMorningWhen" : "10:30",
+        "expectSayEvening" : "deploy at 10:30 pm",
+        "expectSayMorning" : "deploy at 10:30 am",
+        "input" : "deploy at 10.30, please",
+        "why" : "A dotted 10-to-12 with the comma the frame leaves of ', please', both near-spellings at once. Not measured; the same two reasons as 'deploy at 10.30' and 'deploy at 6:30, please'."
+      },
+      {
+        "expectClock" : "2:30",
+        "expectEveningWhen" : "14:30",
+        "expectMorningWhen" : "02:30",
+        "expectSayEvening" : "deploy at 2:30 pm",
+        "expectSayMorning" : "deploy at 2:30 am",
+        "input" : "deploy at 2:30 in the evening",
+        "why" : "A part of the day that the hour does not fit (#277, the director's ruling M1): evening is 5 to 11, so '2:30 in the evening' says two things that disagree. Handing back 'deploy at 2:30 pm' would be the wrong-part-of-the-day suggestion #194 exists to avoid, so a one-digit hour outside its window is asked about instead, and nothing is set."
+      },
+      {
+        "expectClock" : "1:30",
+        "expectEveningWhen" : "13:30",
+        "expectMorningWhen" : "01:30",
+        "expectSayEvening" : "deploy at 1:30 pm",
+        "expectSayMorning" : "deploy at 1:30 am",
+        "input" : "deploy at 1:30 tonight",
+        "why" : "Tonight is 5 to 11, and 12 as midnight; 1:30 is outside it, and the teacher most likely meant 1:30 in the morning. Asked, not guessed - and the question carries no day word, because 'today at 1:30 am' would already have passed."
+      },
+      {
+        "expectClock" : "9:30",
+        "expectEveningWhen" : "21:30",
+        "expectMorningWhen" : "09:30",
+        "expectSayEvening" : "deploy at 9:30 pm",
+        "expectSayMorning" : "deploy at 9:30 am",
+        "input" : "deploy at 9:30 in the afternoon",
+        "why" : "Afternoon is 12 to 5. A one-digit hour outside it is asked about, never answered as 9:30 pm."
+      },
+      {
+        "expectClock" : "6:30",
+        "expectEveningWhen" : "18:30",
+        "expectMorningWhen" : "06:30",
+        "expectSayEvening" : "deploy at 6:30 pm",
+        "expectSayMorning" : "deploy at 6:30 am",
+        "input" : "deploy at 6:30 in the afternoon",
+        "why" : "6 is at neither end of the afternoon (12 to 5), so it is asked about. '5:30 in the afternoon' is inside the window and is in sayItAs."
+      },
+      {
+        "expectClock" : "2:30",
+        "expectEveningWhen" : "tomorrow 14:30",
+        "expectMorningWhen" : "tomorrow 02:30",
+        "expectSayEvening" : "deploy tomorrow at 2:30 pm",
+        "expectSayMorning" : "deploy tomorrow at 2:30 am",
+        "input" : "deploy tomorrow evening at 2:30",
+        "why" : "A part of the day in front of 'at', outside its window. 'Tomorrow' is a day the sentence said plainly, so both answers keep it; 'tonight' and 'this evening' contribute no day to a question, because the part of the day is the thing being contradicted."
+      },
+      {
+        "expectClock" : "2:00",
+        "expectEveningWhen" : "14:00",
+        "expectMorningWhen" : "02:00",
+        "expectSayEvening" : "deploy at 2:00 pm",
+        "expectSayMorning" : "deploy at 2:00 am",
+        "input" : "deploy at 2 tonight",
+        "why" : "A bare hour is read only with am, pm or a part of the day beside it; outside the window, it is asked about like any one-digit hour, with the clock written '2:00'."
       }
     ],
-    "note" : "The family 'deploy at <time>', matched in code and never sent to the model. AUTHORED, not generated: cardPhrasings.parsed carries one example and one near-miss, which is nowhere near enough to describe a family whose variable part is a TIME - one example would have the other platform build one spelling. The frame, after trimming, case-folding and removing a trailing . ! or ?: [please] deploy [it|this section] [today|tomorrow] at <time> [today|tomorrow] [please]. Anything else in the sentence - a section, a course, a weekday, a condition, a second request - falls through to the model. THE RULE THAT CARRIES THE MOST WEIGHT: a time with no am or pm must be written with two digits for the hour, because that is what 24-hour time looks like and it is the form schedule_deploy's own schema asks for. Measured on 2026-09-18: the smaller assistant sent 'Deploy at 6:30 AM' to deploy_section 10 trials out of 10, so a teacher who asked for half six tomorrow got a deploy to students on the spot (research/ai-assist/metal-routing-results.txt, issue #168). ASKED, NOT GUESSED (issue #194): a one-digit hour 1 to 9 with two digits of minutes and no am or pm - 'deploy at 6:30' - is morning or evening and nobody can tell which, so it is neither scheduled nor sent to the model: the app answers in code with wording.morningOrEvening, naming two sentences this family already accepts (the am one and the pm one, in the canonical form 'deploy [today |tomorrow ]at H:MM am|pm'), and the teacher types one of them. Nothing waits for the answer; the question and the teacher's sentence go into the conversation shown to the teacher and never into what the model is sent. wording.morningOrEvening is rendered for 'deploy at 6:30'; each asked row gives the clock and the two sentences for its own input, and each sentence must match this family to the when shown. Two near-spellings are ASKED as well, and nothing more: a full stop for the colon ('deploy at 6.30') and a comma after the time ('deploy at 6:30, please'), because both still reached deploy_section 10 trials out of 10 when sent to the model (the #194 review, Qwen2.5-1.5B Q4_K_M, Apple M4 Pro). The clock is named back with a colon and the answers are built with one, so neither spelling is ever offered back; the family still ANSWERS neither ('deploy at 6.30 pm' is refused). A day-part word - 'tonight', 'in the evening', 'in the morning' - is outside the frame and is not asked about: reading one would change what is accepted, which is a decision of its own. The frame is the same one accepted rows are read with, so anything the frame refuses is refused here too. accepted, asked and refused run the matcher (refused means neither answered nor asked: it goes to the model); resolving runs the settling step that turns a bare time into a whole moment, and is pure input to output with an injected clock so it means the same thing in any time zone.",
+    "note" : "The family 'deploy at <time>', matched in code and never sent to the model. AUTHORED, not generated: cardPhrasings.parsed carries one example and one near-miss, which is nowhere near enough to describe a family whose variable part is a TIME - one example would have the other platform build one spelling. The frame, after trimming, case-folding and removing a trailing . ! or ?: [please] deploy [it|this section] [today|tomorrow] at <time> [today|tomorrow] [please]. Anything else in the sentence - a section, a course, a weekday, a condition, a second request - falls through to the model. THE RULE THAT CARRIES THE MOST WEIGHT: a time with no am or pm must be written with two digits for the hour, because that is what 24-hour time looks like and it is the form schedule_deploy's own schema asks for. Measured on 2026-09-18: the smaller assistant sent 'Deploy at 6:30 AM' to deploy_section 10 trials out of 10, so a teacher who asked for half six tomorrow got a deploy to students on the spot (research/ai-assist/metal-routing-results.txt, issue #168). ASKED, NOT GUESSED (issue #194): a one-digit hour 1 to 9 with two digits of minutes and no am or pm - 'deploy at 6:30' - is morning or evening and nobody can tell which, so it is neither scheduled nor sent to the model: the app answers in code with wording.morningOrEvening, naming two sentences this family already accepts (the am one and the pm one, in the canonical form 'deploy [today |tomorrow ]at H:MM am|pm'), and the teacher types one of them. Nothing waits for the answer; the question and the teacher's sentence go into the conversation shown to the teacher and never into what the model is sent. wording.morningOrEvening is rendered for 'deploy at 6:30'; each asked row gives the clock and the two sentences for its own input, and each sentence must match this family to the when shown. Near-spellings are ASKED as well: a full stop for the colon ('deploy at 6.30'), a comma after the time ('deploy at 6:30, please'), and, since #277, a dotted two-digit hour 10 to 12 ('deploy at 10.30'), because each reached deploy_section 10 trials out of 10 when sent to the model (the #194 fix review, Qwen2.5-1.5B Q4_K_M, Apple M4 Pro). The clock is named back with a colon and the answers are built with one, so no such spelling is ever offered back. ANSWERED WITH THE SPELLING TO USE (issue #277): a time the family can read but does not set is answered in code with ONE sentence to type - wording.sayTheTimeAs, naming the time as written and the sentence, or wording.sayTheTimeAsWithoutTheComma / wording.sayTheTimeAsWithoutPlease when the teacher's sentence differs from it only by a comma, or by a comma and 'please' (sayItAs.expectOnlyDifference: spelling, theComma, please). Nothing is set and nothing is sent to the model; the sentence handed back is built in the canonical form 'deploy [today |tomorrow ]at H:MM am|pm' and must match this family to expectWhen. Caught only for a REASON, of which there are three: a full stop between hour and minutes, one comma after the time (or before a part of the day), or a part of the day - 'in the morning', 'in the afternoon', 'in the evening', 'this morning', 'this afternoon', 'this evening', 'tonight', 'tomorrow morning', 'tomorrow afternoon', 'tomorrow evening' - after the time, or in front of 'at' ('deploy tonight at 6:30'; read by this step only, so what the frame ACCEPTS does not move). What is left must be a clock (hour, ':' or '.', two digits of minutes 0-59) with or without am/pm (joined or apart, dots allowed), or a bare hour beside am/pm or a part of the day. A part of the day is a WINDOW: morning 1-11 (am), afternoon 12-5 (12 is noon, 1-5 pm), evening 5-11 (pm), tonight 5-11 (pm) and 12 as midnight (12 am, said with no day word, because midnight tonight is tomorrow). A two-digit hour with a leading zero, or 13-23, is 24-hour time and must fall inside the window (17:00 counts as both afternoon and evening). An hour outside its window is never respelled: a one-digit hour with no am or pm is ASKED about (the morningOrEvening question, keeping a day word only when the sentence said one plainly or the part of the day was 'tomorrow ...'); anything else is refused. With neither am/pm nor a part of the day, the hour must be two digits (the 24-hour reading); a one-digit hour there is already asked about, and a dotted 10 to 12 is asked. A disagreement is refused, never resolved: am/pm against the part of the day, or a day word against the day the part of the day names. A spelling the family refuses for a reason of its own ('13:30 pm', '6:75 pm', 'deploy at 7') is not caught, and its refused row's reason stands. The frame is the same one accepted rows are read with, so anything the frame refuses is refused here too. accepted, asked, sayItAs and refused run the matcher (refused means neither answered, asked nor given a spelling: it goes to the model, and each refused row's why says what the model did with it where that was measured); resolving runs the settling step that turns a bare time into a whole moment, and is pure input to output with an injected clock so it means the same thing in any time zone.",
     "refused" : [
       {
         "input" : "deploy at 7",
         "why" : "A bare number is not a time anybody has spelled out. Read as an hour it would schedule a deploy off a number that might have been a unit or a section."
-      },
-      {
-        "input" : "deploy at 6.30 pm",
-        "why" : "A full stop is not a clock separator to this family, so a time that carries am or pm but is written with one is not answered in code: reading it would widen what is SCHEDULED, which is a change to the accepted spellings rather than to what is asked. Only a full-stop time with no am or pm is asked about (see asked), because asking sets nothing. This one goes to the model."
       },
       {
         "input" : "deploy at 630",
@@ -860,6 +946,110 @@
       {
         "input" : "can you deploy at 6:30",
         "why" : "Outside the frame, as 'can you deploy at 7 pm?' is, so it is not asked about either. Only sentences the family would read if they carried am or pm are asked about."
+      },
+      {
+        "input" : "deploy at 6,30",
+        "why" : "A comma is not a clock separator, and '6,30' has no reason in it that timeToSayAs reads (#277): it is not a full stop, a trailing comma or a part of the day. Not answered, asked nor given a spelling. Sent to the model it reached deploy_section 10 of 10 (measured for #277: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, the app's server flags and request body, 10 trials, 2026-09-25) - a deploy to students on the spot, which the approval card ('This happens now.') is all that stands in front of."
+      },
+      {
+        "input" : "deploy at 1.5",
+        "why" : "A full stop, but one digit of minutes: not a clock reading. Sent to the model: deploy_section 1 of 10, declined 9 (measured for #277: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, the app's server flags and request body, 10 trials, 2026-09-25)."
+      },
+      {
+        "input" : "deploy at 2.0.1",
+        "why" : "A version number, not a time. Sent to the model it was declined 10 of 10 (measured for #277: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, the app's server flags and request body, 10 trials, 2026-09-25)."
+      },
+      {
+        "input" : "deploy at 6:30, then preview",
+        "why" : "A second request. The frame holds only a time, so nothing is asked and nothing is respelled. Sent to the model it was declined 10 of 10 (measured for #277: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, the app's server flags and request body, 10 trials, 2026-09-25)."
+      },
+      {
+        "input" : "deploy at 6.30 pm, then preview",
+        "why" : "The same, with a time timeToSayAs would otherwise respell: a second request keeps the whole sentence out. Sent to the model it reached deploy_section 10 of 10 (measured for #277: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, the app's server flags and request body, 10 trials, 2026-09-25) - a deploy to students on the spot, which the approval card ('This happens now.') is all that stands in front of."
+      },
+      {
+        "input" : "deploy at 13.30 pm",
+        "why" : "13 with pm is refused for its own reason ('deploy at 13:30 pm' is refused), and the full stop does not change that: a respelling needs an hour 1 to 12 beside am or pm. Sent to the model it reached deploy_section 10 of 10 (measured for #277: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, the app's server flags and request body, 10 trials, 2026-09-25) - a deploy to students on the spot, which the approval card ('This happens now.') is all that stands in front of."
+      },
+      {
+        "input" : "deploy at 0.30",
+        "why" : "A one-digit 0 is not an hour on either clock; the 24-hour reading needs two digits ('deploy at 00.30' is in sayItAs). Sent to the model it reached deploy_section 10 of 10 (measured for #277: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, the app's server flags and request body, 10 trials, 2026-09-25) - a deploy to students on the spot, which the approval card ('This happens now.') is all that stands in front of."
+      },
+      {
+        "input" : "deploy at 6.3 pm",
+        "why" : "One digit of minutes, as 'deploy at 6:3 pm' is refused. Sent to the model it reached deploy_section 10 of 10 (measured for #277: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, the app's server flags and request body, 10 trials, 2026-09-25) - a deploy to students on the spot, which the approval card ('This happens now.') is all that stands in front of."
+      },
+      {
+        "input" : "deploy at 18:30 in the morning",
+        "why" : "A 24-hour time outside its part of the day, with two digits of hour: not asked (only a one-digit hour is), not respelled. Sent to the model it reached deploy_section 10 of 10 (measured for #277: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, the app's server flags and request body, 10 trials, 2026-09-25) - a deploy to students on the spot, which the approval card ('This happens now.') is all that stands in front of."
+      },
+      {
+        "input" : "deploy tomorrow at 6:30 tonight",
+        "why" : "A day word and a part of the day that name different days. Sent to the model it was declined 10 of 10 (measured for #277: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, the app's server flags and request body, 10 trials, 2026-09-25)."
+      },
+      {
+        "input" : "deploy section 2 at 6.30 pm",
+        "why" : "A section this window cannot honour; the frame refuses it, so no spelling is offered. Sent to the model it reached deploy_section 10 of 10, for section 2 (measured for #277: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, the app's server flags and request body, 10 trials, 2026-09-25)."
+      },
+      {
+        "input" : "deploy at 7, please",
+        "why" : "A bare number with a comma: nothing says it is a time, so it keeps 'deploy at 7''s reason. Sent to the model it reached deploy_section 10 of 10 (measured for #277: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, the app's server flags and request body, 10 trials, 2026-09-25) - a deploy to students on the spot, which the approval card ('This happens now.') is all that stands in front of."
+      },
+      {
+        "input" : "deploy at 6.30 pm every day",
+        "why" : "A repeat the frame cannot hold. Sent to the model it was declined 10 of 10 (measured for #277: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, the app's server flags and request body, 10 trials, 2026-09-25)."
+      },
+      {
+        "input" : "deploy on 10.30",
+        "why" : "'on' is not the frame's 'at'; this may be a date. Sent to the model it was declined 10 of 10 (measured for #277: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, the app's server flags and request body, 10 trials, 2026-09-25)."
+      },
+      {
+        "input" : "deploy at 7 in the evening, then preview",
+        "why" : "A second request after a part of the day. Sent to the model it was declined 10 of 10 (measured for #277: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, the app's server flags and request body, 10 trials, 2026-09-25)."
+      },
+      {
+        "input" : "deploy at 6:30 am in the evening",
+        "why" : "am and a part of the day that disagree. Sent to the model it reached deploy_section 10 of 10 (measured for #277: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, the app's server flags and request body, 10 trials, 2026-09-25) - a deploy to students on the spot, which the approval card ('This happens now.') is all that stands in front of."
+      },
+      {
+        "input" : "deploy at 11:30 in the afternoon",
+        "why" : "Afternoon is 12 to 5; 11 is outside it and is not a one-digit hour, so it is neither asked nor respelled (the director's ruling M1). Sent to the model it reached deploy_section 10 of 10 (measured for #277: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, the app's server flags and request body, 10 trials, 2026-09-25) - a deploy to students on the spot, which the approval card ('This happens now.') is all that stands in front of."
+      },
+      {
+        "input" : "deploy at 13:30 in the evening",
+        "why" : "1:30 pm is not the evening (17 to 23). Sent to the model it reached deploy_section 10 of 10 (measured for #277: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, the app's server flags and request body, 10 trials, 2026-09-25) - a deploy to students on the spot, which the approval card ('This happens now.') is all that stands in front of."
+      },
+      {
+        "input" : "deploy at 23:00 in the afternoon",
+        "why" : "11 pm is not the afternoon (12 to 17). Sent to the model it reached deploy_section 10 of 10 (measured for #277: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, the app's server flags and request body, 10 trials, 2026-09-25) - a deploy to students on the spot, which the approval card ('This happens now.') is all that stands in front of."
+      },
+      {
+        "input" : "deploy at 12:30 in the morning",
+        "why" : "Morning is 1 to 11 in the ruling; only tonight reads 12 as midnight. Sent to the model it reached deploy_section 10 of 10 (measured for #277: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, the app's server flags and request body, 10 trials, 2026-09-25) - a deploy to students on the spot, which the approval card ('This happens now.') is all that stands in front of."
+      },
+      {
+        "input" : "deploy at 2:30 pm in the evening",
+        "why" : "pm agrees with the evening but 2:30 pm is not in it; am or pm was said, so there is nothing to ask. Sent to the model it reached deploy_section 10 of 10 (measured for #277: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, the app's server flags and request body, 10 trials, 2026-09-25) - a deploy to students on the spot, which the approval card ('This happens now.') is all that stands in front of."
+      },
+      {
+        "input" : "deploy today at 12:30 tonight",
+        "why" : "Midnight tonight is tomorrow, so 'today' disagrees with it. Sent to the model it reached deploy_section 10 of 10 (measured for #277: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, the app's server flags and request body, 10 trials, 2026-09-25) - a deploy to students on the spot, which the approval card ('This happens now.') is all that stands in front of."
+      },
+      {
+        "input" : "deploy at 12:30 in the evening",
+        "why" : "12 is not in the evening (5 to 11), and 12 is not a one-digit hour to ask about. Sent to the model it reached deploy_section 10 of 10 (measured for #277: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, the app's server flags and request body, 10 trials, 2026-09-25) - a deploy to students on the spot, which the approval card ('This happens now.') is all that stands in front of."
+      },
+      {
+        "input" : "deploy at 06:30 in the evening",
+        "why" : "A leading zero is 24-hour time, 06:30 is the morning, and the evening disagrees. Sent to the model it reached deploy_section 10 of 10 (measured for #277: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, the app's server flags and request body, 10 trials, 2026-09-25) - a deploy to students on the spot, which the approval card ('This happens now.') is all that stands in front of."
+      },
+      {
+        "input" : "deploy at midnight tonight",
+        "why" : "A word time with a part of the day: the reading takes a clock, not 'midnight' (the director's ruling M2 lets this stay). Sent to the model it reached deploy_section 10 of 10 (measured for #277: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, the app's server flags and request body, 10 trials, 2026-09-25) - a deploy to students on the spot, which the approval card ('This happens now.') is all that stands in front of."
+      },
+      {
+        "input" : "deploy at 9 at night",
+        "why" : "'at night' is not in the list of parts of the day read (the director's ruling M2 lets this stay). Sent to the model it reached deploy_section 10 of 10 (measured for #277: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, the app's server flags and request body, 10 trials, 2026-09-25) - a deploy to students on the spot, which the approval card ('This happens now.') is all that stands in front of."
       }
     ],
     "resolving" : [
@@ -950,6 +1140,296 @@
         "today" : "2026-09-19",
         "when" : "half six",
         "why" : "Unreadable, so it travels on exactly as it arrived and the teacher meets the runner's own refusal rather than a silent change of subject."
+      }
+    ],
+    "sayItAs" : [
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy at 6:30 pm",
+        "expectWhen" : "18:30",
+        "expectWritten" : "6.30 pm",
+        "input" : "deploy at 6.30 pm",
+        "why" : "The issue's own sentence (#277), and the boundary row #194 left refused. Sent to the model it reached deploy_section 10 of 10 (the #194 fix review: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, 10 trials): a deploy to students on the spot, for a teacher who had named a time. Answered in code with the one sentence to type; nothing is set, and 'deploy at 6.30 pm' itself is still not ACCEPTED - the family does not read a full stop as a clock separator."
+      },
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy at 6:30 pm",
+        "expectWhen" : "18:30",
+        "expectWritten" : "6.30pm",
+        "input" : "deploy at 6.30pm",
+        "why" : "The same, written up against the digits. Sent to the model it reached deploy_section 10 of 10 (the #194 fix review: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, 10 trials): a deploy to students on the spot, for a teacher who had named a time."
+      },
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy at 6:30 am",
+        "expectWhen" : "06:30",
+        "expectWritten" : "6.30 am",
+        "input" : "deploy at 6.30 am",
+        "why" : "The morning twin. Sent to the model it reached deploy_section 10 of 10 (the #194 fix review: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, 10 trials): a deploy to students on the spot, for a teacher who had named a time."
+      },
+      {
+        "expectOnlyDifference" : "please",
+        "expectSay" : "deploy at 6:30 pm",
+        "expectWhen" : "18:30",
+        "expectWritten" : "6:30 pm",
+        "input" : "deploy at 6:30 pm, please",
+        "why" : "A comma after the time, left behind when the frame takes 'please' off. Sent to the model it reached deploy_section 10 of 10 (the #194 fix review: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, 10 trials): a deploy to students on the spot, for a teacher who had named a time. The only difference from the sentence handed back is ', please', so the reply says to leave 'please' out rather than seem to repeat the teacher's own words (wording.sayTheTimeAsWithoutPlease)."
+      },
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy at 6:30 pm",
+        "expectWhen" : "18:30",
+        "expectWritten" : "6:30pm",
+        "input" : "deploy at 6:30pm, please",
+        "why" : "The same with the pm written against the digits. Sent to the model it reached deploy_section 10 of 10 (the #194 fix review: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, 10 trials): a deploy to students on the spot, for a teacher who had named a time. The sentence handed back differs by a space as well, so the reply names the time as written (wording.sayTheTimeAs's form), not only the comma."
+      },
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy at 6:30 pm",
+        "expectWhen" : "18:30",
+        "expectWritten" : "18.30",
+        "input" : "deploy at 18.30",
+        "why" : "A full stop and a two-digit hour: 24-hour time, read as such. Sent to the model it reached deploy_section 10 of 10 (the #194 fix review: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, 10 trials): a deploy to students on the spot, for a teacher who had named a time. The sentence handed back is the family's canonical 12-hour form; 'deploy at 18:30' would be accepted too."
+      },
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy today at 6:30 pm",
+        "expectWhen" : "today 18:30",
+        "expectWritten" : "6:30 tonight",
+        "input" : "deploy at 6:30 tonight",
+        "why" : "A part of the day after the time. Sent to the model it reached deploy_section 10 of 10 (the #194 fix review: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, 10 trials): a deploy to students on the spot, for a teacher who had named a time. Tonight is 5 to 11 (and 12 as midnight), and names today."
+      },
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy at 6:30 am",
+        "expectWhen" : "06:30",
+        "expectWritten" : "6:30 in the morning",
+        "input" : "deploy at 6:30 in the morning",
+        "why" : "Morning is 1 to 11. Sent to the model it reached deploy_section 10 of 10 (the #194 fix review: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, 10 trials): a deploy to students on the spot, for a teacher who had named a time."
+      },
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy tomorrow at 6:30 pm",
+        "expectWhen" : "tomorrow 18:30",
+        "expectWritten" : "6.30 pm",
+        "input" : "deploy tomorrow at 6.30 pm",
+        "why" : "A day word and a dotted time. Sent to the model this one was DECLINED 10 of 10 (the #194 fix review: Qwen2.5-1.5B Q4_K_M, Apple M4 Pro, Metal, 10 trials), not deployed - it is answered in code because it is the same shape as 'deploy at 6.30 pm', and a teacher who is told nothing gets no deploy either."
+      },
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy at 6:30 pm",
+        "expectWhen" : "18:30",
+        "expectWritten" : "6.30 p.m.",
+        "input" : "deploy at 6.30 p.m.",
+        "why" : "'p.m.' with its dots. The written time keeps the teacher's closing full stop, which the tidier took off the sentence. Not measured; the same shape as 'deploy at 6.30 pm'."
+      },
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy at 6:30 pm",
+        "expectWhen" : "18:30",
+        "expectWritten" : "6.30 PM",
+        "input" : "Deploy at 6.30 PM?",
+        "why" : "Case and a trailing question mark are tidied exactly as the family tidies them; the time is named back in the teacher's own capitals. Not measured."
+      },
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy at 6:30 am",
+        "expectWhen" : "06:30",
+        "expectWritten" : "06.30",
+        "input" : "deploy at 06.30",
+        "why" : "A dotted two-digit hour below 10 is 24-hour time. Not measured."
+      },
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy at 12:30 am",
+        "expectWhen" : "00:30",
+        "expectWritten" : "00.30",
+        "input" : "deploy at 00.30",
+        "why" : "Midnight on the 24-hour clock, handed back as 12:30 am. Not measured."
+      },
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy at 12:30 pm",
+        "expectWhen" : "12:30",
+        "expectWritten" : "12.30 pm",
+        "input" : "deploy at 12.30 pm",
+        "why" : "Noon with a dotted time and pm. Not measured."
+      },
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy at 6:30 pm",
+        "expectWhen" : "18:30",
+        "expectWritten" : "18:30",
+        "input" : "deploy at 18:30, please",
+        "why" : "A comma after a 24-hour time. The same moment as 'deploy at 18:30', which is accepted. Not measured; the comma-after-the-time shape measured 10 of 10 above."
+      },
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy at 10:30 am",
+        "expectWhen" : "10:30",
+        "expectWritten" : "10:30",
+        "input" : "deploy at 10:30, please",
+        "why" : "A COLON 10:30 with a comma is answered as the morning, because 'deploy at 10:30' is already accepted as 10:30 in the morning and a comma must not change that reading. A dotted 10.30 is asked instead (asked). Not measured."
+      },
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy at 7:00 pm",
+        "expectWhen" : "19:00",
+        "expectWritten" : "7pm",
+        "input" : "deploy at 7pm, please",
+        "why" : "A bare hour with pm and a comma; the sentence handed back always writes the minutes. Not measured."
+      },
+      {
+        "expectOnlyDifference" : "theComma",
+        "expectSay" : "deploy at 6:30 pm",
+        "expectWhen" : "18:30",
+        "expectWritten" : "6:30 pm",
+        "input" : "deploy at 6:30 pm,",
+        "why" : "A comma and nothing else. The reply says to leave the comma out (wording.sayTheTimeAsWithoutTheComma). Not measured."
+      },
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy at 6:30 pm",
+        "expectWhen" : "18:30",
+        "expectWritten" : "6:30 in the evening",
+        "input" : "deploy at 6:30 in the evening",
+        "why" : "Evening is 5 to 11. Not measured; #277's title names this phrase."
+      },
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy at 3:30 pm",
+        "expectWhen" : "15:30",
+        "expectWritten" : "3:30 in the afternoon",
+        "input" : "deploy at 3:30 in the afternoon",
+        "why" : "Afternoon is 12 to 5. Not measured."
+      },
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy at 5:30 pm",
+        "expectWhen" : "17:30",
+        "expectWritten" : "5:30 in the afternoon",
+        "input" : "deploy at 5:30 in the afternoon",
+        "why" : "The top of the afternoon window, where it meets the evening. Not measured."
+      },
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy today at 7:00 pm",
+        "expectWhen" : "today 19:00",
+        "expectWritten" : "7 tonight",
+        "input" : "deploy at 7 tonight",
+        "why" : "A bare hour is read when a part of the day stands beside it. Not measured."
+      },
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy today at 6:30 am",
+        "expectWhen" : "today 06:30",
+        "expectWritten" : "6:30 this morning",
+        "input" : "deploy at 6:30 this morning",
+        "why" : "'This morning' names today, and the moment may already have passed: the day was named, so it is not moved, and the runner's own refusal says so when the button is pressed (resolving). Not measured."
+      },
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy today at 12:30 pm",
+        "expectWhen" : "today 12:30",
+        "expectWritten" : "12:30 this afternoon",
+        "input" : "deploy at 12:30 this afternoon",
+        "why" : "12 in the afternoon is just after noon. Not measured."
+      },
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy today at 6:30 pm",
+        "expectWhen" : "today 18:30",
+        "expectWritten" : "6:30 pm tonight",
+        "input" : "deploy at 6:30 pm tonight",
+        "why" : "pm and a part of the day that agree. Not measured."
+      },
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy today at 6:30 pm",
+        "expectWhen" : "today 18:30",
+        "expectWritten" : "6:30 tonight",
+        "input" : "deploy today at 6:30 tonight",
+        "why" : "A day word and a part of the day that name the same day. Not measured."
+      },
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy tomorrow at 6:30 pm",
+        "expectWhen" : "tomorrow 18:30",
+        "expectWritten" : "6.30 pm",
+        "input" : "deploy at 6.30 pm tomorrow",
+        "why" : "A trailing day word; the sentence handed back puts it where the canonical form does. Not measured."
+      },
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy at 6:30 pm",
+        "expectWhen" : "18:30",
+        "expectWritten" : "6.30 pm",
+        "input" : "please deploy it at 6.30 pm",
+        "why" : "'please' and 'it' are read by the frame and left out of the sentence handed back, which is always built in the canonical form rather than around the teacher's words. Not measured."
+      },
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy at 6:30 pm",
+        "expectWhen" : "18:30",
+        "expectWritten" : "18:30 in the evening",
+        "input" : "deploy at 18:30 in the evening",
+        "why" : "A 24-hour time inside its part of the day. Not measured."
+      },
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy at 12:30 am",
+        "expectWhen" : "00:30",
+        "expectWritten" : "12:30 tonight",
+        "input" : "deploy at 12:30 tonight",
+        "why" : "Tonight's 12 is midnight (the director's ruling M1), which is the start of TOMORROW, so no day word is said: a bare 12:30 am settles onto the next one, which is the one meant (resolving). Not measured."
+      },
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy at 12:00 am",
+        "expectWhen" : "00:00",
+        "expectWritten" : "12 tonight",
+        "input" : "deploy at 12 tonight",
+        "why" : "The same, for a bare 12. Not measured."
+      },
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy today at 6:30 pm",
+        "expectWhen" : "today 18:30",
+        "expectWritten" : "tonight at 6:30",
+        "input" : "deploy tonight at 6:30",
+        "why" : "A part of the day in FRONT of 'at' (the director's ruling M2): read by timeToSayAs only, so the family's own frame, and what it accepts, do not move. Not measured."
+      },
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy today at 6:30 pm",
+        "expectWhen" : "today 18:30",
+        "expectWritten" : "this evening at 6:30",
+        "input" : "deploy this evening at 6:30",
+        "why" : "The same, with 'this evening'. Not measured."
+      },
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy tomorrow at 7:00 am",
+        "expectWhen" : "tomorrow 07:00",
+        "expectWritten" : "tomorrow morning at 7:00",
+        "input" : "deploy tomorrow morning at 7:00",
+        "why" : "'Tomorrow morning' in front of 'at' - one of the most natural ways to say it (the plan review, M2). Not measured."
+      },
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy tomorrow at 7:00 am",
+        "expectWhen" : "tomorrow 07:00",
+        "expectWritten" : "7:00 tomorrow morning",
+        "input" : "deploy at 7:00 tomorrow morning",
+        "why" : "The same, after the time. Not measured."
+      },
+      {
+        "expectOnlyDifference" : "spelling",
+        "expectSay" : "deploy today at 6:30 pm",
+        "expectWhen" : "today 18:30",
+        "expectWritten" : "6:30 pm, tonight",
+        "input" : "deploy at 6:30 pm, tonight",
+        "why" : "A comma between the time and the part of the day. Not measured."
       }
     ]
   },
@@ -1593,6 +2073,40 @@
         "name" : "answering the morning-or-evening question with the sentence it named puts the scheduled card up",
         "when" : "decline",
         "why" : "The other half of the question: the answer is a sentence it NAMED, and that sentence is answered in code on the very next turn, with the scheduled card and its question. A question whose suggested answer the app did not understand would be worse than no question. Declined rather than approved because approving would write a real scheduled job; the whole moment is pinned by deployAtATime.resolving."
+      },
+      {
+        "expectTranscriptContains" : [
+          "teacher: deploy at 6.30 pm",
+          "assistant: wording.sayTheTimeAs"
+        ],
+        "given" : {
+          "pending" : "schedule_deploy",
+          "saying" : [
+            "deploy at 6.30 pm"
+          ]
+        },
+        "name" : "a time the app can read but does not set is answered with the spelling to use, and nothing is scheduled",
+        "when" : "say",
+        "why" : "Issue #277. 'deploy at 6.30 pm' names a time the family can read but does not set (a full stop is not its clock separator), and until this it went to the model, which answered it with a deploy to students on the spot 10 trials out of 10 (the #194 fix review, Qwen2.5-1.5B Q4_K_M, Apple M4 Pro). Now it is answered IN CODE with the one sentence to type: the reply is wording.sayTheTimeAs, nothing is scheduled, and 'say' makes a card on this turn the failure. A runner with no model reachable still passes, because the model is never asked; on the old behaviour the line is never written. What the model is sent is not in the transcript, so each platform also pins in its own suite that the teacher's sentence and the reply never reach it."
+      },
+      {
+        "expectTranscriptContains" : [
+          "assistant: wording.sayTheTimeAs",
+          "teacher: deploy at 6:30 pm",
+          "assistant: Section 1",
+          "assistant: wording.scheduleQuestion",
+          "teacher: wording.cancelled"
+        ],
+        "given" : {
+          "pending" : "schedule_deploy",
+          "saying" : [
+            "deploy at 6.30 pm",
+            "deploy at 6:30 pm"
+          ]
+        },
+        "name" : "answering with the sentence the spelling reply named puts the scheduled card up",
+        "when" : "decline",
+        "why" : "The other half: the sentence the reply NAMED is answered in code on the very next turn, with the scheduled card and its question. A reply whose sentence the app did not understand would send the teacher's next turn to the model - the thing it exists to prevent. Declined rather than approved because approving would write a real scheduled job; the whole moment is pinned by deployAtATime.resolving."
       },
       {
         "expectTranscriptContains" : [
