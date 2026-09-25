@@ -1,0 +1,52 @@
+{
+  "shared_folders": [
+    "Concepts",
+    "Warm-Ups",
+    "Studio",
+    "Exercises",
+    "Discussions",
+    "Portfolios",
+    "Tutorials",
+    "Setup",
+    "Style",
+    "Tasks",
+    "Curriculum"
+  ],
+  "shared_files": [
+    "Learning Goals.md",
+    "Help Sessions.md"
+  ],
+  "per_section_folders": [
+    "All Classes"
+  ],
+  "per_section_files": [
+    "Key Links.md",
+    "Private Notes.md",
+    "Scratch Page.md"
+  ],
+  "hidden": [
+    "Curriculum",
+    "Learning Goals.md",
+    "Help Sessions.md",
+    "Key Links.md",
+    "Private Notes.md",
+    "Scratch Page.md"
+  ],
+  "expandable": [
+    "Concepts",
+    "Warm-Ups",
+    "Studio",
+    "Exercises",
+    "Discussions",
+    "Portfolios",
+    "Tutorials",
+    "Setup",
+    "Style",
+    "Tasks"
+  ],
+  "class_weekday_step": 1,
+  "curriculum_folder": "Curriculum",
+  "graded_folders": [
+    "Tasks"
+  ]
+}
