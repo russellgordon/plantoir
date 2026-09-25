@@ -4245,7 +4245,7 @@ A source scan, the `ActivityTrailWiringTests` device, over every Swift file in
 outright if it read fewer than 50 files on either side, so a scan that found
 nothing cannot pass by checking nothing:
 
-1. **The product asks only the seam.** Any of 31 lookups outside
+1. **The product asks only the seam.** Any of 32 lookups outside
    `RealHome.swift` fails, naming file and line: `homeDirectoryForCurrentUser`,
    `NSHomeDirectory`, `homeDirectory(forUser`, `.homeDirectory` (as
    `URL.homeDirectory` or the implicit member `let h: URL = .homeDirectory`),
@@ -4254,10 +4254,12 @@ nothing cannot pass by checking nothing:
    `.libraryDirectory` `.documentsDirectory` `.downloadsDirectory`
    `.cachesDirectory` `.picturesDirectory` `.moviesDirectory` `.musicDirectory`
    `.userDirectory` `.trashDirectory`, a bare `~` handed to a URL
-   (`filePath: "~"`, `fileURLWithPath: "~"` — both answer the real home),
+   (`filePath: "~"`, `fileURLWithPath: "~"` — both answer the real home;
+   matched with spaces removed, so `filePath:"~"` counts too),
    `expandingTildeInPath`, `abbreviatingWithTildeInPath`, `standardizingPath`,
    `getpwuid`, `getpwnam`, `CFCopyHomeDirectoryURL`, `environment["HOME"]`,
-   `getenv("HOME")`, a `"~/` literal and a `"/Users/` literal. Three are
+   `getenv("HOME")`, a `"~/` literal, a `"/Users/` literal and a
+   `"file:///Users/` literal. Three are
    allowed, counted per file and lookup, each with its reason in the test:
    `LogRedactor`'s `/Users/` pattern (it REMOVES home paths), two
    `standardizingPath` calls in `QuartzCheckoutLayout` that collapse `..`
@@ -4265,10 +4267,11 @@ nothing cannot pass by checking nothing:
    `~/Library/LaunchAgents`.
 2. **Tests reach the real home only where named.** The same lookups (minus the
    generic `/Users/`, since made-up homes like `/Users/teacher` are how a test
-   SHOULD name one), plus the running account's own home spelt out. Fifteen allowances in twelve files — mostly the guards
-   themselves, which must know where the real folder is to say nothing answered
-   it, and `ToolchainMirrorTests`, whose mirror must sit under `$HOME` because
-   Colima mounts nothing else. Two tests that spelt `/Users/russellgordon` as
+   SHOULD name one), plus the running account's own home spelt out. Fifteen
+   allowances in twelve files — mostly the guards themselves, which must know
+   where the real folder is to say nothing answered it, and
+   `ToolchainMirrorTests`, whose mirror must sit under `$HOME` because Colima
+   mounts nothing else. Two tests that spelt `/Users/russellgordon` as
    fixture text (`FinderPathBarTests`, `ProblemReportTests`) now use a made-up
    account.
 3. **Nothing stale.** An allowance must match exactly as many lines as it
@@ -4324,6 +4327,12 @@ failures**, led by "found no product source" and "found no test source".
   written in full or assembled (`"/Users" + "/"`), or `~` expanded from a
   VARIABLE by `URL(filePath:)` or `.standardized` (both expand it; no scan can
   see what a variable holds).
+- **A path derived from where the code or the app lives** — `#filePath` or
+  `Bundle.main.bundleURL` walked up with `deletingLastPathComponent()`. Under
+  the suite both are inside the real home (the checkout is under `~/Desktop`,
+  DerivedData under `~/Library`). Not scanned for: `#filePath` is how the
+  tripwire itself finds the source, and neither appears in `QuartzTeachers/`
+  today.
 - **`HOME` read through a local copy of the environment** —
   `let env = ProcessInfo.processInfo.environment` then `env["HOME"]`. Only the
   spellings `environment["HOME"]` and `getenv("HOME")` are scanned.
@@ -4331,9 +4340,14 @@ failures**, led by "found no product source" and "found no test source".
   claims. Guarded today by `isRunningTests && defaults === .standard` checks in
   `WorkspaceModel`, `AppSettings` and `WindowFolderMemory`; the scan cannot see
   that channel.
-- **Block comments.** The scan skips `//` comments (outside string literals);
-  it does not understand `/* … */`, nor `//` inside a multi-line `"""` string. A block comment naming a lookup is reported
-  rather than missed — the safe way round.
+- **Block comments, and two string shapes.** The scan skips `//` comments
+  (outside string literals); it does not understand `/* … */`, nor `//` inside
+  a multi-line `"""` string. A block comment naming a lookup is reported rather
+  than missed — the safe way round. The other two go the unsafe way and cut
+  real code: a raw string with an odd number of `"` before a `//`
+  (`#"a"//b"#; NSHomeDirectory()` is missed, because the walk reads raw strings
+  as ordinary ones), and a regex literal containing `\/\/`. Neither appears in
+  the product today (0 raw strings with `#"`).
 - **The tripwire's own file**, which spells every lookup as the text it looks
   for, and the opt-in UI and integration tests, which name a real workspace or
   read the real weights on purpose and are outside the gate.

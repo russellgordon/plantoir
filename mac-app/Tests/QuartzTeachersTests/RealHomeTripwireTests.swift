@@ -56,8 +56,12 @@ final class RealHomeTripwireTests: XCTestCase {
         ".trashDirectory",
         // A bare `~` handed to a URL: `URL(filePath: "~")` and
         // `URL(fileURLWithPath: "~").standardized` both answer the real home.
+        // Matched with the spaces taken out, so `filePath:"~"` counts too.
         "filePath: \"~\"",
         "fileURLWithPath: \"~\"",
+        // A home written as a file URL, which `"/Users/` below cannot see
+        // because the quote is not directly before it.
+        "\"file:///Users/",
         "expandingTildeInPath",
         "abbreviatingWithTildeInPath",
         "standardizingPath",
@@ -243,7 +247,18 @@ final class RealHomeTripwireTests: XCTestCase {
             if code.isEmpty {
                 continue
             }
-            for needle in needles where code.contains(needle) {
+            let codeWithoutSpaces: String = code.replacingOccurrences(of: " ", with: "")
+            for needle in needles {
+                // A needle with a space in it is matched space-free, so
+                // the same call written without the space is still seen.
+                if needle.contains(" ") {
+                    let needleWithoutSpaces: String = needle.replacingOccurrences(of: " ", with: "")
+                    if !codeWithoutSpaces.contains(needleWithoutSpaces) {
+                        continue
+                    }
+                } else if !code.contains(needle) {
+                    continue
+                }
                 if needle.hasPrefix(".") {
                     // `.homeDirectory` / `.desktopDirectory` must not match a
                     // longer name that merely starts the same way.
