@@ -745,9 +745,9 @@ DAY_PARTS = [
 
 
 def day_part_holds(kind, on_the_clock):
-    """Morning 1-11, afternoon 12-17, evening 17-23, tonight 17-23 and 0."""
+    """Morning 0-11, afternoon 12-17, evening 17-23, tonight 17-23 and 0."""
     if kind == "morning":
-        return 1 <= on_the_clock <= 11
+        return 0 <= on_the_clock <= 11
     if kind == "afternoon":
         return 12 <= on_the_clock <= 17
     if kind == "evening":
@@ -759,6 +759,8 @@ def day_part_place(kind, hour):
     """An hour 1-12 with no am or pm, on the 24-hour clock, else None."""
     if kind == "morning" and 1 <= hour <= 11:
         return hour
+    if kind == "morning" and hour == 12:
+        return 0
     if kind == "afternoon":
         if hour == 12:
             return 12
@@ -810,6 +812,13 @@ def respelling_reading(tidied):
         if not words[-1]:
             return None
         comma = True
+    # "deploy at 6:30 pm tomorrow, please": the comma kept the day word from
+    # the frame, and its order must not decide whether it is read.
+    if comma and words and words[-1] in ("today", "tomorrow"):
+        if frame_day is not None:
+            return None
+        frame_day = words[-1]
+        words = words[:-1]
     part = None
     for candidate in DAY_PARTS:
         if len(words) > len(candidate[0]) and words[-len(candidate[0]):] == candidate[0]:
@@ -821,6 +830,9 @@ def respelling_reading(tidied):
         if not words[-1]:
             return None
         comma = True
+    # "today" and "tonight" agree; tonight decides.
+    if part is not None and part[2] == "tonight" and frame_day == "today":
+        frame_day = None
     if len(words) not in (1, 2):
         return None
     clock, meridiem = words[0], None

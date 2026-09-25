@@ -131,9 +131,11 @@ nonisolated enum AssistWording {
     /// `AssistCardCommand.timeToSayAs` and is a sentence the matcher accepts,
     /// so typing it puts the scheduled deploy's card up on the very next
     /// turn. It names the time as the teacher wrote it — unless all that
-    /// stood in the way was a comma, or a comma and "please", when naming
-    /// their own words back would look like repeating them: then it says what
-    /// to leave out instead (the director's ruling, 2026-09-25). "Nothing is
+    /// stood in the way was a comma (without it, their own sentence sets the
+    /// same moment), when naming their time back would look like calling it
+    /// the problem: then it says to leave the comma out instead (the
+    /// director's rulings, 2026-09-25; a "without “please”" form was ruled
+    /// too and measured unreachable, see `onlyDifference`). "Nothing is
     /// set yet" for the reason `morningOrEvening` gives it. A FIRST DRAFT for
     /// Russell's wording pass.
     static func sayTheTimeAs(
@@ -146,8 +148,6 @@ nonisolated enum AssistWording {
             return "To set a deploy for “\(written)”, say it as “\(say)”. Nothing is set yet."
         case .theComma:
             return "To set that deploy, say it as “\(say)”, without the comma. Nothing is set yet."
-        case .please:
-            return "To set that deploy, say it as “\(say)”, without “please”. Nothing is set yet."
         }
     }
 

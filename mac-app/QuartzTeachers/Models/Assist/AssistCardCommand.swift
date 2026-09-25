@@ -195,8 +195,9 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     /// pm", "6:75 pm", "deploy at 7") is not caught: its refused row's written
     /// reason stands, and it goes to the model as before.
     ///
-    /// **A part of the day is a window.** Morning is 1 to 11, afternoon 12 to
-    /// 5, evening 5 to 11, and tonight the same with 12 as midnight. A time
+    /// **A part of the day is a window.** Morning is 12 (12 am) and 1 to 11,
+    /// afternoon 12 to 5, evening 5 to 11, and tonight the same with 12 as
+    /// midnight. A time
     /// outside its window is a sentence disagreeing with itself — "2:30 in the
     /// evening" — so it is never given a spelling: a one-digit hour with no am
     /// or pm is asked about (`morningOrEvening`), and anything else goes to
@@ -320,6 +321,19 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
             tookOffAComma = true
         }
 
+        // 1b. A day word the comma kept away from the frame: "deploy at 6:30
+        //     pm tomorrow, please" is the same sentence as "…, tomorrow" and
+        //     "tomorrow at 6:30 pm", so the order of the day word must not
+        //     decide whether it is read.
+        var frameDayWord: String? = frame.dayWord
+        if tookOffAComma, let last = words.last, last == "today" || last == "tomorrow" {
+            if frameDayWord != nil {
+                return nil
+            }
+            frameDayWord = last
+            words.removeLast()
+        }
+
         // 2. A part of the day at the end — exact words only.
         var dayPart: DayPart? = nil
         for candidate in DayPart.all {
@@ -339,6 +353,12 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
             }
             words[words.count - 1] = withoutTheComma
             tookOffAComma = true
+        }
+
+        // "Today" and "tonight" in one sentence agree, and "tonight" says
+        // more (its midnight is tomorrow's first minute), so it decides.
+        if dayPart?.kind == .tonight, frameDayWord == "today" {
+            frameDayWord = nil
         }
 
         // 4. What is left is a clock, with or without am or pm.
@@ -393,7 +413,7 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
 
         // 6. The day. A part of the day that names one must agree with a day
         //    word the sentence also carries.
-        var dayWord: String? = frame.dayWord
+        var dayWord: String? = frameDayWord
         if let partDay = dayPart?.dayWord {
             if let said = dayWord, said != partDay {
                 return nil
@@ -439,7 +459,7 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
                 guard hourText.count == 1, hour >= 1 else {
                     return nil
                 }
-                var askingDay: String? = frame.dayWord
+                var askingDay: String? = frameDayWord
                 if dayPart.dayWord == "tomorrow" {
                     askingDay = "tomorrow"
                 }
@@ -460,7 +480,7 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         // said for it: a bare time settles onto the next midnight, which is
         // the one meant.
         if dayPart?.words == ["tonight"], onTheClock < 12 {
-            if frame.dayWord != nil {
+            if frameDayWord != nil {
                 return nil
             }
             dayWord = nil
@@ -568,37 +588,47 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         return String(original[found.lowerBound..<end])
     }
 
-    /// Whether the teacher's sentence and the one handed back differ ONLY by
-    /// a comma, or by a comma and "please" — so the reply can say that,
-    /// rather than seem to repeat what the teacher already typed.
+    /// Whether the teacher's sentence needs only its comma taken out to be a
+    /// sentence the family SETS, for the same
+    /// moment as the one handed back; so the reply can say that rather than
+    /// seem to name back a time the teacher wrote perfectly well.
+    ///
+    /// Decided by the MATCHER and the moment, not by comparing text with
+    /// `say` (the fix review's M1, ruled 2026-09-25): "deploy it at 6:30 pm,
+    /// please" and "deploy at 7 am, please" differ from the canonical sentence
+    /// by more than a comma, and are still only a comma away from one the
+    /// family sets.
     private static func onlyDifference(
         between tidied: String, and say: String
     ) -> AssistTimeRespelling.OnlyDifference {
-        var text: String = tidied
-        while text.hasSuffix("?") {
-            text = String(text.dropLast())
+        guard let handedBack = AssistCardCommand.matching(say),
+              let moment = handedBack.arguments["when"] else {
+            return .spelling
         }
         var withoutCommas: [String] = []
-        for piece in text.split(separator: " ") {
+        for piece in tidied.split(separator: " ") {
             let word: String = piece.replacingOccurrences(of: ",", with: "")
             if !word.isEmpty {
                 withoutCommas.append(word)
             }
         }
-        if withoutCommas.joined(separator: " ") == say {
+        // Only the comma is tried. Taking "please" out as well was ruled too,
+        // and measured unreachable (113,400 sentences, 0): the frame already
+        // takes "please" off either end, so a sentence the family sets
+        // without its commas never needs "please" removed as well.
+        if AssistCardCommand.setsTheSameMoment(withoutCommas, as: moment) {
             return .theComma
         }
-        var withoutPlease: [String] = withoutCommas
-        if withoutPlease.first == "please" {
-            withoutPlease.removeFirst()
-        }
-        if withoutPlease.last == "please" {
-            withoutPlease.removeLast()
-        }
-        if withoutPlease.joined(separator: " ") == say {
-            return .please
-        }
         return .spelling
+    }
+
+    /// Whether `words`, as a sentence, is one the family schedules for
+    /// `moment`.
+    private static func setsTheSameMoment(_ words: [String], as moment: String) -> Bool {
+        guard let command = AssistCardCommand.matching(words.joined(separator: " ")) else {
+            return false
+        }
+        return command.toolName == "schedule_deploy" && command.arguments["when"] == moment
     }
 
     /// A message trimmed, case-folded, and with a trailing full stop or
@@ -1618,18 +1648,17 @@ nonisolated struct AssistTimeQuestion: Sendable, Equatable {
 nonisolated struct AssistTimeRespelling: Sendable, Equatable {
 
     /// What the reply can say about the difference between what was typed
-    /// and `say`, so it does not seem to repeat the teacher's own sentence
-    /// back to them when all that stood in the way was a comma.
+    /// and `say`, so it does not seem to name back a time the teacher wrote
+    /// perfectly well when all that stood in the way was a comma.
     nonisolated enum OnlyDifference: Sendable, Equatable {
 
         /// The time itself is spelled differently: "6.30 pm", "6:30 tonight".
         case spelling
 
-        /// Nothing but a comma: "deploy at 6:30 pm,".
+        /// Nothing but a comma: without it, the teacher's own sentence is
+        /// one the family sets for the same moment — "deploy at 6:30 pm,
+        /// please", "deploy at 7 am,".
         case theComma
-
-        /// A comma and "please": "deploy at 6:30 pm, please".
-        case please
     }
 
     // MARK: - Stored properties
@@ -1642,7 +1671,7 @@ nonisolated struct AssistTimeRespelling: Sendable, Equatable {
     /// The sentence to type instead: "deploy today at 6:30 pm".
     let say: String
 
-    /// Whether a comma, or a comma and "please", is all that differs.
+    /// Whether a comma is all that stood in the way.
     let onlyDifference: OnlyDifference
 }
 
@@ -1705,12 +1734,12 @@ nonisolated private struct DayPart: Sendable, Equatable {
     // MARK: - Functions
 
     /// Whether an hour on the 24-hour clock falls inside this part of the
-    /// day: morning 1–11, afternoon 12–17, evening 17–23, tonight 17–23 and
-    /// midnight.
+    /// day: morning 0–11 (12 am and 1–11), afternoon 12–17, evening 17–23,
+    /// tonight 17–23 and midnight.
     func holds(_ onTheClock: Int) -> Bool {
         switch kind {
         case .morning:
-            return onTheClock >= 1 && onTheClock <= 11
+            return onTheClock >= 0 && onTheClock <= 11
         case .afternoon:
             return onTheClock >= 12 && onTheClock <= 17
         case .evening:
@@ -1722,10 +1751,14 @@ nonisolated private struct DayPart: Sendable, Equatable {
 
     /// An hour written 1 to 12 with no am or pm, placed on the 24-hour clock
     /// by this part of the day — or nil when it falls outside it. Morning
-    /// 1–11; afternoon 12–5; evening 5–11; tonight 5–11, and 12 as midnight.
+    /// 12 (12 am, the fix review's M2) and 1–11; afternoon 12–5; evening 5–11;
+    /// tonight 5–11, and 12 as midnight.
     func place(_ hour: Int) -> Int? {
         switch kind {
         case .morning:
+            if hour == 12 {
+                return 0
+            }
             if hour >= 1 && hour <= 11 {
                 return hour
             }
