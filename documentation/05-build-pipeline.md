@@ -307,9 +307,14 @@ undated.
 - **A page a class links to DIRECTLY** takes the date of the EARLIEST visible,
   dated class of this section that links to it (ties by title), EVEN OVER A DATE
   OF ITS OWN — including one the teacher typed on the page. **A date typed on a
-  shared page that a class links to is REPLACED by its first class's date, on
-  the site and in the file**, on every build; to date such a page by hand, link
-  it from the class whose date it should carry. (Nothing in the app says this
+  page that a class links to no longer decides its date: its first class's
+  date wins, on the site and in the file**, on every build; to date such a page
+  by hand, link it from the class whose date it should carry. In the FILE that
+  means: on a shared (course-level) page, a typed `createdSection<N>` is
+  rewritten, and a typed plain `created:` STAYS, byte for byte — the build adds
+  `createdSection<N>` above it, which the site reads in preference, so editing
+  that `created:` later changes nothing; on a section's own page, `created`
+  (or the `createdSection<N>` it already uses) is rewritten. (Nothing in the app says this
   to a teacher yet: a sentence for them is Russell's wording pass, not this
   piece's.) "Links to directly" means the wikilinks written on the class page
   itself, resolved by relative path and by file name (`_pages_a_page_links_to`,
@@ -433,9 +438,16 @@ the new file over it in one step ONLY if the page still holds exactly the text
 the date was worked out from. A Stop part-way through leaves the old page or the
 new one, never a truncated one; an Obsidian save that lands after the read is
 kept, and the next build dates it. The cost, accepted: a renamed-in file is a
-new file to the file system, so its creation time is the time of the write —
-nothing in Plantoir or the build reads it (only frontmatter dates count), but
-Obsidian's file list sorted by "created time" will move a rewritten page. The
+new file to the file system, so its creation time is the time of the write,
+and it does not carry the page's extended attributes across — measured by the
+fix-round review on macOS 26 through the container, a `user.` attribute was
+lost 4 times of 4 and a Finder tag 1 time of 3 (it came back in the other two,
+presumably restored by macOS — not something to rely on). Nothing in Plantoir
+or the build reads either (only frontmatter dates count), but Obsidian's file
+list sorted by "created time" will move a rewritten page, and a Finder tag on
+one can go. Writing in place would keep both, and stays REJECTED: a Stop or an
+editor save part-way through leaves a torn page, and a torn page is worse than
+a lost tag. The
 first version truncated and wrote in place with no re-check — a window of a few milliseconds per page, across the
 ~100 writes of a course's first build, on the teacher's own file.
 
@@ -447,9 +459,27 @@ the course through a link, and two courses sharing one page would overwrite
 each other's `createdSection1` on alternate builds. Its site copy is still
 dated; the console names it ("Left the date on N page(s) as it was, because
 each one also lives somewhere else…"), and it is not on the trail, because
-nothing was written. A locked (`uchg`) or read-only page is not written either
-— a rename would replace a file that an ordinary write refuses, so this is
-checked before, rather than left to the write to fail.
+nothing was written.
+
+**A read-only page is not written either**, and that IS checked before the
+write, from the page's mode bits (no write bit for owner, group or anyone):
+a rename would replace a file that an ordinary write refuses. It is read from
+the mode bits and not from `os.access` because the build runs as ROOT in the
+container, where `os.access` says yes to every file — the fix-round review
+measured the first version rewriting a 0444 page there, mode kept.
+`test_a_read_only_page_is_named_and_left_alone_even_for_root` makes
+`os.access` answer as it does for root. Its site copy is still dated, and the
+console names it ("Left the date on N page(s) as it was, because each one is
+locked or set so it cannot be changed…"). **Finder's Locked flag (`uchg`) is
+NOT checked before** — Linux cannot see it (no `st_flags`), so the check finds
+nothing in the container. What was measured, as root in the image against a
+`uchg` page under `$HOME`: the HOST refuses the rename, the page is unchanged,
+and `_replace_the_page_safely` removes its hidden file, so none is left
+behind. That page is skipped silently (not named), and the next build tries
+again. Python run on the Mac itself (the tests) does see the flag and names
+the page as it names a read-only one; Windows has no such flag, and its
+read-only attribute shows up in the mode bits, so the native build there
+refuses and names a read-only page.
 
 **A course kept for reference is dated on its site only** — its files are
 never rewritten (`write_back=False` when `reference_course.is_reference` or
