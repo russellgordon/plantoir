@@ -1210,6 +1210,67 @@ final class ClassPlanningContractTests: XCTestCase {
         }
     }
 
+    /// `sectionIndexPointer.dateCases` (#275): the front page's DATE follows
+    /// the class its embed names — and a front page with no class embed keeps
+    /// its own. Every case with a `pointAt` is run through the pointer, with
+    /// that class's date handed in (the repointing test above hands in none,
+    /// which is how the no-embed case passed while the pointer re-dated a
+    /// hand-made front page on every publish). Cases without `pointAt` are the
+    /// build's alone; `scripts/test_dates_follow_the_class.py` runs every case.
+    func testTheFrontPagesDateFollowsTheClassItShows() throws {
+        let pointer: [String: Any] = try ClassPlanningContractTests.section("sectionIndexPointer")
+        let dateCases: [String: Any] = try XCTUnwrap(pointer["dateCases"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(dateCases["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 9)
+
+        var ranThroughThePointer: Int = 0
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            guard let pointAt = testCase["pointAt"] as? String else {
+                continue
+            }
+            let indexText: String = try XCTUnwrap(testCase["indexText"] as? String, name)
+            var classTitles: Set<String> = []
+            var pointAtDay: CalendarDay?
+            for pageClass in try XCTUnwrap(testCase["classes"] as? [[String: Any]], name) {
+                let title: String = try XCTUnwrap(pageClass["title"] as? String, name)
+                classTitles.insert(title.lowercased())
+                if title == pointAt, let created = pageClass["created"] as? String {
+                    pointAtDay = CalendarDay(text: String(created.prefix(10)))
+                }
+            }
+            let sectionNumber: Int = (testCase["section"] as? Int) ?? 1
+            let page: AssistSectionPage = AssistSectionPage(
+                title: pointAt,
+                displayTitle: pointAt,
+                fileURL: URL(fileURLWithPath: "/courses/TEST/section\(sectionNumber)/All Classes/\(pointAt).md"),
+                relativePath: "courses/TEST/section\(sectionNumber)/All Classes/\(pointAt).md",
+                isSectionLocal: true,
+                isVisibleToStudents: true,
+                visibilityIsCertain: true,
+                date: pointAtDay,
+                linkedTitles: [],
+                classFolderNames: ["All Classes"],
+                pathWithinSection: "All Classes/\(pointAt).md"
+            )
+            let result: SectionIndexPointer.Result? = SectionIndexPointer.repointing(
+                indexText, at: page, classTitles: classTitles, createdTail: "T07:00:00.000-0400"
+            )
+            let textAfter: String = result?.text ?? indexText
+            let createdAfter: String? = PageFrontmatter.rawValue(forKey: "created", in: textAfter)
+            let createdBefore: String? = PageFrontmatter.rawValue(forKey: "created", in: indexText)
+
+            if let expectedDay = testCase["expectCreatedDay"] as? String {
+                XCTAssertTrue((createdAfter ?? "").hasPrefix(expectedDay),
+                              "\(name): the front page reads \(createdAfter ?? "no date")")
+            } else {
+                XCTAssertEqual(createdAfter, createdBefore, "\(name): the front page's own date must stay")
+            }
+            ranThroughThePointer += 1
+        }
+        XCTAssertGreaterThanOrEqual(ranThroughThePointer, 7, "the contract lost the pointer's date cases")
+    }
+
     private static func section(_ name: String) throws -> [String: Any] {
         let url: URL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()

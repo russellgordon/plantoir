@@ -22,9 +22,12 @@ import site_health
 import contracts
 import class_pages
 import page_visibility
+import reference_course
 import stop_preview
 import toolchain_paths
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
+import stat as stat_module
+import tempfile
 import threading
 import time
 
@@ -1554,10 +1557,17 @@ def _parse_created_value(val) -> datetime | None:
       - 2025-08-10T12:34:56.000-0400 (no colon offset)
       - 2025-08-10T12:34:56.000-04:00
       - 2025-08-10T12:34:56Z
+      - a plain `2025-08-10` that YAML has already read as a DATE — what
+        Obsidian's Date property writes. It counts as midnight in Toronto.
+        Until 2026-09-25 it was read as no date at all, so a class dated
+        this way dated nothing, and a page it linked took a LATER class's
+        date (measured: Day 2's 09-24 instead of Day 1's 09-10).
     Naive datetimes are assumed in America/Toronto.
     """
     if isinstance(val, datetime):
         dt = val
+    elif isinstance(val, date):
+        dt = datetime(val.year, val.month, val.day)
     elif isinstance(val, str):
         s = val.strip()
         if not s:
@@ -1765,14 +1775,26 @@ def _extract_wikilink_targets(text: str) -> set[str]:
             targets.add(norm_path)
     return targets
 
-def _find_class_reachable_pages(content_root: Path) -> set[Path]:
+# Pages a link can never land on: a folder's own index, and the two pages
+# every section carries. A class does not "bring" them, whatever it links to.
+_STRUCTURAL_PAGE_NAMES = ("index.md", "key links.md", "curriculum coverage.md")
+
+
+def _read_pages_for_linking(content_root: Path):
     """
-    Find all pages in content_root that are reachable (directly or transitively)
-    from any Unit x, Day y class page via wikilinks.
+    Every page in content_root, with the two lookups a wikilink is resolved
+    through: by its path relative to content_root, and by its bare stem.
+
+    Shared by `_find_class_reachable_pages` and `_date_pages_from_their_classes`
+    so that "which page does this link land on?" has ONE answer in the build.
+    The two passes ask different questions of it: the first leaves alone every
+    page a class reaches, directly or through other pages; the second dates
+    only the pages a class links to DIRECTLY — so a page reached only through
+    another keeps its own date, in both.
     """
     pages_by_stem: dict[str, list[Path]] = {}
     pages_by_rel: dict[str, Path] = {}
-    all_pages: dict[Path, frontmatter.Post] = {}
+    all_pages: dict[Path, "frontmatter.Post"] = {}
 
     for root, dirs, files in os.walk(content_root):
         for name in files:
@@ -1786,7 +1808,7 @@ def _find_class_reachable_pages(content_root: Path) -> set[Path]:
                 continue
 
             stem_lower = fp.stem.lower()
-            if name.lower() not in ("index.md", "key links.md", "curriculum coverage.md"):
+            if name.lower() not in _STRUCTURAL_PAGE_NAMES:
                 pages_by_stem.setdefault(stem_lower, []).append(fp)
             try:
                 rel = fp.relative_to(content_root).as_posix().lower()
@@ -1795,6 +1817,38 @@ def _find_class_reachable_pages(content_root: Path) -> set[Path]:
                 pages_by_rel[rel] = fp
             except Exception:
                 pass
+
+    return all_pages, pages_by_stem, pages_by_rel
+
+
+def _pages_a_page_links_to(post, pages_by_stem, pages_by_rel) -> list[Path]:
+    """
+    The pages one page's wikilinks resolve to, by relative path and by stem —
+    never a structural page and never a class page, so a walk built on this
+    stops AT a class rather than continuing through it (#173).
+    """
+    linked: list[Path] = []
+    for target in _extract_wikilink_targets(post.content):
+        matched_paths = []
+        if target in pages_by_rel:
+            matched_paths.append(pages_by_rel[target])
+        if target in pages_by_stem:
+            matched_paths.extend(pages_by_stem[target])
+
+        for target_fp in matched_paths:
+            if target_fp.name.lower() in _STRUCTURAL_PAGE_NAMES or _is_class_page(target_fp):
+                continue
+            if target_fp not in linked:
+                linked.append(target_fp)
+    return linked
+
+
+def _find_class_reachable_pages(content_root: Path) -> set[Path]:
+    """
+    Find all pages in content_root that are reachable (directly or transitively)
+    from any Unit x, Day y class page via wikilinks.
+    """
+    all_pages, pages_by_stem, pages_by_rel = _read_pages_for_linking(content_root)
 
     class_page_paths: list[Path] = []
     for fp, post in all_pages.items():
@@ -1811,20 +1865,10 @@ def _find_class_reachable_pages(content_root: Path) -> set[Path]:
         if post is None:
             continue
 
-        targets = _extract_wikilink_targets(post.content)
-        for target in targets:
-            matched_paths = []
-            if target in pages_by_rel:
-                matched_paths.append(pages_by_rel[target])
-            if target in pages_by_stem:
-                matched_paths.extend(pages_by_stem[target])
-
-            for target_fp in matched_paths:
-                if target_fp.name.lower() in ("index.md", "key links.md", "curriculum coverage.md") or _is_class_page(target_fp):
-                    continue
-                if target_fp not in visited:
-                    visited.add(target_fp)
-                    queue.append(target_fp)
+        for target_fp in _pages_a_page_links_to(post, pages_by_stem, pages_by_rel):
+            if target_fp not in visited:
+                visited.add(target_fp)
+                queue.append(target_fp)
 
     return visited
 
@@ -1852,13 +1896,17 @@ def _sync_non_class_pages_created(content_root: Path, first_class_dt: datetime) 
             except Exception:
                 continue
 
-            # The root section landing page (content/index.md) carries the date of
-            # the section's newest published class; it is never reset to the first day.
+            # The root section landing page (content/index.md) is never reset to
+            # the first day: it carries the date of the class its embed names,
+            # which `_date_pages_from_their_classes` gives it on every build.
             if fp == content_root / "index.md":
                 continue
             title = str(post.get("title") or "")
             if _is_class_page(fp, title):
                 continue
+            # A page a class links to directly is dated from that class
+            # instead, by `_date_pages_from_their_classes`, which runs straight
+            # after this; one reached only through another page keeps its own.
             if fp in reachable_from_classes:
                 continue
 
@@ -1875,6 +1923,557 @@ def _sync_non_class_pages_created(content_root: Path, first_class_dt: datetime) 
                     pass
 
     return (updated, total_non_class)
+
+
+def _class_embed_target(line: str) -> str | None:
+    """
+    The page a front-page line transcludes, lowercased, or None when the line
+    is not a transclusion. The same rule as the app's pointer
+    (`contracts/class-planning.json` → `sectionIndexPointer.found`): the
+    line's trimmed text is `![[…]]`, the target is what comes before any `|`
+    display name or `#` heading, after any folder path.
+    """
+    trimmed = line.strip()
+    if not (trimmed.startswith("![[") and trimmed.endswith("]]")):
+        return None
+    inside = trimmed[3:-2]
+    target = inside.split("|")[0].split("#")[0].strip()
+    bare = target.split("/")[-1].strip()
+    return bare.lower() if bare else None
+
+
+# Where each page of this build's copy came from in the teacher's own folder,
+# and whether it is a SECTION's page (inside section<N>/) or the course's,
+# shared by every section. Filled in by the content copy in
+# `build_section_site`, one build of one section per process, and read by
+# `_date_pages_from_their_classes`, which writes a page's date back into the
+# file it came from (#275, #276). A page the build made itself has no entry and
+# is never written back.
+_vault_sources: dict[Path, tuple[Path, bool]] = {}
+_vault_course_folder: list[Path] = []
+
+
+def remember_vault_source(copied: Path, source: Path, is_section_page: bool) -> None:
+    """Records that `copied`, in this build's copy, came from `source`."""
+    _vault_sources[Path(copied)] = (Path(source), is_section_page)
+
+
+def forget_vault_sources(course_folder: Path | None = None) -> None:
+    """Starts a new build's record, for the course kept in `course_folder`."""
+    _vault_sources.clear()
+    _vault_course_folder.clear()
+    if course_folder is not None:
+        _vault_course_folder.append(Path(course_folder))
+
+
+def _is_frontmatter_fence(line: str) -> bool:
+    """Three or more dashes and nothing else — the app's own fence rule
+    (`PageVisibilityReader.isFence`), so the build writes the block the apps
+    read."""
+    bare = page_visibility.trim(line)
+    return len(bare) >= 3 and set(bare) == {"-"}
+
+
+def _frontmatter_fences(lines: list[str]):
+    """(open, close) line numbers of a page's frontmatter, or None. Leading
+    blank lines are skipped, as python-frontmatter and the apps skip them."""
+    open_index = 0
+    while open_index < len(lines) and page_visibility.trim(lines[open_index]) == "":
+        open_index += 1
+    if open_index >= len(lines) or not _is_frontmatter_fence(lines[open_index]):
+        return None
+    for index in range(open_index + 1, len(lines)):
+        if _is_frontmatter_fence(lines[index]):
+            return (open_index, index)
+    return None
+
+
+def _continuation_line_indices(lines: list[str], key_index: int, close_index: int,
+                               key_value_was_empty: bool) -> list[int]:
+    """
+    The lines below a key that belong to its value, and so must go when the
+    key is rewritten — or they are left behind, orphaned under whatever key
+    comes next, which YAML folds into THAT key's value or refuses outright.
+
+    The rule of `PageVisibilityReader.continuationLineIndices` (#176), which
+    #199 applies to the apps' own date and title writers: step over blank
+    lines and `# note`s at any indent, stop at the first line that is not
+    indented, and take everything up to the last indented line that was not a
+    comment. A block sequence at column 0 continues a key with no value of its
+    own. Ask it BEFORE the key's line is rewritten.
+    """
+    last_value_line = key_index
+    position = key_index + 1
+    while position < close_index and position < len(lines):
+        bare = lines[position].rstrip("\r")
+        content = page_visibility.trim(bare)
+        if content == "" or content.startswith("#"):
+            position += 1
+            continue
+        if bare[:1] not in (" ", "\t"):
+            if not key_value_was_empty:
+                break
+            if content != "-" and not content.startswith("- "):
+                break
+        last_value_line = position
+        position += 1
+    return list(range(key_index + 1, last_value_line + 1))
+
+
+def _trailing_comment(raw_value: str) -> str:
+    """
+    The `# note` at the end of a key's line, with the space before it, or ""
+    when there is none — so a rewrite of the value keeps the teacher's note.
+    YAML starts a comment at a `#` that follows a space or a tab and is not
+    inside quotes; a `#` in the middle of a word is part of the value.
+    """
+    quote = None
+    escaped = False
+    for index, character in enumerate(raw_value):
+        if quote is not None:
+            if escaped:
+                escaped = False
+            elif quote == '"' and character == "\\":
+                escaped = True
+            elif character == quote:
+                quote = None
+            continue
+        if character in ("'", '"') and raw_value[:index].strip() == "":
+            quote = character
+            continue
+        if character == "#" and (index == 0 or raw_value[index - 1] in (" ", "\t")):
+            start = index
+            while start > 0 and raw_value[start - 1] in (" ", "\t"):
+                start -= 1
+            comment = raw_value[start:]
+            return comment if comment.startswith((" ", "\t")) else " " + comment
+    return ""
+
+
+def _setting_frontmatter_value(text: str, key: str, value_text: str) -> str | None:
+    """
+    The page with `key: value_text` in its frontmatter, every other byte left
+    alone — or None when the page cannot be written safely.
+
+    The LAST line naming the key is the one rewritten, because it is the one
+    PyYAML keeps when a page carries the same key twice. Its continuation lines
+    go with it. A missing key is inserted at the top of the block, where the
+    apps and the installer put `created`. A page with no frontmatter block
+    gets one. A `# note` at the end of the key's line stays there. A block
+    opened and never closed, or indented with a tab (which YAML refuses), is
+    not touched.
+    """
+    newline = "\r\n" if "\r\n" in text else "\n"
+    lines = text.split("\n")
+    fences = _frontmatter_fences(lines)
+    if fences is None:
+        for line in lines:
+            if page_visibility.trim(line) == "":
+                continue
+            if _is_frontmatter_fence(line):
+                return None
+            break
+        return f"---{newline}{key}: {value_text}{newline}---{newline}" + text
+    open_index, close_index = fences
+    key_line = re.compile(r"^[\"']?" + re.escape(key) + r"[\"']?[ \t]*:(?=[ \t]|$)(.*)$")
+    found = None
+    for index in range(open_index + 1, close_index):
+        bare = lines[index].rstrip("\r")
+        if bare.startswith("\t"):
+            return None
+        if key_line.match(bare):
+            found = index
+    if found is None:
+        carriage = "\r" if lines[open_index].endswith("\r") else ""
+        lines.insert(open_index + 1, f"{key}: {value_text}{carriage}")
+        return "\n".join(lines)
+    raw_value = key_line.match(lines[found].rstrip("\r")).group(1)
+    trimmed_value = page_visibility.trim(raw_value)
+    was_empty = trimmed_value == "" or trimmed_value.startswith("#")
+    taken = _continuation_line_indices(lines, found, close_index, was_empty)
+    carriage = "\r" if lines[found].endswith("\r") else ""
+    comment = _trailing_comment(raw_value)
+    lines[found] = f"{key}: {value_text}{comment}{carriage}"
+    for index in reversed(taken):
+        del lines[index]
+    return "\n".join(lines)
+
+
+def _date_for_this_section(metadata: dict, section_number: int):
+    """The `created` the build reads for this section: `createdSection<N>`
+    when the page has one, else `created` (see `process_frontmatter`)."""
+    per_section_key = f"createdSection{section_number}"
+    if per_section_key in metadata:
+        return metadata[per_section_key]
+    return metadata.get("created")
+
+
+def _yaml_text_for_date(value) -> str | None:
+    """
+    How to write `value` on a frontmatter line so that the build reads back
+    exactly `value` — plain where that round-trips, double-quoted where a
+    plain string would be read as a date instead. None when neither does.
+    """
+    if isinstance(value, (datetime, date)):
+        candidates = [value.isoformat()]
+    else:
+        text = str(value)
+        candidates = [text, json.dumps(text, ensure_ascii=False)]
+    for candidate in candidates:
+        if "\n" in candidate:
+            continue
+        try:
+            read_back = frontmatter.loads(f"---\ncreated: {candidate}\n---\n").get("created")
+        except Exception:
+            continue
+        if read_back == value and type(read_back) is type(value):
+            return candidate
+    return None
+
+
+def _reaches_the_page_through_a_link(source: Path) -> bool:
+    """
+    Whether the teacher's page is a link to a file kept somewhere else — the
+    page itself, or a folder between it and the course folder — or one of two
+    names for the same file. Writing through it would change a file outside
+    this course, or one a second course shares, and two courses sharing one
+    page would overwrite each other's date on alternate builds (measured on
+    2026-09-25: a file outside the course was rewritten).
+    """
+    course_folders = _vault_course_folder[:1]
+    try:
+        if source.is_symlink():
+            return True
+        if source.stat().st_nlink > 1:
+            return True
+        if course_folders:
+            course_folder = course_folders[0]
+            folder = source.parent
+            while folder != course_folder and course_folder in folder.parents:
+                if folder.is_symlink():
+                    return True
+                folder = folder.parent
+    except OSError:
+        return True
+    return False
+
+
+def _is_locked(source: Path) -> bool:
+    """Whether the page is locked — Finder's Locked (`uchg`) or the system's
+    immutable flag, where the platform has them, or read-only. A rename would
+    replace a locked file that an ordinary write refuses.
+
+    Read-only is read from the MODE BITS — no write bit for owner, group or
+    anyone — and not from `os.access`: the build runs as root in the
+    container, root passes `os.access` for every file, and a 0444 page was
+    rewritten there (measured, review of 2026-09-25). The Locked flag is not
+    visible from Linux at all (no `st_flags`); there the host refuses the
+    rename instead, and `_replace_the_page_safely` removes its temporary file
+    — measured, not checked here."""
+    try:
+        status = os.stat(source)
+    except OSError:
+        return True
+    flags = getattr(status, "st_flags", 0)
+    for name in ("UF_IMMUTABLE", "SF_IMMUTABLE", "UF_APPEND", "SF_APPEND"):
+        flag = getattr(stat_module, name, 0)
+        if flag and flags & flag:
+            return True
+    write_bits = stat_module.S_IWUSR | stat_module.S_IWGRP | stat_module.S_IWOTH
+    if stat_module.S_IMODE(status.st_mode) & write_bits == 0:
+        return True
+    return not os.access(source, os.W_OK)
+
+
+def _replace_the_page_safely(source: Path, original: str, rewritten: str) -> bool:
+    """
+    Puts `rewritten` in place of the teacher's page without ever leaving a
+    half-written file: the new text goes to a hidden file beside the page, is
+    flushed to disk, and is renamed over the page in one step — but only if
+    the page still holds exactly the text the date was worked out from. A
+    Stop partway through leaves the old page or the new one, never an empty
+    one; an Obsidian save that lands after the page was read is kept, and the
+    next build dates it.
+    """
+    folder = source.parent
+    try:
+        handle_number, temporary_name = tempfile.mkstemp(
+            dir=folder, prefix=f".{source.name}.", suffix=".plantoir-dating")
+    except OSError:
+        return False
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(handle_number, "w", encoding="utf-8", newline="") as handle:
+            handle.write(rewritten)
+            handle.flush()
+            os.fsync(handle.fileno())
+        shutil.copymode(source, temporary)
+        with open(source, "r", encoding="utf-8", newline="") as handle:
+            still_there = handle.read()
+        if still_there != original:
+            temporary.unlink()
+            return False
+        os.replace(temporary, source)
+        return True
+    except Exception:
+        try:
+            temporary.unlink()
+        except OSError:
+            pass
+        return False
+
+
+def _write_date_into_the_teachers_page(source: Path, is_section_page: bool,
+                                       section_number: int, value) -> str | None:
+    """
+    Writes a class's date into the teacher's own page — only when the build
+    would otherwise read a different one, so a build whose dates are already
+    right changes no file at all (a changed file after the build began makes
+    the app build again once, #265).
+
+    A course-level page is shared by every section, and the sections do not
+    teach it on the same day, so its date is written to `createdSection<N>` —
+    THIS section's key only; another section's is never touched. A section's
+    own page carries `created`, unless it already uses `createdSection<N>`,
+    which is the one the build reads.
+
+    Every write is checked by reading the page back the way the build does:
+    this section's date must now be `value`, and every other key and the whole
+    body must be exactly what they were. Anything else is not written. The
+    write itself goes to a file beside the page and is renamed over it, after
+    checking the page has not changed since it was read.
+
+    Returns "written", "linked" when the date is wrong but the page is a link
+    to a file kept elsewhere (never written through — the build names it),
+    "locked" when the date is wrong but the page is locked or read-only (not
+    written — the build names it), or None when nothing was written for any
+    other reason.
+    """
+    try:
+        with open(source, "r", encoding="utf-8", newline="") as handle:
+            text = handle.read()
+    except Exception:
+        return None
+    if text.startswith("\ufeff"):
+        return None
+    try:
+        before = frontmatter.loads(text)
+    except Exception:
+        return None
+    if _date_for_this_section(before.metadata, section_number) == value:
+        return None
+    if _reaches_the_page_through_a_link(source):
+        return "linked"
+    if _is_locked(source):
+        return "locked"
+
+    per_section_key = f"createdSection{section_number}"
+    if not is_section_page or per_section_key in before.metadata:
+        key = per_section_key
+    else:
+        key = "created"
+    value_text = _yaml_text_for_date(value)
+    if value_text is None:
+        return None
+    rewritten = _setting_frontmatter_value(text, key, value_text)
+    if rewritten is None or rewritten == text:
+        return None
+
+    try:
+        after = frontmatter.loads(rewritten)
+    except Exception:
+        return None
+    if _date_for_this_section(after.metadata, section_number) != value:
+        return None
+    if after.content != before.content:
+        return None
+    for name in set(before.metadata) | set(after.metadata):
+        if name == key:
+            continue
+        if before.metadata.get(name) != after.metadata.get(name) or \
+                (name in before.metadata) != (name in after.metadata):
+            return None
+
+    if not _replace_the_page_safely(source, text, rewritten):
+        return None
+    return "written"
+
+
+def _date_pages_from_their_classes(content_root: Path, section_number: int = 1,
+                                   write_back: bool = True) -> dict:
+    """
+    Give the section's front page, and every page a visible class brings, the
+    date of their class (GitHub #275 and #276). Runs on EVERY build and
+    REWRITES the teacher's own files, not only the build's copy — Russell,
+    2026-09-25: the vault must carry the true dates, so that Obsidian, the
+    app and the site agree.
+
+    1. The front page (`content_root/index.md`, from `section<N>/index.md`)
+       takes the date of the class page its embed names — the first `![[…]]`
+       line naming one of this build's class pages, found the way the app's
+       pointer finds it — when that class is VISIBLE and dated. A front page
+       with no class embed, or whose embed names a hidden or undated class,
+       keeps its own date.
+    2. A page a visible, dated class links to DIRECTLY — never another class
+       page — takes the date of the EARLIEST such class (ties by title), even
+       over a date of its own. A page reached only through another shared page
+       keeps its own date. Russell's choice (A), 2026-09-24: a page duplicated from a
+       template carries the template's install-day stamp, which no other
+       writer ever moves once the page is visible.
+
+    The date is PER SECTION: this build reads this section's classes, and a
+    course-level page is written to `createdSection<N>` for this section
+    only. The value is the class's own, copied rather than re-formatted —
+    converting to Toronto time can move the calendar day of a timestamp near
+    midnight UTC.
+
+    Returns {"front_page": the front page's new date or None,
+             "site_pages": pages whose date changed in the build's copy,
+             "rewritten": the teacher's pages rewritten, by their place in the
+                          course folder,
+             "left_linked": pages whose date is wrong but which are links to
+                          a file kept elsewhere, and so are never written}.
+    """
+    all_pages, pages_by_stem, pages_by_rel = _read_pages_for_linking(content_root)
+
+    # This build's class pages, by title and by file name.
+    class_pages_by_name: dict[str, Path] = {}
+    for fp, post in all_pages.items():
+        title = str(post.get("title") or "")
+        if _is_class_page(fp, title):
+            class_pages_by_name[fp.stem.strip().lower()] = fp
+            if title.strip():
+                class_pages_by_name[title.strip().lower()] = fp
+
+    def visible_date_of(class_fp: Path):
+        """The class's `created`, when students can see it and it has one."""
+        post = all_pages[class_fp]
+        if _is_draft(frontmatter.dumps(post)):
+            return None
+        raw = post.get("created")
+        if _parse_created_value(raw) is None:
+            return None
+        return raw
+
+    result = {"front_page": None, "site_pages": 0, "rewritten": [], "left_linked": [],
+              "left_locked": []}
+
+    def give_date(fp: Path, value) -> bool:
+        """Dates the build's copy, then the teacher's page it came from."""
+        post = all_pages[fp]
+        changed_here = False
+        if post.get("created") != value:
+            post["created"] = value
+            try:
+                # The build's copy keeps the page's permissions (copy2), so a
+                # read-only page arrives read-only; it is the build's own file,
+                # and a build not running as root (the Windows app's native
+                # build, the tests) could not date it otherwise.
+                mode = stat_module.S_IMODE(os.stat(fp).st_mode)
+                if not mode & stat_module.S_IWUSR:
+                    os.chmod(fp, mode | stat_module.S_IWUSR)
+                with open(fp, "w", encoding="utf-8") as f:
+                    f.write(frontmatter.dumps(post))
+                changed_here = True
+            except Exception:
+                pass
+        source = _vault_sources.get(fp)
+        if write_back and source is not None:
+            source_path, is_section_page = source
+            outcome = _write_date_into_the_teachers_page(source_path, is_section_page, section_number, value)
+            if outcome == "written":
+                result["rewritten"].append(_name_in_the_course(source_path))
+            elif outcome == "linked":
+                result["left_linked"].append(_name_in_the_course(source_path))
+            elif outcome == "locked":
+                result["left_locked"].append(_name_in_the_course(source_path))
+        return changed_here
+
+    # 1. The front page.
+    front_page = content_root / "index.md"
+    front_post = all_pages.get(front_page)
+    if front_post is not None:
+        for line in front_post.content.split("\n"):
+            target = _class_embed_target(line)
+            if target is None or target not in class_pages_by_name:
+                continue
+            named_created = visible_date_of(class_pages_by_name[target])
+            if named_created is not None:
+                if give_date(front_page, named_created):
+                    result["front_page"] = named_created
+            break
+
+    # 2. The pages each visible class brings, earliest class first.
+    dated_classes = []
+    for class_fp in set(class_pages_by_name.values()):
+        created = visible_date_of(class_fp)
+        if created is None:
+            continue
+        title = str(all_pages[class_fp].get("title") or class_fp.stem).strip().lower()
+        dated_classes.append((_parse_created_value(created), title, class_fp, created))
+    dated_classes.sort(key=lambda entry: (entry[0], entry[1]))
+
+    # DIRECT links only. A page reached only THROUGH another shared page — a
+    # hub like "How Marks Work" that Unit 1, Day 1 links, and that links half
+    # the course — keeps its own date, and an undated one stays undated. When
+    # the walk followed links through pages, Day 1 claimed 98 of the 105 pages
+    # EXC2O's first build rewrote, and 2,150 of 5,177 reached pages across the
+    # 39 payloads took an EARLIER class than the first one linking them
+    # directly (reviews of 2026-09-25). Russell's words were "the first
+    # Unit x, Day y page that linked to them".
+    claimed: set[Path] = set()
+    for class_dt, class_title, class_fp, class_created in dated_classes:
+        for linked_fp in _pages_a_page_links_to(all_pages[class_fp], pages_by_stem, pages_by_rel):
+            if linked_fp in claimed:
+                continue
+            claimed.add(linked_fp)
+            if give_date(linked_fp, class_created):
+                result["site_pages"] += 1
+
+    return result
+
+
+def _name_in_the_course(source: Path) -> str:
+    """A page's place in the course folder, without `.md` — a NAME for the
+    activity trail, never anything written on the page."""
+    name = source.name
+    if _vault_course_folder:
+        try:
+            name = source.relative_to(_vault_course_folder[0]).as_posix()
+        except ValueError:
+            pass
+    return name[:-3] if name.lower().endswith(".md") else name
+
+
+def announce_dated_pages(result: dict, course: str, section_number: int, printer=print) -> None:
+    """
+    Says what the date pass rewrote: one line for the teacher, and one
+    machine-readable line the app records on its activity trail
+    (`contracts/shared-rules.json` → `pagesDatedByTheBuild`) — the NAMES of
+    the pages, never anything written on them.
+    """
+    left_linked = result.get("left_linked") or []
+    if left_linked:
+        shown = ", ".join(left_linked[:10])
+        more = f" and {len(left_linked) - 10} more" if len(left_linked) > 10 else ""
+        printer(f"📆 Left the date on {len(left_linked)} page(s) as it was, because each one also "
+                f"lives somewhere else and changing it here would change it there too: {shown}{more}.")
+    left_locked = result.get("left_locked") or []
+    if left_locked:
+        shown = ", ".join(left_locked[:10])
+        more = f" and {len(left_locked) - 10} more" if len(left_locked) > 10 else ""
+        printer(f"📆 Left the date on {len(left_locked)} page(s) as it was, because each one is "
+                f"locked or set so it cannot be changed: {shown}{more}.")
+    rewritten = result.get("rewritten") or []
+    if not rewritten:
+        return
+    printer(f"📆 Gave {len(rewritten)} of your page(s) the date of the first class that links to them.")
+    try:
+        prefix = contracts.section("shared-rules", "pagesDatedByTheBuild", "marker", "prefix")
+    except Exception:
+        return
+    payload = {"course": course, "section": section_number, "pages": rewritten}
+    printer(f"{prefix} {json.dumps(payload, ensure_ascii=False)}")
 # ===========================================================================
 
 
@@ -4280,7 +4879,8 @@ def _is_draft(text: str) -> bool:
     existing course may carry it — but an explicit `publish` always wins.
 
     The text this runs over has ALREADY been through `process_frontmatter`:
-    the only caller is the curriculum-coverage map, which walks the merged
+    its callers are the curriculum-coverage map and the date pass for the
+    pages a class brings (`_date_pages_from_their_classes`), which walk the merged
     `content/` tree. So the per-section keys are gone, `draft:` has been
     deleted, and PyYAML has rewritten any real boolean as lowercase `false`.
     The `draft` branch below is therefore unreachable for anything the build
@@ -5163,10 +5763,12 @@ def build_section_site(
     # copy made any earlier would have been thrown away.
     install_favicon(output_dir, content_root)
 
+    forget_vault_sources(course_dir)
     section_index = section_dir / "index.md"
     if section_index.exists():
         dest = content_root / "index.md"
         shutil.copy2(section_index, dest)
+        remember_vault_source(dest, section_index, is_section_page=True)
         process_frontmatter(dest, section_number)
 
         # The landing title comes from the current settings, not from
@@ -5192,6 +5794,7 @@ def build_section_site(
                 src_file = Path(root) / file
                 dest_file = dest_path / file
                 shutil.copy2(src_file, dest_file)
+                remember_vault_source(dest_file, src_file, is_section_page=False)
                 process_frontmatter(dest_file, section_number)
 
     # Copy shared files
@@ -5201,6 +5804,7 @@ def build_section_site(
         dest = content_root / file_name
         if src.exists():
             shutil.copy2(src, dest)
+            remember_vault_source(dest, src, is_section_page=False)
             process_frontmatter(dest, section_number)
             print(f"  📄 Copied shared file: {file_name}")
 
@@ -5214,6 +5818,7 @@ def build_section_site(
             for root, dirs, files in os.walk(dest):
                 for file in files:
                     fp = Path(root) / file
+                    remember_vault_source(fp, src / fp.relative_to(dest), is_section_page=True)
                     process_frontmatter(fp, section_number)
                     if fp.suffix.lower() == ".md":
                         rewrite_section_wikilinks(fp)
@@ -5226,6 +5831,7 @@ def build_section_site(
         dest = content_root / file_name
         if src.exists():
             shutil.copy2(src, dest)
+            remember_vault_source(dest, src, is_section_page=True)
             process_frontmatter(dest, section_number)
             print("🔍 Checking for wikilinks to rewrite in per-section loose files...")
             rewrite_section_wikilinks(dest)
@@ -5314,6 +5920,17 @@ def build_section_site(
     else:
         updated, total = _sync_non_class_pages_created(content_root, first_class_dt)
         print(f"📆 Synced non-class pages 'created' → {first_class_stamp} for {updated} file(s) ({total} non-class file(s) in total).")
+    # The front page and the pages a class brings take their CLASS's date
+    # (#275, #276) — on every build, whichever way the class was published,
+    # in the build's copy AND in the teacher's own files.
+    # A course kept for reference is last year's, frozen on purpose: its site
+    # copy is dated the same way, but its files are never rewritten.
+    frozen_course = reference_course.is_reference(course_dir) or reference_course.cannot_tell(course_dir)
+    dating = _date_pages_from_their_classes(content_root, section_number, write_back=not frozen_course)
+    if dating["front_page"] is not None:
+        print(f"📆 The front page now carries the date of the class it shows ({dating['front_page']}).")
+    print(f"📆 Dated {dating['site_pages']} page(s) from the first class that links to them.")
+    announce_dated_pages(dating, course_code, section_number)
     # ===========================================================================
 
     # Copy course config into output root (back-compat)
