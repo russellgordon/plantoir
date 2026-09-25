@@ -270,17 +270,246 @@ needs the plain `[[Thread 2, Day 8]]` form.
 
 <a name="dates-drive-everything"></a>
 
-### Curriculum date synchronization
+### Dates: which page carries which, and who writes them
 
 Pages listing folder contents in Quartz sort by date, and this toolchain
 [configures dates to mean *created*](06-quartz-customizations.md#c1-applied-on-first-build--full-rebuild)
-(from frontmatter, never from git). Curriculum-expectation pages are written
-once at course setup and never touched again, which would leave them sorted
-to the bottom of list pages forever. The build therefore finds the **newest
-`created` timestamp anywhere in the section's content**, then bumps every
-file inside any folder whose name contains "curriculum" up to that
-timestamp (only if older). Curriculum pages thus float alongside current
-content without the teacher ever editing them.
+(from frontmatter, never from git). Two passes run on EVERY build, in the
+ALWAYS part of `build_section_site`, after the content has been copied and read
+for this section (`process_frontmatter` has already turned `createdSection<N>`
+into `created` in the build's copy):
+
+1. **Pages no class brings** — `_sync_non_class_pages_created`. Sidebar pages,
+   Key Links, Curriculum pages and anything no class page links to, directly or
+   through other pages, take the first class's date (`class-planning.json` → `datingNonClassPages`), in the
+   build's COPY only. (This section used to describe a "bump every curriculum
+   page up to the newest date". Nothing does that any more: measured
+   2026-09-24, `_is_in_curriculum_folder` is defined and called nowhere, and
+   curriculum pages get the first class's date from this pass like every other
+   page nothing links to.)
+2. **The front page and the pages a class links to directly** — `_date_pages_from_their_classes`
+   (GitHub #275, #276, 2026-09-25). This one REWRITES THE TEACHER'S OWN FILES.
+
+A page reached only THROUGH another shared page is in neither population: the
+first pass skips it (a class reaches it) and the second does not date it (no
+class links it directly), so it keeps its own date — and an undated one stays
+undated.
+
+#### The rules (`sectionIndexPointer.dateCases`, `datingPagesAClassBrings.atBuildTime`)
+
+- **The front page** (`section<N>/index.md`) takes the date of the class page
+  its embed names — the first `![[…]]` line naming one of this section's class
+  pages, found exactly as the app's pointer finds it
+  (`sectionIndexPointer.found`) — when that class is VISIBLE and dated. No class
+  embed, or an embed naming a hidden or undated class: the page keeps its own
+  date and is not written. The build never moves the embed; that is the
+  pointer's job.
+- **A page a class links to DIRECTLY** takes the date of the EARLIEST visible,
+  dated class of this section that links to it (ties by title), EVEN OVER A DATE
+  OF ITS OWN — including one the teacher typed on the page. **A date typed on a
+  page that a class links to no longer decides its date: its first class's
+  date wins, on the site and in the file**, on every build; to date such a page
+  by hand, link it from the class whose date it should carry. In the FILE that
+  means: on a shared (course-level) page, a typed `createdSection<N>` is
+  rewritten, and a typed plain `created:` STAYS, byte for byte — the build adds
+  `createdSection<N>` above it, which the site reads in preference, so editing
+  that `created:` later changes nothing; on a section's own page, `created`
+  (or the `createdSection<N>` it already uses) is rewritten. (Nothing in the app says this
+  to a teacher yet: a sentence for them is Russell's wording pass, not this
+  piece's.) "Links to directly" means the wikilinks written on the class page
+  itself, resolved by relative path and by file name (`_pages_a_page_links_to`,
+  shared with the first pass's walk) — never onto another class page, a
+  folder's index, Key Links or Curriculum Coverage. A page two links away is
+  not dated by the class at all.
+- **A class dated with a plain YAML date** (`created: 2026-09-24`, unquoted —
+  what Obsidian's Date property writes) counts, as midnight in Toronto. Until
+  the fix round `_parse_created_value` read it as no date at all, so such a
+  class dated nothing and a page it linked took a LATER class's date (measured:
+  Day 2's 09-24 instead of Day 1's 09-10). That also widens the first pass and
+  `_find_first_class_created`, which read dates through the same function.
+- **Per section.** The build of section N reads section N's classes and writes
+  section N's keys only: a course-level page gets `createdSection<N>` (never a
+  plain `created:` shared by every section, and never another section's key); a
+  page inside `section<N>/` gets `created`, unless it already uses
+  `createdSection<N>`, which the build reads first. A plain `created:` already on
+  a shared page is left alone — it still dates the sections with no key of their
+  own.
+- **The value is the class's own, copied**, not re-formatted: converting a
+  timestamp to Toronto time can move its calendar day near midnight UTC, and the
+  page must show the day its class shows. It is written plain where that reads
+  back as the same value and double-quoted where it would not (a bare
+  `2026-09-24` string would read back as a DATE, and be rewritten every build).
+
+#### Measured: why nothing dated Russell's pages (2026-09-24, ICS4U section 1)
+
+The front page said `created: 2026-09-08…` (the day the course was made) above
+`![[Thread 1, Day 3]]`, dated 09-24. `Exercises/Using Aggregate Functions`
+carried `createdSection1: 2026-09-08T07:00:00.000+0000` and
+`publishForSection1: true` — install day, very likely inherited from the
+`_DUPLICATE ME` template it was copied from, whose own text promises the dates
+"will be set automatically". Three writers existed and none was on his path:
+
+- the app's pointer (`SectionIndexPointer.repointIndex`) and the assistant's
+  publish-time rule run only when the ASSISTANT publishes — Day 3 was published
+  in Obsidian — and the publish-time rule moves only pages that are still
+  HIDDEN, which this one was not;
+- the installer's `first_use_dates` runs once, at pre-population;
+- the build's first pass explicitly skipped both pages: `index.md` since
+  `61ae2ab5` (2026-08-18, "so the landing page retains its newest published
+  class's date" — preserving a date the mac pointer writes, not deciding that
+  the build must not date it), and every page reachable from a class since
+  `6ddc3fd0` (2026-08-17 — the pass set out to date only pages NO class brings,
+  leaving linked pages to the installer and the assistant). **Neither skip is a
+  decision to leave the page undated; both assumed another writer.** Do not
+  "restore the design" by folding the new pass into the first one: they date
+  different populations with different dates, and are kept as two named passes.
+
+On `origin/dev` before the change, `scripts/test_dates_follow_the_class.py`
+fails 16 cases and errors 9; the ICS4U front page and Using Aggregate Functions
+both stay at `2026-09-08T07:00:00.000+0000`.
+
+#### Why the teacher's files, and not only the site — and what was REJECTED
+
+- **Build-output-only was REJECTED by Russell (2026-09-25 07:40)**, overriding
+  the plan review's recommendation. The review's reasons were real: a write on
+  every preview can meet a page open in Obsidian; a page changed after a build
+  has started makes the app build once more (#265's `.build-started` marker —
+  see "When the stamp is written" below); iCloud churn. Russell wants the files
+  to carry the true dates, so that Obsidian, the app, the assistant and the site
+  agree. What keeps the cost down is idempotence: a page is written ONLY when
+  the date the build would read for this section differs, so after the first
+  build of a course the pass writes nothing, and #265's extra build happens once
+  rather than on every publish. The test builds every case twice and requires
+  the second build to write no file.
+- **(B) "never earlier than the class"** — keep a later date typed by hand — was
+  the other option put to Russell on 2026-09-24; he chose (A), the class's date
+  even over the page's own, because it has no judgement call inside it and a date
+  on a site ordered by date is a statement about the course.
+- **Filling only undated pages** (the first plan) — fixes nothing for Russell's
+  page, which HAS a date; the review measured this on the real file shape.
+- **Hidden classes dating pages** — a class students cannot see has not been
+  taught; a page only a hidden class brings keeps its own date until the class
+  is published.
+- **One `created:` for a shared page** (Russell, 07:45) — the last section
+  built would win for every section.
+- **Following links THROUGH pages** — REJECTED on 2026-09-25, after it had been
+  built that way, by the implementation review's measurement. Courses link hub
+  pages from Day 1 ("How Marks Work", "Learning Goals") that link half the
+  course, so the earliest class claimed nearly everything it could reach. On
+  the EXC2O fixture the first build rewrote 105 pages and **98 of them were
+  given Unit 1, Day 1's 2026-09-08** — `Concepts/Cellular Respiration`, which
+  its October class links directly, among them, by the chain Day 1 → `Setup/How
+  Marks Work` → `Tasks/Lab Reports` → `Investigations/Investigating
+  Photosynthesis` → it. Across the 39 payloads (every class treated as visible)
+  **2,150 of 5,177 reached pages took an EARLIER class than the first one
+  linking them directly** — ICS4U 133 of 136 (59 through `Learning Goals`),
+  SNC1W 107 of 150 (88 through `How Marks Work`), MHF4U 142 of 148. The walk had
+  been harmless while the plan only FILLED missing dates; once choice (A) let it
+  overwrite, it rewrote installer-dated, visible pages and reported success.
+  Russell's words were "the first Unit x, Day y page that LINKED to them", and
+  the installer (`first_use_dates`) already followed direct links only. The
+  contract's hub case (How Marks Work → Lab Reports → Investigating
+  Photosynthesis) pins it: the page in between keeps its own date, and the page
+  a later class links directly takes THAT class's date. Also rejected: walking
+  through pages for UNDATED pages only — it infers a date nobody set from a page
+  in between, which the rule does not ask for.
+
+#### How the write is made — a line splice, never a re-serialisation
+
+`_setting_frontmatter_value` changes one key line and nothing else: the apps'
+own fence rule (three or more dashes; blank lines before the opening fence
+skipped — `PageVisibilityReader.fenceIndices`); the LAST line naming the key,
+because it is the one YAML keeps; the lines below it that belong to its value go
+with it (`continuationLineIndices`' rule from #176, which #199 applies to the
+apps' own date and title writers — ported to Python here because #199 had not
+landed on `dev` when this was written; if the two ever disagree, the contract's
+`writingCases` are the arbiter); a missing key goes at the top of the block; a
+page with no frontmatter gets a block. Not touched at all: a block opened and
+never closed, a tab-indented block, a file starting with a byte-order mark.
+A `# note` at the end of the key's line stays (a `#` inside quotes, or in the
+middle of a word, is part of the value). Every write is read back the way the
+build reads it before it is saved, and refused unless this section's date is now
+the class's and every other key and the whole body are exactly as they were.
+
+**The write is never made in place.** `_replace_the_page_safely` writes the new
+text to a hidden file beside the page (`.<name>.….plantoir-dating`), flushes it
+to disk, copies the page's permissions onto it, re-reads the page, and renames
+the new file over it in one step ONLY if the page still holds exactly the text
+the date was worked out from. A Stop part-way through leaves the old page or the
+new one, never a truncated one; an Obsidian save that lands after the read is
+kept, and the next build dates it. The cost, accepted: a renamed-in file is a
+new file to the file system, so its creation time is the time of the write,
+and it does not carry the page's extended attributes across — measured by the
+fix-round review on macOS 26 through the container, a `user.` attribute was
+lost 4 times of 4 and a Finder tag 1 time of 3 (it came back in the other two,
+presumably restored by macOS — not something to rely on). Nothing in Plantoir
+or the build reads either (only frontmatter dates count), but Obsidian's file
+list sorted by "created time" will move a rewritten page, and a Finder tag on
+one can go. Writing in place would keep both, and stays REJECTED: a Stop or an
+editor save part-way through leaves a torn page, and a torn page is worse than
+a lost tag. The
+first version truncated and wrote in place with no re-check — a window of a few milliseconds per page, across the
+~100 writes of a course's first build, on the teacher's own file.
+
+**Links are never written through.** A page that is a symbolic link, one inside
+a folder that is (between the page and the course folder — the build's copy
+follows a shared folder that is itself a link), or a file with a second name
+(a hard link) is left alone: measured, the first version rewrote a file OUTSIDE
+the course through a link, and two courses sharing one page would overwrite
+each other's `createdSection1` on alternate builds. Its site copy is still
+dated; the console names it ("Left the date on N page(s) as it was, because
+each one also lives somewhere else…"), and it is not on the trail, because
+nothing was written.
+
+**A read-only page is not written either**, and that IS checked before the
+write, from the page's mode bits (no write bit for owner, group or anyone):
+a rename would replace a file that an ordinary write refuses. It is read from
+the mode bits and not from `os.access` because the build runs as ROOT in the
+container, where `os.access` says yes to every file — the fix-round review
+measured the first version rewriting a 0444 page there, mode kept.
+`test_a_read_only_page_is_named_and_left_alone_even_for_root` makes
+`os.access` answer as it does for root. Its site copy is still dated, and the
+console names it ("Left the date on N page(s) as it was, because each one is
+locked or set so it cannot be changed…"). **Finder's Locked flag (`uchg`) is
+NOT checked before** — Linux cannot see it (no `st_flags`), so the check finds
+nothing in the container. What was measured, as root in the image against a
+`uchg` page under `$HOME`: the HOST refuses the rename, the page is unchanged,
+and `_replace_the_page_safely` removes its hidden file, so none is left
+behind. That page is skipped silently (not named), and the next build tries
+again. Python run on the Mac itself (the tests) does see the flag and names
+the page as it names a read-only one; Windows has no such flag, and its
+read-only attribute shows up in the mode bits, so the native build there
+refuses and names a read-only page.
+
+**A course kept for reference is dated on its site only** — its files are
+never rewritten (`write_back=False` when `reference_course.is_reference` or
+`cannot_tell`). Last year's course is frozen on purpose, often with its files
+locked, and a preview of it is a look rather than an edit. This was the
+implementer's call, not Russell's ruling, and is flagged as such
+(`atBuildTime.aCourseKeptForReference`).
+
+**Where a page came from** is recorded as the build copies it
+(`remember_vault_source`, beside each `shutil.copy2`): the section's
+`index.md`, each shared folder and file (a course page), each per-section folder
+and file (a section page). A page the build made itself has no source and is
+never written back.
+
+#### The trail
+
+When anything was rewritten, the build prints a plain sentence and one
+`PLANTOIR_DATED: {"course", "section", "pages"}` line naming each page by its
+place in the course folder (`shared-rules.json` → `pagesDatedByTheBuild`). The
+mac records it as "pages dated by the build" (`PagesDatedByTheBuild`,
+`ScriptRunner`), shows the teacher only the sentence, and prints nothing when
+nothing changed. A SCHEDULED publish records the same line from its own log:
+`ScheduledDeploy.recordFolderProblems` already reads that run's part of the log
+(from `logSizeBeforeRunning`) for `PLANTOIR_HEALTH:` lines, and now hands it to
+`notePagesDatedByTheBuild` too. The first version left it out, saying the app
+was not reading that console — wrong, since the scheduled run IS Plantoir
+(`--run-scheduled-deploy`) and reads its log in-process; and a scheduled publish
+is often the first build after a class goes visible, so the likeliest to rewrite
+files. The sentence the build prints is "Gave N of your page(s) the date of the
+first class that links to them".
 
 ### Which pages are class pages: the word AND the scheme (#267)
 
@@ -396,9 +625,12 @@ unambiguous and carries structure a sentence cannot.
 
 ### Three traps, all met here
 
-- **Do not read the findings from a tail.** Every other structured-line reader in
-  the mac's `ScriptRunner` works from `recentText(maximumCharacters: 8000)`, and
-  the health lines print in the MIDDLE of a build. On any real build they are
+- **Do not read the findings from a tail.** Most other structured-line readers in
+  the mac's `ScriptRunner` work from `recentText(maximumCharacters: 8000)`, and
+  the health lines print in the MIDDLE of a build. (The preview's announced
+  address is the other exception since #235: it is printed even EARLIER, lost
+  the same way, and now read from the same carried-over lines as they arrive —
+  `documentation/09-mac-app.md` → "Where the address comes from".) On any real build they are
   long past that window by the end. Collect them as output arrives. The mac test
   floods 400 lines after the finding to prove the point.
 - **Hide the marker line from the console a teacher reads.** A raw JSON blob is

@@ -227,7 +227,9 @@ class ScriptRunner {
         // runner with `keepingTranscript: true`, and only the build phase
         // announces health. Clearing unconditionally emptied the array between
         // the two, so a deploy threw away the findings it had just collected.
-        resetHealthFindings(keepingTranscript: keepingTranscript)
+        // The preview's announced address is collected the same way and
+        // forgotten by the same call, for the same reason.
+        forgetWhatThePreviousRunSaid(keepingTranscript: keepingTranscript)
         wasCancelled = false
         wasStoppedByUser = false
         isBetweenPhases = false
@@ -506,8 +508,10 @@ class ScriptRunner {
         // Findings are read from the RAW text first: the transcript drops the
         // machine-readable lines on the way in (they are machinery, and a
         // teacher reads that console), so anything that wants them must take
-        // them before they are filtered out.
-        collectHealthFindings(in: text)
+        // them before they are filtered out. The preview's address is read
+        // from the same complete lines, as they arrive — see
+        // `announcedPreviewAddress` for why it cannot wait.
+        collectCompleteLines(in: text)
         transcript.append(rawText: text)
         advanceMilestones(with: text)
         lastOutputAt = Date()
@@ -560,13 +564,23 @@ class ScriptRunner {
 
     /// The local address the preview will serve at, once the launcher has
     /// announced it. The host port belongs to this folder's container and
-    /// is not knowable in advance, so the announcement is the truth.
+    /// is not knowable in advance, so the announcement is the truth — and
+    /// nil means nothing has been announced, never "try the usual port".
     var previewAddress: URL? {
-        return ScriptRunner.previewAddress(in: transcript.recentText(maximumCharacters: 8000))
+        return announcedPreviewAddress
     }
 
     /// Reads "Preview will be available at: http://localhost:8091/" from
     /// the output, taking the LAST announcement.
+    ///
+    /// Give it whole lines with the control sequences already taken out —
+    /// `rememberPreviewAnnouncement(in:)` does. Handed a raw chunk of
+    /// terminal output it can return an address with the RIGHT port and a
+    /// garbage path: Swift folds "\r\n" into one Character, so the split
+    /// below does not split terminal text at all, the "line" runs on to the
+    /// end of the chunk, and `URL(string:)` percent-encodes the rest into the
+    /// path (`http://127.0.0.1:8101/%0D%0A…`, measured on a real first
+    /// preview, GitHub #235).
     static func previewAddress(in text: String) -> URL? {
         let marker: String = "Preview will be available at: "
         var found: URL?
@@ -609,6 +623,29 @@ class ScriptRunner {
     /// 8,000-character window by the time anybody asks.
     private(set) var healthFindings: [SiteHealthFinding] = []
 
+    /// The address the launcher announced for this run's preview — the last
+    /// one, when there is more than one — and nil until it has announced one.
+    ///
+    /// Collected as output ARRIVES, for the reason `healthFindings` is (read
+    /// its comment above). This used to be read back off
+    /// `recentText(maximumCharacters: 8000)`, and the announcement is printed
+    /// EARLY: on a real first preview it had scrolled out of that tail by the
+    /// time Quartz said its server had started — found at the first of the
+    /// preview wait's three phases, nil by the second — and survived only
+    /// because the wait happened to remember what it had seen (GitHub #235).
+    ///
+    /// Deliberately no fallback to the tail, and none to a port: nothing
+    /// reaches this runner by any road but `receiveOutput`, so a second
+    /// reader could only ever find a staler or a wronger answer.
+    ///
+    /// Read it only WHILE the run is going. A run that ends in the middle of
+    /// the announcement — right after `…localhost:8`, say — has that half
+    /// line read as finished when the run ends, and it parses as an address.
+    /// Harmless today (measured by the review: the preview wait returns on
+    /// the run's end before it looks), and written here so nobody trusts it
+    /// after the fact.
+    private(set) var announcedPreviewAddress: URL?
+
     /// Whatever arrived after the last newline, kept until the rest of the
     /// line turns up.
     ///
@@ -618,7 +655,13 @@ class ScriptRunner {
     /// straddle a read boundary; without this, a split marker line failed both
     /// the prefix test and the JSON parse and was dropped silently, and the
     /// finding never reached the dialog, the assistant, or the trail.
-    private var pendingHealthLine: String = ""
+    ///
+    /// The preview's announcement needs it just as much, and fails worse
+    /// without it: cut after `…localhost:8`, `:81` or `:810`, the first half
+    /// is a VALID address on the wrong port, and the rest of the line arrives
+    /// in the next chunk without the words that mark it — measured by cutting
+    /// the real line at every point.
+    private var pendingLine: String = ""
 
     /// Reads whatever is left in the carry-over buffer as a finished line.
     /// Seams for the tests, which cannot start a real script but must be able
@@ -629,31 +672,42 @@ class ScriptRunner {
     }
 
     func prepareForContinuationForTesting(keepingTranscript: Bool) {
-        resetHealthFindings(keepingTranscript: keepingTranscript)
+        forgetWhatThePreviousRunSaid(keepingTranscript: keepingTranscript)
     }
 
     /// The one implementation, so the test seam above exercises what `run()`
     /// actually does rather than a copy of it. A duplicated reset would pass
     /// while the real path regressed — which is precisely how the scheduled
     /// log's append bug got through its own test.
-    private func resetHealthFindings(keepingTranscript: Bool) {
+    private func forgetWhatThePreviousRunSaid(keepingTranscript: Bool) {
         if keepingTranscript {
             return
         }
         healthFindings = []
-        pendingHealthLine = ""
+        announcedPreviewAddress = nil
+        pendingLine = ""
     }
 
-    private func flushPendingHealthLine() {
-        let leftover: String = pendingHealthLine
-        pendingHealthLine = ""
+    private func flushPendingLine() {
+        let leftover: String = pendingLine
+        pendingLine = ""
         if leftover.isEmpty {
             return
         }
         rememberHealthFindings(in: leftover)
+        rememberPreviewAnnouncement(in: [leftover])
     }
 
     private func rememberHealthFindings(in text: String) {
+        // The pages the build gave their class's date (#275, #276), by name.
+        // Read here because this is where finished lines of output arrive,
+        // carried over a chunk boundary like the health lines below.
+        for report in PagesDatedByTheBuild.reports(in: text) {
+            ActivityTrail.note(
+                .pagesDatedByTheBuild, report.trailSentence,
+                course: report.course, section: report.section
+            )
+        }
         for finding in SiteHealthFinding.findings(in: text) {
             if healthFindings.contains(finding) {
                 continue
@@ -673,8 +727,10 @@ class ScriptRunner {
         }
     }
 
-    private func collectHealthFindings(in text: String) {
-        let combined: String = pendingHealthLine + text
+    /// Reads every line that is now complete, keeping the unfinished one for
+    /// the next chunk.
+    private func collectCompleteLines(in text: String) {
+        let combined: String = pendingLine + text
         // Scalar-based, via the same splitter the parser uses: Swift folds
         // "\r\n" into ONE Character, so splitting on "\n" does not split PTY
         // output at all.
@@ -687,8 +743,24 @@ class ScriptRunner {
         }
         // `carried` is now whatever followed the final newline — an unfinished
         // line, unless the chunk happened to end on one.
-        pendingHealthLine = carried
+        pendingLine = carried
         rememberHealthFindings(in: completeLines.joined(separator: "\n"))
+        rememberPreviewAnnouncement(in: completeLines)
+    }
+
+    /// Takes the address out of any complete line that announces one; the
+    /// last announcement wins, as it always has.
+    ///
+    /// The colour codes come out one WHOLE line at a time, never a chunk at a
+    /// time: a chunk can end in the middle of an escape sequence, and half of
+    /// one left in front of the address would be read as part of it.
+    private func rememberPreviewAnnouncement(in lines: [String]) {
+        for line in lines {
+            let plainLine: String = TranscriptBuilder.strippingControlSequences(from: line)
+            if let address = ScriptRunner.previewAddress(in: plainLine) {
+                announcedPreviewAddress = address
+            }
+        }
     }
 
     /// The folder a local-folder deploy published into, if the output
@@ -1201,7 +1273,7 @@ class ScriptRunner {
         // printed as the very last output would otherwise be lost — the exact
         // failure the buffer was added to prevent, surviving at the end of the
         // run instead of in the middle of it.
-        flushPendingHealthLine()
+        flushPendingLine()
         AppLog.output.info("Finished with exit code \(exitCode), transcript \(self.transcript.lines.count) lines")
         lastExitCode = exitCode
         isRunning = false

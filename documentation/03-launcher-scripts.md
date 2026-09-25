@@ -73,7 +73,12 @@ time. At creation the launcher probes for a free block of HOST ports
 matching +1000 websocket block for Quartz's live reload) and maps it to
 the container's fixed ports 8081–8084 and 9081–9084; `preview.sh` prints the
 resolved address ("Preview will be available at: …"), which is what the app
-and a terminal teacher should open. The old shared `teaching-quartz`
+and a terminal teacher should open. It asks the container for that mapping
+twice, and if both answers are empty it says it could not find out where the
+preview will be and stops before building (exit 1) — since #235 it never
+announces the container's own port in its place, which is right only for the
+first folder on a Mac. `--build-only` asks nothing and is never stopped there,
+so a publish is unaffected. The old shared `teaching-quartz`
 container is retired automatically the first time a per-folder container is
 created. The macOS app stops a folder's container (a fast `docker stop`,
 not a removal) when the last window using that folder closes, and on quit —

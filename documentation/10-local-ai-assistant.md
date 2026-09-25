@@ -1274,7 +1274,13 @@ pointing at a class students cannot see. The invariant is held by REPOINTING
 rather than by link reach in any case: `SectionIndexPointer.repointIndex` runs
 on every apply (`AssistPublishPlan.apply`, `SectionReDatePlanner.apply`) and
 repoints the index at the most recent class students CAN see. Nobody publishes
-a section by naming its index page, whose title is `Section <N>`.
+a section by naming its index page, whose title is `Section <N>`. The index's
+DATE is held twice since 2026-09-25 (#275): by this pointer when it repoints,
+and by the BUILD on every preview and publish, which rewrites the teacher's
+front page to the date of the visible class its embed names whichever way that
+class was published — Russell's ICS4U front page stayed on its install day
+because Day 3 was published in Obsidian, so no pointer ran. See
+[the build pipeline](05-build-pipeline.md#dates-drive-everything).
 
 **Two consequences worth writing down before somebody finds them.**
 
@@ -4237,6 +4243,20 @@ here changed in behaviour; what changed is that it is now CONTRACT data,
 `class-planning.json` → `sectionIndexPointer` (9 cases, run by
 `ClassPlanningContractTests.testTheFrontPageIsRepointedAsTheContractSays`;
 removing the class-title check turns it red).
+
+**The date follows the embed, and a page with none keeps its own (#275,
+2026-09-25).** `repointing` used to write the front page's `created` AFTER its
+embed loop whether or not a class embed was found, so a hand-made front page
+with no class on it was re-dated to the newest class on every assistant publish
+(the contract case passed only because the test handed the pointer no date).
+It now returns nil before the date step when no class embed was found — one
+`Bool`, nothing else moves. Windows already behaved this way
+(`AssistWorkspace.ApplyIndexChange` returns before dating when
+`SectionIndex.WithMostRecent` finds nothing). Pinned by
+`sectionIndexPointer.dateCases`, run through the pointer WITH the class's date
+by `testTheFrontPagesDateFollowsTheClassItShows` — two failures on the old
+pointer, by copy-and-restore. The same cases are run by the build, which dates
+the front page on every build ([05](05-build-pipeline.md#dates-drive-everything)).
 
 Windows differs, and the contract says how rather than pretending it does not:
 `SectionIndex.cs` finds the embed by the literal heading "# Most Recent Class",
