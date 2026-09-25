@@ -682,7 +682,8 @@ reaches `main()`, so no node server is left behind. Pinned by
     `inspect.getsource(deploy.main)` to prove the Cloudflare branch returns
     before the badge writer, so `main`'s body has to stay in `main`. One
     handler covers every place a publish can be waiting — the rebuild's
-    `subprocess.run`, both questions, an upload, wrangler.
+    `subprocess.run`, both questions, an upload, wrangler — and the two
+    guards below cover a child that is seen leaving first.
   - **The Cancel that arrives through the build first.** The `^C` reaches the
     rebuild child and `deploy.py` together. Usually `deploy.py` is still in
     `waitpid` and hears its own interrupt first; if the child's exit is seen
@@ -692,15 +693,71 @@ reaches `main()`, so no node server is left behind. Pinned by
     those two statuses (`build_was_stopped_by_the_teacher`), and 1 for any
     other. Not reproduced by hand — the race is narrow — so it is pinned by a
     test that raises the error directly.
-  - Nothing to tidy on the way out: the token file is removed by `deploy.sh`
-    before Python starts, a Netlify upload interrupted midway is never
-    published, and the publish registry belongs to the app.
+  - **The Cancel that arrives through wrangler first.** The same race on the
+    Cloudflare leg: `deploy_to_cloudflare` exits 130 when wrangler reports 130,
+    −2 or 0xC000013A (Ctrl-C on Windows) —
+    `STATUSES_OF_A_PROGRAM_STOPPED_BY_A_CANCEL`, which the rebuild's guard
+    reads too — instead of raising "Cloudflare's deploy tool exited with
+    code …" with a traceback. Measured inside the image with a stand-in API
+    that never answers: **wrangler 4.80.0 exits 0 on SIGINT** (its `pages`
+    commands install a handler that calls `process.exit()`), so the guard
+    cannot see that shape — `deploy.py`'s own interrupt is what covers it, and
+    with the whole group signalled, as the app's `^C` does, the real wrangler
+    run exits 130 with nothing on stderr and no wrangler left running. (A
+    harness that starts Python with SIGINT ignored — any `&` job in a
+    non-interactive shell — shows the danger: wrangler leaves with 0 and the
+    leg reads as published. Restore `default_int_handler` in such a harness.)
+  - **A Cancel during the upload stops the upload.** Until the #259 fix round
+    it did not: the uploads ran in a `with ThreadPoolExecutor` block, and
+    leaving that block on the `KeyboardInterrupt` waits for the executor to
+    RUN every upload still queued. Measured with the real `deploy.py` under a
+    pty, `netlify_api` stubbed (40 files, 0.4 s per PUT, 5 workers) and the
+    `^C` about a second in: **25 of 40 uploads started after the Cancel**, and
+    it took 2.3 s to leave. Now `_upload_required_files` drops the queue
+    (`shutdown(wait=False, cancel_futures=True)`) and sets `stop_uploading`,
+    so an upload waiting out a 429 gives up instead of retrying for up to a
+    minute: **0 of 40 after the Cancel**, 0.23 s, three runs of three. The
+    uploads already in flight — at most five — still finish.
+  - **What reaches the site, and what does not.** Neither host publishes a
+    half-finished upload, so a Cancel in the middle leaves the published site
+    exactly as it was:
+    - Netlify's file-digest deploy is created with `draft: false`, and Netlify
+      documents that it goes live when its state reaches `ready` — after every
+      required file has arrived. A deploy whose files never all arrive never
+      becomes the published one. (The API documents no cancel for a deploy;
+      the unfinished one is simply left waiting, and nothing is sent after the
+      Cancel to tidy it up — a network call during a Cancel was REJECTED, since
+      the app ends the launcher two seconds after its `^C`.)
+    - wrangler uploads every asset first and creates the Pages deployment —
+      the step that changes the site — only after (`pages deploy` in
+      wrangler 4.80.0's `cli.js`: `upload(…)`, then `POST …/deployments`).
+      A Cancel before that step publishes nothing; `subprocess.run` kills
+      wrangler 0.25 s after the interrupt if it has not left on its own.
+
+    **The one window where a Cancel does not stop it:** a Cancel that lands
+    after the last files are already on their way — Netlify's final uploads
+    in flight, or wrangler past its deployment step — or after the upload has
+    finished. The publish then completes and the site changes, while the app
+    reports the task as cancelled (it decides by its own flags, and has no way
+    to know which side of that moment the `^C` landed). The window is the
+    last second or two of the upload; nothing in the app's wording claims the
+    site is unchanged, and whether a sentence should say so is a wording
+    decision left open, not taken here.
+  - Nothing else to tidy on the way out: the token file is removed by
+    `deploy.sh` before Python starts, and the publish registry belongs to the
+    app.
   - Pinned by the second class in `scripts/test_stop_quietly.py`: the
     in-process 130, the program's entry going through `run_until_stopped()`
     (the first case alone would pass with the entry put back to `main()`), the
     rebuild that left first, and a real SIGINT sent to the whole process group
     mid-rebuild (POSIX only). On `origin/dev` before the change: 3 failures and
-    1 error, three runs out of three.
+    1 error, three runs out of three. The fix round added three more: wrangler
+    that left first; 40 stubbed uploads with a real SIGINT to the main thread
+    at the 15th (at most 25 may start in all — the old code started 40); and
+    five uploads turned away with 429 that must give up within 5 s of the
+    Cancel (the old code retried for 61 s; POSIX only, since nothing wakes a
+    main thread whose every upload is waiting without a real signal). On the
+    first round's `deploy.py`: 2 failures and 1 error.
 - **Which button.** Only the progress view's Cancel types a `^C`; the Stop
   Preview and console Stop buttons end the process without one and never
   showed the traceback (measured by the same review).
