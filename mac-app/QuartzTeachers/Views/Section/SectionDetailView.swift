@@ -1522,9 +1522,12 @@ struct SectionDetailView: View {
     }
 
     func waitForPreviewServer(port: Int, siteAsItWas: Date?) async {
-        // The launcher announces the real host address — the container's
-        // ports map to a per-folder block, so the port cannot be assumed.
-        var serverURL: URL = URL(string: "http://127.0.0.1:\(port)/")!
+        // The launcher announces the real host address — the builder's
+        // ports map to a per-folder block, so the port cannot be assumed,
+        // and until it has been announced there is NO address: not the
+        // section's port, which is the one inside the builder and wrong for
+        // every working folder after the first (GitHub #235).
+        var serverURL: URL?
 
         // How long this run has said NOTHING since the builder announced its
         // server — and nil until it has announced one.
@@ -1670,12 +1673,37 @@ struct SectionDetailView: View {
                 releasePreviewLease()
                 return
             }
+            if let announced = previewRunner.previewAddress {
+                serverURL = announced
+            }
+            // Only needed to decide the no-address case, and reading what the
+            // run has said is not free (see `noticeWhatTheRunIsSaying`), so
+            // the ordinary path does not pay for it twice a second.
+            if serverURL == nil {
+                noticeWhatTheRunIsSaying()
+            }
+            let next: PreviewReachability.NextStep = PreviewReachability.nextStep(
+                announced: serverURL,
+                theBuilderSaysItsServerStarted: silence != nil
+            )
+            let addressToOpen: URL
+            switch next {
+            case .tryTheAddress(let announced):
+                addressToOpen = announced
+            case .keepWaiting:
+                try? await Task.sleep(for: .seconds(1))
+                waitedSeconds += 1
+                continue
+            case .stopBecauseNothingWasAnnounced:
+                stopBecauseNoAddressWasAnnounced()
+                return
+            }
             // The address the teacher's Mac is asked about — the announced
             // one, unless this copy of Plantoir has been started with the
             // debug-only request to pretend it cannot be reached, which is
             // how the sentence below can be seen on a healthy Mac.
             var request: URLRequest = URLRequest(
-                url: PreviewReachability.addressToTry(announced: serverURL)
+                url: PreviewReachability.addressToTry(announced: addressToOpen)
             )
             request.timeoutInterval = 2
             do {
@@ -1683,7 +1711,7 @@ struct SectionDetailView: View {
                 if let httpResponse = response as? HTTPURLResponse {
                     if httpResponse.statusCode == 200 {
                         previewBuildWait.end()
-                        previewURL = serverURL
+                        previewURL = addressToOpen
                         // Load the fresh site EXPLICITLY, rather than trusting
                         // the mounting web view's `loadIfNeeded` to do it.
                         //
@@ -1701,7 +1729,7 @@ struct SectionDetailView: View {
                         // is why it does not reintroduce the flicker that made
                         // an unconditional reload-after-load worse than the
                         // problem it addressed.
-                        previewController.showFreshBuild(serverURL)
+                        previewController.showFreshBuild(addressToOpen)
                         // And a second, later reload ONLY when we never saw
                         // the build finish: the bounded Phase 2 wait ran out,
                         // so what was just loaded may itself predate the
@@ -1737,6 +1765,29 @@ struct SectionDetailView: View {
             waitedSeconds += 1
         }
         previewBuildWait.end()
+    }
+
+    /// Ends a preview whose website started without any address for it ever
+    /// being announced — so there is nothing to open, and nothing to ask the
+    /// builder about either.
+    ///
+    /// Ended the way `stopWaitingForThePreview` ends one (read its comment
+    /// for why stopping is right rather than merely giving up), with the
+    /// third sentence, and without its question: that question is about an
+    /// address. Nothing is awaited here, so the run cannot change underneath
+    /// it, which is why it needs none of that function's re-checking.
+    func stopBecauseNoAddressWasAnnounced() {
+        ActivityTrail.note(
+            .previewNeverAppeared,
+            PreviewReachability.trailLineWhenNothingWasAnnounced,
+            course: course.code,
+            section: sectionNumber
+        )
+        stopPreview()
+        previewRefusalTitle = PreviewReachability.alertTitle
+        previewRefusal = PreviewReachability.sentence(
+            for: PreviewReachability.verdictWhenNothingWasAnnounced
+        )
     }
 
     /// Ends a preview that announced its website and never showed it, and
