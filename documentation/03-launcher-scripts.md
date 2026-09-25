@@ -318,13 +318,14 @@ command line. The bash launchers:
    "Starting up (first time can take a few minutes)…", so that label shows on
    exactly the start that is not the first. Known and left alone: it is shown
    only when a runner has no milestones, which no launcher run lacks.
-4. Poll `docker info` for up to 30 seconds ("⏳ Waiting for the website
+4. Poll `docker info` for at least a minute — 30 tries, two seconds apart,
+   each try also waiting for `docker info` itself ("⏳ Waiting for the website
    builder to be ready…" — `friendlyPhase`'s "Starting up…" marker, which
    moved with the text in #263). If the VM claims to be running but
    the daemon never answers (a known Colima state after the Mac sleeps or
    shuts down uncleanly, where a plain `colima start` no-ops), force a clean
    `colima stop --force && colima start` cycle ("🔁 The website builder isn't
-   answering yet — restarting it…") and wait up to 60 seconds more before
+   answering yet — restarting it…") and wait at least two minutes more (60 tries) before
    giving up with "❌ The website builder did not start." and "Restart this
    Mac, then try again." The by-hand recovery a developer would use —
    `colima stop --force && colima start`, then re-run the launcher — is a
@@ -363,6 +364,7 @@ down, and a comment is invisible at run time. It went because the console
 is read by teachers, who have nothing else using Colima and for whom every
 word of it was machinery (`CLAUDE.md` rule 1). Do not restore it as output
 without a way to print it only to a developer.
+
 Whichever toolchain creates the VM first determines its CPU/RAM size, so the
 launchers may find a VM somebody else built. `_colima_growth_flags` handles
 that under two rules: it only ever asks for MORE (a VM another toolchain

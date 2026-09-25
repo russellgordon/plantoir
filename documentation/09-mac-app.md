@@ -919,8 +919,8 @@ longer exists:
 **UNMEASURED, and do not quote a number for it:** how long a warm `colima
 start` takes end to end. 5.0 s from the hostagent to the host-side docker
 socket on an existing VM, but `docker info` readiness is later, and measuring it
-means stopping the shared VM (rule 7). The launcher polls `docker info` for up
-to 30 s and then force-cycles. Measure it on a spare Mac with `time (colima stop
+means stopping the shared VM (rule 7). The launcher polls `docker info` 30 times,
+two seconds apart (at least a minute), and then force-cycles. Measure it on a spare Mac with `time (colima stop
 && colima start && until docker info >/dev/null 2>&1; do :; done)` before
 putting a figure anywhere.
 
