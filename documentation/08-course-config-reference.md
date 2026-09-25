@@ -738,9 +738,9 @@ separately from the reader:
   the splitter change: **11,891 pages, 0 whose split output moves.** Nothing
   the build does changes.
 
-  **Three of this app's own write paths orphaned a continuation** (the first
-  two are fixed; the third is #186's), and they are named here rather than
-  left to be discovered:
+  **Three of this app's own write paths orphaned a continuation** (all three
+  fixed by 2026-09-25: #175's review, #182 and #186), and they are named here
+  rather than left to be discovered:
 
   * ~~`SectionAdder.extendFrontmatter` inserts the new section's
     `createdSection<N>` / `publishForSection<N>` pair after the last
