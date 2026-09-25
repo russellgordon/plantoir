@@ -990,7 +990,11 @@ would mean inventing some during a fix meant to be small. If the host-side check
 is ever not enough, this is the next step. (Since then the import has written one —
 #206 — and #245 gave every lease one shared liveness reader, `ProcessLiveness`,
 described under "Who counts as alive" below. The quit path still reads none;
-#156 is where builds and previews get theirs.)
+#156 is where builds and previews get theirs.) (2026-09-25: #156 ADOPTED the
+lease for builds, previews and publishes — see "Two programs, one course" below.
+The quit path still reads none, and does not need to: its `ps` check already
+sees a launcher whoever started it, which is the one thing a lease would have
+told it.)
 
 **REJECTED — blocking the quit until the containers have stopped.** Quitting
 must not wait on Docker; a teacher whose engine is wedged would get an app that
@@ -1704,6 +1708,217 @@ unsaved settings` and `preview again after settings saved`.
 **What the view must not do.** The notice is decided once, in `save()`, from
 `PreviewLeases.active` and `CourseActivity.activePublishes`; no cell of the
 sidebar table asks the course anything while drawn (the #266 rule above).
+
+## Two programs, one course: the build, preview and publish leases (#156)
+
+Written 2026-09-25 for [issue #156](https://github.com/russellgordon/plantoir/issues/156).
+Russell's decision: **both ways** — the mac READS the leases other programs
+write and WRITES its own. The rules are `contracts/shared-rules.json` →
+`workLeases.declining` (23 cases); the format is `contracts/file-formats.json`
+→ `workLease`; who counts as alive is #245's `workLeases.liveness`, above under
+"Who counts as alive". This section is why it is shaped the way it is.
+
+**The fault.** Two builds of one section clear and rewrite the same folder, so
+the loser serves a half-written site or publishes files the other has just
+deleted, and nothing goes red. Until #156 every rule the mac had about that was
+in-process (`CourseActivity`, `PreviewLeases`), so four things could build one
+course at once without seeing each other: the window, the in-app assistant, a
+publish set for later (its own `Plantoir --run-scheduled-deploy` process), and
+an assistant working from another app — Claude Code or Codex through
+`Plantoir --mcp-stdio`, a separate process with memory of its own.
+
+**What is written, and by whom: one derivation, not N call sites.**
+`WorkLeaseRegistry` works out the leases this process SHOULD hold from what it
+is already recording, and `CourseActivity` and `PreviewLeases` call its
+`reconcile()` at the end of every change:
+
+| kind | held while… |
+|---|---|
+| `build` | any preview of the course is being built (press → first answer), or any section of it is publishing |
+| `publish` | any section of the course is publishing (the whole deploy, its build included — Windows' shape) |
+| `preview` | any section of the course has a preview up in a window |
+
+That covers the window, the in-app assistant and the `--mcp-stdio` process
+with no new call site, because every build of theirs already went through
+`CourseActivity`. One file per folder, course and kind: two sections of one
+course previewing keep ONE `preview` file, ending one keeps it, ending both
+removes it. A file is written only when `courses/` already exists — the suite
+hands these stores pretend folders ("/folder") that must not grow directories
+— atomically, and a failure never stops the work (Windows' rule). The publish
+set for later has no main-actor app and takes its two leases through
+`WorkLeaseFiles` directly. The mac writes no `assist` lease: its MCP server has
+no course lock.
+
+**Line 2 is the process TABLE's name, not `ProcessInfo.processName`.**
+Measured 2026-09-25 with a four-line Swift program compiled in the scratchpad
+and run twice: as itself, `processName=RealName p_comm=RealName`; through a
+symbolic link called `other-link`, `processName=other-link p_comm=RealName`.
+Every reader compares line 2 against the table's name, so a lease written with
+`processName` from a linked binary reads as a recycled id everywhere and never
+blocks anything. `ProcessLiveness.leaseBody` now writes the table's name, which
+also changes #245's import lease (for the better, and for the same reason).
+
+**Who is declined, and with what.** A build from THIS program is declined when
+another live program holds `build`, `publish` or `preview` on the course:
+
+| door | where it asks | what is said |
+|---|---|---|
+| Preview (button, repair dialog, Course Settings' restart, the assistant's restart) | `startPreview()`, after its own preview and build leases are on disk | `wording.courseIsBeingBuiltElsewhere` in the Cannot Preview Yet alert |
+| Deploy (button, and the assistant pressing it) | `deployAndWait()` — early, before the preview is stopped, and AGAIN straight after `beginPublish` | the same sentence, in the Cannot Deploy Yet alert (#156's M5: `isAboutTheDestination`, as the reference-course refusal uses it — nothing ran, so the console has nothing to say) |
+| the in-app assistant's rebuild and deploy | `AssistToolRunner`, before any window is opened or preview stopped | `courseIsBeingBuiltElsewhere` |
+| an outside assistant's rebuild and deploy | the same, and the headless backstops `AssistToolchainWork.rebuildPreview` / `.deploy` after taking | `wording.courseIsBusy` — the existing key: the client is talking to the program that is busy, and that sentence tells it to wait and ask again |
+| `publish_pages` / `undo_last_change` | the write goes ahead (Markdown never conflicts with a build); the stop before it and the restart after it do not | the preview note is the sentence above for the surface |
+
+Every decline writes `build declined, course busy elsewhere` on the trail, with
+what was asked for and the other program's process id — from whichever process
+declined, so an outside assistant's refusal is on the trail too.
+
+**Take, then check, with a tiebreak** (the plan review's H1, accepted). The
+plan had "check, then take, in one synchronous stretch", and that is false for
+the window's Deploy: it stops the teacher's preview between any early check
+and `beginPublish` — `await stopPreviewAndWait()`, seconds of `docker exec` —
+and during those seconds the window holds only a `preview` lease. So every door
+writes its own `build` lease FIRST and then looks, with nothing awaited in
+between, and counts only a lease taken BEFORE its own: an earlier line-3
+moment, or the same moment and a lower process id. Two programs that press at
+once cannot both go ahead, and cannot both back off — exactly one sees the
+other as earlier (`WorkLeaseDecliningTests.testTwoProgramsThatLookAtOnceCannot…`
+walks every order, a tie included). The moments are compared as TEXT, which is
+exact for the one fixed shape both apps write (UTC, seven fractional digits,
+28 characters); anything else counts as earlier. The Deploy's EARLY look
+remains, only so that a refusal does not end the teacher's preview for
+nothing. **The residual:** a program that looks BEFORE it takes — Windows
+today, an older mac — can start in the instant between another's take and its
+own look. That is Windows' own shape, and it is recorded rather than closed.
+
+**Another program's PREVIEW blocks a build here** (the plan review's M2;
+director's ruling 2026-09-25, reversible). Stricter than Windows, whose only
+blocking kind is `build`. The reason is in `build_site.py`: every
+`--build-only` first ends that section's SERVING preview
+(`stop_preview_serving`) on purpose, so without this an outside assistant's
+rebuild would take down the page the teacher is reading — which the in-app
+assistant already refused to do (`busyDescription` counts previews). An
+outside assistant can retry; a teacher reading a page cannot. Because leases
+name the course, a preview of Section 1 in another copy of Plantoir declines a
+build of Section 2 from here too. What the window shows if its preview dies
+anyway (a build started by something that does not read leases) stays what
+#235 made it.
+
+**A publish set for later WAITS** (ruling (a)). In `runScheduled`, after the
+lateness check and before `process.run()`: it holds nothing while it waits,
+looks every **15 s**, and gives up at **10 minutes** measured on the WALL clock
+— a `Date` deadline, because a Mac that sleeps part way through would pause an
+uptime count and a run woken at eight would still be "waiting" for the build it
+found at half six. launchd imposes no run timeout on the agent (its plist has
+no `TimeOut`; `ExitTimeOut` applies only on stop), so ten minutes fits. The
+pause is a blocking sleep of the interval, since `runScheduled` is synchronous
+and never returns — a paced re-check, not a guess at when something settles.
+Once free it takes `build` and `publish` and looks once more (take, then
+check); losing that race puts its leases back and waits again. It waits only
+for `build` and `publish`, NOT `preview`: a preview left open overnight must
+not cost the morning's publish, and its build ends that preview as it always
+has. Still busy at ten minutes it STANDS DOWN the way a job whose day has gone
+by does — plist and wrapper removed, the job booted out so it cannot recur in
+a year — with the new outcome kind `courseWasBusy` and its sentence
+(`scheduledPublishStopped.sentences.courseWasBusy`), which the section shows
+and the sidebar badges. The trail gets `scheduled publish waited for the
+course` (how long, for whom, and whether it went ahead or stood down), plus
+`scheduled deploy turned off` for a stand-down. Its leases come down before the
+job is booted out, since booting out ends the process.
+
+**An outside assistant's process leaving** (the plan review's M3). `serve`
+used to `exit(0)` the moment stdin closed, even mid-build: the lease went with
+the process while the launcher it had started — reparented, not killed, as the
+quit path measured — went on building, and the window was then free to start a
+second build. Now, in order: no new launcher may start (`ScriptRunner.
+refusesNewRuns`, or a deploy's next leg would begin the moment its build was
+stopped); the leases stop following the records (`WorkLeaseRegistry.
+isLeaving`, or the runs ending their own records as they stop would take the
+leases down early); every launcher in flight is stopped and awaited — each
+resumes when its own process has exited, a real dependency; each section it
+was building is stopped inside the website builder (`PreviewStopper`, whose
+own wait is bounded at 20 s); and only then are the leases removed.
+`testLeavingStopsItsOwnLauncherBeforeTheLeaseComesDown` pins that order with a
+stand-in launcher that sleeps. Measured with the real binary: stdin closed
+with nothing running, the process exited 0 in 0.92 s. **Known limit, shared
+with Windows' `plantoir-mcp`:** a client that KILLS the server skips all of
+this; the lease is then ignored (its pid is gone) while a reparented launcher
+may still be building.
+
+**Quit (rule 7): unchanged, and a lease adds nothing to it.** The quit question
+(`QuitConfirmation`) stays in-process — quitting the window does not stop an
+outside assistant's build, so asking about one would ask about something the
+answer cannot affect. The rest path already refuses while ANY launcher runs on
+this Mac: `FolderContainers`' quit script reads `ps -Ao args=`, which sees a
+`preview.sh` or `deploy.sh` whoever started it — the `--mcp-stdio` process,
+launchd's scheduled run, a Terminal. `QuitScriptRunsTests.
+testNothingIsStoppedWhileThatFoldersLauncherIsRunning` proves exactly that
+with a stand-in launcher started as a separate process, not through the app's
+own `ScriptRunner`. So the quit path reads no lease; it simply removes this
+app's own (`WorkLeaseRegistry.releaseEverything()` — tidiness, since a reader
+ignores a lease whose process has gone). During a scheduled publish's WAIT no
+launcher runs, so a quit may rest the machine then, which is harmless: the run
+starts it again when it builds.
+
+**Measured with the real binary** (2026-09-25, a scratch folder under `$HOME`
+with `HOME` pointed at a scratch home so nothing reached Russell's trail, since
+deleted): a three-line Windows-shaped `ICS3U.build.<pid>.lease` naming a live
+`/bin/sleep`, then `deploy_section` and `rebuild_preview` over
+`Plantoir --mcp-stdio` — both answered `courseIsBusy`, nothing ran, and the
+scratch trail read "declined an outside assistant's deploy — the course is
+being built by process 82863 somewhere else on this Mac". Windows' reader
+tolerating the mac's FOUR-line lease was confirmed by reading `WorkLease.cs`:
+`IsAlive` needs at least two lines and compares `lines[1]` only;
+`testALeaseIsWrittenInTheSharedShape` applies that same check to the bytes the
+mac writes.
+
+**REJECTED, and why** (also in `workLeases.declining.rejected`):
+
+- **One-way** — reading without writing, or writing without reading. Russell:
+  "yes, both ways". Either half alone leaves one direction of the race open.
+- **Documenting the gap instead of closing it.** The fault is silent — a
+  half-written site, nothing red — so a paragraph would be the only defence,
+  and nobody reads it at the moment it matters.
+- **Check-then-take with no tiebreak** (the plan's first shape, Windows'
+  today) — the Deploy's awaited stop is a gap of seconds, measured by the plan
+  review on the code.
+- **A section in the lease name** — Windows reads the kind as the third-last
+  dot-separated part, so any extra part is a format change on both sides.
+  Course-level costs Section 2 a decline for the length of a build of Section
+  1, and the sentence names the course.
+- **A sweep of dead leases** on folder open, and the plan's own-pid sweep.
+  `WorkLease`'s design is no cleanup pass; the reader already ignores a dead
+  owner, and line 4's start time settles the recycled-pid case the sweep was
+  proposed for (a leftover whose number now belongs to another live Plantoir).
+- **Standing down at once**, or **going ahead anyway**, for a publish set for
+  later — a thirty-second build would cost a night's publish; two builds on one
+  workspace is the fault itself.
+- **Greying the Deploy button while another program builds** (Windows does). A
+  view cannot observe a file without a watcher, and declining at the press is
+  the whole guarantee. A difference to know, not an obligation.
+
+**Known limits, beyond the ones above.**
+
+- A preview stop ("everything" mode, by working folder) from THIS window —
+  Stop, `onDisappear`, quit's `stopSectionProcessesOnTheWayOut` — on a section
+  an outside assistant is building would end that build too. Narrow: the
+  outside build first ends this window's serve (`stop_preview_serving`), so the
+  window's runner ends and its preview lease comes down before a teacher is
+  likely to press anything.
+- A lease synced in from another Mac or a Windows PC through a cloud-synced
+  working folder names a pid that means nothing here. #245's liveness limit;
+  a Windows lease has no line 4, so a match rests on the name alone.
+- `CourseActivity.busyDescription` (menus, Add Section…) stays in-process on
+  purpose — declining at the press is the guarantee, not the menu's grey.
+
+**Tests.** `WorkLeaseDecliningTests` (21): the contract's 23 cases through the
+pure `WorkLeaseFiles.blocking`; the bytes written; the derivation; a real
+`/bin/sleep` as the other program (held, recycled name ignored, gone ignored);
+the race, pure and on files; every door; the scheduled wait with an injected
+clock (45 s then go ahead; 40 looks then stand down; losing the race; a
+preview not waited for); the stand-down record and its trail line; the MCP
+leaving order. It resets process-wide stores and relies on the scheme's
+`parallelizable = "NO"`, like `CourseActivityTests`.
 
 ## Renaming a course folder
 
@@ -3689,7 +3904,10 @@ teacher meets in the first ten seconds.
   plain static, so it sees deploys this Plantoir started and not `./deploy.sh`
   from a Terminal, `plantoir-mcp`, or a second Plantoir. That is the seam the
   whole app already uses rather than anything new here. It is re-asked
-  immediately before the backup and not again after it.
+  immediately before the backup and not again after it. (Since #156 BUILDS
+  also leave a lease other programs read — "Two programs, one course" — but
+  this refusal still asks only the in-process record, and a copy is not a
+  build, so it was left as it is.)
 - **Invisible spaces are folded on the way IN only.** Resolving a reference
   against the SOURCE's `Media` folds U+00A0/202F/2007, so a link typed with
   real spaces finds a file whose name carries a no-break one; the destination
