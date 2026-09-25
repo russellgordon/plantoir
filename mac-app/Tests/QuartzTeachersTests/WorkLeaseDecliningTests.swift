@@ -793,13 +793,17 @@ final class WorkLeaseDecliningTests: XCTestCase {
                 destination: ScheduledPublishOutcome.nothingWasDeployedName,
                 when: Date()
             ),
-            inHomeFolder: home, course: "ICS3U", section: 1
+            inHomeFolder: home, course: "ICS3U", section: 1, folderID: "0a1b2c3d"
         )
         let stopped: ScheduledPublishOutcome.Stopped = try XCTUnwrap(
-            ScheduledPublishOutcome.stopped(inHomeFolder: home, course: "ICS3U", section: 1)
+            ScheduledPublishOutcome.stopped(
+                inHomeFolder: home, course: "ICS3U", section: 1, folderID: "0a1b2c3d"
+            )
         )
         XCTAssertEqual(stopped.kind, .courseWasBusy, "The record reads back as the kind it was written as.")
-        XCTAssertTrue(ScheduledPublishOutcome.noteOnTrail(inHomeFolder: home, course: "ICS3U", section: 1))
+        XCTAssertTrue(ScheduledPublishOutcome.noteOnTrail(
+            inHomeFolder: home, course: "ICS3U", section: 1, folderID: "0a1b2c3d"
+        ))
         XCTAssertTrue(trailText().contains("still being built somewhere else"), trailText())
     }
 

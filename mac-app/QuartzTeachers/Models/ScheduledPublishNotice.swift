@@ -108,14 +108,19 @@ nonisolated enum ScheduledPublishNotice {
         return SystemNotifications()
     }
 
-    /// One notification per SECTION, keyed like the record file, so a later
-    /// run's notification REPLACES the earlier one instead of stacking beside
-    /// it, and dismissing the band withdraws exactly this section's.
+    /// One notification per SECTION PER WORKING FOLDER, keyed like the record
+    /// file, so a later run's notification REPLACES the earlier one instead of
+    /// stacking beside it, and dismissing the band withdraws exactly this
+    /// section's.
     ///
     /// The course and section are whole segments of the key, so section 1 and
-    /// section 11 can never share one.
-    static func identifier(course: String, section: Int) -> String {
-        return "scheduled-publish.\(course).section\(section)"
+    /// section 11 can never share one. The working folder's id is the last
+    /// segment since #237 (the one the record and the job's label end with):
+    /// two working folders holding the same section each have their own alarm
+    /// and their own record, and a shared key would let one folder's run
+    /// replace — or its Dismiss withdraw — the other folder's news.
+    static func identifier(course: String, section: Int, folderID: String) -> String {
+        return "scheduled-publish.\(course).section\(section).\(folderID)"
     }
 
     /// What the notification says: the section's own sentence, and nothing
@@ -139,15 +144,16 @@ nonisolated enum ScheduledPublishNotice {
         inHomeFolder home: URL,
         course: String,
         section: Int,
+        folderID: String,
         poster: any NotificationPosting = ScheduledPublishNotice.poster,
         ceiling: Duration = ScheduledPublishNotice.ceiling
     ) async -> Announcement {
         guard let stopped = ScheduledPublishOutcome.stopped(
-            inHomeFolder: home, course: course, section: section
+            inHomeFolder: home, course: course, section: section, folderID: folderID
         ) else {
             return .nothingToSay
         }
-        let identifier: String = identifier(course: course, section: section)
+        let identifier: String = identifier(course: course, section: section, folderID: folderID)
         let text: String = body(for: stopped, course: course, section: section)
         let announcement: Announcement = await askAndPost(
             identifier: identifier, body: text, poster: poster, ceiling: ceiling
@@ -291,9 +297,9 @@ nonisolated enum ScheduledPublishNotice {
     ///
     /// A successful run that clears an old record does NOT come through here:
     /// its own notification replaces the old one by identifier anyway.
-    static func teacherDismissed(inHomeFolder home: URL, course: String, section: Int) {
-        ScheduledPublishOutcome.clear(inHomeFolder: home, course: course, section: section)
-        poster.withdraw(identifier: identifier(course: course, section: section))
+    static func teacherDismissed(inHomeFolder home: URL, course: String, section: Int, folderID: String) {
+        ScheduledPublishOutcome.clear(inHomeFolder: home, course: course, section: section, folderID: folderID)
+        poster.withdraw(identifier: identifier(course: course, section: section, folderID: folderID))
     }
 
     /// What macOS's own answer means here.

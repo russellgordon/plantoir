@@ -53,9 +53,13 @@ final class SuiteStaysOutOfRealFoldersTests: XCTestCase {
     // MARK: - The guards
 
     func testTheSuiteNeverTouchesTheRealScheduledNotes() {
-        let success: URL = ScheduledDeploy.successSentinelURL(courseCode: "ICS3U", sectionNumber: 1)
-        let findings: URL = ScheduledDeploy.findingsSentinelURL(courseCode: "ICS3U", sectionNumber: 1)
-        let log: URL = ScheduledDeploy.logURL(courseCode: "ICS3U", sectionNumber: 1)
+        let label: String = ScheduledDeploy.legacyAgentLabel(courseCode: "ICS3U", sectionNumber: 1)
+            + ".0a1b2c3d"
+        let success: URL = ScheduledDeploy.successSentinelURL(label: label)
+        let findings: URL = ScheduledDeploy.findingsSentinelURL(
+            courseCode: "ICS3U", sectionNumber: 1, folderID: "0a1b2c3d"
+        )
+        let log: URL = ScheduledDeploy.logURL(label: label)
         let scripts: URL = ScheduledDeploy.scheduledScriptsDirectoryURL()
 
         XCTAssertFalse(success.path.hasPrefix(realLibraryPath), success.path)
@@ -74,7 +78,9 @@ final class SuiteStaysOutOfRealFoldersTests: XCTestCase {
     func testTheSuiteNeverReadsTheRealLaunchAgents() {
         let agents: URL = ScheduledDeploy.launchAgentsDirectoryURL()
         XCTAssertFalse(agents.path.hasPrefix(realLibraryPath), agents.path)
-        let plist: URL = ScheduledDeploy.plistURL(courseCode: "ICS3U", sectionNumber: 1)
+        let plist: URL = ScheduledDeploy.plistURL(
+            label: ScheduledDeploy.legacyAgentLabel(courseCode: "ICS3U", sectionNumber: 1)
+        )
         XCTAssertFalse(plist.path.hasPrefix(realLibraryPath), plist.path)
     }
 
@@ -157,20 +163,26 @@ final class SuiteStaysOutOfRealFoldersTests: XCTestCase {
     /// The redirect applies only when nobody names a home. A home named
     /// explicitly — as the app names the real one when it writes the script
     /// launchd will run — is used exactly.
-    func testAHomeNamedExplicitlyIsUsedExactly() {
+    func testAHomeNamedExplicitlyIsUsedExactly() throws {
         let home: URL = URL(fileURLWithPath: "/Users/teacher", isDirectory: true)
-        let label: String = ScheduledDeploy.agentLabel(courseCode: "ICS3U", sectionNumber: 1)
+        let label: String = ScheduledDeploy.agentLabel(
+            courseCode: "ICS3U", sectionNumber: 1,
+            workingFolder: URL(fileURLWithPath: "/Users/teacher/Teaching")
+        )
+        let folderID: String = try XCTUnwrap(ScheduledDeploy.folderID(fromLabel: label))
 
         XCTAssertEqual(
-            ScheduledDeploy.successSentinelURL(courseCode: "ICS3U", sectionNumber: 1, inHomeFolder: home).path,
+            ScheduledDeploy.successSentinelURL(label: label, inHomeFolder: home).path,
             "/Users/teacher/Library/Application Support/Plantoir/scheduled/\(label).succeeded"
         )
         XCTAssertEqual(
-            ScheduledDeploy.findingsSentinelURL(courseCode: "ICS3U", sectionNumber: 1, inHomeFolder: home).path,
+            ScheduledDeploy.findingsSentinelURL(
+                courseCode: "ICS3U", sectionNumber: 1, folderID: folderID, inHomeFolder: home
+            ).path,
             "/Users/teacher/Library/Application Support/Plantoir/scheduled/\(label).findings"
         )
         XCTAssertEqual(
-            ScheduledDeploy.logURL(courseCode: "ICS3U", sectionNumber: 1, inHomeFolder: home).path,
+            ScheduledDeploy.logURL(label: label, inHomeFolder: home).path,
             "/Users/teacher/Library/Logs/Plantoir/\(label).log"
         )
 

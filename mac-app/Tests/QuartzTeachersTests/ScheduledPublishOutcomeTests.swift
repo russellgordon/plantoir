@@ -29,6 +29,14 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
     private var home: URL!
     private var workspace: URL!
 
+    // MARK: - Computed properties
+
+    /// The id the generated wrapper bakes into every record it writes: the
+    /// fixture working folder's, the same one the section's badge reads (#237).
+    private var folderID: String {
+        return BuildOutputLocation.folderIdentifier(forWorkingFolder: workspace.path)
+    }
+
     // MARK: - Functions
 
     override func setUpWithError() throws {
@@ -71,7 +79,8 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
     private func writeStubLaunchers(
         deployExit: Int32,
         previewExit: Int32 = 0,
-        failingDestination: String? = nil
+        failingDestination: String? = nil,
+        in folder: URL? = nil
     ) throws {
         let previewScript: String = "#!/bin/bash\nexit \(previewExit)\n"
         var deployScript: String = "#!/bin/bash\n"
@@ -86,7 +95,7 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
             deployScript += "exit \(deployExit)\n"
         }
         for (name, script) in [("preview.sh", previewScript), ("deploy.sh", deployScript)] {
-            let url: URL = workspace.appendingPathComponent(name)
+            let url: URL = (folder ?? workspace).appendingPathComponent(name)
             try script.write(to: url, atomically: true, encoding: .utf8)
             try FileManager.default.setAttributes(
                 [.posixPermissions: 0o755], ofItemAtPath: url.path
@@ -99,8 +108,10 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         course: String,
         section: Int,
         destinations: [String],
-        descriptions: [String]
+        descriptions: [String],
+        in folder: URL? = nil
     ) throws {
+        let workspace: URL = folder ?? self.workspace
         var argumentsList: [[String]] = []
         for description in descriptions {
             argumentsList.append([course, String(section), "--to", description])
@@ -137,7 +148,7 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         )
 
         let stopped = ScheduledPublishOutcome.stopped(
-            inHomeFolder: home, course: "ZZQ1U", section: 1
+            inHomeFolder: home, course: "ZZQ1U", section: 1, folderID: folderID
         )
         XCTAssertEqual(
             stopped?.kind, .neededAnAnswer,
@@ -158,7 +169,7 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         )
 
         let stopped = ScheduledPublishOutcome.stopped(
-            inHomeFolder: home, course: "ZZQ2U", section: 3
+            inHomeFolder: home, course: "ZZQ2U", section: 3, folderID: folderID
         )
         XCTAssertEqual(stopped?.kind, .didNotFinish)
         XCTAssertEqual(stopped?.destination, "Netlify")
@@ -176,7 +187,7 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         )
 
         let stopped = ScheduledPublishOutcome.stopped(
-            inHomeFolder: home, course: "ZZQ3U", section: 2
+            inHomeFolder: home, course: "ZZQ3U", section: 2, folderID: folderID
         )
         XCTAssertEqual(
             stopped?.destination, "Netlify",
@@ -192,10 +203,10 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
             ScheduledPublishOutcome.Stopped(
                 kind: .didNotFinish, destination: "Netlify", when: Date()
             ),
-            inHomeFolder: home, course: "ZZQ4U", section: 1
+            inHomeFolder: home, course: "ZZQ4U", section: 1, folderID: folderID
         )
         XCTAssertNotNil(ScheduledPublishOutcome.stopped(
-            inHomeFolder: home, course: "ZZQ4U", section: 1
+            inHomeFolder: home, course: "ZZQ4U", section: 1, folderID: folderID
         ), "the fixture record should exist before the run")
 
         try writeStubLaunchers(deployExit: 0)
@@ -208,7 +219,7 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         // success, so the teacher is told what happened rather than shown
         // nothing. Either way the stale failure must not survive.
         let outcome = ScheduledPublishOutcome.stopped(
-            inHomeFolder: home, course: "ZZQ4U", section: 1
+            inHomeFolder: home, course: "ZZQ4U", section: 1, folderID: folderID
         )
         XCTAssertEqual(
             outcome?.kind, .succeeded,
@@ -231,7 +242,7 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
             descriptions: ["Netlify", "your deploy folder"]
         )
         let stopped = ScheduledPublishOutcome.stopped(
-            inHomeFolder: home, course: "ZZQ5U", section: 1
+            inHomeFolder: home, course: "ZZQ5U", section: 1, folderID: folderID
         )
         XCTAssertEqual(
             stopped?.destination, "your deploy folder",
@@ -264,7 +275,7 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
             destinations: ["netlify"], descriptions: ["Netlify"]
         )
         let stopped = ScheduledPublishOutcome.stopped(
-            inHomeFolder: home, course: "ZZQ7U", section: 1
+            inHomeFolder: home, course: "ZZQ7U", section: 1, folderID: folderID
         )
         XCTAssertEqual(stopped?.kind, .buildNeededAnAnswer)
         // Written even though the sentence never shows it, so every record has
@@ -272,7 +283,8 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         XCTAssertEqual(stopped?.destination, ScheduledPublishOutcome.buildDestinationName)
         XCTAssertFalse(
             FileManager.default.fileExists(atPath: ScheduledDeploy.successSentinelURL(
-                courseCode: "ZZQ7U", sectionNumber: 1, inHomeFolder: home
+                label: ScheduledDeploy.agentLabel(courseCode: "ZZQ7U", sectionNumber: 1, workingFolder: workspace),
+                inHomeFolder: home
             ).path),
             "the build stopped, so nothing was published and nothing may say it was"
         )
@@ -292,13 +304,14 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         )
         XCTAssertEqual(
             ScheduledPublishOutcome.stopped(
-                inHomeFolder: home, course: "ZZQ8U", section: 1
+                inHomeFolder: home, course: "ZZQ8U", section: 1, folderID: folderID
             )?.kind,
             .buildDidNotFinish
         )
         XCTAssertFalse(
             FileManager.default.fileExists(atPath: ScheduledDeploy.successSentinelURL(
-                courseCode: "ZZQ8U", sectionNumber: 1, inHomeFolder: home
+                label: ScheduledDeploy.agentLabel(courseCode: "ZZQ8U", sectionNumber: 1, workingFolder: workspace),
+                inHomeFolder: home
             ).path),
             "the build failed, so nothing was published and nothing may say it was"
         )
@@ -362,7 +375,7 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
             )
 
             let stopped: ScheduledPublishOutcome.Stopped = try XCTUnwrap(
-                ScheduledPublishOutcome.stopped(inHomeFolder: home, course: course, section: 1),
+                ScheduledPublishOutcome.stopped(inHomeFolder: home, course: course, section: 1, folderID: folderID),
                 "no record at all for \(label)"
             )
             XCTAssertEqual(stopped.kind, expected, label)
@@ -377,7 +390,8 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
 
             let published: Bool = FileManager.default.fileExists(
                 atPath: ScheduledDeploy.successSentinelURL(
-                    courseCode: course, sectionNumber: 1, inHomeFolder: home
+                    label: ScheduledDeploy.agentLabel(courseCode: course, sectionNumber: 1, workingFolder: workspace),
+                    inHomeFolder: home
                 ).path
             )
             XCTAssertEqual(published, anythingPublished, "whether it counts as published: \(label)")
@@ -387,6 +401,83 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         // shrink back to one that no longer tells them apart.
         XCTAssertTrue(buildKindsSeen.contains("buildNeededAnAnswer"))
         XCTAssertTrue(buildKindsSeen.contains("buildDidNotFinish"))
+    }
+
+    // MARK: - One record per working folder (#237)
+
+    /// Two working folders holding the same section, both run the same
+    /// morning: A's stops, B's gets through. Each folder reads its own. With
+    /// the record named for the course and section alone, B's first line
+    /// (`rm -f` of last time's record) erased A's failure, and B's success
+    /// then wore A's badge. Fails with the folder id taken out of `recordURL`.
+    func testTwoFoldersRunsKeepTheirOwnRecord() throws {
+        let second: URL = workspace.deletingLastPathComponent().appendingPathComponent("last-year")
+        try FileManager.default.createDirectory(at: second, withIntermediateDirectories: true)
+        try writeStubLaunchers(deployExit: 1)
+        try writeStubLaunchers(deployExit: 0, in: second)
+
+        try runWrapper(course: "ZZQGU", section: 1, destinations: ["netlify"], descriptions: ["Netlify"])
+        try runWrapper(
+            course: "ZZQGU", section: 1, destinations: ["netlify"], descriptions: ["Netlify"], in: second
+        )
+
+        let mine = ScheduledPublishOutcome.stopped(
+            inHomeFolder: home, course: "ZZQGU", section: 1, workingFolder: workspace
+        )
+        let theirs = ScheduledPublishOutcome.stopped(
+            inHomeFolder: home, course: "ZZQGU", section: 1, workingFolder: second
+        )
+        XCTAssertEqual(mine?.kind, .didNotFinish, "The other folder's run erased this folder's failure")
+        XCTAssertEqual(theirs?.kind, .succeeded)
+        XCTAssertFalse(try XCTUnwrap(theirs?.kind.needsAttention), "B's badge must not show A's failure")
+    }
+
+    /// A record written under the name every release before #237 used says
+    /// nothing about which folder it belongs to, so NO folder's badge or
+    /// notice reads it (#237 review, L2 — it would show folder A's failure in
+    /// folder B). The one moment its owner is known is straight after the run
+    /// of a job set before the update, which files it under that folder.
+    func testARecordFromBeforeTheUpdateIsNeverShownInAnotherFolder() throws {
+        let second: URL = workspace.deletingLastPathComponent().appendingPathComponent("last-year")
+        try FileManager.default.createDirectory(at: second, withIntermediateDirectories: true)
+        let legacy: URL = ScheduledPublishOutcome.legacyRecordURL(inHomeFolder: home, course: "ZZQEU", section: 1)
+        try FileManager.default.createDirectory(
+            at: legacy.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try "did not finish\nNetlify\n".write(to: legacy, atomically: true, encoding: .utf8)
+
+        XCTAssertNil(ScheduledPublishOutcome.stopped(
+            inHomeFolder: home, course: "ZZQEU", section: 1, workingFolder: workspace
+        ))
+        XCTAssertNil(ScheduledPublishOutcome.stopped(
+            inHomeFolder: home, course: "ZZQEU", section: 1, workingFolder: second
+        ))
+
+        // The run of this folder's job, set before the update, files it here.
+        let jobLabel: String = ScheduledDeploy.legacyAgentLabel(courseCode: "ZZQEU", sectionNumber: 1)
+        let section: (courseDirectory: URL, courseCode: String, sectionNumber: Int) = (
+            workspace.appendingPathComponent("courses").appendingPathComponent("ZZQEU"), "ZZQEU", 1
+        )
+        ScheduledPublishOutcome.fileUnderTheFolder(
+            inHomeFolder: home, course: "ZZQEU", section: 1,
+            folderID: ScheduledDeploy.folderIDForRun(label: jobLabel, section: section),
+            jobLabel: jobLabel
+        )
+        XCTAssertEqual(ScheduledPublishOutcome.stopped(
+            inHomeFolder: home, course: "ZZQEU", section: 1, workingFolder: workspace
+        )?.kind, .didNotFinish)
+        XCTAssertNil(ScheduledPublishOutcome.stopped(
+            inHomeFolder: home, course: "ZZQEU", section: 1, workingFolder: second
+        ), "Folder A's failure showed in folder B")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacy.path))
+
+        // A job with today's label wrote its own name, and moves nothing.
+        try "did not finish\nNetlify\n".write(to: legacy, atomically: true, encoding: .utf8)
+        ScheduledPublishOutcome.fileUnderTheFolder(
+            inHomeFolder: home, course: "ZZQEU", section: 1, folderID: folderID,
+            jobLabel: ScheduledDeploy.agentLabel(courseCode: "ZZQEU", sectionNumber: 1, workingFolder: second)
+        )
+        XCTAssertTrue(FileManager.default.fileExists(atPath: legacy.path))
     }
 
     // MARK: - Last night's record
@@ -403,7 +494,7 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
             ScheduledPublishOutcome.Stopped(
                 kind: .neededAnAnswer, destination: "Netlify", when: Date()
             ),
-            inHomeFolder: home, course: "ZZQ9U", section: 1
+            inHomeFolder: home, course: "ZZQ9U", section: 1, folderID: folderID
         )
         try writeStubLaunchers(deployExit: 1)
         try runWrapper(
@@ -411,7 +502,7 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
             destinations: ["local_folder"], descriptions: ["your deploy folder"]
         )
         let stopped = ScheduledPublishOutcome.stopped(
-            inHomeFolder: home, course: "ZZQ9U", section: 1
+            inHomeFolder: home, course: "ZZQ9U", section: 1, folderID: folderID
         )
         XCTAssertEqual(stopped?.kind, .didNotFinish, "tonight's kind, not last week's")
         XCTAssertEqual(
@@ -434,7 +525,7 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
             destinations: ["netlify"], descriptions: ["Netlify"]
         )
         let outcome = ScheduledPublishOutcome.stopped(
-            inHomeFolder: home, course: "ZZQCU", section: 1
+            inHomeFolder: home, course: "ZZQCU", section: 1, folderID: folderID
         )
         XCTAssertEqual(outcome?.kind, .succeeded)
         XCTAssertEqual(outcome?.destination, "Netlify")
@@ -454,7 +545,7 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         )
         XCTAssertEqual(
             ScheduledPublishOutcome.stopped(
-                inHomeFolder: home, course: "ZZQDU", section: 1
+                inHomeFolder: home, course: "ZZQDU", section: 1, folderID: folderID
             )?.destination,
             "Netlify, your deploy folder"
         )
@@ -477,17 +568,17 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
             ScheduledPublishOutcome.Stopped(
                 kind: .neededAnAnswer, destination: "Netlify", when: Date()
             ),
-            inHomeFolder: home, course: "ZZQ6U", section: 1
+            inHomeFolder: home, course: "ZZQ6U", section: 1, folderID: folderID
         )
         let url: URL = ScheduledPublishOutcome.recordURL(
-            inHomeFolder: home, course: "ZZQ6U", section: 1
+            inHomeFolder: home, course: "ZZQ6U", section: 1, folderID: folderID
         )
         let before: Date = try XCTUnwrap(
             (try FileManager.default.attributesOfItem(atPath: url.path))[.modificationDate] as? Date
         )
 
         for _ in 0..<3 {
-            _ = ScheduledPublishOutcome.stopped(inHomeFolder: home, course: "ZZQ6U", section: 1)
+            _ = ScheduledPublishOutcome.stopped(inHomeFolder: home, course: "ZZQ6U", section: 1, folderID: folderID)
         }
 
         let after: Date = try XCTUnwrap(
@@ -506,14 +597,14 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
             ScheduledPublishOutcome.Stopped(
                 kind: .didNotFinish, destination: "Netlify", when: Date()
             ),
-            inHomeFolder: home, course: "ZZQAU", section: 1
+            inHomeFolder: home, course: "ZZQAU", section: 1, folderID: folderID
         )
         XCTAssertTrue(ScheduledPublishOutcome.noteOnTrail(
-            inHomeFolder: home, course: "ZZQAU", section: 1
+            inHomeFolder: home, course: "ZZQAU", section: 1, folderID: folderID
         ))
         XCTAssertFalse(
             ScheduledPublishOutcome.noteOnTrail(
-                inHomeFolder: home, course: "ZZQBU", section: 9
+                inHomeFolder: home, course: "ZZQBU", section: 9, folderID: folderID
             ),
             "no record, nothing to note"
         )
@@ -546,10 +637,10 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
                 destination: ScheduledPublishOutcome.buildDestinationName,
                 when: Date()
             ),
-            inHomeFolder: home, course: "ZZQCU", section: 1
+            inHomeFolder: home, course: "ZZQCU", section: 1, folderID: folderID
         )
         XCTAssertTrue(ScheduledPublishOutcome.noteOnTrail(
-            inHomeFolder: home, course: "ZZQCU", section: 1
+            inHomeFolder: home, course: "ZZQCU", section: 1, folderID: folderID
         ))
 
         let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
@@ -581,10 +672,10 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
                 destination: ScheduledPublishOutcome.buildDestinationName,
                 when: Date()
             ),
-            inHomeFolder: home, course: "ZZQDU", section: 1
+            inHomeFolder: home, course: "ZZQDU", section: 1, folderID: folderID
         )
         XCTAssertTrue(ScheduledPublishOutcome.noteOnTrail(
-            inHomeFolder: home, course: "ZZQDU", section: 1
+            inHomeFolder: home, course: "ZZQDU", section: 1, folderID: folderID
         ))
 
         let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
@@ -823,7 +914,7 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
             destinations: ["folder"], descriptions: ["the class folder"]
         )
         XCTAssertTrue(built, "the overnight run must build a preview's site before publishing it")
-        let stopped = ScheduledPublishOutcome.stopped(inHomeFolder: home, course: "ZZR9Q", section: 1)
+        let stopped = ScheduledPublishOutcome.stopped(inHomeFolder: home, course: "ZZR9Q", section: 1, folderID: folderID)
         XCTAssertEqual(stopped?.kind, .buildNeededAnAnswer, "the question was the build's, not the folder's")
         XCTAssertFalse(
             FileManager.default.fileExists(atPath: deployNote.path),
