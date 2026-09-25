@@ -84,8 +84,9 @@ ditto "${SOURCE}/Sparkle.framework" "${STAGED}/Sparkle.framework"
 # sign_update signs and verifies it. The rest of bin/ is not used here.
 cp -a "${SOURCE}/bin/generate_appcast" "${STAGED}/bin/"
 cp -a "${SOURCE}/bin/sign_update" "${STAGED}/bin/"
-# MIT: the notice travels with every copy, so the app carries it as a file.
-cp -a "${SOURCE}/LICENSE" "${STAGED}/LICENSE"
+# MIT: the notice travels with every copy, so the app carries it as a file —
+# named for whose it is, since it lands at the top of the app's Resources.
+cp -a "${SOURCE}/LICENSE" "${STAGED}/Sparkle-LICENSE"
 
 rm -rf "${DESTINATION}"
 mv "${STAGED}" "${DESTINATION}"
