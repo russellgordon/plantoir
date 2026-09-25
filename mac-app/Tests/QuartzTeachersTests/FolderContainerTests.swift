@@ -8,7 +8,8 @@ final class FolderContainerTests: XCTestCase {
 
     /// The app and the launchers must derive the SAME name, or the app
     /// would stop a container that does not exist while the real one runs
-    /// on. The launchers use `pwd -P | shasum -a 256 | cut -c1-8`.
+    /// on. The launchers use `/bin/pwd -P | shasum -a 256 | cut -c1-8`; every
+    /// spelling of a folder is checked in `FolderIdentityTests`.
     @MainActor
     func testTheNameMatchesWhatTheLaunchersDerive() throws {
         let folder: String = NSTemporaryDirectory() + "fc-\(UUID().uuidString)"
@@ -17,7 +18,7 @@ final class FolderContainerTests: XCTestCase {
 
         let shell: Process = Process()
         shell.executableURL = URL(fileURLWithPath: "/bin/bash")
-        shell.arguments = ["-c", "cd '\(folder)' && pwd -P | shasum -a 256 | cut -c1-8"]
+        shell.arguments = ["-c", "cd '\(folder)' && /bin/pwd -P | shasum -a 256 | cut -c1-8"]
         let output: Pipe = Pipe()
         shell.standardOutput = output
         try shell.run()

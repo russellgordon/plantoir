@@ -887,6 +887,7 @@ with a Windows reader, all three in the table below. `activityTrail.mustRecord`
 grew from 75 to **76** (`scheduled publish notification`), which is not a new
 list.
 Re-taken at the merge into `dev`: **209** lists on the merged tree, `activityTrail.mustRecord` **77**.
+Re-taken at the merge into `dev`: **209** lists on the merged tree, `activityTrail.mustRecord` **77**.
 
 **Re-take it rather than trusting this paragraph** — a census nobody can repeat
 is a number that rots. A case list is *an array of objects reached through

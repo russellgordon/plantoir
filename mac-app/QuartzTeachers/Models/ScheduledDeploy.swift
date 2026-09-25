@@ -2200,24 +2200,21 @@ enum ScheduledDeploy {
         return (courseCode: code, sectionNumber: sectionNumber)
     }
 
-    /// A path with every symlink resolved, POSIX-style.
+    /// A path in the disk's own spelling — `FolderIdentity.canonicalPath`,
+    /// the one answer the container naming and every other folder comparison
+    /// use (#189).
     ///
-    /// `realpath` rather than Foundation's `resolvingSymlinksInPath()`, which
-    /// strips the `/private` prefix from `/var` and `/tmp` paths where the
-    /// POSIX call keeps it — the same trap the container naming met. Two
-    /// spellings of one folder comparing as DIFFERENT would quietly scope
-    /// every job out, and nothing would be cancelled or shown at all.
+    /// Not Foundation's `resolvingSymlinksInPath()`, which strips the
+    /// `/private` prefix from `/var` and `/tmp` paths and folds neither case
+    /// nor Unicode form. Two spellings of one folder comparing as DIFFERENT
+    /// would quietly scope every job out, and nothing would be cancelled or
+    /// shown at all.
     ///
     /// A path that does not exist comes back as it went in, so a working
     /// folder on an unmounted volume compares by its plain text rather than
     /// matching nothing.
     nonisolated static func physicalPath(_ path: String) -> String {
-        guard let resolved = realpath(path, nil) else {
-            return path
-        }
-        let physical: String = String(cString: resolved)
-        free(resolved)
-        return physical
+        return FolderIdentity.canonicalPath(path)
     }
 
     // MARK: - Wording

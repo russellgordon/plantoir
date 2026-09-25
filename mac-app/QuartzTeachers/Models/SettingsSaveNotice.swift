@@ -215,7 +215,10 @@ struct SettingsSaveNotice: Equatable {
 
     // MARK: - Private helpers
 
+    /// One folder, one spelling: links, `/private`, case and Unicode form
+    /// all resolved the way the disk spells the folder (`FolderIdentity`,
+    /// #189), so a lease taken under another spelling is still this folder's.
     private static func standardised(_ path: String) -> String {
-        return URL(fileURLWithPath: path).standardizedFileURL.path
+        return FolderIdentity.canonicalPath(URL(fileURLWithPath: path).standardizedFileURL.path)
     }
 }

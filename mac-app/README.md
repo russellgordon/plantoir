@@ -187,9 +187,10 @@ requirement.
   (`BuildOutputLocation`). The shortcut is what lets `BuildFreshness`,
   `ScheduledDeploy`, `SectionDetailView`, the three launchers and a launchd
   deploy all keep naming the path they already named. The folder id is the
-  same `pwd -P | shasum` hash that names the folder's container, derived once
-  in `BuildOutputLocation.folderIdentifier` and used by `FolderContainers`
-  too. The rule is implemented a second time in the launchers' shell, because
+  same `/bin/pwd -P | shasum` hash that names the folder's container, derived once
+  in `BuildOutputLocation.folderIdentifier` (through `FolderIdentity.canonicalPath`,
+  the disk's own spelling, which every comparison of two folder paths uses too —
+  #189) and used by `FolderContainers` too. The rule is implemented a second time in the launchers' shell, because
   a teacher at the command line and a scheduled publish have no app — the two
   are pinned against `contracts/shared-rules.json` → `buildOutputLocation`.
   **The one thing to know before touching it**: a builds folder with no

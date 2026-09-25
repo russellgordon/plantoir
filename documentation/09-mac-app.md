@@ -80,8 +80,9 @@ Beyond the actions, the app owns delivery and resources:
 - **The built website is kept outside the working folder** — every working
   folder, not only the synced ones. `courses/<CODE>/.merged_output` is a
   symlink to `~/Library/Application Support/Plantoir/builds/<folder id>/<CODE>`,
-  where the folder id is the same `pwd -P | shasum` hash that names the
-  folder's container, and the launchers bind-mount that folder into the
+  where the folder id is the same `/bin/pwd -P | shasum` hash that names the
+  folder's container (the disk's own spelling of the folder — see "One folder,
+  however it is spelled"), and the launchers bind-mount that folder into the
   container at the same absolute path so the link resolves identically on both
   sides. A built site is derived and can always be made again; keeping it in
   the folder meant a synced folder uploaded every build, Time Machine backed
@@ -506,6 +507,96 @@ guard: delete a capture and every stop reads a permanently nil property and
 does nothing at all, wearing the shape of the fix working. The behaviour itself
 was verified by reading the teardown path.
 
+## One folder, however it is spelled
+
+Added 2026-09-25 with [issue #189](https://github.com/russellgordon/plantoir/issues/189).
+
+**The question.** A working folder can reach the app spelled several ways —
+through a link, as `/tmp` for `/private/tmp`, by the firmlink
+`/System/Volumes/Data/…`, in the wrong case, or with an accented letter in the
+other Unicode form (é as one character, as Terminal, a zip or a Windows PC
+stores it; or e + accent, as Finder does). A restored window reads a path
+remembered before a case-only rename; the picker returns the disk's; the MCP
+server gets whatever was typed. Every one of them is the same folder, and every
+place that asks "is this the folder that window is in?" or builds a key from a
+folder path has to say so.
+
+**The answer is one function, `FolderIdentity.canonicalPath`**
+(`Models/FolderIdentity.swift`): open the path (`O_EVTONLY` — no read
+permission needed, and it does not hold a disk against ejection) and ask
+`fcntl(F_GETPATH)` for the disk's own spelling, falling back to `realpath` and
+then to the text as given for a path that cannot be opened (gone, on a disk
+that is not plugged in, or behind a permission the app has not been given —
+which compares as before #189, the honest degradation). `isSameFolder(a, b)`
+compares two canonical paths. **The folder's id —
+`BuildOutputLocation.folderIdentifier`, which names its container and its
+builds folder — is the SAME function**, and the launchers ask the same
+question with `/bin/pwd -P` ([03](03-launcher-scripts.md) → "One folder, one
+spelling"). That is deliberate: a comparison that disagreed with the hash would
+call two spellings of the open folder different folders, and re-choosing it
+would stop the container it is using.
+
+**What was measured.** `F_GETPATH` matched `/bin/pwd -P` byte for byte on all
+17 spellings tried on this Mac (macOS 26.6, APFS): a folder's own spelling, the
+wrong case, a link, `/tmp`, the firmlink of `/private/tmp` and of the home
+folder (right and wrong case), an NFC-stored name reached as NFD, an NFD-stored
+name reached as NFC, an NFD Finder-made name typed in upper case, iCloud Drive
+and `~/Library/CloudStorage/Dropbox` (right and wrong case), and an external
+HFS+ disk (right and wrong case). 10 µs a call (10,000 calls on the repository
+path). `FolderIdentityTests` runs the temporary-folder spellings every time
+and the others on request (`PLANTOIR_TEST_EVERY_PLACE=1`; asking about
+Dropbox or another disk can put a macOS permission question on screen, which
+would hang an unattended suite).
+
+**Rejected.** `realpath(3)`, which the app used until #189: it folds case and
+form and resolves links, but keeps the `/System/Volumes/Data` prefix where
+`/bin/pwd` drops it — so the firmlink spelling, which agreed between the two
+sides only by accident of bash's built-in keeping the typed prefix, would have
+split once the launchers moved to `/bin/pwd`. Foundation's
+`resolvingSymlinksInPath()`: it strips `/private` and folds neither case nor
+form. Making the app imitate bash's built-in `pwd -P` instead: the id would
+then depend on how the folder was reached, which is the bug — and Foundation
+hands a child process an accented name as e + accent whatever the disk stores
+(measured, `Process.arguments`), so the app's "typed" bytes are not even its
+own.
+
+**The places moved onto it**, each a comparison of two of Plantoir's spellings
+of one folder or a key built from one:
+
+| Place | Was | What went wrong with two spellings |
+|---|---|---|
+| `BuildOutputLocation.folderIdentifier`, `writeWorkingFolderMarker` | own `realpath` | the firmlink spelling hashed differently from the launchers |
+| `ScheduledDeploy.physicalPath` | own `realpath` | (now a one-line forwarder) |
+| `ReferenceStaging.claimKey` | own `realpath` | (one copy instead of four) |
+| `WorkspaceModel.folderIsInUse` | `==` | **the container of the folder on screen was stopped** when it was re-chosen in another spelling |
+| `WorkspaceModel.chooseWorkspace`, `pointAtFolder`, `adoptRestoredPath`, the cloud-notice sibling windows, `previewIsRunning` | `==` / `!=` | the same stop; a notice treated as a new choice; a selection dropped; a course read as not previewing |
+| `WorkspaceModel.followWrite`, `anyCopyHasUnsavedChanges`, `followBackupDeletion`, `heldBackupPaths`, `comparablePath` | `resolvingSymlinksInPath` | a Save or a deletion in one window not followed in the other |
+| `PreviewLeases.lease` | `==` | **two previews handed the same port** in one container |
+| `CourseActivity`, `SettingsSaveNotice` | `==` / `standardizedFileURL` | a busy course read as idle |
+| `AssistToolRunner.openWindowModel`, `SectionDetailView`, `SectionScheduleSheet.mine` | `==` / `!=` | the assistant made a second model for an open folder; a lease or a prompt not recognised |
+| `ReferenceImportSource.pathWithSlash` | `resolvingSymlinksInPath` | "the folder you have open" missed by case, so a folder could be copied into itself |
+| `WorkLeaseRegistry.Wanted`, `SectionWindowControllers.Key` | raw / `standardizedFileURL` | **dictionary keys**, which never call `isSameFolder`: canonical when the key is BUILT, or one course got two lease files and `buildClaim` missed its own claim. (`Key`'s comment said it was "case-folded on the way IN"; only the course code was.) |
+
+**Left alone, and why.** `FolderActions` compares against OBSIDIAN's record of
+a vault — another app's spelling, a different subject. The
+`standardizedFileURL` prefix tests in the assistant's page readers,
+`SectionPublishState` and `CourseRestorer` ask whether a page is inside a
+course, on URLs built from one root — never two independent spellings.
+`WorkspaceModel.relativePath(of:under:)` works on what the enumerator hands
+back. `CloudSyncedFolder` still uses `resolvingSymlinksInPath`, so a synced
+folder reached in the WRONG case is not recognised as synced; nothing in the
+app hands it such a path (the picker returns the disk's case), so it was left
+for a piece that has a reason to touch it. Remembered state is untouched:
+`WindowFolderMemory` keys by frame and stores the path as a value, and nothing
+here rewrites a stored value.
+
+**The one-time cost.** The launchers changed, so every folder's container is
+recreated once, as for any launcher edit. An ordinary folder keeps its id and
+its built websites. A folder whose path was not in the disk's own spelling
+builds from nothing once more, and the second copy it had is cleared away by
+the launchers, not by the app — see [03](03-launcher-scripts.md) → "One
+folder, one spelling" for why the Swift sweeps nothing.
+
 ## Quitting: what it frees, what it refuses to free, and why
 
 Added 2026-09-19 with [issue #220](https://github.com/russellgordon/plantoir/issues/220).
@@ -803,6 +894,21 @@ same order and for every live lease: `PreviewStopper` reaches into the
 container, then the host-side launcher is terminated. The script's
 wait-for-idle loop covers the gap. That loop is a wait on an OBSERVABLE
 CONDITION — the container going idle — not a settle delay.
+
+**One running container the app cannot name keeps the VM up too (#189).** The
+quit script stops the containers of the folders that are OPEN, by the name
+`FolderContainers.containerName` gives them. Before #189 a folder with an
+accented name stored the Terminal way, or reached in another case, could have
+a SECOND container the launchers had named from the typed spelling. A copy
+that was running when the app quit is not among the folders it knows, so
+`docker ps -q` stays non-empty and the VM is left running — the refusal's
+sentence is then true (something other than this folder's builder is running)
+but cannot name it. It is not stopped for the app: it may be an older
+launcher's publish in the middle of its work. It stops at the next restart,
+and the next launcher run for that folder in that spelling clears it away
+([03](03-launcher-scripts.md) → "One folder, one spelling"). A limit of the
+transition, not a new fault: before #189 such a copy was just as invisible to
+the quit script, and nothing made one after it.
 
 **Both halves, and the second one is easy to leave out.** A `ScriptRunner`
 lives as `@State` on the section view, so nothing outside that view could reach

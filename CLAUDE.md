@@ -663,10 +663,14 @@ each working folder's `.toolchain/`. The launchers:
   recreated container, with no update checks anywhere;
 - build with BuildKit (`docker buildx build --load`) — the legacy builder
   corrupts a layer, so don't remove that;
-- name containers `teaching-quartz-<hash of pwd -P>`, one per working folder.
-  The Swift side derives the identical name via POSIX `realpath` — Foundation's
-  `resolvingSymlinksInPath()` strips `/private` where `pwd -P` keeps it, so
-  don't swap one for the other;
+- name containers `teaching-quartz-<hash of /bin/pwd -P>`, one per working
+  folder, after moving into `$(/bin/pwd -P)`. `/bin/pwd`, not bash's built-in
+  `pwd -P`, which keeps the TYPED case and Unicode form and gave one folder
+  two containers (#189). The Swift side derives the identical name through
+  `FolderIdentity.canonicalPath` (`fcntl(F_GETPATH)`) — not `realpath`, which
+  keeps a `/System/Volumes/Data` prefix `/bin/pwd` drops, and not Foundation's
+  `resolvingSymlinksInPath()`, which strips `/private` — and compares folders
+  with the same function, so don't swap one for the other;
 - probe a free host port block per container (8081/8091/8101…, walking up
   through forty blocks and skipping any block another folder's container
   holds, stopped ones included — `contracts/app-rules.json` → `previewPorts`,

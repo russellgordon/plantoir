@@ -66,9 +66,14 @@ enum PreviewLeases {
 
     /// Leases a port for a preview of one section, refusing politely when
     /// the section is already live elsewhere or every port is taken.
+    ///
+    /// Two leases are in the same folder however either was spelled (#189):
+    /// the folder's one workspace publishes the ports, so a second spelling
+    /// counted as another folder would be handed a port already in use.
     static func lease(folderPath: String, courseCode: String, sectionNumber: Int) throws -> Lease {
+        let wantedFolder: String = FolderIdentity.canonicalPath(folderPath)
         for existing in active {
-            let samePlace: Bool = existing.folderPath == folderPath
+            let samePlace: Bool = FolderIdentity.canonicalPath(existing.folderPath) == wantedFolder
                 && existing.courseCode == courseCode
                 && existing.sectionNumber == sectionNumber
             if samePlace {
@@ -80,7 +85,7 @@ enum PreviewLeases {
         // so only previews in the SAME folder contend for them.
         var takenPorts: [Int] = []
         for existing in active {
-            if existing.folderPath == folderPath {
+            if FolderIdentity.canonicalPath(existing.folderPath) == wantedFolder {
                 takenPorts.append(existing.port)
             }
         }
