@@ -55,7 +55,7 @@ cd "$(dirname "$0")"
 
 DEV_TEST_IMAGE="quartz-teacher:dev-test"
 # The launchers name their container after the working folder.
-CONTAINER_NAME="teaching-quartz-$(pwd -P | shasum -a 256 | cut -c1-8)"
+CONTAINER_NAME="teaching-quartz-$(/bin/pwd -P | shasum -a 256 | cut -c1-8)"
 # The launchers' own way of naming a folder they hand to a container, loaded
 # out of the block the three of them share rather than spelled a second way
 # here. `-v src:dst` splits on ':', so a working folder called
@@ -1021,7 +1021,7 @@ rm -f "$STAMP_FILE"
 # LINK. Checked here because every other check in this file would pass just as
 # happily with a real folder in the old place — and the whole point of the
 # change is that the bytes are not in the working folder any more.
-EXPECTED_BUILD_ROOT="${HOME%/}/Library/Application Support/Plantoir/builds/$(pwd -P | shasum -a 256 | cut -c1-8)"
+EXPECTED_BUILD_ROOT="${HOME%/}/Library/Application Support/Plantoir/builds/$(/bin/pwd -P | shasum -a 256 | cut -c1-8)"
 LINK_TARGET="$(readlink courses/EXC2O/.merged_output 2>/dev/null || true)"
 if [[ -L "courses/EXC2O/.merged_output" && "$LINK_TARGET" == "$EXPECTED_BUILD_ROOT/EXC2O" ]]; then
   pass "The built site is kept outside the working folder ($LINK_TARGET)"
@@ -1326,7 +1326,7 @@ cp -R courses/EXC2O "$VERIFY_COLON_DIR/courses/EXC2O"
 # The fixture's .merged_output is a LINK to THIS folder's builds root. Copied
 # as a link, it would aim the colon folder's build at this one's built site.
 rm -rf "$VERIFY_COLON_DIR/courses/EXC2O/.merged_output"
-VERIFY_COLON_ID="$(cd "$VERIFY_COLON_DIR" && pwd -P | shasum -a 256 | cut -c1-8)"
+VERIFY_COLON_ID="$(cd "$VERIFY_COLON_DIR" && /bin/pwd -P | shasum -a 256 | cut -c1-8)"
 VERIFY_COLON_CONTAINER="teaching-quartz-${VERIFY_COLON_ID}"
 VERIFY_COLON_BUILDS="${HOME%/}/Library/Application Support/Plantoir/builds/${VERIFY_COLON_ID}"
 docker rm -f "$VERIFY_COLON_CONTAINER" >/dev/null 2>&1 || true
@@ -1402,7 +1402,7 @@ printf -- '---\ntitle: Held Back\ndraft: true\n---\n\nNot for students.\n' \
   > "$VERIFY_LOCK_SECTION/Held Back.md"
 printf -- '---\ntitle: Out In The Open\npublish: true\n---\n\nFor students.\n' \
   > "$VERIFY_LOCK_SECTION/Out In The Open.md"
-VERIFY_LOCK_ID="$(cd "$VERIFY_LOCK_DIR" && pwd -P | shasum -a 256 | cut -c1-8)"
+VERIFY_LOCK_ID="$(cd "$VERIFY_LOCK_DIR" && /bin/pwd -P | shasum -a 256 | cut -c1-8)"
 VERIFY_LOCK_CONTAINER="teaching-quartz-${VERIFY_LOCK_ID}"
 VERIFY_LOCK_BUILDS="${HOME%/}/Library/Application Support/Plantoir/builds/${VERIFY_LOCK_ID}"
 docker rm -f "$VERIFY_LOCK_CONTAINER" >/dev/null 2>&1 || true
