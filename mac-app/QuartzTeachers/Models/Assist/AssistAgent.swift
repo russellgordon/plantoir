@@ -208,12 +208,24 @@ final class AssistAgent {
 
         // The fixed shapes never reach the model — see AssistCardCommand for
         // the measurement that decided this.
-        if let command = AssistCardCommand.matching(
+        var matched: AssistCardCommand? = AssistCardCommand.matching(
             trimmed,
             numberedPageWord: tools.numberedPageWord(forCourse: courseCode),
             windowCourse: courseCode,
             windowSection: sectionNumber
-        ) {
+        )
+        // "What does The Water Cycle link to?" — a phrase beginning "the" is a
+        // page title when this section has a page called that, and is then
+        // answered in code like any other; otherwise it is a description
+        // ("the quiz") and goes to the model (#167 fix review F2).
+        if matched == nil,
+           case .onlyIfAPageIsCalled(let title) = AssistCardCommand.linksQuestion(
+               trimmed, windowCourse: courseCode, windowSection: sectionNumber
+           ),
+           tools.sectionHasAPage(called: title, course: courseCode, section: sectionNumber) {
+            matched = AssistCardCommand.readLinks(of: title)
+        }
+        if let command = matched {
             // Built and SETTLED before the line is written, and then run
             // without being settled again. The order is the whole point: the
             // matcher is clock-free, so "deploy at 6:30 am" arrives here as

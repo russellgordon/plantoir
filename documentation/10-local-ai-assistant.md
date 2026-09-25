@@ -1167,22 +1167,43 @@ is read, and the trail records it under the existing `assistant was asked
 about another course` event with a line saying it was matched in code
 (`AssistAgent.linksQuestionNamedAnotherCourseLine`). This course and ANOTHER
 SECTION goes to the model, as it did before. `in <word>` with no section is a
-course only when it is the window's or has a course code's shape (three
-letters, a digit, a LETTER — so "Lab01" is not one; the implementation
-review's R3); otherwise — "Day 3 in Unit 2" — it is part of the title and the
-lookup decides.
+course only when it is the window's or a course code that EXISTS — one of
+the codes in the two course lists the app already ships
+(`ontario_secondary_courses.json`, `british_columbia_secondary_courses.json`).
+A shape was tried twice and was wrong both times: "three letters, a digit, a
+letter or digit" took "Lab01" for a course (review R3), and "…a letter" then
+missed real codes — 1,091 of the 1,930 Ontario codes have no digit ("ESLBO"),
+and BC's run to seven characters ("MCMPR11"; fix review L2).
+`support/skeletons/families.json`'s 499 prefixes are exactly the Ontario
+list's, so it adds nothing; and not one of the 9,790 example-payload titles,
+nor any word in them, is a code on the list. Otherwise — "Day 3 in Unit 2",
+"Lab1B" — it is part of the title and the lookup decides.
 
 **A title slot that is itself a place is not a page** (the implementation
 review's R1, measured: each of these had become "no page is called …" with the
 turn ended). "What links are in this section?", "Show me the links in section
 1", "List the links in ICS3U section 1" and "What links are in ICS3U?" ask
-about a whole section or course, and go to the model as they always did;
-"What links are in SPH3U?" in an ICS3U window is the another-course refusal.
-"The Ohm's Law page" names Ohm's Law — the article and "page" come off; any
-other title beginning "the" ("the quiz", "the homepage", "the site") is a
-description and goes to the model, at the stated cost that a real title
-beginning "The" goes there too, where `read_page` still answers it. A bare
-day word ("What does today link to?") goes to the model like "today's class".
+about a whole section or course, and go to the model as they always did, and
+so do "my course" and "this course"; "What links are in SPH3U?" in an ICS3U
+window is the another-course refusal. A bare day word ("What does today link
+to?") goes to the model like "today's class", and so does a sentence that is
+two requests ("Show me the links on Unit 2 and publish them").
+
+**A phrase beginning "the" is a title when a page is called that** — the fix
+review's F1 and F2, and the first version of this got it wrong in both
+directions. 423 of the 9,790 titles in the example payloads begin "The" ("The
+Water Cycle") and 28 end "Page" ("Scratch Page"). "The Ohm's Law page" is
+looked up as "Ohm's Law" first; only when that finds nothing is the phrase
+tried as typed without "the", without "page" and whole, and only when none of
+those finds anything is the teacher told no page is called that — so "the
+Water Cycle page" reaches "The Water Cycle", and "the Scratch Page" reaches
+"Scratch Page". Any other phrase beginning "the" — "The Water Cycle", "the
+quiz", "the site" — is answered in code when the section HAS a page called
+that (`AssistAgent` asks `AssistToolRunner.sectionHasAPage`, because the matcher
+is a function of the sentence and cannot see pages), and otherwise goes to the
+model, which has the conversation to read a description against. Sending a
+real "The …" title to the model instead, which an earlier round did, is the
+path this section measured at 0 of 84.
 
 **Refused, so the model keeps them** — each a `refused` row: a pronoun ("what
 does it link to?" — the model has the conversation; this frame does not); a
@@ -1196,12 +1217,12 @@ not this window's place, so "… link to, and publish them" is never half
 answered. With NO window passed (the contract's parsed example is run that
 way), any place at all goes to the model. The research suite's mirror of the
 grammar (`links_question` in `trimmed-surface-suite.py`) was checked against
-the compiled Swift on **3,870,684 generated sentences — 0 disagreements in the
-outcome AND in the extracted title** — after an earlier run had found the one
-fault both shared: with no window, "in ICS3U section 1" was read as another
-course. (The first run, 2,178,770 sentences, compared the outcome only; the
-review pointed out that says nothing about the title, and the mirror now
-returns it.) (One known difference is left
+the compiled Swift on **6,338,596 generated sentences — 0 disagreements in the
+outcome AND in the extracted title** (and the phrase carried for "the … page")
+— after an earlier run had found the one fault both shared: with no window,
+"in ICS3U section 1" was read as another course. (The first run, 2,178,770
+sentences, compared the outcome only; the review pointed out that says nothing
+about the title, and the mirror now returns it.) (One known difference is left
 out of that set on purpose: a title whose lower-casing changes its LENGTH,
 like "İstanbul", is compared by grapheme in Swift and by code point in Python,
 so the mirror refuses what the app reads. No probe carries one.)
