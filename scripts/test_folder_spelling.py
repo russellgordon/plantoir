@@ -59,6 +59,12 @@ def the_rule() -> dict:
     return rules["buildOutputLocation"]["aSecondSpellingIsClearedAway"]
 
 
+def said(what: str) -> str:
+    """The console sentence for one of whatWasCleared's variants."""
+    rule = the_rule()
+    return rule["sayWhenCleared"].replace("{what}", rule["whatWasCleared"][what])
+
+
 def the_trail_line() -> str:
     rules = json.loads((REPOSITORY_ROOT / "contracts" / "shared-rules.json").read_text(encoding="utf-8"))
     for entry in rules["activityTrail"]["mustRecord"]:
@@ -145,15 +151,18 @@ class TheLaunchersMoveIntoOneSpelling(unittest.TestCase):
     def test_the_sentences_are_the_contracts(self):
         body = function_named(launcher_text("setup.sh"), SWEEP)
         rule = the_rule()
-        self.assertIn(f'echo "{rule["sayWhenCleared"]}"', body)
+        self.assertIn('echo "' + rule["sayWhenCleared"].replace("{what}", "${what}") + '"', body)
+        for variant in ["workspace", "builtWebsites", "both"]:
+            self.assertIn(f'what="{rule["whatWasCleared"][variant]}"', body, variant)
         for line in rule["sayWhenStillRunning"]:
             self.assertIn('echo "' + line.replace("{workspace}", "${old_name}") + '"', body)
-        line = the_trail_line().replace("{course}/{section}", "${WORKSPACE_TRAIL_PLACE:-setup}")
+        line = the_trail_line().replace("{course}/{section}", "${WORKSPACE_TRAIL_PLACE:-setup}").replace("{what}", "${what}")
         self.assertIn(f'note_on_the_trail "{line}"', body)
 
     def test_the_sentences_name_no_machinery(self):
         rule = the_rule()
         lines = [rule["sayWhenCleared"], the_trail_line()]
+        lines.extend(rule["whatWasCleared"].values())
         lines.extend(rule["sayWhenStillRunning"])
         for line in lines:
             words = set(re.findall(r"[a-z]+", line.replace("{workspace}", "").lower()))
@@ -381,9 +390,10 @@ class TheSecondCopyIsClearedAway(unittest.TestCase):
                 self.assertIn(f"docker rm {old}", self.calls())
                 self.assertFalse((self.fake / "forced").exists())
                 self.assertFalse(self.old_builds.exists())
-                self.assertIn(the_rule()["sayWhenCleared"], output)
+                self.assertIn(said("both"), output)
                 place = "setup" if launcher == "setup.sh" else "ICS4U/2"
-                expected = the_trail_line().replace("{course}/{section}", place)
+                expected = the_trail_line().replace("{course}/{section}", place).replace(
+                    "{what}", the_rule()["whatWasCleared"]["both"])
                 self.assertTrue(self.trail()[-1].endswith(" · " + expected), self.trail())
                 self.assert_courses_untouched()
 
@@ -396,7 +406,7 @@ class TheSecondCopyIsClearedAway(unittest.TestCase):
         self.assertNotIn(f"docker rm {old}", self.calls())
         self.assertTrue(self.old_builds.is_dir())
         self.assertIn(the_rule()["sayWhenStillRunning"][0].replace("{workspace}", old), output)
-        self.assertNotIn(the_rule()["sayWhenCleared"], output)
+        self.assertNotIn("🧹", output)
         self.assertEqual(self.trail(), [])
 
     def test_nothing_is_removed_when_docker_cannot_be_asked(self):
@@ -404,7 +414,7 @@ class TheSecondCopyIsClearedAway(unittest.TestCase):
         self.an_old_builds_folder()
         output = self.sweep()
         self.assertTrue(self.old_builds.is_dir())
-        self.assertNotIn(the_rule()["sayWhenCleared"], output)
+        self.assertNotIn("🧹", output)
         self.assertEqual(self.trail(), [])
 
     def test_a_refused_removal_stops_the_sweep(self):
@@ -423,7 +433,9 @@ class TheSecondCopyIsClearedAway(unittest.TestCase):
         self.an_old_builds_folder()
         output = self.sweep()
         self.assertFalse(self.old_builds.exists())
-        self.assertIn(the_rule()["sayWhenCleared"], output)
+        self.assertIn(said("builtWebsites"), output)
+        self.assertTrue(self.trail()[-1].endswith(the_rule()["whatWasCleared"]["builtWebsites"]
+                                                  + ", left under another spelling of its name"), self.trail())
         self.assert_courses_untouched()
 
     def test_a_builds_folder_another_workspace_mounts_is_kept(self):
@@ -432,6 +444,31 @@ class TheSecondCopyIsClearedAway(unittest.TestCase):
         self.an_old_builds_folder()
         self.sweep()
         self.assertTrue(self.old_builds.is_dir())
+        self.assertEqual(self.trail(), [])
+
+    def test_when_only_the_workspace_goes_the_sentence_says_so(self):
+        """Review L3: the sentence names only what was removed."""
+        old = "teaching-quartz-" + OLD_ID
+        self.workspaces([old, "teaching-quartz-5eed5eed"])
+        self.mounts("teaching-quartz-5eed5eed", [str(self.old_builds)])
+        self.an_old_builds_folder()
+        output = self.sweep()
+        self.assertIn(f"docker rm {old}", self.calls())
+        self.assertTrue(self.old_builds.is_dir())
+        self.assertIn(said("workspace"), output)
+        self.assertNotIn(said("both"), output)
+        self.assertTrue(self.trail()[-1].endswith(the_rule()["whatWasCleared"]["workspace"]
+                                                  + ", left under another spelling of its name"), self.trail())
+
+    def test_an_empty_note_names_no_folder(self):
+        """Review L1: `cd ""` stays where it is, so an empty note would read
+        as this folder."""
+        self.workspaces([])
+        (self.old_builds / "ICS4U").mkdir(parents=True)
+        (self.old_builds / "working-folder.txt").write_text("", encoding="utf-8")
+        output = self.sweep()
+        self.assertTrue(self.old_builds.is_dir())
+        self.assertNotIn("🧹", output)
         self.assertEqual(self.trail(), [])
 
     def test_a_mount_question_docker_does_not_answer_keeps_it(self):
