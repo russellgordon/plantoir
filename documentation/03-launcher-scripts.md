@@ -170,11 +170,13 @@ its own workspace, handles what an old spelling left behind: if
 `teaching-quartz-<that id>` is removed with a plain `docker rm` (never `-f`),
 and `builds/<that id>` is removed when its `working-folder.txt` names THIS
 folder (compared through `/bin/pwd -P`, since an old launcher wrote the typed
-spelling) and no workspace, running or stopped, still mounts it. A RUNNING
+spelling; an EMPTY note names no folder, because `cd ""` stays put and would
+read as this one) and no workspace, running or stopped, still mounts it. A RUNNING
 copy is left alone and named on the console — it may be an older launcher's
 publish in the middle of its work. Nothing is removed when Docker cannot be
 asked, and the teacher's courses are never touched. The console says what was
-cleared and the trail gets one line (`contracts/shared-rules.json` →
+cleared — the workspace, the built websites, or both, naming only what went —
+and the trail gets one line (`contracts/shared-rules.json` →
 `buildOutputLocation.aSecondSpellingIsClearedAway`, and
 `activityTrail` → "built site moved out of the working folder" →
 `launcherLineWhenASecondCopyIsClearedAway`). Rejected: doing it in the app at
@@ -194,7 +196,12 @@ second copy that is RUNNING when the launcher looks keeps `docker ps` from
 being empty, so the app's quit leaves the virtual machine running until it
 stops ([09](09-mac-app.md) → "Quitting"); a spelling that is never used again
 leaves its stopped copy behind, holding one of the forty preview blocks, which
-the walk's second pass will take when nothing else is free.
+the walk's second pass will take when nothing else is free; and one narrow
+race is open — an OLD launcher (a launchd publish still on the pre-refresh
+`deploy.sh`) that has made its builds folder but not yet started its stopped
+workspace can lose that folder to a new launcher handed the same old spelling
+at the same moment, costing that one publish a build
+(`buildOutputLocation.aSecondSpellingIsClearedAway.knownLimits`).
 
 ### How a folder finds its ports, and when it cannot
 
