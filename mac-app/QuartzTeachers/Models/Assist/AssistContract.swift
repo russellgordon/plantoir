@@ -561,14 +561,20 @@ enum AssistContract {
         }
         var parsed: [[String: Any]] = []
         for shape in AssistCardCommand.everyParsedShape {
-            parsed.append([
+            var family: [String: Any] = [
                 "shape": shape.shape,
                 "tool": shape.tool,
                 "fills": shape.fills,
                 "example": shape.example,
                 "notThis": shape.notThis,
                 "becauseNotThis": shape.becauseNotThis,
-            ])
+            ]
+            // Only the family that reads the window's course carries it, so
+            // every other family is byte-for-byte what it was (#267).
+            if let word = shape.numberedPageWord {
+                family["inANumberedCourseWhosePagesAre"] = word
+            }
+            parsed.append(family)
         }
         return [
             "note": "Matched in CODE and never sent to the model. Trimmed, case-folded, trailing . and ! "
@@ -582,7 +588,10 @@ enum AssistContract {
                         + "integer or a title off a fixed shape is not a judgement anybody needs a "
                         + "language model for. `notThis` is the near-miss each family must REFUSE, "
                         + "and it is the half that stops a family swallowing requests that belong "
-                        + "to the model.",
+                        + "to the model. A family carrying `inANumberedCourseWhosePagesAre` matches "
+                        + "only in a window whose course names its pages with one number and that "
+                        + "word (#267): a runner passes the word to its matcher for the example AND "
+                        + "the near miss, and the family matches nothing in any other course.",
             "parsed": parsed,
         ]
     }

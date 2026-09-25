@@ -222,16 +222,17 @@
         ],
         "insertAtNumber": 2,
         "expectRenamesInOrder": [
-          "Week 9 → Week 10",
-          "Week 8 → Week 9",
           "Week 2 → Week 3"
         ],
+        "expectAddedOn": {
+          "Week 2": "2025-09-25"
+        },
         "expectMovedTo": {
           "Week 3": "2025-10-02"
         },
         "expectNotMoved": [
-          "Week 9",
-          "Week 10"
+          "Week 8",
+          "Week 9"
         ],
         "timetable": [
           "2025-09-18",
@@ -247,7 +248,116 @@
           "2025-11-27",
           "2025-12-04"
         ],
-        "why": "CODING's own dates: a weekly club whose pages for weeks 3–7 were never written. Packing the later pages onto the next free days — the ordinary scheme's rule, which suits a course whose pages sit on consecutive class days — would move old Week 8 to 2025-10-09, SIX WEEKS EARLIER, while the plan said “moved onto later class days”. In a numbered course a page moves only as far as it must: a page already dated after the page before it stays where it is, and otherwise it takes the first class day after that page. For a section with no gaps the two rules give the same dates (the case above). Found by the #267 plan review; measured against the real planner."
+        "why": "CODING's own dates: a weekly club whose pages for weeks 3–7 were never written. Packing the later pages onto the next free days — the ordinary scheme's rule, which suits a course whose pages sit on consecutive class days — would move old Week 8 to 2025-10-09, SIX WEEKS EARLIER, while the plan said “moved onto later class days”. In a numbered course a page moves only as far as it must: a page already dated after the page before it stays where it is, and otherwise it takes the first class day after that page. For a section with no gaps the two rules give the same dates (the case above). NOR is a page RENAMED unless the new number lands on its name: old Week 2 becomes Week 3, and Week 8 and Week 9 keep their names and their links — number 3 was free, so the run stops there. (The first version of this case renamed Week 8 → 9 and Week 9 → 10 as well; the #267 implementation review measured that as two published meetings renamed, links rewritten, for nothing.) Found by the #267 plan review; measured against the real planner."
+      },
+      {
+        "scheme": "numbered",
+        "word": "Week",
+        "name": "making room at a GAP in a numbered course fills the free slot and renames and moves nothing",
+        "count": 1,
+        "existingClasses": [
+          {
+            "date": "2025-09-18",
+            "title": "Week 1"
+          },
+          {
+            "date": "2025-09-25",
+            "title": "Week 2"
+          },
+          {
+            "date": "2025-11-20",
+            "title": "Week 8"
+          },
+          {
+            "date": "2025-11-27",
+            "title": "Week 9"
+          }
+        ],
+        "insertAtNumber": 3,
+        "expectRenamesInOrder": [],
+        "expectAddedOn": {
+          "Week 3": "2025-10-02"
+        },
+        "expectNoMoves": true,
+        "timetable": [
+          "2025-09-18",
+          "2025-09-25",
+          "2025-10-02",
+          "2025-10-09",
+          "2025-10-16",
+          "2025-10-23",
+          "2025-10-30",
+          "2025-11-06",
+          "2025-11-13",
+          "2025-11-20",
+          "2025-11-27",
+          "2025-12-04",
+          "2025-12-11",
+          "2025-12-18"
+        ],
+        "why": "CODING exactly as it is on disk (#267 implementation review, HIGH). A numbered course orders by DATE: the new Week 3 goes after Week 2 — the latest page numbered below it — on the first free class day, 2025-10-02. Week 8 and Week 9 are already later, so nothing is renamed and nothing moves, and the plan lists no move. Measured on the first version: the new page took Week 8's day (2025-11-20) and Week 8 → Week 9 on 11-27, Week 9 → Week 10 on 12-04 — two published meetings renamed and pushed a week later to make room in a slot that was empty."
+      },
+      {
+        "scheme": "numbered",
+        "word": "Week",
+        "name": "only the run of pages the new number collides with is renamed and moved",
+        "count": 1,
+        "existingClasses": [
+          {
+            "date": "2025-09-18",
+            "title": "Week 1"
+          },
+          {
+            "date": "2025-09-25",
+            "title": "Week 2"
+          },
+          {
+            "date": "2025-10-02",
+            "title": "Week 3"
+          },
+          {
+            "date": "2025-10-09",
+            "title": "Week 4"
+          },
+          {
+            "date": "2025-11-20",
+            "title": "Week 8"
+          }
+        ],
+        "insertAtNumber": 2,
+        "expectRenamesInOrder": [
+          "Week 4 → Week 5",
+          "Week 3 → Week 4",
+          "Week 2 → Week 3"
+        ],
+        "expectAddedOn": {
+          "Week 2": "2025-09-25"
+        },
+        "expectMovedTo": {
+          "Week 3": "2025-10-02",
+          "Week 4": "2025-10-09",
+          "Week 5": "2025-10-16"
+        },
+        "expectNotMoved": [
+          "Week 8"
+        ],
+        "timetable": [
+          "2025-09-18",
+          "2025-09-25",
+          "2025-10-02",
+          "2025-10-09",
+          "2025-10-16",
+          "2025-10-23",
+          "2025-10-30",
+          "2025-11-06",
+          "2025-11-13",
+          "2025-11-20",
+          "2025-11-27",
+          "2025-12-04",
+          "2025-12-11",
+          "2025-12-18"
+        ],
+        "why": "When the new page DOES land on a name and a day that are taken, the pages it collides with shift — renamed highest first, each onto the first class day after the page before it — and the shift stops at the first page that is already clear on both counts (Week 8: number 6 would be free, and 2025-11-20 is after 2025-10-16). This is the only shape in which a numbered course's plan says pages moved."
       }
     ],
     "note": "Making room for a class in the middle of a unit. The RENAME ORDER is the part to get right and the part that looks like an implementation detail: it is the difference between a course that survives and one that loses a lesson.",
@@ -399,6 +509,52 @@
         "expectOtherClassesMoving": 1,
         "expectUndoOffered": false,
         "why": "The first case's rule under the one-number scheme (#267): the copy is the source's own next number, and what was there moves up one and onto the next class day."
+      },
+      {
+        "scheme": "numbered",
+        "word": "Week",
+        "name": "duplicating into a gap in a numbered course renames and moves nothing, so it can be taken back",
+        "duplicate": "Week 2",
+        "existingClasses": [
+          {
+            "date": "2025-09-18",
+            "title": "Week 1"
+          },
+          {
+            "date": "2025-09-25",
+            "title": "Week 2"
+          },
+          {
+            "date": "2025-11-20",
+            "title": "Week 8"
+          },
+          {
+            "date": "2025-11-27",
+            "title": "Week 9"
+          }
+        ],
+        "timetable": [
+          "2025-09-18",
+          "2025-09-25",
+          "2025-10-02",
+          "2025-10-09",
+          "2025-10-16",
+          "2025-10-23",
+          "2025-10-30",
+          "2025-11-06",
+          "2025-11-13",
+          "2025-11-20",
+          "2025-11-27",
+          "2025-12-04",
+          "2025-12-11",
+          "2025-12-18"
+        ],
+        "expectNewTitle": "Week 3",
+        "expectDate": "2025-10-02",
+        "expectRenamesInOrder": [],
+        "expectOtherClassesMoving": 0,
+        "expectUndoOffered": true,
+        "why": "CODING as it is on disk (#267 implementation review, HIGH): “Duplicate Week 2 as my next meeting”. The copy is Week 3, on the first class day after Week 2 — 2025-10-02 — and Week 8 and Week 9 are already later, so neither is renamed or moved and the copy can be taken back. The first version dated the copy 2025-11-20 (Week 8's day) and renamed Week 8 → 9 and Week 9 → 10."
       }
     ],
     "forcedUnpublished": {
@@ -490,9 +646,50 @@
         ],
         "expectNumber": 2,
         "why": "A two-number page in a numbered course is not a class page (pageNaming), so it cannot push the count along."
+      },
+      {
+        "scheme": "numbered",
+        "word": "Week",
+        "existingClasses": [
+          {
+            "date": "2025-09-18",
+            "title": "Week 1"
+          },
+          {
+            "date": "2025-09-25",
+            "title": "Week 2"
+          },
+          {
+            "date": "2025-11-20",
+            "title": "Week 8"
+          },
+          {
+            "date": "2025-11-27",
+            "title": "Week 9"
+          }
+        ],
+        "timetable": [
+          "2025-09-18",
+          "2025-09-25",
+          "2025-10-02",
+          "2025-10-09",
+          "2025-10-16",
+          "2025-10-23",
+          "2025-10-30",
+          "2025-11-06",
+          "2025-11-13",
+          "2025-11-20",
+          "2025-11-27",
+          "2025-12-04",
+          "2025-12-11",
+          "2025-12-18"
+        ],
+        "expectNumber": 10,
+        "expectDate": "2025-12-04",
+        "why": "CODING as it is on disk, with its DATES (#267 implementation review, HIGH). A numbered course orders by date, so the next page is dated one class day after the LATEST page — Week 9's 2025-11-27 — not by position (four pages → the fifth date, 2025-10-16, which the first version wrote: five weeks BEFORE Week 8, where the front page, which follows the latest date, never showed it). A runner builds the plan through the real planner with this timetable remembered and asserts the title AND the date. A case with `existingClasses` has no `existing`: it is the dated form."
       }
     ],
-    "note": "What 'add the next class' would be called: the highest unit these pages name, and one past the highest day inside it."
+    "note": "What 'add the next class' would be called: the highest unit these pages name, and one past the highest day inside it. In a numbered course (#267), one past the highest number — and a case that carries `timetable` and `expectDate` also pins its DATE: one class day after the latest dated page, because a numbered course orders by date and may have gaps."
   },
   "note": "Naming, numbering and making room for classes. All of it is pure rules over page titles and dates, so all of it is portable. The insertion cases are the highest-stakes data in these contracts: they rename files a teacher's lessons live in.",
   "numberedClassOrder": {

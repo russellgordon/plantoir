@@ -49,7 +49,13 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     /// requests that only LOOK like a card phrasing ("publish tomorrow's
     /// class, but not the linked pages") and answer the wrong question with
     /// total confidence, which is worse than routing it.
-    static func matching(_ message: String) -> AssistCardCommand? {
+    ///
+    /// `numberedPageWord` is the course's own page word ("Week") when the
+    /// window's course names its pages with ONE number (#267), and nil
+    /// otherwise. Only the one-number make-room frame reads it: that frame
+    /// matches in a numbered course alone, and only on that word or a bare
+    /// number — see `makeRoomAtOneNumber`.
+    static func matching(_ message: String, numberedPageWord: String? = nil) -> AssistCardCommand? {
         let tidied: String = message.trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: ".!"))
             .lowercased()
@@ -65,7 +71,7 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         if let more = AssistCardCommand.moreDays(tidied) {
             return more
         }
-        if let room = AssistCardCommand.makeRoom(tidied) {
+        if let room = AssistCardCommand.makeRoom(tidied, numberedPageWord: numberedPageWord) {
             return room
         }
         if let scheduled = AssistCardCommand.deployAtATime(tidied) {
@@ -310,7 +316,7 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     /// and the parts are read out of it — it does not try to understand a
     /// sentence that merely resembles this one, because answering the wrong
     /// question with total confidence is worse than routing it.
-    private static func makeRoom(_ tidied: String) -> AssistCardCommand? {
+    private static func makeRoom(_ tidied: String, numberedPageWord: String?) -> AssistCardCommand? {
         let spelled: [String: Int] = [
             "a": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
             "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
@@ -328,10 +334,12 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
             words.append(String(piece))
         }
 
-        // <count> class|classes|meeting|meetings at <word> <number> — the
+        // <count> class|classes|meeting|meetings at [<word>] <number> — the
         // one-number shape a numbered course's pages have (#267).
-        if words.count == 5 {
-            return AssistCardCommand.makeRoomAtOneNumber(words, spelled: spelled)
+        if words.count == 4 || words.count == 5 {
+            return AssistCardCommand.makeRoomAtOneNumber(
+                words, spelled: spelled, numberedPageWord: numberedPageWord
+            )
         }
 
         // <count> class|classes at unit <unit> day <day>
@@ -361,33 +369,40 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     }
 
     /// "Make room for a meeting at Week 5" — one number, the way a club names
-    /// its pages (#267).
+    /// its pages (#267) — or "at 5", the bare number.
     ///
-    /// The frame cannot know the course's own word ("Week") — this table is
-    /// a pure function of the sentence — so any single word is read as the
-    /// word, with two exceptions. "day" would turn "at day 5" into a UNIT.
-    /// "unit" keeps the shipped near-miss: "make room for a class at Unit 3"
-    /// names no day, and has always gone to the model
-    /// (`MakeRoomForClassesTests.testNearMissesAreNotSwallowed`). The number
-    /// goes into `unit`, and that is the safe slot in BOTH kinds of course:
-    /// a numbered course reads a lone `unit` as its position
-    /// (`ClassInsertionPlanner.numberedPosition`), and an ordinary course
-    /// given a unit and no day ASKS which day rather than guessing one — so
-    /// "make room for one class at week 5" in a Unit/Day course is a
-    /// question, never a rename.
+    /// **Matched only in a numbered course, and only on that course's own
+    /// word.** The first version could not know the word, so it took any
+    /// single word: "make room for a meeting at period 3", "at block 2", "at
+    /// section 2" were all read as positions in a club and planned as "Week 3"
+    /// (measured by the #267 implementation review), and in a Unit/Day course
+    /// the same sentences stopped reaching the model, which they always had.
+    /// So the window's course says what its word is (`numberedPageWord`), and
+    /// without one — every Unit/Day course — this frame matches nothing and
+    /// the sentence goes to the model exactly as it did before #267. "at unit
+    /// 3" and "at day 5" are therefore model sentences everywhere except a
+    /// numbered course whose word IS "Unit".
+    ///
+    /// The number goes into `unit`, which a numbered course reads as its
+    /// position (`ClassInsertionPlanner.numberedPosition`).
     private static func makeRoomAtOneNumber(
-        _ words: [String], spelled: [String: Int]
+        _ words: [String], spelled: [String: Int], numberedPageWord: String?
     ) -> AssistCardCommand? {
-        guard words[2] == "at", words[3] != "day", words[3] != "unit" else {
+        guard let numberedPageWord, words[2] == "at" else {
             return nil
+        }
+        if words.count == 5 {
+            let word: String = numberedPageWord.lowercased()
+            guard !word.isEmpty, words[3] == word else {
+                return nil
+            }
         }
         let nouns: [String: Bool] = ["class": true, "meeting": true, "classes": false, "meetings": false]
         guard let isSingular = nouns[words[1]] else {
             return nil
         }
-        guard Int(words[3]) == nil,
-              let howMany = spelled[words[0]] ?? Int(words[0]), howMany > 0,
-              let position = Int(words[4]), position > 0 else {
+        guard let howMany = spelled[words[0]] ?? Int(words[0]), howMany > 0,
+              let position = Int(words[words.count - 1]), position > 0 else {
             return nil
         }
         guard (howMany == 1) == isSingular else {
@@ -674,6 +689,12 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         /// half that stops a family swallowing requests it should not.
         let notThis: String
         let becauseNotThis: String
+
+        /// The page word of the numbered course the family is matched in,
+        /// for the one family that reads the window's course (#267); nil for
+        /// every family that matches the sentence alone. A runner passes it
+        /// to the matcher for BOTH the example and the near miss.
+        var numberedPageWord: String? = nil
     }
 
     /// Every parsed family, for the contract.
@@ -747,21 +768,24 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
             // by widening the two above, so the entries Windows already
             // implements are byte-for-byte what they were.
             ParsedShape(
-                shape: "make room for <count> class|classes|meeting|meetings at <word> <number>",
+                shape: "make room for <count> class|classes|meeting|meetings at [<word>] <number>",
                 tool: "make_room_for_classes",
                 fills: [
                     "unit": "<number> — the one number a numbered course's page names carry. "
-                          + "<word> is not read: this table cannot know a course's own word, so any "
-                          + "single word except 'day' and 'unit' is taken ('at unit 3' names no day "
-                          + "and goes to the model, as it always has), and a Unit/Day course given a "
-                          + "unit and no day asks which day rather than guessing one",
+                          + "Matched ONLY in a numbered course, and <word> must be that course's own "
+                          + "page word (case-folded) or absent: 'at Week 5' and 'at 5' in a club whose "
+                          + "pages are “Week N”. In a Unit/Day course this family matches nothing and "
+                          + "the sentence goes to the model, as it did before #267",
                     "howMany": "<count>, as a number — words up to twelve are understood",
                 ],
                 example: "make room for one meeting at Week 5",
-                notThis: "make room for one meeting at day 5",
-                becauseNotThis: "'day' would put the number in the unit slot, so a Unit/Day course "
-                              + "would read 'at day 5' as Unit 5. It goes to the model, which can "
-                              + "ask which unit."
+                notThis: "make room for one meeting at period 3",
+                becauseNotThis: "'period' is not this course's page word. The first version took any "
+                              + "single word, and 'at period 3', 'at block 2' and 'at section 2' were "
+                              + "all planned in a club as “Week 3” or “Week 2” — renaming pages the "
+                              + "teacher's links point at, from a sentence about something else. It "
+                              + "goes to the model.",
+                numberedPageWord: "Week"
             ),
             ParsedShape(
                 shape: "duplicate <page title> as my next meeting",
