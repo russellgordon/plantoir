@@ -2170,14 +2170,24 @@ final class SharedRulesContractTests: XCTestCase {
             )
             let makesTheBuildsFolder: Range<String.Index>? =
                 functionBody.range(of: "\n  ensure_build_root\n")
+            // Since GitHub #280 the container is made by ONE function the
+            // three launchers share (the PREVIEW PORT BLOCK, which
+            // scripts/test_port_blocks.py pins byte-identical and runs), so
+            // the order asked here is "builds folder, then the call to it" —
+            // and the shared function is asked for its refusable form below.
             let makesTheWorkspace: Range<String.Index>? =
-                functionBody.range(of: "\n  if ! docker run -dit")
+                functionBody.range(of: "\n  create_the_workspace_on_free_ports\n")
             XCTAssertNotNil(
                 makesTheBuildsFolder,
                 "\(launcher) never makes the builds folder in run_container_with_mount()"
             )
             XCTAssertNotNil(
                 makesTheWorkspace,
+                "\(launcher) does not create the container through the shared create_the_workspace_on_free_ports"
+            )
+            XCTAssertTrue(
+                text.contains("\ncreate_the_workspace_on_free_ports() {\n")
+                    && text.contains("    if output=\"$(docker run -dit \\\n"),
                 "\(launcher) does not create the container in a form that can refuse"
             )
             if let buildsFolder = makesTheBuildsFolder, let workspace = makesTheWorkspace {

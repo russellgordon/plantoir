@@ -106,6 +106,106 @@ if [[ ! -t 0 ]]; then
   exit 1
 fi
 
+# -------------------- 0.2. One verify.sh at a time on this Mac --------------------
+# >>> VERIFY LOCK >>> — extracted between these markers and run by
+# scripts/test_verify_lock.py. Keep the markers.
+#
+# Two runs at once corrupt each other, and not only through the image tag:
+# at least six things here are shared by every run on a Mac — the
+# quartz-teacher:dev-test image, 78 fixed /tmp/verify_*.log paths (some are
+# grepped for PASS/FAIL), $HOME/.plantoir-verify-26:27 and its workspace,
+# $HOME/.plantoir-verify-locked, and the prune fixtures. Two agents' gates
+# running together on 2026-09-24 was how GitHub #280 was found. A per-run
+# image tag was REJECTED: it fixes one of the six, breaks --skip-build (the
+# tag it would reuse is deleted at the end), and makes every document that
+# names quartz-teacher:dev-test wrong.
+#
+# A second run does not wait: it says who holds the lock and exits 1. A gate
+# that silently queues hides the contention it is waiting on; one that fails
+# at once says so. /tmp rather than $TMPDIR because sessions carry different
+# TMPDIRs, and per user because /tmp is shared.
+#
+# The lock is a directory (mkdir is the atomic test) holding one file, the
+# holder's pid, folder and start time. A lock with NO such file yet is HELD —
+# its maker may be between mkdir and the write — and never taken over; a lock
+# whose pid is gone is stale and is taken over, saying so. It is released on
+# every exit, Ctrl-C, a kill and a hang-up included (`script` and pty.spawn
+# send HUP when their parent goes), and only by the run whose pid is in it. A
+# SIGKILL cannot be caught and leaves it behind: the refusal names the path.
+# (Measured under /bin/bash 3.2: the EXIT trap alone already runs on INT,
+# TERM and HUP — scripts/test_verify_lock.py passes with the three signal
+# traps removed and fails with the EXIT trap removed. The three are kept so
+# the exit status says which signal ended the run.)
+VERIFY_LOCK="${PLANTOIR_VERIFY_LOCK:-/tmp/plantoir-verify-$(id -u).lock}"
+
+release_verify_lock() {
+  local holder=""
+  if [[ -f "$VERIFY_LOCK/holder" ]]; then
+    holder="$(cut -d' ' -f1 "$VERIFY_LOCK/holder" 2>/dev/null || true)"
+  fi
+  if [[ "$holder" == "$$" ]]; then
+    rm -f "$VERIFY_LOCK/holder"
+    rmdir "$VERIFY_LOCK" 2>/dev/null || true
+  fi
+}
+
+take_verify_lock() {
+  local holder_line holder_pid
+  if ! mkdir "$VERIFY_LOCK" 2>/dev/null; then
+    holder_line=""
+    if [[ -f "$VERIFY_LOCK/holder" ]]; then
+      holder_line="$(cat "$VERIFY_LOCK/holder" 2>/dev/null || true)"
+    fi
+    holder_pid="${holder_line%% *}"
+    # A pause between reading the holder and acting on it, for
+    # scripts/test_verify_lock.py only: it is how the takeover race is made
+    # to happen every time rather than once in a thousand. Unset, nothing.
+    if [[ -n "${PLANTOIR_VERIFY_LOCK_TEST_PAUSE:-}" ]]; then
+      sleep "$PLANTOIR_VERIFY_LOCK_TEST_PAUSE"
+    fi
+    if [[ -n "$holder_pid" ]] && ! kill -0 "$holder_pid" 2>/dev/null; then
+      # Taken over under a second lock, so that two runs finding the same
+      # dead holder cannot both win: without it, B's rmdir removed the new,
+      # still-empty lock A had just made, and both held it. Inside, the
+      # holder is read AGAIN and the lock is removed only if it still names
+      # the dead run.
+      local took_over="false"
+      if mkdir "$VERIFY_LOCK.takeover" 2>/dev/null; then
+        if [[ "$(cat "$VERIFY_LOCK/holder" 2>/dev/null || true)" == "$holder_line" ]]; then
+          echo "🧹 A verify.sh that is no longer running (pid $holder_pid) left its lock behind; taking it over."
+          rm -f "$VERIFY_LOCK/holder"
+          rmdir "$VERIFY_LOCK" 2>/dev/null || true
+          if mkdir "$VERIFY_LOCK" 2>/dev/null; then
+            took_over="true"
+          fi
+        fi
+        rmdir "$VERIFY_LOCK.takeover" 2>/dev/null || true
+      fi
+      if [[ "$took_over" != "true" ]]; then
+        echo "❌ Another verify.sh took the lock at the same moment; run this one again when it has finished."
+        echo "   If nothing is running, remove $VERIFY_LOCK (and $VERIFY_LOCK.takeover if it is there)."
+        exit 1
+      fi
+    else
+      echo "❌ Another verify.sh is already running on this Mac, and two at once corrupt each other."
+      if [[ -n "$holder_pid" ]]; then
+        echo "   Held by pid $holder_pid: ${holder_line#* }"
+      else
+        echo "   Its holder has not written its name yet."
+      fi
+      echo "   Run this one again when it has finished. If nothing is running, remove $VERIFY_LOCK"
+      exit 1
+    fi
+  fi
+  trap release_verify_lock EXIT
+  trap 'exit 129' HUP
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  printf '%s %s (started %s)\n' "$$" "$(pwd -P)" "$(date '+%Y-%m-%d %H:%M:%S')" > "$VERIFY_LOCK/holder"
+}
+# <<< VERIFY LOCK <<<
+take_verify_lock
+
 # -------------------- 0.5. Pure-Python unit tests (no Docker needed) --------------------
 # Fast, dependency-free checks that don't need the image — run first so a
 # broken script.py change fails in milliseconds instead of after a full
@@ -214,6 +314,20 @@ if (cd scripts && python3 test_preview_sh_questions.py) >/tmp/verify_preview_sh_
 else
   fail "preview.sh: the one question it can ask refuses under the flag, and is still asked without it (scripts/test_preview_sh_questions.py)"
   cat /tmp/verify_preview_sh_questions_test.log
+fi
+
+if (cd scripts && python3 test_port_blocks.py) >/tmp/verify_port_blocks_test.log 2>&1; then
+  pass "the launchers walk forty blocks for a folder's preview addresses, skip any another folder holds, and say so truthfully when none is free (scripts/test_port_blocks.py)"
+else
+  fail "the launchers walk forty blocks for a folder's preview addresses, skip any another folder holds, and say so truthfully when none is free (scripts/test_port_blocks.py)"
+  cat /tmp/verify_port_blocks_test.log
+fi
+
+if (cd scripts && python3 test_verify_lock.py) >/tmp/verify_lock_test.log 2>&1; then
+  pass "verify.sh lets one run at a time hold this Mac, names the holder to a second, and lets go on every exit (scripts/test_verify_lock.py)"
+else
+  fail "verify.sh lets one run at a time hold this Mac, names the holder to a second, and lets go on every exit (scripts/test_verify_lock.py)"
+  cat /tmp/verify_lock_test.log
 fi
 
 # preview.sh announces the address the app opens, or says it cannot and stops;

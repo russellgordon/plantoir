@@ -1440,9 +1440,376 @@
       8091,
       8101
     ],
+    "hostBlockCases" : [
+      {
+        "expect" : 8081,
+        "name" : "nothing is listening"
+      },
+      {
+        "busyBlocks" : [
+          8081,
+          8091,
+          8101,
+          8111,
+          8121,
+          8131
+        ],
+        "expect" : 8141,
+        "name" : "the development Mac on 2026-09-25: six working folders' workspaces hold the six blocks the old probe knew (GitHub #280)"
+      },
+      {
+        "busyPorts" : [
+          8083
+        ],
+        "expect" : 8091,
+        "name" : "one site port spoils its whole block"
+      },
+      {
+        "busyPorts" : [
+          9091
+        ],
+        "expect" : 8081,
+        "name" : "a websocket port alone spoils its block too"
+      },
+      {
+        "busyBlocks" : [
+          8081
+        ],
+        "busyPorts" : [
+          9091
+        ],
+        "expect" : 8101,
+        "name" : "the first block taken and the second block's websocket taken"
+      },
+      {
+        "busyBlocks" : [
+          8081,
+          8091,
+          8101,
+          8111,
+          8121,
+          8131,
+          8141,
+          8151,
+          8161,
+          8171,
+          8181,
+          8191,
+          8201,
+          8211,
+          8221,
+          8231,
+          8241,
+          8251,
+          8261,
+          8271,
+          8281,
+          8291,
+          8301,
+          8311,
+          8321,
+          8331,
+          8341,
+          8351,
+          8361,
+          8371,
+          8381,
+          8391,
+          8401,
+          8411,
+          8421,
+          8431
+        ],
+        "busyPorts" : [
+          8443
+        ],
+        "expect" : 8451,
+        "name" : "thirty-six blocks taken and another app on 8443 (Supabase on the development Mac)"
+      },
+      {
+        "busyBlocks" : [
+          8081,
+          8091,
+          8101,
+          8111,
+          8121,
+          8131,
+          8141,
+          8151,
+          8161,
+          8171,
+          8181,
+          8191,
+          8201,
+          8211,
+          8221,
+          8231,
+          8241,
+          8251,
+          8261,
+          8271,
+          8281,
+          8291,
+          8301,
+          8311,
+          8321,
+          8331,
+          8341,
+          8351,
+          8361,
+          8371,
+          8381,
+          8391,
+          8401,
+          8411,
+          8421,
+          8431,
+          8441,
+          8451,
+          8461
+        ],
+        "expect" : 8471,
+        "name" : "the fortieth block is the last one tried, and it is tried"
+      },
+      {
+        "busyBlocks" : [
+          8081,
+          8091,
+          8101,
+          8111,
+          8121,
+          8131,
+          8141,
+          8151,
+          8161,
+          8171,
+          8181,
+          8191,
+          8201,
+          8211,
+          8221,
+          8231,
+          8241,
+          8251,
+          8261,
+          8271,
+          8281,
+          8291,
+          8301,
+          8311,
+          8321,
+          8331,
+          8341,
+          8351,
+          8361,
+          8371,
+          8381,
+          8391,
+          8401,
+          8411,
+          8421,
+          8431,
+          8441,
+          8451,
+          8461,
+          8471
+        ],
+        "expect" : null,
+        "name" : "every one of the forty blocks taken"
+      },
+      {
+        "busyBlocks" : [
+          8081,
+          8091,
+          8101,
+          8111,
+          8121,
+          8131,
+          8141,
+          8151,
+          8161,
+          8171,
+          8181,
+          8191,
+          8201,
+          8211,
+          8221,
+          8231,
+          8241,
+          8251,
+          8261,
+          8271,
+          8281,
+          8291,
+          8301,
+          8311,
+          8321,
+          8331,
+          8341,
+          8351,
+          8361,
+          8371,
+          8381,
+          8391,
+          8401,
+          8411,
+          8421,
+          8431,
+          8441,
+          8451,
+          8461
+        ],
+        "busyPorts" : [
+          9474
+        ],
+        "expect" : null,
+        "name" : "thirty-nine blocks taken and the fortieth's last websocket taken"
+      },
+      {
+        "expect" : 8091,
+        "name" : "a block kept by a STOPPED workspace is skipped while there is another",
+        "stoppedBlocks" : [
+          8081
+        ]
+      },
+      {
+        "expect" : 8081,
+        "name" : "all forty kept by STOPPED workspaces: the second pass takes the first of them",
+        "stoppedBlocks" : [
+          8081,
+          8091,
+          8101,
+          8111,
+          8121,
+          8131,
+          8141,
+          8151,
+          8161,
+          8171,
+          8181,
+          8191,
+          8201,
+          8211,
+          8221,
+          8231,
+          8241,
+          8251,
+          8261,
+          8271,
+          8281,
+          8291,
+          8301,
+          8311,
+          8321,
+          8331,
+          8341,
+          8351,
+          8361,
+          8371,
+          8381,
+          8391,
+          8401,
+          8411,
+          8421,
+          8431,
+          8441,
+          8451,
+          8461,
+          8471
+        ]
+      },
+      {
+        "busyBlocks" : [
+          8081
+        ],
+        "expect" : 8091,
+        "name" : "the first in use, the other thirty-nine kept by STOPPED workspaces: the second pass takes the second",
+        "stoppedBlocks" : [
+          8091,
+          8101,
+          8111,
+          8121,
+          8131,
+          8141,
+          8151,
+          8161,
+          8171,
+          8181,
+          8191,
+          8201,
+          8211,
+          8221,
+          8231,
+          8241,
+          8251,
+          8261,
+          8271,
+          8281,
+          8291,
+          8301,
+          8311,
+          8321,
+          8331,
+          8341,
+          8351,
+          8361,
+          8371,
+          8381,
+          8391,
+          8401,
+          8411,
+          8421,
+          8431,
+          8441,
+          8451,
+          8461,
+          8471
+        ]
+      }
+    ],
+    "hostBlockCeilingWhy" : "Forty is a CHOSEN number, not a measured one. Any number up to 99 is possible - block 100's first port would be 9081, the first block's websocket - and forty keeps the walk under 8888 while the websockets (9081-9474) land only on the x1-x4 of each ten, clear of 9090, 9200 and 9229. A ceiling at all keeps the refusal REACHABLE, so it can be tested and its sentence stays true. Until GitHub #280 (2026-09-25) the launchers tried six blocks and stopped: six working folders' workspaces alive on one Mac - agent worktrees did it first, but a teacher who has used six working folders on a Mac does it too, since a workspace exists (and, before the second pass, kept its block) until something removes it, and nothing removes another folder's - and a seventh folder could neither preview nor publish. Every launcher walks the SAME forty for every run, publishing included: a workspace is made once per folder and serves both, and one made without ports for a publish would have to be remade by the next preview, killing anything running in it and discarding its warm copy of the website builder (109 s cold on a teacher's Mac, #225).",
+    "hostBlockClash" : {
+      "saysWhenAStartIsRefused" : "❌ Plantoir could not start this folder's workspace. Try again, or restart this Mac if it happens again.",
+      "saysWhenAStoppedWorkspaceIsRemade" : [
+        "♻️  Something else is now using this folder's preview addresses, so Plantoir is setting this folder up again on free ones.",
+        "   The next preview will be slower than usual — about two minutes — while it gets ready."
+      ],
+      "saysWhenCreationClashes" : "↪️  Those preview addresses were taken a moment ago; trying the next ones…",
+      "saysWhy" : "The three things a launcher says in the console on these paths, written in each launcher's shared PREVIEW PORT BLOCK and checked against these keys by scripts/test_port_blocks.py. Mac-only: they are about a workspace, which the native (Windows) preview does not have. The remade line names its cost because the warm website builder lives inside the workspace and is lost (109 s cold, #225).",
+      "whenCreating" : "The probe and the creation are two steps, so two launchers starting together can both see a block free. When the creation is refused in any of these words the half-made workspace is removed WITHOUT force and the walk goes on from the NEXT block, up to the same ceiling. Any other refusal keeps the sentence it had.",
+      "whenStarting" : "A stopped workspace whose block has been taken since cannot start. Refused in any of these words - and ONLY these - it is removed without force and made again on free ports, and the console says the next preview will be slower (about two minutes: its warm copy of the website builder is gone). Any other refusal stops the run with the engine's own words and a sentence; before #280, setup.sh and deploy.sh stopped there with the engine's words alone and preview.sh carried on to fail later at a step that could not say why.",
+      "why" : "Colima says 'port is already allocated'; Docker Desktop says 'Ports are not available: ... bind: address already in use'. The launchers use any working engine as-is, so matching only Colima's would give a Docker Desktop teacher the old broad sentence for a clash the walk could have stepped past.",
+      "words" : [
+        "port is already allocated",
+        "Ports are not available",
+        "address already in use"
+      ]
+    },
+    "hostBlockCount" : 40,
+    "hostBlockPasses" : [
+      {
+        "counts" : "every port listening on this computer, and every port published by another working folder's workspace, RUNNING OR STOPPED",
+        "pass" : "kept"
+      },
+      {
+        "counts" : "every port listening on this computer, and every port published by another working folder's RUNNING workspace - so a block a stopped workspace was keeping can be taken",
+        "pass" : "in-use",
+        "when" : "only when the first pass found no block"
+      }
+    ],
+    "hostBlockPassesWhy" : "The first pass keeps a stopped workspace's block for it, so the folder it belongs to starts again on its own addresses with its warm website builder. The second exists because nothing removes another folder's workspace: without it a block would be kept for ever by a folder that was moved, renamed or deleted (a workspace is named after its folder's path, so it can never be started again), and neither remedy whenNoBlockIsFree names - closing the other folders' windows, restarting the Mac - would free anything, since both only STOP workspaces. A stopped workspace whose block was taken this way is remade on free ports when its own folder next starts it (hostBlockClash.whenStarting). A native preview (Windows) has no workspaces, so both passes are the same for it; cases with stoppedBlocks describe workspaces and do not apply there.",
+    "hostBlockProbe" : "A block is taken if ANY of its eight ports (base..base+3 and base+1000..base+1003) is listening on this computer, by anybody, or is published by ANOTHER working folder's workspace - stopped ones included in the first of two passes (hostBlockPasses), since a stopped workspace listens on nothing yet needs its block back when it starts. Read from ONE listing of listening ports (0.12 s measured on the development Mac, against 0.123 s per port for the old one-call-per-port probe, 9.8 s for forty blocks), not one question per port. A listing that cannot be read counts as nothing listening - the old probe's answer too. The host listing is the only guard against another APP: Docker publishes over a port a program on the Mac already holds (measured: exit 0). A NATIVE preview (Windows, and build_site.py's own re-probe there) binds ONE site port and its websocket rather than publishing a block of four, so it walks the same forty steps from the port it was asked for and checks only that pair (build_site.first_free_preview_port): of hostBlockCases, the ones made only of whole busyBlocks apply to it as written; the busyPorts ones describe a published block, and the stoppedBlocks ones describe workspaces.",
     "hostBlockStep" : 10,
     "note" : "Several previews run at once, one per working folder, and they must not collide. These numbers are the toolchain's, not either app's: the container publishes fixed ports and the host side probes a block.",
     "websocketOffset" : 1000,
+    "whenNoBlockIsFree" : {
+      "exitCode" : 1,
+      "sentence" : [
+        "Every address Plantoir can use for a preview is taken.",
+        "Close Plantoir's windows for your other working folders, or restart this Mac, then try again."
+      ],
+      "why" : "The old advice - 'stop another preview (or another app using ports 8081+)' - was false: a block belongs to a workspace that EXISTS, running a preview or not, and six idle workspaces held all six blocks on the development Mac. Closing a folder's last window stops its workspace, and a restart stops every workspace (they are made with no restart policy); the second pass of the walk (hostBlockPasses) then counts a stopped workspace's block as free, so both remedies the sentence names really do free room - a window closes for a folder open now, a restart for workspaces left running by a scheduled publish, the command line or a Plantoir from before 2026-09-19. What is left after both is ports other APPS are listening on. Printed by all three launchers - a PUBLISH that cannot get a workspace prints it too, which is why it says 'a preview' rather than naming what was pressed. Written on the trail as the launcher line of the existing 'preview did not appear' event (shared-rules.json -> activityTrail.mustRecord), not as a new event. No machinery words (rule 1)."
+    },
     "whenThePreviewNeverAppears" : {
       "alertTitle" : "Your Preview Did Not Appear",
       "cases" : [
