@@ -2713,7 +2713,10 @@ next course. The sentence says only that it is being imported elsewhere; it
 does not promise the course will appear, because the other import may fail or
 be stopped. The cases are `contracts/shared-rules.json` →
 `referenceCourses.importing.oneImportPerCourseAtATime.cases`, run by
-`WorkLeaseLivenessTests.testTheClaimIsTheContracts` through the REAL claim.
+`WorkLeaseLivenessTests.testTheClaimIsTheContracts` through the REAL claim. The sweep
+also skips any staging folder THIS app has claimed, whether or not its lease
+file was written — that write is best-effort, and a folder whose `.internal`
+cannot be made must not have its import swept by its own app's Reload.
 
 *Why lease-then-check:* of two processes, the one that looks second always
 sees the first one's lease, so they can never both go on; at worst both step

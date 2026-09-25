@@ -388,11 +388,21 @@ enum ReferenceStaging {
             guard ReferenceStaging.isStagingName(name) else {
                 continue
             }
+            // This app's own claims first: they do not depend on a lease file
+            // having been written, which is `try?` and can fail on a folder
+            // whose `.internal` cannot be made.
+            let folderName: String = ReferenceStaging.courseFolderName(fromStaging: name)
+            let key: String = ReferenceStaging.claimKey(
+                for: folderName, inCoursesDirectory: coursesDirectoryURL
+            )
+            if ReferenceStaging.claimedStagingKeys.contains(key) {
+                continue
+            }
             if ReferenceStaging.someoneIsWorkingOn(name, inCoursesDirectory: coursesDirectoryURL) {
                 continue
             }
             if ReferenceStaging.remove(at: child) {
-                swept.append(ReferenceStaging.courseFolderName(fromStaging: name))
+                swept.append(folderName)
             }
         }
         return swept

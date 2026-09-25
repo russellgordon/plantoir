@@ -390,6 +390,19 @@ final class WorkLeaseLivenessTests: XCTestCase {
         ReferenceStaging.giveBack("ICS4U-2025", inCoursesDirectory: coursesDirectoryURL)
     }
 
+    /// A folder this app has claimed is never swept by this app, even if its
+    /// lease file could not be written (the write is best-effort).
+    func testTheSweepLeavesThisAppsOwnClaimAloneWithoutItsLease() throws {
+        XCTAssertEqual(ReferenceStaging.claim("ICS4U-2025", inCoursesDirectory: coursesDirectoryURL), .claimed)
+        ReferenceStaging.releaseLease(for: "ICS4U-2025", inCoursesDirectory: coursesDirectoryURL)
+        XCTAssertEqual(ReferenceStaging.sweepLeftovers(inCoursesDirectory: coursesDirectoryURL), [])
+        ReferenceStaging.giveBack("ICS4U-2025", inCoursesDirectory: coursesDirectoryURL)
+        XCTAssertEqual(
+            ReferenceStaging.sweepLeftovers(inCoursesDirectory: coursesDirectoryURL), ["ICS4U-2025"],
+            "Once given back it is ordinary litter."
+        )
+    }
+
     /// Two windows that reached one working folder by different spellings —
     /// through a link, and in another case — are still one claim. A set that
     /// missed would let the second window clear the first one's copy away
