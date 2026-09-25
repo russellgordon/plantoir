@@ -27,8 +27,9 @@ class WorkspaceModel {
 
     /// True when the hosted test suite is running. Tests drive the real
     /// window, and must not leave the teacher pointed at a fixture folder
-    /// that is deleted when the run ends.
-    static let isRunningTests: Bool = NSClassFromString("XCTestCase") != nil
+    /// that is deleted when the run ends. Asked of `RealHome`, which keeps
+    /// the one definition of "XCTest is in this process" (#264).
+    static let isRunningTests: Bool = RealHome.isInsideTestBundle
 
     /// The models belonging to open windows, in the order they appeared.
     /// Windows register themselves so the in-app tests can drive the real

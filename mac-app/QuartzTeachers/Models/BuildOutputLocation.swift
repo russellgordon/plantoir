@@ -72,7 +72,7 @@ nonisolated enum BuildOutputLocation {
     /// sweep will never find them again: their working folders were under
     /// `/private/var`, and only folders under HOME are ever swept.
     static let isRunningTests: Bool =
-        NSClassFromString("XCTestCase") != nil
+        RealHome.isInsideTestBundle
         || ProcessInfo.processInfo.environment["UITEST_WORKSPACE"] != nil
 
     /// One temporary builds root for the whole test run, so a test that goes
@@ -102,7 +102,7 @@ nonisolated enum BuildOutputLocation {
         if isRunningTests {
             return buildsRootWhileTesting
         }
-        return buildsRoot(inHomeFolder: FileManager.default.homeDirectoryForCurrentUser)
+        return buildsRoot(inHomeFolder: RealHome.forFiles)
     }
 
     // MARK: - Functions
@@ -357,7 +357,7 @@ nonisolated enum BuildOutputLocation {
     /// be back tomorrow. Builds for those simply accumulate, which is the
     /// cheaper mistake.
     static func discardBuildsForMissingWorkingFolders(
-        homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
+        homeDirectory: URL = RealHome.forFiles
     ) {
         let fileManager: FileManager = FileManager.default
         guard let entries = try? fileManager.contentsOfDirectory(

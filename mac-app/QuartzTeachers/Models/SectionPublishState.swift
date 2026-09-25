@@ -349,7 +349,7 @@ nonisolated enum SectionPublishState {
     ) -> [String] {
         var result: [String] = []
         for destination in destinations where !destination.path.isEmpty {
-            let target: URL = URL(fileURLWithPath: (destination.path as NSString).expandingTildeInPath)
+            let target: URL = URL(fileURLWithPath: RealHome.expandingTilde(in: destination.path))
             let relative: String = relativePathOf(target, under: courseDirectory)
             if !relative.isEmpty {
                 result.append(relative)

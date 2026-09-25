@@ -201,7 +201,7 @@ enum ProblemReportPresenter {
     static func askWhereToSave(now: Date) -> URL? {
         let panel: NSSavePanel = NSSavePanel()
         panel.nameFieldStringValue = ProblemReportBuilder.suggestedFileName(now: now)
-        panel.directoryURL = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first
+        panel.directoryURL = RealHome.forFiles.appendingPathComponent("Desktop", isDirectory: true)
         panel.canCreateDirectories = true
         if panel.runModal() != .OK {
             return nil

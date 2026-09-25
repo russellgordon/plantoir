@@ -130,22 +130,23 @@ enum ScheduledDeploy {
     ///
     /// Every resolver that uses it takes `URL? = nil` rather than a default
     /// of the real home, on purpose: a default argument is evaluated at the
-    /// CALL site, so `= homeDirectoryForCurrentUser` could not be redirected
-    /// from inside the function. A caller that passes a home explicitly —
-    /// `oneShotCommand`, writing the real path into the script launchd will
-    /// run — gets exactly that home, test or not.
+    /// CALL site, so it could not be redirected from inside the function. A
+    /// caller that passes a home explicitly gets exactly that home, test or
+    /// not.
+    ///
+    /// **Since issue #264 the real answer comes from `RealHome.forFiles`**,
+    /// the one place allowed to ask the system, and so does every default
+    /// that used to be `= homeDirectoryForCurrentUser` — `oneShotCommand`'s
+    /// included. Under the unit suite `forFiles` already answers the same
+    /// throwaway home as this, so the check below matters only in the app a
+    /// UI test drives, which has no XCTest in it but was moved here by #240
+    /// and stays moved.
     nonisolated static var homeForScheduledNotes: URL {
         if BuildOutputLocation.isRunningTests {
-            return homeWhileTesting
+            return RealHome.homeWhileTesting
         }
-        return FileManager.default.homeDirectoryForCurrentUser
+        return RealHome.forFiles
     }
-
-    /// The one throwaway home for a whole test run, so a test that writes a
-    /// sentinel and then reads it back through another function still finds
-    /// it.
-    nonisolated static let homeWhileTesting: URL = FileManager.default.temporaryDirectory
-        .appendingPathComponent("plantoir-home-under-test-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
 
     /// Where the guard above sends a test that forgot, so that even with
     /// assertions off nothing real is touched. One folder per process, so a
@@ -473,7 +474,7 @@ enum ScheduledDeploy {
         workspaceURL: URL,
         deployArguments: [String],
         calendar: Calendar = Calendar.current,
-        homeFolder: URL = FileManager.default.homeDirectoryForCurrentUser
+        homeFolder: URL = RealHome.forFiles
     ) -> [String: Any] {
         let label: String = agentLabel(courseCode: courseCode, sectionNumber: sectionNumber)
         let components: DateComponents = calendar.dateComponents([.month, .day, .hour, .minute], from: when)
@@ -583,11 +584,12 @@ enum ScheduledDeploy {
         deployArgumentsList: [[String]],
         destinationTypes: [String] = [],
         destinationDescriptions: [String] = [],
-        // Defaulted to the real home, and takeable so a test can drive the
-        // GENERATED SHELL for real without writing into the teacher's own
-        // Application Support. BuildOutputLocation.buildsRoot takes one for
-        // the same reason, and the comment there says why it had to.
-        homeFolder: URL = FileManager.default.homeDirectoryForCurrentUser
+        // Takeable so a test can drive the GENERATED SHELL for real without
+        // writing into the teacher's own Application Support. The default is
+        // RealHome.forFiles (#264): the real home in the app, the suite's
+        // throwaway one under XCTest — so a test that EXECUTES a script built
+        // with the default writes its records there, not into real ones.
+        homeFolder: URL = RealHome.forFiles
     ) -> String {
         let label: String = agentLabel(courseCode: courseCode, sectionNumber: sectionNumber)
         let plistPath: String = plistURL(courseCode: courseCode, sectionNumber: sectionNumber).path
@@ -1252,7 +1254,7 @@ enum ScheduledDeploy {
             // waits for them to look is a line they never get.
             if let section {
                 ScheduledPublishOutcome.noteOnTrail(
-                    inHomeFolder: FileManager.default.homeDirectoryForCurrentUser,
+                    inHomeFolder: RealHome.forFiles,
                     course: section.courseCode,
                     section: section.sectionNumber
                 )
@@ -1365,7 +1367,7 @@ enum ScheduledDeploy {
         try? fileManager.removeItem(at: URL(fileURLWithPath: script))
 
         if let section {
-            let home: URL = fileManager.homeDirectoryForCurrentUser
+            let home: URL = RealHome.forFiles
             // Anything an earlier run left is cleared first — the same thing
             // the wrapper does with its own first line, and for the same
             // reason: `recordStopped` keeps the FIRST record, so last week's

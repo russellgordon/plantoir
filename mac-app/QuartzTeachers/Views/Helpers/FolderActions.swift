@@ -334,8 +334,12 @@ enum FolderActions {
     }
 
     /// Where Obsidian keeps its list of known vaults.
+    ///
+    /// Through `RealHome.forFiles` (#264), so under the unit suite the rename
+    /// paths read and write a throwaway copy — never the real list, which
+    /// they WRITE when Obsidian is open with a window.
     static var obsidianRegistryFileURL: URL {
-        return FileManager.default.homeDirectoryForCurrentUser
+        return RealHome.forFiles
             .appendingPathComponent("Library/Application Support/obsidian/obsidian.json")
     }
 

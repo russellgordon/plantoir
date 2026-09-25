@@ -48,13 +48,23 @@ final class AssistModelStore {
     nonisolated(unsafe) static var directoryOverride: URL?
 
     /// `~/Library/Application Support/Plantoir/models`.
+    ///
+    /// **Under the unit suite, the suite's throwaway home instead** (issue
+    /// #264), through `RealHome.forFiles`. Three tests used to stat the real
+    /// weights here, so a panel sentence they checked depended on what the
+    /// Mac running them had downloaded — a suite that answers differently on
+    /// a Mac with weights. The app a UI test drives has no XCTest in it and
+    /// keeps the real folder, which `AssistantRolloverUITests` needs: it runs
+    /// against a real model.
     static var directoryURL: URL {
         if let override = directoryOverride {
             return override
         }
-        let base: URL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        return base.appendingPathComponent("Plantoir", isDirectory: true)
-                   .appendingPathComponent("models", isDirectory: true)
+        return RealHome.forFiles
+            .appendingPathComponent("Library", isDirectory: true)
+            .appendingPathComponent("Application Support", isDirectory: true)
+            .appendingPathComponent("Plantoir", isDirectory: true)
+            .appendingPathComponent("models", isDirectory: true)
     }
 
     /// Where this tier's weights sit once downloaded.
