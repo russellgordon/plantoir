@@ -2,8 +2,9 @@
 """
 Stopping a build, or a publish, leaves quietly (GitHub #223 and #259).
 
-Pressing Stop on a preview types ^C into the console, which reaches
-build_site.py as a KeyboardInterrupt. It used to escape main() and print a
+Pressing Cancel in the progress view while a preview builds types ^C into
+the console, which reaches build_site.py as a KeyboardInterrupt. (Stop Preview
+and the console's Stop end the process without one.) It used to escape main() and print a
 Python traceback — measured in a real problem report of 2026-09-19 as 21
 lines and 1,230 characters of container paths and subprocess internals, the
 last thing in the console and the first thing anyone reading the report saw.
@@ -27,6 +28,10 @@ during the production rebuild and 10 at the surname question, exit -2.
 deploy.py now runs main() through run_until_stopped(), which exits 130 with
 nothing printed. Its real-interrupt case signals the whole process group, as
 a ^C typed into a terminal does, and is skipped on Windows for the same reason.
+A Cancel during the upload also drops the uploads still queued, rather than
+running them all on the way out — measured through a pty with 40 files, 25
+went up after the Cancel before, none after — so a Netlify deploy is left
+waiting for files that never arrive and never goes live.
 """
 import contextlib
 import io
@@ -35,8 +40,10 @@ import signal
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
+import _thread
 from pathlib import Path
 
 # Importing build_site by hand would otherwise leave scripts/__pycache__
@@ -177,6 +184,17 @@ build_site.main()
 """
 
 
+def interrupt_the_main_thread():
+    """What the app's ^C does to deploy.py: a SIGINT that wakes its main
+    thread wherever it is waiting. Where a real signal cannot be sent to one
+    thread (Windows), the interrupter Python offers instead, which the main
+    thread notices the next time it runs."""
+    if hasattr(signal, "pthread_kill"):
+        signal.pthread_kill(threading.main_thread().ident, signal.SIGINT)
+    else:
+        _thread.interrupt_main()
+
+
 class PublishStopLeavesQuietlyTests(unittest.TestCase):
 
     # MARK: - Set up and tear down
@@ -184,10 +202,12 @@ class PublishStopLeavesQuietlyTests(unittest.TestCase):
     def setUp(self):
         self.original_main = deploy.main
         self.original_run = subprocess.run
+        self.original_netlify_api = deploy.netlify_api
 
     def tearDown(self):
         deploy.main = self.original_main
         subprocess.run = self.original_run
+        deploy.netlify_api = self.original_netlify_api
 
     # MARK: - Tests
 
@@ -236,6 +256,99 @@ class PublishStopLeavesQuietlyTests(unittest.TestCase):
         )
         subprocess.run = self.original_run
         self.assertEqual(exit_code, 1, "A build that really failed must still say so")
+
+    def test_wrangler_that_left_first_on_the_same_cancel_is_not_a_failure(self):
+        # The same race as the rebuild's, on the Cloudflare leg: wrangler is
+        # seen leaving first, and its status must read as the Cancel rather
+        # than a failed publish with a traceback.
+        # 130 left quietly, -2 killed by SIGINT, 0xC000013A killed by Ctrl-C
+        # on Windows.
+        for stopped_status in (130, -2, 0xC000013A):
+            def wrangler_that_was_stopped(command, **arguments):
+                return subprocess.CompletedProcess(command, stopped_status)
+
+            subprocess.run = wrangler_that_was_stopped
+            exit_code, escaped = self.run_and_catch(
+                lambda: deploy.deploy_to_cloudflare(Path("public"), "project", "token", "account")
+            )
+            subprocess.run = self.original_run
+            self.assertFalse(escaped)
+            self.assertEqual(exit_code, 130, "status %d" % stopped_status)
+
+        def wrangler_that_failed(command, **arguments):
+            return subprocess.CompletedProcess(command, 1)
+
+        subprocess.run = wrangler_that_failed
+        with self.assertRaises(RuntimeError, msg="A publish that really failed must still say so"):
+            deploy.deploy_to_cloudflare(Path("public"), "project", "token", "account")
+        subprocess.run = self.original_run
+
+    def test_a_cancel_during_the_upload_starts_no_more_uploads(self):
+        # Leaving the uploads' `with ThreadPoolExecutor` block used to RUN
+        # every upload still queued — measured through a pty with 40 files:
+        # 25 went up after the Cancel, and a Netlify deploy whose files all
+        # arrive goes live. Now only the uploads already in flight finish.
+        uploads_started = []
+        interrupted_after = []
+        lock = threading.Lock()
+
+        def upload_that_takes_a_moment(method, path, token, **arguments):
+            with lock:
+                uploads_started.append(path)
+                if len(uploads_started) == 15:
+                    interrupted_after.append(len(uploads_started))
+                    interrupt_the_main_thread()
+            time.sleep(0.2)
+            return {}
+
+        deploy.netlify_api = upload_that_takes_a_moment
+        with tempfile.TemporaryDirectory() as temporary:
+            required, sha_to_pairs = self.forty_files_in(Path(temporary))
+            escaped = False
+            try:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    deploy._upload_required_files("deploy", "token", Path(temporary), required, sha_to_pairs)
+            except KeyboardInterrupt:
+                escaped = True
+        self.assertTrue(escaped, "The Cancel must still reach run_until_stopped()")
+        # Up to five uploads are in flight when the Cancel lands, and on a
+        # platform slow to deliver it each worker may start one more; never
+        # the whole queue.
+        self.assertLessEqual(
+            len(uploads_started), interrupted_after[0] + 10,
+            "%d of 40 uploads started in all, after a Cancel at the 15th" % len(uploads_started),
+        )
+
+    @unittest.skipIf(
+        not hasattr(signal, "pthread_kill"),
+        "Every upload is waiting to retry, so nothing wakes the main thread "
+        "without a real signal, which Windows cannot send to one thread",
+    )
+    def test_an_upload_waiting_to_retry_gives_up_on_a_cancel(self):
+        # An upload Netlify turned away (429) waits and tries again, for up to
+        # a minute. After a Cancel it must not: the program would sit there
+        # uploading after the teacher had stopped it.
+        attempts = []
+        lock = threading.Lock()
+
+        def upload_turned_away(method, path, token, **arguments):
+            with lock:
+                attempts.append(path)
+                if len(attempts) == 5:
+                    interrupt_the_main_thread()
+            raise RuntimeError("Netlify API error 429: slow down")
+
+        deploy.netlify_api = upload_turned_away
+        with tempfile.TemporaryDirectory() as temporary:
+            required, sha_to_pairs = self.forty_files_in(Path(temporary), count=5)
+            started = time.monotonic()
+            try:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    deploy._upload_required_files("deploy", "token", Path(temporary), required, sha_to_pairs)
+            except KeyboardInterrupt:
+                pass
+            seconds = time.monotonic() - started
+        self.assertLess(seconds, 5, "Uploads kept retrying for %.1f s after a Cancel" % seconds)
 
     @unittest.skipIf(os.name == "nt", "Windows cannot send SIGINT to a process group")
     def test_a_real_interrupt_during_the_rebuild_prints_no_traceback(self):
@@ -302,6 +415,17 @@ class PublishStopLeavesQuietlyTests(unittest.TestCase):
         except KeyboardInterrupt:
             escaped = True
         return exit_code, escaped
+
+    def forty_files_in(self, folder, count=40):
+        required = []
+        sha_to_pairs = {}
+        for number in range(count):
+            name = "page%02d.html" % number
+            (folder / name).write_text("page %d" % number, encoding="utf-8")
+            digest = "%040d" % number
+            required.append(digest)
+            sha_to_pairs[digest] = [("/" + name, name)]
+        return required, sha_to_pairs
 
     def read_until_started(self, process):
         for line in process.stdout:
