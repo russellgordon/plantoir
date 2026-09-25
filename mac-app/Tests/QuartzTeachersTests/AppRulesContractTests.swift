@@ -414,22 +414,31 @@ final class AppRulesContractTests: XCTestCase {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let previewBuilt: URL = root.appendingPathComponent("preview.html")
+        // Each built site is a `public/` folder: the check reads every page
+        // in it (issue #136, `buildFreshness.previewBuild`), the front page
+        // first.
+        let previewBuilt: URL = root.appendingPathComponent("preview/public")
+        try FileManager.default.createDirectory(at: previewBuilt, withIntermediateDirectories: true)
         try "<script>new WebSocket('ws://localhost:9081')</script>".write(
-            to: previewBuilt, atomically: true, encoding: .utf8
+            to: previewBuilt.appendingPathComponent("index.html"), atomically: true, encoding: .utf8
         )
-        let deployBuilt: URL = root.appendingPathComponent("deploy.html")
-        try "<html>no live reload here</html>".write(to: deployBuilt, atomically: true, encoding: .utf8)
+        let deployBuilt: URL = root.appendingPathComponent("deploy/public")
+        try FileManager.default.createDirectory(at: deployBuilt, withIntermediateDirectories: true)
+        try "<html>no live reload here</html>".write(
+            to: deployBuilt.appendingPathComponent("index.html"), atomically: true, encoding: .utf8
+        )
 
         XCTAssertEqual(
-            BuildFreshness.builtForPreview(previewBuilt), true,
+            BuildFreshness.builtForPreview(publicDirectory: previewBuilt), true,
             expectations["the built site was made by a PREVIEW"] == true
                 ? "A preview build must be rebuilt before deploying"
                 : "The contract and the app disagree about preview builds"
         )
-        XCTAssertFalse(BuildFreshness.builtForPreview(deployBuilt))
-        XCTAssertTrue(
-            BuildFreshness.builtForPreview(root.appendingPathComponent("nothing-here.html")),
+        XCTAssertFalse(BuildFreshness.builtForPreview(publicDirectory: deployBuilt))
+        // No front page at all — and no public/ folder either.
+        XCTAssertEqual(
+            BuildFreshness.builtForPreview(publicDirectory: root.appendingPathComponent("nothing-here/public")),
+            expectations["the built index cannot be read"],
             "An unreadable built index is rebuilt rather than trusted"
         )
     }
