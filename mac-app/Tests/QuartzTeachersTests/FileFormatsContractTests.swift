@@ -170,6 +170,63 @@ final class FileFormatsContractTests: XCTestCase {
         }
     }
 
+    /// The date and title writers take a key's continuation lines with it
+    /// (GitHub #199), run as data. Compared as bytes: a check that the new
+    /// value APPEARS passes the two-values-joined output this exists to stop,
+    /// and Swift's `==` reads "\r\n" as one character.
+    func testTheDateAndTitleWritersTakeAKeysWholeValue() throws {
+        let section: [String: Any] = try FileFormatsContractTests.section("datesAndTitles")
+        let group: [String: Any] = try XCTUnwrap(section["writingCases"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(group["cases"] as? [[String: Any]])
+        // A floor, for the reason the visibility list gives above.
+        XCTAssertGreaterThanOrEqual(
+            cases.count, 13, "contracts/file-formats.json → datesAndTitles.writingCases has shrunk"
+        )
+        for testCase in cases {
+            let before: String = try XCTUnwrap(testCase["before"] as? String)
+            let after: String = try XCTUnwrap(testCase["after"] as? String)
+            let why: String = (testCase["why"] as? String) ?? ""
+            let write: [String: Any] = try XCTUnwrap(testCase["write"] as? [String: Any])
+            var written: String
+            if let title = write["title"] as? String {
+                written = PageFrontmatter.settingTitle(in: before, to: title)
+            } else {
+                let day: CalendarDay = try XCTUnwrap(CalendarDay(text: try XCTUnwrap(write["day"] as? String)))
+                let key: String = try XCTUnwrap(write["key"] as? String)
+                written = PageFrontmatter.settingCreated(in: before, key: key, to: day).text
+            }
+            XCTAssertEqual(Data(written.utf8), Data(after.utf8), "\(why) — wrote \(written.debugDescription)")
+        }
+    }
+
+    /// Shapes of an open value the contract list does not carry, run straight
+    /// against the writer: an escaped `\"` and a doubled `''` do not close
+    /// their quote; a value closed on its own line takes nothing below it; a
+    /// quote that never closes inside the block takes nothing (that page does
+    /// not build either way, and guessing where it ends would be worse).
+    func testAnOpenValueRunsUntilItReallyCloses() {
+        let escaped: String = "---\ntitle: \"Unit \\\" 1,\nDay 1\"\npublish: true\n---\nBody.\n"
+        XCTAssertEqual(
+            PageFrontmatter.settingTitle(in: escaped, to: "Unit 1, Day 2"),
+            "---\ntitle: Unit 1, Day 2\npublish: true\n---\nBody.\n"
+        )
+        let doubled: String = "---\ntitle: 'Unit 1''s,\nDay 1'\npublish: true\n---\nBody.\n"
+        XCTAssertEqual(
+            PageFrontmatter.settingTitle(in: doubled, to: "Unit 1, Day 2"),
+            "---\ntitle: Unit 1, Day 2\npublish: true\n---\nBody.\n"
+        )
+        let closed: String = "---\ntitle: \"Unit 1, Day 1\"\npublish: true\n---\nBody.\n"
+        XCTAssertEqual(
+            PageFrontmatter.settingTitle(in: closed, to: "Unit 1, Day 2"),
+            "---\ntitle: Unit 1, Day 2\npublish: true\n---\nBody.\n"
+        )
+        let neverCloses: String = "---\ntitle: \"Unit 1,\npublish: true\n---\nBody.\n"
+        XCTAssertEqual(
+            PageFrontmatter.settingTitle(in: neverCloses, to: "Unit 1, Day 2"),
+            "---\ntitle: Unit 1, Day 2\npublish: true\n---\nBody.\n"
+        )
+    }
+
     /// The two properties the case list cannot state as a before-and-after
     /// pair, both of them about a file this app did not write.
     func testMigrationLeavesAWindowsWrittenFileAsItFoundIt() throws {

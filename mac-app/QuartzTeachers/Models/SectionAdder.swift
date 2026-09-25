@@ -300,16 +300,29 @@ enum SectionAdder {
         // teacher typed, anything before it and the whole body are never
         // rebuilt, so none of them can be rebuilt wrongly. See
         // `extendFrontmatter` for what rebuilding them cost.
+        //
+        // A replaced key takes the lines below it that were part of its old
+        // value (GitHub #199) — `PageFrontmatter.replacingKeyLine`, which also
+        // keeps the line's carriage return. Walked from the BOTTOM up, so the
+        // lines one replacement takes away never move a key still to come.
         var allLines: [String] = text.components(separatedBy: "\n")
-        for position in (block.openIndex + 1)..<block.closeIndex {
+        var closeIndex: Int = block.closeIndex
+        var position: Int = block.closeIndex - 1
+        while position > block.openIndex {
             let line: String = allLines[position]
-            let lineEnding: String = SectionAdder.carriageReturn(endingLine: line)
             if isRootIndex && line.hasPrefix("title:") {
                 let newTitle: String = sectionTitle(for: course, sectionNumber: sectionNumber)
-                allLines[position] = "title: \(newTitle)" + lineEnding
+                closeIndex -= PageFrontmatter.replacingKeyLine(
+                    at: position, key: "title", with: "title: \(newTitle)",
+                    in: &allLines, closeIndex: closeIndex
+                )
             } else if (isRootIndex || isTopLevelPerSectionFile) && line.hasPrefix("created:") {
-                allLines[position] = "created: \(created)" + lineEnding
+                closeIndex -= PageFrontmatter.replacingKeyLine(
+                    at: position, key: "created", with: "created: \(created)",
+                    in: &allLines, closeIndex: closeIndex
+                )
             }
+            position -= 1
         }
         let rewritten: String = allLines.joined(separator: "\n")
         try rewritten.write(to: destinationURL, atomically: true, encoding: .utf8)
@@ -629,16 +642,25 @@ enum SectionAdder {
         created: String
     ) -> String {
         if let sibling, let siblingLines = frontmatterLines(ofFileAt: sibling) {
-            var result: [String] = []
-            for line in siblingLines {
-                let lineEnding: String = SectionAdder.carriageReturn(endingLine: line)
+            // The same replacement as a copied page gets, bottom up, taking a
+            // replaced key's continuation lines with it (GitHub #199). The
+            // lines here are the block's inside, so its end is their count.
+            var result: [String] = siblingLines
+            var position: Int = result.count - 1
+            while position >= 0 {
+                let line: String = result[position]
                 if line.hasPrefix("created:") {
-                    result.append("created: \(created)" + lineEnding)
+                    PageFrontmatter.replacingKeyLine(
+                        at: position, key: "created", with: "created: \(created)",
+                        in: &result, closeIndex: result.count
+                    )
                 } else if line.hasPrefix("title:"), let newTitle {
-                    result.append("title: \(newTitle)" + lineEnding)
-                } else {
-                    result.append(line)
+                    PageFrontmatter.replacingKeyLine(
+                        at: position, key: "title", with: "title: \(newTitle)",
+                        in: &result, closeIndex: result.count
+                    )
                 }
+                position -= 1
             }
             return result.joined(separator: "\n")
         }
