@@ -60,7 +60,7 @@
       "why": "Nothing on disk records a page's history. A page published once and later hidden therefore counts as never published and would take a new date. Recording the truth would mean a new frontmatter key on every page, agreed between both apps and the Python; the inference costs nothing and is right in every case anybody has met."
     },
     "atBuildTime": {
-      "rule": "On every build of section N, a page a VISIBLE, dated class of section N brings takes the date of the EARLIEST such class — even over a date of its own — and the build REWRITES it into the teacher's own file, as well as into the site's copy. A page no visible class of section N brings keeps its own date and is not written. A file is written only when the date the build would read for section N differs from the class's, so a second build changes no file at all.",
+      "rule": "On every build of section N, a page a VISIBLE, dated class of section N links to DIRECTLY takes the date of the EARLIEST such class — even over a date of its own, typed or not — and the build REWRITES it into the teacher's own file, as well as into the site's copy. A page no visible class of section N links to directly keeps its own date and is not written — including a page reached only THROUGH another shared page, and an undated one stays undated. A file is written only when the date the build would read for section N differs from the class's, so a second build changes no file at all.",
       "decidedBy": "Russell. Choice (A), 2026-09-24, of two the plan review put to him: (B), 'never earlier than the class', keeping a later date typed by hand, was the other; (A) was chosen because it has no judgement call inside it and a date on a site that orders pages by date is a statement about the course, not about the file. REWRITE THE FILES, 2026-09-25 07:40. PER SECTION, 07:45.",
       "whereTheDateIsWritten": {
         "coursePage": "A page outside every `section<N>/` folder is shared by all the sections, and they do not teach it on the same day. The build of section N writes `createdSection<N>` — section N's key and no other; a plain `created:` the page already carries is left where it is (it still dates the sections that have no key of their own), and so is every other section's `createdSection<M>`.",
@@ -68,13 +68,13 @@
         "why": "Russell, 07:45: a shared page is deployed by different sections on different dates. One `created:` shared across sections would make the last section built win for every section."
       },
       "whyTheFilesAndNotOnlyTheSite": "Russell, 2026-09-25 07:40, overriding the plan review's recommendation to date the site's copy only. REJECTED: build-output-only — the review's reasons were that a write on every preview can meet a page open in Obsidian, that a change to a page after a build has started makes the app build once more (#265's marker), and iCloud churn. Russell wants the teacher's files to carry the true dates, so that Obsidian, the app, the assistant and the site all agree. What keeps the cost down: a page is written only when its date is wrong, so after the first build of a course the pass writes nothing, and the one extra build #265 causes happens once, not on every publish.",
-      "howTheWriteIsMade": "Line by line, never by re-serialising the page: only the one key line changes. The frontmatter is found by the apps' own fence rule (three or more dashes, blank lines before the opening fence skipped); the LAST line naming the key is rewritten, because it is the one YAML keeps; the lines below the key that belong to its value go with it (`PageVisibilityReader.continuationLineIndices`' rule, which #199 applies to the apps' date and title writers), so no orphaned value is left for YAML to fold into the next key; a missing key goes at the top of the block; a page with no frontmatter block gets one. A block opened and never closed, one indented with a tab, or a file starting with a byte-order mark is not touched. Every write is read back the way the build reads it before it is saved: section N's date must be the class's, and every other key and the whole body must be exactly as they were — otherwise nothing is written. `writingCases` pin the splice.",
+      "howTheWriteIsMade": "Line by line, never by re-serialising the page: only the one key line changes. The frontmatter is found by the apps' own fence rule (three or more dashes, blank lines before the opening fence skipped); the LAST line naming the key is rewritten, because it is the one YAML keeps; the lines below the key that belong to its value go with it (`PageVisibilityReader.continuationLineIndices`' rule, which #199 applies to the apps' date and title writers), so no orphaned value is left for YAML to fold into the next key; a missing key goes at the top of the block; a page with no frontmatter block gets one. A `# note` at the end of the key's line stays there. A block opened and never closed, one indented with a tab, or a file starting with a byte-order mark is not touched. Every write is read back the way the build reads it before it is saved: section N's date must be the class's, and every other key and the whole body must be exactly as they were — otherwise nothing is written. The new text goes to a hidden file beside the page and is renamed over it in one step, and only if the page still holds exactly the text the date was worked out from: a Stop part-way leaves the old page or the new one, never a half-written one, and an Obsidian save that lands in between is kept (the next build dates it). A page that is a link to a file kept elsewhere — the page itself, a folder between it and the course folder, or a second name for the same file — is never written through: two courses sharing one page would overwrite each other's date on alternate builds, and a file outside the course is not the build's to change. The build names such a page in its console instead, and its site copy is still dated. A locked or read-only page is not written. `writingCases` pin the splice.",
       "theTrail": "The build prints the NAMES of the pages it rewrote (their place in the course folder) on one machine-readable line, and the app records them on its activity trail — `shared-rules.json` → `pagesDatedByTheBuild` and `activityTrail.mustRecord`. Never anything written on the pages.",
       "aCourseKeptForReference": "Its site copy is dated the same way, but its files are never rewritten (`shared-rules.json` → `referenceCourses`; the build asks `reference_course.is_reference`, and treats 'cannot tell' the same). Last year's course is frozen on purpose — often with its files locked — and a preview of it is a look, not an edit. Decided by the implementer on 2026-09-25 and flagged for Russell rather than asked, because the ruling said 'every preview and every deploy' and a reference course is never deployed.",
-      "relationToThePublishTimeRule": "The publish-time rule above writes the teacher's file when the assistant publishes, and never moves a page that is already visible. This rule runs on every build, and moves a visible page too — so after a build the two agree only when pages are published in date order; where they differ (a page an earlier class already brought, or one dated by hand) the build wins, and on the next build rewrites nothing.",
-      "reach": "Links are followed from the class outwards, by relative path and by file name, through any number of pages — never through or onto another class page (`reachStopsAtAClassPage`), and never onto a folder's index, Key Links or Curriculum Coverage. A page two links away takes the date of the class that brings the page linking to it. The installer (`first_use_dates`) follows direct links only; payloads link directly, so the two never differ on a pre-populated course.",
+      "relationToThePublishTimeRule": "The publish-time rule above writes the teacher's file when the assistant publishes, never moves a page that is already visible, and follows links through pages to find what to publish. This rule runs on every build, moves a visible page too, and dates DIRECT links only — so after a build the two agree only when pages are published in date order and linked directly; where they differ (a page an earlier class already links, or one dated by hand) the build wins, and on the next build rewrites nothing. A hidden page the publish-time rule dated through a page in between keeps that date: the build does not date it at all.",
+      "reach": "DIRECT links only: the wikilinks written on the class page itself, resolved by relative path and by file name — never onto another class page, and never onto a folder's index, Key Links or Curriculum Coverage. A page two links away is not dated by the class: it keeps its own date, or none. Russell's words were 'the first Unit x, Day y page that LINKED to them', and the installer (`first_use_dates`) follows direct links the same way. REJECTED, 2026-09-25, after it was built: following links through pages. Courses link hub pages from Day 1 ('How Marks Work', 'Learning Goals') that link half the course, so Day 1 claimed nearly everything: on EXC2O 98 of the 105 pages the first build rewrote were given Day 1's 09-08, and across the 39 payloads 2,150 of 5,177 reached pages took an EARLIER class than the first one linking them directly (ICS4U 133 of 136 through 'Learning Goals', SNC1W 107 of 150, MHF4U 142 of 148). Harmless while the pass only filled missing dates; wrong once it overwrote them. Also REJECTED: following links through pages for UNDATED pages only — it would infer a date nobody set from a page in between, which Russell's rule does not ask for.",
       "visibleClassesOnly": "A class students cannot see yet has not been taught. Dating a page from it would show a future date on a page a visible class may also bring, so a hidden class dates nothing; a page ONLY a hidden class brings keeps its own date until that class is published.",
-      "howTheCasesRun": "`classes` are class pages inside `section<N>/All Classes/` (`section`, default 1). `pages` are course-level pages in `folder`, or a section's own when they carry `section`; `frontmatter` is written between fences exactly as given (an empty string means a page with NO frontmatter block), `links` as `[[…]]` lines in the body. The case is built for each of `sections` (default [1]) in order, the way the build copies and reads a section, then the pass for pages no class brings, then this one. `expectCreated` maps a page's title to the `created` the site's copy of the LAST section built must carry, exactly; the teacher's page is REWRITTEN so that the build reads that same value for that section. `expectFileKeys` maps a page's title to the keys its FILE must then carry (null: the key must be absent). `expectUnchanged` lists pages whose file is left byte for byte as it was. `expectRewritten` lists, in any order, every page the builds rewrote. Every case is then built again, and the second build must rewrite nothing. Run by the build (`scripts/test_dates_follow_the_class.py`), which Windows runs too.",
+      "howTheCasesRun": "`classes` are class pages inside `section<N>/All Classes/` (`section`, default 1). `pages` are course-level pages in `folder`, or a section's own when they carry `section`; `frontmatter` is written between fences exactly as given (an empty string means a page with NO frontmatter block), `links` as `[[…]]` lines in the body. The case is built for each of `sections` (default [1]) in order, the way the build copies and reads a section, then the pass for pages no class brings, then this one. `expectCreated` maps a page's title to the `created` the site's copy of the LAST section built must carry, exactly (`expectCreatedDay`: the same, for a plain YAML date, which reads back as a date rather than as text, so the case names its day); the teacher's page is REWRITTEN so that the build reads that same value for that section. `expectFileKeys` maps a page's title to the keys its FILE must then carry (null: the key must be absent). `expectUnchanged` lists pages whose file is left byte for byte as it was. `expectRewritten` lists, in any order, every page the builds rewrote. Every case is then built again, and the second build must rewrite nothing. Run by the build (`scripts/test_dates_follow_the_class.py`), which Windows runs too.",
       "cases": [
         {
           "name": "Russell's ICS4U, 2026-09-24: a page copied from the template, visible, dated install day",
@@ -189,7 +189,7 @@
           "why": "Choice (A): the class's date wins over the page's own, later or earlier, in the file as well as on the site."
         },
         {
-          "name": "a page behind a worksheet takes the date of the class that brings the worksheet",
+          "name": "a page behind a worksheet keeps its own date: only a class's DIRECT links are dated",
           "classes": [
             {
               "title": "Unit 1, Day 1",
@@ -206,24 +206,132 @@
               "folder": "Handouts",
               "frontmatter": "publishForSection1: true\n",
               "links": [
-                "Answer Key"
+                "Answer Key",
+                "Glossary"
               ]
             },
             {
               "title": "Answer Key",
               "folder": "Handouts",
               "frontmatter": "createdSection1: 2026-08-01T07:00:00.000-0400\n"
+            },
+            {
+              "title": "Glossary",
+              "folder": "Handouts",
+              "frontmatter": "title: Glossary\n"
             }
           ],
           "expectCreated": {
             "Worksheet": "2026-09-08T07:00:00.000-0400",
-            "Answer Key": "2026-09-08T07:00:00.000-0400"
+            "Answer Key": "2026-08-01T07:00:00.000-0400"
+          },
+          "expectFileKeys": {
+            "Glossary": {
+              "created": null,
+              "createdSection1": null
+            }
+          },
+          "expectUnchanged": [
+            "Answer Key",
+            "Glossary"
+          ],
+          "expectRewritten": [
+            "Worksheet"
+          ],
+          "why": "Russell's words were 'the first Unit x, Day y page that LINKED to them'. A page reached only through another shared page is not dated by the class at all: it keeps its own date, and an undated one stays undated rather than having one inferred through the page in between. The course's word is left at its default here, so one case checks that 'Unit' still reads as a class."
+        },
+        {
+          "name": "a hub page linked on Day 1 does not hand Day 1's date to everything it links",
+          "classes": [
+            {
+              "title": "Unit 1, Day 1",
+              "created": "2026-09-08T07:00:00.000-0400",
+              "visible": true,
+              "links": [
+                "How Marks Work"
+              ]
+            },
+            {
+              "title": "Unit 2, Day 3",
+              "created": "2026-10-05T07:00:00.000-0400",
+              "visible": true,
+              "links": [
+                "Investigating Photosynthesis"
+              ]
+            }
+          ],
+          "pages": [
+            {
+              "title": "How Marks Work",
+              "folder": "Setup",
+              "frontmatter": "createdSection1: 2026-09-01T07:00:00.000-0400\npublishForSection1: true\n",
+              "links": [
+                "Lab Reports"
+              ]
+            },
+            {
+              "title": "Lab Reports",
+              "folder": "Tasks",
+              "frontmatter": "createdSection1: 2026-09-22T07:00:00.000-0400\npublishForSection1: true\n",
+              "links": [
+                "Investigating Photosynthesis"
+              ]
+            },
+            {
+              "title": "Investigating Photosynthesis",
+              "folder": "Investigations",
+              "frontmatter": "createdSection1: 2026-10-06T07:00:00.000-0400\npublishForSection1: true\n"
+            }
+          ],
+          "expectCreated": {
+            "How Marks Work": "2026-09-08T07:00:00.000-0400",
+            "Lab Reports": "2026-09-22T07:00:00.000-0400",
+            "Investigating Photosynthesis": "2026-10-05T07:00:00.000-0400"
+          },
+          "expectUnchanged": [
+            "Lab Reports"
+          ],
+          "expectRewritten": [
+            "How Marks Work",
+            "Investigating Photosynthesis"
+          ],
+          "why": "The review of 2026-09-25, on EXC2O's own shape: when links were followed through pages, Unit 1, Day 1 reached 107 pages through 'How Marks Work', and 98 of the 105 pages the first build rewrote were given 2026-09-08 — 'Investigating Photosynthesis' among them, which its October class links directly. The page in between keeps its own date; the page a later class links directly takes THAT class's date."
+        },
+        {
+          "name": "a class dated with a plain YAML date (Obsidian's Date property) still dates what it links",
+          "unitWord": "Thread",
+          "classes": [
+            {
+              "title": "Thread 1, Day 1",
+              "created": "2026-09-10",
+              "visible": true,
+              "links": [
+                "Shared Notes"
+              ]
+            },
+            {
+              "title": "Thread 1, Day 2",
+              "created": "2026-09-24T07:00:00.000+0000",
+              "visible": true,
+              "links": [
+                "Shared Notes"
+              ]
+            }
+          ],
+          "pages": [
+            {
+              "title": "Shared Notes",
+              "folder": "Exercises",
+              "frontmatter": "publishForSection1: true\n"
+            }
+          ],
+          "expectCreatedDay": {
+            "Shared Notes": "2026-09-10"
           },
           "expectRewritten": [
-            "Worksheet",
-            "Answer Key"
+            "Shared Notes"
           ],
-          "why": "The course's word is left at its default here, so one case checks that 'Unit' still reads as a class."
+          "why": "`created: 2026-09-10`, unquoted, is a DATE to YAML rather than text. Until 2026-09-25 the build read it as no date at all, so Day 1 dated nothing and the page took Day 2's 09-24. It counts as midnight in Toronto; the page is written the same plain way, so a second build reads the same date back and writes nothing."
         },
         {
           "name": "a page only a HIDDEN class brings keeps its own date",
@@ -549,6 +657,25 @@
             "after": "---\ncreated: 2026-09-24T07:00:00.000+0000\ntitle: Notes\n---\nBody\n"
           },
           {
+            "name": "a note at the end of the key's line stays there",
+            "before": "---\ntitle: Notes\ncreatedSection1: 2026-09-08T07:00:00.000+0000   # the day we started\n---\nBody\n",
+            "write": {
+              "key": "createdSection1",
+              "value": "2026-09-24T07:00:00.000+0000"
+            },
+            "after": "---\ntitle: Notes\ncreatedSection1: 2026-09-24T07:00:00.000+0000   # the day we started\n---\nBody\n",
+            "why": "A teacher's note is theirs; only the value is the build's to change. YAML starts a comment at a # that follows a space."
+          },
+          {
+            "name": "a # inside quotes is part of the value, not a note",
+            "before": "---\ncreated: \"2026-09-08 # not a note\"\ntitle: Notes\n---\nBody\n",
+            "write": {
+              "key": "created",
+              "value": "2026-09-24T07:00:00.000+0000"
+            },
+            "after": "---\ncreated: 2026-09-24T07:00:00.000+0000\ntitle: Notes\n---\nBody\n"
+          },
+          {
             "name": "a missing key goes at the top of the block",
             "before": "---\ntitle: Notes\npublishForSection1: true\n---\nBody\n",
             "write": {
@@ -598,7 +725,7 @@
     }
   },
   "datingNonClassPages": {
-    "note": "Pages that are not linked from a Unit x, Day y page (a page a class DOES bring takes that class's date instead: `datingPagesAClassBrings.atBuildTime`), and are not themselves a Unit x, Day y page (such as sidebar pages, Curriculum pages, and Key Links pages not referenced in any class lesson), inherit the same date as the first class of the year (Unit 1, Day 1) when a site is previewed or deployed, and upon course setup.",
+    "note": "Pages that are not linked from a Unit x, Day y page, directly or through other pages (a page a class links DIRECTLY takes that class's date instead: `datingPagesAClassBrings.atBuildTime`; a page reached only through another shared page keeps its own date, or none), and are not themselves a Unit x, Day y page (such as sidebar pages, Curriculum pages, and Key Links pages not referenced in any class lesson), inherit the same date as the first class of the year (Unit 1, Day 1) when a site is previewed or deployed, and upon course setup.",
     "appliesTo": [
       "sidebar pages (e.g., folder index.md files — but NOT the section's own front page, which carries the date of the class its embed names: `sectionIndexPointer.dateCases`)",
       "Key Links pages that are not linked from any Unit x, Day y class page",
