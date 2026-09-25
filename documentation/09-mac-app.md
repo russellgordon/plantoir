@@ -2031,7 +2031,7 @@ students.
 ## Renaming a course in the sidebar: two claims on the keyboard (#293)
 
 Return, Edit ▸ Rename Course or the row's context menu turns a course's row
-into a field (`CourseRenameField` in `SidebarView.swift`). What it shows under
+into a field (`CourseCodeField` in `SidebarView.swift`). What it shows under
 itself and what Return refuses are ONE function,
 `WorkspaceModel.renameFieldProblem(_:typed:)`; Return goes through
 `renameFromTheField(_:typed:)`, which refuses (and the field beeps) or hands
