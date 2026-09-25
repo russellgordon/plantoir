@@ -396,9 +396,12 @@ unambiguous and carries structure a sentence cannot.
 
 ### Three traps, all met here
 
-- **Do not read the findings from a tail.** Every other structured-line reader in
-  the mac's `ScriptRunner` works from `recentText(maximumCharacters: 8000)`, and
-  the health lines print in the MIDDLE of a build. On any real build they are
+- **Do not read the findings from a tail.** Most other structured-line readers in
+  the mac's `ScriptRunner` work from `recentText(maximumCharacters: 8000)`, and
+  the health lines print in the MIDDLE of a build. (The preview's announced
+  address is the other exception since #235: it is printed even EARLIER, lost
+  the same way, and now read from the same carried-over lines as they arrive —
+  `documentation/09-mac-app.md` → "Where the address comes from".) On any real build they are
   long past that window by the end. Collect them as output arrives. The mac test
   floods 400 lines after the finding to prove the point.
 - **Hide the marker line from the console a teacher reads.** A raw JSON blob is
