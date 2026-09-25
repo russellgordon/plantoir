@@ -729,6 +729,9 @@ class ScriptRunner {
                 course: report.course, section: report.section
             )
         }
+        // A launcher that waited for, or refused on, something running in
+        // the folder's workspace before remaking it (#94).
+        WorkspaceInUseReport.noteOnTheTrail(from: text)
         for finding in SiteHealthFinding.findings(in: text) {
             if healthFindings.contains(finding) {
                 continue

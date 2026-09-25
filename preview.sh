@@ -1094,6 +1094,17 @@ it_was_a_port_clash() {
   return 1
 }
 
+# Whether Docker refused because a workspace by this name already exists —
+# made a moment ago by another launcher remaking the same folder's
+# workspace. Docker's words: 'Conflict. The container name "/…" is already
+# in use by container "…"'.
+it_was_a_name_conflict() {
+  case "$1" in
+    *"is already in use by container"*) return 0 ;;
+  esac
+  return 1
+}
+
 # The sentence when all forty blocks are taken. Pinned word for word in
 # contracts/app-rules.json -> previewPorts.whenNoBlockIsFree. The old one
 # told a teacher to "stop another preview", which frees nothing: a block is
@@ -1117,7 +1128,7 @@ say_there_is_no_room_for_previews() {
 # under this name a moment ago, mid-publish (#94's shape).
 create_the_workspace_on_free_ports() {
   local base="$FIRST_HOST_BLOCK"
-  local next output
+  local next output running named_already=false
   while true; do
     next="$base"
     if ! base="$(find_free_port_block "$base" kept)" \
@@ -1134,6 +1145,25 @@ create_the_workspace_on_free_ports() {
         "$IMAGE" \
         tail -f /dev/null 2>&1)"; then
       return 0
+    fi
+    # Another launcher made this folder's workspace a moment ago, under the
+    # same name (two runs remaking it together). Given two seconds, it is
+    # used as it is if it is running; otherwise the making is tried once
+    # more, and a second refusal stops the run with the sentence.
+    if it_was_a_name_conflict "$output"; then
+      if [ "$named_already" = true ]; then
+        printf '%s\n' "$output"
+        echo "❌ Plantoir could not start this folder's workspace. Try again, or restart this Mac if it happens again."
+        exit 1
+      fi
+      named_already=true
+      sleep 2
+      running="$(docker ps --format '{{.Names}}' 2>/dev/null)" || running=""
+      case $'\n'"$running"$'\n' in
+        *$'\n'"$CONTAINER_NAME"$'\n'*) return 0 ;;
+      esac
+      base="$next"
+      continue
     fi
     if ! it_was_a_port_clash "$output"; then
       printf '%s\n' "$output"
@@ -1270,19 +1300,286 @@ clear_away_this_folders_other_spelling() {
     note_on_the_trail "${WORKSPACE_TRAIL_PLACE:-setup} · cleared away a second copy of this working folder's workspace and built websites, left under another spelling of its name"
   fi
 }
+# ---- Before a workspace is remade: what is running in it (GitHub #94) ---
+# A launcher remakes this folder's workspace when it was made for another
+# folder, without the builds mount, from an older recipe, without the
+# live-reload addresses, or when its courses folder or its connection has
+# gone bad. Removing a workspace ends EVERYTHING running inside it — an open
+# preview, another section's build, a publish half-way through its upload —
+# and until #94 every one of those twenty places (and the three that retired
+# the old shared workspace) stopped it without looking. Now each of them
+# comes here, and this LOOKS FIRST:
+#   - nothing running          -> remade at once, as before;
+#   - a build or a publish     -> waited for, up to ten minutes (the same
+#                                 horizon a publish set for later waits for a
+#                                 busy course, #156), then refused;
+#   - a preview that is OPEN   -> refused after twenty seconds (a preview
+#                                 closed a moment ago may still be ending; one
+#                                 that is open does not end on its own), and
+#                                 the sentence names which one.
+# The numbers are contracts/app-rules.json -> previewPorts
+# .whenTheWorkspaceIsInUse.waiting; the time is COUNTED in looks rather than
+# read from a clock, as the app's quit path counts its own.
+WORKSPACE_LOOK_EVERY_SECONDS=2
+WORKSPACE_PREVIEW_SECONDS=20
+WORKSPACE_WORK_SECONDS=600
+
+# What the last look found: "nothing", "a preview" or "other work", and for
+# a preview which one ("<course> section <n>" and "<course>/<n>").
+WORKSPACE_IS_RUNNING="nothing"
+WORKSPACE_OPEN_PREVIEW=""
+WORKSPACE_OPEN_PREVIEW_PLACE=""
+
+# Whether a preview.sh for this course and section is running on this Mac,
+# other than this run and the programs it started or was started by.
+#
+# Why the Mac is asked as well as the workspace: a preview whose launcher
+# has gone — the app force-quit, a Terminal window closed, an assistant's
+# client exiting — leaves its website builder running inside the workspace
+# (measured: killing the `docker exec` client left the process in
+# `docker top`, parented to the engine's shim). Nothing a teacher can close
+# is left open, so counting it as an open preview would refuse every remake
+# of that folder for ever. A preview counts as OPEN only while the launcher
+# that started it is still running.
+#
+# Matched on the word after preview.sh and the one after that, the course
+# (in either case: the launcher upper-cases it) and the section, because a
+# command-line run names the launcher by a relative path. The whole process
+# table is read once, and this run's own
+# ancestors and descendants are left out (a login shell wrapping this run
+# carries the same words). A `--stop` run is not a preview, and neither is
+# a `--build-only` one (a publish's build, which never serves). A table that
+# cannot be read counts as "running":
+# the cost of that is one refused remake, the cost of the other is a killed
+# preview.
+a_preview_launcher_is_running_for() {
+  local table
+  table="$(ps -Ao pid=,ppid=,args= 2>/dev/null)" || return 0
+  printf '%s\n' "$table" | awk -v self="$$" -v course="$1" -v section="$2" '
+    {
+      pid = $1; parent[pid] = $2
+      line = $0
+      sub(/^[ \t]*[0-9]+[ \t]+[0-9]+[ \t]+/, "", line)
+      args[pid] = line
+      order[++count] = pid
+    }
+    END {
+      mine[self] = 1
+      p = self
+      while ((p in parent) && parent[p] != p && !(parent[p] in mine) && parent[p] > 1) {
+        p = parent[p]; mine[p] = 1
+      }
+      for (i = 1; i <= count; i++) {
+        pid = order[i]
+        if (pid in mine) continue
+        q = pid; ours = 0; steps = 0
+        while ((q in parent) && steps < 64) {
+          if (parent[q] == self) { ours = 1; break }
+          q = parent[q]; steps++
+        }
+        if (ours) continue
+        if (args[pid] ~ /[ \t]--(stop|build-only)([ \t]|$)/) continue
+        n = split(args[pid], word, /[ \t]+/)
+        for (w = 1; w + 2 <= n; w++) {
+          if (word[w] ~ /(^|\/)preview\.sh$/ && toupper(word[w + 1]) == toupper(course) && word[w + 2] == section) {
+            found = 1
+          }
+        }
+      }
+      exit(found ? 0 : 1)
+    }'
+}
+
+# Looks once at what is running in the workspace $1 (an id or a name) and
+# sets WORKSPACE_IS_RUNNING. The rule is contracts/app-rules.json ->
+# previewPorts.whenTheWorkspaceIsInUse.whatCountsAsRunning:
+#   - not running, or gone: "nothing", and the workspace is not asked what
+#     runs in it (a stopped one cannot answer: `docker top` exits 1);
+#   - only its own first process (`tail -f /dev/null`): "nothing" — the same
+#     count the app's quit path uses before it stops a workspace;
+#   - a preview — `build_site.py` without `--build-only`, with everything it
+#     started — whose launcher is still running on this Mac: "a preview";
+#   - anything else: "other work" — a build for publishing, a publish, a
+#     course being set up, another launcher's check of the folder. A preview
+#     whose launcher has gone, with what it started, counts as nothing.
+#   - running, but `docker top` did not answer: "other work". An idle
+#     workspace costs a wait; a busy one stopped costs a publish.
+# An open preview wins over other work: waiting cannot end it.
+look_inside_the_workspace() {
+  local state first inside found place course section
+  WORKSPACE_IS_RUNNING="nothing"
+  WORKSPACE_OPEN_PREVIEW=""
+  WORKSPACE_OPEN_PREVIEW_PLACE=""
+  state="$(docker inspect -f '{{.State.Running}} {{.State.Pid}}' "$1" 2>/dev/null)" || return 0
+  case "$state" in
+    "true "*) first="${state#true }" ;;
+    *) return 0 ;;
+  esac
+  if ! inside="$(docker top "$1" 2>/dev/null)"; then
+    WORKSPACE_IS_RUNNING="other work"
+    return 0
+  fi
+  # One line per process after the heading: UID PID PPID C STIME TTY TIME
+  # CMD, the command whole (measured: arguments are not cut short). Each
+  # process that is part of a preview prints "preview <course> <section>";
+  # any other prints "other". The workspace's own first process prints
+  # nothing.
+  found="$(printf '%s\n' "$inside" | awk -v first="$first" '
+    NR == 1 { next }
+    NF >= 8 {
+      pid = $2; parent[pid] = $3
+      cmd = $8
+      for (f = 9; f <= NF; f++) cmd = cmd " " $f
+      command[pid] = cmd
+      order[++count] = pid
+    }
+    END {
+      for (i = 1; i <= count; i++) {
+        pid = order[i]
+        cmd = command[pid]
+        if (cmd ~ /\/opt\/scripts\/build_site\.py/ && cmd !~ /--build-only/) {
+          c = cmd; sub(/.*--course=/, "", c); sub(/[ \t].*/, "", c)
+          s = cmd; sub(/.*--section=/, "", s); sub(/[ \t].*/, "", s)
+          root[pid] = c " " s
+        } else if (cmd ~ /[ \t]--serve([ \t]|$)/) {
+          serving[pid] = 1
+        }
+      }
+      for (i = 1; i <= count; i++) {
+        pid = order[i]
+        if (pid == first) continue
+        q = pid; belongs = ""; served = 0; steps = 0
+        while ((q in command) && steps < 64) {
+          if (q in root) { belongs = root[q]; break }
+          if (q in serving) served = 1
+          q = parent[q]; steps++
+        }
+        if (belongs != "") {
+          print "preview " belongs
+        } else if (served) {
+          print "orphan"
+        } else {
+          print "other"
+        }
+      }
+    }' | sort -u)"
+  # A website builder serving with no build_site.py above it (and whatever
+  # it started) has lost its launcher's side entirely — build_site.py waits
+  # on it for as long as a preview is open — so it is left out like any
+  # other orphaned preview.
+  while IFS=' ' read -r what course section; do
+    case "$what" in
+      preview)
+        if [ "$WORKSPACE_IS_RUNNING" != "a preview" ] \
+          && a_preview_launcher_is_running_for "$course" "$section"; then
+          WORKSPACE_IS_RUNNING="a preview"
+          WORKSPACE_OPEN_PREVIEW="$course section $section"
+          WORKSPACE_OPEN_PREVIEW_PLACE="$course/$section"
+        fi ;;
+      other)
+        if [ "$WORKSPACE_IS_RUNNING" = "nothing" ]; then
+          WORKSPACE_IS_RUNNING="other work"
+        fi ;;
+    esac
+  done <<LOOKED
+$found
+LOOKED
+}
+
+# The line the app reads onto the activity trail: contracts/shared-rules.json
+# -> activityTrail.mustRecord."workspace was in use" -> marker. It is
+# machinery, so the console a teacher reads leaves it out; the app writes the
+# trail line from it (the same way a build's PLANTOIR_DATED line reaches the
+# trail), whether the run was the app's own or a publish launchd ran.
+# "<outcome> <seconds> <where this run was for> [<the open preview>]".
+tell_the_app_the_workspace_was_in_use() {
+  echo "PLANTOIR_WORKSPACE_IN_USE: $1 $2 ${WORKSPACE_TRAIL_PLACE:-setup}${3:+ $3}"
+}
+
+# Removes this folder's workspace and makes it again, once nothing is running
+# in it. Every remake goes through here: the launchers' own checks say WHY in
+# one line, then call this.
+#
+# The workspace is stopped and removed by its ID, never by name and never
+# with -f. Two launchers started together after an update can both find the
+# old workspace idle; by id, the second one's stop and remove land on the old
+# workspace (already gone: harmless) rather than on the NEW one the first
+# has just made — which is what stopping by name did, and is #94's shape one
+# step down. A remove that fails while the old one is still there is tried
+# once more, two seconds later, and then the run stops with the sentence.
+remake_the_workspace() {
+  local id waited=0 said=false
+  id="$(docker inspect -f '{{.Id}}' "$CONTAINER_NAME" 2>/dev/null)" || id=""
+  if [ -z "$id" ]; then
+    run_container_with_mount
+    return 0
+  fi
+  while true; do
+    look_inside_the_workspace "$id"
+    case "$WORKSPACE_IS_RUNNING" in
+      nothing)
+        break ;;
+      "a preview")
+        if [ "$waited" -ge "$WORKSPACE_PREVIEW_SECONDS" ]; then
+          echo "❌ The preview of $WORKSPACE_OPEN_PREVIEW from this folder is still open, and this folder's workspace needs updating before Plantoir can go on."
+          echo "   Close that preview — in Plantoir, or wherever it was started — then try again. Nothing was changed."
+          tell_the_app_the_workspace_was_in_use preview "$waited" "$WORKSPACE_OPEN_PREVIEW_PLACE"
+          exit 1
+        fi ;;
+      *)
+        if [ "$waited" -ge "$WORKSPACE_WORK_SECONDS" ]; then
+          echo "❌ Something in this folder was still being built or published after ten minutes, so Plantoir stopped rather than interrupt it."
+          echo "   Try again once it has finished. Nothing was changed."
+          tell_the_app_the_workspace_was_in_use work "$waited"
+          exit 1
+        fi ;;
+    esac
+    if [ "$said" = false ]; then
+      echo "⏳ Something in this folder is still running. Plantoir will update this folder's workspace as soon as it has finished…"
+      said=true
+    fi
+    sleep "$WORKSPACE_LOOK_EVERY_SECONDS"
+    waited=$((waited + WORKSPACE_LOOK_EVERY_SECONDS))
+  done
+  if [ "$waited" -gt 0 ]; then
+    tell_the_app_the_workspace_was_in_use waited "$waited"
+  fi
+  docker stop "$id" >/dev/null 2>&1 || true
+  if ! docker rm "$id" >/dev/null 2>&1; then
+    if docker inspect -f '{{.Id}}' "$id" >/dev/null 2>&1; then
+      sleep 2
+      if ! docker rm "$id" >/dev/null 2>&1 \
+        && docker inspect -f '{{.Id}}' "$id" >/dev/null 2>&1; then
+        echo "❌ Plantoir could not start this folder's workspace. Try again, or restart this Mac if it happens again."
+        exit 1
+      fi
+    fi
+  fi
+  run_container_with_mount
+}
+
+# The one shared workspace from before working folders each had their own.
+# Superseded: it holds no content (everything lives on the host), and left
+# running it would shadow the per-folder workspaces' ports. Retired only when
+# nothing is running in it — the same look as above, without the wait — and
+# otherwise left for another day, silently: it holds nothing of the
+# teacher's, and the walk above already steps round its addresses.
+retire_legacy_container() {
+  local id
+  id="$(docker inspect -f '{{.Id}}' teaching-quartz 2>/dev/null)" || return 0
+  [ -n "$id" ] || return 0
+  look_inside_the_workspace "$id"
+  if [ "$WORKSPACE_IS_RUNNING" != "nothing" ]; then
+    return 0
+  fi
+  echo "♻️  Retiring the old shared workspace container…"
+  docker stop "$id" >/dev/null 2>&1 || true
+  docker rm "$id" >/dev/null 2>&1 || true
+}
 # <<< PREVIEW PORT BLOCK <<<
 # Where the refusal above is filed on the trail: this run's course and section.
 WORKSPACE_TRAIL_PLACE="${COURSE}/${SECTION}"
 
-# The one shared container from before working folders each had their own.
-# Superseded: it holds no content (everything lives on the host), and left
-# running it would shadow the per-folder containers' ports.
-retire_legacy_container() {
-  if docker ps -a --format '{{.Names}}' | grep -Eq '^teaching-quartz$'; then
-    echo "♻️  Retiring the old shared workspace container…"
-    docker rm -f teaching-quartz >/dev/null 2>&1 || true
-  fi
-}
 
 run_container_with_mount() {
   retire_legacy_container
@@ -1334,41 +1631,27 @@ if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
   CURRENT_MOUNT_SRC=$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/teaching/courses"}}{{.Source}}{{end}}{{end}}' "$CONTAINER_NAME" 2>/dev/null || echo "")
   if [[ -z "$CURRENT_MOUNT_SRC" ]]; then
     echo "🧩 Existing container has no /teaching/courses mount; recreating with correct mount…"
-    if docker ps --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
-      docker stop "$CONTAINER_NAME" >/dev/null
-    fi
-    docker rm "$CONTAINER_NAME" >/dev/null || true
-    run_container_with_mount
+    remake_the_workspace
   elif [[ "$CURRENT_MOUNT_SRC" != "$HOST_COURSES" ]]; then
     echo "🔄 Detected different working directory:"
     echo "   • Existing mount: $CURRENT_MOUNT_SRC"
     echo "   • Desired mount:  $HOST_COURSES"
     echo "♻️  Recreating container '$CONTAINER_NAME' to point at the new folder…"
-    if docker ps --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
-      docker stop "$CONTAINER_NAME" >/dev/null
-    fi
-    docker rm "$CONTAINER_NAME" >/dev/null || true
-    run_container_with_mount
+    remake_the_workspace
   elif ! container_has_builds_mount; then
     # Built websites moved out of the working folder, which needs a second
     # mount this container was made without. A mount cannot be added to a
     # container that already exists.
     echo "♻️  Rebuilding your workspace so built websites can be kept outside your course folder…"
-    if docker ps --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then docker stop "$CONTAINER_NAME" >/dev/null; fi
-    docker rm "$CONTAINER_NAME" >/dev/null || true
-    run_container_with_mount
+    remake_the_workspace
   elif [[ -n "$DESIRED_IMAGE_ID" && -n "$RUNNING_IMAGE_ID" && "$RUNNING_IMAGE_ID" != "$DESIRED_IMAGE_ID" ]]; then
     echo "♻️  Your workspace was built from an older version; rebuilding it so the update takes effect…"
-    if docker ps --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then docker stop "$CONTAINER_NAME" >/dev/null; fi
-    docker rm "$CONTAINER_NAME" >/dev/null || true
-    run_container_with_mount
+    remake_the_workspace
   elif ! docker inspect -f '{{json .HostConfig.PortBindings}}' "$CONTAINER_NAME" 2>/dev/null | grep -q '9084/tcp'; then
     # An older container publishes only 8081, and published ports cannot
     # be changed after creation — recreating is the only way to add them.
     echo "♻️  Rebuilding your workspace so several previews can run at once…"
-    if docker ps --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then docker stop "$CONTAINER_NAME" >/dev/null; fi
-    docker rm "$CONTAINER_NAME" >/dev/null || true
-    run_container_with_mount
+    remake_the_workspace
   else
     # Mounts match; only start if not already running
     if docker ps --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
