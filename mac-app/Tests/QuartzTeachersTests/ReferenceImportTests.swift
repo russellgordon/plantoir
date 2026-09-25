@@ -1066,6 +1066,10 @@ final class ReferenceImportTests: XCTestCase {
         XCTAssertEqual(ReferenceImportWording.noSchoolYear, wording["noSchoolYear"] as? String)
         XCTAssertEqual(ReferenceImportWording.stopped, wording["stopped"] as? String)
         XCTAssertEqual(
+            ReferenceImportWording.alreadyBeingImported, wording["alreadyBeingImported"] as? String
+        )
+        XCTAssertEqual(ReferenceImportWording.leftoverInTheWay, wording["leftoverInTheWay"] as? String)
+        XCTAssertEqual(
             ReferenceImportWording.couldNotImport(course: "{course}", reason: "{reason}"),
             wording["couldNotImport"] as? String
         )
