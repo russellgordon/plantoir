@@ -7,6 +7,93 @@
       "where" : "Beside the section's built site: .merged_output/section<N>/, the folder that holds public/."
     },
     "note" : "Whether a deploy has to build first. Getting this wrong in one direction wastes minutes; in the other it publishes yesterday's site.",
+    "previewBuild" : {
+      "cases" : [
+        {
+          "expectPreview" : false,
+          "name" : "a production build",
+          "pages" : {
+            "index.html" : "<html><body>Welcome</body></html>",
+            "notes/day-1.html" : "<html><body>Day 1</body></html>"
+          }
+        },
+        {
+          "expectPreview" : true,
+          "name" : "a preview's build",
+          "pages" : {
+            "index.html" : "<script>new WebSocket('ws://localhost:9081')</script>",
+            "notes/day-1.html" : "<script>new WebSocket('ws://localhost:9081')</script>"
+          }
+        },
+        {
+          "expectPreview" : true,
+          "name" : "a clean front page in front of a preview's page (#136)",
+          "pages" : {
+            "index.html" : "<html><body>Welcome</body></html>",
+            "notes/day-1.html" : "<script>new WebSocket('ws://localhost:9081')</script>"
+          }
+        },
+        {
+          "expectPreview" : true,
+          "name" : "a preview's page deep in the tree",
+          "pages" : {
+            "a/b/c/page.html" : "<script>new WebSocket('ws://localhost:9083')</script>",
+            "index.html" : "<html><body>Welcome</body></html>"
+          }
+        },
+        {
+          "expectPreview" : true,
+          "name" : "a preview's page in a hidden folder",
+          "pages" : {
+            ".cache/page.html" : "<script>new WebSocket('ws://localhost:9081')</script>",
+            "index.html" : "<html><body>Welcome</body></html>"
+          }
+        },
+        {
+          "expectPreview" : false,
+          "name" : "the address only in files that are not pages",
+          "pages" : {
+            "index.html" : "<html><body>Welcome</body></html>",
+            "postscript.js" : "new WebSocket('ws://localhost:9081')",
+            "static/contentIndex.json" : "{\"socket\": \"ws://localhost:9081\"}"
+          }
+        },
+        {
+          "expectPreview" : false,
+          "name" : "a near miss: an address with no port",
+          "pages" : {
+            "index.html" : "<a href=\"ws://localhost/\">a local socket</a>"
+          }
+        },
+        {
+          "expectPreview" : false,
+          "name" : "a page that cannot be read is passed over",
+          "pages" : {
+            "index.html" : "<html><body>Welcome</body></html>",
+            "locked.html" : "<script>new WebSocket('ws://localhost:9081')</script>"
+          },
+          "unreadable" : [
+            "locked.html"
+          ]
+        },
+        {
+          "expectPreview" : true,
+          "name" : "a readable preview's page still counts beside one that cannot be read",
+          "pages" : {
+            "index.html" : "<html><body>Welcome</body></html>",
+            "locked.html" : "<html><body>Locked</body></html>",
+            "notes/day-1.html" : "<script>new WebSocket('ws://localhost:9081')</script>"
+          },
+          "unreadable" : [
+            "locked.html"
+          ]
+        }
+      ],
+      "note" : "One rule for 'this built site is a preview's', read by every checker: BuildFreshness in each app, the mac's scheduled publish (its own shell check, because the app is closed when it runs), deploy.sh (three times), deploy.py and deploy.ps1. Serve mode bakes the live-reload client into EVERY page and the built tree is replaced file by file, so a clean front page in front of a preview's pages is a real state — deploy.sh found it on 2026-09-05 and has read the whole tree since, as has deploy.py. The apps read the front page alone until issue #136: they called that state deploy-fresh, skipped their build, and the LAUNCHER then rebuilt under the destination's leg — the build's milestones missing from the panel, and on the mac a question the build asked overnight reported as the destination's. A reader narrower than the launchers is the fault, whichever side it is on. Each case is a tree under the section's public/ folder; `unreadable` names pages that exist but cannot be opened.",
+      "notShared" : "Three things are deliberately NOT cases. (1) A front page that is MISSING or cannot be READ: the apps rebuild (`rules` → 'the built index cannot be read'), while the launchers stop at the copy instead — a different rule, pinned where it lives. (2) A page that is not valid UTF-8: measured 2026-09-25 on macOS 26.6, /usr/bin/grep 2.6.0-FreeBSD under a UTF-8 locale does NOT find the signature on a line that also holds an invalid byte (exit 1), and under LC_ALL=C it does (exit 0), so deploy.sh run from a Terminal can call such a page clean while the apps (bytes), the scheduled check (LC_ALL=C) and deploy.py (errors='ignore') call it a preview's. The error is in the SAFE direction — the app rebuilds first — and Quartz only writes UTF-8, so it is written down rather than pinned. (3) Upper-case .HTML, and a public/ that is ITSELF a symbolic link (neither FileManager's enumerator nor grep -r descends into one; a link further up, such as the mac's .merged_output, is followed by both — measured): Quartz produces neither. deploy.ps1 also matches the signature without regard to case (Select-String's default), which no case here can tell apart.",
+      "signature" : "ws://localhost:",
+      "where" : "Every file whose name ends .html anywhere under the section's built public/ folder, hidden folders included, compared as bytes; the front page first, so a real preview's build answers from one file. A page that cannot be opened is passed over, as every launcher does."
+    },
     "rules" : [
       {
         "expectRebuild" : true,
@@ -19,7 +106,7 @@
       {
         "expectRebuild" : true,
         "when" : "the built site was made by a PREVIEW",
-        "why" : "**The one that is not obvious.** Serve mode bakes a live-reload client pointed at ws://localhost into every page. Publishing that makes visitors' browsers ask about 'access to other apps and services on this device' — so a preview build is never deploy-fresh, however recent it is. Detected by the built index.html containing 'ws://localhost:'."
+        "why" : "**The one that is not obvious.** Serve mode bakes a live-reload client pointed at ws://localhost into every page. Publishing that makes visitors' browsers ask about 'access to other apps and services on this device' — so a preview build is never deploy-fresh, however recent it is. Detected by ANY built page containing the signature — `previewBuild`, which every checker reads (issue #136; the front page alone until then)."
       },
       {
         "expectRebuild" : false,
@@ -36,7 +123,7 @@
         "why" : "Issue #265. A build reads the settings and the pages when it starts and writes index.html minutes later, so a Save made while a publish was building is OLDER than index.html. Compared with index.html alone it looked built: the next Publish sent the same old site, said it had succeeded, and settingsSavedWhilePublishing told the teacher to do exactly that. So the time compared with is the START of the build that made the site on disk — read from buildStartedMarker when it is there, and the earlier of it and index.html's time when both are (an earlier time only ever costs a rebuild that was not needed; a later one sends a stale site). With no marker (a site built before this existed) index.html's time is used, as before. Rejected: comparing the build's copy of course_config.json with the course's (the plan review's A3) — the build copies the settings some seconds AFTER it reads them, so a Save in between matches the copy and is still missed, and it would not catch a PAGE saved during the build, which this does."
       }
     ],
-    "theLaunchersMustDoThisToo" : "These rules were implemented in the APPS only, and that left a hole for two years' worth of command-line use. `deploy.py` refuses a preview build for the Netlify and Cloudflare destinations, but publishing TO A FOLDER is handled entirely host-side by `deploy.sh` / `deploy.ps1` — it never enters the container, so `deploy.py` never runs. From the command line, `./preview.sh CODE N` followed by `./deploy.sh CODE N --to-folder …` therefore published the live-reload client: measured 2026-09-05 as 230 of 244 files. The apps were never exposed, because BuildFreshness forces a rebuild first, which is why three destinations tested clean in August. Both launchers now make the same check and rebuild. THREE things are needed, and each was discovered by getting it wrong. (1) The CHECK must read every HTML page, not just index.html: serve mode bakes the client into all of them and the tree is replaced file by file, so a clean front page in front of stale preview pages is a real state that front-page detection cannot see and publishes untouched. (2) The rebuild must STOP a preview that is still serving that section: the preview's sync watcher mirrors the serve build to the host every second and overwrites the rebuild within a second of it finishing. This was first blamed on bind-mount lag, which was wrong — a rebuild takes about 3 seconds and the tree is clean the moment it returns; the cause was always the race. (3) The WAIT after the rebuild must also cover every HTML page, for the same reason as (1)."
+    "theLaunchersMustDoThisToo" : "These rules were implemented in the APPS only, and that left a hole for two years' worth of command-line use. `deploy.py` refuses a preview build for the Netlify and Cloudflare destinations, but publishing TO A FOLDER is handled entirely host-side by `deploy.sh` / `deploy.ps1` — it never enters the container, so `deploy.py` never runs. From the command line, `./preview.sh CODE N` followed by `./deploy.sh CODE N --to-folder …` therefore published the live-reload client: measured 2026-09-05 as 230 of 244 files. The apps were never exposed, because BuildFreshness forces a rebuild first, which is why three destinations tested clean in August. That held for a whole preview's build, whose front page carries the client too; the MIXED state in (1) below reached the apps until issue #136, because they read the front page alone. They now read the same tree as the launchers — `previewBuild`. Both launchers now make the same check and rebuild. THREE things are needed, and each was discovered by getting it wrong. (1) The CHECK must read every HTML page, not just index.html: serve mode bakes the client into all of them and the tree is replaced file by file, so a clean front page in front of stale preview pages is a real state that front-page detection cannot see and publishes untouched. (2) The rebuild must STOP a preview that is still serving that section: the preview's sync watcher mirrors the serve build to the host every second and overwrites the rebuild within a second of it finishing. This was first blamed on bind-mount lag, which was wrong — a rebuild takes about 3 seconds and the tree is clean the moment it returns; the cause was always the race. (3) The WAIT after the rebuild must also cover every HTML page, for the same reason as (1)."
   },
   "configurationRules" : {
     "cloudflareAccountID" : [

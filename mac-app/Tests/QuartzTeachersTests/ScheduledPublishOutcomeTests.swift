@@ -524,15 +524,27 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
     /// and wrote its page at `pageWritten`, with the settings saved at
     /// `settingsSaved`; then the real wrapper, with a `preview.sh` that
     /// leaves a note when it is asked to build. Returns whether it was.
+    ///
+    /// `siteCase` is one of `app-rules.json` → `buildFreshness.previewBuild`'s
+    /// cases, written over the built site before the run (issue #136);
+    /// `previewExit`, `deployScript` and the destinations let a test say what
+    /// the launchers do once they are reached.
     private func overnightRunBuilt(
         course: String,
         started: TimeInterval,
         settingsSaved: TimeInterval,
-        pageWritten: TimeInterval
+        pageWritten: TimeInterval,
+        siteCase: [String: Any]? = nil,
+        frontPageUnreadable: Bool = false,
+        previewExit: Int32 = 0,
+        deployScript: String = "#!/bin/bash\nexit 0\n",
+        destinations: [String] = ["netlify"],
+        descriptions: [String] = ["Netlify"]
     ) throws -> Bool {
         let buildNote: URL = workspace.appendingPathComponent("the-build-ran")
-        let previewScript: String = "#!/bin/bash\n/usr/bin/touch \(buildNote.path)\nexit 0\n"
-        for (name, script) in [("preview.sh", previewScript), ("deploy.sh", "#!/bin/bash\nexit 0\n")] {
+        try? FileManager.default.removeItem(at: buildNote)
+        let previewScript: String = "#!/bin/bash\n/usr/bin/touch \(buildNote.path)\nexit \(previewExit)\n"
+        for (name, script) in [("preview.sh", previewScript), ("deploy.sh", deployScript)] {
             let url: URL = workspace.appendingPathComponent(name)
             try script.write(to: url, atomically: true, encoding: .utf8)
             try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
@@ -550,6 +562,13 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         try "{}\n".write(to: settings, atomically: true, encoding: .utf8)
         try "<html>a published build</html>".write(to: builtPage, atomically: true, encoding: .utf8)
         try "".write(to: marker, atomically: true, encoding: .utf8)
+        var lockedURLs: [URL] = []
+        if let siteCase {
+            lockedURLs = try BuildFreshnessTests.writePages(
+                of: siteCase, into: siteURL.appendingPathComponent("public")
+            )
+        }
+        defer { BuildFreshnessTests.makeReadable(lockedURLs) }
 
         let now: Date = Date()
         let stamps: [(URL, TimeInterval)] = [
@@ -561,7 +580,12 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
             )
         }
 
-        try runWrapper(course: course, section: 1, destinations: ["netlify"], descriptions: ["Netlify"])
+        if frontPageUnreadable {
+            try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: builtPage.path)
+            lockedURLs.append(builtPage)
+        }
+
+        try runWrapper(course: course, section: 1, destinations: destinations, descriptions: descriptions)
         return FileManager.default.fileExists(atPath: buildNote.path)
     }
 
@@ -580,6 +604,72 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
     func testTheOvernightRunDoesNotBuildWhenNothingChangedSinceTheBuildStarted() throws {
         XCTAssertFalse(
             try overnightRunBuilt(course: "ZZQ8U", started: -400, settingsSaved: -500, pageWritten: -300)
+        )
+    }
+
+    // MARK: - Whether the overnight run reads every page (issue #136)
+
+    /// The overnight check reads the same list the app's does. Each case's
+    /// site is newer than every edit, so the only thing that can make the run
+    /// build is the site being a preview's.
+    func testTheOvernightRunReadsTheSamePreviewCasesAsTheApp() throws {
+        let rule: [String: Any] = try BuildFreshnessTests.previewBuildRule()
+        let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
+        var caseNumber: Int = 0
+        for testCase in cases {
+            caseNumber += 1
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let expectPreview: Bool = try XCTUnwrap(testCase["expectPreview"] as? Bool)
+            let built: Bool = try overnightRunBuilt(
+                course: "ZZR\(caseNumber)U", started: -400, settingsSaved: -500, pageWritten: -300,
+                siteCase: testCase
+            )
+            XCTAssertEqual(built, expectPreview, name)
+        }
+    }
+
+    /// The headline of issue #136. A folder publish, a clean front page newer
+    /// than every edit, a preview's page behind it, and a build that stops for
+    /// a question. The stand-in deploy.sh does what the real one does with that
+    /// tree — rebuilds, and passes the build's exit 3 through — so before the
+    /// fix the morning record blamed the FOLDER and sent the teacher to
+    /// Publish. Now the overnight check builds first, the question is the
+    /// build's, and deploy.sh is never reached.
+    func testABuildQuestionBehindACleanFrontPageIsTheBuildsNotTheFolders() throws {
+        let deployNote: URL = workspace.appendingPathComponent("the-deploy-ran")
+        let publicPath: String = workspace
+            .appendingPathComponent("courses/ZZR9Q/.merged_output/section1/public").path
+        let deployScript: String = "#!/bin/bash\n/usr/bin/touch \(deployNote.path)\n"
+            + "if /usr/bin/grep -rq --include='*.html' 'ws://localhost:' '\(publicPath)'; then exit 3; fi\n"
+            + "exit 0\n"
+        let mixedState: [String: Any] = [
+            "pages": [
+                "index.html": "<html><body>Welcome</body></html>",
+                "notes/day-1.html": "<script>new WebSocket('ws://localhost:9081')</script>",
+            ],
+        ]
+        let built: Bool = try overnightRunBuilt(
+            course: "ZZR9Q", started: -400, settingsSaved: -500, pageWritten: -300,
+            siteCase: mixedState, previewExit: 3, deployScript: deployScript,
+            destinations: ["folder"], descriptions: ["the class folder"]
+        )
+        XCTAssertTrue(built, "the overnight run must build a preview's site before publishing it")
+        let stopped = ScheduledPublishOutcome.stopped(inHomeFolder: home, course: "ZZR9Q", section: 1)
+        XCTAssertEqual(stopped?.kind, .buildNeededAnAnswer, "the question was the build's, not the folder's")
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: deployNote.path),
+            "a build that stopped reaches no destination"
+        )
+    }
+
+    /// A front page that cannot be read is rebuilt rather than trusted, as the
+    /// app's check does — `grep` alone would read "cannot open" as "clean".
+    func testTheOvernightRunBuildsWhenTheFrontPageCannotBeRead() throws {
+        XCTAssertTrue(
+            try overnightRunBuilt(
+                course: "ZZR0U", started: -400, settingsSaved: -500, pageWritten: -300,
+                frontPageUnreadable: true
+            )
         )
     }
 }

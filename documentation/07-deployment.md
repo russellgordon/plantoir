@@ -149,8 +149,8 @@ Deploys always go to **production** (no draft deploys), matching the
 A preview build embeds a live-reload WebSocket client (`ws://localhost:<port>`)
 into generated HTML pages. Deploying those directly would cause students'
 browsers to prompt for local network permissions. `deploy.py` detects this
-signature in `public/index.html` (or checks if `baseUrl` in `quartz.config.ts` needs
-updating for the deployed domain) and automatically re-executes a clean static
+signature in any page under `public/` (every `*.html`, since 2026-09-05 — see
+"One rule, six readers" below) and automatically re-executes a clean static
 build inside the container-internal workspace (`/tmp/quartz-builds/...`),
 mirroring the production assets back to `public/` before uploading.
 
@@ -192,6 +192,95 @@ waited the full timeout, and always refused. It is now `Test-CarriesLiveReload`
 in `deploy.ps1`, which tests for a match object rather than a Boolean. The
 general rule for PowerShell written from the mac: `-Quiet` is not a scalar when
 the input is a pipeline.
+
+#### One rule, six readers (GitHub #136, 2026-09-25)
+
+Whether a built site is a preview's is asked in six places, and until #136
+they did not agree:
+
+| Reader | Where | What it reads |
+|---|---|---|
+| `BuildFreshness.builtForPreview` (mac) | `mac-app/QuartzTeachers/Models/BuildFreshness.swift` | every `*.html` under `public/`, as bytes — the front page ALONE until #136 |
+| The scheduled publish's own check (mac) | `ScheduledDeploy.oneShotCommand` | `LC_ALL=C grep -rqs --include='*.html'` over `public/` — `index.html` alone until #136 |
+| `deploy.sh`, folder leg | three identical `grep -rq --include='*.html'` lines | the whole tree, since 2026-09-05 |
+| `deploy.py`, Netlify and Cloudflare | `public_dir.rglob("*.html")` | the whole tree, since 2026-09-05 |
+| `deploy.ps1`, folder leg | `Test-CarriesLiveReload` | the whole tree |
+| `BuildFreshness.BuiltForPreview` (Windows) | `Plantoir.Core/Models/BuildFreshness.cs` | the front page alone — owed, see the `windows` issue |
+
+(Windows' scheduled task builds unconditionally, so it has no check to get
+wrong.)
+
+**Why the apps being narrower mattered.** The built tree is replaced file by
+file, so a clean front page in front of a preview's pages is a real state. The
+app called it deploy-fresh and skipped its own build; the launcher then saw the
+client and rebuilt under the DESTINATION's leg. On the Deploy button that shows
+the deploy-only milestones while a build is in fact running. On the mac's
+scheduled publish to a folder it was worse: a question the rebuild stopped for
+came back through `deploy.sh`'s exit 3 and was recorded as the folder's
+(`neededAnAnswer`, sending the teacher to Publish) rather than the build's
+(`buildNeededAnAnswer`, sending them to Preview). Now the app and the overnight
+check read the same tree, so whenever `deploy.sh` would rebuild, the build leg
+already has. `deploy.sh`'s own rerun is kept: it is what protects
+`./preview.sh` followed by `./deploy.sh --to-folder` typed at a command line.
+
+**The rule is data**: `contracts/app-rules.json` → `buildFreshness.previewBuild`
+— the `signature`, `where` it is looked for, and nine `cases`, each a tree of
+pages. The mac suite runs the app's check (`BuildFreshnessTests`) and the
+overnight shell (`ScheduledPublishOutcomeTests`) against it;
+`scripts/test_preview_build_detection.py` cuts `deploy.sh`'s check out of the
+launcher and runs it, and runs the real `deploy.py`, against the same list —
+in `verify.sh` and in Windows' `PythonToolchainTests`. `deploy.ps1` is Windows'
+to run against it. Its `notShared` says what the cases deliberately leave out.
+
+**The details each reader has to get right, and why:**
+
+- **Bytes, not text.** A page that is not valid UTF-8 must not change the
+  answer. Reading as a Swift `String` would make one such page force a rebuild
+  on every publish forever. **Measured** (macOS 26.6, `/usr/bin/grep`
+  2.6.0-FreeBSD): under a UTF-8 locale `grep` does NOT find the signature on a
+  line that also holds an invalid byte (exit 1); under `LC_ALL=C` it does
+  (exit 0). So the overnight check runs under `LC_ALL=C`; `deploy.sh` run from
+  a Terminal can call such a page clean while every other reader calls it a
+  preview's — the SAFE direction, since the app then rebuilds first, and Quartz
+  only writes UTF-8. `deploy.py` reads with `errors="ignore"` and matches.
+- **Hidden folders included** — `grep -r` and `rglob` both look inside them, so
+  the Swift enumerates without `.skipsHiddenFiles`.
+- **A page that cannot be opened is passed over; a front page that cannot be
+  opened means rebuild.** The launchers skip an unreadable page (`2>/dev/null`,
+  `except OSError`). The overnight line says `! [ -r index.html ] || … grep
+  -rqs …`: measured, BSD grep with `-s` exits 0 on a match elsewhere and 2
+  otherwise, which an `if` reads as "no", so the front page needs its own test.
+- **The front page first.** A real preview's build carries the client in every
+  page, so it answers from one file.
+
+**Cost — measured on an Apple M4 Pro, macOS 26.6**, a standalone copy of the
+Swift scan run 20 times against real sections (read-only): a clean 244-file /
+230-page section 6.5–7.8 ms warm, 54 ms on the first run in a fresh process; an
+864-file / 353-page section about 12 ms warm, 72–82 ms first. A real preview's
+build answers in 0.1 ms. The front-page-only read it replaced took 0.02 ms. It
+runs once per Publish press, on a path that then builds or uploads for seconds
+to minutes, so it stays synchronous on the main actor.
+
+**Rejected:**
+
+- *Giving `deploy.sh`'s rerun its own exit code*, so the wrapper could tell a
+  build question from a destination's: a launcher contract change Windows
+  shares, for a fault that was the app's check being narrower.
+- *Removing `deploy.sh`'s rerun*: it is the only guard on the command line.
+- *Adding `LC_ALL=C` and `-s` to `deploy.sh`*: correct, but a publishing-path
+  launcher change for a state Quartz cannot produce; written down instead.
+- *Reading pages as `String`*, for the reason above.
+- *Sampling the front page and a few others*: cannot promise the answer, and
+  the whole walk costs about 12 ms.
+- *Moving the scan off the main actor*: unnecessary at these numbers.
+- *A home in `shared-rules.json`*: `buildFreshness` already lives in
+  `app-rules.json`, and one rule gets one home.
+- *A narrower signature* (`new WebSocket('ws://localhost:`), so a page that
+  merely MENTIONS the address — a networking lesson — is not read as a
+  preview's: it would change all six readers, two of them launchers. That limit
+  is older than #136 and is [issue #291](https://github.com/russellgordon/plantoir/issues/291);
+  what #136 adds to it is only that the app now rebuilds such a course on every
+  publish too, as the launchers already did.
 
 **Cancelling a publish ends it quietly (GitHub #259, 2026-09-25).** The
 progress view's Cancel types a `^C` (`ScriptRunner.cancelByUser`), which reaches
@@ -1006,28 +1095,31 @@ proved the same way from the same date, by
 question — including in the flag ORDER the launchd wrapper writes, which is
 the shape a parser bug would hide.
 
-**One narrow path can still produce the sentence #132 removed**, and it is
-filed as [issue #136](https://github.com/russellgordon/plantoir/issues/136)
-rather than fixed. **Publishing to a FOLDER, and only to a folder**, reruns the
-build itself: `deploy.sh` greps the section's whole `public/` tree for
+**One narrow path could produce the sentence #132 removed**, and it was closed
+by [issue #136](https://github.com/russellgordon/plantoir/issues/136) on
+2026-09-25. **Publishing to a FOLDER, and only to a folder**, reruns the build
+itself: `deploy.sh` greps the section's whole `public/` tree for
 `ws://localhost:` and, finding it, runs `preview.sh --build-only` and passes its
 exit 3 straight through (`deploy.sh:472` opens the `TO_FOLDER` branch the rerun
-sits in). The wrapper can only see that as the folder's own question, because
+sits in). The wrapper could only see that as the folder's own question, because
 the exit code is the only thing it gets. Netlify and Cloudflare do not reach it
 at all — they go through `deploy.py`, whose `rebuild_for_production` runs
 `build_site.py` directly, asks nothing, and fails with 1, so those land in
 `didNotFinish` naming the destination, which is honest.
 
-Reaching even the folder case needs the wrapper to have skipped its own build,
-and that is possible because the wrapper's staleness check is
-`BuildFreshness.needsRebuild` written out in shell: it looks at `index.html`
-**alone**, while `deploy.sh` greps the tree. A clean front page in front of a
-stale preview page is the gap, and `deploy.sh`'s own comment records that the
-index-only check was found insufficient on 2026-09-05 — the launcher has been
-quietly compensating for the app's narrower one ever since. Closing it means
-changing `BuildFreshness`, which the Deploy button uses too, so it is its own
-piece of work with its own measurement; giving the rebuild its own exit code
-was rejected as a launcher contract change Windows shares.
+Reaching the folder case needed the wrapper to have skipped its own build, and
+that was possible because the wrapper's staleness check — `BuildFreshness.
+needsRebuild` written out in shell — looked at `index.html` **alone**, while
+`deploy.sh` greps the tree: a clean front page in front of a stale preview page
+got through. Both checks now read the whole tree, from
+`contracts/app-rules.json` → `buildFreshness.previewBuild` (see "One rule, six
+readers" above), so whenever `deploy.sh` would rerun the build, the wrapper
+has already built, and a question there is recorded as the build's.
+`ScheduledPublishOutcomeTests.testABuildQuestionBehindACleanFrontPageIsTheBuildsNotTheFolders`
+runs that state through the generated shell with a stand-in `deploy.sh` that
+does what the real one does. The rerun is now reached only from the command
+line. Giving the rebuild its own exit code was rejected as a launcher contract
+change Windows shares.
 
 ## A course kept for reference is never deployed — fifteen doors, one rule
 
