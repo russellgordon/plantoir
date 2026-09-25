@@ -191,21 +191,35 @@ final class SiteHealthContractTests: XCTestCase {
     /// Rule 1: the interface never names the machinery. These sentences are
     /// shown to a teacher verbatim — in a dialog, and in the assistant's
     /// answer — so a stray "container" or "script" would reach them directly.
+    ///
+    /// EVERY string of a check is swept, not only `sentence` and `detail`:
+    /// since #246 a check can carry pieces the toolchain assembles into them
+    /// (`sentenceForSeveral`, `pageWithLine`, `frontPage`…), and a word in
+    /// one of those reaches a teacher just the same. `name` is an identifier,
+    /// and `why` and `fill` are written for whoever maintains the check.
     func testNoCheckNamesTheMachinery() throws {
         let checks: [[String: Any]] = try XCTUnwrap(siteHealth["checks"] as? [[String: Any]])
         let forbidden: [String] = [
             "toolchain", "script", "docker", "container", "wsl", "python",
             "json", "stdout", "quartz", "repository", "config",
+            "yaml", "frontmatter", "symlink", "vault",
         ]
+        let notShown: Set<String> = ["name", "why", "fill"]
         for check in checks {
             let name: String = (check["name"] as? String) ?? "unnamed"
-            let shown: String = ((check["sentence"] as? String) ?? "")
-                + " " + ((check["detail"] as? String) ?? "")
-            for word in forbidden {
-                XCTAssertFalse(
-                    shown.lowercased().contains(word),
-                    "\(name) says \"\(word)\" to a teacher"
-                )
+            for (key, value) in check {
+                if notShown.contains(key) {
+                    continue
+                }
+                guard let shown = value as? String else {
+                    continue
+                }
+                for word in forbidden {
+                    XCTAssertFalse(
+                        shown.lowercased().contains(word),
+                        "\(name).\(key) says \"\(word)\" to a teacher"
+                    )
+                }
             }
         }
     }

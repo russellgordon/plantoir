@@ -648,6 +648,23 @@ else
   cat /tmp/verify_dates_follow_the_class_test.log
 fi
 
+# ---- build_site.py: a page whose settings cannot be read is hidden ----
+# GitHub #246. Every case in contracts/shared-rules.json ->
+# unreadablePageSettings through the real process_frontmatter, in the image
+# because it needs python-frontmatter: hidden, named with its line, its body
+# kept, the teacher's file untouched, and an unreadable front page clearing
+# the last site and saying so in its own words.
+echo ""
+echo "🔎 Checking that a page whose settings cannot be read is hidden and named…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/test_unreadable_page_settings.py" /opt/scripts/test_unreadable_page_settings.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_unreadable_page_settings.py >/tmp/verify_unreadable_page_settings_test.log 2>&1; then
+  pass "build_site.py: a page whose settings cannot be read is hidden and named (scripts/test_unreadable_page_settings.py)"
+else
+  fail "build_site.py: a page whose settings cannot be read is hidden and named (scripts/test_unreadable_page_settings.py)"
+  cat /tmp/verify_unreadable_page_settings_test.log
+fi
+
 # ---- Whether the site shows a page: the contract, run down the REAL chain ----
 # The one check here that is not about a rule being implemented right — it is
 # about the rule being TRUE. Both apps are tested against
