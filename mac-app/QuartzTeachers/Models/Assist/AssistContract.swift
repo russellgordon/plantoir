@@ -94,8 +94,8 @@ enum AssistContract {
         )
     }
 
-    /// The answer to "deploy at 6.30 pm", and the two forms it takes when a
-    /// comma, or a comma and "please", is all that differs — each rendered
+    /// The answer to "deploy at 6.30 pm", and the form it takes when a comma
+    /// is all that stood in the way — each rendered
     /// through the same two functions the assistant calls (issue #277).
     static func sayTheTimeAs(for sentence: String) -> String {
         guard let respelling = AssistCardCommand.timeToSayAs(sentence) else {
@@ -127,12 +127,11 @@ enum AssistContract {
             "morningOrEvening": AssistContract.morningOrEveningForSixThirty(),
             // The same, for a time written a way the family can read but does
             // not set (issue #277): the sentence for "deploy at 6.30 pm", and
-            // the two forms a comma or "please" gives it. What every other
+            // the form a comma alone gives it. What every other
             // input is answered with is in assist-cases.json →
             // deployAtATime.sayItAs.
             "sayTheTimeAs": AssistContract.sayTheTimeAs(for: "deploy at 6.30 pm"),
             "sayTheTimeAsWithoutTheComma": AssistContract.sayTheTimeAs(for: "deploy at 6:30 pm,"),
-            "sayTheTimeAsWithoutPlease": AssistContract.sayTheTimeAs(for: "deploy at 6:30 pm, please"),
             "deployAccepted": AssistWording.deployAccepted,
             "planAccepted": AssistWording.planAccepted,
             "cancelled": AssistWording.cancelled,

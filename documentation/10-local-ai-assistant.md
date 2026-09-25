@@ -426,8 +426,8 @@ the MODEL writes is a different matter entirely — it is guarded rather than
 bound; see "Never ask the model for something the window already knows".)
 
 Every accepted, asked and refused spelling is DATA, in
-`contracts/assist-cases.json` → `deployAtATime` (23 accepted, 21 asked, 36
-answered with the spelling to use (`sayItAs`), 53 refused, 11 resolving rows —
+`contracts/assist-cases.json` → `deployAtATime` (23 accepted, 22 asked, 45
+answered with the spelling to use (`sayItAs`), 51 refused, 11 resolving rows —
 count them rather than trusting this line),
 authored rather than generated and preserved across `--write-contracts`. One
 example and one near-miss — all `cardPhrasings.parsed` can carry — would have
@@ -619,8 +619,11 @@ The rule, which `deployAtATime.note` states as data:
   A spelling the family refuses for a reason of its own (`13:30 pm`, `6:75
   pm`, `deploy at 7`) is not caught: its refused row's reason stands.
 - **A part of the day is a window, not just am or pm** (the plan review's M1,
-  ruled 2026-09-25): morning 1–11, afternoon 12–5, evening 5–11, tonight 5–11
-  with 12 as midnight. The plan first mapped a part of the day straight to am
+  ruled 2026-09-25): morning 12 (12 am) and 1–11, afternoon 12–5, evening
+  5–11, tonight 5–11 with 12 as midnight. (Morning read 1–11 only until the
+  fix review's M2: `deploy at 12:30 in the morning`, the most natural way to
+  write 00:30, went to the model and deployed on the spot 10 of 10; it now
+  reads 12 the way tonight does.) The plan first mapped a part of the day straight to am
   or pm, and `deploy at 1:30 tonight` came back as `deploy today at 1:30 pm` —
   the wrong-part-of-the-day suggestion #194 exists to prevent. Outside its
   window a time is never given a spelling: a one-digit hour with no am or pm
@@ -630,7 +633,12 @@ The rule, which `deployAtATime.note` states as data:
 - **Midnight tonight has no day word** — `deploy at 12:30 tonight` becomes
   `deploy at 12:30 am`, because midnight tonight is the start of tomorrow and
   a bare time settles onto the next one; `today at 12:30 am` would already
-  have passed.
+  have passed. "Today" and "tonight" in one sentence agree and tonight
+  decides (the fix review's L3), so `deploy today at 12:30 tonight` gets the
+  same answer and `deploy today at 1:30 tonight` asks with no day word.
+- **A day word the comma kept from the frame is read** (the fix review's L1):
+  `deploy at 6:30 pm tomorrow, please` is answered like `deploy at 6:30 pm,
+  tomorrow` — the order of the day word does not decide.
 - **With neither am/pm nor a part of the day** the hour must be two digits (the
   24-hour reading: `18.30` → 6:30 pm, `00.30` → 12:30 am). A one-digit hour is
   already the #194 question, and a dotted 10–12 is asked too (above). A COLON
@@ -640,30 +648,40 @@ The rule, which `deployAtATime.note` states as data:
 - **A disagreement is refused, never resolved**: am/pm against the part of the
   day (`6:30 am in the evening`), a day word against the part of the day's day
   (`deploy tomorrow at 6:30 tonight`).
-- **The reply does not seem to repeat the teacher** (the plan review's M3):
-  when the only difference between what was typed and the sentence handed back
-  is a comma, or a comma and "please", the reply says "…, without the comma" or
-  "…, without “please”" instead of naming the time back — three renderings of
-  one function, `wording.sayTheTimeAs`, `…WithoutTheComma`, `…WithoutPlease`,
-  chosen by `AssistTimeRespelling.onlyDifference`. A known limit: `deploy at
-  6:30pm, please` differs by a space as well, so it gets the ordinary form,
-  naming "6:30pm" back.
+- **The reply does not name back a time that was never the problem** (the plan
+  review's M3, and the fix review's M1): when the teacher's own sentence, with
+  its commas taken out, is one the family SETS for the same moment as the
+  sentence handed back, the reply says "…, without the comma" instead of
+  naming the time back — `wording.sayTheTimeAsWithoutTheComma`, a second
+  rendering of `AssistWording.sayTheTimeAs`, chosen by
+  `AssistTimeRespelling.onlyDifference`. It is decided by the MATCHER and the
+  moment, not by comparing text: the first version compared text with the
+  canonical sentence, so `deploy it at 6:30 pm, please`, `deploy at 7 am,
+  please` and `deploy at 6:30 pm, tomorrow` named the teacher's own time back
+  as if it were wrong. A "without “please”" form was ruled as well and is NOT
+  built: taking "please" out too was measured unreachable (0 of 113,400
+  sentences, the compiled Swift), because the frame already takes "please" off
+  either end — a key the app could never say would have been a sentence in the
+  contract that is not true.
 
 Measured before it was relied on, against the COMPILED Swift
-(`AssistCardCommand.swift` built on its own, 2026-09-25): a grid of 1,118,880
-sentences (14 frames, including four with a part of the day before "at" × 37
-hour spellings × 6 minute spellings × `:`/`.`/`,` × 8 am/pm spellings × 15
-tails) — 4,878 accepted, 3,036 asked, 51,156 given a spelling, the rest to the
-model. **0** sentences in two of the three; **0** differences from an
-independent Python port (the research guard's `respelling_reading`); all 216
+(`AssistCardCommand.swift` built on its own, 2026-09-25, re-run after the fix
+round): a grid of 1,268,064 sentences (14 frames, including four with a part
+of the day before "at" × 37 hour spellings × 6 minute spellings × `:`/`.`/`,`
+× 8 am/pm spellings × 17 tails) — 4,878 accepted, 3,036 asked, 61,872 given a
+spelling, the rest to the model. **0** sentences in two of the three; **0**
+differences from the research guard's Python MIRROR (`respelling_reading` —
+written by the same hand from the same rules, so agreement shows the two say
+the same thing, not that either is right; the legs that follow are the real
+checks); all 216
 distinct suggested sentences accepted by the family and already in canonical
 form; 13,698 full-stop or comma spellings whose colon twin the family accepts,
-**0** landing on a different `when`; 37,458 respellings from a part of the day,
+**0** landing on a different `when`; 38,274 respellings from a part of the day,
 **0** outside its window; 1,776 questions from a part of the day, every one a
 clock the #194 question can name. `ScheduleDeployCardTests` runs every
 `sayItAs` row, and the sentence each hands back, through the real matcher.
 
-**What STILL reaches the model, measured.** The 26 must-not-catch rows in
+**What STILL reaches the model, measured.** The 24 must-not-catch rows in
 `deployAtATime.refused` (each is a row asserting it is neither answered, asked
 nor given a spelling), including the two shapes the ruling let stay —
 `deploy at midnight tonight` and `deploy at 9 at night`. Measured for this
@@ -675,28 +693,51 @@ line appended, a fresh conversation each; 10 greedy trials each, 2026-09-25:
 | Sent to the model | Chose (10 trials) |
 |---|---|
 | `deploy at 6,30`, `deploy at 6.30 pm, then preview`, `deploy at 13.30 pm`, `deploy at 0.30`, `deploy at 6.3 pm`, `deploy at 7, please` | **deploy_section 10** each |
-| `deploy at 18:30 in the morning`, `deploy at 6:30 am in the evening`, `deploy at 11:30 in the afternoon`, `deploy at 13:30 in the evening`, `deploy at 23:00 in the afternoon`, `deploy at 12:30 in the morning`, `deploy at 2:30 pm in the evening`, `deploy today at 12:30 tonight`, `deploy at 12:30 in the evening`, `deploy at 06:30 in the evening` | **deploy_section 10** each |
+| `deploy at 18:30 in the morning`, `deploy at 6:30 am in the evening`, `deploy at 11:30 in the afternoon`, `deploy at 13:30 in the evening`, `deploy at 23:00 in the afternoon`, `deploy at 2:30 pm in the evening`, `deploy at 12:30 in the evening`, `deploy at 06:30 in the evening` | **deploy_section 10** each |
 | `deploy at midnight tonight`, `deploy at 9 at night` | **deploy_section 10** each |
 | `deploy section 2 at 6.30 pm` | **deploy_section 10**, for section 2 |
 | `deploy at 1.5` | deploy_section 1, declined 9 |
 | `deploy at 2.0.1`, `deploy at 6:30, then preview`, `deploy tomorrow at 6:30 tonight`, `deploy at 6.30 pm every day`, `deploy on 10.30`, `deploy at 7 in the evening, then preview` | declined 10 each |
 
-So **19 of the 26 still deploy on the spot 10 of 10** when a teacher types
+(Two more were measured in that run and are no longer on the list: `deploy at
+12:30 in the morning` and `deploy today at 12:30 tonight`, both deploy_section
+10 of 10, are answered with a spelling since the fix round.)
+
+So **17 of the 24 still deploy on the spot 10 of 10** when a teacher types
 them, and the approval card's "This happens now." (#168) is what stands
 between them and students — as it stood between students and the shapes this
-piece closed. They are refused on purpose: each says two things that disagree,
-or carries a second request, or is not a clock reading at all, and handing
-back ONE sentence for it would be a guess. Whether some of them should be
-ASKED about instead is not decided here. Beyond the rows, anything the frame
-and the list of parts of the day do not cover (`tomorrow night`, `12 noon`, a
-weekday) goes to the model as it always did, unmeasured.
+piece closed. They are not all refused for the same reason, and not all of
+them disagree with themselves:
+
+- **They say two things that disagree** — a time outside its part of the day
+  with two digits of hour or with am/pm (`18:30 in the morning`, `6:30 am in
+  the evening`, `11:30 in the afternoon`, `13:30 in the evening`, `23:00 in
+  the afternoon`, `2:30 pm in the evening`, `12:30 in the evening`, `06:30 in
+  the evening`), 13 with pm (`13.30 pm`), or two different days (`deploy
+  tomorrow at 6:30 tonight`). Handing back ONE sentence would be a guess.
+- **They carry more than a time** — a second request, a repeat, another
+  section (`6.30 pm, then preview`, `section 2 at 6.30 pm`, and the declined
+  `6:30, then preview`, `every day`, `7 in the evening, then preview`).
+- **The family does not read them as a clock** — `6,30` (a decimal comma a
+  person reads easily), `0.30`, `6.3 pm`, `7, please`, `1.5`, `2.0.1`, `on
+  10.30`. Some of these a teacher plainly meant as a time; they are refused
+  because their spelling is not one this family reads, not because they are
+  contradictory.
+- **They are merely unread** — `midnight tonight` and `9 at night`, shapes the
+  ruling let stay outside the list of parts of the day. Nothing is wrong with
+  them; they are not covered.
+
+Whether some of them should be ASKED about or read instead is not decided
+here. Beyond the rows, anything the frame
+and the list of parts of the day do not cover (`tomorrow night`, `at night`,
+`12 noon`, a weekday) goes to the model as it always did, unmeasured.
 
 The probe was a one-off copy of `research/ai-assist/trimmed-surface-suite.py`
 with its `CASES` loop replaced by a loop over the sentences above, as #194's
 was; it was not kept. The research guard itself now mirrors `timeToSayAs`
 (`deploy_time_said_as`, `SAID_AS_IN_CODE`) and is checked against every
 `accepted`, `asked`, `sayItAs` and `refused` row before anything is measured
-(133 rows when this was written).
+(141 rows after the fix round).
 
 **Rejected, and why:**
 - **accepting these spellings outright** — every accepted spelling widens what
@@ -714,6 +755,10 @@ was; it was not kept. The research guard itself now mirrors `timeToSayAs`
   sentence rebuilt around them might not be; the canonical form is pinned by
   the test for every row;
 - **mapping a part of the day straight to am or pm** — see the windows above;
+- **deciding "without the comma" by comparing text** — see the reply above;
+  the canonical sentence differs from the teacher's in harmless ways (`7:00`
+  for `7`, no `it`, the day word moved), and text comparison read every one of
+  them as a spelling problem;
 - **widening `deployFrame` for a part of the day in front of "at"** — it would
   move what the family ACCEPTS; the move-to-the-end rebuild keeps one frame
   and leaves the accepted rows untouched.

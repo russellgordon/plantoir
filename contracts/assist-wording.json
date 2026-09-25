@@ -113,7 +113,6 @@
     "rolloverWebsiteNotDecided" : "I have not changed which website this section publishes to — publishing it will still go to last year's website. Ask me to roll it over again if you would like to choose.",
     "rolloverWebsiteQuestion" : "Should this be a new website, or the same one students used last year?",
     "sayTheTimeAs" : "To set a deploy for “6.30 pm”, say it as “deploy at 6:30 pm”. Nothing is set yet.",
-    "sayTheTimeAsWithoutPlease" : "To set that deploy, say it as “deploy at 6:30 pm”, without “please”. Nothing is set yet.",
     "sayTheTimeAsWithoutTheComma" : "To set that deploy, say it as “deploy at 6:30 pm”, without the comma. Nothing is set yet.",
     "scheduleQuestion" : "Shall I schedule the deploy?",
     "scheduleReplaces" : "This replaces the deploy already set for {moment}.",
