@@ -23,6 +23,7 @@ this CANNOT be run on the host. verify.sh runs it in the image:
     docker run --rm -v "$(pwd)/scripts/test_dates_follow_the_class.py:/opt/scripts/test_dates_follow_the_class.py:ro" \
       quartz-teacher:dev-test python3 /opt/scripts/test_dates_follow_the_class.py
 """
+import os
 import shutil
 import sys
 import tempfile
@@ -235,7 +236,7 @@ class DatesFollowTheClassTests(unittest.TestCase):
 
     def test_the_pages_a_class_brings_take_its_date(self):
         cases = self.at_build_time["cases"]
-        self.assertGreaterEqual(len(cases), 12, "the contract lost build-time date cases")
+        self.assertGreaterEqual(len(cases), 14, "the contract lost build-time date cases")
         for index, case in enumerate(cases):
             with self.subTest(case=case["name"]):
                 self.use_the_course_words(case)
@@ -255,6 +256,13 @@ class DatesFollowTheClassTests(unittest.TestCase):
                     self.assertEqual(frontmatter.load(copy).get("created"), value, f"{title} (site)")
                     self.assertEqual(self.date_the_build_reads(folder.files_by_title[title], last_section),
                                      value, f"{title} (file)")
+                for title, day in case.get("expectCreatedDay", {}).items():
+                    # A plain YAML date reads back as a date, not as text, so
+                    # the case names the DAY rather than a string to match.
+                    copy = self.copy_of(content, title)
+                    self.assertEqual(str(frontmatter.load(copy).get("created")), day, f"{title} (site)")
+                    self.assertEqual(str(self.date_the_build_reads(folder.files_by_title[title], last_section)),
+                                     day, f"{title} (file)")
                 for title, keys in case.get("expectFileKeys", {}).items():
                     metadata = frontmatter.load(folder.files_by_title[title]).metadata
                     for key, value in keys.items():
@@ -273,7 +281,7 @@ class DatesFollowTheClassTests(unittest.TestCase):
 
     def test_the_splice_writes_one_key_and_nothing_else(self):
         cases = self.at_build_time["writingCases"]["cases"]
-        self.assertGreaterEqual(len(cases), 7)
+        self.assertGreaterEqual(len(cases), 9)
         for case in cases:
             with self.subTest(case=case["name"]):
                 written = build_site._setting_frontmatter_value(
@@ -290,6 +298,119 @@ class DatesFollowTheClassTests(unittest.TestCase):
             page, False, 1, "2026-09-24T07:00:00.000+0000")
         self.assertFalse(wrote)
         self.assertEqual(page.stat().st_mtime_ns, stamp)
+
+    def one_class_linking(self, title: str) -> dict:
+        return {
+            "unitWord": "Thread",
+            "classes": [{"title": "Thread 1, Day 3", "created": "2026-09-24T07:00:00.000+0000",
+                         "visible": True, "links": [title]}],
+            "pages": [{"title": title, "folder": "Exercises",
+                       "frontmatter": "createdSection1: 2026-09-08T07:00:00.000+0000\n"}],
+        }
+
+    def test_a_page_that_is_a_link_to_a_file_elsewhere_is_never_written_through(self):
+        # The build reads it — the site is dated — but the file it points at
+        # lives outside this course, or is shared by another, so it is named
+        # and left alone.
+        case = self.one_class_linking("Kept Elsewhere")
+        self.use_the_course_words(case)
+        folder = self.folder_for(case, 97)
+        page = folder.files_by_title["Kept Elsewhere"]
+        elsewhere = self.temporary / "elsewhere.md"
+        shutil.move(page, elsewhere)
+        page.symlink_to(elsewhere)
+        original = elsewhere.read_bytes()
+
+        content, result = folder.build(1)
+        self.assertEqual(elsewhere.read_bytes(), original, "the build wrote through the link")
+        self.assertTrue(page.is_symlink(), "the link was replaced")
+        self.assertEqual(result["rewritten"], [])
+        self.assertEqual(result["left_linked"], ["Exercises/Kept Elsewhere"])
+        self.assertEqual(frontmatter.load(self.copy_of(content, "Kept Elsewhere")).get("created"),
+                         "2026-09-24T07:00:00.000+0000", "the site is still dated")
+
+        printed: list[str] = []
+        build_site.announce_dated_pages(result, "TEST", 1, printer=printed.append)
+        self.assertEqual(len(printed), 1)
+        self.assertIn("Exercises/Kept Elsewhere", printed[0])
+
+    def test_a_page_inside_a_linked_folder_is_never_written_through(self):
+        # The build copies a shared folder that is itself a link (os.walk
+        # follows the folder it is given), so the check looks at every folder
+        # between the page and the course folder, not only at the page.
+        course = self.temporary / "courses" / "TEST"
+        elsewhere = self.temporary / "elsewhere-folder"
+        elsewhere.mkdir(parents=True)
+        (elsewhere / "Notes.md").write_text("---\ntitle: Notes\n---\nBody\n", encoding="utf-8")
+        course.mkdir(parents=True)
+        (course / "Exercises").symlink_to(elsewhere, target_is_directory=True)
+        (course / "Plain.md").write_text("---\ntitle: Plain\n---\nBody\n", encoding="utf-8")
+        build_site.forget_vault_sources(course)
+        self.assertTrue(build_site._reaches_the_page_through_a_link(course / "Exercises" / "Notes.md"))
+        self.assertFalse(build_site._reaches_the_page_through_a_link(course / "Plain.md"))
+
+    def test_a_page_with_two_names_is_never_written(self):
+        case = self.one_class_linking("Two Names")
+        self.use_the_course_words(case)
+        folder = self.folder_for(case, 95)
+        page = folder.files_by_title["Two Names"]
+        other_name = self.temporary / "other-name.md"
+        os.link(page, other_name)
+        original = page.read_bytes()
+
+        content, result = folder.build(1)
+        self.assertEqual(page.read_bytes(), original)
+        self.assertEqual(other_name.read_bytes(), original)
+        self.assertEqual(result["left_linked"], ["Exercises/Two Names"])
+
+    def test_a_page_that_changed_after_it_was_read_is_not_overwritten(self):
+        # An Obsidian save landing between the read and the write: the build
+        # keeps the teacher's save and writes nothing (the next build dates it).
+        page = self.temporary / "Saved Meanwhile.md"
+        page.write_text("---\ncreatedSection1: 2026-09-08T07:00:00.000+0000\n---\nTyped just now\n",
+                        encoding="utf-8")
+        what_the_build_read = "---\ncreatedSection1: 2026-09-08T07:00:00.000+0000\n---\nOlder\n"
+        rewritten = "---\ncreatedSection1: 2026-09-24T07:00:00.000+0000\n---\nOlder\n"
+        before = page.read_bytes()
+        self.assertFalse(build_site._replace_the_page_safely(page, what_the_build_read, rewritten))
+        self.assertEqual(page.read_bytes(), before)
+        self.assertEqual(sorted(path.name for path in self.temporary.iterdir()), ["Saved Meanwhile.md"],
+                         "a half-made file was left beside the page")
+
+    def test_a_write_that_fails_part_way_leaves_the_page_whole(self):
+        # A Stop, a full disk or a refused rename: the page is the old one,
+        # whole, and nothing is left beside it.
+        page = self.temporary / "Interrupted.md"
+        text = "---\ncreatedSection1: 2026-09-08T07:00:00.000+0000\n---\nBody\n"
+        page.write_text(text, encoding="utf-8")
+        real_replace = build_site.os.replace
+
+        def refuse(source, destination):
+            raise OSError("interrupted")
+
+        build_site.os.replace = refuse
+        try:
+            wrote = build_site._write_date_into_the_teachers_page(
+                page, False, 1, "2026-09-24T07:00:00.000+0000")
+        finally:
+            build_site.os.replace = real_replace
+        self.assertIsNone(wrote)
+        self.assertEqual(page.read_text(encoding="utf-8"), text)
+        self.assertEqual(sorted(path.name for path in self.temporary.iterdir()), ["Interrupted.md"])
+
+    def test_a_page_that_cannot_be_written_is_left_alone(self):
+        page = self.temporary / "Read Only.md"
+        text = "---\ncreatedSection1: 2026-09-08T07:00:00.000+0000\n---\nBody\n"
+        page.write_text(text, encoding="utf-8")
+        os.chmod(page, 0o444)
+        try:
+            wrote = build_site._write_date_into_the_teachers_page(
+                page, False, 1, "2026-09-24T07:00:00.000+0000")
+            if os.geteuid() != 0:
+                self.assertIsNone(wrote)
+                self.assertEqual(page.read_text(encoding="utf-8"), text)
+        finally:
+            os.chmod(page, 0o644)
 
     def test_a_date_that_would_read_back_differently_is_quoted(self):
         # A plain `2026-09-24` is a DATE to YAML, not the string the class
