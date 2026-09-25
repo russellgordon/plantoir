@@ -286,6 +286,19 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         guard let page = AssistCardCommand.pageTitle(from: title) else {
             return nil
         }
+        // A title slot that is itself a PLACE — "What links are in this
+        // section?", "List the links in ICS3U section 1", "What links are in
+        // SPH3U?" — asks about a whole section or course, not one page (the
+        // implementation review's R1). Another course is the refusal the
+        // other places get; everything else goes to the model.
+        switch AssistCardCommand.place(page, windowCourse: windowCourse, windowSection: windowSection) {
+        case .anotherCourse(let code):
+            return .anotherCourse(code)
+        case .thisWindow, .anotherSection:
+            return nil
+        case .notAPlace:
+            break
+        }
         return .page(page)
     }
 
@@ -320,13 +333,30 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         for opening in ["the page ", "this page ", "that page "] where folded.hasPrefix(opening) {
             return nil
         }
+        // "The Ohm's Law page" names the page Ohm's Law: the article and the
+        // word "page" come off (R1). Any OTHER title beginning "the" — "the
+        // quiz", "the homepage", "the course outline" — is a description the
+        // model can read against the conversation, so it goes there. The
+        // cost, stated: a page whose real title begins "The" is sent to the
+        // model too, which still answers it with read_page as it always did.
+        if folded.hasPrefix("the ") {
+            guard folded.hasSuffix(" page"), folded.count > "the  page".count else {
+                return nil
+            }
+            title = String(title.dropFirst("the ".count).dropLast(" page".count))
+                .trimmingCharacters(in: .whitespaces)
+            if title.isEmpty {
+                return nil
+            }
+            return AssistCardCommand.pageTitle(from: title)
+        }
         // A page named by its DAY. Which class that is depends on the dates,
         // which the model reads and this frame does not.
         let days: [String] = [
             "today", "tomorrow", "yesterday", "tonight", "monday", "tuesday", "wednesday",
             "thursday", "friday", "saturday", "sunday",
         ]
-        for day in days where folded.hasPrefix(day + "'s ") {
+        for day in days where folded == day || folded.hasPrefix(day + "'s ") {
             return nil
         }
         let relative: [String] = ["next ", "last ", "previous ", "first ", "upcoming "]
@@ -417,7 +447,7 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         return .thisWindow
     }
 
-    /// Three letters, a digit, then a letter or a digit — "ICS3U", "MPM2D",
+    /// Three letters, a digit, then a letter — "ICS3U", "MPM2D",
     /// "ENG4U". Only used to tell "in SPH3U" (a course) from "in Unit 2" (part
     /// of a page's name) when no section follows.
     private static func hasACourseCodesShape(_ word: String) -> Bool {
@@ -433,7 +463,10 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         guard characters[3].isASCII, characters[3].isNumber else {
             return false
         }
-        return characters[4].isASCII && (characters[4].isLetter || characters[4].isNumber)
+        // A LETTER last, always: "ICS3U", never "Lab01" — a course code ends
+        // in a letter, and an ordinary word with a digit in it must not read
+        // as a course (the implementation review's R3).
+        return characters[4].isASCII && characters[4].isLetter
     }
 
     /// "Please" off either end, with the comma that may come with it.

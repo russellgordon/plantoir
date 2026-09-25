@@ -1168,8 +1168,21 @@ about another course` event with a line saying it was matched in code
 (`AssistAgent.linksQuestionNamedAnotherCourseLine`). This course and ANOTHER
 SECTION goes to the model, as it did before. `in <word>` with no section is a
 course only when it is the window's or has a course code's shape (three
-letters, a digit, a letter or digit); otherwise — "Day 3 in Unit 2" — it is
-part of the title and the lookup decides.
+letters, a digit, a LETTER — so "Lab01" is not one; the implementation
+review's R3); otherwise — "Day 3 in Unit 2" — it is part of the title and the
+lookup decides.
+
+**A title slot that is itself a place is not a page** (the implementation
+review's R1, measured: each of these had become "no page is called …" with the
+turn ended). "What links are in this section?", "Show me the links in section
+1", "List the links in ICS3U section 1" and "What links are in ICS3U?" ask
+about a whole section or course, and go to the model as they always did;
+"What links are in SPH3U?" in an ICS3U window is the another-course refusal.
+"The Ohm's Law page" names Ohm's Law — the article and "page" come off; any
+other title beginning "the" ("the quiz", "the homepage", "the site") is a
+description and goes to the model, at the stated cost that a real title
+beginning "The" goes there too, where `read_page` still answers it. A bare
+day word ("What does today link to?") goes to the model like "today's class".
 
 **Refused, so the model keeps them** — each a `refused` row: a pronoun ("what
 does it link to?" — the model has the conversation; this frame does not); a
@@ -1183,9 +1196,12 @@ not this window's place, so "… link to, and publish them" is never half
 answered. With NO window passed (the contract's parsed example is run that
 way), any place at all goes to the model. The research suite's mirror of the
 grammar (`links_question` in `trimmed-surface-suite.py`) was checked against
-the compiled Swift on **2,178,770 generated sentences — 0 disagreements** —
-after that same fuzz had found the one fault both shared: with no window, "in
-ICS3U section 1" was read as another course. (One known difference is left
+the compiled Swift on **3,870,684 generated sentences — 0 disagreements in the
+outcome AND in the extracted title** — after an earlier run had found the one
+fault both shared: with no window, "in ICS3U section 1" was read as another
+course. (The first run, 2,178,770 sentences, compared the outcome only; the
+review pointed out that says nothing about the title, and the mirror now
+returns it.) (One known difference is left
 out of that set on purpose: a title whose lower-casing changes its LENGTH,
 like "İstanbul", is compared by grapheme in Swift and by code point in Python,
 so the mirror refuses what the app reads. No probe carries one.)
@@ -1215,8 +1231,10 @@ hidden); a link that leads nowhere marked, spelt as the teacher wrote it.
 **"Leads nowhere" is defined once**, in `AssistToolRunner.linksOnAPage` and in
 `linksQuestion.answering.note`: a wiki-link (`[[…]]` or `![[…]]`) whose target
 is neither a page of the section — by file name without regard to case, or a
-folder whose landing page is in the section — nor any file of that exact name
-in the course's folder. **No extension rule**: "Lab 1.2" is a page and
+folder whose landing page is in the section — nor any FILE of that name,
+whatever the capitals, in the course's folder. A folder is not a file: "[[Unit
+3]]" naming a folder with no landing page leads nowhere and is marked (the
+review's R2 — it was silently dropped, as though it were a picture). **No extension rule**: "Lab 1.2" is a page and
 "diagram.png" a picture because of what is on disk, and a picture or handout
 that exists is not listed at all, since it is not a page.
 

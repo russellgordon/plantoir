@@ -573,7 +573,8 @@ final class AssistToolRunner {
     /// as leading nowhere. **What "leads nowhere" means is stated here once:**
     /// a wiki-link whose target is neither a page of this section (by file
     /// name, whatever the capitals, or a folder with a landing page) nor any
-    /// file of that exact name in the course's folder. No extension rule is
+    /// FILE of that name, whatever the capitals, in the course's folder — a
+    /// folder with no landing page is not a page and leads nowhere. No extension rule is
     /// involved — "Lab 1.2" is a page and "diagram.png" a picture because of
     /// what is on disk, not because of how they are spelt — and a link to a
     /// picture or a handout that exists is not listed at all, since it is not
@@ -651,12 +652,17 @@ final class AssistToolRunner {
         return AssistToolOutcome.answered(answer, detail: page.relativePath + "\n\n" + answer)
     }
 
-    /// Every file name under a folder, lower-cased — what a link that is not a
+    /// Every FILE name under a folder, lower-cased — what a link that is not a
     /// page is checked against before it is called one that leads nowhere.
+    ///
+    /// Files only, never folders: "[[Unit 3]]" written for a folder with no
+    /// landing page reaches nothing on the site, so it must be marked, not
+    /// dropped as though it were a picture (the implementation review's R2).
+    /// Compared without regard to case, as the site resolves a link.
     private static func fileNames(under folder: URL) -> Set<String> {
         var names: Set<String> = []
         guard let enumerator = FileManager.default.enumerator(
-            at: folder, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]
+            at: folder, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles]
         ) else {
             return names
         }
@@ -664,6 +670,10 @@ final class AssistToolRunner {
             let name: String = entry.lastPathComponent
             if name == "node_modules" {
                 enumerator.skipDescendants()
+                continue
+            }
+            let values: URLResourceValues? = try? entry.resourceValues(forKeys: [.isDirectoryKey])
+            if values?.isDirectory == true {
                 continue
             }
             names.insert(name.lowercased())

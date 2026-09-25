@@ -1930,6 +1930,21 @@
         "expectPage" : "Lab 1.2",
         "input" : "What does 'Lab 1.2' link to?",
         "why" : "Single quotes come off; the dot is part of the title - no extension rule anywhere in this family."
+      },
+      {
+        "expectPage" : "Ohm's Law",
+        "input" : "What does the Ohm's Law page link to?",
+        "why" : "'The <title> page' names the page: the article and the word 'page' come off (implementation review R1)."
+      },
+      {
+        "expectPage" : "Unit 2, Day 3",
+        "input" : "What does the Unit 2, Day 3 page link to?",
+        "why" : "The same, around a class page's title."
+      },
+      {
+        "expectPage" : "Unit 2 in Lab01",
+        "input" : "What does Unit 2 in Lab01 link to?",
+        "why" : "'Lab01' ends in a digit, so it is not a course code's shape (R3): the words stay in the title and the lookup decides. It was read as another course 'Lab01' before the fix."
       }
     ],
     "anotherCourse" : [
@@ -1962,6 +1977,16 @@
         "expectCourse" : "Robotics",
         "input" : "What does Unit 2, Day 3 in Robotics section 1 link to?",
         "why" : "'<word> section N' names a course whatever its shape - a club's code need not look like a credit's."
+      },
+      {
+        "expectCourse" : "SPH3U",
+        "input" : "What links are in SPH3U?",
+        "why" : "The noun frame's title slot is itself another course's code (R1). It was answered 'no page is called SPH3U' before the fix."
+      },
+      {
+        "expectCourse" : "SPH3U",
+        "input" : "What does SPH3U link to?",
+        "why" : "The verb frame's title slot is another course's code."
       }
     ],
     "answering" : {
@@ -2078,6 +2103,16 @@
 
           ],
           "name" : "no links"
+        },
+        {
+          "body" : "[[Unit 3]]",
+          "expect" : [
+            {
+              "mark" : "linkedPageIsMissing",
+              "shown" : "Unit 3"
+            }
+          ],
+          "name" : "a folder with no landing page is not a page, and leads nowhere"
         }
       ],
       "lookup" : [
@@ -2112,7 +2147,7 @@
           "why" : "No page is called that. Not the model's noSuchPage sentence, which names a tool."
         }
       ],
-      "note" : "What the answer SAYS, given the section below. read_page with answer = \"links\" lists every link on the page once, in the order the page has them, each by the name a teacher sees for the page it reaches (its display title - the frontmatter title, or a landing page's folder name); a link to a page students cannot see (its own publish or draft key says hidden) is followed by wording.linkedPageIsADraft; a link that LEADS NOWHERE is shown as the teacher wrote it and followed by wording.linkedPageIsMissing. LEADS NOWHERE is defined once, here: a wiki-link (written [[...]] or ![[...]]) whose target is neither a page of this section - by file name without regard to case, or a folder whose landing page (index.md) is in the section - nor any file of that exact name in the course's folder. No extension rule: 'Lab 1.2' is a page and 'diagram.png' a picture because of what is on disk. A link to a picture or a handout that EXISTS is not listed - it is not a page. Links inside `code` and fenced code blocks are examples, not links. A table's escaped pipe ([[Page\\|alias]]) is read without its backslash. A link to the page itself is not listed. With nothing to list, the answer is wording.pageLinksToNothing; with the list, wording.pageLinksTo then one line per link (the mac writes '• <shown>' and ' — <mark>'; the arrangement is the platform's, the names and marks are not). The page asked about is found by file name first, then by the name the sidebar shows - a landing page by its folder's name too; none is wording.noPageCalled, and more than one by the name shown is wording.morePagesThanOneAreCalled followed by where each one is - never a guess. Every branch ENDS THE TURN: the model is not asked afterwards. Measured on the 39 example-content payloads (2026-09-25): 30,930 links and embeds read this way, each once per page, and every one resolved to a page; with code left in, 188 targets read as dead, and with the table backslash left on, 69 did.",
+      "note" : "What the answer SAYS, given the section below. read_page with answer = \"links\" lists every link on the page once, in the order the page has them, each by the name a teacher sees for the page it reaches (its display title - the frontmatter title, or a landing page's folder name); a link to a page students cannot see (its own publish or draft key says hidden) is followed by wording.linkedPageIsADraft; a link that LEADS NOWHERE is shown as the teacher wrote it and followed by wording.linkedPageIsMissing. LEADS NOWHERE is defined once, here: a wiki-link (written [[...]] or ![[...]]) whose target is neither a page of this section - by file name without regard to case, or a folder whose landing page (index.md) is in the section - nor any FILE of that name, whatever the capitals, in the course's folder - a folder is not a file, so [[Unit 3]] naming a folder with no landing page leads nowhere (implementation review R2). No extension rule: 'Lab 1.2' is a page and 'diagram.png' a picture because of what is on disk. A link to a picture or a handout that EXISTS is not listed - it is not a page. Links inside `code` and fenced code blocks are examples, not links. A table's escaped pipe ([[Page\\|alias]]) is read without its backslash. A link to the page itself is not listed. With nothing to list, the answer is wording.pageLinksToNothing; with the list, wording.pageLinksTo then one line per link (the mac writes '• <shown>' and ' — <mark>'; the arrangement is the platform's, the names and marks are not). The page asked about is found by file name first, then by the name the sidebar shows - a landing page by its folder's name too; none is wording.noPageCalled, and more than one by the name shown is wording.morePagesThanOneAreCalled followed by where each one is - never a guess. Every branch ENDS THE TURN: the model is not asked afterwards. Measured on the 39 example-content payloads (2026-09-25): 30,930 links and embeds read this way, each once per page, and every one resolved to a page; with code left in, 188 targets read as dead, and with the table backslash left on, 69 did.",
       "section" : [
         {
           "path" : "All Classes/Unit 1, Day 1.md",
@@ -2151,7 +2186,8 @@
         }
       ],
       "sectionFiles" : [
-        "pictures/diagram.png"
+        "pictures/diagram.png",
+        "Unit 3/notes.txt"
       ]
     },
     "note" : "\"What does <page> link to?\" is answered in CODE, in full, and the turn ends there - the model is never asked (issue #167). Measured 2026-09-25 on both assistants with the app's own flags, request body and system prompt (research/ai-assist/link-question-results.txt): across six courses and fourteen dates, one greedy trial per cell, \"What does Unit 2, Day 3 link to?\" reached read_page 0 times in 84 on BOTH tiers, and on the smaller one \"Which pages does Unit 2, Day 3 link to?\" became a publish_pages plan 31 times in 84 - a write, for a read-only question. The whole family scored 153/588 (larger) and 115/588 (smaller). A sentence in read_page's description was REJECTED: it moves the tool surface both apps were measured against, and it moved other probes across dates when it was tried. Matching is case-folded after the tidying every family gets, with a question mark and a 'please' taken off either end; the title is sliced from what the teacher TYPED and one pair of quotes is taken off. A PLACE may be named before 'link to' or after it, at most once, and is read against the window the sentence was typed in: this window's course and section (or 'this section', or 'section N' naming this one) is accepted; ANOTHER COURSE is refused in code with the sentence a model-named course already gets (wording.askedAboutAnotherCourse when the folder has that course, wording.askedAboutACourseThatIsNotHere when it does not) and nothing is read - see anotherCourse; this course with ANOTHER SECTION goes to the model. 'in <word>' with no section is a course only when it is this window's or has a course code's shape (three letters, a digit, a letter or digit); otherwise it is part of the page's name. The call is read_page with page = the title and answer = \"links\" - an argument in NO schema, so the tool surface does not move. What the answer says is in answering. Rows are run with the window below; with no window at all, the family matches only sentences that name no place.",
@@ -2247,6 +2283,50 @@
       {
         "input" : "What does Unit 2, Day 3 mean?",
         "why" : "No 'link to' or 'point to', so not this question."
+      },
+      {
+        "input" : "What links are in this section?",
+        "why" : "A whole SECTION, not a page: the title slot is itself a place (R1). It was answered 'no page is called this section', ending the turn, before the fix."
+      },
+      {
+        "input" : "Show me the links in this section",
+        "why" : "The same question, another frame."
+      },
+      {
+        "input" : "What does this section link to?",
+        "why" : "The same question, the verb frame."
+      },
+      {
+        "input" : "List the links in ICS3U section 1",
+        "why" : "The window's own course and section as the whole title slot: a section, not a page."
+      },
+      {
+        "input" : "Show me the links in section 1",
+        "why" : "The window's section as the whole title slot."
+      },
+      {
+        "input" : "What links are in ICS3U?",
+        "why" : "The window's course as the whole title slot: a course, not a page."
+      },
+      {
+        "input" : "What does today link to?",
+        "why" : "A bare DAY word. Which class that is depends on the dates, which the model reads."
+      },
+      {
+        "input" : "What does tomorrow link to?",
+        "why" : "The same, tomorrow."
+      },
+      {
+        "input" : "What does the quiz link to?",
+        "why" : "A description beginning 'the', which is not 'the <title> page'. The model has the conversation to read it against. The cost: a real title beginning 'The' goes to the model too, which answers it with read_page as it always did."
+      },
+      {
+        "input" : "What does the homepage link to?",
+        "why" : "'Homepage' is one word, so this is not 'the <title> page'; a description, for the model."
+      },
+      {
+        "input" : "What links are on the site?",
+        "why" : "A description of the whole site, not a page."
       }
     ],
     "window" : {
