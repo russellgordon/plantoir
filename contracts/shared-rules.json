@@ -247,8 +247,10 @@
         "why": "The count is the point. Stopping a preview, closing a window or cancelling a publish asks the launcher to end whatever that section still has running, and nothing else on the trail can tell “there was nothing left to stop” from “a build was still going and was ended” — which are the two competing explanations when a teacher reports that their publish stopped halfway. Recorded from 2026-09-05, when the sweep began ending a mid-flight BUILD and its driver rather than only a preview server: that is a change in what a teacher can lose, and it had no line describing it. The launcher prints the number and the app used to discard it."
       },
       {
-        "carries": "which course and section, how long the preview had been saying nothing, and WHICH of the THREE things was true - the website builder was serving the site and this Mac could not reach it, nothing was serving it at all, or the builder could not be asked and Plantoir does not know",
+        "carries": "which course and section, how long the preview had been saying nothing, and WHICH of the THREE things was true - the website builder was serving the site and this Mac could not reach it, nothing was serving it at all, or the builder could not be asked and Plantoir does not know. Or, with no silence waited out and nobody asked, that its website started and no address for it was ever announced, so there was nothing to open (GitHub #235 - the line that replaced trying a guessed address)",
         "event": "preview did not appear",
+        "launcherLine": "{course}/{section} · the preview stopped before building — Plantoir could not find out where it would be",
+        "launcherLineWhy": "GitHub #235's review. The ending a teacher will actually meet when no address can be found is preview.sh's refusal (it asks for the published port twice and stops before building), not the app's no-address stop, which is a defence that is practically unreachable while the two ship together. Without its own line the trail said only that preview.sh failed. Written by the launcher through note_on_the_trail, with the course/section prefix the app's own lines for this event carry, so one search finds both; the words are pinned here because the app never writes this one and scripts/test_preview_address.py checks the launcher against this field.",
         "why": "The failure that left NOTHING behind, which is exactly the report that arrived on 2026-09-19 (GitHub issue #225). A teacher pressed Preview three times in four minutes on a Mac that had stopped passing new addresses through from the builder; the website was built and served every time and never appeared; and the trail recorded only that a task started and was stopped on purpose - so an evening of a broken Mac reads, months later, as somebody changing their mind three times. WHICH of them it was is the whole value of the line, because the first two are one sentence apart when a teacher describes it (\"the preview never came up\") and a world apart in what to do: one is their pages, one is their Mac. The seconds are recorded rather than the total run because the run is not the fault - a first preview legitimately takes minutes, and what cannot be explained is a run that announced its server and then said nothing. DELIBERATELY WITHOUT `appliesOn`, and the red Windows suite that follows is the request rather than damage: Windows has its own wait for a preview to appear and owes the same line, so this is an obligation and not a permanent platform difference - the two cases appliesOn exists for. The `windows` issue opened with this work says so, and the choice on that side is theirs: record it, or hold it open by name in NamedGapLedger with the issue and milestone that own it. What Windows is NOT exposed to is the CAUSE - there is no container in their preview path, so the question this line's second half answers (can the builder see its own site?) has no counterpart there and they should not build one. What they owe is the bounded quiet time and the line."
       },
       {
@@ -379,6 +381,11 @@
         "carries": "the course that was in hand and was not kept, and the name of the folder it was coming from",
         "event": "course import for reference stopped",
         "why": "Its own event rather than a failure: a teacher who presses Stop chose to, and a line calling that a failure is a line that misleads whoever reads it back. It is also what explains a folder that is NOT there - the course in hand is removed on the way out, so without this line the trail shows an import that started and nothing about how it ended."
+      },
+      {
+        "carries": "the course and section that was built, how many of the teacher's pages the build rewrote, and their NAMES - their place in the course folder, never anything written on them",
+        "event": "pages dated by the build",
+        "why": "From 2026-09-25 every preview and every publish can REWRITE the teacher's own pages: the front page takes the date of the class it shows, and a page a class links to directly takes the date of the earliest visible class that links to it (class-planning.json -> sectionIndexPointer.dateCases and datingPagesAClassBrings.atBuildTime). A change to a teacher's files that nobody asked for in so many words is exactly what a trail exists to answer - 'why did the date on this page change?' - and the build's console, where it is also said, is gone by the time anyone asks. Recorded from the build's own PLANTOIR_DATED: line (pagesDatedByTheBuild), which says nothing when nothing was rewritten, so a build whose dates were already right leaves no line. A SCHEDULED publish records it too, from that run's own part of its log once the run is done: it is often the first build after a class goes visible, so the one likeliest to rewrite files, and nobody is watching a console then."
       },
       {
         "carries": "the course code or codes, how many were deleted, what they took together when every size is known (the LOGICAL size), each deleted file's NAME - a course code, a moment and who made it, never anything written on a page - and, when some were asked for and kept, which ones the open assistant conversation could still restore from, and how many could not be deleted",
@@ -1461,6 +1468,23 @@
       }
     ],
     "note": "What the sidebar's filter field shows. Case-insensitive, matched against the course CODE and the course NAME, and mid-word - a teacher typing 'comp' should find Introduction to Computer Science without knowing it starts with ICS. Matching is CONTAINS rather than prefix, deliberately: a teacher who knows their course as 'Calculus' should not have to know it is filed under MCV4U."
+  },
+  "pagesDatedByTheBuild": {
+    "note": "How the build tells the app which of the teacher's pages it rewrote with their class's date (#275, #276), so the app can put their names on the activity trail. The rewriting rule itself is class-planning.json's; this is only the line that reports it.",
+    "marker": {
+      "prefix": "PLANTOIR_DATED:",
+      "rule": "One line on stdout, printed only when at least one page was rewritten: the prefix followed by a single-line JSON object carrying course (the course code), section (a number) and pages (each rewritten page's place in the course folder, without .md, e.g. \"section1/index\" or \"Exercises/Using Aggregate Functions\"). A plain sentence for a person reading the console is printed just before it. The apps keep the marker line itself out of the console a teacher reads, as they do PLANTOIR_HEALTH: lines.",
+      "examples": [
+        "PLANTOIR_DATED: {\"course\": \"ICS4U\", \"section\": 1, \"pages\": [\"section1/index\", \"Exercises/Using Aggregate Functions\"]}"
+      ],
+      "why": "The same reasons as siteHealth.marker: a prefixed JSON line is unambiguous, survives interleaving with ordinary output, and carries structure a sentence cannot. Separate from PLANTOIR_HEALTH: because it is not a problem - an app that showed every health line in a dialog must not show this one."
+    },
+    "trailLine": {
+      "event": "pages dated by the build",
+      "shape": "the build gave N page(s) the date of their class: <names, comma-separated>",
+      "why": "Names only, and the count first, so a long list can be shortened without losing how many there were.",
+      "readFrom": "The console, as each line arrives, for a preview or a publish the app runs; the run's own log, from the size it had before the run, for a scheduled publish (the mac: ScheduledDeploy.recordFolderProblems, which reads that log for PLANTOIR_HEALTH: lines already). Both, or the scheduled build — the one likeliest to rewrite files — leaves no trace."
+    }
   },
   "siteHealth": {
     "note": "What the toolchain checks about a course's folders before it builds, and the WORDS a teacher reads when one of them is wrong. Certain folder and file names carry behaviour — the curriculum folder, the folder holding class pages, Media, a section's index — and nothing stopped a teacher deleting or renaming one in Obsidian. The features then failed SILENTLY: the Curriculum Coverage map in particular still rendered, still looked healthy, and was wrong.",

@@ -141,6 +141,9 @@ struct TranscriptBuilder {
         if SiteHealthFinding.isMarkerLine(line) {
             return
         }
+        if PagesDatedByTheBuild.isMarkerLine(line) {
+            return
+        }
         lines.append(line)
     }
 

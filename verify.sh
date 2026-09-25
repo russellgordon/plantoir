@@ -216,6 +216,16 @@ else
   cat /tmp/verify_preview_sh_questions_test.log
 fi
 
+# preview.sh announces the address the app opens, or says it cannot and stops;
+# it never announces a port it guessed (GitHub #235). Runs the launcher's own
+# functions with docker answering as told, so it needs no Docker at all.
+if (cd scripts && python3 test_preview_address.py) >/tmp/verify_preview_address_test.log 2>&1; then
+  pass "preview.sh announces the preview's real address or stops, never a guessed one (scripts/test_preview_address.py)"
+else
+  fail "preview.sh announces the preview's real address or stops, never a guessed one (scripts/test_preview_address.py)"
+  cat /tmp/verify_preview_address_test.log
+fi
+
 if (cd scripts && python3 test_preflight_exclusions.py) >/tmp/verify_preflight_exclusions_test.log 2>&1; then
   pass "build_site.py: preflight excluded_items discovery skipping & index.md notes (scripts/test_preflight_exclusions.py)"
 else
@@ -506,6 +516,22 @@ if docker run --rm \
 else
   fail "build_site.py: class-folder rule matches contracts/class-planning.json (scripts/test_class_folder.py)"
   cat /tmp/verify_class_folder_test.log
+fi
+
+# ---- build_site.py: pages take their class's date, in the teacher's files ----
+# The front page and every page a visible class brings (#275, #276), run
+# against the shared contract in the image for the same reason as above — and
+# every case built TWICE, because a second build that rewrote anything would
+# make every publish build once more (#265).
+echo ""
+echo "🔎 Checking that pages take their class's date, against the shared contract…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/test_dates_follow_the_class.py" /opt/scripts/test_dates_follow_the_class.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_dates_follow_the_class.py >/tmp/verify_dates_follow_the_class_test.log 2>&1; then
+  pass "build_site.py: the front page and linked pages take their class's date, per section (scripts/test_dates_follow_the_class.py)"
+else
+  fail "build_site.py: the front page and linked pages take their class's date, per section (scripts/test_dates_follow_the_class.py)"
+  cat /tmp/verify_dates_follow_the_class_test.log
 fi
 
 # ---- Whether the site shows a page: the contract, run down the REAL chain ----

@@ -122,7 +122,7 @@ final class SiteHealthFindingTests: XCTestCase {
 
     /// The bug this design exists to avoid.
     ///
-    /// Every other structured-line reader in `ScriptRunner` works from
+    /// Most other structured-line readers in `ScriptRunner` work from
     /// `transcript.recentText(maximumCharacters: 8000)`, which is a TAIL. The
     /// health lines are printed in the middle of a build, so on a real build
     /// they are far outside that window by the end. Collecting as output
