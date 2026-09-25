@@ -653,7 +653,8 @@ final class AssistToolRunner {
         case .success(let planned):
             return AssistToolOutcome.planned(
                 "Worked out what publishing the class on \(planned.day.text) would do.",
-                plan: planned.plan.describe()
+                plan: planned.plan.describe(),
+                card: planned.plan.describe(noun: planned.located.course.configuration.classNoun)
             )
         }
     }
@@ -678,7 +679,9 @@ final class AssistToolRunner {
                 planned.plan,
                 forSection: planned.located.sectionNumber,
                 in: planned.located.course,
-                summary: "Published the class on \(planned.day.text)."
+                summary: AssistWording.publishedTheClassOn(
+                    planned.day.text, noun: planned.located.course.configuration.classNoun
+                )
             )
         }
     }
@@ -746,7 +749,8 @@ final class AssistToolRunner {
             }
             return AssistToolOutcome.planned(
                 "Worked out what publishing those pages would do.",
-                plan: planned.plan.describe()
+                plan: planned.plan.describe(),
+                card: planned.plan.describe(noun: planned.located.course.configuration.classNoun)
             )
         }
     }
@@ -782,7 +786,8 @@ final class AssistToolRunner {
             }
             return AssistToolOutcome.planned(
                 "Worked out what unpublishing those pages would do.",
-                plan: planned.plan.describe()
+                plan: planned.plan.describe(),
+                card: planned.plan.describe(noun: planned.located.course.configuration.classNoun)
             )
         }
     }
@@ -2224,7 +2229,8 @@ final class AssistToolRunner {
                 asked.plan.changesNothing
                     ? "The next class page already exists."
                     : "Worked out what the next class page would be.",
-                plan: asked.plan.description
+                plan: asked.plan.description,
+                card: asked.plan.describe(noun: asked.located.course.configuration.classNoun)
             )
         }
     }
@@ -2501,16 +2507,26 @@ final class AssistToolRunner {
         // when a short unit was widened — the plan said not one word about the
         // whole of the rest of the year being re-dated, and this is the card a
         // teacher reads before pressing Go.
+        // The card takes the course's own noun (#267); the model's copy of
+        // the plan says "class" whatever the course calls them.
+        var cardLines: [String] = lines
         if request.plan.movesAnythingElse {
             lines.append("")
             lines.append(AssistWording.otherClassesWouldMove(
                 moving: request.plan.otherClassesMoving,
                 renaming: request.plan.renames.count
             ))
+            cardLines.append("")
+            cardLines.append(AssistWording.otherClassesWouldMove(
+                moving: request.plan.otherClassesMoving,
+                renaming: request.plan.renames.count,
+                noun: request.located.course.configuration.classNoun
+            ))
         }
         return AssistToolOutcome.planned(
             "Worked out what duplicating “\(request.sourceTitle)” would do.",
-            plan: lines.joined(separator: "\n")
+            plan: lines.joined(separator: "\n"),
+            card: cardLines.joined(separator: "\n")
         )
     }
 
@@ -2654,17 +2670,21 @@ final class AssistToolRunner {
                 )
             }
             if isRollover, websiteAnswer == "new" {
+                let newWebsite: String =
+                    "\n\nIt would also start a new website for this section, so publishing it "
+                    + "no longer replaces last year's. Last year's details are kept, and any "
+                    + "publish set to happen on its own is turned off."
                 return AssistToolOutcome.planned(
                     "Worked out what rolling that section over would do.",
-                    plan: asked.plan.describe()
-                        + "\n\nIt would also start a new website for this section, so publishing it "
-                        + "no longer replaces last year's. Last year's details are kept, and any "
-                        + "publish set to happen on its own is turned off."
+                    plan: asked.plan.describe() + newWebsite,
+                    card: asked.plan.describe(noun: asked.located.course.configuration.classNoun)
+                        + newWebsite
                 )
             }
             return AssistToolOutcome.planned(
                 "Worked out what re-dating that section would do.",
-                plan: asked.plan.describe()
+                plan: asked.plan.describe(),
+                card: asked.plan.describe(noun: asked.located.course.configuration.classNoun)
             )
         }
     }
@@ -2725,11 +2745,15 @@ final class AssistToolRunner {
             history.record(change)
 
             let moved: Int = asked.plan.moves.count
-            let summary: String = "Re-dated \(asked.plan.classCount) "
-                                + "\(asked.plan.classCount == 1 ? "class" : "classes") and "
-                                + "\(moved - asked.plan.classCount) "
-                                + "\((moved - asked.plan.classCount) == 1 ? "page" : "pages") "
-                                + "they use."
+            // The model's copy says "class" whatever the course calls them;
+            // only the line the teacher reads takes the course's noun (#267).
+            let summary: String = AssistWording.reDated(
+                count: asked.plan.classCount, pagesTheyUse: moved - asked.plan.classCount
+            )
+            let teacherSummary: String = AssistWording.reDated(
+                count: asked.plan.classCount, pagesTheyUse: moved - asked.plan.classCount,
+                noun: asked.located.course.configuration.classNoun
+            )
             var detail: String = summary
             if backedUp {
                 detail += "\n\n" + AssistToolRunner.backedUpNote
@@ -2745,7 +2769,7 @@ final class AssistToolRunner {
             // The website goes in the SUMMARY beside the count of what moved:
             // it is the part a teacher has to answer, and `detail` is not shown
             // to them at all for a write.
-            var said: String = summary
+            var said: String = teacherSummary
             if aboutTheWebsite.isEmpty == false {
                 said += "\n\n" + aboutTheWebsite
                 detail += "\n\n" + aboutTheWebsite
@@ -3067,21 +3091,29 @@ final class AssistToolRunner {
             // promises a teacher will be shown, and a hand-rolled count of
             // renames delivered none of it. The more dangerous tool was the
             // one showing less.
-            var lines: [String] = [asked.plan.description]
-            lines.append("")
-            lines.append("The new pages start hidden, so nothing changes on the site until you publish them.")
-            if asked.plan.movesAnythingElse {
-                lines.append("")
-                lines.append(
-                    "Because other classes move, “Undo that” will not take this back afterwards — "
-                    + "the copy made before any of it is in Plantoir's Backups list."
-                )
-            }
+            //
+            // Written twice: once with "class" for the model, and once in the
+            // course's own noun for the card (#267), so a club changes
+            // nothing the model is given.
+            let noun: ClassNoun = asked.located.course.configuration.classNoun
             return AssistToolOutcome.planned(
                 "Worked out what making room in that unit would do.",
-                plan: lines.joined(separator: "\n")
+                plan: AssistToolRunner.makeRoomPlan(asked.plan, noun: .class),
+                card: AssistToolRunner.makeRoomPlan(asked.plan, noun: noun)
             )
         }
+    }
+
+    /// A make-room plan, in the words a teacher agrees to.
+    private static func makeRoomPlan(_ plan: ClassInsertionPlan, noun: ClassNoun) -> String {
+        var lines: [String] = [plan.describe(noun: noun)]
+        lines.append("")
+        lines.append("The new pages start hidden, so nothing changes on the site until you publish them.")
+        if plan.movesAnythingElse {
+            lines.append("")
+            lines.append(AssistWording.makingRoomCannotBeUndone(noun: noun))
+        }
+        return lines.joined(separator: "\n")
     }
 
     /// Make the room.
@@ -3144,9 +3176,10 @@ final class AssistToolRunner {
                 detail += "\n\n" + AssistToolRunner.backedUpNote
             }
             return AssistToolOutcome.wrote(
-                "Made room for \(asked.count) "
-                + (asked.count == 1 ? "class" : "classes")
-                + " at \(asked.plan.positionTitle).",
+                AssistWording.madeRoom(
+                    count: asked.count, at: asked.plan.positionTitle,
+                    noun: asked.located.course.configuration.classNoun
+                ),
                 detail: detail
             )
         }
@@ -3438,7 +3471,9 @@ final class AssistToolRunner {
                 detail += "\n\n" + AssistToolRunner.backedUpNote
             }
 
-            var summary: String = "Added the next class page."
+            var summary: String = AssistWording.addedTheNextPage(
+                noun: asked.located.course.configuration.classNoun
+            )
             if let created = asked.plan.classes.first {
                 summary = "Added \(created.title), dated \(created.date.text)."
             }

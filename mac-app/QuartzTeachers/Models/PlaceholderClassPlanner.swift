@@ -296,8 +296,15 @@ struct PlaceholderClassPlan {
         return "\(courseCode) Section \(sectionNumber)"
     }
 
-    /// The proposal, as a teacher would hear it.
+    /// The proposal, as a teacher would hear it — and as the model reads it,
+    /// which is why this form always says "class".
     var description: String {
+        return describe(noun: .class)
+    }
+
+    /// The proposal in the course's own noun (#267): "meeting" on a club's
+    /// card. Only the card takes this; see `AssistToolOutcome.planned`.
+    func describe(noun: ClassNoun) -> String {
         var lines: [String] = []
 
         if changesNothing {
@@ -308,7 +315,7 @@ struct PlaceholderClassPlan {
             return lines.joined(separator: "\n")
         }
 
-        lines.append("Add \(classes.count) class page\(classes.count == 1 ? "" : "s") to \(whereTheyGo), on the \(classes.count == 1 ? "day" : "days") this class actually meets:")
+        lines.append(AssistWording.wouldAddPages(count: classes.count, to: whereTheyGo, noun: noun))
         lines.append("")
         for planned in classes {
             lines.append("  \(planned.title)  (\(planned.date.text) \(planned.date.weekdayName))")
@@ -330,13 +337,11 @@ struct PlaceholderClassPlan {
         if sharingTheLastDay > 0 {
             // Said out loud, because a date shared with another class is the
             // one thing on this list a teacher has to go and fix.
-            lines.append("\(sharingTheLastDay == 1 ? "This one has" : "\(sharingTheLastDay) of these have") "
-                         + "no class date left, so \(sharingTheLastDay == 1 ? "it shares" : "they share") "
-                         + "the last day with the class already on it. Give "
-                         + "\(sharingTheLastDay == 1 ? "it a day" : "them days") of your own when you "
-                         + "know what they are.")
+            lines.append(AssistWording.sharingTheLastDay(count: sharingTheLastDay, noun: noun))
         } else {
-            lines.append("\(spareDatesLeft) more class date\(spareDatesLeft == 1 ? "" : "s") \(spareDatesLeft == 1 ? "is" : "are") spare after these, out of the timetable recorded from \(timetableSource).")
+            lines.append(AssistWording.spareDatesAfterThese(
+                count: spareDatesLeft, source: timetableSource, noun: noun
+            ))
         }
         return lines.joined(separator: "\n")
     }

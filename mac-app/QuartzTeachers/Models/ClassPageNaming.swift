@@ -32,7 +32,29 @@ nonisolated enum ClassNoun: String {
     case `class` = "class"
     case meeting = "meeting"
 
+    // MARK: - Computed properties
+
+    /// "class" or "meeting" — one of them, in the middle of a sentence.
+    var singular: String {
+        return rawValue
+    }
+
+    /// "classes" or "meetings".
+    var plural: String {
+        switch self {
+        case .class:
+            return "classes"
+        case .meeting:
+            return "meetings"
+        }
+    }
+
     // MARK: - Functions
+
+    /// The singular or the plural, whichever `count` needs.
+    func counted(_ count: Int) -> String {
+        return count == 1 ? singular : plural
+    }
 
     /// The noun a stored value means.
     static func reading(_ raw: String?) -> ClassNoun {
