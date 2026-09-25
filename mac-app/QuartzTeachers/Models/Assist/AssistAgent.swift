@@ -196,7 +196,9 @@ final class AssistAgent {
 
         // The fixed shapes never reach the model — see AssistCardCommand for
         // the measurement that decided this.
-        if let command = AssistCardCommand.matching(trimmed) {
+        if let command = AssistCardCommand.matching(
+            trimmed, numberedPageWord: tools.numberedPageWord(forCourse: courseCode)
+        ) {
             // Built and SETTLED before the line is written, and then run
             // without being settled again. The order is the whole point: the
             // matcher is clock-free, so "deploy at 6:30 am" arrives here as
@@ -233,9 +235,13 @@ final class AssistAgent {
 
     /// The teacher declined to give their class dates. Said back in the
     /// transcript, so a conversation reads as one somebody took part in.
-    func noteDatesDeclined() {
+    ///
+    /// `noun` is what the course calls one of its pages (#267). The line goes
+    /// into the transcript only — never into `messages` — so a club's
+    /// "meeting" never reaches the model.
+    func noteDatesDeclined(noun: ClassNoun = .class) {
         entries.append(Entry(speaker: .teacher, text: AssistWording.cancelled))
-        entries.append(Entry(speaker: .assistant, text: AssistWording.datesNotGivenYet))
+        entries.append(Entry(speaker: .assistant, text: AssistWording.datesNotGivenYet(for: noun)))
     }
 
     /// Approve the waiting deploy.

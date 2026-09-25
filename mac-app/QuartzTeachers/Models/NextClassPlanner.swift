@@ -47,11 +47,23 @@ enum NextClassPlanner {
     enum Problem: LocalizedError {
         case noTimetable(String, Int)
 
+        /// A numbered course (#267) — a club's "Week 1", "Week 2" — has one
+        /// run of pages and no units, so "start a new unit" and "add five
+        /// more days to Unit 4" have nothing to act on. Refused BEFORE the
+        /// timetable is read, so nobody is asked for their dates on the way
+        /// to being told no. Says "page", not "meeting": this sentence also
+        /// goes back to the model, whose words are not changed by #267.
+        case noUnitsInANumberedCourse(String, String)
+
         var errorDescription: String? {
             switch self {
             case .noTimetable(let code, let number):
                 return "I don’t know when \(code) Section \(number) meets, so I can’t date a new class. "
                      + AssistWording.mayIAskForYourDates
+            case .noUnitsInANumberedCourse(let code, let word):
+                return "\(code) numbers its pages one after another — “\(word) 1”, “\(word) 2” — and has "
+                     + "no units, so there is no unit to start or add days to. Ask for the next page "
+                     + "instead and it takes the next number."
             }
         }
     }
@@ -83,18 +95,35 @@ enum NextClassPlanner {
         in course: Course,
         startingANewUnit: Bool = false
     ) throws -> PlaceholderClassPlan {
+        let naming: ClassPageNaming = course.configuration.classPageNaming
+        if startingANewUnit && naming.isNumbered {
+            throw Problem.noUnitsInANumberedCourse(course.code, naming.word)
+        }
         guard let remembered = try SectionTimetableStore.read(forSection: sectionNumber, in: course) else {
             throw Problem.noTimetable(course.code, sectionNumber)
         }
 
         let existing: [ClassPageSummary] = ClassPages.list(forSection: sectionNumber, in: course)
         let next: UnitDay = startingANewUnit
-            ? firstDayOfANewUnit(after: existing, term: course.configuration.unitWord)
-            : nextUnitAndDay(after: existing, term: course.configuration.unitWord)
+            ? firstDayOfANewUnit(after: existing, naming: naming)
+            : nextUnitAndDay(after: existing, naming: naming)
 
         // Position, not numbering: the class after this section's 15th class
         // takes the 16th date, whatever the 15 pages happen to be called.
-        let position: Int = existing.count
+        //
+        // A numbered course (#267) is the exception, and orders by DATE. A
+        // club's pages are sparse — Russell's CODING has "Week 1", "Week 2",
+        // then "Week 8" and "Week 9" eight weeks on — so four pages does NOT
+        // mean the fifth date: measured, the position rule dated the new
+        // "Week 10" 2025-10-16, five weeks BEFORE Week 8, where the front page
+        // (which follows the latest date) never showed it. There the next
+        // page takes the first class day after the LATEST dated page.
+        var position: Int = existing.count
+        if naming.isNumbered, let after = NextClassPlanner.positionAfterTheLatestPage(
+            existing, in: remembered.dates
+        ) {
+            position = after
+        }
         let date: CalendarDay = try NextClassPlanner.date(
             at: position, from: remembered.dates, course: course, sectionNumber: sectionNumber
         )
@@ -119,6 +148,7 @@ enum NextClassPlanner {
             courseCode: course.code,
             sectionNumber: sectionNumber,
             unit: next.unit,
+            naming: course.configuration.classPageNaming,
             classes: classes,
             alreadyThere: alreadyThere,
             problems: [],
@@ -136,7 +166,7 @@ enum NextClassPlanner {
     /// that renumbers classes. A section with no numbered class at all starts
     /// at Unit 1, Day 1.
     static func nextUnitAndDay(
-        after pages: [ClassPageSummary], term: String = ClassPageTerm.standard
+        after pages: [ClassPageSummary], naming: ClassPageNaming
     ) -> UnitDay {
         var highestUnit: Int = 0
         for page in pages {
@@ -145,7 +175,7 @@ enum NextClassPlanner {
             }
         }
         if highestUnit == 0 {
-            return UnitDay(unit: 1, day: 1, term: term)
+            return UnitDay(unit: 1, day: 1, naming: naming)
         }
 
         var highestDay: Int = 0
@@ -157,7 +187,7 @@ enum NextClassPlanner {
                 highestDay = numbers.day
             }
         }
-        return UnitDay(unit: highestUnit, day: highestDay + 1, term: term)
+        return UnitDay(unit: highestUnit, day: highestDay + 1, naming: naming)
     }
 
     /// Several more days on the end of a unit that already exists.
@@ -179,6 +209,10 @@ enum NextClassPlanner {
         forSection sectionNumber: Int,
         in course: Course
     ) throws -> PlaceholderClassPlan {
+        let naming: ClassPageNaming = course.configuration.classPageNaming
+        if naming.isNumbered {
+            throw Problem.noUnitsInANumberedCourse(course.code, naming.word)
+        }
         guard let remembered = try SectionTimetableStore.read(forSection: sectionNumber, in: course) else {
             throw Problem.noTimetable(course.code, sectionNumber)
         }
@@ -204,7 +238,7 @@ enum NextClassPlanner {
         for step in 1...max(1, howMany) {
             let day: Int = highestDay + step
             let title: String = UnitDay(
-                unit: unit, day: day, term: course.configuration.unitWord
+                unit: unit, day: day, naming: course.configuration.classPageNaming
             ).title
             let pageURL: URL = folder.appendingPathComponent(title + ".md")
             if FileManager.default.fileExists(atPath: pageURL.path) {
@@ -225,6 +259,7 @@ enum NextClassPlanner {
             courseCode: course.code,
             sectionNumber: sectionNumber,
             unit: unit,
+            naming: course.configuration.classPageNaming,
             classes: classes,
             alreadyThere: alreadyThere,
             problems: [],
@@ -255,6 +290,37 @@ enum NextClassPlanner {
         return dates[dates.count - 1]
     }
 
+    /// Where in the timetable a numbered course's next page goes: the index
+    /// of the first date after the LATEST date any class page carries — the
+    /// timetable's length when none is later, so the page shares the last
+    /// day as every other planner here does. Nil when no page is dated, and
+    /// the position rule applies. Pure, so the rule can be tested alone.
+    static func positionAfterTheLatestPage(
+        _ pages: [ClassPageSummary], in dates: [CalendarDay]
+    ) -> Int? {
+        var latest: CalendarDay? = nil
+        for page in pages {
+            guard let date = page.date else {
+                continue
+            }
+            if let current = latest, current >= date {
+                continue
+            }
+            latest = date
+        }
+        guard let latest else {
+            return nil
+        }
+        var index: Int = 0
+        for date in dates {
+            if date > latest {
+                return index
+            }
+            index += 1
+        }
+        return dates.count
+    }
+
     /// The first class of the NEXT unit: one past the highest unit, Day 1.
     ///
     /// **Day starts again at 1, because that is what every course here does.**
@@ -273,7 +339,7 @@ enum NextClassPlanner {
     /// A section with no numbered class at all gets Unit 1, Day 1: there is no
     /// unit yet, so there is none to move past.
     static func firstDayOfANewUnit(
-        after pages: [ClassPageSummary], term: String = ClassPageTerm.standard
+        after pages: [ClassPageSummary], naming: ClassPageNaming
     ) -> UnitDay {
         var highestUnit: Int = 0
         for page in pages {
@@ -282,8 +348,8 @@ enum NextClassPlanner {
             }
         }
         if highestUnit == 0 {
-            return UnitDay(unit: 1, day: 1, term: term)
+            return UnitDay(unit: 1, day: 1, naming: naming)
         }
-        return UnitDay(unit: highestUnit + 1, day: 1, term: term)
+        return UnitDay(unit: highestUnit + 1, day: 1, naming: naming)
     }
 }

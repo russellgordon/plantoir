@@ -2041,6 +2041,11 @@ def prompt_unit_word(saved_config: dict, has_been_set_up_before: bool) -> str:
     """
     current = class_pages.word_from_config(saved_config)
     if has_been_set_up_before:
+        # A numbered course (a club, #267) chose its word with its scheme when
+        # it was made, and neither can be changed afterwards — so there is no
+        # Rename… to point at, and the sentence after the header says the rest.
+        if class_pages.scheme_from_config(saved_config) == class_pages.NUMBERED_SCHEME:
+            return current
         if current != class_pages.DEFAULT_UNIT_WORD:
             print(f"\n📘 This course calls its units “{current}”. To change that, use "
                   f"Rename… beside the word in Plantoir's Course Settings, which renames "
@@ -2398,6 +2403,103 @@ def copy_obsidian_defaults(course_dir: Path) -> None:
 
 # ---------- Main setup flow (baseline preserved + backups + defaults) -------
 
+def class_folder_to_record(per_section_folders: list, saved_config: dict) -> str:
+    """
+    The `class_folder` a (re-)run writes: the one already recorded when it is
+    still in the list, else the old guess. The recorded answer is passed in
+    because the guess alone reads ["Resources", "All Meetings"] as
+    "Resources" — measured for #267 — and the dict this goes into wins over
+    the saved configuration, so a club the app had set up correctly would
+    have been rewritten to look for its meetings in the wrong folder.
+    """
+    return class_pages.folder_name({
+        "per_section_folders": per_section_folders,
+        "class_folder": saved_config.get("class_folder"),
+    })
+
+
+class ClubStart:
+    """
+    What a course whose pages carry ONE number starts with (#267): each
+    section's front page headed with the course's own words and showing the
+    first page, and that first page — "Week 1" — in the class folder.
+
+    Only the heading line and the embed are written into the front page, and
+    only when the front page is new. The first page is PUBLISHED: the front
+    page embeds it, and a student site whose landing page shows a withheld
+    page is exactly what the assistant's repointing exists to prevent — it
+    only moves the embed when a VISIBLE page is newer, so it would not fix
+    this one. It carries no `unit-1` tag: a club has no units, and the tag
+    would make a Quartz tag page listing every meeting.
+    """
+
+    DEFAULT_HEADING = "Most Recent Meeting"
+
+    def __init__(self, word: str, heading: str, class_folder: str):
+        self.word = word
+        self.heading = heading
+        self.class_folder = class_folder
+
+    @classmethod
+    def from_config(cls, config: dict) -> "ClubStart":
+        heading = str(config.get("front_page_heading") or "").strip() or cls.DEFAULT_HEADING
+        return cls(
+            word=class_pages.word_from_config(config),
+            heading=heading,
+            class_folder=class_pages.folder_name(config),
+        )
+
+    @property
+    def first_page_title(self) -> str:
+        return f"{self.word} 1"
+
+    def front_page_body(self) -> str:
+        return f"# {self.heading}\n\n![[{self.first_page_title}]]\n"
+
+    def first_page_text(self, now_str: str) -> str:
+        return (
+            "---\n"
+            f"title: {self.first_page_title}\n"
+            "publish: true\n"
+            f"created: {now_str}\n"
+            "transcludeTitleSize: h2\n"
+            "enableToc: false\n"
+            "excludeBacklinks: true\n"
+            "---\n"
+            "%%\n"
+            f"This is the first page in {self.class_folder}. Add one for each time\n"
+            f"the group meets — {self.word} 2, {self.word} 3, and so on — and the\n"
+            "front page shows the newest one you have published.\n"
+            "%%\n"
+            "\n"
+            "## Agenda\n"
+            "\n"
+            "1. \n"
+        )
+
+    def write_first_page(self, section_path: Path, now_str: str) -> None:
+        """
+        The first page, for a section being MADE — never on a re-run.
+
+        A section whose front page (`index.md`) already exists has been set
+        up before, so a missing "Week 1" there is one the teacher deleted.
+        Guarding on the page alone (the first version) recreated it on every
+        command-line re-run of setup, published and dated NOW — the newest
+        visible meeting, so the front page would follow it (#267
+        implementation review). Called BEFORE the front page is written, so
+        a new section still gets both.
+        """
+        if (section_path / "index.md").exists():
+            return
+        folder = section_path / self.class_folder
+        folder.mkdir(parents=True, exist_ok=True)
+        page = folder / f"{self.first_page_title}.md"
+        if page.exists():
+            return
+        with open(page, "w", encoding="utf-8") as f:
+            f.write(self.first_page_text(now_str))
+
+
 def setup_course(no_backup: bool = False):
     print("📚 Welcome to the Course Setup Script!\n")
 
@@ -2534,7 +2636,17 @@ def setup_course(no_backup: bool = False):
     # pour it in. The curriculum pages get their own question: some
     # teachers want the Ministry's expectations linkable from every lesson,
     # others do not want them on the site at all.
-    example_payload = find_example_content_dir(course_code)
+    # A course whose class pages carry ONE number ("Week 3" — a club, #267)
+    # is offered neither a ready-made course nor a skeleton. Every page those
+    # ship is named "Unit 1, Day 1", which under this course's own scheme is
+    # not a class page at all: pouring them in would give a course in which
+    # nothing counts as a class, and the build would not say so. The app
+    # already writes both answers false for a club; this is the second net,
+    # for a configuration that says otherwise.
+    numbered_course = (
+        class_pages.scheme_from_config(saved_config) == class_pages.NUMBERED_SCHEME
+    )
+    example_payload = None if numbered_course else find_example_content_dir(course_code)
     example_manifest = None
     prepopulate_example = bool(saved_config.get("prepopulate_example_content", False))
     include_curriculum = bool(saved_config.get("include_curriculum_pages", False))
@@ -2580,7 +2692,10 @@ def setup_course(no_backup: bool = False):
     skeleton_payload = None
     skeleton_manifest = None
     use_skeleton = False
-    if not example_manifest:
+    if numbered_course:
+        print("\n📘 This course numbers its pages one after another, so it starts "
+              "with empty folders and its first page.")
+    if not example_manifest and not numbered_course:
         candidate = find_skeleton_dir(course_code)
         if candidate:
             skeleton_manifest = load_example_content_manifest(candidate)
@@ -2832,10 +2947,10 @@ def setup_course(no_backup: bool = False):
         # alone that folder is not found and the curriculum map counts the
         # wrong pages without failing. Written from the same rule that used to
         # do the guessing, so a course made today records what it would have
-        # been given anyway.
-        "class_folder": class_pages.folder_name(
-            {"per_section_folders": per_section_folders}
-        ),
+        # been given anyway — with the answer the app already RECORDED passed
+        # in, because the guess alone reads ["Resources", "All Meetings"] as
+        # "Resources" (measured, #267) and this dict wins over the saved one.
+        "class_folder": class_folder_to_record(per_section_folders, saved_config),
         # NEW: example-content choices, remembered for future re-runs
         "prepopulate_example_content": prepopulate_example,
         "use_skeleton": use_skeleton,
@@ -2896,7 +3011,10 @@ def setup_course(no_backup: bool = False):
     # desktop apps put there wins over this script's own prompt, which they
     # never run.
     chosen_unit_word = class_pages.word_from_config(config)
-    if chosen_unit_word != class_pages.DEFAULT_UNIT_WORD:
+    if numbered_course:
+        print(f"\n📘 This course's pages will be named “{chosen_unit_word} 1”, "
+              f"“{chosen_unit_word} 2” and so on.")
+    elif chosen_unit_word != class_pages.DEFAULT_UNIT_WORD:
         print(f"\n📘 This course calls its units “{chosen_unit_word}”, so its class pages "
               f"will be named “{chosen_unit_word} 1, Day 1” and so on.")
 
@@ -3036,10 +3154,21 @@ def setup_course(no_backup: bool = False):
     else:
         grade_label = ""
 
+    # A numbered course (a club, #267) starts with its first page and a front
+    # page that shows it. Nothing else was poured into it — see
+    # `numbered_course` above — so without this a club would have no heading
+    # for its front page and no embed for the assistant to move.
+    club_start = ClubStart.from_config(config) if numbered_course else None
+
     for sec in section_numbers:
         section_name = f"section{sec}"
         section_path = toolchain_paths.COURSES_DIR / course_code / section_name
         section_path.mkdir(exist_ok=True)
+
+        # Before the front page, which is how it tells a section being made
+        # from one set up before — see `ClubStart.write_first_page`.
+        if club_start is not None:
+            club_start.write_first_page(section_path, now_str)
     
         index_md_path = section_path / "index.md"
         if not index_md_path.exists():
@@ -3058,7 +3187,9 @@ def setup_course(no_backup: bool = False):
                 f.write(f"created: {now_str}\n")
                 f.write("publish: true\n")
                 f.write("---\n")
-    
+                if club_start is not None:
+                    f.write(club_start.front_page_body())
+
         for folder in DEFAULT_PER_SECTION_FOLDERS if not DEFAULT_PER_SECTION_FOLDERS else []:
             # (kept for compatibility; actual per_section_folders handled below)
             pass
@@ -3075,7 +3206,7 @@ def setup_course(no_backup: bool = False):
                     f.write("publish: true\n")
                     f.write("---\n")
                     f.write(f"This is the **{folder}** folder. Add Markdown files to this folder to build out your site.\n")
-    
+
         for file in per_section_files:
             file_path = section_path / file
             if not file_path.exists():

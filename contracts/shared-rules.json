@@ -51,9 +51,9 @@
         "why": "What was actually asked for, as against what the teacher believes they asked for."
       },
       {
-        "carries": "the course code, and WHICH of the three starting points the course began from: the ready-made pages written for its code, the subject's skeleton (named — \"from the computer studies skeleton\"), or empty folders. A skeleton course also says whether the curriculum pages written for its code came with it — \"from the computer studies skeleton with the ICS4U curriculum pages\" — and only when they did. Nothing else: not the course name the teacher typed, not where it publishes, not its folder lists.",
+        "carries": "the course code, and WHICH of the three starting points the course began from: the ready-made pages written for its code, the subject's skeleton (named — \"from the computer studies skeleton\"), or empty folders. A skeleton course also says whether the curriculum pages written for its code came with it — \"from the computer studies skeleton with the ICS4U curriculum pages\" — and only when they did. A club (#267: `class_page_scheme` \"numbered\" in the file just written) says so instead, with its page word and class folder — \"created CODING as a club, with pages named “Week 1” in “All Meetings”\" — and every other course's line is byte-identical to before. Nothing else: not the course name the teacher typed, not where it publishes, not its folder lists.",
         "event": "course created",
-        "why": "\"My new course came out empty\" is the report this event exists to answer, and until 2026-09-21 the trail could not answer it at all. Creating a course recorded ONE line — \"started setup.sh\" — whose arguments are empty for a creation, so the trail carried neither the code nor what the course was meant to start as. Adding a single folder to a list recorded more (\"folder created\" carries the course and the list). That asymmetry is how GitHub issue #248 stayed invisible for five weeks: a teacher declined the ready-made pages for a code that had some, got empty folders instead of the subject's skeleton, and nothing written down said which of those two things the app had done.\n\nThe skeleton clause was added for GitHub issue #251 (2026-09-22), and it is rule 5's \"a changed behaviour changes its line too\" rather than noise: a skeleton course now comes out TWO ways, and they differ by fifty-nine pages and by whether the curriculum coverage map works at all. A line that could not tell them apart could not answer the report it was added for. Read from include_curriculum_pages in the file the wizard has just written, so it says what was actually asked for. The other two sentences are untouched — the ready-made pages have always carried their own curriculum, and an empty course has none to speak of.\n\nIt is one line per creation, written BEFORE the launcher starts, so a creation that fails part-way still says what was asked for. Both platforms create courses, so this carries no appliesOn — a course made on Windows leaves the same line.\n\nWHICH creators write THIS event, so nobody adds a duplicate: the New Course wizard, and the \"Add Example Course\" button — which writes it AFTER the run and from the run's own output, because the example installs under another code when EXC2O is taken, so its code is not known until the script says it. Three other things that produce a course folder deliberately write their OWN event instead, each answering a different question: \"course kept for reference\" and \"course imported for reference\" (a frozen copy of a course that already exists, carrying the school year and the folder it was given), and \"section started a new website\" (a rollover, which re-points a course rather than starting one). A teacher reading the trail should see one line per thing they did, not two for the same act."
+        "why": "\"My new course came out empty\" is the report this event exists to answer, and until 2026-09-21 the trail could not answer it at all. Creating a course recorded ONE line — \"started setup.sh\" — whose arguments are empty for a creation, so the trail carried neither the code nor what the course was meant to start as. Adding a single folder to a list recorded more (\"folder created\" carries the course and the list). That asymmetry is how GitHub issue #248 stayed invisible for five weeks: a teacher declined the ready-made pages for a code that had some, got empty folders instead of the subject's skeleton, and nothing written down said which of those two things the app had done.\n\nThe skeleton clause was added for GitHub issue #251 (2026-09-22), and it is rule 5's \"a changed behaviour changes its line too\" rather than noise: a skeleton course now comes out TWO ways, and they differ by fifty-nine pages and by whether the curriculum coverage map works at all. A line that could not tell them apart could not answer the report it was added for. Read from include_curriculum_pages in the file the wizard has just written, so it says what was actually asked for. The other two sentences are untouched — the ready-made pages have always carried their own curriculum, and an empty course has none to speak of.\n\nIt is one line per creation, written BEFORE the launcher starts, so a creation that fails part-way still says what was asked for. Both platforms create courses, so this carries no appliesOn — a course made on Windows leaves the same line.\n\nWHICH creators write THIS event, so nobody adds a duplicate: the New Course wizard, and the \"Add Example Course\" button — which writes it AFTER the run and from the run's own output, because the example installs under another code when EXC2O is taken, so its code is not known until the script says it. Three other things that produce a course folder deliberately write their OWN event instead, each answering a different question: \"course kept for reference\" and \"course imported for reference\" (a frozen copy of a course that already exists, carrying the school year and the folder it was given), and \"section started a new website\" (a rollover, which re-points a course rather than starting one). A teacher reading the trail should see one line per thing they did, not two for the same act.\n\nThe club clause was added for #267 (2026-09-24), rule 5's \"a changed behaviour changes its line too\": a club starts from none of the three starting points — empty folders plus one first page, its pages named with ONE number in a folder it names itself — and the report it will be looked up for is \"my club's pages are not being seen\", which only the word and the folder can answer. Read from the configuration the wizard has just written, never from the interface, so it says what was actually asked for. The page word and folder are settings the teacher chose, not page content."
       },
       {
         "carries": "the launcher, the outcome, and how long it took",
@@ -1862,6 +1862,246 @@
           "why": "The adoption a declined payload triggers carries the subject's marks pool, exactly as the toggle's own does — the same silent loss the MPM1D adoption case exists to stop, reached by the new road. Written as a LITERAL for the same reason that one is: the skeleton symbol would make it a tautology, so a change to support/skeletons/mathematics/manifest.json must be reflected here by hand."
         }
       ]
+    },
+    "clubToggle": {
+      "note": "“This is a club” in the New Course wizard (#267). Russell, 2026-09-24: a club starts with empty folders and a first “Week 1” page; it has NO curriculum coverage page and no Curriculum folder (coverage can be turned on later in Course Settings); its words are editable in the wizard and NOT switchable afterwards; the defaults are the `club` words below. The choice is shown for EVERY code and starts ticked for a code ClubCodeRule calls a club (course-management.json), until the teacher touches it. Nothing called is_club is written: the course is a club because of what IS written — class_page_scheme \"numbered\", unit_word, class_folder, front_page_heading and class_noun (file-formats.json) — plus use_skeleton and prepopulate_example_content false and the three curriculum keys false. A club takes no skeleton and no ready-made pages because both are Unit/Day pages, which a numbered course does not read as class pages; setup_course.py refuses to pour either into a numbered course as a second net. Mac: WizardWording, ClubVocabulary and ClubFill.applying (Models/ClubFill.swift); NewCourseWizardView.applyClubChoice.",
+      "label": "This is a club",
+      "caption": "A club meets rather than holds classes: its pages are numbered one after another, it has no curriculum, and it starts with a page for its first meeting. The words below can be changed now, but not once the course is made.",
+      "startingContentNote": "A club starts with empty folders and one page for its first meeting — no ready-made pages, no subject skeleton and no curriculum coverage page. The coverage page can be turned on later in Course Settings.",
+      "rows": {
+        "classFolder": "Folder for meeting pages",
+        "frontPageHeading": "Front page heading",
+        "pageWord": "Pages are named",
+        "noun": "The assistant calls a page a",
+        "pageWordCaption": "Pages will be named “{word} 1”, “{word} 2” and so on."
+      },
+      "settingsRows": {
+        "note": "Course Settings shows the three new settings as LOCKED rows — a label and the value, no control — for every course, with one caption under them. The unit word keeps its own row, whose Rename… button is disabled for a numbered course (specialNames.renameUnitWord.renameLockedNumbered).",
+        "pageNaming": "Class pages are named",
+        "pageNamingValue": "“{first page}” — the course's own first page name: “Unit 1, Day 1”, “Module 1, Day 1”, “Week 1”",
+        "frontPageHeading": "Front page heading",
+        "frontPageHeadingValue": "the course's recorded front_page_heading, exactly as stored — never a default",
+        "frontPageHeadingNotSet": "Not recorded — the front page keeps the heading it already has",
+        "frontPageHeadingWhy": "Shown for a course WITHOUT front_page_heading — every course made before #267, CODING included. The first version showed “Most Recent Class” there, and CODING's front page reads “## Most Recent Meeting”: a locked row stating something the page does not say (#267 implementation review, LOW). Nothing rewrites a heading after creation, so the row does not guess.",
+        "noun": "The assistant calls a page a",
+        "lockedCaption": "Chosen when the course was made. An existing course keeps these; they cannot be changed here."
+      },
+      "club": {
+        "classFolder": "All Meetings",
+        "unitWord": "Week",
+        "frontPageHeading": "Most Recent Meeting",
+        "noun": "meeting"
+      },
+      "course": {
+        "classFolder": "All Classes",
+        "unitWord": "Unit",
+        "frontPageHeading": "Most Recent Class",
+        "noun": "class"
+      },
+      "curriculumFolders": [
+        "Ontario Curriculum",
+        "College Board Curriculum",
+        "Curriculum"
+      ],
+      "fillRule": "A field moves only while it still holds the value the OTHER choice would have put there — the words of `course` when ticking, of `club` when unticking — so a teacher's own typing survives the box going off and on. The class folder keeps its PLACE in the per-section list and `classFolder` follows it. Ticking removes every `curriculumFolders` name from the shared folders; unticking puts the terminology's factory curriculum folder back at its factory position. A skeleton's folders already adopted for the code are given up BEFORE the fill (the skeleton toggle's own restore rule), and adoption does nothing while the box is ticked.",
+      "cases": [
+        {
+          "name": "ticking the box fills a club's words and takes the curriculum folder out",
+          "isClub": true,
+          "usesLCSTerminology": false,
+          "given": {
+            "sharedFolders": [
+              "Concepts",
+              "Discussions",
+              "Examples",
+              "Exercises",
+              "Ontario Curriculum",
+              "Portfolios",
+              "Recaps",
+              "Setup",
+              "Style",
+              "Tasks",
+              "Tutorials"
+            ],
+            "perSectionFolders": [
+              "All Classes"
+            ],
+            "classFolder": "All Classes",
+            "unitWord": "Unit",
+            "frontPageHeading": "Most Recent Class",
+            "noun": "class"
+          },
+          "expect": {
+            "sharedFolders": [
+              "Concepts",
+              "Discussions",
+              "Examples",
+              "Exercises",
+              "Portfolios",
+              "Recaps",
+              "Setup",
+              "Style",
+              "Tasks",
+              "Tutorials"
+            ],
+            "perSectionFolders": [
+              "All Meetings"
+            ],
+            "classFolder": "All Meetings",
+            "unitWord": "Week",
+            "frontPageHeading": "Most Recent Meeting",
+            "noun": "meeting"
+          }
+        },
+        {
+          "name": "unticking it puts a course's words and the curriculum folder back",
+          "isClub": false,
+          "usesLCSTerminology": false,
+          "given": {
+            "sharedFolders": [
+              "Concepts",
+              "Discussions",
+              "Examples",
+              "Exercises",
+              "Portfolios",
+              "Recaps",
+              "Setup",
+              "Style",
+              "Tasks",
+              "Tutorials"
+            ],
+            "perSectionFolders": [
+              "All Meetings"
+            ],
+            "classFolder": "All Meetings",
+            "unitWord": "Week",
+            "frontPageHeading": "Most Recent Meeting",
+            "noun": "meeting"
+          },
+          "expect": {
+            "sharedFolders": [
+              "Concepts",
+              "Discussions",
+              "Examples",
+              "Exercises",
+              "Ontario Curriculum",
+              "Portfolios",
+              "Recaps",
+              "Setup",
+              "Style",
+              "Tasks",
+              "Tutorials"
+            ],
+            "perSectionFolders": [
+              "All Classes"
+            ],
+            "classFolder": "All Classes",
+            "unitWord": "Unit",
+            "frontPageHeading": "Most Recent Class",
+            "noun": "class"
+          }
+        },
+        {
+          "name": "a teacher's own words survive the box going off",
+          "isClub": false,
+          "usesLCSTerminology": false,
+          "given": {
+            "sharedFolders": [
+              "Concepts",
+              "Discussions",
+              "Examples",
+              "Exercises",
+              "Portfolios",
+              "Recaps",
+              "Setup",
+              "Style",
+              "Tasks",
+              "Tutorials"
+            ],
+            "perSectionFolders": [
+              "All Gatherings"
+            ],
+            "classFolder": "All Gatherings",
+            "unitWord": "Session",
+            "frontPageHeading": "Most Recent Meeting",
+            "noun": "meeting"
+          },
+          "expect": {
+            "sharedFolders": [
+              "Concepts",
+              "Discussions",
+              "Examples",
+              "Exercises",
+              "Ontario Curriculum",
+              "Portfolios",
+              "Recaps",
+              "Setup",
+              "Style",
+              "Tasks",
+              "Tutorials"
+            ],
+            "perSectionFolders": [
+              "All Gatherings"
+            ],
+            "classFolder": "All Gatherings",
+            "unitWord": "Session",
+            "frontPageHeading": "Most Recent Class",
+            "noun": "class"
+          },
+          "why": "Typed words are the teacher's; only the untouched heading and noun follow the box."
+        },
+        {
+          "name": "the class folder keeps its place in the list",
+          "isClub": true,
+          "usesLCSTerminology": false,
+          "given": {
+            "sharedFolders": [
+              "Concepts",
+              "Discussions",
+              "Examples",
+              "Exercises",
+              "Ontario Curriculum",
+              "Portfolios",
+              "Recaps",
+              "Setup",
+              "Style",
+              "Tasks",
+              "Tutorials"
+            ],
+            "perSectionFolders": [
+              "Resources",
+              "All Classes"
+            ],
+            "classFolder": "All Classes",
+            "unitWord": "Unit",
+            "frontPageHeading": "Most Recent Class",
+            "noun": "class"
+          },
+          "expect": {
+            "sharedFolders": [
+              "Concepts",
+              "Discussions",
+              "Examples",
+              "Exercises",
+              "Portfolios",
+              "Recaps",
+              "Setup",
+              "Style",
+              "Tasks",
+              "Tutorials"
+            ],
+            "perSectionFolders": [
+              "Resources",
+              "All Meetings"
+            ],
+            "classFolder": "All Meetings",
+            "unitWord": "Week",
+            "frontPageHeading": "Most Recent Meeting",
+            "noun": "meeting"
+          },
+          "why": "Measured for #267: the class-folder GUESS reads [\"Resources\", \"All Meetings\"] as \"Resources\". The folder is therefore recorded by name, and setup_course.py keeps the recorded name (classFolder.naming)."
+        }
+      ]
     }
   },
   "workingFolderPathBar": {
@@ -2677,6 +2917,9 @@
       "sheetTitle": "Rename “{word}”",
       "rowCaption": "Class pages are named “{word} 1, Day 1”.",
       "rowCaptionWhy": "In the course's CURRENT word, never the literal 'Unit': a literal would lie the moment a rename landed.",
+      "rowCaptionNumbered": "Class pages are named “{word} 1”, “{word} 2” and so on.",
+      "renameLockedNumbered": "This course numbers its pages one after another, so its word was chosen when the course was made and cannot be renamed here.",
+      "renameLockedNumberedWhy": "A numbered course (class_page_scheme \"numbered\" — a club's “Week 1”, #267) shows the word but its Rename… button is DISABLED, with this sentence under it. Russell, 2026-09-24: a club's settings are chosen in the wizard and are not switchable afterwards. The rename itself is not the danger — the renamer reads pages through the course's scheme, so “Week 3” would become “Meeting 3” — but a club's page word, class folder, front-page heading and assistant noun are one choice, and renaming one of the four afterwards leaves a course none of the settings describes. The caption says the numbered shape, never “{word} 1, Day 1”, which no page in such a course is called. Proposed from the mac 2026-09-24; Windows owes both sentences and the disabled button.",
       "explanation": "This renames every class page on your Mac, in every section, and points your pages’ links at the new names. It happens straight away, so Cancel in Settings will not undo it. To change it back, rename it again; a backup of the whole course is saved first, as a last resort.",
       "proseIsLeftAlone": "Pages and sentences that mention a unit by number, other than the class pages themselves, are left as they are.",
       "proseIsLeftAloneWhy": "The 2026-09-01 decision, restated for a course already in use: the payload rewrite that pours 'by the end of Unit 3' as 'by the end of Module 3' runs only over content Plantoir ships, never over a teacher's own writing, where 'Unit 3 of the textbook' would be a false positive nobody could undo. So a course poured as Unit and renamed to Module keeps its prose — around 574 payload files carry such a sentence — and a shared task called 'Unit 2 Test' keeps its name. Said in the sheet, because otherwise the first teacher who compares the two would report it as a defect.",

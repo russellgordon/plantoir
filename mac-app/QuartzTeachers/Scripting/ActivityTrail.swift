@@ -515,6 +515,11 @@ nonisolated enum ActivityTrail {
         /// GitHub issue #248 was reported against: a teacher declined the
         /// ready-made pages, got empty folders, and nothing on the trail
         /// said which of those two things had happened.
+        ///
+        /// A club (#267) says so, with its page word and class folder —
+        /// "created CODING as a club, with pages named “Week 1” in “All
+        /// Meetings”" — because those are what decide whether any of its
+        /// pages are seen at all.
         case courseCreated = "course created"
 
         /// A course was kept for reference: which folder it was given, the

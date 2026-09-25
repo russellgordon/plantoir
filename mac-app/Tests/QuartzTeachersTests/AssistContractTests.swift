@@ -106,6 +106,12 @@ final class AssistContractTests: XCTestCase {
                 AssistCardCommand.matching(phrasing),
                 "\"\(phrasing)\" is listed as a near miss and is being matched as a card."
             )
+            // And in a club (#267): the one family that reads the window's
+            // course must not take a near miss there either.
+            XCTAssertNil(
+                AssistCardCommand.matching(phrasing, numberedPageWord: "Week"),
+                "\"\(phrasing)\" is listed as a near miss and is being matched as a card in a club."
+            )
         }
     }
 

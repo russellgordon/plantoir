@@ -80,12 +80,22 @@ struct CourseSettingsView: View {
                                 unitWordNotice = nil
                                 isRenamingUnitWord = true
                             }
+                            // A numbered course's word is part of the
+                            // vocabulary chosen in the wizard (#267).
+                            .disabled(configuration.classPageNaming.isNumbered)
                             .accessibilityIdentifier("renameUnitWordButton")
                         }
                     }
-                    Text(UnitWordRenameWording.rowCaption(word: configuration.unitWord))
+                    Text(UnitWordRenameWording.rowCaption(naming: configuration.classPageNaming))
                         .font(.callout)
                         .foregroundStyle(.secondary)
+                    if configuration.classPageNaming.isNumbered {
+                        Text(UnitWordRenameWording.renameLockedNumbered)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("unitWordLockedNotice")
+                    }
                     if let unitWordNotice {
                         Text(unitWordNotice)
                             .font(.callout)
@@ -95,6 +105,33 @@ struct CourseSettingsView: View {
                     }
                 } header: {
                     FormSectionHeader("Settings — Overall")
+                }
+
+                // The words the course was made with (#267): shown, and
+                // LOCKED — a club's are chosen in the wizard and are not
+                // switchable afterwards, and an existing course (CODING
+                // included) can never become one from here.
+                Section {
+                    LabeledContent(WizardWording.settingsPageNamingLabel) {
+                        Text(WizardWording.settingsPageNamingValue(configuration.classPageNaming))
+                            .accessibilityIdentifier("pageNamingValue")
+                    }
+                    LabeledContent(WizardWording.settingsFrontPageHeadingLabel) {
+                        Text(WizardWording.settingsFrontPageHeadingValue(
+                            configuration.recordedFrontPageHeading
+                        ))
+                        .accessibilityIdentifier("frontPageHeadingValue")
+                    }
+                    LabeledContent(WizardWording.settingsNounLabel) {
+                        Text(configuration.classNoun.rawValue)
+                            .accessibilityIdentifier("classNounValue")
+                    }
+                    Text(WizardWording.settingsLockedCaption)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } header: {
+                    FormSectionHeader("Class Pages")
                 }
 
                 Section {

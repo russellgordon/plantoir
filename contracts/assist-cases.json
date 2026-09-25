@@ -101,6 +101,13 @@
       },
       {
         "arguments" : {
+          "when" : "tomorrow"
+        },
+        "phrasing" : "publish tomorrow's meeting",
+        "tool" : "publish_class_on"
+      },
+      {
+        "arguments" : {
           "when" : "monday"
         },
         "phrasing" : "publish monday's class",
@@ -150,6 +157,55 @@
       },
       {
         "arguments" : {
+          "when" : "monday"
+        },
+        "phrasing" : "publish monday's meeting",
+        "tool" : "publish_class_on"
+      },
+      {
+        "arguments" : {
+          "when" : "tuesday"
+        },
+        "phrasing" : "publish tuesday's meeting",
+        "tool" : "publish_class_on"
+      },
+      {
+        "arguments" : {
+          "when" : "wednesday"
+        },
+        "phrasing" : "publish wednesday's meeting",
+        "tool" : "publish_class_on"
+      },
+      {
+        "arguments" : {
+          "when" : "thursday"
+        },
+        "phrasing" : "publish thursday's meeting",
+        "tool" : "publish_class_on"
+      },
+      {
+        "arguments" : {
+          "when" : "friday"
+        },
+        "phrasing" : "publish friday's meeting",
+        "tool" : "publish_class_on"
+      },
+      {
+        "arguments" : {
+          "when" : "saturday"
+        },
+        "phrasing" : "publish saturday's meeting",
+        "tool" : "publish_class_on"
+      },
+      {
+        "arguments" : {
+          "when" : "sunday"
+        },
+        "phrasing" : "publish sunday's meeting",
+        "tool" : "publish_class_on"
+      },
+      {
+        "arguments" : {
 
         },
         "phrasing" : "what pages are in this section?",
@@ -160,6 +216,13 @@
 
         },
         "phrasing" : "add the next class page",
+        "tool" : "add_next_class"
+      },
+      {
+        "arguments" : {
+
+        },
+        "phrasing" : "add the next meeting page",
         "tool" : "add_next_class"
       },
       {
@@ -202,6 +265,34 @@
 
         },
         "phrasing" : "when is my next class",
+        "tool" : "read_remembered_timetable"
+      },
+      {
+        "arguments" : {
+
+        },
+        "phrasing" : "when are my next meetings?",
+        "tool" : "read_remembered_timetable"
+      },
+      {
+        "arguments" : {
+
+        },
+        "phrasing" : "when are my next meetings",
+        "tool" : "read_remembered_timetable"
+      },
+      {
+        "arguments" : {
+
+        },
+        "phrasing" : "when is my next meeting?",
+        "tool" : "read_remembered_timetable"
+      },
+      {
+        "arguments" : {
+
+        },
+        "phrasing" : "when is my next meeting",
         "tool" : "read_remembered_timetable"
       },
       {
@@ -269,6 +360,27 @@
       },
       {
         "arguments" : {
+          "revise" : "yes"
+        },
+        "phrasing" : "i have a revised list of meeting dates",
+        "tool" : "read_remembered_timetable"
+      },
+      {
+        "arguments" : {
+          "revise" : "yes"
+        },
+        "phrasing" : "i have a new list of meeting dates",
+        "tool" : "read_remembered_timetable"
+      },
+      {
+        "arguments" : {
+          "revise" : "yes"
+        },
+        "phrasing" : "change my meeting dates",
+        "tool" : "read_remembered_timetable"
+      },
+      {
+        "arguments" : {
 
         },
         "phrasing" : "re-date my classes",
@@ -279,6 +391,20 @@
 
         },
         "phrasing" : "redate my classes",
+        "tool" : "re_date_classes"
+      },
+      {
+        "arguments" : {
+
+        },
+        "phrasing" : "re-date my meetings",
+        "tool" : "re_date_classes"
+      },
+      {
+        "arguments" : {
+
+        },
+        "phrasing" : "redate my meetings",
         "tool" : "re_date_classes"
       },
       {
@@ -368,6 +494,28 @@
         "tool" : "add_next_class"
       },
       {
+        "becauseNotThis" : "'period' is not this course's page word. The first version took any single word, and 'at period 3', 'at block 2' and 'at section 2' were all planned in a club as “Week 3” or “Week 2” — renaming pages the teacher's links point at, from a sentence about something else. It goes to the model.",
+        "example" : "make room for one meeting at Week 5",
+        "fills" : {
+          "howMany" : "<count>, as a number — words up to twelve are understood",
+          "unit" : "<number> — the one number a numbered course's page names carry. Matched ONLY in a numbered course, and <word> must be that course's own page word (case-folded) or absent: 'at Week 5' and 'at 5' in a club whose pages are “Week N”. In a Unit/Day course this family matches nothing and the sentence goes to the model, as it did before #267"
+        },
+        "inANumberedCourseWhosePagesAre" : "Week",
+        "notThis" : "make room for one meeting at period 3",
+        "shape" : "make room for <count> class|classes|meeting|meetings at [<word>] <number>",
+        "tool" : "make_room_for_classes"
+      },
+      {
+        "becauseNotThis" : "The closing half is what makes the sentence unambiguous, exactly as in 'as my next class'.",
+        "example" : "duplicate Week 3 as my next meeting",
+        "fills" : {
+          "duplicate" : "<page title>, with the capitals the teacher typed"
+        },
+        "notThis" : "duplicate Week 3",
+        "shape" : "duplicate <page title> as my next meeting",
+        "tool" : "add_next_class"
+      },
+      {
         "becauseNotThis" : "A one-digit hour with no am or pm is morning or evening and nobody can tell which. A deploy set twelve hours wrong is a site that updates after the class it was meant for, so the doubt goes to the model rather than being resolved by a coin toss.",
         "example" : "deploy at 6:30 am",
         "fills" : {
@@ -378,7 +526,7 @@
         "tool" : "schedule_deploy"
       }
     ],
-    "parsedNote" : "Families the matcher PARSES rather than compares, because the number or title in them is unbounded. They are matched in code for the same reason the literals are — the whole sentence IS the request, and reading an integer or a title off a fixed shape is not a judgement anybody needs a language model for. `notThis` is the near-miss each family must REFUSE, and it is the half that stops a family swallowing requests that belong to the model."
+    "parsedNote" : "Families the matcher PARSES rather than compares, because the number or title in them is unbounded. They are matched in code for the same reason the literals are — the whole sentence IS the request, and reading an integer or a title off a fixed shape is not a judgement anybody needs a language model for. `notThis` is the near-miss each family must REFUSE, and it is the half that stops a family swallowing requests that belong to the model. A family carrying `inANumberedCourseWhosePagesAre` matches only in a window whose course names its pages with one number and that word (#267): a runner passes the word to its matcher for the example AND the near miss, and the family matches nothing in any other course."
   },
   "deployAtATime" : {
     "accepted" : [
@@ -943,7 +1091,7 @@
     ]
   },
   "nearMisses" : {
-    "note" : "Must NOT match — each one only looks like a card phrasing, and answering the wrong question with total confidence is worse than routing it. Three of them - \"a new website\", \"new one please\" and \"roll this section over onto a new site\" - are the rollover's website question, and they record a KNOWN LIMIT rather than guarding a near-miss: the reply offers two sentences word for word, those exact strings are the only way back in, and a teacher who paraphrases matches nothing at all — re_date_classes is shown to no local model, so nothing catches the paraphrase and the section stays pinned to last year's website with nothing said. Both apps already pass these, so nothing goes red; they are written down so the limit is visible, and so a future looser matcher has to change this list on purpose. \"publish next monday's class\" is a different shape again: it is the near miss of a phrasing that DOES match, and it must reach the model precisely because \"next Monday\" is the one weekday word neither app will settle on its own - see schedule-rules.json, relativeDays. The two hide phrasings were added on 2026-09-19 with issue #215, when \"hide <page>\" became a phrasing answered in code: \"hide unit 4, day 21 in ICS3U\" is the one that matters, because a matched card binds THIS window's course and section into the call unconditionally and the guard against a request naming another course runs only on the model's answers - so a frame that swallowed it would act on the wrong course and report success. \"don't hide unit 2, day 3\" is the negation, the one failure that would act against the teacher. Both are in hideIsUnpublish.refused with their full reasons; they are here as well so that the near-miss walk both apps already run covers them without anything new being wired up.",
+    "note" : "Must NOT match — each one only looks like a card phrasing, and answering the wrong question with total confidence is worse than routing it. Three of them - \"a new website\", \"new one please\" and \"roll this section over onto a new site\" - are the rollover's website question, and they record a KNOWN LIMIT rather than guarding a near-miss: the reply offers two sentences word for word, those exact strings are the only way back in, and a teacher who paraphrases matches nothing at all — re_date_classes is shown to no local model, so nothing catches the paraphrase and the section stays pinned to last year's website with nothing said. Both apps already pass these, so nothing goes red; they are written down so the limit is visible, and so a future looser matcher has to change this list on purpose. \"publish next monday's class\" is a different shape again: it is the near miss of a phrasing that DOES match, and it must reach the model precisely because \"next Monday\" is the one weekday word neither app will settle on its own - see schedule-rules.json, relativeDays. The two hide phrasings were added on 2026-09-19 with issue #215, when \"hide <page>\" became a phrasing answered in code: \"hide unit 4, day 21 in ICS3U\" is the one that matters, because a matched card binds THIS window's course and section into the call unconditionally and the guard against a request naming another course runs only on the model's answers - so a frame that swallowed it would act on the wrong course and report success. \"don't hide unit 2, day 3\" is the negation, the one failure that would act against the teacher. Both are in hideIsUnpublish.refused with their full reasons; they are here as well so that the near-miss walk both apps already run covers them without anything new being wired up. The three \"make room for … at period / block / section N\" phrasings were added with #267's fix round, and they are why a runner now walks this list TWICE: once in an ordinary course, and once in a club whose pages are \"Week N\" (the matcher's numbered page word). The one-number make-room frame reads the window's course, and its first version took ANY single word as a club's page word, so \"at period 3\" was planned in a club as Week 3 — renaming pages the teacher's links point at, from a sentence about something else.",
     "phrasings" : [
       "Undo that change to Unit 2, Day 3",
       "Deploy this section now, but only the published pages",
@@ -956,7 +1104,10 @@
       "",
       "Deploy Section 2 at 6:30 AM",
       "hide unit 4, day 21 in ICS3U",
-      "don't hide unit 2, day 3"
+      "don't hide unit 2, day 3",
+      "make room for a meeting at period 3",
+      "make room for a meeting at block 2",
+      "make room for one meeting at section 2"
     ]
   },
   "note" : "Generated from the macOS app by `Plantoir --assist-contract`. Do not hand-edit; see contracts/README.md.",

@@ -1678,6 +1678,66 @@ is kept OUT of the built site, so a rename that missed it silently un-hid the
 folder and the next publish put pages the teacher had hidden in front of
 students.
 
+## "This is a club": the wizard's choice, and the settings it locks (#267)
+
+The New Course wizard shows **This is a club** under Basics for every code. It
+starts ticked for a code `ClubCodeRule` calls a club (CODING yes, ICS3U and a
+BC code no) and follows the code until the teacher touches it. Ticking it:
+
+- fills a club's words through `ClubFill.applying` (pure, `Models/ClubFill.swift`
+  — a SwiftUI `@State` has no backing store off screen): class folder
+  `All Meetings`, page word `Week`, front-page heading `Most Recent Meeting`,
+  noun `meeting`. A field moves only while it still holds the OTHER choice's
+  word, so typing survives the box going off and on; the class folder keeps its
+  place in the per-section list. Every curriculum folder leaves the shared
+  folders (and the LCS switch cannot bring one back while ticked).
+- gives up a skeleton already adopted for the code (CODING has adopted the
+  general one by the time the box ticks itself) and makes adoption a no-op —
+  `SkeletonCatalog.hasSkeleton(forCode:takingExampleContent:numbered:)` answers
+  no for a club, with no default value, so all three callers had to say.
+- replaces the Starting Content toggles with `clubStartingContentNote`, and the
+  Units row with four editable rows (`wizard.clubToggle.rows`).
+- writes `class_page_scheme`, `front_page_heading` and `class_noun` — for a club
+  ONLY, so every other course's file stays byte-identical (the golden
+  `testTheFileForEveryPathThatExistedBeforeIsUnchanged` holds it) — and records
+  `class_folder` from the club's own row rather than the guess.
+- checks that row's name with the sentences a folder rename in Course Settings
+  uses (`NewCourseWizardView.clubClassFolderProblem` →
+  `SpecialFolderRenamer.problem`): empty, "/" or ":", hidden, Media, a section
+  folder's name, or another per-section folder's name — a red caption under the
+  field and a refusal at Create. The row is typed, not added through the list,
+  so the list's own checks never saw it; the #267 implementation review found
+  an empty name, a duplicate and a "/" all written straight into
+  `per_section_folders` and `class_folder`.
+- protects the chosen class folder in the structure editor by name; the literal
+  "All Classes" test left "All Meetings" deletable.
+
+The trail's `course created` line says "created CODING as a club, with pages
+named “Week 1” in “All Meetings”" (read from the file just written).
+
+**Course Settings shows the three settings LOCKED** — a Class Pages section with
+three label/value rows and one caption, for every course — and disables the
+unit word's Rename… button for a numbered course, with
+`renameLockedNumbered` under it. Russell, 2026-09-24: a club's words are not
+switchable after the wizard. Consequence: an existing course, CODING included,
+can never become a club from the app. REJECTED: a scheme picker in Settings that
+renames pages between shapes (not asked for, and converting 80 "Unit 2, Day 3"
+pages to week numbers is its own piece); a front-page heading rename across
+every section (dropped with the same answer).
+
+**The heading row shows what the course RECORDED**
+(`CourseConfiguration.recordedFrontPageHeading`), and for a course with no
+`front_page_heading` — every course made before #267, CODING included — the
+named sentence `WizardWording.settingsFrontPageHeadingNotSet`. The first version
+filled in "Most Recent Class", so CODING's locked row contradicted its own
+front page ("## Most Recent Meeting"). Nothing rewrites a heading after
+creation, so the row does not guess one. REJECTED: reading the heading off
+section 1's `index.md` (a row about the course would then report one section's
+page, and a teacher may have edited it on purpose).
+
+Every sentence is in `WizardWording` / `UnitWordRenameWording` and pinned in
+`shared-rules.json` (`wizard.clubToggle`, `specialNames.renameUnitWord`).
+
 ## Renaming a course's word for a unit
 
 Beside the word under Settings — Overall ("What do you call a unit?  Unit

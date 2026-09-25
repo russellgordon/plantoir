@@ -27,8 +27,14 @@ enum PlaceholderClassPlanner {
         case noTimetable(String, Int)
         case wrongCourse(String, String)
 
+        /// Any unit but the first, in a numbered course (#267): its pages are
+        /// one run with no units, held as unit 1.
+        case noUnitsInANumberedCourse(String, String)
+
         var errorDescription: String? {
             switch self {
+            case .noUnitsInANumberedCourse(let code, let word):
+                return NextClassPlanner.Problem.noUnitsInANumberedCourse(code, word).errorDescription
             case .unitOutOfRange:
                 return "A unit number starts at 1."
             case .dayOutOfRange:
@@ -62,6 +68,10 @@ enum PlaceholderClassPlanner {
         if count < 1 {
             throw Problem.countOutOfRange
         }
+        let naming: ClassPageNaming = course.configuration.classPageNaming
+        if naming.isNumbered && unit != 1 {
+            throw Problem.noUnitsInANumberedCourse(course.code, naming.word)
+        }
 
         guard let remembered = try SectionTimetableStore.read(forSection: sectionNumber, in: course) else {
             throw Problem.noTimetable(course.code, sectionNumber)
@@ -94,7 +104,7 @@ enum PlaceholderClassPlanner {
         for offset in 0..<count {
             let day: Int = firstDay + offset
             let title: String = UnitDay(
-                unit: unit, day: day, term: course.configuration.unitWord
+                unit: unit, day: day, naming: course.configuration.classPageNaming
             ).title
             let pageURL: URL = folderURL.appendingPathComponent(title + ".md")
 
@@ -121,6 +131,7 @@ enum PlaceholderClassPlanner {
             courseCode: course.code,
             sectionNumber: sectionNumber,
             unit: unit,
+            naming: course.configuration.classPageNaming,
             classes: classes,
             alreadyThere: alreadyThere,
             problems: problems,
@@ -174,6 +185,8 @@ enum PlaceholderClassPlanner {
             let body: String = ClassPages.skeleton(
                 title: planned.title,
                 unit: plan.unit,
+                naming: plan.naming,
+                folderName: folderURL.lastPathComponent,
                 date: planned.date,
                 howMany: plan.classes.count,
                 tail: tail
@@ -192,7 +205,7 @@ enum PlaceholderClassPlanner {
             }
             let they: String = written.count == 1 ? "It is" : "They are"
             let them: String = written.count == 1 ? "it" : "them"
-            message = "Created \(written.count) class page\(written.count == 1 ? "" : "s") in Unit \(plan.unit) of \(plan.courseCode) Section \(plan.sectionNumber), \(dated). \(they) unpublished, so nothing changed on the site — write \(them), then publish when \(written.count == 1 ? "it is" : "they are") ready."
+            message = "Created \(written.count) class page\(written.count == 1 ? "" : "s") in \(plan.whereTheyGo), \(dated). \(they) unpublished, so nothing changed on the site — write \(them), then publish when \(written.count == 1 ? "it is" : "they are") ready."
         }
         if !appearedInBetween.isEmpty {
             message += " \(SectionTimetableStore.list(appearedInBetween)) appeared while you were deciding and \(appearedInBetween.count == 1 ? "was" : "were") left exactly as \(appearedInBetween.count == 1 ? "it is" : "they are")."
@@ -238,6 +251,11 @@ struct PlaceholderClassPlan {
     let sectionNumber: Int
     let unit: Int
 
+    /// How the course names its pages, so a sentence about a unit can say
+    /// the course's own word — or, in a numbered course, nothing about a
+    /// unit at all (#267, #268).
+    let naming: ClassPageNaming
+
     /// The pages that would be created, in order.
     let classes: [PlannedClass]
 
@@ -269,19 +287,35 @@ struct PlaceholderClassPlan {
         return classes.isEmpty
     }
 
-    /// The proposal, as a teacher would hear it.
+    /// "Unit 4 of ICS3U Section 1" — the course's own word for a unit — or,
+    /// in a numbered course, just "CODING Section 1".
+    var whereTheyGo: String {
+        if let unitName = naming.unitName(unit) {
+            return "\(unitName) of \(courseCode) Section \(sectionNumber)"
+        }
+        return "\(courseCode) Section \(sectionNumber)"
+    }
+
+    /// The proposal, as a teacher would hear it — and as the model reads it,
+    /// which is why this form always says "class".
     var description: String {
+        return describe(noun: .class)
+    }
+
+    /// The proposal in the course's own noun (#267): "meeting" on a club's
+    /// card. Only the card takes this; see `AssistToolOutcome.planned`.
+    func describe(noun: ClassNoun) -> String {
         var lines: [String] = []
 
         if changesNothing {
-            lines.append("Nothing to add — every class asked for in Unit \(unit) of \(courseCode) Section \(sectionNumber) already exists.")
+            lines.append("Nothing to add — every class asked for in \(whereTheyGo) already exists.")
             for problem in problems {
                 lines.append("• " + problem)
             }
             return lines.joined(separator: "\n")
         }
 
-        lines.append("Add \(classes.count) class page\(classes.count == 1 ? "" : "s") to Unit \(unit) of \(courseCode) Section \(sectionNumber), on the \(classes.count == 1 ? "day" : "days") this class actually meets:")
+        lines.append(AssistWording.wouldAddPages(count: classes.count, to: whereTheyGo, noun: noun))
         lines.append("")
         for planned in classes {
             lines.append("  \(planned.title)  (\(planned.date.text) \(planned.date.weekdayName))")
@@ -303,13 +337,11 @@ struct PlaceholderClassPlan {
         if sharingTheLastDay > 0 {
             // Said out loud, because a date shared with another class is the
             // one thing on this list a teacher has to go and fix.
-            lines.append("\(sharingTheLastDay == 1 ? "This one has" : "\(sharingTheLastDay) of these have") "
-                         + "no class date left, so \(sharingTheLastDay == 1 ? "it shares" : "they share") "
-                         + "the last day with the class already on it. Give "
-                         + "\(sharingTheLastDay == 1 ? "it a day" : "them days") of your own when you "
-                         + "know what they are.")
+            lines.append(AssistWording.sharingTheLastDay(count: sharingTheLastDay, noun: noun))
         } else {
-            lines.append("\(spareDatesLeft) more class date\(spareDatesLeft == 1 ? "" : "s") \(spareDatesLeft == 1 ? "is" : "are") spare after these, out of the timetable recorded from \(timetableSource).")
+            lines.append(AssistWording.spareDatesAfterThese(
+                count: spareDatesLeft, source: timetableSource, noun: noun
+            ))
         }
         return lines.joined(separator: "\n")
     }
@@ -320,6 +352,7 @@ struct PlaceholderClassPlan {
         courseCode: String,
         sectionNumber: Int,
         unit: Int,
+        naming: ClassPageNaming,
         classes: [PlannedClass],
         alreadyThere: [String],
         problems: [String],
@@ -330,6 +363,7 @@ struct PlaceholderClassPlan {
         self.courseCode = courseCode
         self.sectionNumber = sectionNumber
         self.unit = unit
+        self.naming = naming
         self.classes = classes
         self.alreadyThere = alreadyThere
         self.problems = problems

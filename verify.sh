@@ -255,6 +255,13 @@ else
   cat /tmp/verify_class_pages_test.log
 fi
 
+if (cd scripts && python3 test_club_start.py) >/tmp/verify_club_start_test.log 2>&1; then
+  pass "setup_course.py: a club starts with its front page heading and a published first page, and keeps its recorded class folder (scripts/test_club_start.py)"
+else
+  fail "setup_course.py: a club starts with its front page heading and a published first page, and keeps its recorded class folder (scripts/test_club_start.py)"
+  cat /tmp/verify_club_start_test.log
+fi
+
 if (cd scripts && python3 test_page_visibility.py) >/tmp/verify_page_visibility_test.log 2>&1; then
   pass "page_visibility.py: whether the built site shows a page, against contracts/file-formats.json (scripts/test_page_visibility.py)"
 else
