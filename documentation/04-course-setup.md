@@ -535,7 +535,11 @@ checkout at `/opt/quartz` (the template that every build copies from):
    `quartz.layout.ts` with a configured call containing a `filterFn` and a
    marked line (`// CQ4T-OMIT-ANCHOR`) declaring `const omit = new Set([...])`.
    At build time, `build_site.py` rewrites this set with the course's hidden
-   items. The anchor comment makes the rewrite target unambiguous.
+   items. The anchor comment makes the rewrite target unambiguous. The filter
+   is version 2 since #265 (top-level items by stored name; the marker
+   `CQ4T-HIDE-RULE: v2`), and a section built before that is brought up to
+   date on its next build — see
+   [06 → B1](06-quartz-customizations.md#b1-explorer-omit-anchor-in-quartzlayoutts).
 2. **OverflowList stable ID** — replaces `const id = randomIdNonSecure()`
    with a constant in `OverflowList.tsx`, so rebuilt pages do not differ
    just because a random DOM id changed (fewer files re-uploaded on deploy).

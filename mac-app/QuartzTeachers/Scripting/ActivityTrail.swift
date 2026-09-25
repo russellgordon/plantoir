@@ -38,6 +38,12 @@ nonisolated enum ActivityTrail {
         case workingFolderOpened = "working folder opened"
         case settingsSaved = "settings saved"
         case settingsCouldNotBeSaved = "settings could not be saved"
+        /// A preview started while Course Settings held changes nobody had
+        /// saved, and the teacher was told it uses the saved settings (#265).
+        case previewStartedWithUnsavedSettings = "preview started with unsaved settings"
+        /// Preview Again, pressed beside the sentence Course Settings shows
+        /// after a Save that an open preview could not see (#265).
+        case previewAgainAfterSettingsSaved = "preview again after settings saved"
         case taskStarted = "task started"
         case taskFinished = "task finished"
         case askedForACredential = "asked for a publishing credential"

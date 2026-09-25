@@ -1068,16 +1068,62 @@ def select_section_marker_visibility_for_sections(section_numbers: list[int], sa
 
 # ---------- Hardened Explorer patch helpers ---------------------------------
 
+# The sidebar's hide rule (issue #265, version 2). `hidden` holds the STORED
+# names of TOP-LEVEL items — a file by its name with `.md`, a folder by its
+# name — which is what Course Settings offers and writes. Version 1 matched a
+# file on its page TITLE and a folder on its name at ANY depth, so a page whose
+# title was not its file name was never hidden, and a nested folder or page
+# that shared a ticked name was hidden by accident. Matching ignores case and
+# Unicode normalisation (the Mac's disk does too), which errs toward hiding.
+# A stored name without `.md` still hides the top-level file `<name>.md`, so
+# no older hand-typed entry is un-hidden by the change. The whole rule, with
+# its cases, is `contracts/file-formats.json` → `sidebarHiding`.
+#
+# Three things in this text are load-bearing:
+# - the CQ4T-OMIT-ANCHOR line directly above `const omit = new Set` (the
+#   build rewrites that Set, and verify.sh and the Windows runtime check the
+#   pairing);
+# - HIDE_RULE_MARKER, which is how `build_site.ensure_sidebar_hide_rule_current`
+#   knows an existing section already has this version;
+# - NO `}` followed by `)` before the block's own end: the patchers find a
+#   block with the non-greedy `Component\.Explorer\(\s*\{[\s\S]*?\}\s*\)`,
+#   which would stop early. Hence `if` statements, not callbacks. `filterFn` is
+#   serialised with `.toString()` and run in the browser, so every helper it
+#   uses must be inside it — and NOT as a named inner function or arrow:
+#   Quartz bundles with esbuild's `keepNames`, which wraps one in a `__name`
+#   helper that does not exist in the browser, and the whole sidebar then
+#   fails to draw (caught by `check_sidebar_hiding_against_the_site.py`,
+#   which rebuilds the function from its text the same way). And no
+#   backslash: the patchers pass this text to `re.subn` as a REPLACEMENT,
+#   where a backslash is an escape.
+HIDE_RULE_MARKER = "CQ4T-HIDE-RULE: v2"
+
 EXPLORER_BLOCK = """Component.Explorer({
     folderClickBehavior: "link",
     filterFn: (node) => {
       // CQ4T-OMIT-ANCHOR: do not remove this line; build script overwrites this Set
       const omit = new Set<string>([""]);
-      if (node.isFolder) {
-        return !omit.has(node.fileSegmentHint);
-      } else {
-        return !omit.has(node.data.title);
+      // CQ4T-HIDE-RULE: v2 - stored names, top level only
+      const hiddenNames = new Set<string>();
+      for (const name of omit) {
+        hiddenNames.add(String(name || "").normalize("NFC").toLowerCase());
       }
+      const depth = node.slug.split("/").length;
+      if (node.isFolder) {
+        if (depth !== 2) {
+          return true;
+        }
+        return !hiddenNames.has(String(node.fileSegmentHint || "").normalize("NFC").toLowerCase());
+      }
+      if (depth !== 1) {
+        return true;
+      }
+      const filePath = node.data ? String(node.data.filePath || "").normalize("NFC").toLowerCase() : "";
+      if (hiddenNames.has(filePath)) {
+        return false;
+      }
+      const stem = filePath.endsWith(".md") ? filePath.slice(0, -3) : filePath;
+      return !hiddenNames.has(stem);
     },
   })"""
 

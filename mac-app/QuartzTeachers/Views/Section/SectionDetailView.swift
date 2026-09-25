@@ -114,6 +114,12 @@ struct SectionDetailView: View {
     /// teacher has dismissed it.
     @State var stoppedScheduledPublish: ScheduledPublishOutcome.Stopped?
 
+    /// Said when a preview starts while Course Settings holds changes nobody
+    /// saved (issue #265): the preview reads the saved settings, so the
+    /// switches and the page can disagree. Cleared when the preview stops or
+    /// starts again with nothing unsaved.
+    @State var unsavedSettingsNotice: String? = nil
+
     /// Folder problems the last build reported, shown once when it finishes.
     ///
     /// Held here rather than read from the runner at render time so that the
@@ -242,6 +248,20 @@ struct SectionDetailView: View {
                     sectionNumber: sectionNumber,
                     dismiss: dismissScheduledPublishNotice
                 )
+            }
+            if let unsavedSettingsNotice {
+                HStack(alignment: .firstTextBaseline) {
+                    Image(systemName: "info.circle")
+                        .foregroundStyle(.secondary)
+                    Text(unsavedSettingsNotice)
+                        .font(.callout)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .accessibilityIdentifier("previewUsesSavedSettingsNotice")
+                Divider()
             }
             ZStack {
                 // Base layer: always laid out in the normal, safe-area
@@ -1083,6 +1103,21 @@ struct SectionDetailView: View {
         }
         previewLease = lease
         previewURL = nil
+        // Every window's copy of this course, not only this window's: the
+        // unsaved switches may be in another window's Course Settings.
+        let anyWindowHasUnsavedSettings: Bool = course.configuration.hasUnsavedChanges
+            || WorkspaceModel.anyCopyHasUnsavedChanges(configFileURL: course.configFileURL)
+        unsavedSettingsNotice = SettingsSaveNotice.whenPreviewStarts(
+            settingsHaveUnsavedChanges: anyWindowHasUnsavedSettings
+        )
+        if unsavedSettingsNotice != nil {
+            ActivityTrail.note(
+                .previewStartedWithUnsavedSettings,
+                "started a preview while Course Settings had changes nobody saved — told it uses the saved settings",
+                course: course.code,
+                section: sectionNumber
+            )
+        }
         previewBuildWait.begin(
             folderPath: workspaceURL.path,
             courseCode: course.code,
@@ -1217,6 +1252,8 @@ struct SectionDetailView: View {
             PreviewLeases.release(lease)
             previewLease = nil
         }
+        // The notice was about the preview that just ended.
+        unsavedSettingsNotice = nil
     }
 
     /// Why this course is never deployed, or nil when it is an ordinary one.

@@ -90,6 +90,73 @@ class WorkspaceModel {
         windowModels.append(model)
     }
 
+    /// A course's settings file was just written by `writer`: bring every
+    /// other open window's copy of that course up to date (issue #265).
+    ///
+    /// Each window keeps its own copy of every course's settings, and "the
+    /// same folder in a second window" is supported, so without this a window
+    /// that had not seen a Save went on showing — and could save back — the
+    /// settings as they were before it. A copy with unsaved changes is left
+    /// alone rather than reloaded over them; when it saves, `write(to:)` keeps
+    /// the file's value for every setting it did not change.
+    ///
+    /// Returns how many copies were reloaded, for the tests.
+    @discardableResult
+    static func followWrite(
+        of writer: CourseConfiguration,
+        at url: URL,
+        in models: [WorkspaceModel] = windowModels
+    ) -> Int {
+        let writtenPath: String = url.standardizedFileURL.resolvingSymlinksInPath().path
+        var reloadedCount: Int = 0
+        for model in models {
+            for course in model.courses {
+                if course.configuration === writer {
+                    continue
+                }
+                let coursePath: String = course.configFileURL.standardizedFileURL.resolvingSymlinksInPath().path
+                if coursePath != writtenPath {
+                    continue
+                }
+                if course.configuration.hasUnsavedChanges {
+                    continue
+                }
+                do {
+                    try course.configuration.reloadFromDisk(url: course.configFileURL)
+                    reloadedCount += 1
+                } catch {
+                    // An unreadable file leaves this copy as it was; the next
+                    // folder reload reports the problem the usual way.
+                }
+            }
+        }
+        return reloadedCount
+    }
+
+    /// Whether ANY open window's copy of the course whose settings live at
+    /// `url` holds changes nobody saved — this window's included (issue #265,
+    /// the review's L1). A preview reads the saved file, and with two windows
+    /// on one folder the unsaved switches can be in the OTHER window's Course
+    /// Settings; asking only the previewing window's copy said nothing then.
+    static func anyCopyHasUnsavedChanges(
+        configFileURL url: URL,
+        in models: [WorkspaceModel] = windowModels
+    ) -> Bool {
+        let wantedPath: String = url.standardizedFileURL.resolvingSymlinksInPath().path
+        for model in models {
+            for course in model.courses {
+                let coursePath: String = course.configFileURL.standardizedFileURL.resolvingSymlinksInPath().path
+                if coursePath != wantedPath {
+                    continue
+                }
+                if course.configuration.hasUnsavedChanges {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
     /// True once the app has begun quitting. Windows closing as part of
     /// the quit must not rewrite the remembered list — that is the list
     /// the next launch restores from.

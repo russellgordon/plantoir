@@ -148,7 +148,7 @@ The image is layered as follows (in order):
    - `example_course/EXC2O/` — the complete example course installable from
      the setup wizard (it, too, receives the `.obsidian` defaults on
      install).
-   - `example_content/<CODE>/` — ready-made course content for 38 course
+   - `example_content/<CODE>/` — ready-made course content for 39 course
      codes (count the folders rather than trusting the number), poured into
      a new course of that code
      ([course setup §0b](04-course-setup.md#0b-starting-content-for-the-course-code)).
