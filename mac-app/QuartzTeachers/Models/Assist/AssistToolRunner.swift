@@ -539,7 +539,10 @@ final class AssistToolRunner {
         // "What does Unit 2, Day 3 link to?", matched in code (#167). The
         // argument is in no schema; without it, this function is what it was.
         if text("answer", in: arguments) == AssistCardCommand.linksAnswer {
-            return linksOnAPage(titled: title, in: graph, located: located)
+            return linksOnAPage(
+                titled: title, asTyped: text(AssistCardCommand.linksAsTypedArgument, in: arguments),
+                in: graph, located: located
+            )
         }
         guard let page = graph.page(titled: title) else {
             return AssistToolOutcome.couldNotRead(AssistToolRefusal.noSuchPage(
@@ -585,12 +588,24 @@ final class AssistToolRunner {
     /// The model was never asked; handing back would give it a tool result with
     /// no question in front of it. The `detail` names the page all the same, so
     /// a follow-up turn about "it" has something to refer to.
+    ///
+    /// `asTyped` is "the Water Cycle page" when the card stripped it to
+    /// "Water Cycle": only when THAT finds nothing are the phrase's other
+    /// readings tried ("The Water Cycle", "Scratch Page"), and only when none
+    /// of them finds anything is the teacher told no page is called that
+    /// (fix review F1).
     private func linksOnAPage(titled title: String,
+                              asTyped: String,
                               in graph: AssistSectionGraph,
                               located: Located) -> AssistToolOutcome {
         let course: String = located.course.code
         let section: String = "\(located.sectionNumber)"
-        let candidates: [AssistSectionPage] = graph.pagesATeacherMayMean(title)
+        var candidates: [AssistSectionPage] = graph.pagesATeacherMayMean(title)
+        if candidates.isEmpty && !asTyped.isEmpty {
+            for alternative in AssistCardCommand.linksTitleAlternatives(asTyped: asTyped) where candidates.isEmpty {
+                candidates = graph.pagesATeacherMayMean(alternative)
+            }
+        }
         if candidates.isEmpty {
             let sentence: String = AssistWording.noPageCalled(page: title, course: course, section: section)
             return AssistToolOutcome.answered(sentence, detail: sentence)
@@ -650,6 +665,23 @@ final class AssistToolRunner {
         let answer: String = AssistWording.pageLinksTo(page: page.displayTitle) + "\n"
             + lines.joined(separator: "\n")
         return AssistToolOutcome.answered(answer, detail: page.relativePath + "\n\n" + answer)
+    }
+
+    /// Whether this section has a page a teacher may mean by `title` — asked by
+    /// `AssistAgent` before answering "What does The Water Cycle link to?" in
+    /// code, since the matcher cannot see the pages (fix review F2).
+    func sectionHasAPage(called title: String, course code: String, section number: Int) -> Bool {
+        var course: Course? = nil
+        for candidate in workspace.courses where candidate.code.lowercased() == code.lowercased() {
+            course = candidate
+        }
+        guard let course else {
+            return false
+        }
+        let graph: AssistSectionGraph = AssistSectionGraph.read(
+            forSection: number, in: course, workspaceURL: workspace.workspaceURL
+        )
+        return !graph.pagesATeacherMayMean(title).isEmpty
     }
 
     /// Every FILE name under a folder, lower-cased — what a link that is not a

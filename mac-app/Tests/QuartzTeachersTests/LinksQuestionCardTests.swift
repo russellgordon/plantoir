@@ -55,6 +55,9 @@ final class LinksQuestionCardTests: XCTestCase {
             XCTAssertEqual(command.toolName, "read_page", input)
             XCTAssertEqual(command.arguments["page"], row["expectPage"] as? String, input)
             XCTAssertEqual(command.arguments["answer"], AssistCardCommand.linksAnswer, input)
+            XCTAssertEqual(
+                command.arguments[AssistCardCommand.linksAsTypedArgument], row["expectAsTyped"] as? String, input
+            )
             // A card binds this window's course and section itself, so a card
             // that carried one of its own would be answering a different
             // question with total confidence.
@@ -97,6 +100,27 @@ final class LinksQuestionCardTests: XCTestCase {
             XCTAssertNil(
                 AssistCardCommand.matching(input, windowCourse: window.course, windowSection: window.section),
                 "\"\(input)\" names another course and became a card for this one"
+            )
+        }
+    }
+
+    /// A phrase beginning "the" that is not "the <title> page" is never a card
+    /// by itself: it is answered in code only when the section has a page
+    /// called that, which the AGENT asks (#167 fix review F2).
+    func testEveryPhraseThatIsATitleOnlyIfAPageIsCalledThatIsNeverACardByItself() throws {
+        let window: (course: String, section: Int) = try LinksQuestionCardTests.window()
+        for row in try LinksQuestionCardTests.rows(named: "onlyIfAPageIsCalled") {
+            let input: String = try XCTUnwrap(row["input"] as? String)
+            let page: String = try XCTUnwrap(row["expectPage"] as? String)
+            XCTAssertNotNil(row["why"] as? String, input)
+            XCTAssertEqual(
+                AssistCardCommand.linksQuestion(input, windowCourse: window.course, windowSection: window.section),
+                .onlyIfAPageIsCalled(page),
+                input
+            )
+            XCTAssertNil(
+                AssistCardCommand.matching(input, windowCourse: window.course, windowSection: window.section),
+                input
             )
         }
     }
@@ -176,7 +200,9 @@ final class LinksQuestionCardTests: XCTestCase {
         for lookup in lookups {
             let ask: String = try XCTUnwrap(lookup["ask"] as? String)
             let expect: String = try XCTUnwrap(lookup["expect"] as? String)
-            let outcome: AssistToolOutcome = await made.runner.run(call: LinksQuestionCardTests.readLinks(of: ask))
+            let outcome: AssistToolOutcome = await made.runner.run(
+                call: LinksQuestionCardTests.readLinks(of: ask, asTyped: lookup["asTyped"] as? String)
+            )
             XCTAssertFalse(outcome.shouldContinue, "\(ask): the turn must end in every branch")
             XCTAssertFalse(outcome.summary.contains("list_pages"), "\(ask): a tool's name reached the teacher")
 
@@ -301,6 +327,30 @@ final class LinksQuestionCardTests: XCTestCase {
         )
     }
 
+    /// "What does The Water Cycle link to?" is answered in code when the
+    /// section has that page, and "What does the quiz link to?" — with no
+    /// page called that — goes to the model (#167 fix review F2).
+    func testAPhraseBeginningTheIsAnsweredInCodeOnlyWhenAPageIsCalledThat() async throws {
+        let made = try LinksQuestionCardTests.sectionFromTheContract(askedPageBody: "[[Ohm's Law]]")
+        ActivityTrail.store = ProblemReportStore(folderURL: made.root.appendingPathComponent("trail"))
+        let engine: StubEngine = try StubEngine()
+        defer {
+            engine.stop()
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        engine.serve(#"{"choices":[{"message":{"role":"assistant","content":"Here it is."}}],"usage":{"completion_tokens":4}}"#)
+        let agent: AssistAgent = AssistFixture.makeAgent(tools: made.runner, engineAt: engine.baseURL)
+
+        await agent.say("What does The Water Cycle link to?")
+        XCTAssertEqual(engine.requestCount, 0, "a page that exists was sent to the model")
+        let last: AssistAgent.Entry = try XCTUnwrap(agent.entries.last)
+        XCTAssertEqual(last.speaker, .toolResult(name: "read_page"))
+        XCTAssertEqual(last.text, AssistWording.pageLinksToNothing(page: "The Water Cycle"))
+
+        await agent.say("What does the quiz link to?")
+        XCTAssertEqual(engine.requestCount, 1, "a description with no page by that name must go to the model")
+    }
+
     // MARK: - Helpers
 
     /// A course laid out as `answering.section` says, with the page asked
@@ -335,10 +385,13 @@ final class LinksQuestionCardTests: XCTestCase {
         return made
     }
 
-    private static func readLinks(of page: String) -> AssistToolCall {
-        let arguments: [String: Any] = [
+    private static func readLinks(of page: String, asTyped: String? = nil) -> AssistToolCall {
+        var arguments: [String: Any] = [
             "course": "ICS3U", "section": 1, "page": page, "answer": AssistCardCommand.linksAnswer,
         ]
+        if let asTyped {
+            arguments[AssistCardCommand.linksAsTypedArgument] = asTyped
+        }
         let encoded: Data = (try? JSONSerialization.data(withJSONObject: arguments)) ?? Data("{}".utf8)
         return AssistToolCall(
             id: UUID().uuidString, type: "function",

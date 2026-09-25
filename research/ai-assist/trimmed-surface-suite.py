@@ -590,7 +590,9 @@ def intercepted(message, window_course=None, window_section=None):
     links = links_question(message, window_course, window_section)
     if links is not None and links[0] == "page":
         return "read_page"
-    if links is not None:
+    # ("ifcalled", title) is a card only when the section has that page, which
+    # this guard cannot see; the probes carry none, so it is not intercepted.
+    if links is not None and links[0] == "another":
         # Not a tool: another course named in a links question is refused in
         # code with the sentence a model-named course gets (#167).
         return REFUSED_IN_CODE
@@ -668,17 +670,17 @@ def links_question(message, window_course, window_section):
             return None
     if places > 1:
         return None
-    page = links_page_title(title)
-    if not page:
+    reading = links_page_title(title)
+    if not reading:
         return None
     # A title slot that is itself a place asks about a section or a course,
     # not a page (#167 review R1).
-    place = links_place(page, window_course, window_section)
+    place = links_place(reading[1], window_course, window_section)
     if isinstance(place, tuple):
         return place
     if place is not None:
         return None
-    return ("page", page)
+    return reading
 
 
 def links_without_please(typed):
@@ -713,13 +715,6 @@ def links_page_title(slot):
         return None
     if folded.startswith(("the page ", "this page ", "that page ")):
         return None
-    if folded.startswith("the "):
-        if not folded.endswith(" page") or len(folded) <= len("the  page"):
-            return None
-        title = title[len("the "):len(title) - len(" page")].strip(" \t")
-        if not title:
-            return None
-        return links_page_title(title)
     for day in ("today", "tomorrow", "yesterday", "tonight", "monday", "tuesday", "wednesday",
                 "thursday", "friday", "saturday", "sunday"):
         if folded == day or folded.startswith(day + "'s "):
@@ -728,9 +723,39 @@ def links_page_title(slot):
         for opening in ("", "my ", "the "):
             if folded.startswith(opening + word):
                 return None
-    if " link to" in folded or " point to" in folded:
+    if folded.startswith("the "):
+        if folded.endswith(" page") and len(folded) > len("the  page"):
+            inner = links_page_title(title[len("the "):len(title) - len(" page")].strip(" \t"))
+            if inner and inner[0] == "page" and len(inner) == 2:
+                return ("page", inner[1], title)
+            return None
+        if links_two_requests(folded):
+            return None
+        return ("ifcalled", title)
+    if links_two_requests(folded):
         return None
-    return title
+    return ("page", title)
+
+
+def links_two_requests(folded):
+    if " link to" in folded or " point to" in folded:
+        return True
+    for verb in ("publish", "unpublish", "hide", "deploy", "delete"):
+        if (" and " + verb + " ") in folded or folded.endswith(" and " + verb):
+            return True
+    return False
+
+
+def known_course_codes():
+    """The codes the app ships (Ontario and BC lists), upper-cased (#167 L2)."""
+    codes = set()
+    for name in ("ontario_secondary_courses.json", "british_columbia_secondary_courses.json"):
+        with open(ROOT / "support" / name, encoding="utf-8") as handle:
+            codes.update(code.upper() for code in json.load(handle))
+    return codes
+
+
+KNOWN_COURSE_CODES = known_course_codes()
 
 
 def links_place(words, window_course, window_section):
@@ -748,6 +773,9 @@ def links_place_against_the_window(words, window_course, window_section):
     parts = [part for part in words.replace(",", " ").split(" ") if part]
     folded = [part.lower() for part in parts]
     course_word = section_word = None
+    if folded in (["my", "course"], ["this", "course"], ["our", "course"], ["my", "class"],
+                  ["this", "class"]):
+        return "window"
     if folded == ["this", "section"]:
         return "section" if window_section is None else "window"
     elif len(folded) == 2 and folded[0] == "section":
@@ -759,7 +787,7 @@ def links_place_against_the_window(words, window_course, window_section):
     elif len(folded) == 1:
         if window_course and parts[0].lower() == window_course.lower():
             return "window"
-        if re.fullmatch(r"[A-Za-z]{3}[0-9][A-Za-z]", parts[0]):
+        if parts[0].upper() in KNOWN_COURSE_CODES:
             return ("another", parts[0])
         return None
     else:
@@ -1266,12 +1294,22 @@ def assert_links_question_matches_contract():
         if intercepted(row["input"], course, section) != "read_page":
             wrong.append("accepted and NOT intercepted: %r" % row["input"])
     for row in family["accepted"]:
-        if links_question(row["input"], course, section) != ("page", row["expectPage"]):
+        expected = ("page", row["expectPage"])
+        if "expectAsTyped" in row:
+            expected = ("page", row["expectPage"], row["expectAsTyped"])
+        if links_question(row["input"], course, section) != expected:
             wrong.append("accepted with another title than %r: %r" % (row["expectPage"], row["input"]))
+    for row in family["onlyIfAPageIsCalled"]:
+        if links_question(row["input"], course, section) != ("ifcalled", row["expectPage"]):
+            wrong.append("not a title-if-a-page-is-called %r: %r" % (row["expectPage"], row["input"]))
+        if intercepted(row["input"], course, section) is not None:
+            wrong.append("title-if-a-page-is-called intercepted as a card: %r" % row["input"])
     for row in family["anotherCourse"]:
         if links_question(row["input"], course, section) != ("another", row["expectCourse"]):
             wrong.append("another course and not refused naming %s: %r" % (row["expectCourse"], row["input"]))
     for row in family["refused"]:
+        if links_question(row["input"], course, section) is not None:
+            wrong.append("refused and read as a links question anyway: %r" % row["input"])
         if intercepted(row["input"], course, section) in ("read_page", REFUSED_IN_CODE):
             wrong.append("refused and intercepted anyway: %r" % row["input"])
     if wrong:
@@ -1280,7 +1318,8 @@ def assert_links_question_matches_contract():
             "-> linksQuestion:\n  %s\nFix it before quoting a number from this suite."
             % "\n  ".join(wrong)
         )
-    return len(family["accepted"]) + len(family["anotherCourse"]) + len(family["refused"])
+    return (len(family["accepted"]) + len(family["anotherCourse"]) + len(family["refused"])
+            + len(family["onlyIfAPageIsCalled"]))
 
 
 def ask(prompt):

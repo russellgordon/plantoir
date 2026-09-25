@@ -88,10 +88,14 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
             message, windowCourse: windowCourse, windowSection: windowSection
         )
         if case .page(let title) = links {
-            return AssistCardCommand(
-                toolName: "read_page",
-                arguments: ["page": title, "answer": AssistCardCommand.linksAnswer]
-            )
+            return AssistCardCommand.readLinks(of: title)
+        }
+        if case .theTitlePage(let title, let asTyped) = links {
+            var command: AssistCardCommand = AssistCardCommand.readLinks(of: title)
+            var arguments: [String: String] = command.arguments
+            arguments[AssistCardCommand.linksAsTypedArgument] = asTyped
+            command = AssistCardCommand(toolName: command.toolName, arguments: arguments)
+            return command
         }
         return AssistCardCommand.duplicateClass(tidied, original: message)
     }
@@ -107,6 +111,36 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     /// and `re_date_classes`' `rollover`. An MCP caller that sends it anyway
     /// gets the code's answer, which is harmless: it is a read.
     static let linksAnswer: String = "links"
+
+    /// The hidden argument that carries "The Water Cycle page" as typed, for
+    /// the lookup to try when the stripped title finds nothing. In no schema,
+    /// like `answer`.
+    static let linksAsTypedArgument: String = "asTyped"
+
+    /// The card for the links on a page.
+    static func readLinks(of title: String) -> AssistCardCommand {
+        return AssistCardCommand(
+            toolName: "read_page",
+            arguments: ["page": title, "answer": AssistCardCommand.linksAnswer]
+        )
+    }
+
+    /// What "the Water Cycle page" may name, in the order they are tried after
+    /// the stripped title: without "the" ("Water Cycle page"), without "page"
+    /// ("the Water Cycle" — "The Water Cycle"), and as typed.
+    static func linksTitleAlternatives(asTyped: String) -> [String] {
+        let typed: String = asTyped.trimmingCharacters(in: .whitespaces)
+        var alternatives: [String] = []
+        let lowered: String = typed.lowercased()
+        if lowered.hasPrefix("the ") {
+            alternatives.append(String(typed.dropFirst("the ".count)).trimmingCharacters(in: .whitespaces))
+        }
+        if lowered.hasSuffix(" page") {
+            alternatives.append(String(typed.dropLast(" page".count)).trimmingCharacters(in: .whitespaces))
+        }
+        alternatives.append(typed)
+        return alternatives
+    }
 
     /// "What does Unit 2, Day 3 link to?" — the page's links, answered in
     /// code, and never sent to the model (issue #167).
@@ -283,14 +317,24 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
             return nil
         }
 
-        guard let page = AssistCardCommand.pageTitle(from: title) else {
+        guard let reading = AssistCardCommand.pageTitle(from: title) else {
             return nil
+        }
+        var page: String = ""
+        switch reading {
+        case .title(let read):
+            page = read
+        case .theTitlePage(let stripped, _):
+            page = stripped
+        case .onlyIfAPageIsCalled(let read):
+            page = read
         }
         // A title slot that is itself a PLACE — "What links are in this
         // section?", "List the links in ICS3U section 1", "What links are in
-        // SPH3U?" — asks about a whole section or course, not one page (the
-        // implementation review's R1). Another course is the refusal the
-        // other places get; everything else goes to the model.
+        // SPH3U?", "What does my course link to?" — asks about a whole section
+        // or course, not one page (the implementation review's R1). Another
+        // course is the refusal the other places get; everything else goes to
+        // the model.
         switch AssistCardCommand.place(page, windowCourse: windowCourse, windowSection: windowSection) {
         case .anotherCourse(let code):
             return .anotherCourse(code)
@@ -299,12 +343,35 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         case .notAPlace:
             break
         }
-        return .page(page)
+        switch reading {
+        case .title(let read):
+            return .page(read)
+        case .theTitlePage(let stripped, let asTyped):
+            return .theTitlePage(stripped, asTyped: asTyped)
+        case .onlyIfAPageIsCalled(let read):
+            return .onlyIfAPageIsCalled(read)
+        }
+    }
+
+    /// What `pageTitle` made of a title slot.
+    private enum TitleReading {
+
+        /// A title, looked up as it is.
+        case title(String)
+
+        /// "The Ohm's Law page": looked up as "Ohm's Law" first, and — only
+        /// when no page is called that — as the teacher typed it, "The Water
+        /// Cycle" and "Scratch Page" being real titles (fix review F1).
+        case theTitlePage(String, asTyped: String)
+
+        /// "The Water Cycle", "the quiz": a title when a page is called that,
+        /// and otherwise a description for the model (fix review F2).
+        case onlyIfAPageIsCalled(String)
     }
 
     /// The title slot tidied into a page title, or nil when what is in it is
     /// not a page title this family may look up.
-    private static func pageTitle(from slot: String) -> String? {
+    private static func pageTitle(from slot: String) -> TitleReading? {
         var title: String = slot.trimmingCharacters(in: .whitespaces)
         while title.hasSuffix(",") {
             title = String(title.dropLast()).trimmingCharacters(in: .whitespaces)
@@ -333,23 +400,6 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         for opening in ["the page ", "this page ", "that page "] where folded.hasPrefix(opening) {
             return nil
         }
-        // "The Ohm's Law page" names the page Ohm's Law: the article and the
-        // word "page" come off (R1). Any OTHER title beginning "the" — "the
-        // quiz", "the homepage", "the course outline" — is a description the
-        // model can read against the conversation, so it goes there. The
-        // cost, stated: a page whose real title begins "The" is sent to the
-        // model too, which still answers it with read_page as it always did.
-        if folded.hasPrefix("the ") {
-            guard folded.hasSuffix(" page"), folded.count > "the  page".count else {
-                return nil
-            }
-            title = String(title.dropFirst("the ".count).dropLast(" page".count))
-                .trimmingCharacters(in: .whitespaces)
-            if title.isEmpty {
-                return nil
-            }
-            return AssistCardCommand.pageTitle(from: title)
-        }
         // A page named by its DAY. Which class that is depends on the dates,
         // which the model reads and this frame does not.
         let days: [String] = [
@@ -365,11 +415,46 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
                 return nil
             }
         }
-        // A second "link to" means the sentence is two questions.
-        if folded.contains(" link to") || folded.contains(" point to") {
+        // "The Ohm's Law page" names the page Ohm's Law: the article and the
+        // word "page" come off (R1) — and the runner looks the phrase up as
+        // typed too when that finds nothing, because 423 of the 9,790 titles
+        // in the example payloads begin "The" and 28 end "Page" (fix review
+        // F1). Any OTHER phrase beginning "the" — "The Water Cycle", "the
+        // quiz" — is answered in code only when a page IS called that, and
+        // otherwise goes to the model (F2): sending a real "The …" title
+        // there is the path #167 measured at 0 of 84.
+        if folded.hasPrefix("the ") {
+            if folded.hasSuffix(" page"), folded.count > "the  page".count {
+                let stripped: String = String(title.dropFirst("the ".count).dropLast(" page".count))
+                    .trimmingCharacters(in: .whitespaces)
+                if case .title(let inner)? = AssistCardCommand.pageTitle(from: stripped) {
+                    return .theTitlePage(inner, asTyped: title)
+                }
+                return nil
+            }
+            if AssistCardCommand.isTwoRequests(folded) {
+                return nil
+            }
+            return .onlyIfAPageIsCalled(title)
+        }
+        if AssistCardCommand.isTwoRequests(folded) {
             return nil
         }
-        return title
+        return .title(title)
+    }
+
+    /// A second "link to", or "… and publish them": the sentence is two
+    /// requests, and a card must not answer half of one.
+    private static func isTwoRequests(_ folded: String) -> Bool {
+        if folded.contains(" link to") || folded.contains(" point to") {
+            return true
+        }
+        for verb in ["publish", "unpublish", "hide", "deploy", "delete"] {
+            if folded.contains(" and " + verb + " ") || folded.hasSuffix(" and " + verb) {
+                return true
+            }
+        }
+        return false
     }
 
     /// What a place named in a links question refers to.
@@ -405,6 +490,14 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
 
         var courseWord: String? = nil
         var sectionWord: String? = nil
+        // "My course", "this course", "my class": the window's own course or
+        // a class named by when it is — a place, not a page (fix review L1).
+        let wholeWindow: [[String]] = [
+            ["my", "course"], ["this", "course"], ["our", "course"], ["my", "class"], ["this", "class"],
+        ]
+        if wholeWindow.contains(folded) {
+            return .thisWindow
+        }
         if folded == ["this", "section"] {
             // Always this window's section, whichever it is.
             return windowSection == nil ? .anotherSection : .thisWindow
@@ -418,13 +511,13 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
             sectionWord = folded[1]
         } else if folded.count == 1 {
             // "in ICS3U" alone. Read as a course only when it is this window's
-            // or has a course code's shape; anything else — "in Unit 2" — is
+            // or is a course code that exists; anything else — "in Unit 2" — is
             // part of the page's name as far as this frame can tell.
             let only: String = parts[0]
             if let windowCourse, only.lowercased() == windowCourse.lowercased() {
                 return .thisWindow
             }
-            if AssistCardCommand.hasACourseCodesShape(only) {
+            if AssistCardCommand.isAKnownCourseCode(only) {
                 return .anotherCourse(only)
             }
             return .notAPlace
@@ -447,27 +540,37 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         return .thisWindow
     }
 
-    /// Three letters, a digit, then a letter — "ICS3U", "MPM2D",
-    /// "ENG4U". Only used to tell "in SPH3U" (a course) from "in Unit 2" (part
-    /// of a page's name) when no section follows.
-    private static func hasACourseCodesShape(_ word: String) -> Bool {
-        let characters: [Character] = Array(word)
-        guard characters.count == 5 else {
-            return false
-        }
-        for index in 0..<3 {
-            if !characters[index].isASCII || !characters[index].isLetter {
-                return false
+    /// Whether a word is a course code that EXISTS — one of the 1,930
+    /// Ontario and 117 British Columbia codes the app already ships in
+    /// `ontario_secondary_courses.json` and `british_columbia_secondary_courses.json`
+    /// (fix review L2). Only used to tell "in SPH3U" (a course) from "in Unit
+    /// 2" or "Lab1B" (part of a page's name) when no section follows.
+    ///
+    /// Read from what exists rather than from a shape, because the shapes
+    /// disagree with each other: 1,091 Ontario codes have no digit at all
+    /// ("ESLBO"), five end in two digits, BC codes run to seven characters
+    /// ("MCMPR11", "MMA--09"), and a shape wide enough for all of them takes in
+    /// ordinary words. `support/skeletons/families.json`'s 499 prefixes are
+    /// exactly the Ontario list's, so it adds none.
+    private static func isAKnownCourseCode(_ word: String) -> Bool {
+        return AssistCardCommand.knownCourseCodes.contains(word.uppercased())
+    }
+
+    /// Every code in the two course lists the app carries, upper-cased.
+    private static let knownCourseCodes: Set<String> = {
+        var codes: Set<String> = []
+        for fileName in ["ontario_secondary_courses", "british_columbia_secondary_courses"] {
+            guard let url = Bundle.main.url(forResource: fileName, withExtension: "json"),
+                  let data = try? Data(contentsOf: url),
+                  let decoded = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                continue
+            }
+            for code in decoded.keys {
+                codes.insert(code.uppercased())
             }
         }
-        guard characters[3].isASCII, characters[3].isNumber else {
-            return false
-        }
-        // A LETTER last, always: "ICS3U", never "Lab01" — a course code ends
-        // in a letter, and an ordinary word with a digit in it must not read
-        // as a course (the implementation review's R3).
-        return characters[4].isASCII && characters[4].isLetter
-    }
+        return codes
+    }()
 
     /// "Please" off either end, with the comma that may come with it.
     private static func withoutPlease(_ typed: String) -> String {
@@ -2229,6 +2332,16 @@ nonisolated enum AssistLinksQuestion: Sendable, Equatable {
 
     /// The links on the page with this title, in this window's section.
     case page(String)
+
+    /// "The Ohm's Law page": the links on "Ohm's Law" — or, when no page is
+    /// called that, on the page called what the teacher typed ("The Water
+    /// Cycle", "Scratch Page"). `asTyped` travels as a hidden argument.
+    case theTitlePage(String, asTyped: String)
+
+    /// "The Water Cycle", "the quiz": answered in code when this section has
+    /// a page called that, and otherwise sent to the model. Never a card on
+    /// its own — the matcher cannot see the pages; `AssistAgent` asks.
+    case onlyIfAPageIsCalled(String)
 
     /// The sentence named ANOTHER course. Refused in code with the sentence a
     /// model-named course gets (`AssistWording.askedAboutAnotherCourse`), and
