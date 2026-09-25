@@ -556,13 +556,6 @@ class ScriptRunner {
                 if line.isEmpty {
                     return
                 }
-                // Half a marker line is machinery, not a question — and one
-                // cut after `"sentence":` ends in a colon, which would
-                // otherwise be offered to the teacher as something to answer,
-                // raw JSON and all (#153).
-                if SiteHealthFinding.isMarkerLine(line) || PagesDatedByTheBuild.isMarkerLine(line) {
-                    return
-                }
                 if ScriptRunner.looksLikeQuestion(line) {
                     let asked = ScriptRunner.separateDefaultAnswer(from: line)
                     self.pendingQuestion = asked.question
@@ -888,7 +881,14 @@ class ScriptRunner {
     }
 
     /// Prompt shapes the toolchain's scripts actually use.
+    ///
+    /// Never a marker line (#153): half a health payload cut after
+    /// `"sentence":` ends in a colon, and would otherwise be offered to the
+    /// teacher as something to answer, raw JSON and all.
     static func looksLikeQuestion(_ line: String) -> Bool {
+        if SiteHealthFinding.isMarkerLine(line) || PagesDatedByTheBuild.isMarkerLine(line) {
+            return false
+        }
         if line.hasSuffix(":") || line.hasSuffix("?") || line.hasSuffix(">") {
             return true
         }

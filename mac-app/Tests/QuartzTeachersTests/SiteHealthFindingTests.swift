@@ -273,6 +273,18 @@ final class SiteHealthFindingTests: XCTestCase {
         XCTAssertFalse(transcript.recentText(maximumCharacters: 8000).contains(SiteHealthFinding.markerPrefix))
     }
 
+    /// Half a marker cut after `"sentence":` ends in a colon — a question's
+    /// shape — so after a quiet spell the prompt check would have offered raw
+    /// JSON to the teacher as something to answer.
+    func testHalfAMarkerIsNeverAQuestion() {
+        let cut: String.Index = mediaLine.index(mediaLine.startIndex, offsetBy: 60)
+        let half: String = String(mediaLine[..<cut]).trimmingCharacters(in: .whitespaces)
+        XCTAssertTrue(half.hasSuffix(":"), half)
+        XCTAssertFalse(ScriptRunner.looksLikeQuestion(half))
+        XCTAssertFalse(ScriptRunner.looksLikeQuestion("PLANTOIR_DATED: {\"course\":"))
+        XCTAssertTrue(ScriptRunner.looksLikeQuestion("Enter Netlify site name:"), "real prompts still ask")
+    }
+
     /// The trail sentence is the one the contract writes down — read out of
     /// `activityTrail.mustRecord` → "folder problem found" → `carries`, not
     /// retyped here. The mac wrote a straight apostrophe where the contract
@@ -444,7 +456,7 @@ final class ScheduledDeployFolderProblemTests: XCTestCase {
         let taken: [SiteHealthFinding] = ScheduledDeploy.takeFolderProblems(
             courseCode: "ICS3U", sectionNumber: 1, inHomeFolder: homeFolderURL
         )
-        XCTAssertEqual(taken.count, 3, "the sentinel keeps every marker line, as before")
+        XCTAssertEqual(taken.count, 2, "a finding printed twice is kept once, so the dialog lists it once")
         let linesAfter: Int = store.activityText(includingPrompts: false).components(separatedBy: "\n").count
         XCTAssertEqual(linesAfter, linesBefore)
     }

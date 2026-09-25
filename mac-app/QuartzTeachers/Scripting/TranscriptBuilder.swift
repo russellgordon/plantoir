@@ -58,7 +58,7 @@ struct TranscriptBuilder {
     /// marker. Windows hides the line under construction the same way
     /// (`VisibleCurrentLine`). `currentLine` itself is untouched: the prompt
     /// check reads it, and refuses a marker line itself
-    /// (`ScriptRunner.schedulePromptCheck`).
+    /// (`ScriptRunner.looksLikeQuestion`).
     ///
     /// Named residual, the same on Windows: a chunk that ends in the middle of
     /// the PREFIX ("…PLANTOIR_HE") shows that fragment until the next chunk.
