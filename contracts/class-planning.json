@@ -719,6 +719,36 @@
               "value": "2026-09-24T07:00:00.000+0000"
             },
             "after": null
+          },
+          {
+            "name": "a line of INDENTED dashes is part of the value, not the closing fence: it goes with the key",
+            "before": "---\ncreatedSection1: 2026-09-08T07:00:00.000+0000\n  ---\ntitle: Notes\n---\nBody\n",
+            "write": {
+              "key": "createdSection1",
+              "value": "2026-09-24T07:00:00.000+0000"
+            },
+            "after": "---\ncreatedSection1: 2026-09-24T07:00:00.000+0000\ntitle: Notes\n---\nBody\n",
+            "why": "Issue #188. python-frontmatter's closing fence is `^-{3,}\\s*$` at column 0, so the indented dashes are a continuation of the date. The splice used to trim both ends of a fence, as the apps did, end the block there, and write a page that read back wrong — so the write was dropped and the page quietly left undated."
+          },
+          {
+            "name": "an INDENTED opening fence still opens the block",
+            "before": "  ---\ntitle: Notes\n---\nBody\n",
+            "write": {
+              "key": "createdSection1",
+              "value": "2026-09-24T07:00:00.000+0000"
+            },
+            "after": "  ---\ncreatedSection1: 2026-09-24T07:00:00.000+0000\ntitle: Notes\n---\nBody\n",
+            "why": "The guard on #188's other half: python-frontmatter strips the whole document before it matches, so an indented opener is a fence. Refusing it would give the page a second block in front of the teacher's own."
+          },
+          {
+            "name": "a block closed only by INDENTED dashes is never closed, and is not written",
+            "before": "---\ntitle: Notes\n  ---\nBody\n",
+            "write": {
+              "key": "createdSection1",
+              "value": "2026-09-24T07:00:00.000+0000"
+            },
+            "after": null,
+            "why": "Issue #188. With no column-0 close the page has no frontmatter to python-frontmatter, and this writer refuses a block that is opened and never closed rather than prepend one. The apps' visibility writer PREPENDS on the same shape (file-formats.json -> pageVisibility.writingCases), which is right for a hide; a date is not worth restructuring a teacher's file for, and the SITE is dated anyway, because the build dates its own copy whether or not the teacher's file is written. documentation/08-course-config-reference.md says why the two differ."
           }
         ]
       }

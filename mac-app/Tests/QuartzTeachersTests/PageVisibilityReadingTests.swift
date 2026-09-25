@@ -150,6 +150,18 @@ final class PageVisibilityReadingTests: XCTestCase {
             PageVisibilityReader.answer(in: "---\npublish: false\n----\nBody.\n", forSection: 1),
             .hidden
         )
+        // And spaces or a tab AFTER the dashes are still a fence: `^-{3,}\s*$`
+        // allows whitespace at the END. Measured 2026-09-25 — both are HIDDEN
+        // on the site. They guard the strictness `isFence` gained with issue
+        // #188, which is about what comes BEFORE the dashes only.
+        XCTAssertEqual(
+            PageVisibilityReader.answer(in: "---   \npublish: false\n---   \nBody.\n", forSection: 1),
+            .hidden
+        )
+        XCTAssertEqual(
+            PageVisibilityReader.answer(in: "---\t\npublish: false\n---\t\nBody.\n", forSection: 1),
+            .hidden
+        )
     }
 
     /// An indented `# note` is a comment, not a value.
@@ -235,6 +247,11 @@ final class PageVisibilityReadingTests: XCTestCase {
         XCTAssertEqual(
             PageVisibilityReader.answer(in: "\n---\npublish: false\n---\nBody.\n", forSection: 1),
             .hidden
+        )
+        XCTAssertEqual(
+            PageVisibilityReader.answer(in: "\n\n---   \npublish: false\n---\nBody.\n", forSection: 1),
+            .hidden,
+            "Blank lines and trailing spaces on the opening fence together"
         )
     }
 
@@ -665,6 +682,167 @@ final class PageVisibilityReadingTests: XCTestCase {
         XCTAssertTrue(after.contains("publish: false\n"), after)
         XCTAssertFalse(after.contains("\n  false"), "The continuation went with the key")
         XCTAssertEqual(PageVisibilityReader.answer(in: after, forSection: 1), .hidden)
+    }
+
+    // MARK: - A line of INDENTED dashes is not a closing fence (#188)
+
+    /// A line of dashes with spaces or a tab in front of it is part of the
+    /// value above it, not the end of the block.
+    ///
+    /// python-frontmatter's boundary is `^-{3,}\s*$` matched with
+    /// `re.MULTILINE`, so `^` is the start of a LINE and there is no room for
+    /// whitespace before the dashes. Measured 2026-09-25 through the real
+    /// image (python-frontmatter 1.3.0 / PyYAML 6.0.3, then gray-matter with
+    /// js-yaml on `JSON_SCHEMA`, then `patches/publish.ts`): every page below
+    /// but the tab one is PUBLISHED before the write — `publish: false` over
+    /// `  ---` is the string `"false ---"` — and every one is HIDDEN after it.
+    /// The tab row is hidden both ways, because the build cannot read a tab
+    /// used as indentation and has hidden such a page since #246.
+    ///
+    /// This reader used to end the block at those dashes, see a complete
+    /// `false` and answer `hidden` CONFIDENTLY — so `setting`'s already-right
+    /// gate returned before the writer ran, and "hide this page" was a no-op
+    /// the teacher was told had worked.
+    /// [Issue #188](https://github.com/russellgordon/plantoir/issues/188).
+    func testAnIndentedLineOfDashesIsNotAClosingFence() {
+        let rows: [String] = [
+            "publish: false\n  ---\ntitle: x",
+            "publish: no\n  ---\ntitle: x",
+            "publish: >-\n  ---\ntitle: x",
+            "publish:\n  ---\ntitle: x",
+            "publish: false\n  ----\ntitle: x",
+            "publish: false\n  ---  \ntitle: x",
+            "publish: false\n\t---\ntitle: x",
+            "publish: false\n  ---\n  ---\ntitle: x",
+        ]
+        for frontmatter in rows {
+            XCTAssertEqual(
+                PageVisibilityReader.answer(in: file(frontmatter), forSection: 1),
+                .cannotTell,
+                "\(frontmatter) — the dashes are part of the value, so there is no value to read"
+            )
+            let hidden = AssistPageVisibility.setting(
+                published: false, in: file(frontmatter), forSection: 1, isSectionLocal: true
+            )
+            XCTAssertTrue(hidden.changed, "\(frontmatter) — asking to hide this page must not be a no-op")
+            XCTAssertEqual(hidden.text, file("publish: false\ntitle: x"), frontmatter)
+            XCTAssertEqual(PageVisibilityReader.answer(in: hidden.text, forSection: 1), .hidden, frontmatter)
+        }
+    }
+
+    /// The same shape on a course-level page, where the early close had a
+    /// second victim: ADDING A SECTION. `SectionAdder` put the new pair above
+    /// the dashes, so section 1's value lost them (hidden) and section 2's
+    /// took them (`"false ---"`, published). Measured 2026-09-25. The whole
+    /// file is `course-management.json → sectionNumbers.addingKeysToAPage`;
+    /// this pins both sections' verdicts, which the bytes alone do not say.
+    func testAddingASectionLeavesSectionOnesIndentedDashesWithItsValue() throws {
+        let folder: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("indented-dashes-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let pageURL: URL = folder.appendingPathComponent("Loops.md")
+        let before: String = "---\ntitle: Loops\npublishForSection1: false\n  ---\n---\nBody line one.\n"
+        try Data(before.utf8).write(to: pageURL)
+        XCTAssertTrue(AssistPageVisibility.publishes(in: before, forSection: 1), "The site publishes section 1")
+
+        let outcome = SectionAdder.extendFrontmatter(
+            ofPageAt: pageURL, toInclude: 2, created: "2026-09-25T07:00:00.000-0400"
+        )
+        let after: String = try String(contentsOf: pageURL, encoding: .utf8)
+        XCTAssertEqual(outcome, .givenKeysAndKeptHiddenBecauseUnreadable)
+        XCTAssertEqual(
+            PageVisibilityReader.answer(in: after, forSection: 1), .cannotTell,
+            "Section 1 still reads \"false ---\" — the dashes stayed with its value"
+        )
+        XCTAssertEqual(
+            PageVisibilityReader.answer(in: after, forSection: 2), .hidden,
+            "The new section is held back, because section 1's value could not be read"
+        )
+    }
+
+    /// And the other half of the same rule, which is the one that must NOT be
+    /// made symmetric: an indented line of dashes at the TOP of the file still
+    /// opens the block.
+    ///
+    /// `frontmatter.parse` does `text.strip()` on the WHOLE document before
+    /// `^-{3,}\s*$` sees anything, so the indent of the first line is gone by
+    /// the time the regex looks. Measured 2026-09-25: every page here is
+    /// HIDDEN on the site.
+    ///
+    /// **A guard, not a fix** — it passes on the old reader too, and that is
+    /// the point. Reading these strictly would leave this app seeing no block
+    /// at all, and the writer would PREPEND one of its own, turning the
+    /// teacher's frontmatter into body text in front of their students, which
+    /// is the bug #140 fixed.
+    func testAnIndentedOpeningFenceIsStillFrontmatter() {
+        for pageText in [
+            "  ---\npublish: false\n---\nBody.\n",
+            "\t---\npublish: false\n---\nBody.\n",
+            "\n  ---\npublish: false\n---\nBody.\n",
+        ] {
+            XCTAssertEqual(PageVisibilityReader.answer(in: pageText, forSection: 1), .hidden, pageText)
+            let hidden = AssistPageVisibility.setting(
+                published: false, in: pageText, forSection: 1, isSectionLocal: true
+            )
+            XCTAssertFalse(hidden.changed, "\(pageText) — this page already says what was asked")
+            XCTAssertEqual(hidden.text, pageText, pageText)
+        }
+    }
+
+    /// A file written on Windows keeps its line endings through this sweep
+    /// too.
+    func testAnIndentedFenceInACrlfFileLeavesCrlfBehind() {
+        let windowsWritten: String = "---\r\npublish: false\r\n  ---\r\ntitle: x\r\n---\r\nBody.\r\n"
+        let hidden = AssistPageVisibility.setting(
+            published: false, in: windowsWritten, forSection: 1, isSectionLocal: true
+        )
+        XCTAssertTrue(hidden.changed)
+        XCTAssertEqual(Data(hidden.text.utf8), Data("---\r\npublish: false\r\ntitle: x\r\n---\r\nBody.\r\n".utf8))
+        XCTAssertEqual(PageVisibilityReader.answer(in: hidden.text, forSection: 1), .hidden)
+    }
+
+    /// And the one shape whose STRUCTURE changes: a page whose only
+    /// closing-looking line is indented has no closed block at all any more,
+    /// to this app or to the build.
+    ///
+    /// python-frontmatter reads no frontmatter on it, so every line is body
+    /// text and the page is PUBLISHED. The write gives the page a block of
+    /// its own, as for any fence that is never closed, and the page is HIDDEN
+    /// — measured 2026-09-25. This is the prepend #140 taught nobody to make,
+    /// and it is right here because there was never a block to push into the
+    /// body: those lines already were the body. (The build's own date writer
+    /// refuses the same shape; `class-planning.json → atBuildTime`.)
+    func testAPageWhoseIndentedDashesAreItsOnlyClosingFenceIsGivenABlock() {
+        let neverClosed: String = "---\npublish: false\n  ---\ntitle: x\nBody.\n"
+        XCTAssertEqual(
+            PageVisibilityReader.answer(in: neverClosed, forSection: 1), .cannotTell,
+            "There is a fence, and what follows it is not something to answer about"
+        )
+        XCTAssertTrue(
+            AssistPageVisibility.publishes(in: neverClosed, forSection: 1),
+            "Reporting collapses `cannot tell` to visible — and here that is what the site does"
+        )
+        let hidden = AssistPageVisibility.setting(
+            published: false, in: neverClosed, forSection: 1, isSectionLocal: true
+        )
+        XCTAssertTrue(hidden.changed)
+        XCTAssertEqual(hidden.text, "---\npublish: false\n---\n" + neverClosed)
+        XCTAssertEqual(PageVisibilityReader.answer(in: hidden.text, forSection: 1), .hidden)
+    }
+
+    /// The fence rule is one rule: the page copier's builder-agreement guard
+    /// asks the reader's `isFence` rather than keeping a copy of its own.
+    func testTheCopierAsksTheSameFenceRule() {
+        for line in ["---", "----", "---  ", "---\t", "---\r", "  ---", "\t---", "--", "---x", "- - -"] {
+            XCTAssertEqual(
+                CopiedPageText.isAFenceTheBuilderSees(line),
+                PageVisibilityReader.isFence(line),
+                line.debugDescription
+            )
+        }
+        XCTAssertFalse(PageVisibilityReader.isFence("  ---"), "A closing fence is never indented")
+        XCTAssertTrue(PageVisibilityReader.isOpeningFence("  ---"), "An opening fence may be")
     }
 
     /// Reading does not depend on where the page lives — the build consults

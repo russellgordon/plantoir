@@ -583,28 +583,84 @@ separately from the reader:
   in full and sweeps. Measured after that write: `False` → HIDDEN. It changes
   none of the 54 shared `readingCases` that existed before it.
 
-  **"Whatever is on the key's own line" is closed; "the first line that could
-  be a value" has one pre-existing exception, and it is the one that reaches
-  this same fault.** A line of INDENTED DASHES — `publish: false` over
-  `  ---` — never reaches the rule above, because `isFence` trims leading
-  whitespace before testing for dashes and so takes `  ---` for the CLOSING
-  fence. python-frontmatter's own boundary is `^-{3,}\s*$`, which allows no
-  leading whitespace at all, so the build reads that line as part of the value
-  and the site PUBLISHES the page (`"false ---"`), while the reader says
-  `hidden` — confidently — and "hide this page" is a no-op, exactly the shape
-  this section exists to close. `publish: no` over `  ---` behaves the same;
-  `publish: >-` and `publish:` over `  ---` are written but the `  ---` is
-  left behind, because `continuationLineIndices` is bounded by
-  `block.closeIndex`, which is the fake fence. All measured; `origin/dev` and
-  Windows produce byte-identical output on every row, so this is pre-existing
-  and shared rather than anything this piece introduced. It is NOT fixed here
-  on purpose: `isFence` is the fence finder that the reader, both visibility
-  writers and `PageFrontmatter` all share, so changing it is its own piece
-  rather than a ride-along.
+  **"The first line that could be a value" had one exception until #188 (2026-09-25),
+  and it reached this same fault.** A line of INDENTED DASHES — `publish: false`
+  over `  ---` — never reached the rule above, because `isFence` trimmed leading
+  whitespace before testing for dashes and so took `  ---` for the CLOSING
+  fence. python-frontmatter's own boundary is `^-{3,}\s*$` matched line by line,
+  which allows no leading whitespace at all, so the build reads that line as
+  part of the value and the site PUBLISHES the page (`"false ---"`), while the
+  reader said `hidden` — confidently — and "hide this page" was a no-op.
+  `publish: no` over `  ---` behaved the same; `publish: >-` and `publish:` over
+  `  ---` were written but the `  ---` was left behind, because the sweep is
+  bounded by the block's close, which was the fake fence. On a course page the
+  same early close let ADDING A SECTION split section 1's key from its value:
+  measured, section 1 turned hidden and the new section read `"false ---"` and
+  was published.
+
+  **The fence rule is now asymmetric, on the mac and in the build's own
+  splice.** The CLOSING fence is three or more dashes at column 0, trailing
+  spaces and tabs only (`PageVisibilityReader.isFence`,
+  `build_site._is_frontmatter_fence`); the OPENING fence may be indented
+  (`isOpeningFence`, `_is_opening_frontmatter_fence`), because
+  `frontmatter.parse` strips the whole document before it matches, so the
+  indent of the first line is gone by the time the regex looks — measured,
+  `  ---` / `publish: false` / `---` is HIDDEN on the site. Every mac writer
+  finds its block through that one finder (`PageFrontmatter.block` →
+  `fenceIndices`), and the page copier's builder-agreement guard asks the same
+  `isFence` rather than keeping its own copy. Measured over 3,000 seeded pages
+  against python-frontmatter's own `detect`/`split`: the old finder disagreed
+  on **1,316**, the new one on **0**, and the build's Python copy the same
+  (1,316 → 0) — `research/frontmatter-fences/`, which regenerates the corpus
+  from its seed.
+
+  **Rejected: a symmetric "never indented" rule.** It sees no block behind an
+  indented OPENER, which python-frontmatter does read, and every writer then
+  prepends a second block and turns the teacher's own into body text — #140's
+  bug. `testAnIndentedOpeningFenceIsStillFrontmatter` and the contract's
+  indented-opener writing case are the guard, and they pass on the old finder
+  too, on purpose.
+
+  **One shape's STRUCTURE changes, and the two writers answer it differently
+  on purpose.** A page whose only closing-looking line is indented —
+  `---` / `title: x` / `  ---` / body — has no closed block to python-frontmatter,
+  so every line of it is body text and the page is PUBLISHED. Since #188 the
+  apps agree it has no block, and the visibility writer PREPENDS one of its
+  own, as it does for any fence that is never closed: measured, the page goes
+  from published to HIDDEN. This is the move #140 teaches nobody to make, and
+  it is right here because there was never a block for it to push into the
+  body — those lines already were the body. The build's date splice
+  (`_setting_frontmatter_value`) REFUSES the same shape instead, as it refuses
+  every block that is opened and never closed: a date is not worth
+  restructuring a teacher's file for, and the site is dated anyway because the
+  build dates its own copy. Both are contract cases
+  (`pageVisibility.writingCases`, `atBuildTime.writingCases`).
+
+  **What a teacher sees change on upgrade, with nothing written.** The reader
+  answers differently on pages it used to close early, and it says so on
+  screen the moment the app is updated — no file is touched and no trail line
+  records it, because no trail event carries a visibility READING (all 75
+  `mustRecord` events were checked; none does). Measured over the same 3,000
+  pages, each judged on the site with #246's build (a page whose settings it
+  cannot read is hidden): **99 that the app showed as hidden now show as
+  published** — the site was publishing every one of them all along, so the
+  app is catching up with what students could already read; 15 go from "says
+  nothing" to hidden, all of them hidden on the site; and 12 that the app
+  showed as hidden now show as published while the site HIDES them — every
+  one a page the build cannot parse (a tab used as indentation, or an
+  indented line below the value that YAML cannot fold into it), which since #246 the build hides and names in
+  a folder-problem finding, so reporting visible there is the documented mild
+  direction and the finding says what is wrong. Pages the app calls hidden
+  while the site publishes them: 99 before, **0** after. A `cannot tell` guard
+  for the pages that went the other way was considered by the plan's review
+  and not needed on this base. Unicode whitespace after the dashes (a
+  non-breaking space, which python's `\s` matches and the apps' trim does not)
+  and a byte-order mark are not in the fuzz and were not measured on a real
+  page; they are named here rather than coded for.
   [Issue #188](https://github.com/russellgordon/plantoir/issues/188).
 
-  **Windows fixed all of this — everything above except that one indented-dashes
-  shape — on 2026-09-19** — `PageVisibilityReader
+  **Windows fixed all of this — everything above except the indented-dashes
+  shape, which it owes with #188 — on 2026-09-19** — `PageVisibilityReader
   .ReadScalar` for the reading, `PageFrontmatter.ContinuationLines` for the
   sweep, used by both of `SetDraft`'s branches; tests in
   `PageVisibilityReadingTests` →

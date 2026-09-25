@@ -33,7 +33,7 @@ import frontmatter
 
 def main():
     cases = contracts.section("file-formats", "datesAndTitles", "writingCases", "cases")
-    if len(cases) < 13:
+    if len(cases) < 14:
         print(f"Only {len(cases)} cases — the list has shrunk, so this would pass having read little.")
         return 1
     failures = []

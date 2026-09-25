@@ -609,27 +609,35 @@ nonisolated enum PageVisibilityReader {
 
     // Finding the block.
 
-    /// Is this line one of the fences around a page's frontmatter?
+    /// Is this line the CLOSING fence of a page's frontmatter?
     ///
-    /// Three dashes OR MORE, with nothing after them but spaces and tabs.
-    /// That is python-frontmatter's own boundary, `^-{3,}\s*$`, and therefore
-    /// the build's. A page fenced with `----` really does have frontmatter,
-    /// and reading it as an ordinary page said a hidden page was visible.
+    /// Three dashes OR MORE, with nothing after them but spaces and tabs and
+    /// **nothing before them at all**. That is python-frontmatter's own
+    /// boundary, `^-{3,}\s*$`, matched with `re.MULTILINE` against the text of
+    /// the whole page — so `^` is the start of a LINE, there is no room for
+    /// whitespace in front of the dashes, and a line of INDENTED dashes is not
+    /// a fence at all: it is part of the value above it. A page fenced with
+    /// `----` really does have frontmatter, and reading it as an ordinary page
+    /// said a hidden page was visible.
     ///
-    /// **It is not quite that regex, in one measured way**: this trims
-    /// LEADING spaces and tabs before testing, and `^-{3,}\s*$` allows none —
-    /// so a line of INDENTED dashes is a closing fence here and part of the
-    /// value to the build. Measured: `publish: false` over `  ---` is the
-    /// plain scalar `"false ---"` and the site PUBLISHES the page, while this
-    /// reader ends the block at the `  ---`, sees a complete `false`, and
-    /// answers `hidden` — confidently, so a writer's already-right gate makes
-    /// "hide this page" a no-op. Pre-existing, shared with Windows, and NOT
-    /// changed with issue #176 on purpose: four callers share this finder —
-    /// the reader, both visibility writers and `PageFrontmatter` — so it is
-    /// its own piece.
+    /// Until issue #188 this trimmed LEADING spaces and tabs too. Measured:
+    /// `publish: false` over `  ---` is the plain scalar `"false ---"` and the
+    /// site PUBLISHES the page, while this reader ended the block at the
+    /// `  ---`, saw a complete `false` and answered `hidden` — confidently, so
+    /// `AssistPageVisibility.setting`'s already-right gate made "hide this
+    /// page" a no-op while students went on reading it. On a course page the
+    /// same shape let adding a section split section 1's key from its value.
+    ///
+    /// The whole argument in one number: `fenceIndices`, with this test for
+    /// the close and `isOpeningFence` for the open, was compared page by page
+    /// against python-frontmatter's own `detect`/`split` over 3,000 generated
+    /// pages (indents, tabs, dash counts, trailing whitespace, CRLF, leading
+    /// blank lines, dashes inside values) and **disagreed 0 times**; the
+    /// version that trimmed both ends disagreed 1,316 times. The generator is
+    /// `research/frontmatter-fences/fuzz_fences.py`.
     /// [Issue #188](https://github.com/russellgordon/plantoir/issues/188).
     static func isFence(_ line: String) -> Bool {
-        let bare: String = trimmingYAMLSpaces(line)
+        let bare: String = trimmingTrailingYAMLSpaces(line)
         if bare.count < 3 {
             return false
         }
@@ -639,6 +647,38 @@ nonisolated enum PageVisibilityReader {
             }
         }
         return true
+    }
+
+    /// A string without the spaces and tabs at the END of it, and without a
+    /// Windows line ending's carriage return. The leading end is deliberately
+    /// left alone — see `isFence`, which is the one caller that needs the
+    /// difference.
+    static func trimmingTrailingYAMLSpaces(_ text: String) -> String {
+        var trimmed: Substring = Substring(PageFrontmatter.trimmingCarriageReturn(text))
+        while trimmed.last == " " || trimmed.last == "\t" {
+            trimmed = trimmed.dropLast()
+        }
+        return String(trimmed)
+    }
+
+    /// Is this the line that OPENS a page's frontmatter?
+    ///
+    /// The same dashes, but indentation IS allowed here, and the asymmetry is
+    /// measured rather than chosen: `frontmatter.parse` does `text.strip()` on
+    /// the WHOLE document before it tests anything, so the whitespace in front
+    /// of the first line — blank lines and the indent of the fence itself — is
+    /// gone by the time `^-{3,}\s*$` looks at it. Measured:
+    /// `  ---` / `publish: false` / `---` is HIDDEN on the site, and so is the
+    /// tab-indented form.
+    ///
+    /// Reading it the strict way would be worse than wrong. This app would see
+    /// no block on such a page, and `AssistPageVisibility.setting` would
+    /// PREPEND one of its own — leaving the teacher's real frontmatter behind
+    /// it as body text printed to their students, which is the bug #140 fixed.
+    /// A symmetric "never indented" finder was measured and REJECTED for
+    /// exactly that reason.
+    static func isOpeningFence(_ line: String) -> Bool {
+        return isFence(trimmingYAMLSpaces(line))
     }
 
     /// Where this page's frontmatter is.
@@ -684,7 +724,7 @@ nonisolated enum PageVisibilityReader {
             }
             openIndex += 1
         }
-        guard openIndex < lines.count, isFence(lines[openIndex]) else {
+        guard openIndex < lines.count, isOpeningFence(lines[openIndex]) else {
             return nil
         }
         var index: Int = openIndex + 1
@@ -704,7 +744,7 @@ nonisolated enum PageVisibilityReader {
             if trimmingYAMLSpaces(line).isEmpty {
                 continue
             }
-            return isFence(line)
+            return isOpeningFence(line)
         }
         return false
     }

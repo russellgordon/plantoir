@@ -399,6 +399,11 @@
           "after": "---\ntitle: Loops\ncreatedSection1: 2026-09-08T07:00:00.000-0400\npublishForSection1:\n  false\ncreatedSection2: 2026-09-25T07:00:00.000-0400\npublishForSection2: false\n---\nBody line one.\n",
           "before": "---\ntitle: Loops\ncreatedSection1: 2026-09-08T07:00:00.000-0400\npublishForSection1:\n  false\n---\nBody line one.\n",
           "shape": "the setting for section 1 on the line BELOW its key, hidden: the pair goes after the whole value, and is held back because a value that runs onto the next line is not copied (measured: put between the key and its value, as before the review of #175, section 1 read no setting and was PUBLISHED, and section 2 read 'false false', also published)"
+        },
+        {
+          "after": "---\ntitle: Loops\npublishForSection1: false\n  ---\ncreatedSection2: 2026-09-25T07:00:00.000-0400\npublishForSection2: false\n---\nBody line one.\n",
+          "before": "---\ntitle: Loops\npublishForSection1: false\n  ---\n---\nBody line one.\n",
+          "shape": "issue #188: section 1's value runs into a line of INDENTED dashes, which is part of it rather than the closing fence (the site reads \"false ---\" and PUBLISHES section 1): the pair goes after the dashes and is held back, because a value that runs onto the next line is not copied. Measured 2026-09-25: before #188 the pair went ABOVE the dashes, so section 1 turned HIDDEN and section 2 read \"false ---\" and was PUBLISHED; now section 1 is unchanged (visible) and section 2 is hidden"
         }
       ],
       "created": "2026-09-25T07:00:00.000-0400",
