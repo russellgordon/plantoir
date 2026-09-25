@@ -998,6 +998,17 @@ final class AssistAgent {
         return withTheMomentSettled(withTheDaySettled(boundToThisSection(rawCall)))
     }
 
+    /// The trail's line for a time asked about rather than answered.
+    ///
+    /// No clock in it, deliberately: "6:30" is something the teacher wrote,
+    /// and the trail never carries that (`assistantAsked` already has the
+    /// sentence, which is where it belongs). "Nothing was set" is the half a
+    /// reader of the trail needs — the line sits where a scheduled deploy's
+    /// line would, and must not be mistaken for one.
+    static let askedMorningOrEveningLine: String =
+        "matched in code, not sent to the model — asked whether the time was morning or evening; "
+        + "nothing was set"
+
     /// The trail line for a sentence answered in code, naming the tool — and
     /// the MOMENT, when the sentence carried one.
     ///
@@ -1011,17 +1022,6 @@ final class AssistAgent {
     ///
     /// Only a WHOLE moment is ever added — a value `moment(named:)` can read —
     /// so nothing a teacher wrote, and no half-settled word, can arrive here.
-    /// The trail's line for a time asked about rather than answered.
-    ///
-    /// No clock in it, deliberately: "6:30" is something the teacher wrote,
-    /// and the trail never carries that (`assistantAsked` already has the
-    /// sentence, which is where it belongs). "Nothing was set" is the half a
-    /// reader of the trail needs — the line sits where a scheduled deploy's
-    /// line would, and must not be mistaken for one.
-    static let askedMorningOrEveningLine: String =
-        "matched in code, not sent to the model — asked whether the time was morning or evening; "
-        + "nothing was set"
-
     static func matchedInCodeLine(for call: AssistToolCall) -> String {
         let line: String = "matched in code, not sent to the model — ran " + call.function.name
         guard let when = call.argumentValues["when"] as? String,
