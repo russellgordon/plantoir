@@ -74,8 +74,15 @@ final class BackupSpaceTests: XCTestCase {
         let root: URL = try makeWorkingFolder()
         _ = try makeBackup(named: "ICS3U_backup_2026-09-01_120000.zip", course: "ICS3U", bytes: 4096, in: root)
         let model: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
+        XCTAssertEqual(model.backupSizeMeasurementsStarted, 0)
         model.chooseWorkspace(at: root)
         let item: BackupItem = try XCTUnwrap(model.backupItems.first)
+        // The reload started a measurement of its OWN — without it the header
+        // total never appears until something else happens to measure.
+        XCTAssertGreaterThanOrEqual(
+            model.backupSizeMeasurementsStarted, 1,
+            "opening a folder did not start measuring its backups — is it still in reloadCourses?"
+        )
 
         // Waiting on the measurement the reload started, by starting one more
         // and awaiting it: the later measurement is the one that counts.
@@ -98,6 +105,60 @@ final class BackupSpaceTests: XCTestCase {
         let space: BackupSpace = BackupSpace.of(items, sizes: [items[0].id: 10])
         XCTAssertFalse(space.isComplete)
         XCTAssertEqual(space.totalCount, 2)
+    }
+
+    /// A backup a finished measurement could not size — gone from Finder
+    /// between listing and measuring — is said to be unreadable and left out
+    /// of the total, rather than leaving "Working out…" up for ever.
+    func testABackupThatCannotBeSizedIsSaidSoAndLeftOutOfTheTotal() async throws {
+        let root: URL = try makeWorkingFolder()
+        _ = try makeBackup(named: "ICS3U_backup_2026-09-01_120000.zip", course: "ICS3U", bytes: 300, in: root)
+        let vanishing: URL = try makeBackup(
+            named: "ICS3U_backup_2026-09-02_120000.zip", course: "ICS3U", bytes: 700, in: root
+        )
+        let model: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
+        model.chooseWorkspace(at: root)
+        let gone: BackupItem = try items(named: [vanishing], in: model)[0]
+        try FileManager.default.removeItem(at: vanishing)
+
+        await model.measureBackupSizes()
+
+        let space: BackupSpace = model.backupSpace
+        XCTAssertTrue(space.isComplete, "the measurement has finished, so nothing is still being worked out")
+        XCTAssertEqual(space.unsizedCount, 1)
+        XCTAssertEqual(space.totalBytes, 300)
+        XCTAssertEqual(model.sizeDescription(of: gone), AssistWording.backupSizeCouldNotBeRead)
+    }
+
+    /// The confirmation says, BEFORE anything is deleted, that the open
+    /// conversation's backup will be kept — and counts only what will go.
+    func testTheConfirmationNamesTheKeptBackupAndCountsOnlyWhatGoes() throws {
+        let root: URL = try makeWorkingFolder()
+        _ = try makeBackup(named: "ICS3U_backup_2026-09-01_120000.zip", course: "ICS3U", bytes: 1, in: root)
+        let held: URL = try makeBackup(
+            named: "ICS3U_backup_2026-09-02_120000_assistant-section2.zip", course: "ICS3U", bytes: 1, in: root
+        )
+        let model: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
+        model.chooseWorkspace(at: root)
+        var sizes: [String: Int64] = [:]
+        for item in model.backupItems {
+            sizes[item.id] = item.fileURL.lastPathComponent == held.lastPathComponent ? 9_000_000 : 1_000_000
+        }
+        AssistActivity.begin(folderPath: root.path, courseCode: "ICS3U", sectionNumber: 2)
+        AssistActivity.holdBackups(folderPath: root.path, courseCode: "ICS3U", sectionNumber: 2) {
+            return [held]
+        }
+
+        let message: String = WorkspaceModel.deleteConfirmation(
+            for: model.backupItems,
+            sizes: sizes,
+            heldPaths: WorkspaceModel.heldBackupPaths(),
+            active: AssistActivity.active
+        )
+
+        XCTAssertTrue(message.contains("It takes \(BackupSizes.description(ofBytes: 1_000_000))."), message)
+        XCTAssertFalse(message.contains(BackupSizes.description(ofBytes: 10_000_000)), message)
+        XCTAssertTrue(message.contains("One of these is kept: the assistant for ICS3U Section 2 is open"), message)
     }
 
     // MARK: - Deleting several

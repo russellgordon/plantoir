@@ -120,7 +120,8 @@ enum AssistActivity {
     /// still offers "Restore Section N…", and a restore from a zip that is gone
     /// fails after the teacher has already agreed to it. Measured by the plan
     /// review: the "Select the Assistant's" convenience first proposed for the
-    /// All Backups pane, followed by one Delete, removed exactly that backup.
+    /// All Backups pane, followed by one Delete, would remove exactly that
+    /// backup — reasoned from the code, not measured.
     static func backupsAnOpenConversationHolds() -> [URL] {
         guard let report = store.heldBackups else {
             return []
@@ -128,11 +129,19 @@ enum AssistActivity {
         return report()
     }
 
-    /// "Close the assistant for ICS3U Section 2 first" — one copy, because a
-    /// teacher meets it from two places: opening a second assistant, and
-    /// deleting a backup the open conversation still needs (#242).
+    /// "Close the assistant for ICS3U Section 2 " followed by `when` — the ONE
+    /// place the sentence is built, because a teacher meets it from three:
+    /// opening a second assistant and deleting a backup the open conversation
+    /// still needs ("…first", `closeTheAssistantFirst`), and removing a
+    /// downloaded assistant ("…before removing this.",
+    /// `AssistModelLibrary.reasonItCannotBeRemoved`).
+    static func closeTheAssistant(_ session: Session, _ when: String) -> String {
+        return "Close the assistant for \(session.courseCode) Section \(session.sectionNumber) " + when
+    }
+
+    /// "Close the assistant for ICS3U Section 2 first".
     static func closeTheAssistantFirst(_ session: Session) -> String {
-        return "Close the assistant for \(session.courseCode) Section \(session.sectionNumber) first"
+        return AssistActivity.closeTheAssistant(session, "first")
     }
 
     /// Whether the assistant may be opened for this section.

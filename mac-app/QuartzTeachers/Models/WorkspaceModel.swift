@@ -287,10 +287,17 @@ class WorkspaceModel {
     /// says so rather than showing a total that is quietly too small.
     var backupSizes: [String: Int64] = [:]
 
+    /// Every backup the last finished measurement LOOKED at, by id — so one it
+    /// could not size reads as unsized rather than as still being measured.
+    var backupsMeasured: Set<String> = []
+
     /// How many measurements have been started, so one that finishes after a
     /// newer one never overwrites it — a total that never shrinks after a
     /// delete, or sizes for zips that are gone, is what that race looks like.
-    private var backupSizeMeasurementsStarted: Int = 0
+    ///
+    /// Readable from outside so a test can see that opening a folder started
+    /// one — the reload's own measurement, not one the test asked for.
+    private(set) var backupSizeMeasurementsStarted: Int = 0
 
     /// The backups a delete-several confirmation is being shown for, if any.
     var backupsDeleteRequest: [BackupItem]?
@@ -1745,19 +1752,13 @@ class WorkspaceModel {
         _ items: [BackupItem],
         following otherWindows: [WorkspaceModel] = WorkspaceModel.windowModels
     ) -> BackupDeletion {
-        // Compared as RESOLVED paths: the runner names its backup from the
-        // folder it was given, the list from what the folder enumerates, and
-        // `/var` against `/private/var` is the same file spelt twice.
-        var heldPaths: Set<String> = []
-        for heldURL in AssistActivity.backupsAnOpenConversationHolds() {
-            heldPaths.insert(heldURL.standardizedFileURL.resolvingSymlinksInPath().path)
-        }
+        let heldPaths: Set<String> = WorkspaceModel.heldBackupPaths()
 
         var deleted: [BackupItem] = []
         var kept: [BackupItem] = []
         var failed: [(item: BackupItem, reason: String)] = []
         for item in items {
-            if heldPaths.contains(item.fileURL.standardizedFileURL.resolvingSymlinksInPath().path) {
+            if heldPaths.contains(WorkspaceModel.comparablePath(of: item)) {
                 kept.append(item)
                 continue
             }
@@ -1854,6 +1855,73 @@ class WorkspaceModel {
         }
     }
 
+    /// The backups an open assistant conversation holds, as comparable paths.
+    ///
+    /// Compared as RESOLVED paths: the runner names its backup from the
+    /// folder it was given, the list from what the folder enumerates, and
+    /// `/var` against `/private/var` is the same file spelt twice.
+    static func heldBackupPaths() -> Set<String> {
+        var heldPaths: Set<String> = []
+        for heldURL in AssistActivity.backupsAnOpenConversationHolds() {
+            heldPaths.insert(heldURL.standardizedFileURL.resolvingSymlinksInPath().path)
+        }
+        return heldPaths
+    }
+
+    /// A backup's path in the form `heldBackupPaths` uses.
+    static func comparablePath(of item: BackupItem) -> String {
+        return item.fileURL.standardizedFileURL.resolvingSymlinksInPath().path
+    }
+
+    /// The delete-several confirmation's message (the plan review's L3).
+    ///
+    /// Said BEFORE anything is deleted, so it tells the truth about what will
+    /// happen: a backup the open assistant conversation holds is named as
+    /// kept, and "Together they take" counts only what will actually go. The
+    /// same honesty as the single delete — for good, nothing kept, the courses
+    /// untouched — otherwise.
+    static func deleteConfirmation(
+        for items: [BackupItem],
+        sizes: [String: Int64],
+        heldPaths: Set<String>,
+        active: AssistActivity.Session?
+    ) -> String {
+        var going: [BackupItem] = []
+        var keptCount: Int = 0
+        for item in items {
+            if heldPaths.contains(WorkspaceModel.comparablePath(of: item)) {
+                keptCount += 1
+            } else {
+                going.append(item)
+            }
+        }
+
+        var message: String = going.count == 1
+            ? "This deletes the backup for good — unlike removing a course, nothing is kept."
+            : "This deletes them for good — unlike removing a course, nothing is kept."
+        var bytes: Int64 = 0
+        var everySizeKnown: Bool = true
+        for item in going {
+            if let size = sizes[item.id] {
+                bytes += size
+            } else {
+                everySizeKnown = false
+            }
+        }
+        if everySizeKnown && !going.isEmpty {
+            let together: String = going.count == 1 ? "It takes" : "Together they take"
+            message += " \(together) \(BackupSizes.description(ofBytes: bytes))."
+        }
+        if keptCount > 0, let active {
+            let which: String = keptCount == 1 ? "One of these is" : "\(keptCount) of these are"
+            message += "\n\n" + which + " kept: the assistant for \(active.courseCode) Section "
+                + "\(active.sectionNumber) is open and can still put the section back from "
+                + (keptCount == 1 ? "it." : "them.")
+        }
+        message += "\n\nThe courses themselves are not touched."
+        return message
+    }
+
     /// What the teacher is told when a delete did not do everything asked,
     /// or nil when it did.
     static func problem(with deletion: BackupDeletion) -> String? {
@@ -1923,12 +1991,17 @@ class WorkspaceModel {
 
     /// What the backups take, per course and in total.
     var backupSpace: BackupSpace {
-        return BackupSpace.of(backupItems, sizes: backupSizes)
+        return BackupSpace.of(backupItems, sizes: backupSizes, measured: backupsMeasured)
     }
 
-    /// "15.9 MB" for one backup, or nil until it has been measured.
+    /// "15.9 MB" for one backup, `AssistWording.backupSizeCouldNotBeRead` for
+    /// one a finished measurement could not size, or nil until it has been
+    /// measured.
     func sizeDescription(of item: BackupItem) -> String? {
         guard let size = backupSizes[item.id] else {
+            if backupsMeasured.contains(item.id) {
+                return AssistWording.backupSizeCouldNotBeRead
+            }
             return nil
         }
         return BackupSizes.description(ofBytes: size)
@@ -1942,7 +2015,7 @@ class WorkspaceModel {
         let measurement: (number: Int, fileURLs: [URL]) = beginMeasuringBackupSizes()
         Task { @MainActor [weak self] in
             let sizes: [String: Int64] = await BackupSizes.measure(measurement.fileURLs)
-            self?.finishMeasuringBackupSizes(measurement.number, sizes: sizes)
+            self?.finishMeasuringBackupSizes(measurement.number, sizes: sizes, lookedAt: measurement.fileURLs)
         }
     }
 
@@ -1951,7 +2024,7 @@ class WorkspaceModel {
     func measureBackupSizes() async {
         let measurement: (number: Int, fileURLs: [URL]) = beginMeasuringBackupSizes()
         let sizes: [String: Int64] = await BackupSizes.measure(measurement.fileURLs)
-        finishMeasuringBackupSizes(measurement.number, sizes: sizes)
+        finishMeasuringBackupSizes(measurement.number, sizes: sizes, lookedAt: measurement.fileURLs)
     }
 
     /// Numbers a new measurement and says which files it covers.
@@ -1965,10 +2038,16 @@ class WorkspaceModel {
     }
 
     /// Stores a measurement's answer, unless a newer one has been started.
-    func finishMeasuringBackupSizes(_ number: Int, sizes: [String: Int64]) {
+    /// `lookedAt` is every file it was asked about, sized or not.
+    func finishMeasuringBackupSizes(_ number: Int, sizes: [String: Int64], lookedAt fileURLs: [URL] = []) {
         if number != backupSizeMeasurementsStarted {
             return
         }
+        var lookedAtPaths: Set<String> = []
+        for fileURL in fileURLs {
+            lookedAtPaths.insert(fileURL.path)
+        }
+        backupsMeasured = lookedAtPaths
         backupSizes = sizes
     }
 

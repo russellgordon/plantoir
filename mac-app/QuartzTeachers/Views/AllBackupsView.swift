@@ -16,8 +16,9 @@ import SwiftUI
 /// and the one Delete button says how many it will delete.
 ///
 /// There is deliberately no "select the assistant's" shortcut. It was
-/// proposed, and the plan review measured it followed by one Delete removing
-/// the backup an open assistant conversation restores from; the delete itself
+/// proposed, and the plan review reasoned (from the code, not by measuring)
+/// that it followed by one Delete would remove the backup an open assistant
+/// conversation restores from; the delete itself
 /// now refuses that one, and a shortcut that selects it is an invitation.
 struct AllBackupsView: View {
 
@@ -97,6 +98,10 @@ struct AllBackupsView: View {
                 Text("These backups take \(BackupSizes.description(ofBytes: space.totalBytes)).")
                     .font(.title3)
                     .accessibilityIdentifier("allBackupsTotal")
+                if space.unsizedCount > 0 {
+                    Text(unsizedLine(space.unsizedCount))
+                        .foregroundStyle(.secondary)
+                }
                 ForEach(space.courses, id: \.courseCode) { share in
                     Text(courseLine(for: share))
                         .foregroundStyle(.secondary)
@@ -165,6 +170,12 @@ struct AllBackupsView: View {
         return "\(share.courseCode) — \(share.count) \(noun), \(BackupSizes.description(ofBytes: share.bytes))"
     }
 
+    /// "1 backup: size could not be read, so it is not in the total".
+    func unsizedLine(_ count: Int) -> String {
+        let noun: String = count == 1 ? "backup" : "backups"
+        return "\(count) \(noun): " + AssistWording.backupSizeCouldNotBeRead.lowercased()
+    }
+
     /// Who made a backup, short enough for a column.
     func madeBy(_ item: BackupItem) -> String {
         switch item.maker {
@@ -175,27 +186,15 @@ struct AllBackupsView: View {
         }
     }
 
-    /// The same honesty as the single delete's confirmation — for good,
-    /// nothing kept, the courses untouched — with how much is being deleted.
+    /// Built by `WorkspaceModel.deleteConfirmation`, which names a backup the
+    /// open assistant conversation holds as kept and counts only what goes.
     func deleteConfirmationMessage(for items: [BackupItem]) -> String {
-        var message: String = items.count == 1
-            ? "This deletes the backup for good — unlike removing a course, nothing is kept."
-            : "This deletes them for good — unlike removing a course, nothing is kept."
-        var bytes: Int64 = 0
-        var everySizeKnown: Bool = true
-        for item in items {
-            if let size = workspace.backupSizes[item.id] {
-                bytes += size
-            } else {
-                everySizeKnown = false
-            }
-        }
-        if everySizeKnown {
-            let together: String = items.count == 1 ? "It takes" : "Together they take"
-            message += " \(together) \(BackupSizes.description(ofBytes: bytes))."
-        }
-        message += "\n\nThe courses themselves are not touched."
-        return message
+        return WorkspaceModel.deleteConfirmation(
+            for: items,
+            sizes: workspace.backupSizes,
+            heldPaths: WorkspaceModel.heldBackupPaths(),
+            active: AssistActivity.active
+        )
     }
 
     /// Drops a selection whose backup is no longer listed — deleted here, or

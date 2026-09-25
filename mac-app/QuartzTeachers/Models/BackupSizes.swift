@@ -115,17 +115,36 @@ struct BackupSpace: Equatable {
     /// shown, because a number that is quietly too small is worse than none.
     let isComplete: Bool
 
+    /// How many backups a FINISHED measurement could not size — a zip deleted
+    /// in Finder between listing and measuring, or one that cannot be read.
+    /// They are left out of the total and said so beside each one, rather
+    /// than leaving "Working out…" up for a measurement that has ended.
+    let unsizedCount: Int
+
     // MARK: - Functions
 
     /// The space `items` take, from sizes keyed by `BackupItem.id`.
-    static func of(_ items: [BackupItem], sizes: [String: Int64]) -> BackupSpace {
+    ///
+    /// `measured` is every backup a finished measurement LOOKED at, whether or
+    /// not it could size it; a backup in it with no size is unsized rather than
+    /// still to come. Nil means "only what has a size was looked at".
+    static func of(
+        _ items: [BackupItem],
+        sizes: [String: Int64],
+        measured: Set<String>? = nil
+    ) -> BackupSpace {
         var bytesByCourse: [String: Int64] = [:]
         var countByCourse: [String: Int] = [:]
         var totalBytes: Int64 = 0
         var measuredCount: Int = 0
+        var unsizedCount: Int = 0
         for item in items {
             countByCourse[item.courseCode, default: 0] += 1
             guard let size = sizes[item.id] else {
+                if let measured, measured.contains(item.id) {
+                    unsizedCount += 1
+                    measuredCount += 1
+                }
                 continue
             }
             bytesByCourse[item.courseCode, default: 0] += size
@@ -151,7 +170,8 @@ struct BackupSpace: Equatable {
             courses: courses,
             totalBytes: totalBytes,
             totalCount: items.count,
-            isComplete: measuredCount == items.count
+            isComplete: measuredCount == items.count,
+            unsizedCount: unsizedCount
         )
     }
 }

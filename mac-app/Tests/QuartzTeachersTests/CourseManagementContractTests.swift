@@ -560,10 +560,14 @@ final class CourseManagementContractTests: XCTestCase {
             for fileName in try XCTUnwrap(testCase["heldByAnOpenConversation"] as? [String]) {
                 held.append(folder.appendingPathComponent(fileName))
             }
-            if !held.isEmpty {
+            // A constant for the closure to capture: `held` is built above and
+            // never changes again, and saying so keeps the compiler from
+            // warning that a captured variable might.
+            let heldURLs: [URL] = held
+            if !heldURLs.isEmpty {
                 AssistActivity.begin(folderPath: rootURL.path, courseCode: "ICS3U", sectionNumber: 2)
                 AssistActivity.holdBackups(folderPath: rootURL.path, courseCode: "ICS3U", sectionNumber: 2) {
-                    return held
+                    return heldURLs
                 }
             }
 
