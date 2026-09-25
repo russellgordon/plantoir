@@ -17,8 +17,10 @@ the shared contracts**, not by reading Swift.
 > strategy for bringing this app to parity with what the mac ships in v1.3.2 —
 > every issue on the milestone "Windows: parity with mac v1.3.2" placed in one
 > ordered phase, what is inherited free from the shared Python, the traps, and
-> the first week. Read it before the open issues, then come back here for the
-> rules while working.
+> the first week. Read it after `CLAUDE.md` and this brief's section 1
+> reading list, before you work through the open issues one by one. Then come
+> back here for the rules while working. The issues remain the source of
+> truth, and that file is deleted when the milestone closes.
 
 
 ## 0. Outline the plan before implementing

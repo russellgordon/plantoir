@@ -249,6 +249,12 @@ issue and the issue is where the work lives. If the issue closes, or gets
 pulled into the release being cut, the entry goes and the full assertion comes
 back on its own.
 
+**While no Windows release is being cut, an entry may name an open issue on
+the milestone "Windows: parity with mac v1.3.2" itself.** Those entries are
+that milestone's burn-down list: the milestone cannot close, and no Windows
+release can be cut, while any of them remains (2026-09-25; see
+[`WINDOWS-PARITY.md`](../WINDOWS-PARITY.md) → section 8).
+
 The ledger lives on Windows because that is the side that currently owes
 something; there is no mac equivalent and none is needed until the mac is the
 side behind. The same shape would work there.
