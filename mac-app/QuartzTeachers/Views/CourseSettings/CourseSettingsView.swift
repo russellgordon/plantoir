@@ -117,8 +117,10 @@ struct CourseSettingsView: View {
                             .accessibilityIdentifier("pageNamingValue")
                     }
                     LabeledContent(WizardWording.settingsFrontPageHeadingLabel) {
-                        Text(configuration.frontPageHeading)
-                            .accessibilityIdentifier("frontPageHeadingValue")
+                        Text(WizardWording.settingsFrontPageHeadingValue(
+                            configuration.recordedFrontPageHeading
+                        ))
+                        .accessibilityIdentifier("frontPageHeadingValue")
                     }
                     LabeledContent(WizardWording.settingsNounLabel) {
                         Text(configuration.classNoun.rawValue)

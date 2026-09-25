@@ -478,17 +478,22 @@ class CourseConfiguration {
         set { values["class_page_scheme"] = newValue.rawValue }
     }
 
-    /// The heading a new numbered course's front pages are created with.
-    /// Absent means "Most Recent Class". Read at creation only (#267).
-    var frontPageHeading: String {
-        get {
-            let stored: String = stringValue(forKey: "front_page_heading").trimmingCharacters(in: .whitespaces)
-            if stored.isEmpty {
-                return "Most Recent Class"
-            }
-            return stored
+    /// The heading this course's front pages were created with, as
+    /// `front_page_heading` records it — nil when the course has none, which
+    /// is every course made before #267 (CODING included).
+    ///
+    /// **No default is filled in, on purpose.** The first version answered
+    /// "Most Recent Class" for a course without the key, and Course Settings'
+    /// locked row then showed that for CODING, whose front page reads "Most
+    /// Recent Meeting" — a locked row stating something the page does not
+    /// say. Nothing rewrites a heading after creation, so the only honest
+    /// answer for a course without the key is that none was recorded.
+    var recordedFrontPageHeading: String? {
+        let stored: String = stringValue(forKey: "front_page_heading").trimmingCharacters(in: .whitespaces)
+        if stored.isEmpty {
+            return nil
         }
-        set { values["front_page_heading"] = newValue }
+        return stored
     }
 
     /// What the assistant calls one class page to the teacher (#267).

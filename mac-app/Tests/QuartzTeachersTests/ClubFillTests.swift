@@ -64,6 +64,7 @@ final class ClubFillTests: XCTestCase {
         XCTAssertEqual(WizardWording.settingsFrontPageHeadingLabel, settings["frontPageHeading"] as? String)
         XCTAssertEqual(WizardWording.settingsNounLabel, settings["noun"] as? String)
         XCTAssertEqual(WizardWording.settingsLockedCaption, settings["lockedCaption"] as? String)
+        XCTAssertEqual(WizardWording.settingsFrontPageHeadingNotSet, settings["frontPageHeadingNotSet"] as? String)
 
         let club: [String: Any] = try XCTUnwrap(block["club"] as? [String: Any])
         XCTAssertEqual(ClubVocabulary.club.classFolder, club["classFolder"] as? String)
@@ -71,6 +72,60 @@ final class ClubFillTests: XCTestCase {
         XCTAssertEqual(ClubVocabulary.club.frontPageHeading, club["frontPageHeading"] as? String)
         XCTAssertEqual(ClubVocabulary.club.noun.rawValue, club["noun"] as? String)
         XCTAssertEqual(ClubFill.curriculumFolders, block["curriculumFolders"] as? [String])
+    }
+
+    /// The locked heading row says what the course RECORDED, and never a
+    /// default: CODING has no `front_page_heading` and its front page reads
+    /// "Most Recent Meeting", so "Most Recent Class" there would be false.
+    func testTheHeadingRowShowsOnlyWhatWasRecorded() {
+        let coding: CourseConfiguration = CourseConfiguration(
+            values: ["code": "CODING", "unit_word": "Unit"], lastSavedData: Data()
+        )
+        XCTAssertNil(coding.recordedFrontPageHeading)
+        XCTAssertEqual(
+            WizardWording.settingsFrontPageHeadingValue(coding.recordedFrontPageHeading),
+            WizardWording.settingsFrontPageHeadingNotSet
+        )
+        let blank: CourseConfiguration = CourseConfiguration(
+            values: ["front_page_heading": "   "], lastSavedData: Data()
+        )
+        XCTAssertNil(blank.recordedFrontPageHeading)
+        let club: CourseConfiguration = CourseConfiguration(
+            values: ["front_page_heading": "Most Recent Meeting"], lastSavedData: Data()
+        )
+        XCTAssertEqual(
+            WizardWording.settingsFrontPageHeadingValue(club.recordedFrontPageHeading),
+            "Most Recent Meeting"
+        )
+    }
+
+    /// The club's class-pages folder gets the checks every other folder
+    /// name gets, in the same sentences (#267 review): it is typed into a
+    /// field of its own, so the list's checks never saw it.
+    func testTheClubsClassFolderNameIsChecked() {
+        XCTAssertNil(NewCourseWizardView.clubClassFolderProblem(
+            "All Meetings", perSectionFolders: ["All Meetings", "Private Notes"]
+        ))
+        XCTAssertEqual(
+            NewCourseWizardView.clubClassFolderProblem("  ", perSectionFolders: ["  ", "Private Notes"]),
+            SpecialNames.renameFolderProblemEmpty
+        )
+        XCTAssertEqual(
+            NewCourseWizardView.clubClassFolderProblem("Weeks/All", perSectionFolders: ["Weeks/All"]),
+            SpecialNames.renameFolderProblemHasSeparator
+        )
+        XCTAssertEqual(
+            NewCourseWizardView.clubClassFolderProblem(
+                "Private Notes", perSectionFolders: ["Private Notes", "Private Notes"]
+            ),
+            SpecialNames.renameFolderProblemAlreadyUsed(name: "Private Notes")
+        )
+        XCTAssertEqual(
+            NewCourseWizardView.clubClassFolderProblem(
+                "private notes", perSectionFolders: ["private notes", "Private Notes"]
+            ),
+            SpecialNames.renameFolderProblemAlreadyUsed(name: "private notes")
+        )
     }
 
     /// What the wizard WRITES for a club: the numbered scheme and the four
