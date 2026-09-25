@@ -502,11 +502,23 @@ separately from the reader:
   closing fence: python-frontmatter does not accept one, and Windows'
   `Block.Parse` did until 2026-09-19, which read a block as ending early.)
 
-  **Two other finders are still hand-rolled, and knowing which is which
-  matters more than unifying them.** `SectionAdder`'s (`frontmatterLines` /
-  `FrontmatterLines`) is strict on BOTH platforms — the very first line
-  exactly `---` — so the section carry agrees with itself across the two apps;
-  that is parity, and it is recorded here rather than filed. `CourseRestorer`'s
+  **Other finders are still hand-rolled, and knowing which is which matters
+  more than unifying them.** `SectionAdder`'s WAS one — strict on both
+  platforms, the very first line exactly `---`, recorded here as parity — until
+  it was measured to PUBLISH pages: a page it could not find the block of got
+  no `publishForSection<N>` for the new section, and a page with no key is
+  shown, so a page hidden in section 1 appeared in the new section (#175,
+  2026-09-25; the build's own `process_frontmatter` read section 2 as
+  `publish=None` for a `----` fence, a blank line before the fence, a space
+  after it, and Windows line endings). The mac's `frontmatterLines` now asks
+  `PageFrontmatter.block`, and its two writers splice by LINE inside the block
+  rather than rebuilding `---` + block and cutting the old text by a character
+  count — the old arithmetic, pointed at the lenient finder, left `…-0400e`
+  on the new date and made a Windows-line-ending page lose its frontmatter
+  entirely. The cases are `contracts/course-management.json` →
+  `sectionNumbers.addingKeysToAPage`; Windows' `FrontmatterLines` is still
+  strict and owes the same change (the `windows` issue from #175).
+  `CourseRestorer`'s
   is strict on Windows and, since the mac's `PageFrontmatter.block` was
   loosened for the reason above, lenient on the mac — so a restore reaches
   different pages on the two platforms, which is
