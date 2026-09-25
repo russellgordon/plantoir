@@ -2009,6 +2009,17 @@ on a Mac before 2026-09-25) can still have its own code re-typed while being
 renamed — it cannot be given the name, and renaming it away is how it leaves.
 The sentence says the name is kept, never what for: rule 1.
 
+**The command line still accepts "work", deliberately.** `setup_course.py`'s
+code prompt has never carried the app's rule — it refuses only a leading dot,
+and does not hold the twelve-character limit or the character rule either — so
+adding one name to it would be a third, partial copy of a rule that has one
+home. The app's rule is the gate a teacher meets: both wizards validate before
+they ever start `setup.sh`/`setup.ps1`. A teacher typing codes into the launcher
+by hand is off the supported path already, and on Windows the damaging half of
+the collision is guarded separately — `BuildOutputLocation.WouldCollideWithEveryCourse`
+refuses to delete by that path. If the command line ever gets the shared rule,
+it gets all of it, WORK included.
+
 ## Renaming a course folder
 
 Folder rows in Course Settings carry a pencil. It renames the folder **on

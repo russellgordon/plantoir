@@ -250,7 +250,7 @@ item 5).
 | **#289** | Take #156's lease rules. Another program's `preview`/`publish` declines a BUILD, but never a write (`RefuseIfPlantoirIsBuilding`'s comment says why). Take, then check, with a line-3/pid tiebreak. The scheduled publish writes `build`+`publish` leases and waits 15 s, up to 10 min, by the wall clock. `plantoir-mcp` stops its own work before leaving. Adds `courseIsBeingBuiltElsewhere`, 2 events and `courseWasBusy`. **Build the `WorkLease` decision seam here**, and run `workLeases.liveness` (19) and `workLease.bodyCases` (7) through it. Their import rows wait for #244 | MATCH | `shared-rules.json` → `workLeases.declining` (29), `.liveness`; `file-formats.json` → `workLease.bodyCases`; doc 09 → "Two programs, one course" |
 | **#239** | Removing a COURSE cancels its scheduled deploy FIRST, scoped to the working folder, comparing the sanitised code. Adds `scheduled deploy turned off`, `tooLateToRun`, and preserving `scheduled_deploy_may_run_late_days` on write. **Answer on the issue whether Task Scheduler runs a missed `/SC ONCE` start late.** If it does not, the ten `howLateIsTooLate` cases should be recorded as EXEMPT in the contract | MATCH + CHECK | `shared-rules.json` → `scheduledDeployCancellation` (9+10+7+5); doc 07 → "A scheduled deploy that outlived its course" |
 | **#218** | Check that the scheduled-publish notice arrives while the teacher is looking at the section. If it does not: one app-wide watcher on `%LOCALAPPDATA%\Plantoir\scheduled\unanswered`, marshalled to the UI thread; the record assembled OUTSIDE the watched folder and then moved in; hover text on the badge | CHECK, then fix | `shared-rules.json` → `scheduledPublishStopped.whenItIsShown`; doc 07 → "The notice has to arrive while the teacher is looking" |
-| **#231** | The quit path. Q3 is live: ask before quitting through a PUBLISH (a preview being merely open is not work under way), and never show a modal on `WM_QUERYENDSESSION`. Delete both `appliesOn: ["mac"]` keys when you adopt it. Q1/Q2 apply only to the dead WSL fallback in `FolderContainers`. Check whether `RunDetached("wsl"/"powershell")` resolves from System32. **Decided 2026-09-25: match all three** — stop only what can be proved idle, refuse while any launcher is running, ask before quitting through a running publish; the one recorded difference is WHAT is stopped (a WSL2 distribution vs a Colima VM), not WHEN | **DECIDED: match all three**, MATCH | `shared-rules.json` → `quittingWhileWorkIsUnderWay` (8); doc 09 → "Quitting: what it frees, what it refuses to free, and why"; `contracts/README.md` → the named-gap exception paragraph |
+| **#231** | The quit path. Q3 is live: ask before quitting through a PUBLISH (a preview being merely open is not work under way), and never show a modal on `WM_QUERYENDSESSION`. Delete both `appliesOn: ["mac"]` keys when you adopt it. Q1/Q2 apply only to the dead WSL fallback in `FolderContainers`. Check whether `RunDetached("wsl"/"powershell")` resolves from System32. **Decided 2026-09-25: match all three**, so the dead WSL fallback is HARDENED (the same three rules), not deleted — stop only what can be proved idle, refuse while any launcher is running, ask before quitting through a running publish; the one recorded difference is WHAT is stopped (a WSL2 distribution vs a Colima VM), not WHEN | **DECIDED: match all three**, MATCH | `shared-rules.json` → `quittingWhileWorkIsUnderWay` (8); doc 09 → "Quitting: what it frees, what it refuses to free, and why"; `contracts/README.md` → the named-gap exception paragraph |
 
 ### Phase 4: preview and publish mechanics (4 issues, plus #136 and #189 as they land; #234 and #94 owe nothing, see section 5)
 
@@ -379,8 +379,8 @@ out?**
   uses `UseShellExecute = true` for this reason.
 - **There is no container on Windows, and WSL2 has no host GPU.** The build
   and the model both run natively (Vulkan, falling back to CPU). Do not
-  build toward the WSL fallback in `FolderContainers`: #231 asks whether to
-  delete it.
+  build toward the WSL fallback in `FolderContainers` beyond hardening it:
+  #231 was decided 2026-09-25 as harden (the mac's three quit rules), not delete.
 - **The test interpreter needs `python-frontmatter`** (#279) and runs with
   `PYTHONUTF8=1`. Temp-folder cleanup must tolerate Defender holding a
   handle. Fixture dates stay in the PAST. Classes that write the trail, the
@@ -467,7 +467,7 @@ out?**
 3. **Phase 3: #231.** Delete the dead WSL fallback in `FolderContainers`, or
    harden it? The issue leaves this to "whoever owns that side". It is
    listed here so that somebody actually owns it. **Decided 2026-09-25:
-   match all three** — stop only what can be proved idle, refuse while any
+   harden it, matching all three** — stop only what can be proved idle, refuse while any
    launcher is running, ask before quitting through a running publish; WHAT
    is stopped (a WSL2 distribution vs a Colima VM) is the one recorded
    difference, not WHEN.
