@@ -350,6 +350,12 @@ a reply that is the question again". The second one is also the answer to "what
 should the app SAY when the model hands the teacher their own sentence back?",
 which is a different question with a different fix.
 
+A third came on 2026-09-25, and it is the one to read for a READ answered in
+code: "What does Unit 2, Day 3 link to?" in "'What does this page link to?' is
+answered in code" below. The count of parsed families at that point is
+**nine** — #267 had added two for clubs, and this is the ninth
+(`AssistCardCommand.everyParsedShape`; count it there rather than from prose).
+
 ### A time is a number, not a judgement
 
 Written 2026-09-19, closing [issue
@@ -1103,6 +1109,146 @@ byte-identical against `origin/dev`, and the 13-tool local WIRE surface hashes
 the same as a copy taken from the live server before this change. The matcher
 is strictly upstream of the model; the echo guard is strictly downstream of it.
 
+### "What does this page link to?" is answered in code (#167)
+
+Written 2026-09-25, closing [issue
+#167](https://github.com/russellgordon/plantoir/issues/167). The larger
+assistant's `read` probe — `What does "Unit 2, Day 3" in EXC2O section 1 link
+to?` — had gone from 10/10 in August to 0-1/10 on Metal, and #167's own
+comments had already found that its answer was decided by the dateline's
+weekday word and the course code: 88 of 92 days right for VVH2O, a different
+four wrong for another course. Greedy decoding makes ten trials of ONE date one
+measurement repeated ten times, so the question was re-asked across dates.
+
+**Conditions for every number below** (they belong to these numbers and to
+nothing else): Mac16,8 M4 Pro, 48 GiB; llama.cpp b10435 on Metal, the
+`llama-server` bundled in the dev 68214a6c Debug build; `AssistServerHost.
+serverArguments` per tier; the app's request body (temperature 0,
+`tool_choice` auto, `max_tokens` read out of the Swift); the shipped system
+prompt; the 13-tool local surface from the contract. Raw output, the grid's
+script and the conditions in full: `research/ai-assist/link-question-results.txt`.
+
+| | larger (Qwen3 4B) | smaller (Qwen2.5 1.5B) |
+|---|---|---|
+| 29-probe suite, VVH2O, 10 trials, 2026-09-25 | 290/290, `read` 10/10 | 210/290, `read` 0/10 (check_section) |
+| #167's sentence, 6 courses × 14 dates | 55/84 | 54/84 |
+| "What does Unit 2, Day 3 link to?" | **0/84** | **0/84** |
+| "Which pages does Unit 2, Day 3 link to?" | 0/84 | 0/84 — **31 × publish_pages** |
+| "What links are on…" / "Where does … point to?" | 0/84 / 0/84 | 0/84 / 0/84 |
+| the family, seven phrasings | 153/588 | 115/588 |
+
+So the day's 10/10 was the date lottery, the plainest phrasing a teacher would
+type is 0 of 84 on BOTH tiers, and on the smaller one a read-only question
+became a publish PLAN 31 times — a write, held behind the card by default,
+which is the only reason it was not worse. It is a fixed frame around a page
+title, the shape #194 and #277 had already moved into code.
+
+**So it is the ninth parsed family, `AssistCardCommand.linksQuestion`**, and it
+never reaches the model:
+
+```
+[please] what|which pages|what pages does <page> link to [<place>] [please]
+         what does <page> point to     where does <page> link|point to
+         what links are on|in <page>   show me|list the links on|in|from <page>
+<place> := in this section | in section <n> | in <course> [section <n>] | in section <n> of <course>
+```
+
+**A place is read BEFORE "link to" as well as after it**, and that was the
+plan review's blocker: #167's own sentence puts `in EXC2O section 1` between
+the title and "link to", and a frame that looked only after "link to" would
+have read the title as `"Unit 2, Day 3" in EXC2O section 1` and answered, with
+total confidence, that no page is called that. **Only THIS window's place is
+accepted**, because a card binds the window's course and section into its call
+whatever the sentence said (`AssistAgent.encode`) — the hide family's reason,
+honoured exactly. Another COURSE is refused in code with the sentence a
+model-named course already gets (`AssistWording.askedAboutAnotherCourse`, or
+`askedAboutACourseThatIsNotHere` when the folder has no such course), nothing
+is read, and the trail records it under the existing `assistant was asked
+about another course` event with a line saying it was matched in code
+(`AssistAgent.linksQuestionNamedAnotherCourseLine`). This course and ANOTHER
+SECTION goes to the model, as it did before. `in <word>` with no section is a
+course only when it is the window's or has a course code's shape (three
+letters, a digit, a letter or digit); otherwise — "Day 3 in Unit 2" — it is
+part of the title and the lookup decides.
+
+**Refused, so the model keeps them** — each a `refused` row: a pronoun ("what
+does it link to?" — the model has the conversation; this frame does not); a
+page named by its DAY ("today's class", "my next class" — no class is resolved
+by date here; the model reads dates, and a second resolver would be a second
+answer to one question); a description beginning "the page"; the REVERSE
+question, "what links to Unit 2, Day 3?" and "which pages link to …", which
+asks which pages point AT this one and is the family's near miss; a plural
+"what do … link to"; "what would … link to"; anything after "link to" that is
+not this window's place, so "… link to, and publish them" is never half
+answered.
+
+**The answer is a READ answered in full, and the turn ends there.** The card
+builds `read_page` with `page` and an argument the model is never shown,
+`answer: "links"` — the `scope: "all"` / `rollover` precedent: in no schema, so
+`toolSchemas` does not move by a byte (local sha256 `46b96562…2cd96cb6`, mcp
+`9bcc7eb7…9cef36f7`, before and after, `--write-contracts` run twice). An MCP
+caller that sends it gets the code's answer, which is harmless: it is a read.
+Without it, `read_page` is exactly what it was. **Every branch ends the turn**
+(`AssistToolOutcome.answered`, `shouldContinue: false`), and that is required
+rather than taste: a code-matched turn never appends the teacher's sentence to
+the model's conversation, so handing back would give the model a tool result
+with no question in front of it — the lap where the smaller assistant turns a
+read into a plan. The tool result's `detail` still names the page, so a
+follow-up about "it" has a referent. A scenario proves the end with a new
+field, `expectModelRequests: 0`: a transcript cannot show an absence, so the
+mac runs that case against a `StubEngine` and counts.
+
+**What the answer says**, all through `AssistWording` (`pageLinksTo`,
+`pageLinksToNothing`, `linkedPageIsADraft`, `linkedPageIsMissing`,
+`noPageCalled`, `morePagesThanOneAreCalled`, `pageCouldNotBeRead`): every link
+once, in the page's order, by the name the sidebar shows for the page it
+reaches; a draft marked (the linked page's own publish or draft key says
+hidden); a link that leads nowhere marked, spelt as the teacher wrote it.
+**"Leads nowhere" is defined once**, in `AssistToolRunner.linksOnAPage` and in
+`linksQuestion.answering.note`: a wiki-link (`[[…]]` or `![[…]]`) whose target
+is neither a page of the section — by file name without regard to case, or a
+folder whose landing page is in the section — nor any file of that exact name
+in the course's folder. **No extension rule**: "Lab 1.2" is a page and
+"diagram.png" a picture because of what is on disk, and a picture or handout
+that exists is not listed at all, since it is not a page.
+
+**Measured before it was chosen**, on the 39 example-content payloads, each
+link counted once per page: read with `AssistSectionGraph.linksAsWritten`,
+**30,930 links and embeds, every one resolved to a page** — no false "leads
+nowhere". Two things that reading does differently from `linkTargets` (which
+publishing follows, and is untouched): links inside `code` and fenced blocks
+are examples, not links — left in, **188** targets read as dead, nearly all on
+the Scavenger Hunt pages that teach `[[Page Name]]`; and a table's escaped
+pipe, `[[Ohm's Law\|Ohm]]`, leaves a backslash on the target — left on, **69
+real links** read as dead. **That second finding is true of publishing too**:
+`linkTargets` keeps the backslash, so a link written inside a table with an
+alias is not followed when a class is published with what it links to. It is
+recorded here rather than fixed, because changing what publishing follows is a
+change of its own with its own measurement.
+
+**The page asked about is found by file name first, then by the name the
+sidebar shows** — a folder's landing page by its folder's name as well, so
+"What does Unit 2 link to?" finds `Unit 2/index.md`. More than one page by the
+shown name is answered with `morePagesThanOneAreCalled` and where each one is,
+never a guess; none is `noPageCalled` — **not** `AssistToolRefusal.noSuchPage`,
+whose sentence ends "Use list_pages…", a tool's name in front of a teacher.
+**A known limit**, stated rather than discovered: two FILES with one name, a
+section's own page and a course-wide one, still resolve to the first in path
+order, the rule every link in `AssistSectionGraph` already follows.
+
+**Rejected, with the numbers.** A sentence in `read_page`'s description (the
+2026-09-19 candidate on #167, `TEACHERS SAY: "what does that page link to?"`):
+it moves the tool surface both apps were measured against — a routing change on
+both platforms — it moved OTHER probes across dates when it was tried, and on
+the smaller assistant seven of thirteen held-out phrasings did not move at all.
+Leaving it: 0 of 84 for the plainest phrasing on both tiers, and a write on 31
+of 84 for "which pages". **No routing re-run is owed**: nothing new reaches the
+model, and the surface hashes are unchanged. The research suite now prints
+`read -> read_page` as intercepted — 7 of 29 probes answered in code where it
+was 6, so "the N the model SEES" is 22 where it was 23; a number from before
+this is not comparable to one after it without saying so. **Windows' model
+still sees the probe** until their app answers the family in code too.
+
 ### The dateline, and why its position is a finding
 
 A model has no clock. Every message the teacher sends therefore carries
@@ -1813,7 +1959,10 @@ Three things to take from it — and one that is not in the table: on this same
 suite the 4B scored **280/290 with the Windows-comparable 18 at 180/180** in
 August, and the whole difference is two probes, one of which (`read`, answered
 with `check_section` where it used to answer `read_page`) is unexplained by
-anything measured here. That is issue #167.
+anything measured here. That is issue #167. (**Answered in code since
+2026-09-25** — re-measured across six courses and fourteen dates, the probe
+turned out to be the lucky member of a family the model gets wrong on both
+tiers; see "'What does this page link to?' is answered in code" in Part 3.)
 
 **The 2026-08-24 change is neutral on the tier this Mac runs** — 28 of the 29
 probes give the identical tool with the old wording and the new one — and the cluster it was written for was never present
@@ -4753,7 +4902,8 @@ rather than by writing the code.
    compared by EQUALITY (never substring), followed by the parsed families —
    four when that was written, six today ("deploy at <time>" joined them on
    2026-09-19, #168; "hide" joined the existing unpublish family the same day
-   rather than adding a seventh, #215).
+   rather than adding a seventh, #215) — and **nine** since 2026-09-25: #267
+   added two for clubs, and "what does <page> link to?" is the ninth (#167).
    The plain-preview sentences are not a second layer here: "preview" and
    "rebuild the preview" are entries in `fixedShapes` like everything else.
    Corrected 2026-09-18 while measuring #117, which counted them rather than
@@ -4767,7 +4917,11 @@ rather than by writing the code.
        card: undo               -> undo_last_change
        card: deploy now         -> deploy_section
 
-   all six of them promise-card phrasings. (It was five until #215 widened the
+   all six of them promise-card phrasings — and since 2026-09-25 a seventh,
+   `read -> read_page`, which is not a card: #167's probe names its own
+   window's course and section, which the links family accepts, so the N a
+   model sees is **22** from then on (the **23** a few lines down was true on
+   its day). (It was five until #215 widened the
    unpublish family to take a class page, which took `card: unpublish by name`
    out of the routing measurement — and the run's own "promise-card, the N the
    model sees" line from 6 of 11 to 5 of 11.) The suite reports both totals
