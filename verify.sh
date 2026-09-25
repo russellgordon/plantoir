@@ -343,8 +343,9 @@ fi
 # preview.sh makes sure this Mac can reach the builder before it builds, and
 # stops in seconds when every try is refused (GitHub #234). Runs the launcher's
 # own functions with docker, curl and sleep answering as told — no Docker, no
-# network, no waiting. The real preview below is the live proof that a healthy
-# Mac is not refused.
+# network, no waiting. The previews verify.sh runs are --build-only, which
+# asks nothing, so none of them exercises the probe against a real forward;
+# a serving preview checked by hand is that proof (documentation/03).
 if (cd scripts && python3 test_preview_reach.py) >/tmp/verify_preview_reach_test.log 2>&1; then
   pass "preview.sh checks this Mac can reach the builder before building, and stops only on a refusal (scripts/test_preview_reach.py)"
 else

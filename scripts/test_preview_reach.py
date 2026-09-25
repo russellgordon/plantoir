@@ -357,8 +357,13 @@ class TheLauncherAndTheContractAgree(unittest.TestCase):
         self.assertGreater(flag, 0, "ensure_container_runtime no longer sets the flag")
         self.assertGreater(flag, body.find("return 0"), "the flag is set on the fast path")
         self.assertLess(flag, body.find("colima start"), "the flag is set after a start")
-        text = the_launcher_text()
-        self.assertRegex(text, r'(?m)^THIS_RUN_STARTED_THE_BUILDER=""\nensure_container_runtime$')
+        # The flag is set identically in all three launchers, so their copies
+        # of the first-run code stay the same text (#263 checks that). Only
+        # preview.sh reads it.
+        for launcher in ["setup.sh", "preview.sh", "deploy.sh"]:
+            text = (REPOSITORY_ROOT / launcher).read_text(encoding="utf-8")
+            self.assertRegex(text, r'(?m)^THIS_RUN_STARTED_THE_BUILDER=""\nensure_container_runtime$', launcher)
+            self.assertIn("  THIS_RUN_STARTED_THE_BUILDER=1\n", text, launcher)
 
 
 if __name__ == "__main__":

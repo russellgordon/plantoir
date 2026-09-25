@@ -886,13 +886,27 @@ bound is for the one case **nobody has measured: the first address after the
 builder's virtual machine starts cold.** That is not rare — since #220,
 quitting Plantoir stops the VM when nothing else uses it, so it is the first
 preview of most days — which is why a run that started the VM
-(`ensure_container_runtime` sets `THIS_RUN_STARTED_THE_BUILDER` in
-`preview.sh`'s copy only, on every path past its "already running" return)
-allows 60 tries. Measuring it would have meant a throwaway second Colima
+(`ensure_container_runtime` sets `THIS_RUN_STARTED_THE_BUILDER` on every
+path past its "already running" return) allows 60 tries. The assignment, and
+the `""` before the call, are in all THREE launchers' copies, although only
+`preview.sh` reads the flag: the first-run code from `_download()` to the
+`ensure_container_runtime` call is one text in all three, and #263's test
+holds it identical — a line in one copy only would turn that red. Measuring it would have meant a throwaway second Colima
 profile on Russell's Mac; the director ruled that out, so the number stays
 unmeasured. Instead, **a run that needed more than one try says so in the
 console** (`reachedAfterRetrying`, "…took N tries"), so the next transcript a
 teacher sends carries the figure the bound rests on.
+
+**No gate exercises the probe against a real forward.** Every `preview.sh`
+that `verify.sh` runs is `--build-only` (or `--stop`), and `--build-only`
+returns before the question is asked; `scripts/test_preview_reach.py` stubs
+curl. A serving preview was checked by hand in the implementation review
+(2026-09-25): `./preview.sh EXC2O 1 --image quartz-teacher:dev-test
+--non-interactive` against a real Colima forward announced
+`http://localhost:8241/` on the first try, with no "took N tries" line. Five
+real Colima forwards with nothing inside answered curl 52 in 0.031–0.035 s;
+a listener that accepts and closes answers 56, one that never answers 28 —
+both go ahead.
 
 **Rejected:**
 - *`lsof` as the probe* — above: slower, and blind to listeners the teacher

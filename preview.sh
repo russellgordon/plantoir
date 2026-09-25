@@ -802,11 +802,9 @@ ensure_container_runtime() {
     return 0
   fi
 
-  # preview.sh's copy only (GitHub #234): from here on, this run is the one
-  # that starts the builder's virtual machine, and the reach check before the
-  # build (this_mac_can_reach_the_builder) allows it longer to hand over its
-  # first address. setup.sh and deploy.sh never ask that question, so their
-  # copies of this function do not set it.
+  # Set when this run starts the builder's virtual machine; preview.sh's
+  # reach check reads it (GitHub #234). The same line is in all three
+  # launchers so that their copies of this function stay identical.
   THIS_RUN_STARTED_THE_BUILDER=1
 
   # "Setting up this Mac" is a progress marker the app matches word for word
