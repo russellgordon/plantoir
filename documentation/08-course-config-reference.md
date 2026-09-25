@@ -9,7 +9,7 @@ by the macOS app from scratch: a class imported from the older
 folder-per-class layout has no settings file at all, so the importer writes
 one (see "Reference courses" below) — **read and auto-extended** by the
 build ([`build_site.py`](05-build-pipeline.md) appends newly discovered
-folders/files), and **statically imported** by the patched Explorer
+folders/files, and never touches `hidden`), and **statically imported** by the patched Explorer
 components at Quartz build time
 ([customizations C2-1](06-quartz-customizations.md#c2-applied-on-every-build)).
 
@@ -59,7 +59,7 @@ A representative example:
 | `shared_files` | string[] | setup + build discovery | build | Course-root loose `.md` files copied into every section's site. |
 | `per_section_folders` | string[] | setup + build discovery | build | Folder names expected inside each `section<N>/`, copied only into that section's site. |
 | `per_section_files` | string[] | setup + build discovery | build | Loose `.md` files inside each `section<N>/`. |
-| `hidden` | string[] | setup + build (auto-adds `Media`) | build → Explorer omit set | Items filtered out of the sidebar. Still built, linkable, and searchable. |
+| `hidden` | string[] | setup + the apps ONLY — the build never changes it (#265); it adds `Media` and `Curriculum Coverage.md` to the sidebar's list in memory, never to this file | build → Explorer omit set | Items filtered out of the sidebar. Still built, linkable, and searchable. Each entry is the STORED name of a TOP-LEVEL item — a file with `.md` (`"Key Links.md"`), a folder by name (`"Tasks"`) — matched ignoring case and Unicode normalisation; a name without `.md` also hides `<name>.md`; nothing nested is hidden by a name. Contract: `file-formats.json` → `sidebarHiding`. |
 | `expandable` | string[] | setup + build discovery | patched Explorer (statically imported) | Folders rendered as collapsible trees; all other folders render as plain links to their index page. |
 | `expandOnFolderClick` | bool | setup | build → `folderClickBehavior` + `data-expand-on-navigate` | `true`: clicking a folder name expands it. `false` (default): name navigates; only the chevron expands. |
 | `footer_html` | string | setup | build → `Footer.tsx` | Raw HTML injected into every page's footer. |
@@ -70,14 +70,17 @@ A representative example:
 | `color_schemes.section<N>` | string | setup | build → `quartz.config.ts` colors + social card | Scheme id from `support/colour_schemes.json` (43 available). The section's social sharing card is drawn in this scheme too. |
 | `custom_domains.sections.section<N>` | object (per-destination-type map, e.g. `{"netlify": "…", "cloudflare_pages": "…"}`) | app (Advanced, per-section settings — one field per configured destination) | app (published-site links, per destination) + `build_site.py` (baseUrl, via the PRIMARY destination's own entry only — one build's sitemap/RSS/social-card links can only follow one domain) | The teacher's own domain for ONE destination of the section's published site. Links after a deploy swap that destination's own host for it (path preserved, https) — never another destination's. An OLDER shape (a bare string, from before a course could have more than one destination) is still read, as the domain for whichever destination is currently primary (`deploy_target`). The domain itself must already be configured with that host (Netlify/Cloudflare Pages) — this key only changes what Plantoir LINKS to. Entries are normalized (scheme and path stripped) on the way in. |
 | `prepopulate_example_content` | bool | setup | setup (remembered on a re-run) | Whether the teacher took the ready-made payload for this course code. |
-| `use_skeleton` | bool | setup | setup (remembered on a re-run) | Whether the teacher took the subject skeleton instead. Mutually exclusive with the key above — a course gets one starting content source or neither. Offered for a code whose prefix has a family AND whose teacher is NOT taking the ready-made payload, which is the 38 payload codes as well as the ~1,900 without one: both apps wrote `false` for a payload code whatever the teacher chose until 2026-09-21, so declining the ready-made pages gave empty folders ([#248](https://github.com/russellgordon/plantoir/issues/248); 18 pages against the skeleton's 47, measured on ICS4U). |
+| `use_skeleton` | bool | setup | setup (remembered on a re-run) | Whether the teacher took the subject skeleton instead. Mutually exclusive with the key above — a course gets one starting content source or neither. Offered for a code whose prefix has a family AND whose teacher is NOT taking the ready-made payload, which is the 39 payload codes as well as the ~1,900 without one: both apps wrote `false` for a payload code whatever the teacher chose until 2026-09-21, so declining the ready-made pages gave empty folders ([#248](https://github.com/russellgordon/plantoir/issues/248); 18 pages against the skeleton's 47, measured on ICS4U). |
 | `include_curriculum_pages` | bool | setup | setup | Whether the curriculum pages written for this course code come with it — every expectation as its own page, and what the coverage map is built from. TWO starting points reach them since [#251](https://github.com/russellgordon/plantoir/issues/251) (2026-09-22): the teacher TAKING the payload gets its Curriculum folder, and the teacher who DECLINES the payload but keeps the subject's skeleton gets those same pages installed into the skeleton's Curriculum folder (ICS4U 2 pages to 61, MCMPR11 to 59 British Columbia standards, ICS2O — no payload — unchanged at 2). Declining it strips the `%%curriculum-start%%`…`%%curriculum-end%%` passages from every payload page and unlinks inline expectation references. |
-| `include_curriculum_coverage` | bool (default `true`) | setup | build | Whether the generated `Curriculum Coverage` map page is produced. |
+| `include_curriculum_coverage` | bool (default `true`) | setup | build | Whether the generated `Curriculum Coverage` map page is produced. A club (#267) is created with it `false` and no Curriculum folder; a teacher who turns it on later in Course Settings gets the build-health advisory `curriculumCoverageFoundNothing` until a curriculum folder with pages exists — advisory and correct, not a fault. |
 | `curriculum_folder` | string or null | setup | build | What this course calls the folder holding one page per expectation. Declared by every payload and skeleton manifest. The build tries it FIRST and only then falls back to scanning for a top-level folder whose name contains `curriculum` — which is still the path a from-scratch course takes, but would never have found a folder called something else entirely. |
-| `class_folder` | string or null | setup, and a rename in Course Settings | build, both apps | Which per-section folder holds this course's class pages. **Absent falls back to the GUESS** — the first per-section folder whose name contains `class`, else the first, else the literal `All Classes` — which is what every course made before 2026-09-01 relies on. The key exists because the guess quietly decided what a teacher was allowed to CALL the folder: somebody whose vocabulary is "Thread 2, Day 3" would sensibly call it `All Days`, and the guess would then point the next-class button and the coverage map at whatever folder happened to be first. **A rename writes this key even on a course that never had one**, because a rename is the one moment Plantoir witnesses the change. A stale name loses to the guess; a name differing only in case yields the folder LIST's spelling, because file paths are built from the answer. |
-| `unit_word` | string | setup (new courses); Course Settings → Rename… (a course in use — mac; Windows: [#158](https://github.com/russellgordon/plantoir/issues/158)); Import Courses for Reference… for a class kept a website folder per class (#256, only when its class pages agree on one word) | build, both apps | What this course calls the first half of a class page's name — `Unit 2, Day 3`, or `Module 2, Day 3`. **Absent means `Unit`**, and so does an empty string; unlike `graded_folders`, the two are not distinguished, because there is no sensible reading of "the teacher cleared the word". Chosen when the course is made, where the ready-made pages are written in that word as they are poured; changed later from Course Settings → Rename…, which renames every class page and follows the links before writing the key (see [09-mac-app.md](09-mac-app.md) → "Renaming a course's word for a unit"). `Day` is deliberately fixed. |
+| `class_folder` | string or null | setup, and a rename in Course Settings | build, both apps | Which per-section folder holds this course's class pages. **Absent falls back to the GUESS** — the first per-section folder whose name contains `class`, else the first, else the literal `All Classes` — which is what every course made before 2026-09-01 relies on. The key exists because the guess quietly decided what a teacher was allowed to CALL the folder: somebody whose vocabulary is "Thread 2, Day 3" would sensibly call it `All Days`, and the guess would then point the next-class button and the coverage map at whatever folder happened to be first. **A rename writes this key even on a course that never had one**, because a rename is the one moment Plantoir witnesses the change. A stale name loses to the guess; a name differing only in case yields the folder LIST's spelling, because file paths are built from the answer. **A club (#267) writes the name the teacher chose — `All Meetings` by default — and `setup_course.py` keeps a RECORDED name on a re-run** rather than rebuilding it from the guess, which reads `["Resources", "All Meetings"]` as `Resources` (measured). |
+| `unit_word` | string | setup (new courses); Course Settings → Rename… (a course in use — mac; Windows: [#158](https://github.com/russellgordon/plantoir/issues/158)); Import Courses for Reference… for a class kept a website folder per class (#256, only when its class pages agree on one word) | build, both apps | What this course calls the first half of a class page's name — `Unit 2, Day 3`, or `Module 2, Day 3`. **Absent means `Unit`**, and so does an empty string; unlike `graded_folders`, the two are not distinguished, because there is no sensible reading of "the teacher cleared the word". Chosen when the course is made, where the ready-made pages are written in that word as they are poured; changed later from Course Settings → Rename…, which renames every class page and follows the links before writing the key (see [09-mac-app.md](09-mac-app.md) → "Renaming a course's word for a unit"). `Day` is deliberately fixed. **Under `class_page_scheme: "numbered"` it is the whole word of a ONE-number name** — a club writes `Week`, so its pages are `Week 3` — reused rather than joined by a second word key, so the key's name under-describes it. A numbered course's word is not renamed afterwards: Course Settings disables Rename… for it. |
+| `class_page_scheme` | string (`unit_day` or `numbered`) | setup (a club only, #267) | build, both apps | The SHAPE of a class page's name: `unit_day` is `<unit_word> 2, Day 3`; `numbered` is `<unit_word> 3`, one number counting meetings. **Absent, empty and unknown all mean `unit_day`**, so a scheme a newer app wrote, opened by an older one, reads as today's shape (it then sees no class pages — degraded, never corrupting) and nothing is rewritten. Written by the wizard for a club only; every other course's file is byte-identical to before. **Not switchable after creation**, and an existing course — Russell's `CODING` included — can never become numbered from the app. In a numbered course there are NO units: "publish Week 1" acts on one page, "start a new unit" and "add days to a unit" are refused, and make-room keeps the section's date gaps ([10](10-local-ai-assistant.md) → "A numbered course has no units"). |
+| `front_page_heading` | string | setup (a club only, #267) | setup only | The heading a new numbered course's section front pages are created with, above the embed of the newest page: a club writes `Most Recent Meeting`. **Absent means nothing is recorded**: the course's front pages keep whatever heading they have (`Most Recent Class` for a course set up before #267, or whatever it was edited to — CODING's reads `Most Recent Meeting`), and Course Settings' locked row says it was not recorded rather than naming a default. Read only when a course is created; the assistant's repointing finds the embed by the class page it names, never by the heading, so it never reads or writes this. Not switchable afterwards; Course Settings shows it locked. |
+| `class_noun` | string (`class` or `meeting`) | setup (a club only, #267) | both apps | What the assistant calls one page when it talks to the teacher: a club writes `meeting`. **Absent and unknown mean `class`.** A closed pair, not free text, because the sentences carry articles and plurals. The build never reads it, and it moves no byte of what the assistant's model is shown. Not switchable afterwards; Course Settings shows it locked. |
 | `excluded_items` | object with `shared` and/or `per_section` arrays | Course Settings | build | Folder and file names the teacher removed in Settings, kept out of previews and deploys. **Authoritative at build time**: preflight drops an excluded name it finds back in the folder lists rather than re-adding it, and never un-hides it. Keyed by scope because the same bare name can legitimately exist in both, and the two are found by different scans. An exclusion does NOT expire when the folder is deleted and re-created — discovery is name-based, so the build cannot tell "the folder I excluded" from "the new folder I just made". |
-| `graded_folders` | array of strings | setup, and the Marks checklist in Course Settings | build, both apps | The folders whose work counts for marks, which is what makes an expectation "assessed" on the coverage map. **Absent is not empty.** Absent means the teacher has never been asked, so the historical rule applies (any folder whose name contains `task`) and an existing course keeps exactly the marks it had; `[]` means they were asked and cleared it. Seeding existing courses would not have been safe — the mathematics skeleton ships `Thinking Tasks`, which the old rule counted and a pool of `["Tasks"]` does not. **The first tick FREEZES the pool**: the moment a teacher touches the checklist, the key is written with everything the course was already counting, and the historical rule stops applying to it. **A REMOVAL does not** — taking a folder out of the course in Settings is not an answer to the marks question, so a never-asked course is left with the key ABSENT rather than frozen to the historical answer minus that folder (which, on the ordinary course whose only marked folder is `Tasks`, would be `[]`: nothing counting for marks, permanently, from a gesture the teacher was told would do one narrow thing). The rule, its second exception and what it deliberately leaves unpinned are `gradedFolders.removingAFolder`, seven cases, run on both platforms (six since 2026-09-18, the seventh since 2026-09-19). The second exception — a name the checklist STILL OFFERS keeps its place — is asked CASE-INSENSITIVELY, the way the build asks it, since 2026-09-19 ([#172](https://github.com/russellgordon/plantoir/issues/172), raised from Windows): the checklist returns names as they are spelled on disk, so an exact test drops a pooled `Tasks` when `Portfolios/tasks` survives while the build goes on counting that folder. What remains unpinned is the DROP's own comparison, which the mac makes exactly and Windows with `OrdinalIgnoreCase`. Which is why what the checklist OFFERS matters as much as what it writes — the build matches a folder at any depth, so the apps offer the two folder lists plus every folder found inside the course, four levels deep. That rule, its skip list and what it deliberately leaves out are in [`contracts/shared-rules.json`](../contracts/shared-rules.json) → `gradedFolders.choices`, and both apps run its 14 cases. Two parts of it are easy to leave out and cost a teacher their marks: a folder named in `excluded_items` is NOT offered (it is still on disk, so the walk hands back a folder they just removed unless it is told not to), and each folder's children are sorted ORDINALLY and case-insensitively — see [`04-course-setup.md`](04-course-setup.md) for the measured table of which comparison, because the natural call on each platform is a different one. |
+| `graded_folders` | array of strings | setup, and the Marks checklist in Course Settings | build, both apps | The folders whose work counts for marks, which is what makes an expectation "assessed" on the coverage map. **Absent is not empty.** Absent means the teacher has never been asked, so the historical rule applies (any folder whose name contains `task`) and an existing course keeps exactly the marks it had; `[]` means they were asked and cleared it. Seeding existing courses would not have been safe — the mathematics skeleton ships `Thinking Tasks`, which the old rule counted and a pool of `["Tasks"]` does not. **The first tick FREEZES the pool**: the moment a teacher touches the checklist, the key is written with everything the course was already counting, and the historical rule stops applying to it. **A REMOVAL does not** — taking a folder out of the course in Settings is not an answer to the marks question, so a never-asked course is left with the key ABSENT rather than frozen to the historical answer minus that folder (which, on the ordinary course whose only marked folder is `Tasks`, would be `[]`: nothing counting for marks, permanently, from a gesture the teacher was told would do one narrow thing). The rule, its second exception and what it deliberately leaves unpinned are `gradedFolders.removingAFolder`, seven cases, run on both platforms (six since 2026-09-18, the seventh since 2026-09-19). The second exception — a name the checklist STILL OFFERS keeps its place — is asked CASE-INSENSITIVELY, the way the build asks it, since 2026-09-19 ([#172](https://github.com/russellgordon/plantoir/issues/172), raised from Windows): the checklist returns names as they are spelled on disk, so an exact test drops a pooled `Tasks` when `Portfolios/tasks` survives while the build goes on counting that folder. What remains unpinned is the DROP's own comparison, which the mac makes exactly and Windows with `OrdinalIgnoreCase`. **A re-run of `setup.sh` / `setup.ps1` writes a saved pool back exactly as it was** (a saved `null` as `[]`, an absent key left absent, and only entries that cannot name a folder — null, blank, non-string, an exact repeat — removed) — it used to re-check the pool against the top-level folder lists and emptied every pool naming a folder found inside another; `gradedFolders.rerunningSetup`, eleven cases ([#192](https://github.com/russellgordon/plantoir/issues/192)). Which is why what the checklist OFFERS matters as much as what it writes — the build matches a folder at any depth, so the apps offer the two folder lists plus every folder found inside the course, four levels deep. That rule, its skip list and what it deliberately leaves out are in [`contracts/shared-rules.json`](../contracts/shared-rules.json) → `gradedFolders.choices`, and both apps run its 14 cases. Two parts of it are easy to leave out and cost a teacher their marks: a folder named in `excluded_items` is NOT offered (it is still on disk, so the walk hands back a folder they just removed unless it is told not to), and each folder's children are sorted ORDINALLY and case-insensitively — see [`04-course-setup.md`](04-course-setup.md) for the measured table of which comparison, because the natural call on each platform is a different one. |
 | `include_coverage_notes` | bool (default `true`) | setup | build | Whether that page carries its explanatory sections ("What counts", "Reading it honestly") or the map alone. |
 | `kept_for_reference` | bool (default `false`) | app (Keep a Copy for Reference…, Import Courses for Reference…) | the app, `scripts/reference_course.py`, `deploy.sh`, `deploy.py` | `true` marks a REFERENCE COURSE: last year's course, or a course full of example content, kept in this year's sidebar to be read and never deployed. **Absent means false** — the only safe direction, since the reverse would make a live course silently undeployable. See "Reference courses" below. |
 | `reference_school_year` | integer or null | app (Keep a Copy for Reference…, Import Courses for Reference…, Set School Year…) | the app (sidebar grouping, the MCP course listing) | Which school year a reference course was taught in, as the calendar year it STARTED in: `2025` means 2025–26. The label is derived, never stored. Absent, null, or anything that is not a whole number within the offered range reads as **Other**. |
@@ -88,7 +91,7 @@ A representative example:
 | Key | Type | Written by | Read by | Meaning |
 |---|---|---|---|---|
 | `deploy_target` | string (default `netlify`) | app only (Course Settings → Publishing; the wizard preserves it but never writes it) | the app, which translates it into the launcher's `--target cloudflare` / `--to-folder <path>` flags — neither the launcher nor `deploy.py` reads the key | Where this course's sections publish: `netlify`, `cloudflare_pages`, or `local_folder`. Absent means `netlify`, so every existing course keeps working untouched. See [deployment](07-deployment.md). |
-| `deploy_folder_path` | string | app (Publishing, folder mode) | the app, which passes it as `--to-folder <path>`; the launcher does the host-side copy from that flag | Only for `local_folder`: the folder sections are mirrored into, one `sectionN` subfolder each. Validated live in the app — a missing, unwritable, or file-not-folder path blocks Save rather than failing at publish time. |
+| `deploy_folder_path` | string | app (Publishing, folder mode) | the app, which passes it as `--to-folder <path>`; the launcher does the host-side copy from that flag | Only for `local_folder`: the folder sections are mirrored into, one `sectionN` subfolder each. Validated live in the app — a missing, unwritable, file-not-folder or **not-a-full-path** path blocks Save rather than failing at publish time (the last since #227: a partial path was checked against the app's current folder and published into the working folder). The app hands the launcher the path trimmed of surrounding spaces. |
 | `scheduled_deploy_may_run_late_days` | integer (default `7`; only `1`, `3`, `7` or `14` mean themselves) | app (Course Settings → Deploying). **Not the wizard**, deliberately: a course that has never been deployed cannot be scheduled at all, so the question would have no consequence at the moment it is asked | the app, at the moment a scheduled deploy FIRES — read straight out of this file by a process with no `CourseConfiguration` loaded, so changing the setting after scheduling changes what a job already set will do. Nothing in `scripts/` reads it | How late a deploy set to happen on its own may still go ahead. The Mac may have been off or asleep at the chosen time; past this window the run stands down, deploys nothing and tells the teacher. **Absent means 7, and so does anything that is not one of the four offered values** — an older build's number, a value hand-edited in — because honouring a stored `0` would stand every scheduled deploy down. There is deliberately no "always". See [deployment](07-deployment.md) → "A scheduled deploy that outlived its course", and `contracts/shared-rules.json` → `scheduledDeployCancellation`. |
 | `additional_deploy_targets` | array of `{type, path}` objects | app (Publishing, "Also publish to, for redundancy") | the app — currently config/UI only; nothing yet triggers a second deploy from it (see below) | Extra destinations this course ALSO publishes to, beyond `deploy_target` (the primary), for redundancy against one host having a bad day. `type` uses the same spellings as `deploy_target`; `path` is only present for a `local_folder` entry. **Absent entirely** (never written as `[]`) for the overwhelming majority of courses that have not opted in, so an untouched course writes the exact same file it always has. At most one entry per known type, and never a type that is already the primary — `CourseConfiguration.deployTarget`'s own setter enforces this, dropping a type from this list the moment it becomes the primary. |
 
@@ -158,8 +161,9 @@ and in `setup_course.py`), and `show_section_marker` false for `section1`
 (every import is section 1, so "S1" would be wrong for an S2).
 
 `hidden` is the set of names the site's sidebar leaves out — the Explorer's
-`omit` set, written by `update_quartz_layout`; the pages are still built and
-still reachable by link. The import writes only `Media`, because pictures are
+`omit` set, written by `update_quartz_layout` with each name as stored
+(`.md` kept, since #265); the pages are still built and still reachable by
+link. The import writes only `Media`, because pictures are
 not pages, and the build adds `Media` itself anyway. It deliberately does NOT
 copy the wizard's own list (`WizardDefaults.hiddenItems`: Private Notes,
 Scratch Page, Key Links, Learning Goals and so on), which would hide seven of
@@ -208,7 +212,9 @@ labelled "0000–01" built out of a value that coerced to zero.
 the config it owns, then copies through every key already in the saved file
 that it did not write — the app's publishing choice, and anything a future
 version adds. Without that, re-running the wizard on an existing course would
-silently drop settings made in the app.
+silently drop settings made in the app. `graded_folders` is treated the same
+way even though the wizard writes it: a saved pool goes back unchanged, because
+a re-run never asks the marks question (`gradedFolders.rerunningSetup`, #192).
 
 The Cloudflare **account ID** is deliberately *not* here: it identifies the
 teacher rather than the course, so it lives in the app's own settings (and,
@@ -240,7 +246,7 @@ belong in the same mental model:
 
 | Frontmatter key | Where | Effect |
 |---|---|---|
-| `publishForSection<N>` / `createdSection<N>` | shared content | Per-section publication state; collapsed to `publish`/`created` when building section N ([mechanism](05-build-pipeline.md#frontmatter-processing)). |
+| `publishForSection<N>` / `createdSection<N>` | shared content | Per-section publication state; collapsed to `publish`/`created` when building section N ([mechanism](05-build-pipeline.md#frontmatter-processing)). Since 2026-09-25 the BUILD writes `createdSection<N>` too, for the section it is building only: a shared page a visible class links to DIRECTLY is given the date of the earliest such class ([dates](05-build-pipeline.md#dates-drive-everything), #276). **A date typed on such a page no longer decides it: that class's date wins on every build** — a typed `createdSection<N>` is rewritten, and a typed plain `created:` stays in the file untouched while the build adds (or updates) `createdSection<N>`, which the site uses in preference, so editing that `created:` later changes nothing; to date a shared page by hand, link it from the class whose date it should carry. A page reached only through another shared page keeps its own date, and an undated one stays undated. |
 | `publish` | any page | `false` keeps the page out of the built site. Anything else — including no key at all — publishes it. **"`false`" is not the same as "looks false"**: see [Whether students see a page](#whether-students-see-a-page) below, which is the measured table and the one both apps are written against. |
 | `created` | any page | The displayed and sort date ([C1-3](06-quartz-customizations.md#c1-applied-on-first-build--full-rebuild)). |
 | `draft` / `draftSection<N>` | any page | **Legacy, still read.** The same idea with the opposite polarity (`draft: true` hides). Used only when no `publish` key is present. Editing such a page's visibility rewrites the key to `publish` / `publishForSection<N>` on the same line and removes the old one (decided 2026-09-07; `contracts/file-formats.json` → `pageVisibility.writingRules`). The build reads both spellings either way. |
@@ -326,7 +332,11 @@ tag such as
 inside double quotes, an indented key, a value that starts with a character
 YAML reserves (`%`, `@`, a backtick, `- `) or carries its own `key: value`, and
 frontmatter the build cannot parse at all — tab indentation or an unclosed
-fence, which stop the whole build so there is no site verdict to mirror).
+quote, which until #246 stopped the whole build and since #246 (2026-09-25)
+the build HIDES and names in a folder-problem finding; so the site's verdict
+is hidden, each app's reporting of visible is the mild direction, and the
+finding tells the teacher — see `05-build-pipeline.md` → "A page whose
+settings cannot be read is hidden (#246)").
 
 Two shapes are NOT `cannotTell` and are worth naming, because both were read
 the dangerous way round before they were measured:
@@ -334,7 +344,9 @@ the dangerous way round before they were measured:
 * **`publish:false`, with no space after the colon, is not a key at all.** YAML
   needs a space, a tab or the end of the line after the colon to make a mapping
   — so that line is one plain scalar, the page reaches Quartz with no keys, and
-  it is PUBLISHED. (With another key beside it the same line stops the build.)
+  it is PUBLISHED. (With another key beside it the same line cannot be parsed
+  at all: that stopped the build until #246, and since #246 the build hides
+  the page and names it.)
   Reading everything after the first colon called this page hidden.
 * **YAML's whitespace is a space and a tab, and nothing else.** The
   non-breaking space Option-Space types on a Mac is not whitespace to YAML, so
@@ -448,7 +460,8 @@ separately from the reader:
   which cannot be copied to another key's line at all; that, and a DRAFT value
   the reader cannot read, are written as HELD BACK — and the continuation
   lines are taken WITH the key, because an indented scalar left behind lands
-  under whatever key follows and stops the build. A key with nothing after it
+  under whatever key follows and makes a block the build cannot parse — which
+  stopped the build until #246, and since #246 hides the page and names it. A key with nothing after it
   is the one exception: that is a null, which PUBLISHES the page, so the copy
   keeps it a null rather than deciding for the teacher. A page wrongly held back is
   one a teacher notices and fixes; a page wrongly published is one nobody
@@ -498,17 +511,33 @@ separately from the reader:
   closing fence: python-frontmatter does not accept one, and Windows'
   `Block.Parse` did until 2026-09-19, which read a block as ending early.)
 
-  **Two other finders are still hand-rolled, and knowing which is which
-  matters more than unifying them.** `SectionAdder`'s (`frontmatterLines` /
-  `FrontmatterLines`) is strict on BOTH platforms — the very first line
-  exactly `---` — so the section carry agrees with itself across the two apps;
-  that is parity, and it is recorded here rather than filed. `CourseRestorer`'s
+  **Other finders are still hand-rolled, and knowing which is which matters
+  more than unifying them.** `SectionAdder`'s WAS one — strict on both
+  platforms, the very first line exactly `---`, recorded here as parity — until
+  it was measured to PUBLISH pages: a page it could not find the block of got
+  no `publishForSection<N>` for the new section, and a page with no key is
+  shown, so a page hidden in section 1 appeared in the new section (#175,
+  2026-09-25; the build's own `process_frontmatter` read section 2 as
+  `publish=None` for a `----` fence, a blank line before the fence, a space
+  after it, and Windows line endings). The mac's `frontmatterLines` now asks
+  `PageFrontmatter.block`, and its two writers splice by LINE inside the block
+  rather than rebuilding `---` + block and cutting the old text by a character
+  count — the old arithmetic, pointed at the lenient finder, left `…-0400e`
+  on the new date and made a Windows-line-ending page lose its frontmatter
+  entirely. The cases are `contracts/course-management.json` →
+  `sectionNumbers.addingKeysToAPage`; Windows' `FrontmatterLines` is still
+  strict and owes the same change (the `windows` issue from #175).
+  `CourseRestorer`'s
   is strict on Windows and, since the mac's `PageFrontmatter.block` was
   loosened for the reason above, lenient on the mac — so a restore reaches
   different pages on the two platforms, which is
-  [issue #177](https://github.com/russellgordon/plantoir/issues/177) and needs
-  a decision. The trap to avoid is reading "one fence finder" and making the
-  MAC strict, which puts the second-block bug straight back.
+  [issue #177](https://github.com/russellgordon/plantoir/issues/177). Russell
+  decided it on 2026-09-19: the restore uses the SHARED finder, on both
+  platforms. The mac's has since #140; since #182 (2026-09-25) it also carries
+  and drops each key WITH the lines it owns (below), and Windows owes both in
+  one change (the `windows` issue from #182). The trap to avoid is reading
+  "one fence finder" and making the MAC strict, which puts the second-block bug
+  straight back.
 
 * **A writer must take a value's CONTINUATION lines with the key.**
   Replacing a key's line alone orphans the indented line below it onto the new
@@ -560,28 +589,95 @@ separately from the reader:
   in full and sweeps. Measured after that write: `False` → HIDDEN. It changes
   none of the 54 shared `readingCases` that existed before it.
 
-  **"Whatever is on the key's own line" is closed; "the first line that could
-  be a value" has one pre-existing exception, and it is the one that reaches
-  this same fault.** A line of INDENTED DASHES — `publish: false` over
-  `  ---` — never reaches the rule above, because `isFence` trims leading
-  whitespace before testing for dashes and so takes `  ---` for the CLOSING
-  fence. python-frontmatter's own boundary is `^-{3,}\s*$`, which allows no
-  leading whitespace at all, so the build reads that line as part of the value
-  and the site PUBLISHES the page (`"false ---"`), while the reader says
-  `hidden` — confidently — and "hide this page" is a no-op, exactly the shape
-  this section exists to close. `publish: no` over `  ---` behaves the same;
-  `publish: >-` and `publish:` over `  ---` are written but the `  ---` is
-  left behind, because `continuationLineIndices` is bounded by
-  `block.closeIndex`, which is the fake fence. All measured; `origin/dev` and
-  Windows produce byte-identical output on every row, so this is pre-existing
-  and shared rather than anything this piece introduced. It is NOT fixed here
-  on purpose: `isFence` is the fence finder that the reader, both visibility
-  writers and `PageFrontmatter` all share, so changing it is its own piece
-  rather than a ride-along.
+  **"The first line that could be a value" had one exception until #188 (2026-09-25),
+  and it reached this same fault.** A line of INDENTED DASHES — `publish: false`
+  over `  ---` — never reached the rule above, because `isFence` trimmed leading
+  whitespace before testing for dashes and so took `  ---` for the CLOSING
+  fence. python-frontmatter's own boundary is `^-{3,}\s*$` matched line by line,
+  which allows no leading whitespace at all, so the build reads that line as
+  part of the value and the site PUBLISHES the page (`"false ---"`), while the
+  reader said `hidden` — confidently — and "hide this page" was a no-op.
+  `publish: no` over `  ---` behaved the same; `publish: >-` and `publish:` over
+  `  ---` were written but the `  ---` was left behind, because the sweep is
+  bounded by the block's close, which was the fake fence. On a course page the
+  same early close let ADDING A SECTION split section 1's key from its value:
+  measured, section 1 turned hidden and the new section read `"false ---"` and
+  was published.
+
+  **The fence rule is now asymmetric, on the mac and in the build's own
+  splice.** The CLOSING fence is three or more dashes at column 0, trailing
+  spaces and tabs only (`PageVisibilityReader.isFence`,
+  `build_site._is_frontmatter_fence`); the OPENING fence may be indented
+  (`isOpeningFence`, `_is_opening_frontmatter_fence`), because
+  `frontmatter.parse` strips the whole document before it matches, so the
+  indent of the first line is gone by the time the regex looks — measured,
+  `  ---` / `publish: false` / `---` is HIDDEN on the site. Every mac writer
+  finds its block through that one finder (`PageFrontmatter.block` →
+  `fenceIndices`), and the page copier's builder-agreement guard asks the same
+  `isFence` rather than keeping its own copy. Measured over 3,000 seeded pages
+  against python-frontmatter's own `detect`/`split`: the old finder disagreed
+  on **1,316**, the new one on **0**, and the build's Python copy the same
+  (1,316 → 0) — `research/frontmatter-fences/`, which regenerates the corpus
+  from its seed.
+
+  **Rejected: a symmetric "never indented" rule.** It sees no block behind an
+  indented OPENER, which python-frontmatter does read, and every writer then
+  prepends a second block and turns the teacher's own into body text — #140's
+  bug. `testAnIndentedOpeningFenceIsStillFrontmatter` and the contract's
+  indented-opener writing case are the guard, and they pass on the old finder
+  too, on purpose.
+
+  **One shape's STRUCTURE changes, and the apps and the build answer it
+  differently on purpose.** A page whose only closing-looking line is indented —
+  `---` / `title: x` / `  ---` / body — has no closed block to python-frontmatter,
+  so every line of it is body text and the page is PUBLISHED. Since #188 the
+  apps agree it has no block, and the visibility writer PREPENDS one of its
+  own, as it does for any fence that is never closed: measured, the page goes
+  from published to HIDDEN. This is the move #140 teaches nobody to make, and
+  it is right here because there was never a block for it to push into the
+  body — those lines already were the body. The app's DATE writer
+  (`PageFrontmatter.settingCreated`, re-date and make-room) does the same —
+  measured `.written`, and the site reads the new date — and that was kept
+  rather than refused: those are a teacher's requests, and the app reads the
+  date back to order the section's classes, so a page it declined would drop
+  out of that order. The build's date splice (`_setting_frontmatter_value`)
+  REFUSES the same shape instead, as it refuses every block that is opened and
+  never closed: it runs unattended on every build over the teacher's own
+  files, and the site is dated anyway because the build dates its own copy.
+  All three are contract cases (`pageVisibility.writingCases`,
+  `datesAndTitles.writingCases`, `atBuildTime.writingCases`). (This paragraph
+  said at first that a date is "not worth restructuring a teacher's file
+  for" — true of the build, and contradicted by the app's own date writer, as
+  the review found.)
+
+  **What a teacher sees change on upgrade, with nothing written.** The reader
+  answers differently on pages it used to close early, and it says so on
+  screen the moment the app is updated — no file is touched and no trail line
+  records it, because no trail event carries a visibility READING (all 75
+  `mustRecord` events were checked; none does). Measured over the same 3,000
+  pages, each judged on the site with #246's build (a page whose settings it
+  cannot read is hidden): **99 that the app showed as hidden now show as
+  published** — the site was publishing every one of them all along, so the
+  app is catching up with what students could already read; 15 go from "says
+  nothing" to hidden, all of them hidden on the site; and 12 that the app
+  showed as hidden now show as published while the site HIDES them — every
+  one a page the build cannot parse (a tab used as indentation, or an
+  indented line below the value that YAML cannot fold into it), which since #246 the build hides and names in
+  a folder-problem finding, so reporting visible there is the documented mild
+  direction and the finding says what is wrong. Pages the app calls hidden
+  while the site publishes them: 99 before, **0** after. A `cannot tell` guard
+  for the pages that went the other way was considered by the plan's review
+  and not needed on this base. Whitespace python's `\s` matches and the apps'
+  trim does not — a non-breaking space, a FORM FEED or a vertical tab after
+  the dashes — closes a block for the build and not for the apps, and a
+  byte-order mark is its own case. The review's extended fuzz (seed 31337,
+  3,000 pages with `---\f` among the fences) disagreed on 199 pages, every one
+  a form feed after the dashes; without it, 0 of 2,663. None of these was
+  measured on a real page; they are named here rather than coded for.
   [Issue #188](https://github.com/russellgordon/plantoir/issues/188).
 
-  **Windows fixed all of this — everything above except that one indented-dashes
-  shape — on 2026-09-19** — `PageVisibilityReader
+  **Windows fixed all of this — everything above except the indented-dashes
+  shape, which it owes with #188 — on 2026-09-19** — `PageVisibilityReader
   .ReadScalar` for the reading, `PageFrontmatter.ContinuationLines` for the
   sweep, used by both of `SetDraft`'s branches; tests in
   `PageVisibilityReadingTests` →
@@ -625,13 +721,14 @@ separately from the reader:
     steps over blank lines but not comments, unlike every other stepping in
     this family. Measured consequence: `publish: false` / `# note` /
     `  false` is a page the build cannot parse, and `_is_draft` calls it
-    hidden. **Left alone deliberately.** It is not unreachable —
-    `process_frontmatter` CATCHES the YAML error, prints `⚠️ Could not read
-    frontmatter from …` and leaves the file byte-identical
-    (`build_site.py:1976-1979`), so such a page reaches the merged tree with
-    its comments intact and `_is_draft` reads raw text. But every page that
-    can reach it is a page that stops the Quartz build anyway, so the gap has
-    no teacher behind it; and `scripts/build_site.py` is inside
+    hidden. **Left alone deliberately.** Since #246 it is unreachable from
+    the build: `process_frontmatter` catches the reader's error and rewrites
+    the build's copy to `publish: false` over the page's body, so `_is_draft`
+    never meets the original block. (Before #246 it left the copy
+    byte-identical after printing the reader's message, such a page reached
+    the merged tree with its comments intact, and every page that could reach
+    it stopped the Quartz build anyway — so the gap never had a teacher behind
+    it); and `scripts/build_site.py` is inside
     `.githooks/pre-commit`'s publishing closure, which engages `RELEASING.md`'s
     rule that a release changing the publishing path needs a full
     `verify-deploy` run. Twenty minutes and three credentials for a two-line
@@ -654,35 +751,155 @@ separately from the reader:
   the splitter change: **11,891 pages, 0 whose split output moves.** Nothing
   the build does changes.
 
-  **Three of this app's own write paths still orphan a continuation**, and
-  they are named here rather than left to be discovered:
+  **Three of this app's own write paths orphaned a continuation** (all three
+  fixed by 2026-09-25: #175's review, #182 and #186), and they are named here
+  rather than left to be discovered:
 
-  * `SectionAdder.extendFrontmatter` inserts the new section's
+  * ~~`SectionAdder.extendFrontmatter` inserts the new section's
     `createdSection<N>` / `publishForSection<N>` pair after the last
-    per-section KEY LINE, so on a page whose value continues below it the pair
-    lands between the key and its value — measured, a page HIDDEN in section 1
-    becomes VISIBLE in both sections.
-    [Issue #181](https://github.com/russellgordon/plantoir/issues/181).
-  * `CourseRestorer.settingPerSectionKeys` swaps this section's key line for
-    the backup's without either side's continuation lines — measured, a live
-    `publishForSection1:` / `  a: 1` whose backup had no such key is left as
-    `  a: 1` alone and the build stops.
+    per-section KEY LINE~~ — **fixed 2026-09-25 by the review of #175**: the
+    pair now goes after the last key's continuation lines
+    (`continuationLineIndices`, asked on the whole file's lines, bounded by the
+    block), and a setting that runs onto the next line is carried as held back
+    and counted on the trail (`section added`). Measured before the fix, a page
+    HIDDEN in section 1 became VISIBLE in both sections (`None` and
+    `'false false'`); after it, hidden in both. Case seven of
+    `course-management.json` → `sectionNumbers.addingKeysToAPage`.
+    [Issue #181](https://github.com/russellgordon/plantoir/issues/181) is
+    all section adder: this is its mac half. Windows' half is
+    `SectionAdder.cs:222-234`, which still inserts after the key line; the
+    seventh `addingKeysToAPage` case is what closes it there (the `windows`
+    issue from #175 carries it).
+  * ~~`CourseRestorer.settingPerSectionKeys` swaps this section's key line for
+    the backup's without either side's continuation lines~~ — **fixed
+    2026-09-25 by #182.** Measured before the fix, on #246's build: a live
+    `publishForSection1:` / `  a: 1` whose backup had no such key was left as
+    `  a: 1` alone, a block the build cannot read, so the page went HIDDEN in
+    every section; a backup's `publishForSection1: >-` / `  false` (hidden)
+    came back as `publishForSection1: >-` alone — empty, PUBLISHED; and a
+    live `draftSection1: >-` / `  # note` left its note to join a restored
+    `|-` scalar (`"false\n# note"`, PUBLISHED). Both halves of the swap now
+    walk `PageVisibilityReader.linesOwnedByKey` — `continuationLineIndices`
+    with ONE clause changed: an indented line counts even when it is a
+    `# note`, because a note under a key that is REMOVED attaches to whatever
+    arrives in its place. Separate function, not a flag: the reason they
+    differ is a sentence, and a flag on this family is how "step over comments
+    only when indented" diverged three times. Restored lines now go after the
+    last line any per-section key OWNS: placed after the last line that
+    merely NAMED one, restoring section 1 onto a page whose last key was
+    section 2's `publishForSection2: >-` / `  false` split section 2's key
+    from its value and PUBLISHED section 2 (a finding of #182's plan, not of
+    the issue). And when this section has no line on the live page and the
+    block has no column-0 level for a new key (#186's shape — `---` /
+    `  a: 1` / `---`), the page is left exactly as it is and COUNTED:
+    `restoreSection` returns the count, the transcript adds
+    `AssistWording.sharedPagesWhoseSettingsCouldNotBePutBack`, and the trail
+    gets `page settings left as they were`. Six whole-file cases, byte-compared
+    by the mac and judged on the site per section by
+    `check_visibility_against_the_site.py`: `course-management.json` →
+    `backups.restoringOneSectionsKeys`.
     [Issue #182](https://github.com/russellgordon/plantoir/issues/182).
-  * **`setting`'s own INSERT branch** — the third branch of the very function
-    the sweep was added to, and the surprising one. It CREATES an orphan
-    rather than leaving one: a block whose first line is indented gets the new
-    key inserted above it at `openIndex + 1`, and that indented line becomes
-    the new key's value. Measured, `---` / `  a: 1` / `---` is VISIBLE (no
-    flag at all) and after a hide it STOPS the build — `bad indentation of a
-    mapping entry (3:4)`. There is nothing to SWEEP there; the fix is where to
-    insert, which is a decision about a teacher's hand-edited YAML rather than
-    a mechanical one.
+  * ~~**`setting`'s own INSERT branch** CREATES an orphan~~ — **fixed
+    2026-09-25 by #186.** A block whose first line is indented got the new
+    key inserted above it at `openIndex + 1`, and that indented line became
+    the new key's value. Measured on #246's build: `---` / `  a: 1` / `---` is
+    VISIBLE, and after a hide it was a block the build cannot read (it stopped
+    the build until #246; since, it is hidden and named — so the same write
+    asked to SHOW the page hid it); `---` / `  false` / `---` after a hide was
+    `"false false"` and stayed PUBLISHED while the teacher was told it was
+    hidden. There is nothing to SWEEP there; the fix is WHERE a new key may
+    go. `PageVisibilityReader.placeForANewTopLevelKey` answers the first line
+    inside the block, as before — and nil when the block's own first line,
+    blank lines and `# note`s aside, is indented or names no key (a flow
+    collection, `- a`, a bare scalar, `a:1`; a quoted key and `? key` DO name
+    one). Nil means nothing is written: `setting` and
+    `PageFrontmatter.settingCreated` return `.noRoomForAKey` — a three-way
+    `FrontmatterWriteOutcome` (`written` / `alreadyRight` / `noRoomForAKey`)
+    replaced their `changed` flag, because `changed: false` could not tell
+    "already hidden" from "declined", which is the lie this issue was about.
+    Every caller says so: the publish/unpublish plan asks the real writer at
+    plan time and names the page on the card and in the reply
+    (`AssistWording.pagesWhoseSettingsCannotBeAddedTo`), a whole unit no
+    longer answers "already hidden" about pages it declined, a re-date and a
+    make-room name the pages they could not date, the section restore counts
+    them (#182), the page copier's plain-key append declines too (its
+    read-back then refuses the copy), and the trail records
+    `page settings left as they were` with the act and the count. The build's
+    date splice follows the same rule (`_place_for_a_new_top_level_key`).
+    **Rejected** (measured by the first attempt, 2026-09-19, over 384 block
+    shapes): inserting at the END of the block (fixes none and moves a shared
+    case's bytes), writing the key at the block's own indent (the site hides
+    the page and this app reads it visible for ever; a second write
+    duplicates the key), refusing whenever ANY line is indented (refuses
+    `tags:` over `  - a`, the commonest page there is), and re-indenting the
+    teacher's block (rewriting their YAML is what `PageFrontmatter` exists not
+    to do). The honest cost: on `---` / `  a: 1` / `---` a HIDE now leaves the
+    page visible, where #246's build had been hiding it by accident, because
+    the orphan made the block unreadable — the teacher is told instead, and
+    told which page. Contract cases: four `pageVisibility.writingCases` (with
+    `expectOutcome`), one `datesAndTitles.writingCases`, one
+    `atBuildTime.writingCases`.
     [Issue #186](https://github.com/russellgordon/plantoir/issues/186).
 
-  All three are pre-existing, all three are shared with Windows (which inserts
-  at `open + 1` too), and none is worsened by this piece. The first two are not
-  reached by the fixed reader or writer at all — neither calls `setting`. The
-  rule above is the app's rule; these three are where it is not yet kept.
+  All three were pre-existing and all three are shared with Windows (which
+  inserts at `open + 1` too, and owes #182 and #186 with #188 — one `windows`
+  issue). The first two are not reached by the fixed reader or writer at all
+  — neither calls `setting`. The rule above is now kept by every one of them.
+
+  **The same rule for the DATE and TITLE writers (#199, 2026-09-25, mac).**
+  `PageFrontmatter.settingCreated` (every re-date, move, insert and the
+  section index pointer) and `settingTitle` (renames, the unit-word rename)
+  replaced a key's line alone, and so did `SectionAdder`'s copy of a section's
+  landing page and its scaffold. Measured with python-frontmatter 1.3.0 /
+  PyYAML 6.0.3: a date or title below its key, folded, or quoted over two
+  lines read on the site as the new value and the old one JOINED
+  (`2026-09-24T07:00:00.000-0400 2026-09-08T07:00:00.000-0400`,
+  `Unit 1, Day 2 Unit 1, Day 1`, `Unit 1, Day 2 Day 1"`), and a `# note`
+  between key and value STOPPED the build — while the app read the new value,
+  so the two disagreed about a class's day in silence. None is a visibility
+  key, so none could publish a hidden page; each needed a hand-typed shape.
+  All four now go through `PageFrontmatter.replacingKeyLine`, which asks
+  `continuationLineIndices` BEFORE replacing the line (with `keyValueWasEmpty`
+  from the reader's matcher), removes bottom-up, and keeps the line's `\r`;
+  `SectionAdder` walks its replacements from the bottom of the block so a
+  removal never moves a key still to come. Cases: `file-formats.json` →
+  `datesAndTitles.writingCases` (13, whole-file, with `expectSiteReads`),
+  run as bytes by `FileFormatsContractTests` and re-checked against the real
+  build in the image by `scripts/check_dates_and_titles_against_the_site.py`.
+  **Two more shapes, from its review:** a quoted or flow value continued at
+  COLUMN 0 (`title: "Unit 1,` / `Day 1"`, `title: [Unit 1,` / `Day 1]`) —
+  PyYAML reads each as one value, the indentation rule stopped at the second
+  line, and leaving `Day 1"` behind made the page unreadable to the build
+  (ScannerError). `replacingKeyLine` now also takes lines until an open
+  quote or bracket closes, at any indent (`linesUntilOpenValueCloses`: `"`
+  honours a backslash escape and `'` a doubled quote; a quote that never
+  closes inside the block takes nothing). Its limit, recorded rather than
+  fixed: "never closes" means never closes LEXICALLY — on a page that ALREADY
+  fails to build, a quote left open on one key can be closed by a quote on a
+  later key, and every line up to that one goes with the value (probe:
+  `title: "Unit 1,` then `description: say "hi"` — a ParserError before, a
+  page that builds with the new title and no `description:` after, which is
+  what YAML's own scanner makes of it). The scanner also ignores comments, so a
+  `'` inside a `# note` within a multi-line flow value, or an apostrophe in a
+  plain scalar in a flow list (`[teacher's day]`), opens a quote; every such
+  shape the review tried fell back harmlessly (to `continuationLineIndices`,
+  or to "never closes"). And a QUOTED date with a note after
+  it (`created: "2026-09-08T09:30:00.000-0400" # moved`) was rewritten as
+  `…-0400"` — `timeAndOffset` stripped quotes only from the two ends, so the
+  closing quote stayed on the tail, and Quartz replaces a date it cannot read
+  with today. It now reads a quoted value INSIDE its quotes and an unquoted one
+  up to a ` #` comment (`scalarText(ofRawValue:)`); the quotes and the note go
+  with the old value. Three more cases (13 in all).
+  **Not in it, recorded:** an all-indented block — `settingTitle` declines it
+  silently, and `settingCreated` INSERTED `created:` at `openIndex + 1`, above
+  the indented line, which was #186's orphan shape; since #186 (2026-09-25) it
+  declines too and says `.noRoomForAKey` (`rawValue` cannot read that page's
+  date either, so nothing a teacher could see is lost); duplicate keys — the writer and `rawValue` take the
+  FIRST `created:`, PyYAML keeps the LAST (measured) — is a separate
+  disagreement; and the time of a folded or below-key date is not read, so the
+  rewrite uses the fallback `T07:00:00.000-0400`, which is harmless. Windows'
+  `SetTitle`/`SetCreated` still replace one line (the `windows` issue from
+  #199).
 
 * **A `#` inside quotes is not a comment**, wherever a writer looks for one.
   Windows' `ReplaceValue` split the line at the first `#` on it, so hiding a

@@ -34,7 +34,8 @@ struct ScheduleDeploySheet: View {
             sectionNumber: sectionNumber,
             when: when,
             now: Date(),
-            cloudflareAccountID: AppSettings.shared.cloudflareAccountID
+            cloudflareAccountID: AppSettings.shared.cloudflareAccountID,
+            inWorkingFolder: workspaceURL
         )
     }
 
@@ -125,6 +126,15 @@ struct ScheduleDeploySheet: View {
         ) {
             failure = problem
             return
+        }
+        // The first time a teacher schedules from the window, ask whether
+        // Plantoir may tell them how it went (#212). Never at launch — most
+        // teachers never schedule anything — and never from the run itself,
+        // which has nobody to ask. Does nothing once asked.
+        let courseCode: String = course.code
+        let section: Int = sectionNumber
+        Task {
+            await ScheduledPublishNotice.askPermissionIfNotAskedYet(course: courseCode, section: section)
         }
         onScheduled()
         dismiss()

@@ -48,7 +48,7 @@ final class ProblemReportTests: XCTestCase {
             finishedAt: startedAt.addingTimeInterval(seconds),
             scriptName: scriptName,
             arguments: arguments,
-            workingFolderPath: "/Users/russellgordon/Documents/Teaching",
+            workingFolderPath: "/Users/jordanteacher/Documents/Teaching",
             outcome: outcome,
             wasFailure: wasFailure,
             explanation: explanation,
@@ -94,9 +94,9 @@ final class ProblemReportTests: XCTestCase {
     /// added later is covered without anybody remembering to.
     func testTheWholeRecordIsRedactedNotJustTheTranscript() {
         let text: String = record(
-            transcript: "reading /Users/russellgordon/Documents/Teaching/ICS3U\nCLOUDFLARE_API_TOKEN=abc123XYZ_secret"
+            transcript: "reading /Users/jordanteacher/Documents/Teaching/ICS3U\nCLOUDFLARE_API_TOKEN=abc123XYZ_secret"
         ).text(timeZone: utc)
-        XCTAssertFalse(text.contains("russellgordon"), text)
+        XCTAssertFalse(text.contains("jordanteacher"), text)
         XCTAssertFalse(text.contains("abc123XYZ_secret"), text)
         XCTAssertTrue(text.contains("/Users/person/Documents/Teaching"), text)
         XCTAssertTrue(text.contains("CLOUDFLARE_API_TOKEN=" + LogRedactor.removedToken), text)
@@ -318,8 +318,8 @@ final class ProblemReportTests: XCTestCase {
     /// sentence is their words, not a licence to write their home folder out.
     func testTrailLinesAreRedactedOnTheWayIn() {
         let store: ProblemReportStore = ProblemReportStore(folderURL: folderURL)
-        store.appendActivityLine("looked in /Users/russellgordon/Documents")
-        XCTAssertFalse(store.activityText(includingPrompts: true).contains("russellgordon"))
+        store.appendActivityLine("looked in /Users/jordanteacher/Documents")
+        XCTAssertFalse(store.activityText(includingPrompts: true).contains("jordanteacher"))
     }
 
     func testTheTrailStopsGrowing() {
@@ -332,6 +332,225 @@ final class ProblemReportTests: XCTestCase {
         let trimmed: String = ProblemReportStore.trimmed(lines.joined(separator: "\n"))
         XCTAssertEqual(trimmed.components(separatedBy: "\n").count, ProblemReportStore.keptActivityLines)
         XCTAssertTrue(trimmed.hasSuffix("line \(ProblemReportStore.mostActivityLines + 49)"), trimmed.suffix(20).description)
+    }
+
+    // MARK: - Two writers at once never lose a line (#238)
+
+    /// Four writers in one process, all at once. A lock that belonged to the
+    /// PROCESS would let these straight past each other; the folder lock is
+    /// per open folder, so they wait exactly as four processes would. Before
+    /// #238 every line rewrote the whole file and about three in four of
+    /// these were lost. 400 lines stays under the trim, so every one of them
+    /// must be there.
+    func testWritersAtTheSameInstantEachKeepTheirLine() async {
+        let store: ProblemReportStore = ProblemReportStore(folderURL: folderURL)
+        await withTaskGroup(of: Void.self) { group in
+            for writer in 0..<4 {
+                group.addTask {
+                    await ProblemReportTests.writeLines(to: store, writer: "writer \(writer)", count: 100)
+                }
+            }
+        }
+        let text: String = store.activityText(includingPrompts: true)
+        XCTAssertEqual(ProblemReportTests.linesIn(text).count, 400)
+        for writer in 0..<4 {
+            for number in 0..<100 {
+                XCTAssertTrue(
+                    text.contains("writer \(writer) line \(number)\n"),
+                    "writer \(writer) line \(number) was lost"
+                )
+            }
+        }
+    }
+
+    /// The app and a launcher writing together — the pairing that happens
+    /// every time the app starts a preview or a publish, because the launcher
+    /// it just started notes its own lines while the app notes the app's. The
+    /// launcher's append is the REAL one (`FolderContainers.trailFunction`,
+    /// the same lines `note_on_the_trail` carries). Stays under the trim, so
+    /// every line must be kept: 900 of 900. Before #238 the app's rewrite
+    /// threw away most of the launcher's lines (52 of 300 kept, measured).
+    @MainActor
+    func testALauncherWritingAtTheSameTimeKeepsEveryLine() async throws {
+        let home: URL = folderURL.appendingPathComponent("home", isDirectory: true)
+        let store: ProblemReportStore = ProblemReportStore(folderURL: ProblemReportTests.trailFolder(inHome: home))
+        let launcher: Process = try ProblemReportTests.startLauncherWriting(lines: 300, inHome: home)
+        await withTaskGroup(of: Void.self) { group in
+            for writer in 0..<2 {
+                group.addTask {
+                    await ProblemReportTests.writeLines(to: store, writer: "writer \(writer)", count: 300)
+                }
+            }
+            group.addTask {
+                await ProblemReportTests.waitFor(launcher)
+            }
+        }
+        XCTAssertEqual(launcher.terminationStatus, 0)
+        let text: String = store.activityText(includingPrompts: true)
+        var launcherLinesKept: Int = 0
+        for line in ProblemReportTests.linesIn(text) {
+            if line.contains("launcher line ") {
+                launcherLinesKept += 1
+            }
+        }
+        XCTAssertEqual(launcherLinesKept, 300, "the launcher's lines were lost")
+        XCTAssertEqual(ProblemReportTests.linesIn(text).count, 900)
+    }
+
+    /// The trim is the one write that REPLACES the file, so it is the one a
+    /// launcher's append could be lost under. Each round starts the trail one
+    /// line short of the limit, starts a launcher writing, and — once its
+    /// first line has landed — adds ONE line from the app, which trims while
+    /// the launcher is still appending. After the trim every line of the
+    /// round is inside the kept window, so each round must keep all of them.
+    /// Twenty rounds, twenty trims raced. Measured with the app's lock taken
+    /// out: 42 to 54 lines lost in forty rounds, in each of six runs.
+    @MainActor
+    func testTheTrimNeverLosesALauncherLine() async throws {
+        let home: URL = folderURL.appendingPathComponent("home", isDirectory: true)
+        let trailFolder: URL = ProblemReportTests.trailFolder(inHome: home)
+        try FileManager.default.createDirectory(at: trailFolder, withIntermediateDirectories: true)
+        let trailURL: URL = trailFolder.appendingPathComponent(ProblemReportStore.activityFileName)
+        let store: ProblemReportStore = ProblemReportStore(folderURL: trailFolder)
+        // Long seed lines make the trim's read and rewrite take several
+        // milliseconds — longer than the gap between two of the launcher's
+        // appends — so a trim that did not wait for the lock would all but
+        // certainly swallow one. With short lines the trim is over before
+        // the launcher's next line and the test could pass on a writer that
+        // takes no lock at all (it did, before this was measured).
+        let padding: String = String(repeating: "x", count: 2000)
+        var seed: String = ""
+        for number in 0..<(ProblemReportStore.mostActivityLines - 1) {
+            seed += "seed line \(number) \(padding)\n"
+        }
+        let launcherLines: Int = 10
+        var linesLost: Int = 0
+        var trims: Int = 0
+        let rounds: Int = 20
+        for round in 0..<rounds {
+            try seed.write(to: trailURL, atomically: true, encoding: .utf8)
+            let launcher: Process = try ProblemReportTests.startLauncherWriting(
+                lines: launcherLines, inHome: home, saying: "round \(round) launcher line"
+            )
+            await ProblemReportTests.writeOneLineAfterTheLauncherStarts(
+                to: store, saying: "round \(round) app line", launcher: launcher
+            )
+            XCTAssertEqual(launcher.terminationStatus, 0)
+            let text: String = store.activityText(includingPrompts: true)
+            if !text.contains("seed line 0 ") {
+                trims += 1
+            }
+            if !text.contains("round \(round) app line\n") {
+                linesLost += 1
+            }
+            for number in 0..<launcherLines {
+                if !text.contains("round \(round) launcher line \(number)\n") {
+                    linesLost += 1
+                }
+            }
+        }
+        XCTAssertEqual(trims, rounds, "a round did not trim, so it proved nothing")
+        XCTAssertEqual(linesLost, 0, "lines lost to a trim across \(rounds) rounds")
+    }
+
+    /// The generated script's append and the launchers' are the same lines,
+    /// so the lock the tests above prove for one is the lock the other takes.
+    @MainActor
+    func testTheGeneratedScriptAppendsTheWayTheLaunchersDo() throws {
+        let repository: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let setupText: String = try String(
+            contentsOf: repository.appendingPathComponent("setup.sh"),
+            encoding: .utf8
+        )
+        let generated: String = FolderContainers.trailFunction(inHomeFolder: folderURL)
+        var comparedLines: Int = 0
+        for line in generated.components(separatedBy: "\n") {
+            if line.contains("lockf") || line.contains(">> \"$trail/activity.txt\"") {
+                XCTAssertTrue(setupText.contains(line + "\n"), "setup.sh no longer carries: \(line)")
+                comparedLines += 1
+            }
+        }
+        XCTAssertEqual(comparedLines, 2)
+    }
+
+    /// `~/Library/Logs/Plantoir` under a scratch home.
+    private static func trailFolder(inHome home: URL) -> URL {
+        return home
+            .appendingPathComponent("Library", isDirectory: true)
+            .appendingPathComponent("Logs", isDirectory: true)
+            .appendingPathComponent("Plantoir", isDirectory: true)
+    }
+
+    /// Starts `/bin/sh` running the generated script's own `note` function
+    /// `lines` times, writing under `home`.
+    @MainActor
+    private static func startLauncherWriting(
+        lines: Int,
+        inHome home: URL,
+        saying sentence: String = "launcher line"
+    ) throws -> Process {
+        var script: String = FolderContainers.trailFunction(inHomeFolder: home) + "\n"
+        script += "i=0\n"
+        script += "while [ \"$i\" -lt \(lines) ]; do note \"\(sentence) $i\"; i=$((i + 1)); done\n"
+        let process: Process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = ["-c", script]
+        process.standardInput = FileHandle.nullDevice
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        return process
+    }
+
+    /// Off the test's actor, so the writers really do run side by side.
+    /// `@concurrent` is load-bearing: under approachable concurrency a plain
+    /// `nonisolated async` function runs on its caller's actor, and four
+    /// writers on one actor would take turns rather than race.
+    @concurrent
+    private nonisolated static func writeLines(to store: ProblemReportStore, writer: String, count: Int) async {
+        for number in 0..<count {
+            store.appendActivityLine("\(writer) line \(number)")
+        }
+    }
+
+    /// Waits until the launcher's first line is in the file, writes one line
+    /// — the one that trims — while the launcher is still going, then waits
+    /// for the launcher to finish. Waits on the file, not on a clock.
+    @concurrent
+    private nonisolated static func writeOneLineAfterTheLauncherStarts(
+        to store: ProblemReportStore,
+        saying sentence: String,
+        launcher: Process
+    ) async {
+        let trailURL: URL = store.folderURL.appendingPathComponent(ProblemReportStore.activityFileName)
+        var launcherHasWritten: Bool = false
+        while !launcherHasWritten && launcher.isRunning {
+            let text: String = (try? String(contentsOf: trailURL, encoding: .utf8)) ?? ""
+            launcherHasWritten = text.contains("launcher line 0\n")
+            await Task.yield()
+        }
+        store.appendActivityLine(sentence)
+        launcher.waitUntilExit()
+    }
+
+    @concurrent
+    private nonisolated static func waitFor(_ process: Process) async {
+        process.waitUntilExit()
+    }
+
+    /// The trail's lines, without the empty one after the last newline.
+    private static func linesIn(_ text: String) -> [String] {
+        var lines: [String] = []
+        for line in text.components(separatedBy: "\n") {
+            if !line.isEmpty {
+                lines.append(line)
+            }
+        }
+        return lines
     }
 
     // MARK: - Tests must not write into the real folder

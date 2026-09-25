@@ -109,7 +109,11 @@ struct AssistWindowView: View {
                 // shape, not usually the actual page. A card that fired
                 // immediately would make the shelf a row of buttons a teacher
                 // learns not to touch.
-                AssistPromptShelfView { phrasing in
+                AssistPromptShelfView(
+                    groups: AssistPromptShelfView.groups(
+                        naming: session.classPageNaming, noun: session.classNoun
+                    )
+                ) { phrasing in
                     show(phrasing)
                     history.stopBrowsing()
                     isComposerFocused = true
@@ -328,11 +332,11 @@ struct AssistWindowView: View {
                     if let offer = SectionSchedulePrompt.shared.offer,
                        offer.courseCode == session.courseCode,
                        offer.sectionNumber == session.sectionNumber {
-                        AssistDatesOfferView(reason: offer.reason) {
+                        AssistDatesOfferView(reason: offer.reason, noun: session.classNoun) {
                             SectionSchedulePrompt.shared.acceptOffer()
                         } decline: {
                             SectionSchedulePrompt.shared.declineOffer()
-                            session.agent?.noteDatesDeclined()
+                            session.agent?.noteDatesDeclined(noun: session.classNoun)
                         }
                     }
                     if let agent = session.agent, agent.planMode.shouldOfferToStop {
@@ -777,6 +781,10 @@ private struct AssistDatesOfferView: View {
     // MARK: - Stored properties
 
     let reason: String
+
+    /// What the course calls one of its pages (#267).
+    let noun: ClassNoun
+
     let accept: () -> Void
     let decline: () -> Void
 
@@ -784,7 +792,7 @@ private struct AssistDatesOfferView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label(AssistWording.mayIAskForYourDates, systemImage: "calendar")
+            Label(AssistWording.mayIAskForYourDates(for: noun), systemImage: "calendar")
                 .font(.headline)
             if !reason.isEmpty {
                 Text(reason)

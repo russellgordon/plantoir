@@ -16,45 +16,61 @@ nonisolated struct UnitDay: Equatable, Hashable {
     let unit: Int
     let day: Int
 
-    /// What this course calls a unit. Carried on the value rather than looked
-    /// up, so a page read out of a Module course cannot be written back as a
-    /// Unit — the two halves of a rename are the same object.
-    let term: String
+    /// How this course names its class pages — its word AND its scheme.
+    /// Carried on the value rather than looked up, so a page read out of a
+    /// Module course cannot be written back as a Unit, nor a club's "Week 3"
+    /// as "Week 1, Day 3" — the two halves of a rename are the same object.
+    let naming: ClassPageNaming
 
     // MARK: - Computed properties
 
-    /// The page name these numbers make: "Unit 2, Day 3".
+    /// The page name these numbers make: "Unit 2, Day 3", or "Week 3".
     var title: String {
-        return "\(term) \(unit), Day \(day)"
+        return naming.title(unit: unit, day: day)
+    }
+
+    /// What this course calls a unit (the naming's word).
+    var term: String {
+        return naming.word
     }
 
     // MARK: - Initializer
 
-    init(unit: Int, day: Int, term: String = ClassPageTerm.standard) {
+    /// A position in a course. No default naming, deliberately: see
+    /// `ClassPageNaming`.
+    init(unit: Int, day: Int, naming: ClassPageNaming) {
         self.unit = unit
         self.day = day
-        self.term = ClassPageTerm.cleaned(term)
+        self.naming = naming
     }
 
     /// The numbers inside a page name, or nil when it is named some other way.
-    init?(pageTitle: String, term: String = ClassPageTerm.standard) {
-        let word: String = ClassPageTerm.cleaned(term)
-        self.term = word
-        let pattern: String = "^" + NSRegularExpression.escapedPattern(for: word)
-                            + #"\s+(\d+),\s*Day\s+(\d+)$"#
-        guard let expression = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
+    ///
+    /// Under `numbered` the one number is the DAY of unit 1 — "Week 3" is
+    /// unit 1, day 3 — so every planner that already works on (unit, day)
+    /// inside one unit counts one number with no rewrite of its own.
+    init?(pageTitle: String, naming: ClassPageNaming) {
+        self.naming = naming
+        guard let expression = try? NSRegularExpression(pattern: naming.pattern, options: [.caseInsensitive]) else {
             return nil
         }
         let trimmed: String = pageTitle.trimmingCharacters(in: .whitespaces)
         let whole: NSRange = NSRange(trimmed.startIndex..<trimmed.endIndex, in: trimmed)
         guard let match = expression.firstMatch(in: trimmed, range: whole),
-              let unitRange = Range(match.range(at: 1), in: trimmed),
-              let dayRange = Range(match.range(at: 2), in: trimmed),
-              let unit = Int(trimmed[unitRange]),
+              let firstRange = Range(match.range(at: 1), in: trimmed),
+              let first = Int(trimmed[firstRange]) else {
+            return nil
+        }
+        if naming.isNumbered {
+            self.unit = 1
+            self.day = first
+            return
+        }
+        guard let dayRange = Range(match.range(at: 2), in: trimmed),
               let day = Int(trimmed[dayRange]) else {
             return nil
         }
-        self.unit = unit
+        self.unit = first
         self.day = day
     }
 
@@ -84,25 +100,30 @@ struct ClassPageSummary {
     /// The day the page's frontmatter puts it on, or nil when it has none.
     let date: CalendarDay?
 
-    /// What the course calls a unit, carried here so every planner that works
-    /// from a list of summaries reads and writes the same word without being
-    /// handed the course as well.
-    let term: String
+    /// How the course names its class pages, carried here so every planner
+    /// that works from a list of summaries reads and writes the same names
+    /// without being handed the course as well.
+    let naming: ClassPageNaming
 
     // MARK: - Computed properties
 
     /// The unit and day in the page's name, when it is named that way.
     var unitAndDay: UnitDay? {
-        return UnitDay(pageTitle: title, term: term)
+        return UnitDay(pageTitle: title, naming: naming)
+    }
+
+    /// What the course calls a unit (the naming's word).
+    var term: String {
+        return naming.word
     }
 
     // MARK: - Initializer
 
-    init(title: String, fileURL: URL, date: CalendarDay?, term: String = ClassPageTerm.standard) {
+    init(title: String, fileURL: URL, date: CalendarDay?, naming: ClassPageNaming) {
         self.title = title
         self.fileURL = fileURL
         self.date = date
-        self.term = ClassPageTerm.cleaned(term)
+        self.naming = naming
     }
 }
 
@@ -171,7 +192,7 @@ enum ClassPages {
                 summaries.append(
                     summary(
                         ofPageAt: pageURL, forSection: sectionNumber,
-                        term: course.configuration.unitWord
+                        naming: course.configuration.classPageNaming
                     )
                 )
             }
@@ -199,7 +220,7 @@ enum ClassPages {
     /// One page, read.
     static func summary(
         ofPageAt url: URL, forSection sectionNumber: Int,
-        term: String = ClassPageTerm.standard
+        naming: ClassPageNaming
     ) -> ClassPageSummary {
         let title: String = url.deletingPathExtension().lastPathComponent
         var date: CalendarDay? = nil
@@ -210,7 +231,7 @@ enum ClassPages {
                 in: text, key: PageFrontmatter.createdKey(forSection: sectionNumber, isSectionLocal: true)
             )
         }
-        return ClassPageSummary(title: title, fileURL: url, date: date, term: term)
+        return ClassPageSummary(title: title, fileURL: url, date: date, naming: naming)
     }
 
     /// Every markdown page belonging to one section: the section's own folder,
@@ -294,8 +315,16 @@ enum ClassPages {
     /// The teacher's own template, down to the frontmatter keys — with one
     /// deliberate difference. It starts `publish: false`: a page nobody has
     /// written yet has no business appearing on the site.
-    static func skeleton(title: String, unit: Int, date: CalendarDay, howMany: Int, tail: String) -> String {
+    static func skeleton(
+        title: String, unit: Int, naming: ClassPageNaming, folderName: String,
+        date: CalendarDay, howMany: Int, tail: String
+    ) -> String {
         let plural: String = howMany == 1 ? "This page was" : "\(howMany) of these were"
+        if naming.isNumbered {
+            return numberedSkeleton(
+                title: title, folderName: folderName, date: date, plural: plural, tail: tail
+            )
+        }
         return """
         ---
         title: \(title)
@@ -327,6 +356,47 @@ enum ClassPages {
         1.
 
         ## Things to do before our next class
+
+        - [ ]
+
+        """
+    }
+
+    /// A new page in a numbered course (#267) — a club's "Week 4".
+    ///
+    /// No `unit-N` tag: a numbered course is held as unit 1 inside this app,
+    /// so every page would carry `unit-1` and Quartz would make a tag page
+    /// listing every meeting there has ever been. The comment names the
+    /// course's OWN class folder rather than "All Classes", and says
+    /// "the group" rather than "this class". Same shape otherwise, so the
+    /// assistant's other planners read it exactly as they read a Unit page.
+    private static func numberedSkeleton(
+        title: String, folderName: String, date: CalendarDay, plural: String, tail: String
+    ) -> String {
+        return """
+        ---
+        title: \(title)
+        publish: false
+        created: \(date.text)\(tail)
+        transcludeTitleSize: h2
+        enableToc: false
+        excludeBacklinks: true
+        ---
+
+        %%
+        \(plural) created for you, dated to the days the group actually meets.
+        The `created:` date is what puts them in order under \(folderName), so a
+        new page needs one of its own.
+
+        This page is unpublished. Write it, then publish it when it is ready.
+        Delete this comment when you do — comments never reach the site either.
+        %%
+
+        ## Agenda
+
+        1.
+
+        ## Things to do before we next meet
 
         - [ ]
 

@@ -74,6 +74,7 @@ final class InAppUserInterfaceTests: XCTestCase {
         // The window capture cannot draw the sidebar's vibrancy material,
         // so prove the rows exist by walking the REAL window's
         // accessibility tree (the same thing VoiceOver reads).
+        try AccessibilityInspector.skipUnlessTheWindowCanBeRead(workspace.window)
         let visibleLabels: [String] = AccessibilityInspector.collectAllLabels()
         XCTAssertTrue(visibleLabels.contains("EXC2O"), "Sidebar should expose the EXC2O row; found \(visibleLabels.count) labels: \(visibleLabels.prefix(40))")
 

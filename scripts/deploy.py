@@ -194,8 +194,29 @@ def rebuild_for_production(course_code: str, section: str, host_os: str):
         subprocess.run(cmd, check=True)
         print("✅ Production build complete.")
     except (subprocess.CalledProcessError, OSError) as e:
+        if build_was_stopped_by_the_teacher(e):
+            # A Cancel reaches the build and this program together. Usually
+            # this program is still waiting on the build and hears it first,
+            # as a KeyboardInterrupt that run_until_stopped() turns into 130.
+            # When the build finishes leaving first, the same Cancel arrives
+            # here instead — and must not read as a failed build (GitHub #259).
+            sys.exit(130)
         print(f"❌ Production rebuild failed: {e}")
         sys.exit(1)
+
+
+# How a program this one started reports that the same Cancel stopped it:
+# 130 when it leaves quietly (build_site.py since #223), -2 when the
+# interrupt killed it outright (the negative of SIGINT), and 0xC000013A
+# (STATUS_CONTROL_C_EXIT) for a program killed by Ctrl-C on Windows.
+STATUSES_OF_A_PROGRAM_STOPPED_BY_A_CANCEL = (130, -2, 0xC000013A)
+
+
+def build_was_stopped_by_the_teacher(error) -> bool:
+    """True when the rebuild ended because of an interrupt rather than a fault."""
+    if not isinstance(error, subprocess.CalledProcessError):
+        return False
+    return error.returncode in STATUSES_OF_A_PROGRAM_STOPPED_BY_A_CANCEL
 
 def ensure_base_url_and_rebuild(section_dir: Path, target_domain: str, course_code: str, section: str, host_os: str):
     """
@@ -704,6 +725,14 @@ def deploy_to_cloudflare(public_dir: Path, project_name: str, token: str, accoun
         completed = subprocess.run(cmd, env=env)
     except OSError as e:
         raise RuntimeError(f"Could not run Cloudflare's deploy tool: {e}") from e
+    if completed.returncode in STATUSES_OF_A_PROGRAM_STOPPED_BY_A_CANCEL:
+        # The Cancel reaches wrangler and this program together; usually this
+        # program hears it first, as a KeyboardInterrupt. When wrangler is
+        # seen leaving first, the same Cancel must not read as a failed
+        # publish with a traceback (GitHub #259). wrangler 4.80.0 itself
+        # exits 0 on SIGINT (measured), so only this program's own
+        # interrupt covers that shape; this covers the rest.
+        sys.exit(130)
     if completed.returncode != 0:
         raise RuntimeError(f"Cloudflare's deploy tool exited with code {completed.returncode}")
 
@@ -888,6 +917,10 @@ def _upload_required_files(deploy_id: str, token: str, root: Path, required_shas
     uploaded = 0
     total = len(items_to_upload)
     import concurrent.futures
+    import threading
+
+    # Set by a Cancel, so that an upload waiting to retry gives up instead.
+    stop_uploading = threading.Event()
 
     def _upload_one(item):
         # Netlify rate-limits the upload endpoint, and concurrent PUTs reach
@@ -925,25 +958,44 @@ def _upload_required_files(deploy_id: str, token: str, root: Path, required_shas
                         wait = max(wait, float(retry_after))
                     except ValueError:
                         pass
-                time.sleep(min(wait, 30.0))
+                # Waits for the back-off, or for a Cancel — whichever
+                # comes first. After a Cancel, this file is not tried again.
+                if stop_uploading.wait(min(wait, 30.0)):
+                    return
                 delay *= 2
             except (urllib.error.URLError, TimeoutError) as e:
                 # Socket timeout or drop mid-upload; the file is small, retry it.
                 last_error = e
-                time.sleep(min(delay, 30.0))
+                if stop_uploading.wait(min(delay, 30.0)):
+                    return
                 delay *= 2
         raise RuntimeError(f"Upload of {enc_path} kept failing after retries: {last_error}") from last_error
 
     # 5 workers, not 10: with retries in place 10 still converges, but it
     # spends most of its time backing off — 5 stays under the limit.
     max_workers = min(5, max(1, len(items_to_upload)))
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
+    try:
         futures = {executor.submit(_upload_one, item): item for item in items_to_upload}
         for future in concurrent.futures.as_completed(futures):
             future.result()
             uploaded += 1
             if uploaded % 25 == 0 or uploaded == total:
                 print(f" …uploaded {uploaded}/{total} required files", flush=True)
+    except KeyboardInterrupt:
+        # A Cancel (the app's ^C) lands here, in this thread. Leaving a
+        # `with` block would have waited for the executor to RUN every
+        # upload still queued — measured: 25 of 40 files went up after the
+        # Cancel — and a Netlify deploy whose required files all arrive goes
+        # live. So drop the queue and stop retrying: only the uploads already
+        # in flight (at most max_workers) finish, the deploy is left waiting
+        # for files that never come, and the published site stays as it was
+        # (GitHub #259; documentation/05 → "Stopping a build").
+        stop_uploading.set()
+        executor.shutdown(wait=False, cancel_futures=True)
+        raise
+    finally:
+        executor.shutdown(wait=True)
 
     print(f"⬆️ Uploaded {uploaded} file(s) required by Netlify.", flush=True)
 
@@ -1309,5 +1361,28 @@ def main():
 
     print("\n✅ Deploy complete.")
 
+def run_until_stopped():
+    """Run main(); a Cancel in the app (its ^C) or Ctrl-C at a terminal leaves
+    quietly with exit 130 rather than a Python traceback. GitHub #259, the
+    sibling of #223 in build_site.py — see documentation/05-build-pipeline.md
+    → "Stopping a build: exit 130, and no traceback".
+
+    It wraps main() rather than living inside it because
+    test_deploy_netlify_headers.py reads main()'s own source, so main()'s
+    body has to stay where it is. One handler here covers every place a
+    publish can be waiting when the Cancel arrives: the production rebuild,
+    either question at the keyboard, an upload, and wrangler."""
+    try:
+        main()
+    except KeyboardInterrupt:
+        # 130: the status a shell gives an interrupted program, and what
+        # docker exec passed on before this change, so a terminal, deploy.sh's
+        # `set -e` and deploy.ps1 all see what they saw. The app does not
+        # decide by it — its Cancel sets its own flags — so this is about
+        # every other reader. Print nothing: the app already says the task
+        # was cancelled.
+        sys.exit(130)
+
+
 if __name__ == "__main__":
-    main()
+    run_until_stopped()

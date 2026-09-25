@@ -32,9 +32,10 @@ enum GradedFolderRule {
     /// A name they ticked and then took out of the course would otherwise be
     /// written into `graded_folders` matching nothing on disk: the file would
     /// say something untrue, and the two apps would write DIFFERENT files for
-    /// the same clicks. (`setup_course.py` reconciles the key again when it
-    /// reads it, so no teacher ends up with a broken course — that is the
-    /// second net, not a reason to write it.) Windows narrows the pool the
+    /// the same clicks. (There is no second net: since GitHub issue #192
+    /// `setup_course.py` writes a saved pool back as it was, so what the
+    /// wizard writes is what the course keeps — contracts/shared-rules.json
+    /// → `gradedFolders.rerunningSetup`.) Windows narrows the pool the
     /// same way (`GradedFolderRule.Reconciled`), on every read of it
     /// (`CurrentGradedFolders`) and again as the file is written.
     ///

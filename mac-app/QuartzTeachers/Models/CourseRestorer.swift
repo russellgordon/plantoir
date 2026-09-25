@@ -214,11 +214,16 @@ enum CourseRestorer {
     ///
     /// Nothing else in the zip is looked at. The zip itself stays, exactly as
     /// it does for a whole-course restore.
+    ///
+    /// Returns how many shared pages kept their current setting for this
+    /// section because there was nowhere on the page to put the backup's
+    /// back — see `restorePerSectionKeys`. Almost always 0.
+    @discardableResult
     static func restoreSection(
         _ sectionNumber: Int,
         from item: BackupItem,
         coursesDirectoryURL: URL
-    ) throws {
+    ) throws -> Int {
         let fileManager: FileManager = FileManager.default
         let courseURL: URL = coursesDirectoryURL.appendingPathComponent(item.courseCode)
         if !fileManager.fileExists(atPath: courseURL.path) {
@@ -256,12 +261,13 @@ enum CourseRestorer {
             of: courseURL.appendingPathComponent(folderName),
             with: backedUpSectionURL
         )
-        restorePerSectionKeys(sectionNumber, inCourseAt: courseURL, from: payload)
+        let notPutBack: Int = restorePerSectionKeys(sectionNumber, inCourseAt: courseURL, from: payload)
         discardBuiltSite(
             forSection: sectionNumber,
             courseCode: item.courseCode,
             coursesDirectoryURL: coursesDirectoryURL
         )
+        return notPutBack
     }
 
     /// Empties a folder and refills it from another, leaving the folder itself
@@ -289,18 +295,26 @@ enum CourseRestorer {
     /// `section<N>` folders — and puts one section's per-section keys back the
     /// way the backup had them.
     ///
-    /// Best-effort by design, and deliberately quiet: a page that has since
-    /// been deleted, renamed or made unreadable is skipped rather than
-    /// recreated. Nothing outside `section<N>/` is ever added or removed here,
-    /// because nothing outside it is this section's to restore.
+    /// Best-effort by design: a page that has since been deleted, renamed or
+    /// made unreadable is skipped rather than recreated. Nothing outside
+    /// `section<N>/` is ever added or removed here, because nothing outside it
+    /// is this section's to restore.
+    ///
+    /// Returns how many pages had a setting in the backup that could NOT be
+    /// put back, because the page as it stands has nowhere a new key can go
+    /// (`settingPerSectionKeys`). Those pages are left exactly as they are,
+    /// and the count is what lets the teacher be told (#182) — a restore that
+    /// quietly left a page published that the backup held back would be the
+    /// silence this family of issues exists to close.
     private static func restorePerSectionKeys(
         _ sectionNumber: Int,
         inCourseAt courseURL: URL,
         from payload: URL
-    ) {
+    ) -> Int {
+        var notPutBack: Int = 0
         let fileManager: FileManager = FileManager.default
         guard let walker = fileManager.enumerator(at: courseURL, includingPropertiesForKeys: nil) else {
-            return
+            return notPutBack
         }
         while let entry = walker.nextObject() as? URL {
             let name: String = entry.lastPathComponent
@@ -319,17 +333,22 @@ enum CourseRestorer {
                   let liveText = try? String(contentsOf: entry, encoding: .utf8) else {
                 continue
             }
-            let rewritten: String = settingPerSectionKeys(
+            let rewritten: (text: String, couldNotBePutBack: Bool) = settingPerSectionKeys(
                 sectionNumber, in: liveText, asIn: backedUpText
             )
-            if rewritten != liveText {
-                try? rewritten.write(to: entry, atomically: true, encoding: .utf8)
+            if rewritten.couldNotBePutBack {
+                notPutBack += 1
+            }
+            if rewritten.text != liveText {
+                try? rewritten.text.write(to: entry, atomically: true, encoding: .utf8)
             }
         }
+        return notPutBack
     }
 
     /// One page's text with a single section's per-section key lines put back
-    /// exactly as the backup had them, and every other byte left alone.
+    /// exactly as the backup had them, and every other byte left alone — and
+    /// whether the backup's setting could NOT be put back.
     ///
     /// The backup's LINES are carried across verbatim rather than its values
     /// read and rewritten, because a restore's whole job is to put back what
@@ -340,6 +359,25 @@ enum CourseRestorer {
     /// what the page says). Rewriting the key here would mean a restore
     /// putting back something the backup never contained.
     ///
+    /// **It moves LINES, not key lines.** A key's value can live on the lines
+    /// below it, and both halves of the swap carry those lines with it —
+    /// `perSectionLineIndices`, which walks `linesOwnedByKey`. Measured
+    /// 2026-09-25 through the real chain: carrying a backup's
+    /// `publishForSection1: >-` without the `  false` under it restored a page
+    /// the backup HELD BACK as one students could read, and dropping a live
+    /// `publishForSection1:` without the `  a: 1` under it left an orphan the
+    /// build could not read (it stopped the build until #246). Restored lines
+    /// also go after the last line any per-section key OWNS, never after the
+    /// last one that merely names one: measured, restoring section 1 onto a
+    /// page whose last key was section 2's `publishForSection2: >-` over
+    /// `  false` put section 1's line between that key and its value, and
+    /// section 2 was PUBLISHED.
+    /// [Issue #182](https://github.com/russellgordon/plantoir/issues/182).
+    ///
+    /// **When the page has nowhere for a new key**, the live text comes back
+    /// unchanged and `couldNotBePutBack` is true — see `restoreSection`,
+    /// which counts those pages so the teacher is told.
+    ///
     /// Which lines count is asked of `SectionAdder.perSectionKeyNumber`, so
     /// this can never disagree with the code that writes them about what
     /// `draftSection2:` means.
@@ -347,36 +385,40 @@ enum CourseRestorer {
         _ sectionNumber: Int,
         in liveText: String,
         asIn backupText: String
-    ) -> String {
+    ) -> (text: String, couldNotBePutBack: Bool) {
+        // The backup's lines, WITH the lines below them that are part of their
+        // values.
         var restoredLines: [String] = []
-        if let backupBlock = PageFrontmatter.block(in: backupText) {
-            for line in backupBlock.lines {
-                let bare: String = PageFrontmatter.trimmingCarriageReturn(line)
-                if SectionAdder.perSectionKeyNumber(in: bare) == sectionNumber {
-                    restoredLines.append(bare)
-                }
-            }
+        let backupLines: [String] = backupText.components(separatedBy: "\n")
+        for index in perSectionLineIndices(forSection: sectionNumber, in: backupText) {
+            restoredLines.append(PageFrontmatter.trimmingCarriageReturn(backupLines[index]))
         }
 
         guard let liveBlock = PageFrontmatter.block(in: liveText) else {
             if restoredLines.isEmpty {
-                return liveText
+                return (liveText, false)
             }
             // No frontmatter at all, but the backup had keys: give the page a
             // block of its own, the way `AssistPageVisibility.setting` does.
-            return "---\n" + restoredLines.joined(separator: "\n") + "\n---\n" + liveText
+            return ("---\n" + restoredLines.joined(separator: "\n") + "\n---\n" + liveText, false)
         }
 
         let lines: [String] = liveText.components(separatedBy: "\n")
 
+        // Everything this section owns on the LIVE page. Dropping the key line
+        // alone left an indented orphan under whatever followed it.
+        var doomed: Set<Int> = []
+        for index in perSectionLineIndices(forSection: sectionNumber, in: liveText) {
+            doomed.insert(index)
+        }
+
         // Where the restored lines go when this section has none of its own
-        // left on the page: after the last per-section key, so each section's
-        // lines stay together and in order — the placement `SectionAdder`
-        // uses when it adds a section's pair.
+        // left on the page: after the last line ANY per-section key OWNS, so
+        // each section's lines stay together and in order — and so they can
+        // never land between another section's key and its value.
         var lastPerSectionIndex: Int = -1
-        for index in (liveBlock.openIndex + 1)..<liveBlock.closeIndex {
-            let bare: String = PageFrontmatter.trimmingCarriageReturn(lines[index])
-            if SectionAdder.perSectionKeyNumber(in: bare) != nil {
+        for index in perSectionLineIndices(forSection: nil, in: liveText) {
+            if index > lastPerSectionIndex {
                 lastPerSectionIndex = index
             }
         }
@@ -385,9 +427,8 @@ enum CourseRestorer {
         rebuilt.append(lines[liveBlock.openIndex])
         var placed: Bool = false
         for index in (liveBlock.openIndex + 1)..<liveBlock.closeIndex {
-            let bare: String = PageFrontmatter.trimmingCarriageReturn(lines[index])
-            if SectionAdder.perSectionKeyNumber(in: bare) == sectionNumber {
-                // This section's own line: replaced by the backup's, or
+            if doomed.contains(index) {
+                // This section's own lines: replaced by the backup's, or
                 // dropped entirely when the backup had none. A key the
                 // assistant added where there was none before must go.
                 if !placed {
@@ -403,12 +444,70 @@ enum CourseRestorer {
             }
         }
         if !placed && !restoredLines.isEmpty {
+            // This section has no line of its own left on the live page, so
+            // the backup's go in as NEW keys — and only a block with a
+            // column-0 level of its own has anywhere to put one. Measured
+            // 2026-09-25: live `---` / `  a: 1` / `---` is a page the site
+            // shows, and appending `publishForSection1: false` before the
+            // closing fence makes a block the build cannot read (it stopped
+            // the build until #246).
+            //
+            // Nothing has been removed at this point (`placed` is only false
+            // when this section owned no line), so returning the live text
+            // returns the page byte for byte — the safe direction, and SAID:
+            // the caller counts it.
+            guard PageVisibilityReader.placeForANewTopLevelKey(
+                in: lines, openIndex: liveBlock.openIndex, closeIndex: liveBlock.closeIndex
+            ) != nil else {
+                return (liveText, true)
+            }
             rebuilt.append(contentsOf: restoredLines)
         }
         for index in liveBlock.closeIndex..<lines.count {
             rebuilt.append(lines[index])
         }
-        return rebuilt.joined(separator: "\n")
+        return (rebuilt.joined(separator: "\n"), false)
+    }
+
+    /// Every line inside a page's frontmatter that belongs to a per-section
+    /// key — the key lines AND the lines below them that are part of their
+    /// values.
+    ///
+    /// `forSection` nil means "any section", which is how the insertion point
+    /// is found: the restored lines go after the last line any per-section key
+    /// OWNS, never after the last one that merely NAMES one, or they land
+    /// between another section's key and its value.
+    ///
+    /// The walk is `PageVisibilityReader.linesOwnedByKey` rather than
+    /// `continuationLineIndices`, because a restore REMOVES a key's line —
+    /// see that function for the measured difference between the two.
+    static func perSectionLineIndices(forSection sectionNumber: Int?, in pageText: String) -> [Int] {
+        guard let block = PageFrontmatter.block(in: pageText) else {
+            return []
+        }
+        let lines: [String] = pageText.components(separatedBy: "\n")
+        var found: [Int] = []
+        for index in (block.openIndex + 1)..<block.closeIndex {
+            let bare: String = PageFrontmatter.trimmingCarriageReturn(lines[index])
+            guard let number = SectionAdder.perSectionKeyNumber(in: bare) else {
+                continue
+            }
+            if let wanted = sectionNumber, number != wanted {
+                continue
+            }
+            found.append(index)
+            // Asked of the key's own line as it stands, because nothing here
+            // is rewritten: a column-0 sequence is only this key's value while
+            // the key's own value is empty.
+            let wasEmpty: Bool = SectionAdder.valueIsEmpty(onKeyLine: bare)
+            for taken in PageVisibilityReader.linesOwnedByKey(
+                belowKeyAt: index, in: lines, closeIndex: block.closeIndex,
+                keyValueWasEmpty: wasEmpty
+            ) {
+                found.append(taken)
+            }
+        }
+        return found
     }
 
     /// True for `section1`, `section12` — and false for `sections` or

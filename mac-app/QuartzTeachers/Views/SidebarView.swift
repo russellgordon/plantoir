@@ -278,9 +278,15 @@ struct SidebarView: View {
                     // are safety nets the teacher made on purpose, not
                     // things put away.
                     Section(isExpanded: $workspace.isShowingBackups) {
+                        // Every backup at once: what they take, and a way to
+                        // delete several (#242). First, so it is found before
+                        // the list it summarises.
+                        Label("All Backups", systemImage: "square.stack.3d.up")
+                            .tag(SidebarSelection.allBackups)
+                            .accessibilityIdentifier("allBackups")
                         ForEach(workspace.backupItems) { item in
                             Label(item.title, systemImage: item.symbolName)
-                                .help(item.subtitle)
+                                .help(backupHelp(for: item))
                                 .tag(SidebarSelection.backup(item.id))
                                 .accessibilityIdentifier("backup-\(item.id)")
                                 .contextMenu {
@@ -292,13 +298,24 @@ struct SidebarView: View {
                                     }
                                     Divider()
                                     Button("Delete Backup…", systemImage: "trash", role: .destructive) {
-                                        workspace.backupDeleteRequest = item
+                                        workspace.requestDeleteBackup(item)
                                     }
                                 }
                         }
                     } header: {
-                        Text("Backups")
-                            .accessibilityIdentifier("backupsGroup")
+                        // The total beside the name, once every backup has
+                        // been measured — the space is what a teacher could
+                        // not see before (#242).
+                        HStack {
+                            Text("Backups")
+                            Spacer()
+                            if workspace.backupSpace.isComplete {
+                                Text(BackupSizes.description(ofBytes: workspace.backupSpace.totalBytes))
+                                    .foregroundStyle(.secondary)
+                                    .accessibilityIdentifier("backupsTotal")
+                            }
+                        }
+                        .accessibilityIdentifier("backupsGroup")
                     }
                 }
 
@@ -361,9 +378,28 @@ struct SidebarView: View {
                 WorkspaceModel.rememberOpenFolders()
                 // Clicking a row moves the keyboard to the sidebar, the way
                 // a source list behaves everywhere else on this platform.
-                // Deferred, because the detail pane rebuilds for the newly
-                // selected course and claims focus on its way up.
-                DispatchQueue.main.async {
+                //
+                // Deferred one turn, and that deferral papers over a FOCUS
+                // RACE rather than fixing one: the detail pane rebuilds for
+                // the newly selected course and its first text field takes
+                // SwiftUI's initial focus on the way up, so this waits for
+                // that to land and then takes the keyboard back. It is a
+                // Task on the main actor rather than a main-queue block only
+                // because that is the house style — the two run at the same
+                // point, and the race is unchanged (never `Task.immediate`,
+                // which runs inline and would lose to the detail pane).
+                //
+                // The race has a second loser, measured in #293: a rename
+                // field opened in the SAME turn as a selection change takes
+                // focus first and then loses it to this, and with the app
+                // active it commits the unchanged code and closes (2 of 2
+                // runs with the test host frontmost; 4 of 4 passed with it
+                // in the background). The trace was the rename test's own
+                // selection-then-open in one turn. No teacher path does both
+                // in one turn — a click and the Return or menu item that
+                // opens the field are separate events — so the test was
+                // changed rather than this.
+                Task { @MainActor in
                     returnKey.focusTheCoursesList()
                 }
             }
@@ -442,11 +478,7 @@ struct SidebarView: View {
             Button("Cancel", role: .cancel) {
             }
         } message: { item in
-            Text("""
-                This deletes the backup for good — unlike removing a course, nothing is kept.
-
-                \(item.courseCode) itself is not touched.
-                """)
+            Text(singleBackupDeleteMessage(for: item))
         }
         .alert(
             "Delete this archive of \(workspace.archiveDeleteRequest?.title ?? "")?",
@@ -625,10 +657,17 @@ struct SidebarView: View {
         sectionNumber: Int,
         generation: Int
     ) -> ScheduledPublishOutcome.Stopped? {
+        // THIS working folder's record only (#237): the same section in
+        // another working folder keeps its own, and its failure is not this
+        // folder's to show.
+        guard let workingFolderURL = workspace.workspaceURL else {
+            return nil
+        }
         let outcome: ScheduledPublishOutcome.Stopped? = ScheduledPublishOutcome.stopped(
             inHomeFolder: ScheduledDeploy.homeForScheduledNotes,
             course: courseCode,
-            section: sectionNumber
+            section: sectionNumber,
+            workingFolder: workingFolderURL
         )
         // Only a failure earns a badge. A success is news rather than a
         // problem, and a badge beside every section that published fine
@@ -828,6 +867,25 @@ struct SidebarView: View {
         )
     }
 
+    /// A backup's tooltip: when, who, and — once measured — what it takes.
+    func backupHelp(for item: BackupItem) -> String {
+        guard let size = workspace.sizeDescription(of: item) else {
+            return item.subtitle
+        }
+        return item.subtitle + " · " + size
+    }
+
+    /// The single delete's confirmation, with what the backup takes once it
+    /// has been measured.
+    func singleBackupDeleteMessage(for item: BackupItem) -> String {
+        var message: String = "This deletes the backup for good — unlike removing a course, nothing is kept."
+        if let size = workspace.backupSizes[item.id] {
+            message += " It takes \(BackupSizes.description(ofBytes: size))."
+        }
+        message += "\n\n\(item.courseCode) itself is not touched."
+        return message
+    }
+
     var backupDeleteRequestIsPresented: Binding<Bool> {
         return Binding(
             get: { workspace.backupDeleteRequest != nil },
@@ -938,10 +996,13 @@ struct SidebarView: View {
     /// after something else happened to redraw the sidebar.
     func scheduledDeployTime(courseCode: String, sectionNumber: Int, generation: Int) -> Date? {
         _ = generation
+        guard let workingFolderURL = workspace.workspaceURL else {
+            return nil
+        }
         return ScheduledDeploy.nextRun(
             courseCode: courseCode,
             sectionNumber: sectionNumber,
-            inWorkingFolder: workspace.workspaceURL
+            inWorkingFolder: workingFolderURL
         )
     }
 
@@ -1376,7 +1437,7 @@ struct SidebarView: View {
             // The minus button removes live courses; an archived item is
             // already put away.
             return
-        case .backup:
+        case .backup, .allBackups:
             // Deleting a backup is a real deletion, so it happens only
             // through its own explicit menu item, never the minus button.
             return
@@ -1578,14 +1639,11 @@ struct CourseCodeField: View {
 
     // MARK: - Computed properties
 
-    /// Why what has been typed cannot be used, live — the same rule the New
-    /// Course wizard asks, in the short words a sidebar row has room for.
+    /// Why what has been typed cannot be used, live — asked of the model,
+    /// which asks the same question when Return is pressed, so what the
+    /// field shows and what it refuses cannot come apart.
     var problem: String? {
-        var existingCodes: [String] = []
-        for existingCourse in workspace.courses {
-            existingCodes.append(existingCourse.code)
-        }
-        return CourseCodeRule.shortProblem(text, existingCodes: existingCodes, currentCode: course.code)
+        return workspace.renameFieldProblem(course, typed: text)
     }
 
     // MARK: - Initializer
@@ -1604,9 +1662,13 @@ struct CourseCodeField: View {
             // The field and its message share ONE solid card, and that is
             // what makes them readable.
             //
-            // A course is always SELECTED while it is being renamed, so this
-            // row is drawing on the selection colour — and everything inside
-            // a selected sidebar row is tinted to sit on it. Black-on-blue
+            // A course renamed from Return or the Edit menu is SELECTED
+            // while it is being renamed, so this row is drawing on the
+            // selection colour — and everything inside a selected sidebar
+            // row is tinted to sit on it. (The context menu can open the
+            // field on a row that is NOT selected — driven for #293, where
+            // the card read the same on a plain row, so it is harmless
+            // there.) Black-on-blue
             // for the field and red-on-blue for the message were the result.
             // Painting a card in the system's own text-background colour
             // takes the content off the selection entirely, and because that
@@ -1664,11 +1726,10 @@ struct CourseCodeField: View {
     /// cannot. The reason is already on screen under the field, so saying it
     /// again in an alert would only take the field away.
     func commit() {
-        if problem != nil {
+        let renamed: Bool = workspace.renameFromTheField(course, typed: text)
+        if !renamed {
             NSSound.beep()
-            return
         }
-        workspace.rename(course, to: text)
     }
 
     /// Clicking away is a commit, as it is in Finder — but a code that
@@ -1705,8 +1766,16 @@ struct CourseCodeField: View {
     /// SwiftUI has no way to ask for this, so it is asked of the field
     /// editor — the shared NSTextView a text field borrows while it has
     /// focus — one pass of the run loop later, once focus has landed.
+    ///
+    /// That deferral papers over the same kind of focus race as the
+    /// sidebar's `.onChange(of: workspace.selection)`: it waits for focus
+    /// rather than being told focus arrived. A Task on the main actor, not
+    /// a main-queue block, only for the house style — the two run at the
+    /// same point (never `Task.immediate`, which would run before focus has
+    /// landed and find no field editor). See #293 for where that race has
+    /// already cost a test.
     func selectEverything() {
-        DispatchQueue.main.async {
+        Task { @MainActor in
             guard let editor = NSApp.keyWindow?.firstResponder as? NSTextView else {
                 return
             }

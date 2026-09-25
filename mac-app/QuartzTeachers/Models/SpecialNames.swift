@@ -92,6 +92,54 @@ enum SpecialNames {
     nonisolated static let contentStructureTip: String =
         "Tip: you can also simply create new folders and files in Obsidian — they’re added to your site automatically the next time you preview. The exception is anything you remove here: it stays off your site, even if you make it again in Obsidian, until you add it back here."
 
+    /// Beside "Saved ✓" in Course Settings when a preview of this course is
+    /// open (issue #265). A preview bakes every setting in when its build
+    /// starts, so a Save changes nothing it shows until it is built again —
+    /// measured: 20 s after a save, the served sidebar filter was unchanged.
+    /// The Preview Again button beside it rebuilds the open preview. About
+    /// EVERY setting, not only the sidebar: footer, colours and reading time
+    /// are baked in the same way. `contracts/shared-rules.json` →
+    /// `specialNames.settingsSavedWhilePreviewing`.
+    nonisolated static let settingsSavedWhilePreviewing: String =
+        "A preview of this course is still showing the settings it started with. Press Preview Again to see what you just saved."
+
+    /// Beside "Saved ✓" when a publish of this course is running. The publish
+    /// read the settings when its build began, so it sends the earlier ones.
+    /// "Publish again" is TRUE advice: the next Publish compares the course
+    /// with the time that build STARTED (`BuildFreshness.needsRebuild`), so a
+    /// Save made during it makes the next one build afresh — before that
+    /// fix it called the site up to date and sent the same build. Said
+    /// rather than blocked: the Save itself is right.
+    /// `specialNames.settingsSavedWhilePublishing`.
+    nonisolated static let settingsSavedWhilePublishing: String =
+        "This course is being published right now, and that publish uses the settings from before this save. Publish again once it has finished to send what you just saved."
+
+    /// After a Save that found the sidebar list had ALSO been changed in the
+    /// file since this window read it — another window on the same folder,
+    /// most likely — and wrote this window's list over it (issue #265, the
+    /// review's M2). The last Save wins, by the director's ruling for Russell,
+    /// 2026-09-24: no merge of two lists, but never silently.
+    /// `specialNames.settingsSaveReplacedSidebarChange`.
+    nonisolated static let settingsSaveReplacedSidebarChange: String =
+        "Which items the sidebar hides had also been changed somewhere else since this window read them — most likely in another Plantoir window. This save replaced that change with the switches shown here."
+
+    /// In place of Preview Again when the preview that was open at the Save
+    /// has stopped since, or its window has closed — the button would do
+    /// nothing (issue #265, the review's L2).
+    /// `specialNames.settingsPreviewAgainNothingOpen`.
+    nonisolated static let settingsPreviewAgainNothingOpen: String =
+        "That preview has stopped since, so there is nothing to preview again. Open the section and press Preview to see what you saved."
+
+    /// Where a preview's progress appears, when it starts while Course
+    /// Settings holds changes nobody saved — in ANY window on the folder, not
+    /// only this one (the review's L1). A preview reads the saved file,
+    /// so the switches on screen and the preview can disagree with nothing
+    /// said. Not auto-saved (a half-typed setting would be written) and not
+    /// blocked (previewing the saved settings may be the point).
+    /// `specialNames.previewUsesSavedSettings`.
+    nonisolated static let previewUsesSavedSettings: String =
+        "Course Settings has changes you have not saved, so this preview uses the settings as they were last saved."
+
     // MARK: - Functions
 
     nonisolated static func curriculumFolderBlockedByCurriculumPages(jurisdiction: String) -> String {

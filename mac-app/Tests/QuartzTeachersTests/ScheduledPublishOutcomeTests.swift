@@ -29,6 +29,14 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
     private var home: URL!
     private var workspace: URL!
 
+    // MARK: - Computed properties
+
+    /// The id the generated wrapper bakes into every record it writes: the
+    /// fixture working folder's, the same one the section's badge reads (#237).
+    private var folderID: String {
+        return BuildOutputLocation.folderIdentifier(forWorkingFolder: workspace.path)
+    }
+
     // MARK: - Functions
 
     override func setUpWithError() throws {
@@ -71,7 +79,8 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
     private func writeStubLaunchers(
         deployExit: Int32,
         previewExit: Int32 = 0,
-        failingDestination: String? = nil
+        failingDestination: String? = nil,
+        in folder: URL? = nil
     ) throws {
         let previewScript: String = "#!/bin/bash\nexit \(previewExit)\n"
         var deployScript: String = "#!/bin/bash\n"
@@ -86,7 +95,7 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
             deployScript += "exit \(deployExit)\n"
         }
         for (name, script) in [("preview.sh", previewScript), ("deploy.sh", deployScript)] {
-            let url: URL = workspace.appendingPathComponent(name)
+            let url: URL = (folder ?? workspace).appendingPathComponent(name)
             try script.write(to: url, atomically: true, encoding: .utf8)
             try FileManager.default.setAttributes(
                 [.posixPermissions: 0o755], ofItemAtPath: url.path
@@ -99,8 +108,10 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         course: String,
         section: Int,
         destinations: [String],
-        descriptions: [String]
+        descriptions: [String],
+        in folder: URL? = nil
     ) throws {
+        let workspace: URL = folder ?? self.workspace
         var argumentsList: [[String]] = []
         for description in descriptions {
             argumentsList.append([course, String(section), "--to", description])
@@ -137,7 +148,7 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         )
 
         let stopped = ScheduledPublishOutcome.stopped(
-            inHomeFolder: home, course: "ZZQ1U", section: 1
+            inHomeFolder: home, course: "ZZQ1U", section: 1, folderID: folderID
         )
         XCTAssertEqual(
             stopped?.kind, .neededAnAnswer,
@@ -158,7 +169,7 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         )
 
         let stopped = ScheduledPublishOutcome.stopped(
-            inHomeFolder: home, course: "ZZQ2U", section: 3
+            inHomeFolder: home, course: "ZZQ2U", section: 3, folderID: folderID
         )
         XCTAssertEqual(stopped?.kind, .didNotFinish)
         XCTAssertEqual(stopped?.destination, "Netlify")
@@ -176,7 +187,7 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         )
 
         let stopped = ScheduledPublishOutcome.stopped(
-            inHomeFolder: home, course: "ZZQ3U", section: 2
+            inHomeFolder: home, course: "ZZQ3U", section: 2, folderID: folderID
         )
         XCTAssertEqual(
             stopped?.destination, "Netlify",
@@ -192,10 +203,10 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
             ScheduledPublishOutcome.Stopped(
                 kind: .didNotFinish, destination: "Netlify", when: Date()
             ),
-            inHomeFolder: home, course: "ZZQ4U", section: 1
+            inHomeFolder: home, course: "ZZQ4U", section: 1, folderID: folderID
         )
         XCTAssertNotNil(ScheduledPublishOutcome.stopped(
-            inHomeFolder: home, course: "ZZQ4U", section: 1
+            inHomeFolder: home, course: "ZZQ4U", section: 1, folderID: folderID
         ), "the fixture record should exist before the run")
 
         try writeStubLaunchers(deployExit: 0)
@@ -208,7 +219,7 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         // success, so the teacher is told what happened rather than shown
         // nothing. Either way the stale failure must not survive.
         let outcome = ScheduledPublishOutcome.stopped(
-            inHomeFolder: home, course: "ZZQ4U", section: 1
+            inHomeFolder: home, course: "ZZQ4U", section: 1, folderID: folderID
         )
         XCTAssertEqual(
             outcome?.kind, .succeeded,
@@ -231,7 +242,7 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
             descriptions: ["Netlify", "your deploy folder"]
         )
         let stopped = ScheduledPublishOutcome.stopped(
-            inHomeFolder: home, course: "ZZQ5U", section: 1
+            inHomeFolder: home, course: "ZZQ5U", section: 1, folderID: folderID
         )
         XCTAssertEqual(
             stopped?.destination, "your deploy folder",
@@ -264,7 +275,7 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
             destinations: ["netlify"], descriptions: ["Netlify"]
         )
         let stopped = ScheduledPublishOutcome.stopped(
-            inHomeFolder: home, course: "ZZQ7U", section: 1
+            inHomeFolder: home, course: "ZZQ7U", section: 1, folderID: folderID
         )
         XCTAssertEqual(stopped?.kind, .buildNeededAnAnswer)
         // Written even though the sentence never shows it, so every record has
@@ -272,12 +283,19 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         XCTAssertEqual(stopped?.destination, ScheduledPublishOutcome.buildDestinationName)
         XCTAssertFalse(
             FileManager.default.fileExists(atPath: ScheduledDeploy.successSentinelURL(
-                courseCode: "ZZQ7U", sectionNumber: 1, inHomeFolder: home
+                label: ScheduledDeploy.agentLabel(courseCode: "ZZQ7U", sectionNumber: 1, workingFolder: workspace),
+                inHomeFolder: home
             ).path),
             "the build stopped, so nothing was published and nothing may say it was"
         )
     }
 
+    /// A build that failed OUTRIGHT is recorded as its own kind (#137), not
+    /// as a destination that stopped — and nothing is published.
+    ///
+    /// Until #137 this was `didNotFinish`, whose sentence named
+    /// `buildDestinationName` as though it were a destination and sent the
+    /// teacher to Publish.
     func testABuildThatFailedOutrightIsRecordedToo() throws {
         try writeStubLaunchers(deployExit: 0, previewExit: 1)
         try runWrapper(
@@ -286,10 +304,180 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         )
         XCTAssertEqual(
             ScheduledPublishOutcome.stopped(
-                inHomeFolder: home, course: "ZZQ8U", section: 1
+                inHomeFolder: home, course: "ZZQ8U", section: 1, folderID: folderID
             )?.kind,
-            .didNotFinish
+            .buildDidNotFinish
         )
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: ScheduledDeploy.successSentinelURL(
+                label: ScheduledDeploy.agentLabel(courseCode: "ZZQ8U", sectionNumber: 1, workingFolder: workspace),
+                inHomeFolder: home
+            ).path),
+            "the build failed, so nothing was published and nothing may say it was"
+        )
+    }
+
+    /// The contract's own table of which LEG and which exit code give which
+    /// kind, played through the REAL generated wrapper.
+    ///
+    /// `scheduledPublishStopped.whichKind.cases` is the list Windows runs
+    /// against its own wrapper too, so the rule has one home. Each case gets a
+    /// course code of its own (fixture names no real course uses), so one
+    /// case's record or success mark cannot answer for another's. The kind
+    /// named by the contract is found by walking `Kind.allCases` through
+    /// `SharedRulesContractTests.contractKey(for:)` rather than a list retyped
+    /// here.
+    func testEveryLegAndExitCodeIsFiledAsTheContractSays() throws {
+        let rule: [String: Any] = try SharedRulesContractTests.section("scheduledPublishStopped")
+        let whichKind: [String: Any] = try XCTUnwrap(rule["whichKind"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(whichKind["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 6, "the whichKind case list has lost cases")
+
+        var buildKindsSeen: Set<String> = []
+        var caseNumber: Int = 0
+        for testCase in cases {
+            let leg: String = try XCTUnwrap(testCase["leg"] as? String)
+            let exitCode: Int = try XCTUnwrap(testCase["exitCode"] as? Int)
+            let kindKey: String = try XCTUnwrap(testCase["kind"] as? String)
+            let namesADestination: Bool = try XCTUnwrap(testCase["namesADestination"] as? Bool)
+            let anythingPublished: Bool = try XCTUnwrap(testCase["anythingPublished"] as? Bool)
+            let why: String = try XCTUnwrap(testCase["why"] as? String)
+            let label: String = "\(leg) exit \(exitCode) — \(why)"
+
+            var expectedKind: ScheduledPublishOutcome.Kind?
+            for kind in ScheduledPublishOutcome.Kind.allCases {
+                if SharedRulesContractTests.contractKey(for: kind) == kindKey {
+                    expectedKind = kind
+                }
+            }
+            let expected: ScheduledPublishOutcome.Kind = try XCTUnwrap(
+                expectedKind, "the contract names a kind the app does not have: \(kindKey)"
+            )
+
+            var previewExit: Int32 = 0
+            var deployExit: Int32 = 0
+            if leg == "build" {
+                previewExit = Int32(exitCode)
+                buildKindsSeen.insert(kindKey)
+            } else if leg == "destination" {
+                deployExit = Int32(exitCode)
+            } else {
+                XCTAssertEqual(leg, "none", "unknown leg in \(label)")
+                XCTAssertEqual(exitCode, 0, "a run where nothing stopped exits 0: \(label)")
+            }
+
+            let course: String = "ZZR\(caseNumber)U"
+            caseNumber += 1
+            try writeStubLaunchers(deployExit: deployExit, previewExit: previewExit)
+            try runWrapper(
+                course: course, section: 1,
+                destinations: ["netlify"], descriptions: ["Netlify"]
+            )
+
+            let stopped: ScheduledPublishOutcome.Stopped = try XCTUnwrap(
+                ScheduledPublishOutcome.stopped(inHomeFolder: home, course: course, section: 1, folderID: folderID),
+                "no record at all for \(label)"
+            )
+            XCTAssertEqual(stopped.kind, expected, label)
+
+            let sentence: String = ScheduledPublishOutcome.sentence(
+                for: stopped, course: course, section: 1
+            )
+            XCTAssertEqual(
+                sentence.contains(stopped.destination), namesADestination,
+                "whether the sentence names the record's destination (\(stopped.destination)): \(label)"
+            )
+
+            let published: Bool = FileManager.default.fileExists(
+                atPath: ScheduledDeploy.successSentinelURL(
+                    label: ScheduledDeploy.agentLabel(courseCode: course, sectionNumber: 1, workingFolder: workspace),
+                    inHomeFolder: home
+                ).path
+            )
+            XCTAssertEqual(published, anythingPublished, "whether it counts as published: \(label)")
+        }
+
+        // Both build kinds must stay in the table, so the list cannot quietly
+        // shrink back to one that no longer tells them apart.
+        XCTAssertTrue(buildKindsSeen.contains("buildNeededAnAnswer"))
+        XCTAssertTrue(buildKindsSeen.contains("buildDidNotFinish"))
+    }
+
+    // MARK: - One record per working folder (#237)
+
+    /// Two working folders holding the same section, both run the same
+    /// morning: A's stops, B's gets through. Each folder reads its own. With
+    /// the record named for the course and section alone, B's first line
+    /// (`rm -f` of last time's record) erased A's failure, and B's success
+    /// then wore A's badge. Fails with the folder id taken out of `recordURL`.
+    func testTwoFoldersRunsKeepTheirOwnRecord() throws {
+        let second: URL = workspace.deletingLastPathComponent().appendingPathComponent("last-year")
+        try FileManager.default.createDirectory(at: second, withIntermediateDirectories: true)
+        try writeStubLaunchers(deployExit: 1)
+        try writeStubLaunchers(deployExit: 0, in: second)
+
+        try runWrapper(course: "ZZQGU", section: 1, destinations: ["netlify"], descriptions: ["Netlify"])
+        try runWrapper(
+            course: "ZZQGU", section: 1, destinations: ["netlify"], descriptions: ["Netlify"], in: second
+        )
+
+        let mine = ScheduledPublishOutcome.stopped(
+            inHomeFolder: home, course: "ZZQGU", section: 1, workingFolder: workspace
+        )
+        let theirs = ScheduledPublishOutcome.stopped(
+            inHomeFolder: home, course: "ZZQGU", section: 1, workingFolder: second
+        )
+        XCTAssertEqual(mine?.kind, .didNotFinish, "The other folder's run erased this folder's failure")
+        XCTAssertEqual(theirs?.kind, .succeeded)
+        XCTAssertFalse(try XCTUnwrap(theirs?.kind.needsAttention), "B's badge must not show A's failure")
+    }
+
+    /// A record written under the name every release before #237 used says
+    /// nothing about which folder it belongs to, so NO folder's badge or
+    /// notice reads it (#237 review, L2 — it would show folder A's failure in
+    /// folder B). The one moment its owner is known is straight after the run
+    /// of a job set before the update, which files it under that folder.
+    func testARecordFromBeforeTheUpdateIsNeverShownInAnotherFolder() throws {
+        let second: URL = workspace.deletingLastPathComponent().appendingPathComponent("last-year")
+        try FileManager.default.createDirectory(at: second, withIntermediateDirectories: true)
+        let legacy: URL = ScheduledPublishOutcome.legacyRecordURL(inHomeFolder: home, course: "ZZQEU", section: 1)
+        try FileManager.default.createDirectory(
+            at: legacy.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try "did not finish\nNetlify\n".write(to: legacy, atomically: true, encoding: .utf8)
+
+        XCTAssertNil(ScheduledPublishOutcome.stopped(
+            inHomeFolder: home, course: "ZZQEU", section: 1, workingFolder: workspace
+        ))
+        XCTAssertNil(ScheduledPublishOutcome.stopped(
+            inHomeFolder: home, course: "ZZQEU", section: 1, workingFolder: second
+        ))
+
+        // The run of this folder's job, set before the update, files it here.
+        let jobLabel: String = ScheduledDeploy.legacyAgentLabel(courseCode: "ZZQEU", sectionNumber: 1)
+        let section: (courseDirectory: URL, courseCode: String, sectionNumber: Int) = (
+            workspace.appendingPathComponent("courses").appendingPathComponent("ZZQEU"), "ZZQEU", 1
+        )
+        ScheduledPublishOutcome.fileUnderTheFolder(
+            inHomeFolder: home, course: "ZZQEU", section: 1,
+            folderID: ScheduledDeploy.folderIDForRun(label: jobLabel, section: section),
+            jobLabel: jobLabel
+        )
+        XCTAssertEqual(ScheduledPublishOutcome.stopped(
+            inHomeFolder: home, course: "ZZQEU", section: 1, workingFolder: workspace
+        )?.kind, .didNotFinish)
+        XCTAssertNil(ScheduledPublishOutcome.stopped(
+            inHomeFolder: home, course: "ZZQEU", section: 1, workingFolder: second
+        ), "Folder A's failure showed in folder B")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacy.path))
+
+        // A job with today's label wrote its own name, and moves nothing.
+        try "did not finish\nNetlify\n".write(to: legacy, atomically: true, encoding: .utf8)
+        ScheduledPublishOutcome.fileUnderTheFolder(
+            inHomeFolder: home, course: "ZZQEU", section: 1, folderID: folderID,
+            jobLabel: ScheduledDeploy.agentLabel(courseCode: "ZZQEU", sectionNumber: 1, workingFolder: second)
+        )
+        XCTAssertTrue(FileManager.default.fileExists(atPath: legacy.path))
     }
 
     // MARK: - Last night's record
@@ -306,7 +494,7 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
             ScheduledPublishOutcome.Stopped(
                 kind: .neededAnAnswer, destination: "Netlify", when: Date()
             ),
-            inHomeFolder: home, course: "ZZQ9U", section: 1
+            inHomeFolder: home, course: "ZZQ9U", section: 1, folderID: folderID
         )
         try writeStubLaunchers(deployExit: 1)
         try runWrapper(
@@ -314,7 +502,7 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
             destinations: ["local_folder"], descriptions: ["your deploy folder"]
         )
         let stopped = ScheduledPublishOutcome.stopped(
-            inHomeFolder: home, course: "ZZQ9U", section: 1
+            inHomeFolder: home, course: "ZZQ9U", section: 1, folderID: folderID
         )
         XCTAssertEqual(stopped?.kind, .didNotFinish, "tonight's kind, not last week's")
         XCTAssertEqual(
@@ -337,7 +525,7 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
             destinations: ["netlify"], descriptions: ["Netlify"]
         )
         let outcome = ScheduledPublishOutcome.stopped(
-            inHomeFolder: home, course: "ZZQCU", section: 1
+            inHomeFolder: home, course: "ZZQCU", section: 1, folderID: folderID
         )
         XCTAssertEqual(outcome?.kind, .succeeded)
         XCTAssertEqual(outcome?.destination, "Netlify")
@@ -357,7 +545,7 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         )
         XCTAssertEqual(
             ScheduledPublishOutcome.stopped(
-                inHomeFolder: home, course: "ZZQDU", section: 1
+                inHomeFolder: home, course: "ZZQDU", section: 1, folderID: folderID
             )?.destination,
             "Netlify, your deploy folder"
         )
@@ -380,17 +568,17 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
             ScheduledPublishOutcome.Stopped(
                 kind: .neededAnAnswer, destination: "Netlify", when: Date()
             ),
-            inHomeFolder: home, course: "ZZQ6U", section: 1
+            inHomeFolder: home, course: "ZZQ6U", section: 1, folderID: folderID
         )
         let url: URL = ScheduledPublishOutcome.recordURL(
-            inHomeFolder: home, course: "ZZQ6U", section: 1
+            inHomeFolder: home, course: "ZZQ6U", section: 1, folderID: folderID
         )
         let before: Date = try XCTUnwrap(
             (try FileManager.default.attributesOfItem(atPath: url.path))[.modificationDate] as? Date
         )
 
         for _ in 0..<3 {
-            _ = ScheduledPublishOutcome.stopped(inHomeFolder: home, course: "ZZQ6U", section: 1)
+            _ = ScheduledPublishOutcome.stopped(inHomeFolder: home, course: "ZZQ6U", section: 1, folderID: folderID)
         }
 
         let after: Date = try XCTUnwrap(
@@ -409,14 +597,14 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
             ScheduledPublishOutcome.Stopped(
                 kind: .didNotFinish, destination: "Netlify", when: Date()
             ),
-            inHomeFolder: home, course: "ZZQAU", section: 1
+            inHomeFolder: home, course: "ZZQAU", section: 1, folderID: folderID
         )
         XCTAssertTrue(ScheduledPublishOutcome.noteOnTrail(
-            inHomeFolder: home, course: "ZZQAU", section: 1
+            inHomeFolder: home, course: "ZZQAU", section: 1, folderID: folderID
         ))
         XCTAssertFalse(
             ScheduledPublishOutcome.noteOnTrail(
-                inHomeFolder: home, course: "ZZQBU", section: 9
+                inHomeFolder: home, course: "ZZQBU", section: 9, folderID: folderID
             ),
             "no record, nothing to note"
         )
@@ -449,10 +637,10 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
                 destination: ScheduledPublishOutcome.buildDestinationName,
                 when: Date()
             ),
-            inHomeFolder: home, course: "ZZQCU", section: 1
+            inHomeFolder: home, course: "ZZQCU", section: 1, folderID: folderID
         )
         XCTAssertTrue(ScheduledPublishOutcome.noteOnTrail(
-            inHomeFolder: home, course: "ZZQCU", section: 1
+            inHomeFolder: home, course: "ZZQCU", section: 1, folderID: folderID
         ))
 
         let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
@@ -466,7 +654,79 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         )
     }
 
+    /// A build that failed outright is noted under the EXISTING "did not
+    /// finish" event, with a line naming no destination (#137).
+    ///
+    /// Reads the trail FILE, for the reason the test above does: the return
+    /// value is `true` for any record that parses, so only the line itself
+    /// can show that no destination was named.
+    func testABuildThatFailedOutrightIsNotedOnTheTrailWithoutADestination() throws {
+        let scratch: URL = home.appendingPathComponent("trail-build-failed", isDirectory: true)
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: scratch)
+        defer { ActivityTrail.store = previousStore }
+
+        ScheduledPublishOutcome.recordStopped(
+            ScheduledPublishOutcome.Stopped(
+                kind: .buildDidNotFinish,
+                destination: ScheduledPublishOutcome.buildDestinationName,
+                when: Date()
+            ),
+            inHomeFolder: home, course: "ZZQDU", section: 1, folderID: folderID
+        )
+        XCTAssertTrue(ScheduledPublishOutcome.noteOnTrail(
+            inHomeFolder: home, course: "ZZQDU", section: 1, folderID: folderID
+        ))
+
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(
+            trail.contains("the pages could not be built"),
+            "the line a teacher's problem report would carry: \(trail)"
+        )
+        XCTAssertFalse(
+            trail.contains(ScheduledPublishOutcome.buildDestinationName),
+            "no destination was reached, so the trail may not name one"
+        )
+    }
+
     // MARK: - What a teacher reads
+
+    /// A build that failed outright names no destination, and is not the
+    /// destination-failure sentence with a stand-in filled in (#137).
+    ///
+    /// The sentence itself is pinned whole against the contract by
+    /// `SharedRulesContractTests`; what this pins is the SHAPE — the
+    /// contract's template has no destination slot at all, and the rendered
+    /// sentence does not carry the record's second line.
+    func testTheSentenceForAFailedBuildNamesNoDestination() throws {
+        let rule: [String: Any] = try SharedRulesContractTests.section("scheduledPublishStopped")
+        let sentences: [String: Any] = try XCTUnwrap(rule["sentences"] as? [String: Any])
+        let template: String = try XCTUnwrap(sentences["buildDidNotFinish"] as? String)
+        XCTAssertFalse(template.contains("{destination}"))
+
+        let failedBuild = ScheduledPublishOutcome.Stopped(
+            kind: .buildDidNotFinish,
+            destination: ScheduledPublishOutcome.buildDestinationName,
+            when: Date()
+        )
+        let failedDestination = ScheduledPublishOutcome.Stopped(
+            kind: .didNotFinish,
+            destination: ScheduledPublishOutcome.buildDestinationName,
+            when: Date()
+        )
+        let sentence: String = ScheduledPublishOutcome.sentence(
+            for: failedBuild, course: "ICS3U", section: 2
+        )
+        XCTAssertFalse(
+            sentence.contains(ScheduledPublishOutcome.buildDestinationName),
+            "no destination was reached, so none may be named"
+        )
+        XCTAssertNotEqual(
+            sentence,
+            ScheduledPublishOutcome.sentence(for: failedDestination, course: "ICS3U", section: 2)
+        )
+        XCTAssertTrue(failedBuild.kind.needsAttention)
+    }
 
     func testTheSentenceForAnUnansweredQuestionIsTheContractsOwn() throws {
         let stopped = ScheduledPublishOutcome.Stopped(
@@ -517,5 +777,159 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         )
         XCTAssertTrue(sentence.contains("did not finish"))
         XCTAssertTrue(sentence.contains("your deploy folder"))
+    }
+    // MARK: - Whether the overnight run builds first (issue #265)
+
+    /// A course whose site was built by a publish that STARTED at `started`
+    /// and wrote its page at `pageWritten`, with the settings saved at
+    /// `settingsSaved`; then the real wrapper, with a `preview.sh` that
+    /// leaves a note when it is asked to build. Returns whether it was.
+    ///
+    /// `siteCase` is one of `app-rules.json` → `buildFreshness.previewBuild`'s
+    /// cases, written over the built site before the run (issue #136);
+    /// `previewExit`, `deployScript` and the destinations let a test say what
+    /// the launchers do once they are reached.
+    private func overnightRunBuilt(
+        course: String,
+        started: TimeInterval,
+        settingsSaved: TimeInterval,
+        pageWritten: TimeInterval,
+        siteCase: [String: Any]? = nil,
+        frontPageUnreadable: Bool = false,
+        previewExit: Int32 = 0,
+        deployScript: String = "#!/bin/bash\nexit 0\n",
+        destinations: [String] = ["netlify"],
+        descriptions: [String] = ["Netlify"]
+    ) throws -> Bool {
+        let buildNote: URL = workspace.appendingPathComponent("the-build-ran")
+        try? FileManager.default.removeItem(at: buildNote)
+        let previewScript: String = "#!/bin/bash\n/usr/bin/touch \(buildNote.path)\nexit \(previewExit)\n"
+        for (name, script) in [("preview.sh", previewScript), ("deploy.sh", deployScript)] {
+            let url: URL = workspace.appendingPathComponent(name)
+            try script.write(to: url, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+        }
+
+        let courseURL: URL = workspace.appendingPathComponent("courses").appendingPathComponent(course)
+        let siteURL: URL = courseURL.appendingPathComponent(".merged_output/section1")
+        try FileManager.default.createDirectory(at: siteURL.appendingPathComponent("public"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: courseURL.appendingPathComponent("section1"), withIntermediateDirectories: true)
+        let page: URL = courseURL.appendingPathComponent("section1/index.md")
+        let settings: URL = courseURL.appendingPathComponent("course_config.json")
+        let builtPage: URL = siteURL.appendingPathComponent("public/index.html")
+        let marker: URL = siteURL.appendingPathComponent(BuildFreshness.buildStartedMarkerName)
+        try "# lesson\n".write(to: page, atomically: true, encoding: .utf8)
+        try "{}\n".write(to: settings, atomically: true, encoding: .utf8)
+        try "<html>a published build</html>".write(to: builtPage, atomically: true, encoding: .utf8)
+        try "".write(to: marker, atomically: true, encoding: .utf8)
+        var lockedURLs: [URL] = []
+        if let siteCase {
+            lockedURLs = try BuildFreshnessTests.writePages(
+                of: siteCase, into: siteURL.appendingPathComponent("public")
+            )
+        }
+        defer { BuildFreshnessTests.makeReadable(lockedURLs) }
+
+        let now: Date = Date()
+        let stamps: [(URL, TimeInterval)] = [
+            (page, -600), (marker, started), (settings, settingsSaved), (builtPage, pageWritten),
+        ]
+        for (url, offset) in stamps {
+            try FileManager.default.setAttributes(
+                [.modificationDate: now.addingTimeInterval(offset)], ofItemAtPath: url.path
+            )
+        }
+
+        if frontPageUnreadable {
+            try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: builtPage.path)
+            lockedURLs.append(builtPage)
+        }
+
+        try runWrapper(course: course, section: 1, destinations: destinations, descriptions: descriptions)
+        return FileManager.default.fileExists(atPath: buildNote.path)
+    }
+
+    /// The reviewer's H1, in the overnight run's own shell: settings saved
+    /// while the last publish was building are older than its page, and the
+    /// run must still build rather than send that publish's site again.
+    func testTheOvernightRunBuildsWhenSettingsWereSavedDuringTheLastBuild() throws {
+        XCTAssertTrue(
+            try overnightRunBuilt(course: "ZZQ7U", started: -400, settingsSaved: -350, pageWritten: -300),
+            "A Save after the last build started was not in it: the overnight run must build first"
+        )
+    }
+
+    /// And the check still says "up to date" when nothing changed after the
+    /// build started — the marker must not make every run rebuild.
+    func testTheOvernightRunDoesNotBuildWhenNothingChangedSinceTheBuildStarted() throws {
+        XCTAssertFalse(
+            try overnightRunBuilt(course: "ZZQ8U", started: -400, settingsSaved: -500, pageWritten: -300)
+        )
+    }
+
+    // MARK: - Whether the overnight run reads every page (issue #136)
+
+    /// The overnight check reads the same list the app's does. Each case's
+    /// site is newer than every edit, so the only thing that can make the run
+    /// build is the site being a preview's.
+    func testTheOvernightRunReadsTheSamePreviewCasesAsTheApp() throws {
+        let rule: [String: Any] = try BuildFreshnessTests.previewBuildRule()
+        let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
+        var caseNumber: Int = 0
+        for testCase in cases {
+            caseNumber += 1
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let expectPreview: Bool = try XCTUnwrap(testCase["expectPreview"] as? Bool)
+            let built: Bool = try overnightRunBuilt(
+                course: "ZZR\(caseNumber)U", started: -400, settingsSaved: -500, pageWritten: -300,
+                siteCase: testCase
+            )
+            XCTAssertEqual(built, expectPreview, name)
+        }
+    }
+
+    /// The headline of issue #136. A folder publish, a clean front page newer
+    /// than every edit, a preview's page behind it, and a build that stops for
+    /// a question. The stand-in deploy.sh does what the real one does with that
+    /// tree — rebuilds, and passes the build's exit 3 through — so before the
+    /// fix the morning record blamed the FOLDER and sent the teacher to
+    /// Publish. Now the overnight check builds first, the question is the
+    /// build's, and deploy.sh is never reached.
+    func testABuildQuestionBehindACleanFrontPageIsTheBuildsNotTheFolders() throws {
+        let deployNote: URL = workspace.appendingPathComponent("the-deploy-ran")
+        let publicPath: String = workspace
+            .appendingPathComponent("courses/ZZR9Q/.merged_output/section1/public").path
+        let deployScript: String = "#!/bin/bash\n/usr/bin/touch \(deployNote.path)\n"
+            + "if /usr/bin/grep -rq --include='*.html' 'ws://localhost:' '\(publicPath)'; then exit 3; fi\n"
+            + "exit 0\n"
+        let mixedState: [String: Any] = [
+            "pages": [
+                "index.html": "<html><body>Welcome</body></html>",
+                "notes/day-1.html": "<script>new WebSocket('ws://localhost:9081')</script>",
+            ],
+        ]
+        let built: Bool = try overnightRunBuilt(
+            course: "ZZR9Q", started: -400, settingsSaved: -500, pageWritten: -300,
+            siteCase: mixedState, previewExit: 3, deployScript: deployScript,
+            destinations: ["folder"], descriptions: ["the class folder"]
+        )
+        XCTAssertTrue(built, "the overnight run must build a preview's site before publishing it")
+        let stopped = ScheduledPublishOutcome.stopped(inHomeFolder: home, course: "ZZR9Q", section: 1, folderID: folderID)
+        XCTAssertEqual(stopped?.kind, .buildNeededAnAnswer, "the question was the build's, not the folder's")
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: deployNote.path),
+            "a build that stopped reaches no destination"
+        )
+    }
+
+    /// A front page that cannot be read is rebuilt rather than trusted, as the
+    /// app's check does — `grep` alone would read "cannot open" as "clean".
+    func testTheOvernightRunBuildsWhenTheFrontPageCannotBeRead() throws {
+        XCTAssertTrue(
+            try overnightRunBuilt(
+                course: "ZZR0U", started: -400, settingsSaved: -500, pageWritten: -300,
+                frontPageUnreadable: true
+            )
+        )
     }
 }

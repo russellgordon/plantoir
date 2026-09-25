@@ -101,6 +101,19 @@ xcodebuild -project Plantoir.xcodeproj -scheme Plantoir test \
   -only-testing:QuartzTeachersTests/NewCourseCreatorIntegrationTests
 ```
 
+**The tests that read the real window run with the app in the background,
+and SKIP when its desktop is not showing.** Six classes walk the window's
+accessibility tree (`AccessibilityInspector`). macOS leaves a window out of
+that tree while it sits on a Space that is not showing — a full-screen app or
+another desktop in front — so those tests skip, saying so, rather than fail on
+a tree that holds only the menu bar. Being in the background is fine and is
+the normal case. **A normal full run has 3 skipped (a fourth,
+`QuitScriptRunsTests.testTheSharedMachineIsStoppedOnAClearAnswer`, skips while
+any launcher is running on the Mac); more than 3 skipped means read the skip
+reasons.** Why, and what was rejected:
+`documentation/09-mac-app.md` → "Testing: the tests that read the real window,
+and a window on another Space (#249)".
+
 > **Tip:** stop any copy of the app running under Xcode's debugger (⏹)
 > before running the UI tests — a debugged instance cannot be terminated
 > by the test runner, which fails the first UI test with
@@ -117,6 +130,19 @@ in 30 before it existed, 0 in 30 after. Nothing in the shipped app changes, and
 the file itself carries the stack, the numbers, and the levers that look like
 they should work and do not. If a test ever needs to watch a sheet ANIMATE, that
 is the thing standing in its way.
+
+**The suite never asks for the real home folder, and a test says so.** Only
+`QuartzTeachers/Models/RealHome.swift` may ask macOS where the home folder is;
+everything else takes `RealHome.forFiles`, which is the real home in the app
+and one throwaway folder while the unit suite hosts the process.
+`RealHomeTripwireTests` scans the product and test sources for every way to ask
+(`homeDirectoryForCurrentUser`, `URL.applicationSupportDirectory`,
+`expandingTildeInPath`, `getenv("HOME")`, a literal `"/Users/"` …) and fails
+naming the file and line. If it fails on something you just wrote, use
+`RealHome.forFiles` — or, in a test, a made-up home such as `/Users/teacher`.
+What it catches, what it cannot (a child process takes `HOME` from its
+environment), and the probes that were measured and rejected are in
+`documentation/09-mac-app.md` → "Testing: the real-home tripwire (#264)".
 
 There is also a conventional **XCUITest** suite (`QuartzTeachersUITests`)
 that drives the app with synthesized clicks. Running it requires a one-time
@@ -161,9 +187,10 @@ requirement.
   (`BuildOutputLocation`). The shortcut is what lets `BuildFreshness`,
   `ScheduledDeploy`, `SectionDetailView`, the three launchers and a launchd
   deploy all keep naming the path they already named. The folder id is the
-  same `pwd -P | shasum` hash that names the folder's container, derived once
-  in `BuildOutputLocation.folderIdentifier` and used by `FolderContainers`
-  too. The rule is implemented a second time in the launchers' shell, because
+  same `/bin/pwd -P | shasum` hash that names the folder's container, derived once
+  in `BuildOutputLocation.folderIdentifier` (through `FolderIdentity.canonicalPath`,
+  the disk's own spelling, which every comparison of two folder paths uses too —
+  #189) and used by `FolderContainers` too. The rule is implemented a second time in the launchers' shell, because
   a teacher at the command line and a scheduled publish have no app — the two
   are pinned against `contracts/shared-rules.json` → `buildOutputLocation`.
   **The one thing to know before touching it**: a builds folder with no

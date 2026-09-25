@@ -148,7 +148,7 @@ The image is layered as follows (in order):
    - `example_course/EXC2O/` — the complete example course installable from
      the setup wizard (it, too, receives the `.obsidian` defaults on
      install).
-   - `example_content/<CODE>/` — ready-made course content for 38 course
+   - `example_content/<CODE>/` — ready-made course content for 39 course
      codes (count the folders rather than trusting the number), poured into
      a new course of that code
      ([course setup §0b](04-course-setup.md#0b-starting-content-for-the-course-code)).
@@ -213,9 +213,10 @@ it does not. On the mac, the builder image is tagged
 a new tag and orphans the previous one. Nothing in the repository had ever
 removed one: 139 images and 50 GB on this dev machine, ~115 of them
 `teaching-quartz` tags. Containers were never the problem — each launcher
-already removes its own container by name before recreating it, and the name
-is a hash of the working folder, so it is one container per folder replaced in
-place.
+already removes its own container before recreating it (since #94 by its id,
+and only once nothing is running in it — 03 → "Before a workspace is
+remade"), and the name is a hash of the working folder, so it is one container
+per folder replaced in place.
 
 The mac fix is `prune_superseded_images()` in `setup.sh`, `preview.sh` and
 `deploy.sh`: after a build SUCCEEDS, remove every `teaching-quartz:src-*` tag

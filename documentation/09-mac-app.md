@@ -29,7 +29,7 @@ interfaces automatically.
 | Preview | Runs [`preview.sh`](03-launcher-scripts.md) `--port N` (serve mode) and embeds the announced address in a web view once it responds — up to four sections per folder at once |
 | Deploy | Runs [`deploy.sh`](07-deployment.md) with output streamed into the app (prompts answered inline); if a preview is running or building, stops it and awaits container cleanup first; the finished live-site link wears the section's custom domain when one is set |
 | New Course | Writes the collected answers as `course_config.json`, then runs the real `./setup.sh`, accepting each prompt's default — the wizard re-reads the file as its saved answers, so scaffolding/backups/Quartz patches are all the wizard's own work |
-| Add Section | Context-click a course; scaffolds the new section the way the wizard would, mirroring sibling sections' frontmatter |
+| Add Section | Context-click a course; scaffolds the new section the way the wizard would, mirroring sibling sections' frontmatter, and gives every course-level page with per-section keys a pair for the new section — found with the build's own fence rule and spliced in by line, so the page's fence, body and line endings never move (#175; `contracts/course-management.json` → `sectionNumbers.addingKeysToAPage`) |
 | Open in Obsidian | Registers the course folder in Obsidian's own vault registry when needed and opens the section at its `index.md` |
 
 Beyond the actions, the app owns delivery and resources:
@@ -80,8 +80,9 @@ Beyond the actions, the app owns delivery and resources:
 - **The built website is kept outside the working folder** — every working
   folder, not only the synced ones. `courses/<CODE>/.merged_output` is a
   symlink to `~/Library/Application Support/Plantoir/builds/<folder id>/<CODE>`,
-  where the folder id is the same `pwd -P | shasum` hash that names the
-  folder's container, and the launchers bind-mount that folder into the
+  where the folder id is the same `/bin/pwd -P | shasum` hash that names the
+  folder's container (the disk's own spelling of the folder — see "One folder,
+  however it is spelled"), and the launchers bind-mount that folder into the
   container at the same absolute path so the link resolves identically on both
   sides. A built site is derived and can always be made again; keeping it in
   the folder meant a synced folder uploaded every build, Time Machine backed
@@ -274,6 +275,81 @@ the `…StillWrapsInFullAtRealWidths` tests host the view alone, so they prove
 "not line-limited", not "never truncated". Issue #213; never answer it by
 putting the modifier back.
 
+## The chosen folder's path bar names every folder when there is room (#295)
+
+The folder picker, once a teacher has chosen an EMPTY folder (the offer to set
+it up) or one a cloud service keeps in sync (the note about what that costs),
+names the chosen folder first with the same Finder-style path bar the window
+uses — "Macintosh HD › Users › … › Desktop › Class Websites". Until
+2026-09-25 that bar showed only icons for every folder but the chosen one, at
+every window size, however wide the window. Russell confirmed the screen.
+The main window's "Working folder:" bar is a different place and was not
+changed.
+
+**The fault was a width limit that had outlived its reason.** The picker drew
+the bar as `FinderPathBarView(folderURL:).frame(maxWidth: 520)`. The 520 came
+in with the bar itself on 2026-08-09 (c97a05a5), when the bar was a horizontal
+scroll view — a scroll view fills whatever width it is offered, so it needed
+holding in. Issues #145 and #148 (2026-09-09) changed the bar underneath it:
+it now asks only for the room its crumbs need, and its own `ViewThatFits`
+chooses between every name, icons only, and a scroll from the end. That choice
+is made against the width OFFERED, and the 520 was still offering 520 whatever
+the window had. Measured with the real `FinderPathBarView` compiled standalone
+and `NSHostingController.sizeThatFits`: Russell's own path, `~/Desktop/Class
+Websites - 2026-27`, needs **554 points** with every name and 303 as icons
+only, so 520 picked icons only at 900, 1200 and 1600 points of window alike.
+Rendered without the limit, the same path is named at all three.
+
+**The fix is to remove the limit and nothing else.** The bar now gets the
+picker's own width: the window, whose minimum is 900, less `.padding(40)` on
+each side — so it is always offered **at least 820 points**. For an ordinary
+path the icons-only form therefore never appears in the picker; it and the
+scroll still take over for a path longer than that, which is what they are
+for. The 520 on the cloud-sync explanation below the bar stays: that one is a
+reading measure for prose, and a line of prose 1,500 points long is hard to
+read in a way a path is not. The bar can now be wider than the text under it,
+both centred; it is a path rather than a paragraph, and that reads fine.
+
+**Pinned by measuring what the screen draws.** The bar moved into
+`WorkspacePickerView.chosenFolderPathBar(for:)`, and `body` calls it and adds
+nothing after it, so `PathBarWidthTests` measures exactly what the picker
+draws. `testThePickerDrawsEveryNameWhenTheWindowHasRoom` offers 1,400 points
+and requires the width of the full row (a fixture path deeper than 520, with a
+precondition that fails, rather than passing vacuously, if it ever fits);
+`testThePickerStillCollapsesWhenTheWindowHasNoRoom` offers a width between the
+two rows and requires the icons-only row. Put the 520 back and both fail
+(measured, 2 of the class's 8): the first with the bar claiming 520 against
+the fixture's full row of 687, the second with 503.5 against its icons-only
+row of 320 — the limit is a flexible frame, so it claims whatever it is
+offered up to 520 while the bar inside it is still drawing icons only.
+
+**Rejected:**
+
+- **A larger limit** (say 800). The same fault, moved: it still decides "does
+  not fit" without asking the window, and a deeper folder meets it.
+- **A hand-written width → named / icons-only / scrolling rule with a custom
+  `Layout`.** It would re-implement `ViewThatFits`, which already re-measures
+  on every layout pass — a window resize included — and could drift from what
+  is drawn. Measuring the real view tests the decision where it is made.
+- **An accessibility check.** The bar is one accessibility element labelled
+  with the whole path in every form, before the fix and after, so VoiceOver
+  was never affected and cannot tell a named row from an icons-only one.
+  `WindowPathBarTests` already asserts that label.
+
+**Not changed, and why.** The main window's footer bar was measured every
+50 points from 600 to 1300 of detail column: Russell's path is named from 676
+up. At the app's minimum window of 900 with a 228-point sidebar the column is
+671, so it collapses there by five points — a genuine lack of room rather than
+a limit, and a separate question if it ever matters.
+
+**Windows** carries the same limit: `MaxWidth="520"` on the `BreadcrumbBar`
+in its picker's empty-folder offer, where it ellipsises the leftmost crumbs at
+520 whatever the window's width. Its picker shows no bar for a synced folder
+(that notice lives in its main window), so there the empty-folder offer is
+the only place. The rule is `contracts/shared-rules.json` →
+`workingFolderPathBar.fitsInTheSpace`, whose second sentence says "the space"
+means the room the window gives the bar.
+
 ## What a window lets go of when it changes working folder
 
 The defect, reported as [issue
@@ -430,6 +506,97 @@ half that is easy to leave out, and leaving it out would be worse than no
 guard: delete a capture and every stop reads a permanently nil property and
 does nothing at all, wearing the shape of the fix working. The behaviour itself
 was verified by reading the teardown path.
+
+## One folder, however it is spelled
+
+Added 2026-09-25 with [issue #189](https://github.com/russellgordon/plantoir/issues/189).
+
+**The question.** A working folder can reach the app spelled several ways —
+through a link, as `/tmp` for `/private/tmp`, by the firmlink
+`/System/Volumes/Data/…`, in the wrong case, or with an accented letter in the
+other Unicode form (é as one character, as Terminal, a zip or a Windows PC
+stores it; or e + accent, as Finder does). A restored window reads a path
+remembered before a case-only rename; the picker returns the disk's; the MCP
+server gets whatever was typed. Every one of them is the same folder, and every
+place that asks "is this the folder that window is in?" or builds a key from a
+folder path has to say so.
+
+**The answer is one function, `FolderIdentity.canonicalPath`**
+(`Models/FolderIdentity.swift`): open the path (`O_EVTONLY` — no read
+permission needed, and it does not hold a disk against ejection) and ask
+`fcntl(F_GETPATH)` for the disk's own spelling, falling back to `realpath` and
+then to the text as given for a path that cannot be opened (gone, on a disk
+that is not plugged in, or behind a permission the app has not been given —
+which compares as before #189, the honest degradation). `isSameFolder(a, b)`
+compares two canonical paths. **The folder's id —
+`BuildOutputLocation.folderIdentifier`, which names its container and its
+builds folder — is the SAME function**, and the launchers ask the same
+question with `/bin/pwd -P` ([03](03-launcher-scripts.md) → "One folder, one
+spelling"). That is deliberate: a comparison that disagreed with the hash would
+call two spellings of the open folder different folders, and re-choosing it
+would stop the container it is using.
+
+**What was measured.** `F_GETPATH` matched `/bin/pwd -P` byte for byte on all
+17 spellings tried on this Mac (macOS 26.6, APFS): a folder's own spelling, the
+wrong case, a link, `/tmp`, the firmlink of `/private/tmp` and of the home
+folder (right and wrong case), an NFC-stored name reached as NFD, an NFD-stored
+name reached as NFC, an NFD Finder-made name typed in upper case, iCloud Drive
+and `~/Library/CloudStorage/Dropbox` (right and wrong case), and an external
+HFS+ disk (right and wrong case). 10 µs a call (10,000 calls on the repository
+path). `FolderIdentityTests` runs the temporary-folder spellings every time
+and the others on request (`PLANTOIR_TEST_EVERY_PLACE=1`; asking about
+Dropbox or another disk can put a macOS permission question on screen, which
+would hang an unattended suite).
+
+**Rejected.** `realpath(3)`, which the app used until #189: it folds case and
+form and resolves links, but keeps the `/System/Volumes/Data` prefix where
+`/bin/pwd` drops it — so the firmlink spelling, which agreed between the two
+sides only by accident of bash's built-in keeping the typed prefix, would have
+split once the launchers moved to `/bin/pwd`. Foundation's
+`resolvingSymlinksInPath()`: it strips `/private` and folds neither case nor
+form. Making the app imitate bash's built-in `pwd -P` instead: the id would
+then depend on how the folder was reached, which is the bug — and Foundation
+hands a child process an accented name as e + accent whatever the disk stores
+(measured, `Process.arguments`), so the app's "typed" bytes are not even its
+own.
+
+**The places moved onto it**, each a comparison of two of Plantoir's spellings
+of one folder or a key built from one:
+
+| Place | Was | What went wrong with two spellings |
+|---|---|---|
+| `BuildOutputLocation.folderIdentifier`, `writeWorkingFolderMarker` | own `realpath` | the firmlink spelling hashed differently from the launchers |
+| `ScheduledDeploy.physicalPath` | own `realpath` | (now a one-line forwarder) |
+| `ReferenceStaging.claimKey` | own `realpath` | (one copy instead of four) |
+| `WorkspaceModel.folderIsInUse` | `==` | **the container of the folder on screen was stopped** when it was re-chosen in another spelling |
+| `WorkspaceModel.chooseWorkspace`, `pointAtFolder`, `adoptRestoredPath`, the cloud-notice sibling windows, `previewIsRunning` | `==` / `!=` | the same stop; a notice treated as a new choice; a selection dropped; a course read as not previewing |
+| `WorkspaceModel.followWrite`, `anyCopyHasUnsavedChanges`, `followBackupDeletion`, `heldBackupPaths`, `comparablePath` | `resolvingSymlinksInPath` | a Save or a deletion in one window not followed in the other |
+| `PreviewLeases.lease` | `==` | **two previews handed the same port** in one container |
+| `CourseActivity`, `SettingsSaveNotice` | `==` / `standardizedFileURL` | a busy course read as idle |
+| `AssistToolRunner.openWindowModel`, `SectionDetailView`, `SectionScheduleSheet.mine` | `==` / `!=` | the assistant made a second model for an open folder; a lease or a prompt not recognised |
+| `ReferenceImportSource.pathWithSlash` | `resolvingSymlinksInPath` | "the folder you have open" missed by case, so a folder could be copied into itself |
+| `ScheduledDeploy.agentLabel` (#237, after #189) | label had no folder in it | **a PERSISTED key built from the folder id**: a scheduled deploy's launchd label, and its record's file name, end with `folderIdentifier` — on disk for days. So #237 was branched from #189's final tip, never from the `realpath` id, and the id is a way of keeping two folders' files apart rather than how a job is FOUND (every reader scans for the plist's `WorkingDirectory`), so a later change to `canonicalPath` cannot hide a job. See `07-deployment.md` → "One alarm per working folder (#237)". |
+| `WorkLeaseRegistry.Wanted`, `SectionWindowControllers.Key` | raw / `standardizedFileURL` | **dictionary keys**, which never call `isSameFolder`: canonical when the key is BUILT, or one course got two lease files and `buildClaim` missed its own claim. (`Key`'s comment said it was "case-folded on the way IN"; only the course code was.) |
+
+**Left alone, and why.** `FolderActions` compares against OBSIDIAN's record of
+a vault — another app's spelling, a different subject. The
+`standardizedFileURL` prefix tests in the assistant's page readers,
+`SectionPublishState` and `CourseRestorer` ask whether a page is inside a
+course, on URLs built from one root — never two independent spellings.
+`WorkspaceModel.relativePath(of:under:)` works on what the enumerator hands
+back. `CloudSyncedFolder` still uses `resolvingSymlinksInPath`, so a synced
+folder reached in the WRONG case is not recognised as synced; nothing in the
+app hands it such a path (the picker returns the disk's case), so it was left
+for a piece that has a reason to touch it. Remembered state is untouched:
+`WindowFolderMemory` keys by frame and stores the path as a value, and nothing
+here rewrites a stored value.
+
+**The one-time cost.** The launchers changed, so every folder's container is
+recreated once, as for any launcher edit. An ordinary folder keeps its id and
+its built websites. A folder whose path was not in the disk's own spelling
+builds from nothing once more, and the second copy it had is cleared away by
+the launchers, not by the app — see [03](03-launcher-scripts.md) → "One
+folder, one spelling" for why the Swift sweeps nothing.
 
 ## Quitting: what it frees, what it refuses to free, and why
 
@@ -666,6 +833,13 @@ issue #220 one level down — a line that will be believed.
    FAILS the container counts as busy**, because "I could not ask" must never
    mean "nobody is using it".
 
+   Since GitHub #94 the launchers use the same count before they REMAKE a
+   folder's container (`remake_the_workspace`, documentation/03 → "Before a
+   workspace is remade"), so the app and the launchers agree on what
+   "running" means. They add one refinement the quit path does not need: a
+   preview whose `preview.sh` is no longer running on the Mac is an orphan
+   and counts as nothing, because refusing for it would refuse for ever.
+
 Check 1 exists because check 2 is **blind to the long windows**. A launcher
 that has to build the image, start Colima or download the pinned tools does all
 of that with no container of ours running at all — measured, `docker buildx
@@ -729,6 +903,21 @@ container, then the host-side launcher is terminated. The script's
 wait-for-idle loop covers the gap. That loop is a wait on an OBSERVABLE
 CONDITION — the container going idle — not a settle delay.
 
+**One running container the app cannot name keeps the VM up too (#189).** The
+quit script stops the containers of the folders that are OPEN, by the name
+`FolderContainers.containerName` gives them. Before #189 a folder with an
+accented name stored the Terminal way, or reached in another case, could have
+a SECOND container the launchers had named from the typed spelling. A copy
+that was running when the app quit is not among the folders it knows, so
+`docker ps -q` stays non-empty and the VM is left running — the refusal's
+sentence is then true (something other than this folder's builder is running)
+but cannot name it. It is not stopped for the app: it may be an older
+launcher's publish in the middle of its work. It stops at the next restart,
+and the next launcher run for that folder in that spelling clears it away
+([03](03-launcher-scripts.md) → "One folder, one spelling"). A limit of the
+transition, not a new fault: before #189 such a copy was just as invisible to
+the quit script, and nothing made one after it.
+
 **Both halves, and the second one is easy to leave out.** A `ScriptRunner`
 lives as `@State` on the section view, so nothing outside that view could reach
 one; `ScriptRunner.runsInFlight` now registers every run for its lifetime so
@@ -758,6 +947,69 @@ Swift (`FolderContainers.sentence(for:occasion:…)`) and carried into the scrip
 already formed, so they can be pinned by a test; the script appends directly, so
 `LogRedactor` never sees them and they must carry nothing that would need
 redacting — the working folder's LAST COMPONENT, never its path.
+
+### Testing it against a written-down process list (#243)
+
+The quit script reads what is running on this Mac INSIDE the script, by `sh`,
+after the app has gone — `launcherRunning` and `anyLauncherRunning` both used to
+call `ps -Ao args=` directly. Under the unit suite that list is shared with
+everything else on the Mac, so the suite's answer depended on what else
+happened to be running. Measured on 2026-09-25, with one stand-in
+`/bin/bash "…/Other Class/preview.sh" ICS3U 1` started under `/private/tmp`
+(inside the test-run lock, killed by PID from a trap before the lock was
+released) and `QuitScriptRunsTests` run on unmodified `dev`: **12 tests, 1
+failure, 1 skipped** — `testTheSharedMachineIsLeftAloneWhenSomethingElseIsInIt`
+red (the "a publish or preview is still going" branch won, and it asserts
+"other software on this Mac"), and `testTheSharedMachineIsStoppedOnAClearAnswer`
+skipped by its own `XCTSkipIf`, hiding the one case that proves the machine is
+ever freed. Three review runs flaked the same day from another worktree's
+`testNothingIsStoppedWhileThatFoldersLauncherIsRunning`, whose stand-in
+`deploy.sh` sleeps 25 seconds. A `verify.sh` does it too: its
+`./preview.sh … --build-only` is RELATIVE, which the per-folder check cannot
+see, but `/preview.sh ` is still in it, which the any-launcher pattern matches.
+
+**The seam is a choice of shell command, `FolderContainers.ProcessListing`.**
+The script now has one function, `processesOnThisMac`, which both checks call:
+`.thisMac` writes `ps -Ao args= 2>/dev/null`, `.readFrom(file:)` writes `cat
+'<file>' 2>/dev/null`. The default is keyed on `RealHome.isInsideTestBundle`,
+the same fact as `RealHome.forFiles`: the real list in the app, and under the
+suite a file in the throwaway home that nothing writes — a missing file lists
+nothing, which is what a test that said nothing means. `QuitScriptRunsTests.run`
+writes its own list (empty unless a test passes `processesRunningOnThisMac:`).
+The app's script differs from the one before this change by exactly the new
+three-line function and the two `seen=` lines that call it; that was diffed,
+not assumed, by generating the script from `dev` and from the branch.
+After the change, with the same stand-in running: **0 failures, 0 skipped.**
+
+**One test reads the real list on purpose**:
+`testNothingIsStoppedWhileThatFoldersLauncherIsRunning`, the only proof that a
+real `ps` line carries a launcher's absolute path. It cannot be flaked from
+outside (its own "Teach 2" publish already makes the any-launcher check true;
+its folders sit under a unique scratch root). Its stand-ins are still VISIBLE
+to anything reading the real list for up to 25 seconds — and after a crash of
+the test host, which skips its `defer` — but no other test reads the real list
+any more. The same two rules it proves are also checked against a written-down
+list (`testALauncherForAnyFolderHoldsTheSharedMachine`,
+`testThatFoldersOwnLauncherHoldsItsBuilderButNotItsNeighbours`), so they are
+checked on every run whatever the Mac is doing.
+
+Rejected, and why:
+
+- **`XCTSkipIf` when a launcher is running** — what was there. It hid the
+  coverage it guarded, and it raced: the check and the run were two reads of a
+  list that changes in between.
+- **A Swift protocol, like `LaunchControlRunning`.** The read happens in `sh`
+  after the app has quit; there is nothing in Swift to inject.
+- **A stand-in `ps` in the scratch tools folder**, shadowing `/bin/ps` the way
+  the stand-in `docker` does. It WOULD work — the script calls `ps` unqualified,
+  after `HelperPrograms`' export line — and needed no product change. Rejected
+  because it is opt-in per test: the next test that runs a quit script without
+  writing the shim reads this Mac again, which is the failure this issue is; and
+  the shim would have to impersonate `ps -Ao args=`'s flags.
+- **An explicit parameter with no suite default.** It fixes this file and
+  leaves the next test exposed — the argument #264 made for `RealHome.forFiles`.
+- **Serialising suites across worktrees.** The test-run lock already exists and
+  does not help: `verify.sh` and real previews are not suites.
 
 ### ⌘Q while something is under way
 
@@ -919,8 +1171,8 @@ longer exists:
 **UNMEASURED, and do not quote a number for it:** how long a warm `colima
 start` takes end to end. 5.0 s from the hostagent to the host-side docker
 socket on an existing VM, but `docker info` readiness is later, and measuring it
-means stopping the shared VM (rule 7). The launcher polls `docker info` for up
-to 30 s and then force-cycles. Measure it on a spare Mac with `time (colima stop
+means stopping the shared VM (rule 7). The launcher polls `docker info` 30 times,
+two seconds apart (at least a minute), and then force-cycles. Measure it on a spare Mac with `time (colima stop
 && colima start && until docker info >/dev/null 2>&1; do :; done)` before
 putting a figure anywhere.
 
@@ -952,20 +1204,62 @@ the machinery (rule 1). They now print "🐳 Setting up this Mac…" and
 - **No duration is claimed**, because the warm start is unmeasured (above).
   REJECTED: the issue's own suggestion "this takes a moment the first time each
   day" — after #220 the machine can stop and start several times a day.
-- **The word "Colima" has NOT left the console, nor has the rest of the
-  machinery.** `colima start` writes its own `INFO[…] starting colima` lines
-  into the details a teacher can open, and `ensure_container_runtime` still
-  prints "Waiting for the container runtime to be ready…", "Docker isn't
-  responding yet — restarting Colima…", the "(Colima is shared …)" note, and
-  "Colima did not become ready." with its "Try running 'colima stop --force &&
-  colima start' by hand, then re-run this script."; `ensure_local_tools`,
-  which it calls, prints "Getting the container runtime…", "the container
-  tools" and "the image builder" on a first run. All outside #228's two lines;
-  the director files them as ONE follow-up issue (this paragraph should then
-  carry its number). "Waiting for the container runtime" is also a
-  `friendlyPhase` marker, so moving it means moving that too. The test above
-  checks a marker only on `echo` lines: a first version checked the whole
-  file and was satisfied by the comment that names the marker beside the echo.
+- **The rest of the first-run block followed as GitHub #263 (2026-09-25).**
+  #228 changed two lines; the rest of `ensure_container_runtime` and the
+  `ensure_local_tools` downloads it calls still printed "the container
+  runtime", "Docker isn't responding yet — restarting Colima…", a note that
+  Colima is shared, and "Colima did not become ready." with a `colima` command
+  to type. The whole block from `_download()` to the bare
+  `ensure_container_runtime` call — byte-identical in the three launchers —
+  now speaks of "your website builder": the downloads are "what your website
+  builder needs (N of 4)", the first start is "setting up your website
+  builder" (#228 had left "building the virtual machine" and its "disk image"
+  standing; #263 reworded that too), the wait, the restart and the failure all
+  name the builder, and the failure's advice is "Restart this Mac, then try
+  again." — by then the launcher has already force-cycled, and a restart is
+  what cleared the wedged builder in #225. The shared-Colima note and the
+  `colima stop --force && colima start` recovery became comments for a
+  developer; losing the printed note is a trade-off, written up in
+  [`03-launcher-scripts.md`](03-launcher-scripts.md) beside "Colima is treated
+  as shared infrastructure".
+  - **`friendlyPhase` moved with the text**: its marker "Waiting for the
+    container runtime" is now "Waiting for the website builder" (same label,
+    "Starting up…"), pinned by
+    `ScriptRunnerStatusTests.testWaitingForTheWebsiteBuilderIsAPhase`. Without
+    the move the phase would have stayed on the previous marker's label,
+    silently. No alias for the old text, for #228's reason.
+  - **Pinned by `AppRulesContractTests.testTheFirstRunLinesNameNoMachinery`**:
+    it extracts that block from each launcher, asserts the three copies are
+    identical, and scans what is PRINTED — `echo` lines and each `_download`
+    label, with `$( … )` removed first so `$(_colima_cpus)` does not count as
+    the word — for toolchain, script, Docker, container, Colima, Lima, buildx,
+    BuildKit, "virtual machine" and image, whole words, any case. It also
+    requires at least ten printed lines, so an extraction that finds nothing
+    cannot pass. Proven by copy-and-restore: the old label back in
+    `preview.sh` and a comment changed in `deploy.sh` gave 3 failures (one
+    word, two identity), the old marker back in `ScriptRunner.swift` a 4th.
+    The #228 test still checks a marker only on `echo` lines: a first version
+    checked the whole file and was satisfied by the comment that names the
+    marker beside the echo.
+  - **No contract keys.** These are mac-only launcher lines with no Windows
+    counterpart, and `contracts/app-rules.json` → `markerOrigins` →
+    `knownDivergence.note` already rules launcher text "the platform's text
+    rather than the product's". None is a milestone marker, so the generated
+    `milestones` did not move. REJECTED: an authored `launcherWording` key —
+    Windows has nothing to match and no reader for it.
+  - **What is still there.** Colima's own `INFO[…] starting colima` lines,
+    kept on Russell's ruling: REJECTED, filtering them in the app (a new
+    cross-platform line filter where `transcriptStripping` strips only control
+    characters, and it would blank them from the problem report that most
+    needs them), and piping `colima start` through `sed` (`pipefail`
+    interplay, lost diagnostics). And, outside the block, dozens of `echo`
+    lines across the three launchers — "🔌 Docker context", "Using image",
+    the container create/recreate lines, "the toolchain's build recipe", and
+    two milestone markers, "Starting container if needed" and "Ensuring
+    container is running", which are a contract change of their own. They are
+    ONE follow-up issue, listed line by line; a whole-launcher scan belongs to
+    it (REJECTED here: a whole-file ratchet with an allow-list, which would
+    freeze the list rather than empty it).
 
 **REJECTED — write the tools folder into `~/.zprofile` at install.** Plantoir
 editing a teacher's shell profile is exactly the machinery the product hides, it
@@ -987,7 +1281,14 @@ at once.
 does it.** Right idea, wrong piece: the mac has no cross-process state of that
 kind today (`CourseActivity` and `PreviewLeases` are in-process statics), so it
 would mean inventing some during a fix meant to be small. If the host-side check
-is ever not enough, this is the next step.
+is ever not enough, this is the next step. (Since then the import has written one —
+#206 — and #245 gave every lease one shared liveness reader, `ProcessLiveness`,
+described under "Who counts as alive" below. The quit path still reads none;
+#156 is where builds and previews get theirs.) (2026-09-25: #156 ADOPTED the
+lease for builds, previews and publishes — see "Two programs, one course" below.
+The quit path still reads none, and does not need to: its `ps` check already
+sees a launcher whoever started it, which is the one thing a lease would have
+told it.)
 
 **REJECTED — blocking the quit until the containers have stopped.** Quitting
 must not wait on Docker; a teacher whose engine is wedged would get an app that
@@ -1126,6 +1427,79 @@ seconds and which of the three it was. The sentences are in
 `contracts/app-rules.json` → `previewPorts.whenThePreviewNeverAppears`, so
 Windows can match the behaviour rather than re-derive it.
 
+### Where the address comes from — and why it is never guessed (#235)
+
+The only address the wait ever tries is the one `preview.sh` announces
+("Preview will be available at: …"). Three things used to break that, none of
+which a teacher had met, all of which were measured:
+
+- **The address was read from a tail.** `ScriptRunner.previewAddress` read
+  `recentText(maximumCharacters: 8000)`, and the announcement is printed EARLY.
+  On one real first preview (now the fixture
+  `mac-app/Tests/Goldens/235-preview-first-build.json` — a pseudo-terminal
+  capture with its CRLF and colour codes kept and one path redacted) the
+  announcement is 6,055 characters in and about 11,000 more follow: fed through
+  in pieces of 256, 1,024 or 4,096, the tail read found it and then LOST it,
+  and was nil by `Started a Quartz server`. It survived only because the wait
+  remembered what it had seen. It is now collected as output ARRIVES, from the
+  same carried-over complete lines as the health findings (one buffer), with
+  colour codes taken out a WHOLE line at a time, last announcement winning, and
+  forgotten by the same `keepingTranscript`-guarded reset.
+- **Two traps in reading it as it arrives,** both measured on the real line.
+  Read a raw piece of terminal output whole and Swift's `"\r\n"` — ONE
+  Character — defeats the `"\n"` split, the "line" runs to the end of the
+  piece, and `URL(string:)` percent-encodes the rest into the path: the RIGHT
+  port and a garbage address (`http://127.0.0.1:8101/%0D%0A…`), which a test
+  that checks only the port passes. And read a piece at a time with nothing
+  carried over, cutting the line after `:8`, `:81` or `:810` gives a valid
+  address on the WRONG port, with the rest of the line arriving unmarked in the
+  next piece. So the collector splits by scalar first, carries the unfinished
+  line over, and the tests assert the whole address, cut at every point.
+- **Nothing announced became a guess, twice.** The wait started from
+  `http://127.0.0.1:<the section's port>/` — the port INSIDE the builder, which
+  this Mac's own folder publishes as 8091 — and `preview.sh`, when
+  `docker port` came back empty, announced that same inside port as fact. A
+  guess is right only for the first working folder on a Mac, and can open
+  another section's preview as this one. Now `preview.sh` asks twice (one
+  empty answer is not proof, and on the commonest Mac the guess happened to be
+  right, so refusing on a single miss would stop previews that used to work),
+  then says it could not find out where the preview will be and stops before
+  building; `--build-only` asks nothing, so a publish is never stopped by it.
+  And the wait starts from nothing: `PreviewReachability.nextStep` tries an
+  announced address, waits while there is none and the server has not started,
+  and — once `Started a Quartz server` is in with no address — stops AT ONCE
+  (`stopBecauseNoAddressWasAnnounced`), because the launcher announces before
+  it builds and output is read in order, so nothing is still on its way. The
+  run is stopped the Stop-button way, the teacher gets the third sentence
+  (`plantoirCouldNotTell` — exactly true), the builder is NOT asked (its
+  question is about an address), and the trail gets `preview did not appear`
+  with its own line saying no address was announced. Not if the teacher has
+  just pressed Stop: Stop only signals the run, which is still "running" until
+  it has ended, so a wait waking in that gap would have reported a preview
+  they ended themselves — `nextStep` waits instead (review of #235).
+
+  **The ending a teacher will actually meet is the launcher's**, not the
+  app's: with the two shipped together `preview.sh` always announces or
+  stops, so the app's no-address stop is a defence. So the launcher writes its
+  own trail line when it stops — `preview did not appear`, in words
+  `contracts/shared-rules.json` pins as `launcherLine` and
+  `scripts/test_preview_address.py` checks (with `HOME` in a scratch folder,
+  so no test ever writes the real trail). Without it the trail said only that
+  `preview.sh` failed.
+
+REJECTED: keeping a tail fallback behind the arrival capture (nothing reaches
+the runner by any other road, so a second reader can only be staler or wronger
+— Windows keeps one and should drop it); waiting on to the silence or
+ten-minute bound when nothing was announced (the "still building for ever"
+state this section exists to end); a new sentence for it (the third one is
+true); and **announcing again, late, from `build_site.py`** — the issue's third
+half. With capture on arrival nothing can scroll out of anything, so a second
+announcement buys the mac nothing, adds a second writer of the address, and
+the `os.name == "nt"` block it would come from RE-PROBES ports and must stay
+Windows-only. The rule is in `contracts/app-rules.json` →
+`previewPorts.announcedAddress` and
+`previewPorts.whenThePreviewNeverAppears.whenNoAddressWasAnnounced`.
+
 ### Seeing it happen on a healthy Mac
 
 `PLANTOIR_PRETEND_THIS_MAC_CANNOT_REACH_THE_PREVIEW=1`, read at the moment the
@@ -1167,7 +1541,12 @@ during setup that night, but the report's own transcripts say
 for all three previews — `run_container_with_mount()` is reached only on
 create or recreate — so it would not have run on any of the three occasions a
 teacher was left waiting. A check in the preview path, against the port that
-preview will use, is the one that earns its place. Its own issue.
+preview will use, is the one that earns its place — and since #234 it
+exists: `preview.sh` connects to the address it is about to announce BEFORE it
+builds, and stops in about ten seconds when every try is refused. How, what it
+measured and what it rejected: `03-launcher-scripts.md` → "Before building,
+preview.sh makes sure this Mac can reach the builder". This alert stays the
+backstop for everything that check lets through.
 
 **Believing the log.** `ha.stderr.log` writes `Forwarding TCP from …` even when
 every forward failed; the tell is the `failed to set up forwarding` warning,
@@ -1298,6 +1677,649 @@ test, and choosing it over a hosted-view geometry check was the same call
 `Form` renders lazily on macOS, so walking the view tree means fighting the
 layout for an answer the source already gives.
 
+## Course Settings lists are tables, and why
+
+Issue #266, 2026-09-24. Every list of folders or files in Course Settings and
+the New Course wizard is a standard macOS table: the checkbox sits in the row
+beside the name it belongs to, and the four Content Structure lists have + and
+− at the lower left. Before, each tick was a `Toggle` inside a grouped `Form`,
+which macOS draws as a SWITCH at the far trailing edge — about 500 points from
+its label on a normal window — and each name list had a ⊖ per row and an
+always-visible text field.
+
+**Russell's three answers (they decided the shape):** +/− only on the four
+Content Structure lists (the lists a teacher types into); Hide and Expandable as
+ONE table with two checkbox columns (Hide | Expandable | Folder or file); the
+wizard keeps its layout — the four name tables stay collapsed under "Folders and
+files", the Marks table below them.
+
+**Three components, not one generic one.**
+
+- `StringListEditorView` — the name table (Content Structure, both surfaces).
+  Its initialiser did not change, so no call site was re-plumbed.
+- `MembershipToggleListView` — the Marks tick table (both surfaces). A single
+  column whose checkbox carries its name as a VISIBLE label, the way Xcode's
+  target-membership list draws it, so clicking the name ticks the box as the
+  old toggle's label did.
+- `SidebarVisibilityTableView` — the combined Hide/Expandable table (Course
+  Settings only; the wizard has none). It takes TWO bindings, which is why it
+  is a new view rather than a mode of the tick table.
+
+Shared pieces live in `ListTable.swift`: `ListTableRow`, `ListTableMetrics`
+(sizes, row building) and `ListAddRemoveFooter` (the +/− bar, drawn with the
+sidebar's own glyph and target sizes so the app has one +/− look).
+
+**What keeps the saved file identical.** One pure function,
+`MembershipToggleListView.updatedMembers(_:item:isMember:)`, turns a tick into
+a list, and every checkbox in all three tables goes through it. Every removal —
+the − button, the Delete key, the row menu's Remove — goes through
+`StringListEditorView.requestRemoval(of:)`, which asks the list's protection
+first: ordinary removes; consequential asks (the existing confirmation);
+blocked removes nothing, shows the SAME named reason from the − button and
+notes `removalBlocked` with the SAME trail line the row's info button writes.
+Nothing new is recorded on the trail — what is written did not change, only
+which control triggers it. A fixed gesture script (`ListGestureScript.swift`)
+was run through the OLD code before the redraw and captured into
+`Tests/Goldens/266-course-settings-gestures.json` and `266-wizard-gestures.json`;
+`ListTableGoldenTests` runs it through the new entry points and demands the
+same bytes.
+
+**Measured, with the table hosted off-screen in a grouped `Form` (planner's and
+reviewer's probes, `NSTableView` read directly):**
+
+| Question | Answer |
+|---|---|
+| Row height | **24.0** points, at every Dynamic Type and control size tried (`xxxLarge`, `accessibility3`, `.large`, `.small`). So the frame uses a CONSTANT 24, not `@ScaledMetric` — a scaled frame over fixed rows leaves an empty band. `TickTableTests.testTheRowAndHeaderHeightsAreTheOnesTheFrameAssumes` pins it, and a header of **28.0**. |
+| Height | rows × 24 + (header ? 28 : 0) + 2 shows every row with no inner scroll; capped at 20 rows (the longest real list is 18 — TEJ4M, MDM4U, MCMPR11). |
+| Page scroll | the outer Form still scrolls with the pointer over a table that fits its rows. |
+| Keyboard | Space (`.onKeyPress`) and Delete (`.onDeleteCommand`) reach the table once it is first responder. |
+| **A disabled table** | `.disabled(true)` does NOT stop the keys: the `NSTableView` stays enabled, arrows select, and Space and Delete FIRE. The wizard's Structure section is disabled until a course is chosen, so every key handler (and the double-click action) asks `@Environment(\.isEnabled)` first. |
+| VoiceOver / XCUITest | each checkbox is an `AXCheckBox` carrying its identifier, `AXDescription` = its label, `AXValue` 0/1; AX-press writes the model; rows below the fold are still exposed. |
+| Two popovers on one state | two presenters read from one state opened TWO popover windows, one silently unseen — so the − button's refusal has its own state (`removalExplanation`) apart from the row info button's. |
+
+**Identifiers.** `hideToggle-<item>` and `expandToggle-<item>` in the
+Sidebar Visibility table; `toggle-<item>` on the Marks table ONLY (it used to
+be emitted by Hide, Expandable and Marks at once); `table-<title>`,
+`addTo-<title>` (+), `removeFrom-<title>` (−), `addField-<title>` and
+`addConfirm-<title>` in the add popover; `sidebarVisibilityTable`. Gone:
+`remove-<item>` (the per-row ⊖; nothing read it).
+
+**Decisions, and what was REJECTED:**
+
+- **`Table`, not `List(.bordered)`.** Both are an `NSTableView` underneath with
+  24-point rows, but only `Table` carries a column header and more than one
+  checkbox column, and `List` left an empty band under its rows.
+- **+ opens a popover, not an editable new row.** A focus landing in a SwiftUI
+  table cell could not be confirmed without activating a window in front of
+  Russell, and table-cell fields are known to need a click to begin editing; a
+  popover is its own window and its field takes the keyboard at once, and a
+  half-typed name never becomes a row that Space, Delete or a selection could
+  act on. The always-visible add field was rejected as not the +/− convention.
+- **Add stays disabled while the name would not be added** (empty, `media` in
+  any case, or already listed) rather than closing — a popover that closed on
+  `media` would read as success. No new sentence was added for it.
+- **− is disabled only when nothing is selected**, never for a blocked row: a
+  disabled button explains nothing, and the issue says a refused removal says
+  why.
+- **Single selection.** Multi-select removal would put several protection
+  answers behind one gesture.
+- **Space toggles Hide; Expandable by click or the row's context menu.** A
+  table is ONE focusable control, so Full Keyboard Access reaches the second
+  column through the menu (`SidebarVisibilityTableView.hideMenuTitle` and
+  `.expandableMenuTitle` — the two lists' former titles, so "sidebar" says
+  whose; Plantoir has one of its own). Like Space, Delete and double-click,
+  every row menu offers nothing while the table is disabled
+  (`ListTableMetrics.contextMenuTarget`).
+  Type-select is on, so a Space typed inside a type-select run now toggles —
+  accepted.
+- **Each checkbox column has its own VoiceOver label** ("Hide Tasks",
+  "Expandable: Tasks"); with the bare name, both boxes on a row read "Tasks,
+  checkbox".
+- **Rows are one per NAME** in the tick tables (a shared and a per-section
+  folder may share a name; both rows could only ever tick together). Swift's
+  `==` treats NFC and NFD as equal, so two byte-different spellings show as
+  one row whose tick writes the first — left to #265, which owns what the
+  build matches.
+- **The Expandable box on a FILE row is a visible no-op** (the site's explorer
+  expands folders only). Kept, so a file ticked today stays ticked and the
+  saved file is unchanged.
+- **No +/− on Hide, Expandable or Marks** — their rows come from the Content
+  Structure lists and from the disk, and the Marks caption promises only
+  "tick". Renaming the components to `…Table` was rejected as churn.
+- No Cmd+Z for removal (there was none before; out of scope).
+
+**How the tests reach a real table.** `Tests/TableHost.swift` puts the
+COMPONENT (not the settings page — a grouped `Form` realises rows lazily) in an
+off-screen window that is never activated, and clicks
+`frameOfCell(atColumn:row:)` with `NSWindow.sendEvent`. `TickTableTests` and
+`NameTableTests` drive clicks, Space and Delete through it. Each must-fail was
+proved by copying the source aside, breaking it, running, and copying it back:
+the getter inverted, the setter ignoring a blocked untick, Space computing
+protection as ordinary, the Hide and Expandable columns swapped, Space and
+Delete not asking `isEnabled`, and `requestRemoval` skipping the protection all
+turn a named test red.
+
+**Not verified by driving the real app yet:** that the row's info popover
+survives the table reloading underneath it, and the in-process key routing in
+the running app (this app has met a table eating a key before —
+`Views/Helpers/SidebarReturnKey.swift`). Both are in the by-hand list for the
+next time the Mac is free.
+
+### A cell never asks the course a question (the "no subgraph" crash)
+
+**The trap.** On the first cut of the tables, leaving Course Settings for
+nothing — or opening another working folder while it showed — aborted the
+whole app with SwiftUI's `precondition failure: no subgraph`
+(`AGGraphGetAttributeSubgraph`, under
+`AppKitOutlineTableCoordinator.update(to:with:diffRows:diffColumns:)`). The
+test host died six times on 2026-09-24 before it was pinned down, and the full
+suite still printed "0 failures", because XCTest restarts the host and totals
+only the half that ran after the restart. **Read a suite log for
+`Restarting after` as well as the totals line.**
+
+**The trigger, measured by bisecting in the real window** (each variant one
+run): only the Marks table crashed; a plain-text cell survived; a cell given a
+fixed "blocked" answer survived; a cell that read the list's `@Binding`
+survived; a cell that CALLED the `protection` closure crashed — with the
+button and popover taken out, still crashed. Handing the Marks question
+(`gradedFolderProtection`) to the Shared folders table crashed that table too,
+so the four name tables had survived only because of which closure each was
+given.
+
+**The mechanism is NOT known.** What was measured is narrower than an
+explanation: calling the protection closure from inside a cell crashes, and
+the same answer handed in as a value does not. It is not simply "a cell read
+the model": the Marks checkbox's own binding getter reads
+`course.configuration.gradedFolders` and, when that is unset, walks the
+course's folders on disk — per cell, on every draw, then and now — and a cell
+doing that read survived the bisect. So do not tidy that getter on the
+strength of this section, and do not read the rule below as "no cell ever
+touches the course"; it is the rule that FIXED the crash, as measured.
+
+Where it showed: choosing one of the course's sections did not crash; clearing the selection
+and changing working folder did.
+
+**The rule that fixed it.** A cell never asks the course a question through
+the list's closures: every per-row answer such as a protection is worked out
+in the LIST's body (`protectionsAsDrawn()` in `MembershipToggleListView` and
+`StringListEditorView`) and handed to the cell as a value; a gesture (a
+click, Space, Delete) may still ask the model at the moment it happens. `CourseSettingsTeardownTests`
+is the must-fail (two of its three tests crash the host on the old cells);
+`TickTableTests.testAProtectionATickBringsAboutHoldsAtOnce` guards that the
+answer is not stale after a tick changes it.
+
+**Rejected.** A delay before tearing down (Russell's rule against waiting out
+a race; it would also only move the window). Taking the tables out of the
+grouped `Form` — the Form is not the cause: hosting `CourseSettingsView` on
+its own in `TableHost` and removing it did NOT crash in five variants (tall
+and short windows, animated or not, with a change to the course in the same
+moment), which is also why the must-fail drives the real window.
+
+<a name="two-windows-one-course"></a>
+
+## Two windows, one course: what a Save writes, and what it tells you (issue #265)
+
+**What was reported.** Russell, 2026-09-24: the switches under "Hide from the
+site's sidebar" "do not work" — in the preview and on the published site, with
+no correlation between the switches and the sidebar. Two walks at the Mac matched
+perfectly, which is what pointed away from the build. The plan review found the
+cause and Russell confirmed it: **two windows were open on the same working
+folder.**
+
+**Why two windows disagree.** Each window has its own `WorkspaceModel`
+(`WindowRootView`'s `@State`), and `reloadCourses()` gives each its own
+`CourseConfiguration` per course. Nothing re-read the file on focus, and
+"the same folder in a second window" is a supported case (`folderForNewWindow`
+opens the key window's folder by default). `CourseConfiguration.write` was a blind
+whole-file write. Measured with the real `CourseConfiguration.swift` compiled
+standalone and a copy of his ICS4U file: window A saved three hides; window B,
+still holding the old ten, saved an unrelated setting (reading time); the file
+went back to the ten, and BOTH windows reported nothing unsaved while showing
+different switches. Every preview, publish and scheduled publish reads the file,
+so the site followed whichever window saved LAST, for any reason.
+
+**What a Save writes now.** `write(to:)` re-reads the file first. If it has not
+changed since this copy last read or wrote it (`lastSavedData`), the write is the
+old one, byte for byte. Otherwise, per TOP-LEVEL key: a key this copy did not
+change keeps the file's value (another window's Save, or a folder a build
+appended); a key this copy did change is written, and if the file had changed it
+too, the result says so (`WriteResult.replacedChangesFromElsewhere`). The same
+read-check-write loop as `recordOnDisk` guards the instant between. Afterwards the
+in-memory copy IS the file, so an open form shows what was really saved. All six
+writers use it — Course Settings, Add Section, archive, restore, course rename,
+school year — which is why the rule is in `write` and not in the Settings view.
+Then `WorkspaceModel.followWrite` reloads every OTHER window's copy of that
+course, unless it has unsaved changes (never discarded; its own Save merges).
+Course Settings also re-reads the file each time it is opened
+(`reloadIfNothingUnsaved`), so a folder a build discovered is offered without a
+relaunch. The rule and its cases: `contracts/shared-rules.json` →
+`savingSettings`, run against `CourseConfiguration.merged`.
+
+**Revert reads the FILE** (`revertToFile(at:)`, the fix round's M1). A copy
+with unsaved edits is deliberately skipped by `followWrite`, so the bytes it
+last read can be older than the file. Reverting to those — what the button did
+first — measured badly in the review: window B with an unsaved edit, A saves
+three hides, B presses Revert and shows the OLD ten with "nothing unsaved", and
+B's next hide is then a change B "made" to a ten-item list, so its Save wrote
+eleven hides and took A's "All Classes" away. Reverting to the file is what
+"put it back the way it was saved" means when somebody else saved last. An
+unreadable file falls back to the old behaviour. Must-fail:
+`TwoWindowSettingsTests.testRevertShowsTheFileAndTheNextSaveDoesNotPutTheOldListBack`.
+
+**When both windows changed the sidebar list, the last Save wins — and says
+so** (the review's M2; ruled by the director for Russell, 2026-09-24). The
+merge is per key, so two windows that both changed `hidden` cannot both win;
+the later Save writes its whole list. That used to reach only the trail. Now,
+when the Save's `replacedChangesFromElsewhere` names `hidden`,
+`SpecialNames.settingsSaveReplacedSidebarChange` is the first after-Save
+sentence — with nothing running as well — and the trail line adds that the
+teacher was told. Only the sidebar list is said on screen: it is the one a
+teacher reads back as "the switches do nothing", and another setting replaced
+this way stays on the trail. Rejected again, for the reason below: merging the
+two lists.
+
+**Rejected**, and why:
+- *Merging inside lists* (union the two `hidden` lists, say): needs rules for
+  order and for an item removed on one side and added on the other; nothing
+  reported needs them. Per key is enough for "a stale window saved something
+  else", which is the case that happened.
+- *Refusing a Save that met another window's change and reloading instead*:
+  throws away what the teacher just did. The Save wins; the trail records that it
+  replaced a change made elsewhere.
+- *A file watcher per window*: a new moving part, for what reload-after-Save and
+  reload-on-open already cover.
+
+**What a Save tells you** (`SettingsSaveNotice`). A preview and a publish read
+the settings once, when their build begins — measured: 20 s after a Save the
+served sidebar filter was unchanged. So:
+- **A preview of the course is open** → beside the Save row,
+  `SpecialNames.settingsSavedWhilePreviewing`, with a **Preview Again** button
+  (Russell's choice). Leaving a section for its course's settings STOPS that
+  section's preview (`SectionDetailView.onDisappear`), so an open preview is in
+  ANOTHER window; the button restarts it through `SectionWindowControllers` —
+  the same stop-then-start the assistant uses. The notice is worked out at the
+  Save and stays up, so the preview it names can stop, or its window close,
+  before the button is pressed; the button then did nothing and said nothing
+  (the review's L2). Measured from the code: an in-app lease is taken only in
+  `SectionDetailView.startPreview` and released in the same synchronous
+  `onDisappear` that unregisters the window, so a lease with no window does not
+  persist — what persists is the notice. So Preview Again is live:
+  `SettingsSaveNotice.sectionsStillPreviewed` keeps a section only while its
+  lease is held AND its window is registered AND its preview is running, the
+  button is disabled when none is left, and
+  `SpecialNames.settingsPreviewAgainNothingOpen` is shown instead. Reading
+  `PreviewLeases.active` (observable) is what redraws it; a press that reaches
+  nothing in the instant between still leaves a trail line.
+- **A publish of the course is running** (the plan review's A3) →
+  `settingsSavedWhilePublishing` instead, and NO button: a preview is refused
+  while that course publishes (`rebuildAfterRepair`), so a button that could only
+  be refused would be worse than none. The sentence tells the teacher to
+  Publish again once this one finishes, and that advice is TRUE only because
+  of the freshness fix below (the review's H1): until it, the next Publish
+  called the site up to date and sent the same old build, reporting success.
+- **The next Publish rebuilds after a Save made during a build** (the fix
+  round's H1). `BuildFreshness.needsRebuild` compared the course's files with
+  the time `index.html` was WRITTEN — the END of the build — while the build
+  read the settings at its START, so a Save in between was older than the page
+  and looked published. `build_site.py` now makes
+  `.merged_output/section<N>/.build-started.pending` before it reads anything
+  and renames it to `.build-started` once the site is copied out, and
+  `needsRebuild` compares with the earlier of that file's time and the page's
+  (`referenceDate`; an early answer only costs a rebuild, a late one sends a
+  stale site; no file means the page's time, as before). The scheduled publish's
+  generated shell makes the same choice (`FRESH_SINCE` in
+  `ScheduledDeploy.oneShotCommand`). It covers a PAGE saved during a build as
+  well, which was the same hole. **Measured** before choosing it: a file made
+  from inside the Colima container on a bind mount is stamped by the MAC's
+  clock (5 of 5 creations stamped 55–67 ms before the container's own clock
+  read just ahead of them), so the marker and the teacher's Save are on one
+  clock and no time is written into the file. **Rejected:** the plan review's
+  A3 amendment, comparing the build's copy of `course_config.json` with the
+  course's — the build copies the settings some seconds AFTER it reads them, so
+  a Save in between matches the copy and is still missed, and it would not
+  catch a page; and writing `time.time()` into the marker, which compares two
+  clocks. Must-fails: `BuildFreshnessTests.testSettingsSavedWhileThePublishWasBuildingMeanRebuild`,
+  `ScheduledPublishOutcomeTests.testTheOvernightRunBuildsWhenSettingsWereSavedDuringTheLastBuild`
+  (runs the generated shell), `scripts/test_build_started_marker.py`. Contract:
+  `app-rules.json` → `buildFreshness` (the rule and `buildStartedMarker`).
+- The notice does not fade (unlike "Saved ✓"); it stays until the next Save,
+  Preview Again (which takes away only the preview sentence and its button — a
+  sentence about the Save itself stays), or leaving the course.
+- **A preview STARTS while Course Settings holds unsaved changes** — in ANY
+  window on the folder (`WorkspaceModel.anyCopyHasUnsavedChanges`, the review's
+  L1; the unsaved switches can be in the other window) →
+  `previewUsesSavedSettings` above the preview. Unsaved edits live in the
+  course's shared configuration and survive leaving the form, so the switches
+  and the page could disagree with nothing said. Rejected: saving automatically
+  (a half-typed setting would be written) and refusing (previewing the saved
+  settings may be the point).
+- *Rejected: rebuilding the preview automatically on every Save* — it kills a
+  page the teacher may be reading, for a Save that may have changed only the
+  footer, and the preview belongs to another window's runner.
+
+**The trail.** `settings saved` now says what the Save hid and showed (names
+only, compared with the file before the Save), which settings it kept or
+replaced from elsewhere (and, for the sidebar list, that the teacher was told),
+and whether a preview or a publish was running — the
+line that would have settled #265 in one read. New: `preview started with
+unsaved settings` and `preview again after settings saved`.
+
+**What the view must not do.** The notice is decided once, in `save()`, from
+`PreviewLeases.active` and `CourseActivity.activePublishes`; no cell of the
+sidebar table asks the course anything while drawn (the #266 rule above).
+
+## Two programs, one course: the build, preview and publish leases (#156)
+
+Written 2026-09-25 for [issue #156](https://github.com/russellgordon/plantoir/issues/156).
+Russell's decision: **both ways** — the mac READS the leases other programs
+write and WRITES its own. The rules are `contracts/shared-rules.json` →
+`workLeases.declining` (29 cases); the format is `contracts/file-formats.json`
+→ `workLease`; who counts as alive is #245's `workLeases.liveness`, above under
+"Who counts as alive". This section is why it is shaped the way it is.
+
+**The fault.** Two builds of one section clear and rewrite the same folder, so
+the loser serves a half-written site or publishes files the other has just
+deleted, and nothing goes red. Until #156 every rule the mac had about that was
+in-process (`CourseActivity`, `PreviewLeases`), so four things could build one
+course at once without seeing each other: the window, the in-app assistant, a
+publish set for later (its own `Plantoir --run-scheduled-deploy` process), and
+an assistant working from another app — Claude Code or Codex through
+`Plantoir --mcp-stdio`, a separate process with memory of its own.
+
+**What is written, and by whom: one derivation, not N call sites.**
+`WorkLeaseRegistry` works out the leases this process SHOULD hold from what it
+is already recording, and `CourseActivity` and `PreviewLeases` call its
+`reconcile()` at the end of every change:
+
+| kind | held while… |
+|---|---|
+| `build` | any preview of the course is being built (press → first answer), or any section of it is publishing |
+| `publish` | any section of the course is publishing (the whole deploy, its build included — Windows' shape) |
+| `preview` | any section of the course has a preview up in a window |
+
+That covers the window, the in-app assistant and the `--mcp-stdio` process
+with no new call site, because every build of theirs already went through
+`CourseActivity`. One file per folder, course and kind: two sections of one
+course previewing keep ONE `preview` file, ending one keeps it, ending both
+removes it. A file is written only when `courses/` already exists — the suite
+hands these stores pretend folders ("/folder") that must not grow directories
+— atomically, and a failure never stops the work (Windows' rule). The publish
+set for later has no main-actor app and takes its two leases through
+`WorkLeaseFiles` directly. The mac writes no `assist` lease: its MCP server has
+no course lock.
+
+**Line 2 is the process TABLE's name, not `ProcessInfo.processName`.**
+Measured 2026-09-25 with a four-line Swift program compiled in the scratchpad
+and run twice: as itself, `processName=RealName p_comm=RealName`; through a
+symbolic link called `other-link`, `processName=other-link p_comm=RealName`.
+Every reader compares line 2 against the table's name, so a lease written with
+`processName` from a linked binary reads as a recycled id everywhere and never
+blocks anything. `ProcessLiveness.leaseBody` now writes the table's name, which
+also changes #245's import lease (for the better, and for the same reason).
+
+**Who is declined, and with what.** A build from THIS program is declined when
+another live program holds `build`, `publish` or `preview` on the course:
+
+| door | where it asks | what is said |
+|---|---|---|
+| Preview (button, repair dialog, Course Settings' restart, the assistant's restart) | `startPreview()`, after its own build lease and THEN its preview lease are on disk (that order is load-bearing — below) | `wording.courseIsBeingBuiltElsewhere` in the Cannot Preview Yet alert |
+| Deploy (button, and the assistant pressing it) | `deployAndWait()` — `WorkLeaseRegistry.claimAPublish` (`beginPublish`, then the look) BEFORE the preview is stopped, so the window's `build` lease is up through the stop | the same sentence, in the Cannot Deploy Yet alert (#156's M5: `isAboutTheDestination`, as the reference-course refusal uses it — nothing ran, so the console has nothing to say) |
+| the in-app assistant's rebuild and deploy | `AssistToolRunner`, before any window is opened or preview stopped | `courseIsBeingBuiltElsewhere` |
+| an outside assistant's rebuild and deploy | the same, and the headless backstops `AssistToolchainWork.rebuildPreview` / `.deploy` after taking | `wording.courseIsBusy` — the existing key: the client is talking to the program that is busy, and that sentence tells it to wait and ask again |
+| `publish_pages` / `undo_last_change` | the write goes ahead (Markdown never conflicts with a build); the stop before it and the restart after it do not | the preview note is the sentence above for the surface |
+
+Every decline writes `build declined, course busy elsewhere` on the trail, with
+what was asked for and the other program's process id — from whichever process
+declined, so an outside assistant's refusal is on the trail too.
+
+**A build, preview or publish lease with no name line is treated as gone**
+(added in the fix round after #245's `ProcessLiveness.nameToCompare`, which
+supplies "Plantoir" for a nameless IMPORT lease and nothing for any other kind).
+Neither app writes such a lease — the mac writes atomically and always writes
+line 2 — and Windows' reader already calls fewer than two lines stale; judged
+on its id alone it could hold a course for the whole life of whatever process
+was handed that id. The last case in `workLeases.declining` pins it, and the
+liveness rule says so.
+
+**Take, then check, with a tiebreak** (the plan review's H1, accepted). The
+plan had "check, then take, in one synchronous stretch", and that is false for
+the window's Deploy: it stops the teacher's preview — `await
+stopPreviewAndWait()`, seconds of `docker exec` — between any early check and
+its own lease. So every door writes its own `build` lease FIRST and then looks,
+with nothing awaited in between, and counts only a lease taken BEFORE its own
+build lease: an earlier line-3 moment, or the same moment and a lower process
+id. **Never both go ahead** is the guarantee: of two programs that each take a
+build and look at once, exactly one sees the other as earlier
+(`testTwoProgramsThatLookAtOnceCannot…` walks every order, a tie included).
+
+*Where the Deploy takes it* (the implementation review's M1, 2026-09-25). The
+first cut took the claim straight AFTER the stop, with an early look before it.
+The stop is `preview.sh --stop`, which ends builds as well as servers by working
+directory, and the window released its preview lease the moment it began — so
+for those seconds it held NO lease, and an outside build started then was told
+the course was free and was killed by the stop. The claim now comes BEFORE the
+stop (`WorkLeaseRegistry.claimAPublish`), which also means a refusal stops
+nothing and the console never shows the last deploy's panel behind the alert.
+
+*What the claim is compared from* (the same review's M2). Other programs compare
+their build against EVERY lease this window holds, the `preview` included, while
+this window compares from its BUILD. A Preview used to write its preview lease
+first, so an outside build landing between the two files made both back off —
+measured by the reviewer on the real `WorkLeaseFiles`. `startPreview` now
+records the build first (`testAPreviewAndAnOutsideBuildThatRaceCannotBothBackOff`
+measures it on real files). The review proposed the other cure — claim from the
+EARLIEST of this program's leases — and it was **REJECTED on a measured
+counterexample**: a publish set for later does not wait for previews, so with
+the window's preview up since 06:00 it takes `build` at 06:30 and runs; a
+Deploy pressed at 06:31 claimed from 06:00 reads the 06:30 build as LATER and
+goes ahead — two builds at once, the fault itself
+(`testWhyTheClaimIsTheBuildMomentAndNotTheEarliestLease`, and the last case in
+`workLeases.declining`). What is left is one harmless shape: a Deploy pressed
+while this window ALREADY has a preview up, racing an outside build that lands
+between that preview and the Deploy's build — both back off, nothing runs, a
+retry works. Closing it would need a lease to say whether its owner waits for
+previews, which is a format change.
+
+The moments are compared as TEXT, exact for the one fixed 28-character shape
+both apps write (UTC, seven fractional digits); the mac's `DateFormatter` fills
+only three of them — millisecond resolution, measured `…57.9620000Z` — so a
+same-moment tie is ordinary, and goes to the lower pid. Anything else counts as
+earlier. **The residual:** a program that looks BEFORE it takes — Windows
+today, an older mac — can start in the instant between another's take and its
+own look. That is Windows' own shape, and it is recorded rather than closed.
+
+**Another program's PREVIEW blocks a build here** (the plan review's M2;
+director's ruling 2026-09-25, reversible). Stricter than Windows, whose only
+blocking kind is `build`. The reason is in `build_site.py`: every
+`--build-only` first ends that section's SERVING preview
+(`stop_preview_serving`) on purpose, so without this an outside assistant's
+rebuild would take down the page the teacher is reading — which the in-app
+assistant already refused to do (`busyDescription` counts previews). An
+outside assistant can retry; a teacher reading a page cannot. Because leases
+name the course, a preview of Section 1 in another copy of Plantoir declines a
+build of Section 2 from here too. What the window shows if its preview dies
+anyway (a build started by something that does not read leases) stays what
+#235 made it.
+
+**A publish set for later WAITS** (ruling (a)). In `runScheduled`, after the
+lateness check and before `process.run()`: it holds nothing while it waits,
+looks every **15 s**, and gives up at **10 minutes** measured on the WALL clock
+— a `Date` deadline, because a Mac that sleeps part way through would pause an
+uptime count and a run woken at eight would still be "waiting" for the build it
+found at half six. launchd imposes no run timeout on the agent (its plist has
+no `TimeOut`; `ExitTimeOut` applies only on stop), so ten minutes fits. The
+pause is a blocking sleep of the interval, since `runScheduled` is synchronous
+and never returns — a paced re-check, not a guess at when something settles.
+Once free it takes `build` and `publish` and looks once more (take, then
+check); losing that race puts its leases back and waits again. It waits only
+for `build` and `publish`, NOT `preview`: a preview left open overnight must
+not cost the morning's publish, and its build ends that preview as it always
+has. Still busy at ten minutes it STANDS DOWN the way a job whose day has gone
+by does — plist and wrapper removed, the job booted out so it cannot recur in
+a year — with the new outcome kind `courseWasBusy` and its sentence
+(`scheduledPublishStopped.sentences.courseWasBusy`), which the section shows
+and the sidebar badges. The trail gets `scheduled publish waited for the
+course` (how long, for whom, and whether it went ahead or stood down), plus
+`scheduled deploy turned off` for a stand-down. Its leases come down before the
+job is booted out, since booting out ends the process.
+
+**An outside assistant's process leaving** (the plan review's M3). `serve`
+used to `exit(0)` the moment stdin closed, even mid-build: the lease went with
+the process while the launcher it had started — reparented, not killed, as the
+quit path measured — went on building, and the window was then free to start a
+second build. Now, in order: no new launcher may start (`ScriptRunner.
+refusesNewRuns`, or a deploy's next leg would begin the moment its build was
+stopped); the leases stop following the records (`WorkLeaseRegistry.
+isLeaving`, or the runs ending their own records as they stop would take the
+leases down early); every launcher in flight is stopped and awaited — each
+resumes when its own process has exited, a real dependency; each section it
+was building is stopped inside the website builder (`PreviewStopper`, whose
+own wait is bounded at 20 s); and only then are the leases removed.
+`testLeavingStopsItsOwnLauncherBeforeTheLeaseComesDown` pins that order with a
+stand-in launcher that sleeps. Measured with the real binary: stdin closed
+with nothing running, the process exited 0 in 0.92 s. **Known limit, shared
+with Windows' `plantoir-mcp`:** a client that KILLS the server skips all of
+this; the lease is then ignored (its pid is gone) while a reparented launcher
+may still be building.
+
+**Quit (rule 7): unchanged, and a lease adds nothing to it.** The quit question
+(`QuitConfirmation`) stays in-process — quitting the window does not stop an
+outside assistant's build, so asking about one would ask about something the
+answer cannot affect. The rest path already refuses while ANY launcher runs on
+this Mac: `FolderContainers`' quit script reads `ps -Ao args=`, which sees a
+`preview.sh` or `deploy.sh` whoever started it — the `--mcp-stdio` process,
+launchd's scheduled run, a Terminal. `QuitScriptRunsTests.
+testNothingIsStoppedWhileThatFoldersLauncherIsRunning` proves exactly that
+with a stand-in launcher started as a separate process, not through the app's
+own `ScriptRunner` — the one quit test that reads the real list, on purpose
+(#243; every other test hands the script a written-down list). So the quit path reads no lease; it simply removes this
+app's own (`WorkLeaseRegistry.releaseEverything()` — tidiness, since a reader
+ignores a lease whose process has gone). During a scheduled publish's WAIT no
+launcher runs, so a quit may rest the machine then, which is harmless: the run
+starts it again when it builds.
+
+**Measured with the real binary** (2026-09-25, a scratch folder under `$HOME`
+with `HOME` pointed at a scratch home so nothing reached Russell's trail, since
+deleted): a three-line Windows-shaped `ICS3U.build.<pid>.lease` naming a live
+`/bin/sleep`, then `deploy_section` and `rebuild_preview` over
+`Plantoir --mcp-stdio` — both answered `courseIsBusy`, nothing ran, and the
+scratch trail read "declined an outside assistant's deploy — the course is
+being built by process 82863 somewhere else on this Mac". Windows' reader
+tolerating the mac's FOUR-line lease was confirmed by reading `WorkLease.cs`:
+`IsAlive` needs at least two lines and compares `lines[1]` only;
+`testALeaseIsWrittenInTheSharedShape` applies that same check to the bytes the
+mac writes.
+
+**REJECTED, and why** (also in `workLeases.declining.rejected`):
+
+- **One-way** — reading without writing, or writing without reading. Russell:
+  "yes, both ways". Either half alone leaves one direction of the race open.
+- **Documenting the gap instead of closing it.** The fault is silent — a
+  half-written site, nothing red — so a paragraph would be the only defence,
+  and nobody reads it at the moment it matters.
+- **Check-then-take with no tiebreak** (the plan's first shape, Windows'
+  today) — the Deploy's awaited stop is a gap of seconds, measured by the plan
+  review on the code.
+- **A section in the lease name** — Windows reads the kind as the third-last
+  dot-separated part, so any extra part is a format change on both sides.
+  Course-level costs Section 2 a decline for the length of a build of Section
+  1, and the sentence names the course.
+- **A sweep of dead leases** on folder open, and the plan's own-pid sweep.
+  `WorkLease`'s design is no cleanup pass; the reader already ignores a dead
+  owner, and line 4's start time settles the recycled-pid case the sweep was
+  proposed for (a leftover whose number now belongs to another live Plantoir).
+- **Standing down at once**, or **going ahead anyway**, for a publish set for
+  later — a thirty-second build would cost a night's publish; two builds on one
+  workspace is the fault itself.
+- **Greying the Deploy button while another program builds** (Windows does). A
+  view cannot observe a file without a watcher, and declining at the press is
+  the whole guarantee. A difference to know, not an obligation.
+
+**Known limits, beyond the ones above.**
+
+- A preview stop ("everything" mode, by working folder) from THIS window —
+  Stop, the preview's and the deploy's Cancel buttons, `onDisappear`, the
+  assistant's stop-then-start, quit's `stopSectionProcessesOnTheWayOut` —
+  releases the window's lease (a cancelled deploy's `build` lease goes when
+  `deployAndWait` returns, through its `defer`) as it begins while the stop itself runs on (waited up to 20 s). An outside build
+  started in those seconds is told the course is free and is then ended by the
+  stop. Nobody builds twice; the outside program is told its build failed and a
+  retry works. The Deploy no longer has this gap (its build lease is up through
+  its stop — above); the others were left, because holding the preview lease
+  until the stop returns means keeping a lease for a preview that is gone. (An
+  option not taken, from the fix review: derive a `build` lease from
+  `PreviewStopper`'s in-process list of stops still running, which would cover
+  every path at once — the stop does end builds.)
+- A Plantoir that quits during a publish leaves its reparented `deploy.sh`
+  running (quitting deliberately does not end a publish) with no live lease —
+  the same shape as an outside assistant's process being KILLED, or sent
+  SIGTERM, rather than having its input closed: both skip the orderly leave.
+  Before #156 there was no lease at all, so this is a limit, not a regression.
+- The outside assistant's orderly leave waits for each section's stop through
+  `PreviewStopper.stopSectionProcessesAndWait`, whose stop reads the launcher's
+  count through a pipe; a stop that outlives its 20 s bound is still writing
+  when the process exits, which risks the SIGPIPE `stopSectionProcessesOnTheWayOut`
+  exists to avoid. Left as it is: the stop prints one line, at its end.
+- When the in-app assistant restarts a window's preview and that restart is then
+  declined at the window's own take-then-check (a race only — its early look
+  passed), the assistant still says the preview is rebuilding; the window's
+  alert is the truth.
+- A lease synced in from another Mac or a Windows PC through a cloud-synced
+  working folder names a pid that means nothing here. #245's liveness limit;
+  a Windows lease has no line 4, so a match rests on the name alone.
+- `CourseActivity.busyDescription` (menus, Add Section…) stays in-process on
+  purpose — declining at the press is the guarantee, not the menu's grey.
+
+**Tests.** `WorkLeaseDecliningTests` (25): the contract's 29 cases through the
+pure `WorkLeaseFiles.blocking`; the bytes written; the derivation; a real
+`/bin/sleep` as the other program (held, recycled name ignored, gone ignored);
+the race, pure and on files, and the two orders the review measured; the Deploy's claim and the window's lease ORDER (read from the source, which the suite cannot construct); every door; the scheduled wait with an injected
+clock (45 s then go ahead; 40 looks then stand down; losing the race; a
+preview not waited for); the stand-down record and its trail line; the MCP
+leaving order. It resets process-wide stores and relies on the scheme's
+`parallelizable = "NO"`, like `CourseActivityTests`.
+
+## A course code Plantoir keeps for itself: WORK (#101)
+
+`CourseCodeRule` refuses the code `WORK`, in any case and with any surrounding
+spaces, with its own sentence (`CourseCodeRule.Trouble.keptForPlantoir`, both
+lengths). It is the one rule the New Course wizard, a rename in the sidebar and
+Keep a Copy for Reference all ask, so the refusal reaches all three; the cases
+are in [`contracts/course-management.json`](../contracts/course-management.json)
+→ `courseCode.problems`, which both apps run.
+
+**Why, when nothing on a Mac collides.** The Windows launchers build each
+preview in `<buildRoot>\work\<CODE>\section<N>`, beside every course's
+`<buildRoot>\<CODE>` — so a Windows course called "work" would share its
+folder with the build ([`12-windows-app.md`](12-windows-app.md) → the builds
+table). `preview.sh` never sets `PLANTOIR_WORK_DIR`, so the mac's builds folder
+holds only course folders. Russell decided on 2026-09-25 to reserve the name on
+BOTH platforms anyway: a code one app accepts and the other refuses is a course
+a teacher can make on one computer and not open on the other.
+
+**Rejected:** refusing it on Windows only (a platform difference somebody has
+to remember for ever), and renaming the Windows folder instead (the clash goes,
+but the name stays free for the next thing to want it).
+
+**Two edges, both pinned by cases.** The kept name is checked BEFORE the clash
+with an existing course, so a folder already called `WORK` is not answered
+with "keep a copy for reference", which would invite another. And it is checked
+AFTER the rename's self-check, so a course that already carries the name (made
+on a Mac before 2026-09-25) can still have its own code re-typed while being
+renamed — it cannot be given the name, and renaming it away is how it leaves.
+The sentence says the name is kept, never what for: rule 1.
+
+**The command line still accepts "work", deliberately.** `setup_course.py`'s
+code prompt has never carried the app's rule — it refuses only a leading dot,
+and does not hold the twelve-character limit or the character rule either — so
+adding one name to it would be a third, partial copy of a rule that has one
+home. The app's rule is the gate a teacher meets: both wizards validate before
+they ever start `setup.sh`/`setup.ps1`. A teacher typing codes into the launcher
+by hand is off the supported path already, and on Windows the damaging half of
+the collision is guarded separately — `BuildOutputLocation.WouldCollideWithEveryCourse`
+refuses to delete by that path. If the command line ever gets the shared rule,
+it gets all of it, WORK included.
+
 ## Renaming a course folder
 
 Folder rows in Course Settings carry a pencil. It renames the folder **on
@@ -1346,6 +2368,129 @@ deleted anything and nobody could tell.
 is kept OUT of the built site, so a rename that missed it silently un-hid the
 folder and the next publish put pages the teacher had hidden in front of
 students.
+
+## Renaming a course in the sidebar: two claims on the keyboard (#293)
+
+Return, Edit ▸ Rename Course or the row's context menu turns a course's row
+into a field (`CourseCodeField` in `SidebarView.swift`). What it shows under
+itself and what Return refuses are ONE function,
+`WorkspaceModel.renameFieldProblem(_:typed:)`; Return goes through
+`renameFromTheField(_:typed:)`, which refuses (and the field beeps) or hands
+on to `rename(_:to:)`. Clicking away commits, as in Finder, and a code that
+cannot be used reverts instead — unless the app is not active, because a field
+cannot hold focus in an inactive app and would otherwise close itself the
+moment the teacher looks at Obsidian.
+
+**Two things want the keyboard when the field opens.** The field takes focus
+as it appears; the sidebar's `.onChange(of: workspace.selection)` takes it
+back one turn after ANY selection change, deferred so the detail pane's first
+text field — which SwiftUI focuses as the pane rebuilds — has landed first.
+That deferral waits for focus rather than being told it arrived, and the
+comment on it says so. It is harmless for a teacher, because a click (or an
+arrow key) that changes the selection and the Return or menu item that opens
+the field are separate events, and the deferred focus has run before the
+second is handled.
+
+A test is not a teacher. `CourseRenameInterfaceTests.testAnUnusableCodeIsShownUnderTheFieldRatherThanInAnAlert`
+selected the course and opened the field in the SAME turn, then waited 0.8 s.
+The field lost focus to the list ~100 ms later, called `commitOnLeaving`,
+and what happened next depended on which app was frontmost:
+
+| Test host | Old test | Why |
+|---|---|---|
+| another app frontmost | passed 4/4 (planner), 2/2 (implementer) | `commitOnLeaving` returns at its `isActive` guard |
+| the test host activated by pid | **failed 2/2 (planner), 2/2 (implementer)** | commits the unchanged code; the no-op rename closes the field |
+| activated, selection set ≥ 0.5 s before opening | passed 2/2 (planner) | the deferred focus had already run |
+
+So "passes alone, fails in the full run" was whether the test host happened
+to be in front. The test now asserts in the same turn it opens the field —
+no `await` between `beginRenamingSelectedCourse()` and the last assertion —
+and presses Return through `renameFromTheField` rather than only checking the
+field survived a wait. Measured after: 3/3 class runs with the host activated
+by pid and 3/3 with iTerm in front.
+
+**The one teacher path that opens the field on an UNSELECTED row, driven
+once (2026-09-25).** The context menu's Rename Course sets
+`renamingCourseCode` without touching the selection. With EXC2O selected,
+right-click EXC3O ▸ Rename Course opened the field on EXC3O; clicking INTO
+the field left the selection on EXC2O and the field focused, and two typed
+characters stayed in it — the suspected second race (a click in the field
+changing the selection and the deferred list focus committing half-typed
+text) did not happen. Clicking empty sidebar space then committed what was
+typed (`EXC3OZQ`), which is the Finder-like click-away commit, by design.
+
+**Rejected:** a longer settle, or waiting for `NSApp.isActive` (a delay and an
+activation state are what made it flaky; macOS 14's cooperative activation
+also refuses `NSApp.activate(ignoringOtherApps:)` from the test host, 2/2);
+waiting on the window's `firstResponder` (tests the focus plumbing, not the
+claim); and a product guard "do not focus the list while a rename field is
+open" (the rebuilt detail pane's own initial focus would still race, and it
+changes focus behaviour for a case no teacher reaches). The two
+`DispatchQueue.main.async` deferrals in `SidebarView.swift` became
+`Task { @MainActor in … }` in the same piece — house style, and behaviour-
+equivalent: both are jobs on the main queue at the same point (the old test
+still failed 2/2 with the Task version). `Task.immediate` would run inline and
+lose to the detail pane; do not reach for it.
+
+## "This is a club": the wizard's choice, and the settings it locks (#267)
+
+The New Course wizard shows **This is a club** under Basics for every code. It
+starts ticked for a code `ClubCodeRule` calls a club (CODING yes, ICS3U and a
+BC code no) and follows the code until the teacher touches it. Ticking it:
+
+- fills a club's words through `ClubFill.applying` (pure, `Models/ClubFill.swift`
+  — a SwiftUI `@State` has no backing store off screen): class folder
+  `All Meetings`, page word `Week`, front-page heading `Most Recent Meeting`,
+  noun `meeting`. A field moves only while it still holds the OTHER choice's
+  word, so typing survives the box going off and on; the class folder keeps its
+  place in the per-section list. Every curriculum folder leaves the shared
+  folders (and the LCS switch cannot bring one back while ticked).
+- gives up a skeleton already adopted for the code (CODING has adopted the
+  general one by the time the box ticks itself) and makes adoption a no-op —
+  `SkeletonCatalog.hasSkeleton(forCode:takingExampleContent:numbered:)` answers
+  no for a club, with no default value, so all three callers had to say.
+- replaces the Starting Content toggles with `clubStartingContentNote`, and the
+  Units row with four editable rows (`wizard.clubToggle.rows`).
+- writes `class_page_scheme`, `front_page_heading` and `class_noun` — for a club
+  ONLY, so every other course's file stays byte-identical (the golden
+  `testTheFileForEveryPathThatExistedBeforeIsUnchanged` holds it) — and records
+  `class_folder` from the club's own row rather than the guess.
+- checks that row's name with the sentences a folder rename in Course Settings
+  uses (`NewCourseWizardView.clubClassFolderProblem` →
+  `SpecialFolderRenamer.problem`): empty, "/" or ":", hidden, Media, a section
+  folder's name, or another per-section folder's name — a red caption under the
+  field and a refusal at Create. The row is typed, not added through the list,
+  so the list's own checks never saw it; the #267 implementation review found
+  an empty name, a duplicate and a "/" all written straight into
+  `per_section_folders` and `class_folder`.
+- protects the chosen class folder in the structure editor by name; the literal
+  "All Classes" test left "All Meetings" deletable.
+
+The trail's `course created` line says "created CODING as a club, with pages
+named “Week 1” in “All Meetings”" (read from the file just written).
+
+**Course Settings shows the three settings LOCKED** — a Class Pages section with
+three label/value rows and one caption, for every course — and disables the
+unit word's Rename… button for a numbered course, with
+`renameLockedNumbered` under it. Russell, 2026-09-24: a club's words are not
+switchable after the wizard. Consequence: an existing course, CODING included,
+can never become a club from the app. REJECTED: a scheme picker in Settings that
+renames pages between shapes (not asked for, and converting 80 "Unit 2, Day 3"
+pages to week numbers is its own piece); a front-page heading rename across
+every section (dropped with the same answer).
+
+**The heading row shows what the course RECORDED**
+(`CourseConfiguration.recordedFrontPageHeading`), and for a course with no
+`front_page_heading` — every course made before #267, CODING included — the
+named sentence `WizardWording.settingsFrontPageHeadingNotSet`. The first version
+filled in "Most Recent Class", so CODING's locked row contradicted its own
+front page ("## Most Recent Meeting"). Nothing rewrites a heading after
+creation, so the row does not guess one. REJECTED: reading the heading off
+section 1's `index.md` (a row about the course would then report one section's
+page, and a teacher may have edited it on purpose).
+
+Every sentence is in `WizardWording` / `UnitWordRenameWording` and pinned in
+`shared-rules.json` (`wizard.clubToggle`, `specialNames.renameUnitWord`).
 
 ## Renaming a course's word for a unit
 
@@ -1639,16 +2784,18 @@ because the obvious home is wrong twice over:
   `findCommandLineTool` (`~/.local/bin`, `~/.nvm` …) — outside this issue's
   folders.
 
-  **The limit of the guard, so nobody oversells it.** The redirects are per
+  **The limit of the guard, and what closed it.** The redirects were per
   SUBSYSTEM — `homeForScheduledNotes` for everything a scheduled deploy leaves,
   `supportDirectory`'s own for the launch files, `buildsRoot`'s for builds — and
-  `SuiteStaysOutOfRealFoldersTests` asks the resolvers it names. A NEW product
-  path that resolves the real home by itself would not be caught today; the
-  stopped-record reads were exactly such a path, found by a probe rather than
-  a test. A source-scan tripwire (the `ActivityTrailWiringTests` device) is a
-  follow-up, not part of this piece. Windows owes nothing as an
-  obligation, but the shape is worth a look there: a resolver with no home
-  parameter, fed a fixture course a teacher plausibly has.
+  `SuiteStaysOutOfRealFoldersTests` asks the resolvers it names, so a NEW
+  product path that resolved the real home by itself would not have been
+  caught; the stopped-record reads were exactly such a path, found by a probe
+  rather than a test. Issue #264 closed that: one seam, `RealHome`, is the only
+  product file allowed to ask for the home folder, and a source scan fails the
+  suite when anything else does — see "Testing: the real-home tripwire (#264)"
+  below. It also moved the models folder, `oneShotCommand`'s default and the
+  obsidian.json reads named in this bullet into the throwaway home under the
+  suite.
 - **Not inside `SidebarView.performRemoval` either**, which is where it started.
   Nothing in the suite constructs that view — every reference to it is to a
   static member — so a cancel living there could be proved only by proving the
@@ -2006,17 +3153,17 @@ older layout never carries one at all (below). The rest of the list, with a reas
 config, plus a Finder duplicate of a config found in a real course, plus what
 an external disk leaves in a folder.
 
-**`.obsidian` is copied, deliberately.** Opening the course in Obsidian is the
-point of keeping it, and Plantoir opens the course folder AS the vault; without
-those 312 KB the vault opens with first-run prompts, none of the teacher's
-plugins and none of the folder state that makes last year's material
-navigable. Its `workspace.json` was MEASURED on a real imported course rather
-than assumed: every path in it is vault-relative, with no absolute path and no
-mention of the old folder, so it resolves inside the new course as it stands.
-(An earlier draft of this page said the opposite. Nothing needs stripping, and
-nothing needs registering either — the app opens a vault by path.) That is the
-MODERN route; a class from the older layout comes WITHOUT its add-ons, for a
-reason measured in "The older layout" below.
+**`.obsidian` is copied, deliberately — without its add-ons.** Opening the
+course in Obsidian is the point of keeping it, and Plantoir opens the course
+folder AS the vault; without those 312 KB the vault opens with first-run
+prompts, none of the teacher's appearance and none of the folder state that
+makes last year's material navigable. Its `workspace.json` was MEASURED on a
+real imported course rather than assumed: every path in it is vault-relative,
+with no absolute path and no mention of the old folder, so it resolves inside
+the new course as it stands. (An earlier draft of this page said the opposite.
+Nothing needs stripping, and nothing needs registering either — the app opens a
+vault by path.) Since #255 its add-ons stay behind on this route as on every
+other — "Obsidian's settings come; its add-ons do not" below.
 
 **A file name is carried as BYTES, and that is why this path talks to POSIX
 rather than to `FileManager`.** The walk reads names with `readdir` and the
@@ -2053,6 +3200,133 @@ reads the older spelling correctly. (A class from the older folder-per-class
 layout is the exception to "what students saw": its pages carry Digital
 Garden's keys, which the build does not read — see "The older layout" below.) (#207's rule — a page copied INTO a live
 course starts hidden — belongs to the copy, not to the import.)
+
+#### Obsidian's settings come; its add-ons do not (#255)
+
+**Every route that makes a reference course leaves the same three entries of
+the course's `.obsidian` behind** — Keep a Copy for Reference…, and Import
+Courses for Reference… reading a modern working folder, the older
+folder-per-class layout (#254) or the 2024–25 website-folder-per-class layout
+(#256). `ObsidianAddOns` names them, once, for all four:
+
+| Left behind | Why |
+|---|---|
+| `plugins/` | Every community add-on, its code and its settings. An add-on runs code with network access, and a publishing add-on keeps its credential in its own `data.json` — every real 2023–24 class folder carries Digital Garden's with a live `githubToken` ("The older layout", below). Copied, that credential lands in the working folder and in every backup zip, and once Obsidian trusts the vault's add-ons it is a publish command outside all fifteen refusals. |
+| `community-plugins.json` | The list of add-ons Obsidian switches on. |
+| `publish.json` | Core Obsidian Publish's connection to a LIVE site. |
+
+`publish.json` was found by the plan review's question rather than by a folder
+that had one, and was **measured in Obsidian 1.13.6's own bundle**: a core
+add-on's `loadData` is `vault.readConfigJson(id)`, which reads
+`<configDir>/<id>.json`, and Publish's data is `{siteId, host, included,
+excluded}`. With the teacher signed in to Obsidian, a copied one is a click
+from publishing the reference course over the site it came from. Core Sync is
+NOT on the list: its remote lives in Obsidian's own storage, keyed by the vault
+(IndexedDB `<appId>-sync`, the same bundle), so a copied folder carries nothing
+of it. There are 0 `publish.json` files in Russell's 2023–24 folders and 0 in
+the 2025–26 backup.
+
+**Everything else in `.obsidian` comes** — `app.json` (where
+`ReferenceReadingView` writes reading view), `appearance.json`, `themes/`,
+`snippets/` (CSS cannot publish), `core-plugins.json` (switches only — `"sync":
+true, "publish": false` in Russell's four — never an account or a site),
+`graph.json`, `workspace.json` **and its conflicted copies**. MPM2DE's
+`.obsidian` holds 63 `workspace (… conflicted copy …).json` files; they are a
+sync provider's clutter, not a danger, and matching them would mean matching
+every provider's naming in every language. Russell, 2026-09-25: they come.
+
+**Keep a Copy of a LIVE course follows the same rule** (Russell, 2026-09-25).
+The copy is a reference course and is never published, so an add-on in it is
+only ever a way to publish it outside the refusals, whoever installed it; the
+course being taught keeps its add-ons untouched, and the sheet says both halves
+(`referenceCourses.wording.keepACopyLeavesAddOnsBehind`).
+
+**What was measured on Russell's own data.** The 2025–26 backup holds exactly
+four `.obsidian` folders (found case-insensitively, at any depth), all at a
+course's top. ICS3U's has an EMPTY `plugins/` and a `community-plugins.json`
+of `[]`; CODING, ICS4U and MPM2DE have neither. A course Plantoir made
+(`support/obsidian_defaults/.obsidian`) has no add-ons at all. So on Russell's
+folders the change is invisible — one empty folder and a `[]` stop being
+copied — and a teacher notices it only if they installed an add-on themselves.
+
+**Anchored at a place, not matched by a name.** `ReferenceTreeCopier.walk`'s
+by-name list matches at every depth, so `plugins` on it would drop a teacher's
+own `Unit 1/plugins` folder of pages. The three are PATHS instead —
+`leavingBehindPaths`, compared with where the walk is (`.obsidian/plugins` from
+the course; `plugins` from inside `content/.obsidian` in the 2024–25 layout) —
+and a separate parameter from the names, so a caller that overrides the names
+(the sheet does, tests do) cannot drop the rule by accident. Proven by
+mutation: matching by name turns the contract's "a teacher's own pages called
+plugins" case red on both routes.
+
+**Skipped, never walked and filtered.** Each is skipped before it is so much as
+`lstat`-ed. The two older layouts used to walk INTO `plugins/` and drop what
+they found afterwards, so a folder inside an add-on that the disk would not
+hand over landed in `unreadableFolders` and refused the whole class — for
+something that was never going to be copied. All four routes now skip, and
+each has a test that locks a folder inside an add-on (`chmod 000`) and imports
+anyway; putting either older file back as it was turns its test red.
+
+**A `.obsidian` that is itself a link is not copied at all** on the two
+modern routes (`leavingBehindIfALink`). Sharing one settings folder between
+vaults is a known Obsidian practice, and the modern walk copies a link AS a
+link — so the reference course would have been reading the live settings, add-ons
+and credential included, and `ReferenceReadingView` would have WRITTEN
+`defaultViewMode` into them through the link, changing a course the teacher is
+teaching. Now the copy gets a real `.obsidian` holding only the reading-view
+default. Two contract cases hold it: the live settings folder with an `app.json`
+of `{}` and with none at all — the two shapes the reading-view writer DOES write
+into (it leaves a file that is not JSON alone, which is why the first cut of
+this case, whose `app.json` was plain text, proved nothing about writing through
+the link and was caught in review). Each checks the whole source tree, the
+link's target included, is byte-identical afterwards; with the old copier or
+importer put back, that check fails on both. (The older layout already leaves every
+link out; the 2024–25 layout judges every link at the top of `content/` on its
+own.)
+
+**Said only when there is something to say.** A course "has add-ons" when
+`plugins/` holds an entry not starting with `.`, or `plugins/` is a link or
+could not be listed, or `.obsidian` is a link, or `publish.json` is there
+(`ObsidianAddOns.found`: one `lstat` per entry and one listing of `plugins/`,
+nothing inside an add-on opened). ICS3U's empty folder and `[]` say nothing —
+telling a teacher their add-ons were left behind when they had none is false.
+The import sheet says `wording.addOnsAreLeftBehind` when a modern course in the
+list has any, INSTEAD of `wording.olderLayoutAddOnsAreLeftBehind`: beside a
+modern course with an add-on, "…from older class folders…" would read as if
+that course's add-ons came. Otherwise an older class still gets the older
+sentence, as before (`ImportCoursesForReferenceSheet.addOnsNote`). The Keep a
+Copy sheet reads the course once in `.onAppear`, not in `body`.
+
+**The trail** — "course kept for reference", and "course imported for
+reference" for a MODERN course — ends with what was left behind, by folder
+name, only when anything was (`ObsidianAddOns.trailClause`); a course without
+add-ons leaves the line it left before, and a test compares that line written
+out, because a comparison with the function that builds it would change with
+it. `trailLine(for:broughtInFrom:)` is shared by all three import routes, so
+the clause is passed by the modern route only: the older layouts already count
+their add-on entries on their own second line, and two answers to one question
+is one too many.
+
+**Known limits, recorded rather than handled** (the contract's
+`obsidianAddOns.knownLimits`): a vault NESTED inside the course
+(`section1/.obsidian/plugins`) comes across whole, because the rule is
+anchored at the course's own `.obsidian`; another spelling (`.Obsidian/Plugins`,
+which APFS would let Obsidian load) is compared exactly and comes across; and
+Obsidian's "override config folder" setting can move a vault's settings to a
+folder of another name, which is then copied as the teacher's own. None is met
+in any folder measured — the four `.obsidian` folders above are the whole of
+the 2025–26 backup.
+
+**Rejected**, each in `obsidianAddOns.rejected` with its reason: an allow-list
+of "harmless" add-ons (any add-on runs arbitrary code, and the list would rot);
+copying the add-ons but stripping credentials from `data.json` (every add-on
+names its settings differently); copying `plugins/` switched off (the
+credential still lands in every zip, and one toggle turns it back on); walking
+and filtering (the unreadable-folder refusal above); adding `plugins` to the
+by-name list (a teacher's own folder of that name); a different rule for Keep a
+Copy; leaving the conflicted workspace copies behind; and leaving the modern
+route as it was because Plantoir-made courses carry no add-ons — true today,
+and exactly the quiet difference between routes nobody chose.
 
 #### What the copy costs, measured, and why it is still cancellable
 
@@ -2123,16 +3397,17 @@ refusal is the safe direction: no real course code begins with a dot.
 
 A leftover that somebody is STILL WORKING ON is left alone. The import takes a
 lease naming its own process — `<FOLDER>.import.<pid>.lease` in
-`courses/.internal/activity/`, the shape `WorkLease` already uses — and the
-sweep skips a staging folder whose lease names a live process, taking the
-stale lease of one whose owner is gone. This is not a rare race: File ▸ Reload
+`courses/.internal/activity/`, the NAME shape every work lease has — and the
+sweep skips a staging folder whose lease names a LIVE owner, taking the stale
+lease of one whose owner is gone. This is not a rare race: File ▸ Reload
 Courses is offered while the import sheet is up, a second window on the same
 working folder reads it, and `Plantoir --mcp-stdio` — how a Claude Code
 session starts — reads it too. Any of those used to delete the tree under the
 running copy, and after the lock and before the rename it would have thrown
 away a finished reference course. Asked of a lease rather than of the folder's
 AGE deliberately: a threshold is a guessed duration, and the case that needs
-it most is the slow disk where the guess is wrong.
+it most is the slow disk where the guess is wrong. Who counts as a live owner,
+and what happens when two imports want the same folder, is the next section.
 
 A leftover from an import that never finished is **swept when a working folder
 is read** (`ReferenceStaging.sweepLeftovers`): unlock, remove, one trail line
@@ -2159,6 +3434,195 @@ reported by name with what happened, and the run carries on. A folder of four
 where one clashes imports three. Only Stop ends a run early, and it has its own
 trail event rather than being recorded as a failure: a teacher who stops
 something chose to.
+
+**Every course the summary lists as not imported leaves one line on the
+trail** (#287) — "course could not be imported for reference", naming the
+course, the folder it was read from, and the sentence the summary showed. Until
+#287 two refusals wrote nothing: the shelf rule's (already kept for reference
+under that school year — which also refuses the second of two courses of one
+code in one run) and a folder of that name already being there. Both were
+thought "said on the sheet", and the sheet does drop a shelf-troubled course
+before the run — but the importer reaches both when the shelf or the disk
+changed after the sheet read them (another window kept or imported one) and
+for the same-code pair, and then the summary lists a course as not imported
+with nothing behind it on the trail. Each early `continue` in
+`ReferenceImporter.importCourses` that appends `.notImported` now calls
+`noteNotImported` first; the reason is the teacher's sentence, the same shape
+#245's claim refusals already wrote, so one event does not carry two formats.
+Pinned by `testAShelfRefusalLeavesALineOnTheTrail` and
+`testAFolderAlreadyThereLeavesALineOnTheTrail`.
+
+**Keep a Copy for Reference… has its own failure line**, "course could not be
+kept for reference": which course it was copied from, the folder it was to be
+given, and the sentence the sheet showed. Before #287 no failure of Keep a Copy
+wrote anything — only a copy that was made did. It is written ONCE, by a catch
+around the whole act in `ReferenceCopier.keepACopy` (the body is
+`makeTheCopy`), so the four ways it throws today and any fifth added later are
+covered without anyone remembering; a copy that was made writes "course kept
+for reference" instead, never both. The copy-failed reason is the system's
+sentence, which can name a FILE in the course (never a page's contents) — the
+same exposure the import's catch already had. The sheet's own refusals of a
+name or a school year grey the button out with a sentence; a disabled button
+is not a press, and writes nothing. Pinned by
+`ReferenceCopierTests.testAFailedCopyLeavesNothingBehind` (the full prefix plus
+the thrown sentence), `testAFolderNameAlreadyTakenIsRefusedBeforeAnythingIsWritten`
+and `testKeepACopyLeavesAnotherCopysWorkAlone`; a successful copy is asserted
+to write no failure line. Measured by copying the old `ReferenceImporter.swift`
+and `ReferenceCopier.swift` back in under the new tests: 5 tests red (6
+assertions), green once restored.
+
+*Rejected: routing Keep a Copy's failures through "course could not be
+imported for reference"*, which is what the issue literally asked. Nothing was
+imported, and that line names a source folder this act does not have; the
+contract keeps "course kept for reference" and "course imported for reference"
+apart on purpose (one line per thing the teacher did), and a failure line
+carrying the other act's name misleads whoever reads it back. *Rejected:
+noting only #245's already-being-made refusal* — a disk that filled is the
+same gap on the same button, and one catch covers all of them for no extra
+code. *Rejected: writing the line in the sheet's catch* — the success line
+lives in the model, and a view is not where a test can reach it.
+
+#### Who counts as alive, and two imports of the same course at once (#245)
+
+**What a lease holds.** Since #245 the import writes Windows' `WorkLease`
+shape — process id, process name, the moment it was taken in .NET's
+round-trip form (`2026-09-25T13:59:23.8960000Z`) — plus a FOURTH line, when
+its owner started (`1790345209.217862`: seconds, a dot, microseconds padded to
+six). Windows' reader reads two lines and ignores the rest. The NAME did not
+change, on purpose: an older Plantoir reads only the name and the pid in it, so
+it still leaves a new lease's folder alone. The format is
+`contracts/file-formats.json` → `workLease`; before #245 the body was the pid
+alone, and a one-line lease is still honoured because an older copy of
+Plantoir still writes one — judged as if its name line said "Plantoir", the
+only program that ever wrote an import lease
+(`ProcessLiveness.nameToCompare`). Judging it on the pid alone, as the first
+version of this piece did, was caught in review: a one-line lease left by a
+pre-#245 crash names a pid that, after a restart, can belong to an unrelated
+daemon for the whole uptime — and since #245 a live lease REFUSES the import,
+with a sentence ("being imported in another window…") that is false and has
+no way out. The name check turns that into litter again.
+
+**Line 2 through a symlink — measured in review, and fixed by #156, not
+here.** #245 writes line 2 from `ProcessInfo.processName`, which is the last
+part of argv[0]; the reader compares it with the process table's `p_comm`,
+the executable's real name. Run through `ln -s LongBinaryNameForTest
+link-name`, `processName` was `link-name`, `p_comm` was `LongBinaryNameFo`,
+and the process read its OWN live lease as GONE — the destructive direction.
+Latent today: only the GUI writes import leases, and LaunchServices launches it
+with argv[0] ending `…/MacOS/Plantoir`. #156, stacked on this branch, makes
+line 2 the process table's own name (falling back to `processName`) for every
+lease it writes; it was left there rather than changed here so the two
+branches do not edit the same function.
+
+**Who counts as alive is ONE reader, `ProcessLiveness`**, shared with every
+other lease (#156 builds its build/preview/publish leases on it rather than
+growing a second). The rule and its nineteen cases are
+`contracts/shared-rules.json` → `workLeases.liveness`, run by
+`WorkLeaseLivenessTests` against the pure `ProcessLiveness.decide`, so a case
+needs no real process. Measured on this Mac as an ordinary user, 2026-09-25:
+
+| Asked | Answer | What it means |
+|---|---|---|
+| `kill(1, 0)` — launchd, root's | −1, `EPERM` | exists, not ours to signal. **Until #245 this read as "gone"**, so another account's live import — or one running as root — was swept. |
+| `kill(99999, 0)` | −1, `ESRCH` | the only signal answer that means no such process |
+| `kill(0, 0)` | **0** | pid 0 is "my own process group": a lease naming it read as alive for ever. Refused outright now. |
+| `proc_name(1, …)` | fails, `EPERM` | cannot name another account's process, so it is not used |
+| `sysctl(CTL_KERN, KERN_PROC, KERN_PROC_PID, pid)` | answers for ANY process: pid 1 → "launchd" and its start; 99999 → an empty answer | one call gives existence, the zombie state, the name and the start |
+| a child that has finished and not been collected | `kill` → 0; the table → zombie | a zombie is GONE; the signal alone cannot see it |
+
+So: a pid of 0 or less is not a process; `ESRCH` is gone and every other
+signal answer goes on to the table; the table's "no such process" is gone,
+a zombie is gone, a name that is not the recorded one is a recycled id (gone,
+compared without regard to case on the sixteen characters the table keeps),
+and a start that is not the recorded one is a recycled id too. **A table that
+cannot be asked is ALIVE**: the two errors are not equal — reading a live
+owner as gone removes somebody's half-made work, reading a gone one as alive
+leaves litter until the folder is next opened. Windows' `WorkLease.IsAlive`
+errs the same way.
+
+*Why the start time is in this piece and not left for later:* the change
+below makes a live lease REFUSE a second import rather than merely leave
+litter, so a recycled pid read as alive would block every retry of that course
+until the unrelated process holding the number exits — after a reboot,
+plausibly for the whole uptime. Every copy of Plantoir is called Plantoir, so
+the name check cannot tell a crashed Plantoir from a later Plantoir handed the
+same number; the start time names the exact process.
+*Rejected: the process name alone* (Windows' check) — for that reason.
+*Rejected: `flock` on the lease* — the kernel releases it at death, but nothing
+else reads a lock (older builds and Windows read names and pids), and working
+folders live on cloud-synced volumes where advisory locks are not something to
+bet a teacher's copy on.
+
+**The second edge: two imports of the same course, and the tidy-up that took
+the other one's work.** Traced on the code before #245 — and it did not need
+two processes. Two windows are ONE process with one pid, so one lease name.
+Window A checks (nobody), leases, and goes off to read the old folder. Window
+B checks, reads A's lease as a live owner, so skips the leftover removal,
+leases the same file, and later fails to make the folder A already made — and
+its catch **tidied away the staging folder, which was A's half-made copy**,
+then its release deleted the lease A still depended on. Keep a Copy for
+Reference… had the identical catch and, being synchronous, runs between the
+importer's suspension points, so it could do the same to an import of the same
+folder name. Measured on the old code: two concurrent imports of one course
+imported NEITHER, ten runs out of ten.
+
+**Now a staging folder is CLAIMED, in one act, and only its claimer ever
+removes it** (`ReferenceStaging.claim`, called by the importer and by Keep a
+Copy before anything is read; the folder exists, empty, from the claim):
+
+1. already claimed in THIS app (another window) → refused;
+2. take our lease, THEN look for another process's live lease → refused if
+   one is found;
+3. a leftover of that name — nobody live owns it — is cleared; one that will
+   not go means the import does not start (`wording.leftoverInTheWay`);
+4. make the folder EXCLUSIVELY; already there means somebody slipped in →
+   refused, nothing removed.
+
+A refused course is reported with `wording.alreadyBeingImported` and writes
+the "course could not be imported for reference" trail line, and the run
+carries on to the next course. That import sentence says only that the course
+is being imported elsewhere; it does not promise the course will appear,
+because the other import may fail or be stopped. Keep a Copy is refused with
+`referenceCourses.wording.copyAlreadyBeingMade` and writes its OWN line,
+"course could not be kept for reference" (#287 — this paragraph said it wrote
+the import's line, which no failure of Keep a Copy did until then). The cases are `contracts/shared-rules.json` →
+`referenceCourses.importing.oneImportPerCourseAtATime.cases`, run by
+`WorkLeaseLivenessTests.testTheClaimIsTheContracts` through the REAL claim. The sweep
+also skips any staging folder THIS app has claimed, whether or not its lease
+file was written — that write is best-effort, and a folder whose `.internal`
+cannot be made must not have its import swept by its own app's Reload.
+
+*Why lease-then-check:* of two processes, the one that looks second always
+sees the first one's lease, so they can never both go on; at worst both step
+back and both say so. Check-then-lease has a window where both see nobody.
+*Why the in-app set is keyed by the courses folder's REAL path* (plus the
+staging name in lower case): two windows can reach one working folder through
+a link, through `/private`, or in another case on a case-insensitive disk, and
+a set that missed would let window B clear window A's copy as a leftover —
+the original fault again. Measured: `realpath` returns one string for all
+three spellings.
+
+*Rejected: the second import WAITS for the first.* A poll is a guessed
+duration by another name, and it would end in a refusal anyway — once the
+first lands, the shelf rule refuses the same code in the same school year.
+*Rejected: making the folder earlier without the in-app set* — a create cannot
+tell A's folder from a crashed leftover, and the leftover removal before it is
+what cleared A's work. *Rejected: a unique token in the lease NAME* — an older
+build parses the pid out of the name, fails on the token, skips the lease and
+would SWEEP a live import.
+
+**What is still open, said so nobody believes otherwise.** (1) A Reload
+Courses in ANOTHER process that reads the folder in the microseconds between
+a claim's lease check and its leftover removal can see no live lease on a
+folder about to be made; the import then fails and says so — never a
+half-made visible course, never the source touched. (2) An OLDER Plantoir
+(before #245) still checks, then leases, then makes the folder late, and its
+own tidy-up can still take a newer copy's work; it cannot be taught otherwise
+from here. (3) **A lease synced from ANOTHER computer** — a working folder in
+iCloud Drive or Dropbox opened on two Macs — names a pid that means nothing on
+this one, so it reads as gone and that computer's half-made folder is swept
+here, and the sweep syncs back. The lease does not cover two computers sharing
+one synced folder.
 
 #### The school year is proposed from the pages, and the newest page was rejected
 
@@ -2302,7 +3766,7 @@ sizes and the importer both use):
 | `Home.md` | `section1/index.md` — **the one rename**, bytes unchanged | With no `section1/index.md` the build writes no `index.html` and the preview waits forever. 0 real links name `Home` (Russell, decision 6). |
 | a root `index.md` | `section1/index.md` when there is no `Home.md`; left out when there is | Both would fight over the front page. 0 measured. |
 | `All Prior Classes.md` | `section1/All Prior Classes.md` (`per_section_files`) | That section's own list; Copy a Page never offers a section's page. |
-| `.obsidian/…` | the course root, **without** `plugins/` and `community-plugins.json` | See "add-ons" below. |
+| `.obsidian/…` | the course root, **without** `plugins/`, `community-plugins.json` and `publish.json` | See "add-ons" below, and #255's section above. |
 | any other real entry | the course root, same name (`shared_folders` / `shared_files`) | One section, so shared vs per-section is invisible in the build; at the root Copy a Page offers it, which is the point of keeping the course. |
 | a top-level LINK | the Shared folder's REAL entry of that name, copied | "The Shared folder's real folders replace the links." |
 | a top-level link with no Shared counterpart | nothing; named as missing in the sheet (before Import and in the summary) and on the trail | Decision 2: never refused for this. |
@@ -2373,8 +3837,9 @@ add-ons, which Plantoir's "Open in Obsidian" invites — give a publish command
 outside all fifteen of Plantoir's refusals. The rest of `.obsidian` comes, so
 the course opens normally and `ReferenceReadingView` still sets reading view.
 The sheet and its summary say so in plain words
-(`wording.olderLayoutAddOnsAreLeftBehind`). Whether the MODERN route needs the
-same rule is an open question for Russell, not part of this piece.
+(`wording.olderLayoutAddOnsAreLeftBehind`). Since #255 this is the rule EVERY
+route keeps, with `publish.json` added, and the add-ons are skipped rather than
+walked and filtered — "Obsidian's settings come; its add-ons do not" above.
 
 **What its preview shows is more than students saw, and that is accepted.**
 The class pages carry Obsidian Digital Garden's keys (`dg-publish`,
@@ -2584,8 +4049,9 @@ copied), else from the pages.
 already the front page, so nothing is renamed; `All Classes` lands at
 `section1/All Classes`, the modern layout's own place, where #207's class-page
 stop finds it by folder); `shared/*` → the course root, `Media` included;
-`content/.obsidian` WITHOUT `plugins/` and `community-plugins.json` (#254's
-rule; none exist here, core plugins only). The 21 links are a MANIFEST, not a
+`content/.obsidian` WITHOUT `plugins/`, `community-plugins.json` and
+`publish.json` (the rule every route keeps since #255; none exist here, core
+plugins only). The 21 links are a MANIFEST, not a
 source: each link's TEXT, worked out against `content/` as a path, must name
 the page or folder of its OWN name in `shared/` or `s1/`, and that entry must
 be there. Where the per-section/shared split falls is read from the source,
@@ -2747,17 +4213,36 @@ After the page is written it is **read back from disk** and asked, for every
 section the destination has AND for one it does not, whether it is hidden. The
 test is `!= .hidden`, so a value the app cannot read counts as failure.
 
+> **Since #246 (2026-09-25) the build no longer publishes a page whose
+> settings it cannot read, nor stops on one.** It hides the page in its own
+> copy and names it in a folder-problem finding
+> (`05-build-pipeline.md` → "A page whose settings cannot be read is hidden
+> (#246)"). Every sentence below that says "`frontmatter.load` raises … and
+> the page reaches Quartz unresolved, which publishes it" describes the build
+> the guard was designed against, and is kept as the reasoning of its day.
+> The guard itself is unchanged and still refuses those copies: a copy that
+> arrives hidden by accident, and named as a problem on every build, is not a
+> clean copy. Whether it can now be relaxed is a follow-up, not part of #246.
+
 That is necessary and it is not sufficient, which is the finding worth carrying
 away. **The app's reader is not the one that decides what students see**, and
 two shapes were reproduced end to end where the two split — the copy certified
 hidden here and PUBLISHED there:
 
 - a settings block closed by an **indented `---`**. `PageVisibilityReader`
-  trims leading spaces before testing a fence; python-frontmatter's boundary is
-  `^-{3,}\s*$` and does not. The builder never finds the end, reads no settings
-  at all, and Quartz publishes a page that says nothing. (The divergence itself
-  is [#188](https://github.com/russellgordon/plantoir/issues/188); this is the
-  place where it costs the most.)
+  trimmed leading spaces before testing a fence; python-frontmatter's boundary
+  is `^-{3,}\s*$` and does not. The builder never finds the end, reads no
+  settings at all, and Quartz publishes a page that says nothing. (The
+  divergence itself was [#188](https://github.com/russellgordon/plantoir/issues/188),
+  fixed 2026-09-25: the app's closing fence is now column 0 as well, so it too
+  finds no block on such a source, and `isAFenceTheBuilderSees` now simply
+  asks `PageVisibilityReader.isFence`. Such a SOURCE now has no block to
+  either reader — its lines are body text on its own site — so the copy is
+  given a block of its own and arrives HIDDEN, with those lines as its body:
+  `CoursePageCopyTests.testASourceWhoseOnlyCloseIsIndentedIsCopiedHidden`,
+  and measured hidden on the site in both sections. The guard's own
+  must-fail test moved to a lone carriage return, the disagreement that is
+  still real.)
 - a block carrying a **YAML anchor or alias**. Taking the plain `publish:` line
   out can orphan an alias the rest of the block refers to; `frontmatter.load`
   then raises, `build_site.py` prints a warning and RETURNS, and the page
@@ -2774,10 +4259,13 @@ description: |
 publish: true
 ```
 
-The app closes the block at the indented `---` INSIDE the scalar, so it never
-sees the `publish: true` below and inserts its own `publish: false` inside the
+The app closed the block at the indented `---` INSIDE the scalar, so it never
+saw the `publish: true` below and inserted its own `publish: false` inside the
 scalar; the builder reads the whole block and takes the LAST `publish`. The
 copy reached students in section 1 while the summary said it was hidden.
+(Since #188 the app no longer closes there, so the two readers now see the
+same block on this page; the invariant below was kept as the test all the
+same, for the reason it gives.)
 
 Chasing shapes one at a time was clearly the wrong game, so
 `CopiedPageText.theBuilderWouldReadItTheSameWay` states **one invariant** and
@@ -3099,7 +4587,10 @@ teacher meets in the first ten seconds.
   plain static, so it sees deploys this Plantoir started and not `./deploy.sh`
   from a Terminal, `plantoir-mcp`, or a second Plantoir. That is the seam the
   whole app already uses rather than anything new here. It is re-asked
-  immediately before the backup and not again after it.
+  immediately before the backup and not again after it. (Since #156 BUILDS
+  also leave a lease other programs read — "Two programs, one course" — but
+  this refusal still asks only the in-process record, and a copy is not a
+  build, so it was left as it is.)
 - **Invisible spaces are folded on the way IN only.** Resolving a reference
   against the SOURCE's `Media` folds U+00A0/202F/2007, so a link typed with
   real spaces finds a file whose name carries a no-break one; the destination
@@ -3285,6 +4776,170 @@ the position is a signal only half the time, and nothing here relies on the
 teacher noticing it: the guard in the pruner is what keeps such a zip safe,
 not their attention.
 
+## Backups: what they take, and deleting several (#242)
+
+**Decided by Russell, 2026-09-21 (option C): keep every backup a teacher makes,
+and make the space they take VISIBLE.** A backup is the one place where
+silently deleting something is the wrong default — a copy made on purpose
+before a risky change should not vanish because ten more were made after it —
+so the fault was never that they are kept but that nothing SHOWED the space.
+Each backup carries the whole course, Media included: **467 MB and 9.7 s** per
+backup of a real course with 487 MB of Media. The assistant's own backups keep
+their cap of five (`CourseArchiver.mostBackupsKept`, untouched); a teacher's are
+never pruned. The rules are `contracts/course-management.json` → `backups`,
+with `pruneCases`, `sizeCases` and `deleteCases`.
+
+**Where the space is shown.** The sidebar's Backups header carries the total
+once every backup has been measured; each backup's tooltip, its own pane and
+its delete confirmation carry its size; and a new first row, **All Backups**
+(`SidebarSelection.allBackups`, remembered with the window like every other
+selection), opens `AllBackupsView`: "These backups take 105.6 MB.", one line
+per course ("ICS4U — 11 backups, 105.6 MB"), a sentence when the working folder
+is kept in sync by a cloud service, and a table of every backup — course, when,
+who made it, size — with ordinary macOS multiple selection (⌘-click, ⇧-click)
+and ONE button whose label carries the count ("Delete 3 Backups…"). It goes
+through a confirmation with the single delete's honesty: for good, nothing
+kept, the courses untouched, and what they take together. **A backup the open
+assistant conversation holds** (below) is named in that confirmation as KEPT,
+and "Together they take" counts only what will actually go
+(`WorkspaceModel.deleteConfirmation`); a selection of held backups ONLY has
+nothing to delete, so the button is disabled rather than offering a
+confirmation that deletes nothing. The sidebar's and the pane's single "Delete
+Backup…" on a held backup offers no confirmation at all: it refuses at once
+with the same sentence the multi-delete uses (`requestDeleteBackup`).
+
+**Measured, on this Mac.** Russell's real working folder, read-only
+(`~/Desktop/Class Websites - 2026-27/courses/_backups`, `stat` only, nothing
+opened), 2026-09-25: 2 course folders, 23 zips, **11 of them backups totalling
+105,612,629 bytes** (the other 12 are archives and setup-wizard zips, which the
+Backups list does not show and so its total does not count — a number a
+teacher cannot act on from that list would only mislead). Summing is cheap —
+the plan measured 23 real zips in **12.2 ms** cold and 500 sparse 467 MB zips in
+**3.4 ms** — and is still done off the main thread, because a working folder on
+a slow or network volume is not this Mac's SSD.
+
+**Off the main thread, and the traps in that.** `BackupSizes.measure` is
+`@concurrent`: this target builds with `SWIFT_APPROACHABLE_CONCURRENCY`, under
+which a plain `nonisolated async` function runs on its caller's actor — correct
+numbers, on the main thread, every other assertion passing. So it records where
+it ran through a SYNCHRONOUS helper (`noteTheThread`, the
+`CoursePageCopier.lastPassRanOnTheMainThread` seam — `Thread.isMainThread` does
+not compile inside an async function), and `BackupSpaceTests` reads it.
+`WorkspaceModel.reloadCourses` lists backups synchronously as before, then
+starts a numbered measurement; one that finishes after a newer one was started
+is thrown away (`finishMeasuringBackupSizes`), so a slow first measurement
+landing after a delete cannot put back sizes for zips that are gone. While a
+measurement is still running no total is shown — "Working out how much space
+these backups take…" — because a number that is quietly too small is worse
+than none (`BackupSpace.isComplete`). Once it has FINISHED, a backup it could
+not size (deleted in Finder between listing and measuring, or unreadable) is
+not "still being worked out": it shows the short `backupSizeCouldNotBeReadShort`
+in the Size column and the full `backupSizeCouldNotBeRead` in its tooltip, its
+pane and a line under the total, and the total — which IS then shown — leaves it
+out. Without that, one unreadable zip would leave "Working out…" up for ever.
+No GCD hop and no sleep anywhere.
+
+**The LOGICAL size, never the size on this disk.** Russell's working folder is
+in iCloud Drive (Desktop & Documents sync is on), and an evicted file takes
+almost nothing on this disk while costing its whole size in iCloud storage —
+and costing it here again the moment it is restored. The plan measured the
+sparse shape of an evicted file: logical 244.84 GB, on disk "Zero KB". So
+`fileSize`, never `totalFileAllocatedSize`, which would tell that teacher their
+backups take nothing; `sizeCases` carries a sparse case and the test checks the
+file really is sparse before trusting it. **Not measured**: a real evicted file
+(that would mean evicting Russell's), and whether a deleted zip keeps costing
+iCloud storage while it sits in iCloud's Recently Deleted — so nothing here
+promises the space comes back at once.
+
+**Deleting several.** `WorkspaceModel.deleteBackups` removes each permanently,
+as the single delete always did (the single delete is now its one-item case),
+reports one that cannot be deleted — a locked file — with the others still
+deleted rather than stopping at the first, re-reads the list ONCE at the end
+rather than once per file, and lets go of a selection pointing at a zip that is
+gone. **Then every OTHER window on the same folder follows**
+(`followBackupDeletion`, the shape of #265's `followWrite`): Russell runs two
+windows on one folder, and without it the other window's list, total and
+Restore button go on naming zips that are gone. Only the Backups list is
+re-read there — never the courses, whose settings copies may hold changes
+nobody has saved.
+
+**A delete never removes the backup an open assistant conversation restores
+from.** The plan review reasoned the failure from the code (it was not
+measured): the proposed "Select the Assistant's" shortcut, then one Delete,
+would remove the zip behind the open window's "Restore Section N…" button, and
+the restore would then fail with the raw error after the teacher had agreed to
+it. So the shortcut is gone, and the
+window reports which backups its conversation made (`AssistActivity.holdBackups`,
+asked of its runner each time, cleared when the window closes);
+`deleteBackups` leaves those alone, deletes the rest, and says "Close the
+assistant for ICS3U Section 2 first. That conversation can still put Section 2
+back from this backup, so it was kept." — the start of that sentence is the one
+a second assistant window is refused with (`AssistActivity.closeTheAssistantFirst`;
+the sentence is built in ONE place, `AssistActivity.closeTheAssistant`, which the
+"…before removing this." of removing a downloaded assistant goes through too). An OLDER assistant backup of the same section is not held:
+only what the open conversation made. And a conversation backup deleted anyway,
+in Finder, is refused at Restore with the existing plain sentence
+(`AssistSectionRestore.Problem.unreadableBackup`) before anything is touched.
+Not covered: a conversation held by a Claude Code session over MCP runs in a
+different process, which this one cannot see — and the MCP surface offers no
+"Restore Section" button to break.
+
+**On the trail** (rule 5): `backups deleted`, with the course code(s), the
+count, the total when every size is known, each deleted file's NAME (a course
+code, a moment and who made it — never page content), and any kept for the
+assistant. "My backup is gone" is answered by this line and nothing else. There
+is still no line for a backup being MADE or PRUNED — see "One `if` in the
+pruner" above for why.
+
+**What was REJECTED, and why:**
+- **A lighter backup that leaves Media out** — restoring one would DELETE the
+  course's Media (recorded on #242 so it is not proposed again).
+- **Pruning a teacher's backups**, by count or by age — the app overruling
+  them about their own safety net; the space is shown instead.
+- **Multiple selection in the sidebar itself** — it would change how every
+  course and section row is selected, to serve one group of it.
+- **A "Select the Assistant's" convenience** — see above.
+- **Counting archives and wizard zips in the total** — not in the list, not
+  deletable from it.
+- **Labelling a Copy a Page backup "before copying pages from …"** — it needs a
+  new backup-name piece, which Windows' reader (like the mac's `BackupMaker.
+  reading`) would treat as "not a backup", making a mac-made zip VANISH from a
+  Windows list until they ship the same reader. Its own small piece, Windows
+  first or together.
+
+## Notifications: the one permission, and where it is asked (#212)
+
+A scheduled publish tells the teacher how it went with a macOS notification,
+sent by the RUN (`Plantoir --run-scheduled-deploy`, started by launchd) — not by
+the window, which may not be open. What it says, why, what was measured and what
+was rejected is in `documentation/07-deployment.md` → "When nobody is looking";
+this is the app-side wiring.
+
+- **Asked once, from the window.** `ScheduleDeploySheet.schedule()` and the
+  in-app assistant's `schedule_deploy` (`AssistToolRunner`, `surface == .local`)
+  call `ScheduledPublishNotice.askPermissionIfNotAskedYet` after a deploy is
+  set. It does nothing unless macOS says nobody has been asked yet. Never at
+  launch, never from an outside assistant over `--mcp-stdio` (no window to
+  explain the question), never from the run. The question asks for alerts only
+  — no sound, no badge.
+- **`AppDelegate` is the notification centre's delegate**, set in
+  `applicationWillFinishLaunching` (where Apple asks for it), and answers
+  `willPresent` with `[.banner, .list]` so a notification still shows when
+  Plantoir is the app in front. Not set under the suite.
+- **Dismiss withdraws it.** `SectionDetailView.dismissScheduledPublishNotice`
+  goes through `ScheduledPublishNotice.teacherDismissed`, which clears the
+  record AND withdraws that section's notification.
+- **The suite never reaches the real notification centre.** The test host is
+  Plantoir.app — the very bundle whose permission this is — so
+  `ScheduledPublishNotice.poster` is `QuietNotifications` under XCTest,
+  `SystemNotifications` refuses there too, and tests that need to see a post use
+  a recording stand-in (`ScheduledPublishNoticeTests`). A test that forgot the
+  stand-in would otherwise be able to put the permission question on the screen
+  of the Mac running the suite.
+- **One permission for every copy.** The Debug build in DerivedData and an
+  installed copy share the bundle identifier, so the answer given to one is the
+  answer for both.
+
 ## Reporting a problem
 
 Plantoir keeps a note of every task it runs — in
@@ -3369,6 +5024,110 @@ run, and only when the run reported the code it installed under — the example
 arrives as EXC2O unless that code is taken, so a line written up front would
 name a course that may not exist, and a failed run writes nothing. Windows
 creates courses too, so the contract entry carries no `appliesOn`.
+
+### Two writers at once: the trail never loses a line
+
+Since 2026-09-25 ([#238](https://github.com/russellgordon/plantoir/issues/238)).
+`activity.txt` has more writers than the app: a scheduled publish runs as its
+own process, `Plantoir --mcp-stdio` is a third, and every launcher appends its
+own lines with `note_on_the_trail` (setup.sh, preview.sh, deploy.sh, and the
+`note` function in the script `FolderContainers` writes for quitting). They
+routinely write within the same second — the app notes "started preview.sh"
+while the launcher it just started notes its own first line.
+
+**What was wrong.** `ProblemReportStore.appendActivityLine` read the whole
+file, added its line, trimmed, and renamed a rewritten copy over the original
+— with no lock. Two writers that read the same file both wrote a whole file,
+and the later rename won; a launcher's `>>` landing between the read and the
+rename went into the file being thrown away. Every write was atomic, so
+nothing ever looked broken. Measured on an M-series Mac, APFS, macOS 26, with
+a standalone replica of the exact lines, each writer its own process:
+
+| Writers | Lost |
+|---|---|
+| 3 app processes × 3 lines onto an 800-line trail, 100 bursts (the realistic case) | **446 of 900 lines; every burst lost some** |
+| the same with 2 app processes and one launcher × 3 lines each | 302 of 900; every burst lost some |
+| 2 processes × 500 | 483 of 1,000 |
+| 4 threads in ONE process × 250 | 747 of 1,000 |
+| 2 app writers, the lock on the folder added round the same rewrite, + a launcher `>>` × 300 | app 600/600, **launcher 52 of 300 kept** |
+
+The last row is why a lock round the old rewrite was NOT enough (it was the
+first plan, and review measured it): the launchers take no lock of their own,
+so any writer that REPLACES the file on every line loses their lines.
+
+**What it does now — two changes, one on each side.**
+
+- **The app adds its line to the END of the file** (`open` with `O_APPEND`,
+  one `write`), never by rewriting it, all while holding an exclusive `flock`
+  on the **Logs folder itself**. The trim — the one write that does replace the
+  file — runs only under that lock, and only when the file is past its limit
+  (1,200 lines, cut to 600, unchanged). The line is redacted by `LogRedactor`
+  BEFORE any of this, so nothing unredacted is ever held or written.
+- **Every launcher's append takes the same lock**: `/usr/bin/lockf -k
+  "$trail"` round the `>>`, where `$trail` is the Logs folder. `lockf(1)` on
+  macOS locks with `O_EXLOCK`, which is the same lock `flock` takes, so it
+  waits for the app's trim (measured: it waited 2.59 s for a Python `flock` on
+  the folder held 3 s); `-k` stops it trying to delete the folder
+  afterwards. The function is byte-identical in the three launchers
+  (`scripts/test_trail_lock.py`), and the generated script's lock and append
+  lines are the launchers' own (`ProblemReportTests.testTheGeneratedScriptAppendsTheWayTheLaunchersDo`).
+
+Measured after the change: the app-and-launcher burst, 0 of 900 lost in 100
+bursts (the replica of the new writer against the launchers' real
+`note_on_the_trail`); 4 threads × 100 in
+one process, 400 of 400 (`testWritersAtTheSameInstantEachKeepTheirLine`); two
+app writers and a launcher, 900 of 900 (`testALauncherWritingAtTheSameTimeKeepsEveryLine`);
+twenty trims raced against a launcher mid-append, every line kept
+(`testTheTrimNeverLosesALauncherLine` — with the app's lock taken out, or the
+old writer put back, the same test at forty rounds lost 42 to 54 lines in
+every one of six runs). With the OLD launcher and the new app
+writer — the gap that remains until a working folder's launchers are
+refreshed — a line was lost in 2 runs of 10 (1,500 app + 1,500 launcher lines
+across several trims per run), because only a trim can lose one now. With the
+new launcher, 0 in 10. Cost: 0.54 ms a line for the app, down from 0.97
+(the rewrite is gone from all but one line in six hundred); a launcher's line
+takes about 10 ms instead of 5, for a handful of lines a run.
+
+**Why the FOLDER is the lock.** It creates no file. A sidecar
+`activity.txt.lock` would work identically, but it would sit in the folder
+Console shows a teacher, a mystery file with nothing in it. Both `flock` and
+`lockf` belong to the open file rather than to the process, so two threads of
+the app wait for each other exactly as two processes do, and the kernel
+releases the lock when its holder exits — a `kill -9` cannot leave it held.
+`O_CLOEXEC` keeps a launcher the app starts from inheriting the app's lock.
+
+**When the lock cannot be had, the line is written anyway.** If the folder
+cannot be opened, or `flock` refuses (`ENOTSUP` on some network volumes), the
+app appends unlocked — an append still cannot discard another append, so only
+a trim at that exact instant could lose a line, which is the old behaviour at
+its best. The launchers do the same where there is no `/usr/bin/lockf` or it
+fails. Refusing or dropping the line would be worse than the race.
+
+**Rejected, and why:**
+
+- **A lock round the old read-modify-write** (the first plan). Closes the
+  race between app processes and threads, but leaves the launchers' lines
+  exactly as exposed as before — 52 of 300 kept, measured above.
+- **`O_APPEND` alone, with no lock.** Appends were measured whole on APFS
+  even for 1 MB lines, four processes at once, none torn. But something still
+  has to TRIM, and a trim rewrites the file: unlocked, it lost 2 lines in
+  4 × 1,000. Moving the trim to whoever READS the trail was rejected too — the
+  file would grow without bound between reports.
+- **One file per process, merged when a report is gathered.** The issue's own
+  three lines share one second, so a merge by timestamp cannot order them; the
+  trail is one file precisely because order is its point (see the comment on
+  `activityFileName`).
+- **Waiting for the lock with a timeout.** The lock is held for one append and,
+  one line in six hundred, one rewrite — about a millisecond, 104 ms at worst
+  under a contrived four-way hammer — and it dies with its holder. A timeout
+  would be a guessed delay, which this codebase does not use to paper over a
+  race; blocking is correct.
+
+**Found on the way and fixed with it.** The trim used to read the trail as
+strict UTF-8, and one byte that was not UTF-8 — a launcher can `printf`
+anything — made the read come back empty, so the next write REPLACED the whole
+trail with its single line. The trim now reads bytes and decodes leniently, and
+a file that needs no trimming is never rewritten at all.
 
 ## The local assistant
 
@@ -3551,6 +5310,347 @@ the reasoning and a Windows-porting note per entry — is
 [`GUI-IMPROVEMENTS.md`](../GUI-IMPROVEMENTS.md). Architecture, build
 instructions (XcodeGen + Xcode), and the test suite are documented in
 [`mac-app/README.md`](../mac-app/README.md).
+
+## Testing: the real-home tripwire (#264)
+
+**One place asks where the home folder is, and a test fails if anything else
+does.** Everything Plantoir keeps on a Mac hangs off the home folder — built
+websites, helper programs, scheduled-publish notes and the assistant's weights
+under `~/Library/Application Support/Plantoir`, the trail under
+`~/Library/Logs/Plantoir`, Obsidian's list of vaults, the Desktop a problem
+report is saved to. Until 2026-09-25, 15 product files asked the system for it
+directly — 27 lookups, in five different spellings — and the suite was kept out
+of the teacher's folders only where somebody had noticed a test reaching one
+and redirected that resolver (#240 above: 482 reaches in one run before its
+fix). A resolver added next month would not have been redirected, and nothing
+would have said so. That is the gap this closes.
+
+### The seam: `RealHome`, one door
+
+`mac-app/QuartzTeachers/Models/RealHome.swift` is the only product file allowed
+to ask.
+
+- **`RealHome.forFiles`** — the home for anything Plantoir reads, writes or
+  names to a child process as text. The real home in the app; ONE throwaway
+  folder per run (`RealHome.homeWhileTesting`) while the unit suite hosts the
+  process. It needs no allow-list: it cannot answer a real folder under the
+  suite, so it is safe by construction rather than by review. Every default
+  that used to be `= homeDirectoryForCurrentUser` is now `= RealHome.forFiles`
+  — `oneShotCommand`'s included, which sends the 95 script-text hits in #240's
+  final probe to the throwaway home by construction (not re-probed), and
+  closes the case #240 left open: a test that EXECUTES a script built
+  with the default home (as `ScheduledPublishOutcomeTests` does with an
+  explicit one) would have written real `.succeeded` and stopped records.
+  `RealHome.expandingTilde(in:)` replaces `expandingTildeInPath` for the two
+  places a person types `~/…` (a publish destination; the `--mcp-stdio`
+  folder), so a typed `~` under the suite also lands in the throwaway home.
+  It expands `~` and `~/…` only; `~name/…`, another account's home, is left as
+  typed rather than looked up.
+- **No second door for "the real home, even under the suite".** The first
+  version had one — `RealHome.real(for: Use)`, an enum of named uses, each
+  allowed only from files the tripwire listed, and forbidden in `Tests/` — and
+  review deleted it. It was measured empty: with all 27 lookups moved to
+  `forFiles`, the full suite ran and every test outside the tripwire itself
+  stayed green, so nothing needed a real value. An empty door kept a standing
+  "will never be executed" compiler warning in a teaching codebase and a third
+  test that could only ever check nothing. If a test ever genuinely needs the
+  real home, that is a new function in `RealHome` and a line in the tripwire,
+  made in a diff somebody reviews.
+
+**Keyed on XCTest being loaded in THIS process** (`RealHome.isInsideTestBundle`,
+`NSClassFromString("XCTestCase")`), not on `BuildOutputLocation.isRunningTests`,
+which is also true inside the app a UI test drives (it reads
+`UITEST_WORKSPACE`). That app has no XCTest in it — XCTest lives in the UI
+test's runner, a separate process — and the opt-in `AssistantRolloverUITests`
+needs it to load the real assistant weights. The three folders #240 already
+moved for the UI-tested app too (built websites, scheduled-publish notes, the
+assistant's launch files) keep that: their resolvers check `isRunningTests`
+before they fall through to `forFiles`. `WorkspaceModel.isRunningTests` and
+`ProblemReportStore.isRunningTests` now ask `RealHome.isInsideTestBundle` too;
+the second used to read `XCTestConfigurationFilePath` from the environment, a
+third definition of "under test".
+
+What went through it — every product lookup of the home folder that existed on
+`dev` at 43d8e853:
+
+| File | What it resolved |
+|---|---|
+| `Scripting/HelperPrograms.swift` (5) | the pinned helpers' `tools/bin`, the PATH text children get |
+| `Scripting/PreviewStopper.swift` | the stop command's PATH |
+| `Scripting/ProblemReport.swift` | `~/Library/Logs/Plantoir` (the trail and task records) |
+| `Models/PreviewReachability.swift` | the "ask the builder" command's PATH |
+| `Models/FolderContainers.swift` (2) | the quit script's PATH and trail |
+| `Models/ScheduledDeploy.swift` (5) | `homeForScheduledNotes`, the plist and wrapper defaults, the launchd-run paths |
+| `Models/BuildOutputLocation.swift` (2) | `buildsRoot`, the sweep's "under home" rule |
+| `Models/CloudSyncedFolder.swift` | which synced folder a working folder is in |
+| `Models/QuartzCheckoutLayout.swift` (2) | a path written from `~` in a sentence or on the trail |
+| `Models/SectionPublishState.swift` | a typed `~/…` destination |
+| `Models/Assist/AssistMCPServer.swift` | a typed `~/…` working folder |
+| `Models/Assist/ClaudeCodeLauncher.swift` (2) | where `claude`/`codex` might be installed; `…/Plantoir/assist` |
+| `Models/Assist/AssistModelStore.swift` | the assistant's weights |
+| `Views/Helpers/FolderActions.swift` | Obsidian's `obsidian.json` (READ, and WRITTEN when Obsidian is open) |
+| `App/ProblemReportCommands.swift` | the save panel's starting Desktop |
+
+**The models folder is redirected, not allowed** (review H2). #240's probe
+left six stat-only reads of the real weights by three tests, which made a
+panel sentence those tests checked depend on what the Mac running them had
+downloaded. The plan proposed a per-test runtime recorder to allow exactly
+those three; the review showed it would charge a stat from an async warm-up
+that outlived its test to the NEXT test, red at random, and turn red on a
+rename. Sending the folder through `forFiles` made the allowed set zero and
+the recorder unnecessary.
+
+### The tripwire: `RealHomeTripwireTests`
+
+A source scan, the `ActivityTrailWiringTests` device, over every Swift file in
+`QuartzTeachers/` and `Tests/` (about 2.3 seconds for its three tests). It fails
+outright if it read fewer than 50 files on either side, so a scan that found
+nothing cannot pass by checking nothing:
+
+1. **The product asks only the seam.** Any of 32 lookups outside
+   `RealHome.swift` fails, naming file and line: `homeDirectoryForCurrentUser`,
+   `NSHomeDirectory`, `homeDirectory(forUser`, `.homeDirectory` (as
+   `URL.homeDirectory` or the implicit member `let h: URL = .homeDirectory`),
+   `NSUserName()`, `urls(for:`, `url(for:`, `NSSearchPathForDirectoriesInDomains`,
+   the directory statics `.applicationSupportDirectory` `.desktopDirectory`
+   `.libraryDirectory` `.documentsDirectory` `.downloadsDirectory`
+   `.cachesDirectory` `.picturesDirectory` `.moviesDirectory` `.musicDirectory`
+   `.userDirectory` `.trashDirectory`, a bare `~` handed to a URL
+   (`filePath: "~"`, `fileURLWithPath: "~"` — both answer the real home;
+   matched with spaces removed, so `filePath:"~"` counts too),
+   `expandingTildeInPath`, `abbreviatingWithTildeInPath`, `standardizingPath`,
+   `getpwuid`, `getpwnam`, `CFCopyHomeDirectoryURL`, `environment["HOME"]`,
+   `getenv("HOME")`, a `"~/` literal, a `"/Users/` literal and a
+   `"file:///Users/` literal. Three are
+   allowed, counted per file and lookup, each with its reason in the test:
+   `LogRedactor`'s `/Users/` pattern (it REMOVES home paths), two
+   `standardizingPath` calls in `QuartzCheckoutLayout` that collapse `..`
+   before comparing two paths, and one sentence in `ScheduledDeploy` naming
+   `~/Library/LaunchAgents`.
+2. **Tests reach the real home only where named.** The same lookups (minus the
+   generic `/Users/`, since made-up homes like `/Users/teacher` are how a test
+   SHOULD name one), plus the running account's own home spelt out. Fifteen
+   allowances in twelve files — mostly the guards themselves, which must know
+   where the real folder is to say nothing answered it, and
+   `ToolchainMirrorTests`, whose mirror must sit under `$HOME` because Colima
+   mounts nothing else. Two tests that spelt `/Users/russellgordon` as
+   fixture text (`FinderPathBarTests`, `ProblemReportTests`) now use a made-up
+   account.
+3. **Nothing stale.** An allowance must match exactly as many lines as it
+   says — fewer is a stale entry that would let a new reach back in, more is a
+   new reach beside an allowed one.
+
+A line is read the way Swift would: `//` starts a comment only outside a
+string literal (a quote-aware pass, with `\"` escapes), so
+`let s = "a //b"; let h = NSHomeDirectory()` is still caught —
+`testACommentStartsOnlyOutsideAString` pins that.
+
+Beside it, `SuiteStaysOutOfRealFoldersTests.testEveryDefaultHomeIsTheSuitesThrowawayOne`
+asks thirteen default-home wrappers what they answer under the suite and
+fails if any names the real home — the runtime half, so that "the scan is
+green" and "the one door answers the right home" are separately true.
+
+**Must-fail, by copy-and-restore of the source files.** One run with seven
+deliberate faults (a `homeDirectoryForCurrentUser` in `ScheduledPublishOutcome`,
+`URL.applicationSupportDirectory` in `AssistModelStore`, `HelperPrograms.binDirectory`'s
+default put back to the raw lookup, `NSHomeDirectory()` in `FinderPathBarTests`,
+`RealHome.real(` in `ProblemReportTests`, a stale allowance, and two cases of
+the since-deleted `Use` enum): **10 tests, 7 failures**, every fault named by
+file and line, and the reverted default ALSO caught at
+run time (`HelperPrograms.binDirectory named the real home`). A second run with
+`forFiles` made to return the real home under the suite: **7 tests, 18
+failures**, twelve of them naming the wrapper that answered the real home.
+Restored byte-identical (`cmp`) and green. The review's fix round added
+seven more spellings to `ScheduledPublishOutcome.swift` at once — implicit
+`.homeDirectory`, `URL(filePath: "~")`, `URL(fileURLWithPath: "~").standardized`,
+`NSUserName()`, `URL.picturesDirectory`, `.userDirectory`, and
+`NSHomeDirectory()` after `"a //b"` on the same line — and the scan named **all
+seven** (3 tests, 1 failure; before the fix the review measured the first two
+of these missed). Pointing both scans at an empty folder: **3 tests, 20
+failures**, led by "found no product source" and "found no test source".
+
+### What it cannot see — do not oversell it
+
+- **Child processes.** A launcher takes `HOME` from its environment, not from
+  Swift, and `ScriptRunner` hands children this process's environment — the
+  real `HOME` — so a test that drove a real `setup.sh` could reach
+  `~/Library/Application Support/Plantoir/tools` with every check here green.
+  Not live today, measured two ways: every test that executes a launcher or a
+  generated script either sets a scratch `HOME` (`QuitScriptRunsTests.run`,
+  which since #243 also hands the quit script a written-down list of what is
+  running, so it does not read this Mac's real processes either — "Testing it
+  against a written-down process list"),
+  passes a scratch home (`ScheduledPublishOutcomeTests.runWrapper`), runs a
+  stub, or is opt-in and skipped (`ScriptRunnerIntegrationTests`,
+  `NewCourseCreatorIntegrationTests`); and a full suite run on this branch
+  changed nothing under the real `…/Plantoir`, `~/Library/Logs/Plantoir`,
+  `~/Library/LaunchAgents` or Obsidian's list (`find -newer` against a marker
+  touched just before a full run of 1,890 tests: 0 entries — which sees a
+  file or folder written, added or removed, and cannot see a read). The fix — a throwaway `HOME` in the child
+  environment under the suite — is a follow-up, not part of this piece.
+- **A path spelt out with no lookup at all**: another account's `/Users/…`
+  written in full or assembled (`"/Users" + "/"`), or `~` expanded from a
+  VARIABLE by `URL(filePath:)` or `.standardized` (both expand it; no scan can
+  see what a variable holds).
+- **A path derived from where the code or the app lives** — `#filePath` or
+  `Bundle.main.bundleURL` walked up with `deletingLastPathComponent()`. Under
+  the suite both are inside the real home (the checkout is under `~/Desktop`,
+  DerivedData under `~/Library`). Not scanned for: `#filePath` is how the
+  tripwire itself finds the source, and neither appears in `QuartzTeachers/`
+  today.
+- **`HOME` read through a local copy of the environment** —
+  `let env = ProcessInfo.processInfo.environment` then `env["HOME"]`. Only the
+  spellings `environment["HOME"]` and `getenv("HOME")` are scanned.
+- **`UserDefaults.standard`**, which holds the working-folder path and window
+  claims. Guarded today by `isRunningTests && defaults === .standard` checks in
+  `WorkspaceModel`, `AppSettings` and `WindowFolderMemory`; the scan cannot see
+  that channel.
+- **Block comments, and two string shapes.** The scan skips `//` comments
+  (outside string literals); it does not understand `/* … */`, nor `//` inside
+  a multi-line `"""` string. A block comment naming a lookup is reported rather
+  than missed — the safe way round. The other two go the unsafe way and cut
+  real code: a raw string with an odd number of `"` before a `//`
+  (`#"a"//b"#; NSHomeDirectory()` is missed, because the walk reads raw strings
+  as ordinary ones), and a regex literal containing `\/\/`. Neither appears in
+  the product today (0 raw strings with `#"`).
+- **The tripwire's own file**, which spells every lookup as the text it looks
+  for, and the opt-in UI and integration tests, which name a real workspace or
+  read the real weights on purpose and are outside the gate.
+
+### Rejected, with what was measured
+
+- **A file-system probe as the gate.** DTrace needs System Integrity
+  Protection off (`csrutil status`: enabled on this Mac); `fs_usage` and
+  `eslogger` need root, and `sudo -n` asks for a password, so no agent can run
+  them — Russell could, by hand, as a one-off audit. An `open`/`stat`
+  interposer (`DYLD_INTERPOSE`) saw **12 of 12** Foundation file operations
+  when loaded at launch by `DYLD_INSERT_LIBRARIES` — but loaded the way a test
+  bundle is loaded, by `dlopen`, it intercepted **0**: interposing happens only
+  at launch. It would have to go in the scheme's test environment beside
+  Xcode's own `libXCTestBundleInject.dylib` (coexistence unmeasured), as a C
+  target in a project Russell reads as teaching code, and it still would not
+  see children (SIP strips `DYLD_*` for `/bin/sh` and `/bin/bash`).
+- **`CFFIXED_USER_HOME` in the scheme.** It moves **7 of 7** Foundation answers
+  (`homeDirectoryForCurrentUser`, `NSHomeDirectory`, Application Support,
+  Library, Desktop, `~` expansion, `NSHomeDirectoryForUser`) where `HOME=`
+  moves **none** — so it would redirect tomorrow's resolver too. Rejected
+  because it HIDES a reach rather than reporting one (the issue asked for a
+  failure), breaks the tests that need the real `$HOME` (`ToolchainMirrorTests`:
+  Colima mounts only `$HOME`), and makes "a home named explicitly is used
+  exactly" untestable.
+- **Ten `Use` cases chosen by "touches no file"** (the plan), and then the
+  empty `Use` door itself (the first implementation). The only reason for a
+  real door is a test that needs the real value; `forFiles` already answers
+  the real home in the app. Measured: none do, so there is no door.
+- **A contract entry.** How a test host finds a home is platform mechanics —
+  not a sentence, a rule with portable inputs and outputs, or an ordered
+  sequence — and `contracts/README.md`'s coverage table already leaves test
+  harness mechanics out. No `GUI-IMPROVEMENTS.md` row and no trail event: a
+  teacher sees none of it.
+
+**Windows.** Its unit suite has the same exposure in its own shape:
+`AppDataRoot` is already the one resolver, but `dotnet test` never redirects
+it, and the scheduled-publish path registers a real Task Scheduler task. The
+`windows` issue for this asks for the intent — redirect `AppDataRoot` in the
+test assembly and add a source-scan test — not the Swift mechanism.
+
+## Testing: the tests that read the real window, and a window on another Space (#249)
+
+Written 2026-09-25. Six test classes read the real window through the
+accessibility tree, starting at `AXUIElementCreateApplication` on the test
+host's own process — `AccessibilityInspector.collectAllLabels`,
+`frame(forIdentifier:)` and `press(identifier:)`:
+`InAppUserInterfaceTests`, `RemovalButtonTests`,
+`SidebarRestorationProbeTests` (two tests), `WindowPathBarTests` and
+`HitAreaTests`. On 2026-09-21 five of them failed together in the gate, each
+with a tree that held the menu bar and nothing else.
+
+**The cause is the window's Space, not the foreground.** The issue as filed
+blamed another app being frontmost. That was measured and is wrong: in every
+normal run the test host is never the active app (`NSApp.isActive` false at
+launch, iTerm in front), and the walk finds everything. A probe walked the
+tree in each window state (origin/dev 68214a6c):
+
+| Window state | `isActive` | window `isOnActiveSpace` | windows in the tree | walk finds the sidebar row, the − button, the path bar |
+|---|---|---|---|---|
+| normal, iTerm in front | false | true | 1 | yes |
+| miniaturized | false | true | 1 | yes |
+| app hidden | false | — | 1 | yes |
+| `orderOut` | false | — | 0 | no (menu bar only, 166 labels) |
+| **full screen, then another app activated, so its Space is not showing** | false | **false** | **0** | **no (menu bar only, 167 labels)** |
+| full screen exited | false | true | 1 | yes |
+
+The full-screen row reproduces the 9/21 signature exactly, down to the
+Window menu still listing the window (so AppKit had it while the tree did
+not). A clean full suite that run had all five passing, with the app in the
+background throughout.
+
+**What the tests do now.** Before every walk they call
+`AccessibilityInspector.skipUnlessTheWindowCanBeRead(workspace.window)`,
+which SKIPS with a reason naming the Space only when all three hold: the
+tree does not list the test's own window (matched by frame), the test's own
+window is visible, and AppKit says that window is not on the showing Space.
+The decision is a pure function, `reasonTheWindowCannotBeRead`, pinned by
+`AccessibilityInspectorTests`. Every other shape still FAILS as before, on
+purpose:
+
+- **Only the test's own window counts** (the one its `WorkspaceModel` holds).
+  An assistant, Settings or About window sitting off-Space says nothing about
+  it — and if the test's window has actually gone, skipping because some
+  OTHER window is off-Space would hide a real fault. That case is pinned.
+- A window on the showing Space that is missing from the tree is a real fault
+  and fails.
+- A missing window model keeps its existing `XCTFail` / `XCTSkip` guard; that
+  is a different fault.
+- `RemovalButtonTests` checks again after its press, and closes the alert
+  before skipping, so a desktop change mid-test does not leave an alert over
+  the window for the next class.
+- `AccessibilityInspectorTests.testTheTestsWindowIsFoundInTheTreeWhenItIsShowing`
+  checks, live, that the frame match finds the window when it is showing — so
+  the tree half of the check is not dead code that always says "missing".
+
+**Reading the totals.** A normal full run has **3 skipped** — the three tests
+that want `INTEGRATION_WORKSPACE` — plus a fourth,
+`QuitScriptRunsTests.testTheSharedMachineIsStoppedOnAClearAnswer`, whenever
+any launcher is running on the Mac (a preview in the app, another session's
+`verify.sh`; #243 is fixing that class). More than 3 means read the skip
+reasons: a Space skip says so, and so does that one. A test that always skips is a test nobody runs, and that
+is the risk this change carries; the reason in the log is the defence. One
+way it could happen for good is the test host (the same bundle as the
+teacher's app) restoring a full-screen window. Checked 2026-09-25 after the
+full-screen probe: there is no `Saved Application State` folder for
+`ca.russellgordon.Plantoir`, the saved main-window frame
+(`NSWindow Frame main-AppWindow-1`) is 1100×720 — the size
+`InAppUserInterfaceTests` sets — and no full-screen key is stored.
+
+**Rejected, with the numbers:**
+
+- **Activate the test host and wait for `NSApp.isActive`.** Refused by macOS
+  at 3 of 4 probe points (`activate(ignoringOtherApps: true)`, then polling
+  for 3 s, left it inactive, iTerm still in front), granted once mid-suite —
+  not deterministic. It also fixes the wrong thing (being inactive never broke
+  the walk), and where it IS granted it takes the foreground from the person
+  at the Mac for the rest of the run, which rules 9 and 10 exist to stop.
+- **Walk the window's own element instead.** In process,
+  `NSObject.accessibilityAttributeValue(.children)` yields 4–5 labels in every
+  state, none of the controls — SwiftUI does not surface its tree that way.
+  Through AX, the app's `kAXWindows` list is exactly what empties off-Space.
+- **Make the test window join every Space** (`canJoinAllSpaces` /
+  `fullScreenAuxiliary`). Not measured: the tests would drive a window
+  configured unlike the teacher's, and it would draw over whatever is
+  full-screen on the Mac — possibly a class being taught.
+- **Opt-in behind a flag**, as Windows' `PLANTOIR_UI_TESTS=1` is. An opt-in
+  test is one nobody runs, and in the normal case these pass in the gate.
+
+**Test hygiene only**: no product file changed, so there is no
+`GUI-IMPROVEMENTS.md` row, no contract case, no trail event and no `windows`
+issue. Windows has no Spaces, and its UI Automation tests already require the
+foreground by design.
+
+**Honest limit.** Removing the check from one class and running it on the
+showing Space still passes, so the call sites are not proven by a must-fail;
+only the predicate is. The off-Space end-to-end path was measured with the
+probe above, before the helper existed, not re-run against it.
 
 ## A test host that segfaults, and the six levers that look like they should fix it
 

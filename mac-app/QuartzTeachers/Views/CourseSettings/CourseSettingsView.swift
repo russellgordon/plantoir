@@ -18,6 +18,12 @@ struct CourseSettingsView: View {
     @State var saveProblem: String?
     @State var didJustSave: Bool = false
 
+    /// What the last Save could not reach — a preview or a publish of this
+    /// course already running (issue #265). Unlike "Saved ✓" it does not
+    /// fade after three seconds: it has to stay long enough to be read, so it
+    /// stays until the next Save, Preview Again, or leaving this course.
+    @State var saveNotice: SettingsSaveNotice? = nil
+
     // MARK: - Body
 
     var body: some View {
@@ -74,12 +80,22 @@ struct CourseSettingsView: View {
                                 unitWordNotice = nil
                                 isRenamingUnitWord = true
                             }
+                            // A numbered course's word is part of the
+                            // vocabulary chosen in the wizard (#267).
+                            .disabled(configuration.classPageNaming.isNumbered)
                             .accessibilityIdentifier("renameUnitWordButton")
                         }
                     }
-                    Text(UnitWordRenameWording.rowCaption(word: configuration.unitWord))
+                    Text(UnitWordRenameWording.rowCaption(naming: configuration.classPageNaming))
                         .font(.callout)
                         .foregroundStyle(.secondary)
+                    if configuration.classPageNaming.isNumbered {
+                        Text(UnitWordRenameWording.renameLockedNumbered)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("unitWordLockedNotice")
+                    }
                     if let unitWordNotice {
                         Text(unitWordNotice)
                             .font(.callout)
@@ -89,6 +105,33 @@ struct CourseSettingsView: View {
                     }
                 } header: {
                     FormSectionHeader("Settings — Overall")
+                }
+
+                // The words the course was made with (#267): shown, and
+                // LOCKED — a club's are chosen in the wizard and are not
+                // switchable afterwards, and an existing course (CODING
+                // included) can never become one from here.
+                Section {
+                    LabeledContent(WizardWording.settingsPageNamingLabel) {
+                        Text(WizardWording.settingsPageNamingValue(configuration.classPageNaming))
+                            .accessibilityIdentifier("pageNamingValue")
+                    }
+                    LabeledContent(WizardWording.settingsFrontPageHeadingLabel) {
+                        Text(WizardWording.settingsFrontPageHeadingValue(
+                            configuration.recordedFrontPageHeading
+                        ))
+                        .accessibilityIdentifier("frontPageHeadingValue")
+                    }
+                    LabeledContent(WizardWording.settingsNounLabel) {
+                        Text(configuration.classNoun.rawValue)
+                            .accessibilityIdentifier("classNounValue")
+                    }
+                    Text(WizardWording.settingsLockedCaption)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } header: {
+                    FormSectionHeader("Class Pages")
                 }
 
                 Section {
@@ -116,14 +159,10 @@ struct CourseSettingsView: View {
                         title: "Shared folders (all sections)",
                         items: $configuration.sharedFolders,
                         onRemove: { name in
-                            configuration.exclude(name, inScope: "shared")
-                            dropFromMarksPool(name)
-                            ActivityTrail.note(.itemExcluded, "excluded shared folder " + name + " in " + course.code)
+                            folderWasRemoved(name, scope: .shared)
                         },
                         onAdd: { name in
-                            if configuration.reinclude(name, inScope: "shared") {
-                                ActivityTrail.note(.itemReincluded, "re-included shared folder " + name + " in " + course.code)
-                            }
+                            folderWasAdded(name, scope: .shared)
                         },
                         protection: sharedFolderProtection,
                         renameProblem: { oldName, newName, finishing in
@@ -150,27 +189,20 @@ struct CourseSettingsView: View {
                         hidesMarkdownExtension: true,
                         items: $configuration.sharedFiles,
                         onRemove: { name in
-                            configuration.exclude(name, inScope: "shared")
-                            ActivityTrail.note(.itemExcluded, "excluded shared file " + name + " in " + course.code)
+                            fileWasRemoved(name, scope: .shared)
                         },
                         onAdd: { name in
-                            if configuration.reinclude(name, inScope: "shared") {
-                                ActivityTrail.note(.itemReincluded, "re-included shared file " + name + " in " + course.code)
-                            }
+                            fileWasAdded(name, scope: .shared)
                         }
                     )
                     StringListEditorView(
                         title: "Per-section folders",
                         items: $configuration.perSectionFolders,
                         onRemove: { name in
-                            configuration.exclude(name, inScope: "per_section")
-                            dropFromMarksPool(name)
-                            ActivityTrail.note(.itemExcluded, "excluded per-section folder " + name + " in " + course.code)
+                            folderWasRemoved(name, scope: .perSection)
                         },
                         onAdd: { name in
-                            if configuration.reinclude(name, inScope: "per_section") {
-                                ActivityTrail.note(.itemReincluded, "re-included per-section folder " + name + " in " + course.code)
-                            }
+                            folderWasAdded(name, scope: .perSection)
                         },
                         protection: perSectionFolderProtection,
                         renameProblem: { oldName, newName, finishing in
@@ -197,13 +229,10 @@ struct CourseSettingsView: View {
                         hidesMarkdownExtension: true,
                         items: $configuration.perSectionFiles,
                         onRemove: { name in
-                            configuration.exclude(name, inScope: "per_section")
-                            ActivityTrail.note(.itemExcluded, "excluded per-section file " + name + " in " + course.code)
+                            fileWasRemoved(name, scope: .perSection)
                         },
                         onAdd: { name in
-                            if configuration.reinclude(name, inScope: "per_section") {
-                                ActivityTrail.note(.itemReincluded, "re-included per-section file " + name + " in " + course.code)
-                            }
+                            fileWasAdded(name, scope: .perSection)
                         },
                         protection: perSectionFileProtection
                     )
@@ -233,15 +262,10 @@ struct CourseSettingsView: View {
                 }
 
                 Section {
-                    MembershipToggleListView(
-                        title: "Hide from the site's sidebar",
+                    SidebarVisibilityTableView(
                         allItems: configuration.allSidebarItems,
-                        members: $configuration.hiddenItems
-                    )
-                    MembershipToggleListView(
-                        title: "Expandable in the site's sidebar",
-                        allItems: configuration.allSidebarItems,
-                        members: $configuration.expandableItems
+                        hidden: $configuration.hiddenItems,
+                        expandable: $configuration.expandableItems
                     )
                 } header: {
                     FormSectionHeader("Sidebar Visibility")
@@ -258,12 +282,49 @@ struct CourseSettingsView: View {
 
             Divider()
 
+            if let saveNotice {
+                HStack(alignment: .firstTextBaseline) {
+                    Image(systemName: "info.circle")
+                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(saveNotice.sentences, id: \.self) { sentence in
+                            Text(sentence)
+                                .font(.callout)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        // The preview this was about has stopped, or its
+                        // window closed: say so rather than leave a button
+                        // that does nothing (the review's L2).
+                        if !saveNotice.sectionsToPreviewAgain.isEmpty
+                            && sectionsStillPreviewed(offered: saveNotice.sectionsToPreviewAgain).isEmpty {
+                            Text(SpecialNames.settingsPreviewAgainNothingOpen)
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .accessibilityIdentifier("settingsPreviewAgainNothingOpen")
+                        }
+                    }
+                    Spacer()
+                    if !saveNotice.sectionsToPreviewAgain.isEmpty {
+                        Button("Preview Again") {
+                            previewAgain(sections: sectionsStillPreviewed(offered: saveNotice.sectionsToPreviewAgain))
+                        }
+                        .disabled(sectionsStillPreviewed(offered: saveNotice.sectionsToPreviewAgain).isEmpty)
+                        .accessibilityIdentifier("settingsPreviewAgainButton")
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, 10)
+                .accessibilityIdentifier("settingsSaveNotice")
+            }
+
             HStack {
                 // "Revert", not "Cancel": this is a settings form, not a
                 // dialog — the button puts the values back the way the last
-                // save left them.
+                // save left them. The FILE's values, not this copy's memory
+                // of them: another window may have saved since (issue #265).
                 Button("Revert") {
-                    try? course.configuration.discardChanges()
+                    try? course.configuration.revertToFile(at: course.configFileURL)
                 }
                 .disabled(!course.configuration.hasUnsavedChanges)
                 .accessibilityIdentifier("revertButton")
@@ -312,6 +373,12 @@ struct CourseSettingsView: View {
             }
         }
         .navigationSubtitle(course.configuration.courseName)
+        .onAppear {
+            // The file may have moved on since this window read it: a build
+            // adds folders it discovers, and another window on the same
+            // folder may have saved. Never over unsaved edits (issue #265).
+            course.configuration.reloadIfNothingUnsaved(url: course.configFileURL)
+        }
     }
 
     // MARK: - Computed properties
@@ -406,8 +473,29 @@ struct CourseSettingsView: View {
             return
         }
         do {
-            try course.configuration.write(to: course.configFileURL)
-            ActivityTrail.note(.settingsSaved, "saved the settings for " + course.code)
+            // What the file hid BEFORE this Save, for the trail — read from
+            // the file, not this copy, because the file is what the site was
+            // built from.
+            var hiddenBefore: [String] = []
+            if let onDisk = try? CourseConfiguration(contentsOf: course.configFileURL) {
+                hiddenBefore = onDisk.hiddenItems
+            }
+            let result: CourseConfiguration.WriteResult = try course.configuration.write(to: course.configFileURL)
+            let notice: SettingsSaveNotice? = SettingsSaveNotice.afterSave(
+                folderPath: workingFolderPath,
+                courseCode: course.code,
+                previewLeases: PreviewLeases.active,
+                publishes: CourseActivity.activePublishes,
+                replacedChangesFromElsewhere: result.replacedChangesFromElsewhere
+            )
+            saveNotice = notice
+            ActivityTrail.note(.settingsSaved, SettingsSaveNotice.trailLine(
+                courseCode: course.code,
+                hiddenBefore: hiddenBefore,
+                hiddenAfter: course.configuration.hiddenItems,
+                result: result,
+                notice: notice
+            ))
             didJustSave = true
             Task {
                 try? await Task.sleep(for: .seconds(3))
@@ -416,6 +504,82 @@ struct CourseSettingsView: View {
         } catch {
             saveProblem = "Could not save: \(error.localizedDescription)"
             ActivityTrail.note(.settingsCouldNotBeSaved, "could not save the settings for " + course.code + " — " + error.localizedDescription)
+        }
+    }
+
+    /// The working folder this course lives in — the folder a preview's
+    /// lease and a publish's record name.
+    var workingFolderPath: String {
+        return course.directoryURL
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .path
+    }
+
+    /// Of `offered`, the sections whose preview Preview Again can still reach.
+    /// Reads `PreviewLeases.active`, which is observable, so this view is
+    /// drawn again when a preview stops or its window closes.
+    func sectionsStillPreviewed(offered: [Int]) -> [Int] {
+        let folderPath: String = workingFolderPath
+        let courseCode: String = course.code
+        return SettingsSaveNotice.sectionsStillPreviewed(
+            offered: offered,
+            folderPath: folderPath,
+            courseCode: courseCode,
+            previewLeases: PreviewLeases.active,
+            previewIsRunning: { section in
+                guard let controller = SectionWindowControllers.shared.controller(
+                    folderPath: folderPath, courseCode: courseCode, sectionNumber: section
+                ) else {
+                    return nil
+                }
+                return controller.isPreviewRunning()
+            }
+        )
+    }
+
+    /// Builds each open preview of this course again, so it shows what was
+    /// just saved. The preview belongs to the section's own view — in another
+    /// window, since leaving a section for its course's settings stops that
+    /// section's preview — so this goes through the same registered controls
+    /// the assistant uses, which stop and start it the way its own button
+    /// does. A section whose preview has since stopped is left alone.
+    func previewAgain(sections: [Int]) {
+        // The preview sentence is answered; a sentence about the Save itself
+        // (another window's sidebar change replaced) stays to be read.
+        saveNotice = saveNotice?.withoutPreviewAgain()
+        let folderPath: String = workingFolderPath
+        let courseCode: String = course.code
+        Task { @MainActor in
+            var rebuilt: [String] = []
+            for section in sections {
+                guard let controller = SectionWindowControllers.shared.controller(
+                    folderPath: folderPath, courseCode: courseCode, sectionNumber: section
+                ) else {
+                    continue
+                }
+                if controller.previewState() == .notRunning {
+                    continue
+                }
+                await controller.stopPreview()
+                controller.startPreview()
+                rebuilt.append(String(section))
+            }
+            if !rebuilt.isEmpty {
+                ActivityTrail.note(
+                    .previewAgainAfterSettingsSaved,
+                    "previewed " + courseCode + " again after saving its settings (section "
+                        + rebuilt.joined(separator: ", ") + ")"
+                )
+            } else {
+                // The button is disabled when nothing is reachable, so this
+                // is the instant between drawing it and pressing it — rare,
+                // and still worth a line rather than silence.
+                ActivityTrail.note(
+                    .previewAgainAfterSettingsSaved,
+                    "pressed Preview Again for " + courseCode + ", but no preview of it was open any more"
+                )
+            }
         }
     }
 
@@ -486,6 +650,51 @@ struct CourseSettingsView: View {
             }
         }
         course.configuration.gradedFolders = remaining
+    }
+
+    // MARK: - Adding and removing folders and files
+
+    /// What removing a name from one of the Content Structure lists does
+    /// beyond taking it out of the list: records it in `excluded_items`, so
+    /// the build stops publishing it, and takes it out of the marks pool.
+    ///
+    /// Named methods rather than closures written at the call site so that a
+    /// test can run exactly what the list runs — the goldens for issue #266
+    /// drive these, and a closure in `body` cannot be reached from a test.
+    func folderWasRemoved(_ name: String, scope: FolderScope) {
+        course.configuration.exclude(name, inScope: scope.exclusionKey)
+        dropFromMarksPool(name)
+        ActivityTrail.note(.itemExcluded, "excluded " + trailWord(for: scope) + " folder " + name + " in " + course.code)
+    }
+
+    /// A folder name added back to a list is taken out of `excluded_items`.
+    func folderWasAdded(_ name: String, scope: FolderScope) {
+        if course.configuration.reinclude(name, inScope: scope.exclusionKey) {
+            ActivityTrail.note(.itemReincluded, "re-included " + trailWord(for: scope) + " folder " + name + " in " + course.code)
+        }
+    }
+
+    /// The file twin of `folderWasRemoved`: a file is never in the marks pool.
+    func fileWasRemoved(_ name: String, scope: FolderScope) {
+        course.configuration.exclude(name, inScope: scope.exclusionKey)
+        ActivityTrail.note(.itemExcluded, "excluded " + trailWord(for: scope) + " file " + name + " in " + course.code)
+    }
+
+    /// The file twin of `folderWasAdded`.
+    func fileWasAdded(_ name: String, scope: FolderScope) {
+        if course.configuration.reinclude(name, inScope: scope.exclusionKey) {
+            ActivityTrail.note(.itemReincluded, "re-included " + trailWord(for: scope) + " file " + name + " in " + course.code)
+        }
+    }
+
+    /// How the trail names a scope: "shared" or "per-section".
+    func trailWord(for scope: FolderScope) -> String {
+        switch scope {
+        case .shared:
+            return "shared"
+        case .perSection:
+            return "per-section"
+        }
     }
 
     // MARK: - Renaming a folder

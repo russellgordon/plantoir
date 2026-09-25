@@ -14,7 +14,7 @@ import Foundation
 ///
 /// A code with example content has a skeleton too, and gets it the moment
 /// the teacher turns the example content down — see
-/// `hasSkeleton(forCode:takingExampleContent:)`, which is the one place
+/// `hasSkeleton(forCode:takingExampleContent:numbered:)`, which is the one place
 /// that rule lives.
 ///
 /// The mapping is by three-letter prefix — ADA is drama, AMU is music, SCH
@@ -162,14 +162,15 @@ enum SkeletonCatalog {
 
     /// The structure a course of this code should adopt, or nil when
     /// nothing should change: either no skeleton is offered for it at all
-    /// (`hasSkeleton(forCode:takingExampleContent:)` — the example content
+    /// (`hasSkeleton(forCode:takingExampleContent:numbered:)` — the example content
     /// the teacher is TAKING chooses its own folders), or the teacher has
     /// edited the folder list and their edit must survive a change to the
     /// code.
     static func structureToAdopt(forCode code: String,
                                  takingExampleContent: Bool,
+                                 numbered: Bool,
                                  currentSharedFolders: [String]) -> Family? {
-        if !hasSkeleton(forCode: code, takingExampleContent: takingExampleContent) {
+        if !hasSkeleton(forCode: code, takingExampleContent: takingExampleContent, numbered: numbered) {
             return nil
         }
         guard let candidate = family(forCode: code) else {
@@ -270,7 +271,16 @@ enum SkeletonCatalog {
     /// `takingExampleContent:` has no default value on purpose: a call site
     /// that has not been made to think about the example-content toggle
     /// should fail to compile rather than quietly pick an answer.
-    static func hasSkeleton(forCode code: String, takingExampleContent: Bool) -> Bool {
+    ///
+    /// `numbered:` is a club (#267): its pages are "Week 1", "Week 2", and
+    /// every skeleton's class pages are "Unit 1, Day 1" — which a numbered
+    /// course does not read as class pages at all, so every planner would
+    /// see nothing and the build would report success. No skeleton is
+    /// offered, and no default either, for the same reason as above.
+    static func hasSkeleton(forCode code: String, takingExampleContent: Bool, numbered: Bool) -> Bool {
+        if numbered {
+            return false
+        }
         if takingExampleContent && ExampleContentCatalog.hasContent(forCode: code) {
             return false
         }

@@ -22,6 +22,23 @@ struct NewCourseWizardView: View {
     /// class pages and follows the links.
     @State var unitWord: String = ClassPageTerm.standard
 
+    /// "This is a club" (#267). Follows `ClubCodeRule` — so CODING arrives
+    /// ticked and ICS3U does not — until the teacher touches it, and from
+    /// then on it is theirs. Wizard state only: what is written is the four
+    /// words below and the numbered scheme, never an `is_club` flag, which
+    /// could disagree with them.
+    @State var isClubCourse: Bool = false
+    @State var clubChoiceIsTheTeachers: Bool = false
+
+    /// The club's words, each editable before Create and none switchable
+    /// afterwards (Russell, 2026-09-24). `classFolderName` is the entry of
+    /// `perSectionFolders` that holds the class pages, RECORDED as
+    /// `class_folder` rather than guessed — "All Meetings" has no "class" in
+    /// it for the guess to find.
+    @State var classFolderName: String = ClubVocabulary.course.classFolder
+    @State var frontPageHeading: String = ClubVocabulary.course.frontPageHeading
+    @State var classNoun: ClassNoun = ClubVocabulary.course.noun
+
     /// The province the course-code picker is currently browsing —
     /// narrows its suggestion list, never gates typing a code straight
     /// through. Defaults to Ontario, the more common case, so nothing is
@@ -152,7 +169,12 @@ struct NewCourseWizardView: View {
         sharedFiles: [String] = WizardDefaults.sharedFiles,
         perSectionFolders: [String] = WizardDefaults.perSectionFolders,
         perSectionFiles: [String] = WizardDefaults.perSectionFiles,
-        gradedFolders: [String] = ["Tasks"]
+        gradedFolders: [String] = ["Tasks"],
+        isClubCourse: Bool = false,
+        classFolderName: String = ClubVocabulary.course.classFolder,
+        unitWord: String = ClassPageTerm.standard,
+        frontPageHeading: String = ClubVocabulary.course.frontPageHeading,
+        classNoun: ClassNoun = ClubVocabulary.course.noun
     ) {
         _creator = State(initialValue: creator)
         if startedForTesting {
@@ -168,6 +190,12 @@ struct NewCourseWizardView: View {
         _perSectionFolders = State(initialValue: perSectionFolders)
         _perSectionFiles = State(initialValue: perSectionFiles)
         _gradedFolders = State(initialValue: gradedFolders)
+        _isClubCourse = State(initialValue: isClubCourse)
+        _clubChoiceIsTheTeachers = State(initialValue: isClubCourse)
+        _classFolderName = State(initialValue: classFolderName)
+        _unitWord = State(initialValue: unitWord)
+        _frontPageHeading = State(initialValue: frontPageHeading)
+        _classNoun = State(initialValue: classNoun)
     }
 
     // MARK: - Computed properties
@@ -191,6 +219,26 @@ struct NewCourseWizardView: View {
             get: { AppSettings.shared.cloudflareAccountID },
             set: { newValue in AppSettings.shared.cloudflareAccountID = newValue }
         )
+    }
+
+    /// Why a club's class-pages folder cannot have this name, in the
+    /// sentences a folder rename in Course Settings already uses
+    /// (`SpecialFolderRenamer.problem`): empty, a "/" or ":", hidden, Media,
+    /// a section folder's name, or the name of ANOTHER per-section folder.
+    /// `perSectionFolders` holds the class folder itself, once, since the
+    /// field renames its entry in place; that one entry is not a clash.
+    static func clubClassFolderProblem(_ name: String, perSectionFolders: [String]) -> String? {
+        let typed: String = name.trimmingCharacters(in: .whitespaces)
+        var others: [String] = []
+        var skippedItsOwnEntry: Bool = false
+        for folder in perSectionFolders {
+            if !skippedItsOwnEntry && folder == name {
+                skippedItsOwnEntry = true
+                continue
+            }
+            others.append(folder)
+        }
+        return SpecialFolderRenamer.problem(renaming: "", to: typed, existingNames: others)
     }
 
     /// The parsed timetable section numbers, e.g. "1,3" → [1, 3].
@@ -263,7 +311,7 @@ struct NewCourseWizardView: View {
     /// course's folders and files — the pages were written for one exact
     /// layout, and a hand-edited structure would strand their links.
     var structureComesFromExampleContent: Bool {
-        return prepopulatesExampleContent
+        return takesExampleContent
             && ExampleContentCatalog.hasContent(forCode: courseCode)
     }
 
@@ -341,6 +389,13 @@ struct NewCourseWizardView: View {
         return ClubCodeRule.isClub(courseCode)
     }
 
+    /// Whether the course will take the ready-made pages written for its
+    /// code. Never for a club (#267): those pages are Unit/Day pages, which
+    /// a numbered course does not read as class pages.
+    var takesExampleContent: Bool {
+        return prepopulatesExampleContent && !isClubCourse
+    }
+
     var gradedFolderChoices: [String] {
         var choices: [String] = []
         for folder in sharedFolders {
@@ -375,11 +430,11 @@ struct NewCourseWizardView: View {
     /// until the view is on screen.
     var curriculumPagesOffered: Bool {
         return CourseConfiguration.curriculumPagesOffered(
-            codeHasExampleContent: ExampleContentCatalog.hasContent(forCode: courseCode),
+            codeHasExampleContent: ExampleContentCatalog.hasContent(forCode: courseCode) && !isClubCourse,
             payloadIncludesCurriculum: ExampleContentCatalog.includesCurriculum(forCode: courseCode),
-            prepopulatesExampleContent: prepopulatesExampleContent,
+            prepopulatesExampleContent: takesExampleContent,
             skeletonIsOffered: SkeletonCatalog.hasSkeleton(
-                forCode: courseCode, takingExampleContent: prepopulatesExampleContent
+                forCode: courseCode, takingExampleContent: takesExampleContent, numbered: isClubCourse
             ),
             startsFromSkeleton: startsFromSkeleton
         )
@@ -502,6 +557,14 @@ struct NewCourseWizardView: View {
                 // moved or gone, so Return would take something the
                 // teacher never looked at.
                 highlightedCourseCode = nil
+                // The club choice follows the code until the teacher
+                // touches it (#267).
+                if !clubChoiceIsTheTeachers && isClubCourse != ClubCodeRule.isClub(courseCode) {
+                    isClubCourse = ClubCodeRule.isClub(courseCode)
+                }
+            }
+            .onChange(of: isClubCourse) { _, isAClubNow in
+                applyClubChoice(isAClubNow)
             }
             // The structure editor must show what will actually be
             // created, in both directions — so the toggle adopts and
@@ -812,6 +875,21 @@ struct NewCourseWizardView: View {
                         ExampleCaption("Shown beside the emoji — 12 characters at most")
                     }
                     }
+                    // Shown for EVERY code, not only a club-looking one:
+                    // the rule only decides where it starts (#267).
+                    VStack(alignment: .leading, spacing: 4) {
+                        Toggle(WizardWording.clubToggleLabel, isOn: Binding(
+                            get: {
+                                return isClubCourse
+                            },
+                            set: { newValue in
+                                clubChoiceIsTheTeachers = true
+                                isClubCourse = newValue
+                            }
+                        ))
+                        .accessibilityIdentifier("clubToggle")
+                        ExampleCaption(WizardWording.clubToggleCaption)
+                    }
                     VStack(alignment: .leading, spacing: 4) {
                         // See the note beside Course Name's own
                         // `LabeledContent` for why the label is written
@@ -843,6 +921,12 @@ struct NewCourseWizardView: View {
             }
 
             Section {
+                if isClubCourse {
+                    Text(WizardWording.clubStartingContentNote)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("clubStartingContentNote")
+                } else {
                 if ExampleContentCatalog.hasContent(forCode: courseCode) {
                     VStack(alignment: .leading, spacing: 4) {
                         Toggle("Pre-populate course with example content", isOn: $prepopulatesExampleContent)
@@ -867,7 +951,7 @@ struct NewCourseWizardView: View {
                 // resolves and `noExampleContentNote` is what a teacher
                 // reads before they have chosen anything.
                 if SkeletonCatalog.hasSkeleton(
-                    forCode: courseCode, takingExampleContent: prepopulatesExampleContent
+                    forCode: courseCode, takingExampleContent: prepopulatesExampleContent, numbered: isClubCourse
                 ), let skeleton = SkeletonCatalog.family(forCode: courseCode) {
                     VStack(alignment: .leading, spacing: 4) {
                         Toggle(
@@ -940,6 +1024,7 @@ struct NewCourseWizardView: View {
                         ExampleCaption("Two short sections at the foot of the map: what counts as addressing an expectation, and how to read it honestly — red in September is normal, red in May is not. Turn this off to publish the map on its own.")
                     }
                 }
+                }
             } header: {
                 FormSectionHeader("Starting Content")
             }
@@ -1003,6 +1088,53 @@ struct NewCourseWizardView: View {
             // ready-made pages are poured in this word rather than renamed
             // afterwards, which is why it cannot be moved into Settings later.
             Section {
+                if isClubCourse {
+                    // A club's words (#267): the page word is the same
+                    // `unit_word` field, naming the whole of "Week 3".
+                    LabeledContent(WizardWording.clubClassFolderLabel) {
+                        TextField("", text: Binding(
+                            get: {
+                                return classFolderName
+                            },
+                            set: { newValue in
+                                renameClassFolder(to: newValue)
+                            }
+                        ))
+                        .textFieldStyle(.roundedBorder)
+                        .accessibilityIdentifier("clubClassFolderField")
+                    }
+                    if let problem = NewCourseWizardView.clubClassFolderProblem(
+                        classFolderName, perSectionFolders: perSectionFolders
+                    ) {
+                        Text(problem)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .accessibilityIdentifier("clubClassFolderProblem")
+                    }
+                    LabeledContent(WizardWording.clubFrontPageHeadingLabel) {
+                        TextField("", text: $frontPageHeading)
+                            .textFieldStyle(.roundedBorder)
+                            .accessibilityIdentifier("clubFrontPageHeadingField")
+                    }
+                    LabeledContent(WizardWording.clubPageWordLabel) {
+                        TextField("", text: $unitWord)
+                            .textFieldStyle(.roundedBorder)
+                            .accessibilityIdentifier("unitWordField")
+                    }
+                    if let problem = ClassPageTerm.problem(with: unitWord) {
+                        Text(problem)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .accessibilityIdentifier("unitWordProblem")
+                    } else {
+                        ExampleCaption(WizardWording.clubPageWordCaption(word: ClassPageTerm.cleaned(unitWord)))
+                    }
+                    Picker(WizardWording.clubNounLabel, selection: $classNoun) {
+                        Text("class").tag(ClassNoun.class)
+                        Text("meeting").tag(ClassNoun.meeting)
+                    }
+                    .accessibilityIdentifier("clubNounPicker")
+                } else {
                 LabeledContent("What do you call a unit?") {
                     TextField("Unit", text: $unitWord, prompt: Text(ClassPageTerm.standard))
                         .textFieldStyle(.roundedBorder)
@@ -1015,6 +1147,7 @@ struct NewCourseWizardView: View {
                         .accessibilityIdentifier("unitWordProblem")
                 } else {
                     ExampleCaption("Class pages will be named “\(ClassPageTerm.cleaned(unitWord)) 1, Day 1”. Some teachers say Module or Thread.")
+                }
                 }
             } header: {
                 FormSectionHeader(
@@ -1059,6 +1192,15 @@ struct NewCourseWizardView: View {
                             toFactory: isLCS ? WizardDefaults.lcsSharedFiles : WizardDefaults.sharedFiles,
                             fromFactory: wasLCS ? WizardDefaults.lcsSharedFiles : WizardDefaults.sharedFiles
                         )
+                        // A club has no curriculum folder, whichever
+                        // terminology's factory list just came back (#267).
+                        if isClubCourse {
+                            var kept: [String] = []
+                            for folder in sharedFolders where !ClubFill.curriculumFolders.contains(folder) {
+                                kept.append(folder)
+                            }
+                            sharedFolders = kept
+                        }
                     }
 
                     // The lists are long, so they stay collapsed until needed.
@@ -1214,12 +1356,13 @@ struct NewCourseWizardView: View {
     /// teacher who declined the skeleton and then corrected a typo in the
     /// code would silently be given the skeleton's folders back.
     func adoptSkeletonStructure() {
-        guard startsFromSkeleton else {
+        guard startsFromSkeleton && !isClubCourse else {
             return
         }
         guard let skeleton = SkeletonCatalog.structureToAdopt(
             forCode: courseCode,
             takingExampleContent: prepopulatesExampleContent,
+            numbered: isClubCourse,
             currentSharedFolders: sharedFolders
         ) else {
             return
@@ -1243,6 +1386,53 @@ struct NewCourseWizardView: View {
         )
         putIntoEditor(restored)
         adoptedStructure = nil
+    }
+
+    /// "This is a club" went on or off (#267). A skeleton's folders are
+    /// given up first — a club takes none, and a code like CODING has
+    /// already adopted the general one by the time the box ticks itself —
+    /// then `ClubFill` moves the words and folders the teacher has not
+    /// edited. Turning it off offers the subject's skeleton again.
+    func applyClubChoice(_ isAClub: Bool) {
+        if isAClub && adoptedStructure != nil {
+            restoreGenericStructure()
+        }
+        let filled: ClubFillFields = ClubFill.applying(
+            isClub: isAClub,
+            to: ClubFillFields(
+                sharedFolders: sharedFolders, perSectionFolders: perSectionFolders,
+                classFolder: classFolderName, unitWord: unitWord,
+                frontPageHeading: frontPageHeading, noun: classNoun
+            ),
+            usesLCSTerminology: usesLCSTerminology
+        )
+        sharedFolders = filled.sharedFolders
+        perSectionFolders = filled.perSectionFolders
+        classFolderName = filled.classFolder
+        unitWord = filled.unitWord
+        frontPageHeading = filled.frontPageHeading
+        classNoun = filled.noun
+        reconcileGradedFolders()
+        if !isAClub {
+            adoptSkeletonStructure()
+        }
+    }
+
+    /// The class-pages folder renamed in the club's own row: the entry in
+    /// the per-section list follows it, in its place.
+    func renameClassFolder(to newName: String) {
+        var folders: [String] = []
+        var renamed: Bool = false
+        for folder in perSectionFolders {
+            if folder == classFolderName && !renamed {
+                folders.append(newName)
+                renamed = true
+            } else {
+                folders.append(folder)
+            }
+        }
+        perSectionFolders = folders
+        classFolderName = newName
     }
 
     /// Puts a set of lists into the structure editor.
@@ -1308,6 +1498,11 @@ struct NewCourseWizardView: View {
         // not exist yet, and the name it will record is the one this rule is
         // about to pick. The literal is the right test here.
         if ClassFolder.isTheAllClassesFolder(folder) {
+            return .blocked(reason: SpecialNames.classFolderBlocked)
+        }
+        // A club's class folder is protected by the name it was given
+        // (#267): the literal alone left "All Meetings" deletable.
+        if isClubCourse && folder == classFolderName {
             return .blocked(reason: SpecialNames.classFolderBlocked)
         }
         if gradedFolders.contains(folder) {
@@ -1389,6 +1584,16 @@ struct NewCourseWizardView: View {
             validationProblem = problem
             return
         }
+        // The club's class-pages folder is typed into a field of its own
+        // rather than added through the list, so it gets the list's checks
+        // here (#267 review): empty, a "/", or another folder's name would
+        // otherwise go straight into `per_section_folders` and `class_folder`.
+        if isClubCourse, let problem = NewCourseWizardView.clubClassFolderProblem(
+            classFolderName, perSectionFolders: perSectionFolders
+        ) {
+            validationProblem = problem
+            return
+        }
         guard let workspaceURL = workspace.workspaceURL else {
             validationProblem = "No working folder is selected."
             return
@@ -1467,12 +1672,13 @@ struct NewCourseWizardView: View {
         var chosenGradedFolders: [String] = gradedFolders
         var skeleton: SkeletonCatalog.Family? = nil
         if startsFromSkeleton && SkeletonCatalog.hasSkeleton(
-            forCode: code, takingExampleContent: prepopulatesExampleContent
+            forCode: code, takingExampleContent: prepopulatesExampleContent, numbered: isClubCourse
         ) {
             skeleton = SkeletonCatalog.family(forCode: code)
             if let adopted = SkeletonCatalog.structureToAdopt(
                 forCode: code,
                 takingExampleContent: prepopulatesExampleContent,
+                numbered: isClubCourse,
                 currentSharedFolders: sharedFolders
             ) {
                 let lateAdoption: WizardStructure.Lists = WizardStructure.adopting(adopted)
@@ -1525,11 +1731,11 @@ struct NewCourseWizardView: View {
         // It reads the code this configuration is FOR rather than the
         // field's current contents, the same way every other key here does.
         let pagesOffered: Bool = CourseConfiguration.curriculumPagesOffered(
-            codeHasExampleContent: ExampleContentCatalog.hasContent(forCode: code),
+            codeHasExampleContent: ExampleContentCatalog.hasContent(forCode: code) && !isClubCourse,
             payloadIncludesCurriculum: ExampleContentCatalog.includesCurriculum(forCode: code),
-            prepopulatesExampleContent: prepopulatesExampleContent,
+            prepopulatesExampleContent: takesExampleContent,
             skeletonIsOffered: SkeletonCatalog.hasSkeleton(
-                forCode: code, takingExampleContent: prepopulatesExampleContent
+                forCode: code, takingExampleContent: takesExampleContent, numbered: isClubCourse
             ),
             startsFromSkeleton: startsFromSkeleton
         )
@@ -1567,16 +1773,22 @@ struct NewCourseWizardView: View {
             // a teacher whose vocabulary is "Thread 2, Day 3" can call it
             // "All Days" without the next-class button and the curriculum map
             // quietly looking somewhere else.
-            "class_folder": ClassFolder.name(inPerSectionFolders: chosenPerSectionFolders),
+            //
+            // A club's (#267) is the name the teacher chose in the club's
+            // own row: "All Meetings" has no "class" for the guess to find,
+            // so the guess would fall back to whichever folder is FIRST.
+            "class_folder": isClubCourse && chosenPerSectionFolders.contains(classFolderName)
+                ? classFolderName
+                : ClassFolder.name(inPerSectionFolders: chosenPerSectionFolders),
             // The real wizard reads these as its defaults, exactly like
             // every other answer here. False when no skeleton is offered
             // for the code — including a code whose ready-made pages the
             // teacher IS taking — so a stale true can never mean anything.
             "use_skeleton": SkeletonCatalog.hasSkeleton(
-                forCode: code, takingExampleContent: prepopulatesExampleContent
+                forCode: code, takingExampleContent: prepopulatesExampleContent, numbered: isClubCourse
             ) && startsFromSkeleton,
             "prepopulate_example_content": ExampleContentCatalog.hasContent(forCode: code)
-                && prepopulatesExampleContent,
+                && takesExampleContent,
             // Written exactly as they are for a payload course, because
             // the pages are the payload's either way: the teacher who
             // declined the ready-made lessons and kept the subject's
@@ -1628,7 +1840,22 @@ struct NewCourseWizardView: View {
             }
             config["additional_deploy_targets"] = encoded
         }
-        let structureFromExample: Bool = prepopulatesExampleContent
+        // How class pages are named, the front page's heading, and what the
+        // assistant calls a page (#267) — written for a CLUB only. An ABSENT
+        // key means today's "Unit 2, Day 3", "Most Recent Class" and
+        // "class" (contracts/file-formats.json), so every other course's
+        // file stays byte-for-byte what it was: the golden
+        // `WizardStructureTests.testTheFileForEveryPathThatExistedBeforeIsUnchanged`
+        // holds it to that, and a course has nothing to say in these keys
+        // that their absence does not already say.
+        if isClubCourse {
+            let heading: String = frontPageHeading.trimmingCharacters(in: .whitespaces)
+            config["class_page_scheme"] = ClassPageScheme.numbered.rawValue
+            config["front_page_heading"] = heading.isEmpty ? ClubVocabulary.club.frontPageHeading : heading
+            config["class_noun"] = classNoun.rawValue
+        }
+
+        let structureFromExample: Bool = takesExampleContent
             && ExampleContentCatalog.hasContent(forCode: code)
         if !structureFromExample {
             // Narrowed once more as the file is written, the way Windows does
@@ -1637,9 +1864,10 @@ struct NewCourseWizardView: View {
             // skeleton given up — but the terminology switch does not, so a
             // teacher who ticked College Board Curriculum and then turned LCS
             // off would otherwise have that folder written into a course that
-            // has no such folder. `setup_course.py` reconciles the key again
-            // when it reads it, so this is the second net rather than the
-            // only one; what it buys is that both apps write the same file.
+            // has no such folder. This is the ONLY net: since GitHub issue
+            // #192 `setup_course.py` writes a saved pool back as it was
+            // (gradedFolders.rerunningSetup), and it also makes both apps
+            // write the same file.
             config["graded_folders"] = GradedFolderRule.reconciled(
                 chosenGradedFolders,
                 toFolders: chosenSharedFolders + chosenPerSectionFolders

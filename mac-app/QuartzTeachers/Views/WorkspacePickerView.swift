@@ -50,8 +50,7 @@ struct WorkspacePickerView: View {
                 // is what this stack used to arrange for itself. It moved into FinderPathBarView on 2026-09-09
                 // because the WINDOW's bar had the same need and did not
                 // have the same workaround (issue #145).
-                FinderPathBarView(folderURL: chosenURL)
-                    .frame(maxWidth: 520)
+                WorkspacePickerView.chosenFolderPathBar(for: chosenURL)
             }
 
             // A folder a cloud service keeps in sync: say so here, where the
@@ -134,5 +133,28 @@ struct WorkspacePickerView: View {
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - Functions
+
+    /// The path bar under the folder a teacher has just chosen, exactly as
+    /// the confirmation screen draws it.
+    ///
+    /// A function of its own so that `PathBarWidthTests` measures what this
+    /// screen draws rather than a copy of it — which holds only while `body`
+    /// calls this and adds nothing after it, so keep it that way.
+    ///
+    /// It has NO width limit of its own, on purpose (issue #295). Until
+    /// 2026-09-25 it carried `.frame(maxWidth: 520)`, added on 2026-08-09 when
+    /// the bar was a scroll view that filled any width it was offered and so
+    /// needed holding in. Since issues #145 and #148 the bar asks only for
+    /// the room its crumbs need and hides the folders' names only when they
+    /// do not fit — but the 520 still decided "do not fit", whatever the
+    /// window's width. An ordinary Desktop path needs about 554 points, so it
+    /// lost every name except the folder's own at every window size. The
+    /// window is at least 900 wide and the screen is padded by 40 each side,
+    /// so the bar is now offered at least 820.
+    static func chosenFolderPathBar(for folderURL: URL) -> some View {
+        FinderPathBarView(folderURL: folderURL)
     }
 }

@@ -905,7 +905,7 @@ What replaces the old container concepts:
   container name.** All three launchers still compute `$WORKDIR_ID` — the
   first 8 hex characters of SHA-256 over the folder's physical path (via
   `GetFinalPathNameByHandleW`, the same Win32 call as before) plus a
-  newline, matching the mac's `pwd -P | shasum -a 256` derivation. A
+  newline, matching the mac's `/bin/pwd -P | shasum -a 256` derivation. A
   `$CONTAINER_NAME = "teaching-quartz-$WORKDIR_ID"` variable is still
   assigned in each script for parity with the mac's naming scheme, but
   nothing native reads it — the real use of `$WORKDIR_ID` today is naming a
@@ -914,10 +914,52 @@ What replaces the old container concepts:
   entirely **out of the working folder**, because teachers keep working
   folders in OneDrive and a build's thousands of small files would sync and
   lock in place there.
+
+  **One folder, one spelling — what the mac learned, for Windows to KNOW
+  (GitHub #189, 2026-09-25).** The mac found that its launchers and its app
+  named one working folder two ways: bash's built-in `pwd -P` keeps the TYPED
+  case and Unicode form (é as one character or as e + accent), while the app
+  asked the disk — so a folder reached in the wrong case, or with an accented
+  name stored the Terminal way, had two containers and two builds folders
+  that cleared each other's builds. The fix there is `cd "$(/bin/pwd -P)"` in
+  each launcher and one Swift function (`FolderIdentity.canonicalPath`) used
+  for the hash AND every comparison of two folder paths; the reasoning is in
+  [03](03-launcher-scripts.md) → "One folder, one spelling" and
+  [09](09-mac-app.md) → "One folder, however it is spelled". **Windows has no
+  `pwd -P` to get wrong**: `GetFinalPathNameByHandleW` already returns the
+  disk's own casing, and NTFS is case-insensitive, so it is the Windows twin
+  of `/bin/pwd` and nothing needs to change on the strength of this note.
+  The trap, if a new derivation of a folder id or a new folder comparison is
+  ever written on that side: take the OS's own name for the folder, never the
+  string that was typed or passed on a command line — and use the same
+  function for the id and for the comparison, so they cannot disagree. (Git
+  Bash's and WSL's `pwd -P` are bash's built-in and keep the typed case.)
+  Whether the two already agree on one spelling is a check, not a change; the
+  `windows` issue opened with #189 asks for it.
+
+  **A remake never ends live work — what the mac learned, for Windows to KNOW
+  (GitHub #94, 2026-09-25).** The mac's launchers used to remove a folder's
+  container to remake it (after an update, for a new mount, for a stale
+  connection) without looking at what ran inside it, which killed an open
+  preview or a publish half-way through its upload. They now wait for a build
+  or publish, refuse while a preview whose launcher is still running is open,
+  and remove by id ([03](03-launcher-scripts.md) → "Before a workspace is
+  remade"). **Nothing is owed here**: Windows builds natively, so there is no
+  container to remake, and `contracts/app-rules.json` →
+  `previewPorts.whenTheWorkspaceIsInUse` and the `workspace was in use` trail
+  event are both `appliesOn: ["mac"]`, permanently. The trap, if Windows ever
+  gains something long-lived that is shared by a folder's runs and replaced
+  when it goes stale (a warm builder process, a per-folder server): look at
+  what is using it before replacing it, and tell a live user from an orphan by
+  whether the program that started it is still running — an orphan counted as
+  live refuses for ever.
 - **Concurrent previews are still isolated by port, exactly as before.**
   `preview.ps1` still probes a free host port block (8081/8091/8101/8111/8121/8131,
   base..base+3 for the site, base+1000..+1003 for Quartz's live-reload
-  websocket) and prints the exact "Preview will be available at:" line the
+  websocket — six blocks, where the mac launchers walk forty since GitHub
+  #280 and `preview.ps1` owes the same walk: `contracts/app-rules.json` →
+  `previewPorts.hostBlockCases`, and 03 → "How a folder finds its ports, and
+  when it cannot") and prints the exact "Preview will be available at:" line the
   app watches for. What changed is only what is listening on that port: a
   Node process running directly on the PC, bound to `127.0.0.1` (patched at
   runtime-build time in `fetch-runtime.ps1`, native-only — see the favicon
@@ -972,7 +1014,10 @@ as history, not as what Windows does today.
   matching the mac's naming scheme, but nothing native reads it today —
   don't build app logic around a container name existing.
 - **Port blocks**: `preview.ps1` still probes a free host port block
-  (bases 8081, 8091, 8101, 8111, 8121, 8131): base..base+3 for the preview
+  (bases 8081, 8091, 8101, 8111, 8121, 8131 — the mac's six until GitHub #280
+  made it forty, 8081 … 8471; `preview.ps1` owes that walk, and
+  `build_site.py`'s own native re-probe already walks forty blocks from the
+  port it is given): base..base+3 for the preview
   site (four concurrent previews per folder) and base+1000..+1003 for
   Quartz's live-reload websockets. What is listening on those ports is now
   a native Node process bound to `127.0.0.1`, not a container's forwarded
@@ -1311,10 +1356,15 @@ VISIBILITY writer — and that qualifier is load-bearing, because two other
 finders are still hand-rolled and were deliberately left alone:
 `CourseRestorer.FrontmatterBounds` (strict here, lenient on the mac since
 #140, so a restore reaches different pages on the two platforms — that is
-[issue #177](https://github.com/russellgordon/plantoir/issues/177), a
-`decision`) and `SectionAdder.FrontmatterLines` (strict on BOTH platforms, so
-the section carry agrees with itself — parity, not a divergence, and
-documented rather than filed). Four finders, two unified. Check which one you
+[issue #177](https://github.com/russellgordon/plantoir/issues/177), which
+Russell decided on 2026-09-19: adopt the shared finder; it is owed together
+with #182's carry-the-value-lines restore, see the `windows` issue from #182)
+and `SectionAdder.FrontmatterLines` (strict here; it was strict
+on the mac too until #175, 2026-09-25, when that strictness was measured to
+PUBLISH a page hidden in section 1 into a newly added section — the mac now
+uses the shared finder and splices by line, and this one owes the same, see
+`documentation/08-course-config-reference.md` → "A writer must find the BLOCK").
+Four finders, two unified here, three on the mac. Check which one you
 are looking at before "tidying" any of them.
 
 A third fault was shared with the mac and **was fixed here first, on
@@ -1406,7 +1456,9 @@ should mirror it:
   test target is app-hosted (`TEST_HOST`), so the host app writes its launch
   lines before any test-bundle code loads. Instead the redirect lives in the
   product (`ProblemReportStore.standard` returns a throwaway folder when
-  `XCTestConfigurationFilePath` is in the environment), and
+  XCTest is loaded in the process — `RealHome.isInsideTestBundle` since
+  #264; it read `XCTestConfigurationFilePath` from the environment before),
+  and
   `testTheSuiteWritesToAThrowawayTrail` pins it so a refactor cannot lose it
   silently. Worth a matching pin on Windows: one test asserting the trail
   path is the redirected one, so the module initializer's presence is itself

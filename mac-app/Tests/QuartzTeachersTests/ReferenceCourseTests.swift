@@ -392,6 +392,10 @@ final class ReferenceCourseTests: XCTestCase {
             ReferenceWording.copyIsASnapshot(course: "{course}"),
             wording["copyIsASnapshot"] as? String
         )
+        XCTAssertEqual(
+            ReferenceWording.copyAlreadyBeingMade(folder: "{folder}"),
+            wording["copyAlreadyBeingMade"] as? String
+        )
         XCTAssertEqual(ReferenceWording.groupTitle, wording["groupTitle"] as? String)
         XCTAssertEqual(ReferenceWording.keepACopyMenuItem, wording["keepACopyMenuItem"] as? String)
         XCTAssertEqual(

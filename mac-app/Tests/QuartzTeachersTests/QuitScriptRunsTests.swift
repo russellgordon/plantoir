@@ -12,6 +12,12 @@ import XCTest
 /// folder `HelperPrograms` looks in first — so the real `docker` and the real
 /// `colima` on the machine running the suite are shadowed and cannot be
 /// reached, and nothing of anybody's is stopped.
+///
+/// The list of what is running on this Mac is stood in for too (issue #243):
+/// every run reads a file written here, empty unless a test says otherwise,
+/// so another worktree's suite, a `verify.sh` or a real preview running on
+/// the same Mac can no longer turn a test red or make one skip itself. One
+/// test reads the real list on purpose, and says why.
 final class QuitScriptRunsTests: XCTestCase {
 
     // MARK: - Types
@@ -229,6 +235,16 @@ final class QuitScriptRunsTests: XCTestCase {
     /// too eagerly — `Teach` is a prefix of `Teach 2`, and a neighbour's
     /// launcher must not hold a folder that has none. Nothing here needs
     /// Docker or Colima; the stand-ins are the only ones reachable.
+    ///
+    /// The ONE test in the suite that reads this Mac's real process list, on
+    /// purpose (issue #243): it is the only proof that a real `ps` line
+    /// carries the absolute launcher path the script matches on, which a
+    /// written-down list cannot prove. Nothing outside can flake it — its own
+    /// "Teach 2" publish already makes "any launcher running" true, and its
+    /// folders sit under a unique scratch root. Its stand-ins ARE visible to
+    /// anything else reading the real list for up to 25 seconds, or longer if
+    /// the test host crashes before `defer` runs; since #243 no other test
+    /// reads it, so they can no longer turn anybody else's run red.
     @MainActor
     func testNothingIsStoppedWhileThatFoldersLauncherIsRunning() throws {
         let scratch: Scratch = try makeScratch()
@@ -284,7 +300,8 @@ final class QuitScriptRunsTests: XCTestCase {
             in: scratch,
             includingTheSharedSetup: true,
             secondsToWaitForWork: 2,
-            folderPaths: [busy.path, quiet.path, stopping.path]
+            folderPaths: [busy.path, quiet.path, stopping.path],
+            readingTheRealProcessList: true
         )
 
         var stopped: [String] = []
@@ -347,10 +364,6 @@ final class QuitScriptRunsTests: XCTestCase {
     /// nothing of ours running on the machine.
     @MainActor
     func testTheSharedMachineIsStoppedOnAClearAnswer() throws {
-        try XCTSkipIf(
-            aLauncherIsRunningOnThisMac(),
-            "A launcher is running on this Mac right now, which is exactly what the script refuses to stop anything through — this case cannot be told apart from the refusal working."
-        )
         let scratch: Scratch = try makeScratch()
         defer { try? FileManager.default.removeItem(at: scratch.root) }
         try writeDockerStandIn(in: scratch, running: false, processesInside: 1, psExitCode: 0)
@@ -358,6 +371,111 @@ final class QuitScriptRunsTests: XCTestCase {
         try makeSocket(at: colimaSocketPath(in: scratch))
 
         let trail: String = try run(in: scratch, includingTheSharedSetup: true)
+
+        XCTAssertTrue(
+            callsMade(in: scratch).contains("colima stop"),
+            "What was asked:\n\(callsMade(in: scratch).joined(separator: "\n"))"
+        )
+        XCTAssertTrue(trail.contains("the memory it was holding is back"), "The trail says: \(trail)")
+    }
+
+    // MARK: - What else is running on this Mac, written down
+
+    /// A launcher for ANY folder holds the shared machine: a publish from
+    /// another working folder may be between its calls into the machine, or
+    /// not have reached it yet.
+    ///
+    /// Written down rather than started, so the answer does not depend on
+    /// what else happens to be running on the Mac the suite runs on — which
+    /// is issue #243, and why this is a separate test from the real-list one
+    /// above.
+    @MainActor
+    func testALauncherForAnyFolderHoldsTheSharedMachine() throws {
+        let scratch: Scratch = try makeScratch()
+        defer { try? FileManager.default.removeItem(at: scratch.root) }
+        try writeDockerStandIn(in: scratch, running: false, processesInside: 1, psExitCode: 0)
+        try writeColimaStandIn(in: scratch)
+        try makeSocket(at: colimaSocketPath(in: scratch))
+
+        let trail: String = try run(
+            in: scratch,
+            includingTheSharedSetup: true,
+            processesRunningOnThisMac: [
+                "/bin/bash /Users/someone/Desktop/Other Class/preview.sh ICS3U 1"
+            ]
+        )
+
+        XCTAssertFalse(
+            callsMade(in: scratch).contains("colima stop"),
+            "The shared machine was stopped while another folder's preview was running"
+        )
+        XCTAssertTrue(
+            trail.contains("a publish or preview is still going"),
+            "The trail says: \(trail)"
+        )
+    }
+
+    /// A folder's own launcher holds its builder, and a neighbour whose name
+    /// it begins with is not held by it — `Teach` is a prefix of `Teach 2`.
+    ///
+    /// The same rule the real-list test proves, against a written-down list,
+    /// so it is checked on every run whatever else the Mac is doing.
+    @MainActor
+    func testThatFoldersOwnLauncherHoldsItsBuilderButNotItsNeighbours() throws {
+        let scratch: Scratch = try makeScratch()
+        defer { try? FileManager.default.removeItem(at: scratch.root) }
+        try writeDockerStandIn(in: scratch, running: true, processesInside: 1, psExitCode: 0)
+
+        let desktop: URL = scratch.home.appendingPathComponent("Desktop", isDirectory: true)
+        let busy: URL = desktop.appendingPathComponent("Teach 2", isDirectory: true)
+        let quiet: URL = desktop.appendingPathComponent("Teach", isDirectory: true)
+
+        let trail: String = try run(
+            in: scratch,
+            includingTheSharedSetup: false,
+            secondsToWaitForWork: 2,
+            folderPaths: [busy.path, quiet.path],
+            processesRunningOnThisMac: [
+                "/bin/bash " + busy.appendingPathComponent("deploy.sh").path + " COMP 1"
+            ]
+        )
+
+        var stopped: [String] = []
+        for call in callsMade(in: scratch) where call.hasPrefix("stop -t 2 ") {
+            stopped.append(String(call.dropFirst("stop -t 2 ".count)))
+        }
+        XCTAssertFalse(
+            stopped.contains(FolderContainers.containerName(forFolder: busy.path)),
+            "A folder with a publish running had its builder stopped. Stopped: \(stopped)"
+        )
+        XCTAssertTrue(
+            stopped.contains(FolderContainers.containerName(forFolder: quiet.path)),
+            "“Teach” was held by its neighbour's publish. Stopped: \(stopped)"
+        )
+        XCTAssertTrue(trail.contains("left the website builder for “Teach 2”"), "The trail says: \(trail)")
+    }
+
+    /// The app's own `--stop` runs do not hold the shared machine, or every
+    /// quit with a preview open would free nothing.
+    ///
+    /// Not a must-fail for #243 — the real list on a quiet Mac gives the same
+    /// answer — but it keeps the `--stop` exclusion checked against a list
+    /// the test controls.
+    @MainActor
+    func testAStopRunDoesNotHoldTheSharedMachine() throws {
+        let scratch: Scratch = try makeScratch()
+        defer { try? FileManager.default.removeItem(at: scratch.root) }
+        try writeDockerStandIn(in: scratch, running: false, processesInside: 1, psExitCode: 0)
+        try writeColimaStandIn(in: scratch)
+        try makeSocket(at: colimaSocketPath(in: scratch))
+
+        let trail: String = try run(
+            in: scratch,
+            includingTheSharedSetup: true,
+            processesRunningOnThisMac: [
+                "/bin/bash /Users/someone/Desktop/Other Class/preview.sh ICS3U 1 --stop"
+            ]
+        )
 
         XCTAssertTrue(
             callsMade(in: scratch).contains("colima stop"),
@@ -403,18 +521,36 @@ final class QuitScriptRunsTests: XCTestCase {
     /// scratch tools folder, so a suite run can never stop a container or a
     /// virtual machine belonging to the person running it. The substitution
     /// is asserted to have applied, so this cannot quietly stop being true.
+    ///
+    /// The list of what is running on this Mac is a file written here from
+    /// `processesRunningOnThisMac` — empty unless a test says otherwise — so
+    /// no run depends on what else the Mac is doing (issue #243). Only
+    /// `readingTheRealProcessList` reads the real one.
     @MainActor
     private func run(
         in scratch: Scratch,
         includingTheSharedSetup: Bool,
         secondsToWaitForWork: Int = 20,
-        folderPaths: [String]? = nil
+        folderPaths: [String]? = nil,
+        processesRunningOnThisMac: [String] = [],
+        readingTheRealProcessList: Bool = false
     ) throws -> String {
+        var processListing: FolderContainers.ProcessListing = .thisMac
+        if !readingTheRealProcessList {
+            let listFile: URL = scratch.root.appendingPathComponent("processes.txt")
+            var listText: String = ""
+            for line in processesRunningOnThisMac {
+                listText += line + "\n"
+            }
+            try Data(listText.utf8).write(to: listFile)
+            processListing = .readFrom(file: listFile)
+        }
         let script: String = FolderContainers.quitScript(
             folderPaths: folderPaths ?? [scratch.workingFolder.path],
             includingTheSharedSetup: includingTheSharedSetup,
             secondsToWaitForWork: secondsToWaitForWork,
-            inHomeFolder: scratch.home
+            inHomeFolder: scratch.home,
+            processListing: processListing
         )
         let nowhere: String = scratch.root.appendingPathComponent("no-homebrew-here").path
         try FileManager.default.createDirectory(
@@ -573,20 +709,5 @@ final class QuitScriptRunsTests: XCTestCase {
         }
         close(descriptor)
         XCTAssertEqual(bound, 0, "Could not make a socket at \(path)")
-    }
-
-    /// Is one of Plantoir's launchers running on this Mac at this moment?
-    private func aLauncherIsRunningOnThisMac() -> Bool {
-        let shell: Process = Process()
-        shell.executableURL = URL(fileURLWithPath: "/bin/sh")
-        shell.arguments = [
-            "-c",
-            "ps -Ao args= | grep -E '/(preview|deploy|setup)\\.sh( |$)' | grep -Fv -- ' --stop' | grep -Fv grep"
-        ]
-        shell.standardOutput = FileHandle.nullDevice
-        shell.standardError = FileHandle.nullDevice
-        try? shell.run()
-        shell.waitUntilExit()
-        return shell.terminationStatus == 0
     }
 }

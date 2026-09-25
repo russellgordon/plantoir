@@ -306,7 +306,7 @@ final class RolloverWebsiteTests: XCTestCase {
         // Since 2026-09-20 the rollover asks each agent WHICH WORKING FOLDER
         // it belongs to, so a file that says nothing is a file that belongs to
         // nobody — see `testARolloverNeverTouchesAnotherFoldersScheduledDeploy`.
-        let plistURL: URL = ScheduledDeploy.plistURL(courseCode: course.code, sectionNumber: 1)
+        let plistURL: URL = ScheduledDeploy.plistURL(courseCode: course.code, sectionNumber: 1, inWorkingFolder: root)
         try RolloverWebsiteTests.writeAgent(
             courseCode: course.code, sectionNumber: 1, workingFolder: root, at: plistURL
         )
@@ -329,9 +329,10 @@ final class RolloverWebsiteTests: XCTestCase {
     /// folder's live scheduled deploy.
     ///
     /// **The case the rest of issue #236 was written for, in the one cancel
-    /// path its first pass missed.** An agent's label is the course code and
-    /// the section number and nothing else, so `plistURL` names one file per
-    /// code and section for the whole Mac. A teacher holding last year's
+    /// path its first pass missed.** An agent's label was the course code and
+    /// the section number and nothing else until #237, so `plistURL` named one
+    /// file per code and section for the whole Mac — which is why the other
+    /// folder's job below carries that old label. A teacher holding last year's
     /// working folder and this year's, both with ICS3U section 1, with the
     /// live deploy in LAST year's, used to roll section 1 over in this year's
     /// and have the other folder's deploy deleted — and be told it had been
@@ -344,7 +345,13 @@ final class RolloverWebsiteTests: XCTestCase {
 
         let otherFolder: URL = root.deletingLastPathComponent()
             .appendingPathComponent("last-years-working-folder-\(UUID().uuidString)")
-        let plistURL: URL = ScheduledDeploy.plistURL(courseCode: course.code, sectionNumber: 1)
+        // Under the label every release before #237 wrote — the one name a
+        // section had for the whole Mac, and so the one another folder's job
+        // could share with this folder's. A job of the other folder's under
+        // today's label could not be confused by name at all.
+        let plistURL: URL = ScheduledDeploy.plistURL(
+            label: ScheduledDeploy.legacyAgentLabel(courseCode: course.code, sectionNumber: 1)
+        )
         try RolloverWebsiteTests.writeAgent(
             courseCode: course.code, sectionNumber: 1, workingFolder: otherFolder, at: plistURL
         )
@@ -368,9 +375,8 @@ final class RolloverWebsiteTests: XCTestCase {
         courseCode: String, sectionNumber: Int, workingFolder: URL, at plistURL: URL
     ) throws {
         let plist: [String: Any] = [
-            "Label": ScheduledDeploy.agentLabel(
-                courseCode: courseCode, sectionNumber: sectionNumber
-            ),
+            // The label the file is named for, as every plist of ours is.
+            "Label": plistURL.deletingPathExtension().lastPathComponent,
             "WorkingDirectory": workingFolder.path,
             "ProgramArguments": [
                 "/Applications/Plantoir.app/Contents/MacOS/Plantoir",

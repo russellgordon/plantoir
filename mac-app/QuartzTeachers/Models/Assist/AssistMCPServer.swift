@@ -39,6 +39,10 @@ enum AssistMCPServer {
     /// The flag that turns the app into a server.
     static let flag: String = "--mcp-stdio"
 
+    /// True in the process `serve` is running in — so a trail line written
+    /// by code the app and the server share can say which of the two wrote it.
+    static var isServing: Bool = false
+
     // MARK: - Functions
 
     /// The working folder given on the command line, when the flag is present.
@@ -57,7 +61,7 @@ enum AssistMCPServer {
         if path.isEmpty || path.hasPrefix("-") {
             return nil
         }
-        return URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
+        return URL(fileURLWithPath: RealHome.expandingTilde(in: path))
     }
 
     /// Read requests from stdin, write replies to stdout, until stdin closes.
@@ -65,6 +69,7 @@ enum AssistMCPServer {
     /// Never returns — MCP servers live until their client goes away, and the
     /// caller uses this to replace the app's ordinary startup.
     static func serve(workingFolder: URL) -> Never {
+        isServing = true
         let workspace: WorkspaceModel = WorkspaceModel()
         workspace.adoptRestoredPath(workingFolder.path)
         let runner: AssistToolRunner = AssistToolRunner(workspace: workspace, surface: .mcp)
@@ -87,11 +92,86 @@ enum AssistMCPServer {
                 }
             }
             Task { @MainActor in
+                await AssistMCPServer.stopOwnWorkBeforeLeaving()
                 exit(0)
             }
         }
 
         dispatchMain()
+    }
+
+    /// The client has gone: stop what THIS process started, and only then
+    /// take its leases down (#156).
+    ///
+    /// Leaving at once (`exit(0)` as soon as stdin closed, which is what this
+    /// did) took the `build` lease down with the process while the launcher it
+    /// had started carried on — a child on a pseudo-terminal is reparented
+    /// rather than killed when its parent goes (measured for the quit path),
+    /// so the build went on writing into the section's folder with nothing on
+    /// disk saying so, and the window was then free to start a second one:
+    /// the fault the lease exists to prevent.
+    ///
+    /// In order: no new launcher may start (a deploy's next leg would
+    /// otherwise begin the moment its build is stopped); the leases stop
+    /// following the records, so that the runs ending their own records as
+    /// they are stopped cannot take the leases down early; every launcher
+    /// this process has in flight is stopped and WAITED for — each resumes
+    /// when its own process has actually exited, a real dependency rather
+    /// than a guessed delay; then each section it was building is stopped
+    /// inside the website builder as well (`PreviewStopper`, whose own wait
+    /// is bounded); and only then are the leases removed.
+    ///
+    /// A client that KILLS the server rather than closing its input skips all
+    /// of this. The lease is then left behind with a pid that is gone, which
+    /// every reader ignores — but the reparented launcher may still be
+    /// building. That is a known limit, shared with Windows' `plantoir-mcp`.
+    static func stopOwnWorkBeforeLeaving(
+        stopInsideTheBuilder: (_ courseCode: String, _ sectionNumber: Int, _ folder: URL) async -> Void
+            = AssistMCPServer.stopSectionInsideTheBuilder
+    ) async {
+        var sections: [CourseActivity.PreviewBuildRecord] = []
+        for build in CourseActivity.activePreviewBuilds {
+            sections.append(build)
+        }
+        for publish in CourseActivity.activePublishes {
+            let asBuild: CourseActivity.PreviewBuildRecord = CourseActivity.PreviewBuildRecord(
+                folderPath: publish.folderPath,
+                courseCode: publish.courseCode,
+                sectionNumber: publish.sectionNumber
+            )
+            if !sections.contains(asBuild) {
+                sections.append(asBuild)
+            }
+        }
+
+        ScriptRunner.refusesNewRuns = true
+        WorkLeaseRegistry.isLeaving = true
+
+        var inFlight: [ScriptRunner] = []
+        for runner in ScriptRunner.runsInFlight {
+            inFlight.append(runner)
+        }
+        for runner in inFlight {
+            runner.stopByUser()
+        }
+        for runner in inFlight {
+            await runner.waitUntilFinished()
+        }
+
+        for section in sections {
+            await stopInsideTheBuilder(
+                section.courseCode, section.sectionNumber, URL(fileURLWithPath: section.folderPath)
+            )
+        }
+
+        WorkLeaseRegistry.releaseEverything()
+    }
+
+    /// The real stop for one section inside the website builder.
+    static func stopSectionInsideTheBuilder(_ courseCode: String, _ sectionNumber: Int, _ folder: URL) async {
+        await PreviewStopper.stopSectionProcessesAndWait(
+            courseCode: courseCode, sectionNumber: sectionNumber, workspaceURL: folder
+        )
     }
 
     /// One request, answered. Returns nil for a notification, which by the
