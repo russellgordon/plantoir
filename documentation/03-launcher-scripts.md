@@ -915,6 +915,17 @@ the shared Python and watching that case — and only that case — fail. The sa
 was done for the descendant walk. A green suite proves nothing about a case
 that cannot fail.
 
+
+**A preview another program is building is declined before any stop (#156).**
+Since 2026-09-25 the mac reads the work leases under `courses/.internal/activity/`,
+so a Preview, a Deploy or an assistant's rebuild that another program — an
+outside assistant, another copy of Plantoir, a publish set for later — is in
+the way of is declined BEFORE this stop runs, never after it. The stop reaches
+builds as well as servers (above), so a stop placed first would end the other
+program's build for a press that was going to be refused anyway. The rule and
+its cases are `contracts/shared-rules.json` → `workLeases.declining`;
+`09-mac-app.md` → "Two programs, one course" is the manual.
+
 ## A course kept for reference is refused in the launcher, early
 
 `deploy.sh` and `deploy.ps1` both read `courses/<CODE>/course_config.json`

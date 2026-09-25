@@ -2590,6 +2590,57 @@ the date drift it fixes, because the mac has no equivalent of your `DateAudit`.
 The three `plan_` twins travel with their writes and are not separate
 decisions.
 
+### What an outside assistant is refused while another program builds the course (#156)
+
+Added 2026-09-25. `Plantoir --mcp-stdio` is a separate process from the app a
+teacher has open, with memory of its own, so until #156 neither could see the
+other's builds: Claude Code could rebuild or deploy a section while the window
+was building the same course, and the two builds cleared each other's folder.
+Now both read and write the work-lease files under `courses/.internal/activity/`
+— the manual is `09-mac-app.md` → "Two programs, one course"; the rule is
+`contracts/shared-rules.json` → `workLeases.declining`.
+
+What the MCP client meets:
+
+- **`deploy_section` and `rebuild_preview`** are REFUSED, with
+  `wording.courseIsBusy`, when another live program holds `build`, `publish` or
+  `preview` on the course. The check is made before anything is stopped, and
+  again by the headless deploy and rebuild right after they take their own
+  `build` lease (take, then check — only a lease taken earlier counts).
+- **`publish_pages` and `undo_last_change`** still WRITE — Markdown never
+  conflicts with a build — and leave the teacher's preview up; the note where
+  the preview would have been refreshed is `courseIsBusy`. The consequence to
+  know: with the teacher's preview open in the window, an outside assistant's
+  change reaches the page but not the preview until the teacher presses Preview
+  (a program's own lease never stands in its own way). Before #156
+  the rebuild went ahead and ended that preview instead. Windows' plantoir-mcp
+  refuses WRITES only on `build`, for the reason its
+  `RefuseIfPlantoirIsBuilding` records — refusing writes during a preview made
+  the assistant useless to a teacher watching one — and the mac agrees: only
+  the BUILD after the write is declined.
+- **Why `courseIsBusy` and not the new `courseIsBeingBuiltElsewhere`.** The
+  client is talking TO the program whose course is busy, so "busy in Plantoir —
+  a preview or a deploy is running. Wait for that to finish, then ask again" is
+  true and tells it what it can do. It reads a little loosely when the holder is
+  a SECOND outside session or a publish set for later (neither is "a preview or
+  a deploy" in the window), and that was accepted rather than adding a key
+  (plan review L1). The teacher, in the app, gets
+  `courseIsBeingBuiltElsewhere`, which says where the other work might be.
+- **Why a PREVIEW blocks it, when Windows' `plantoir-mcp` blocks only on
+  `build`.** Every `--build-only` ends that section's serving preview first
+  (`build_site.stop_preview_serving`), so an outside rebuild would take down the
+  page the teacher is reading — which the in-app assistant already refused to
+  do. The client can retry; the teacher reading the page cannot. Stricter than
+  Windows on purpose, and a red contract case there is the request.
+- **When the client goes away mid-build**, the server stops the launchers it
+  started, and the sections inside the website builder, BEFORE its leases come
+  down. A client that kills the server skips that; see the known limit in 09.
+
+None of this touches the tool surface: no description, schema or prompt byte
+moved (local 13 `46b96562…2cd96cb6`, MCP 32 `9bcc7eb7…9cef36f7`, hashed before
+and after). The rule lives in code, as "steer the model with code, not with
+tool descriptions" says it must.
+
 ### The model's list is SHORTER than the server's
 
 Two lists, deliberately. `definitions` is what the local model sees;
