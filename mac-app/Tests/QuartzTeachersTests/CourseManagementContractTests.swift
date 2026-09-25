@@ -203,7 +203,7 @@ final class CourseManagementContractTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: folder) }
 
         let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 6)
+        XCTAssertGreaterThanOrEqual(cases.count, 8)
         for testCase in cases {
             let shape: String = try XCTUnwrap(testCase["shape"] as? String)
             let before: String = try XCTUnwrap(testCase["before"] as? String)

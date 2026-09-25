@@ -246,10 +246,11 @@ nonisolated enum CopyPageWording {
     /// website builder could read differently.
     ///
     /// Two shapes are known and each was reproduced: a block closed by an
-    /// INDENTED `---`, which this app reads as the end and the builder does
-    /// not (issue #188) — so the copy reads hidden here and is PUBLISHED
-    /// there — and a block carrying a YAML anchor or alias, which the builder
-    /// refuses to parse at all. Measured at 0 of 777 real pages; refused
+    /// INDENTED `---`, which this app read as the end and the builder does
+    /// not (issue #188, since fixed: neither reads it as an end now, so such
+    /// a source is copied HIDDEN with those lines as its body) — so the copy
+    /// read hidden here and was PUBLISHED there — and a block carrying a YAML
+    /// anchor or alias, which the builder refuses to parse at all. Measured at 0 of 777 real pages; refused
     /// anyway, because the promise this feature makes is certainty.
     static func thePageIsWrittenInAWayPlantoirCannotBeSureOf(page: String) -> String {
         return "“\(page)” was not copied: its settings are written in a way Plantoir cannot be sure of, and a copy must never turn up where students can read it."

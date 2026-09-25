@@ -95,7 +95,13 @@ final class FileFormatsContractTests: XCTestCase {
 
     func testVisibilityIsReadAsTheContractSays() throws {
         let section: [String: Any] = try FileFormatsContractTests.section("pageVisibility")
-        for testCase in try XCTUnwrap(section["readingCases"] as? [[String: Any]]) {
+        let readingCases: [[String: Any]] = try XCTUnwrap(section["readingCases"] as? [[String: Any]])
+        // A floor, for the reason the writing list gives below: a loop over a
+        // list an edit has emptied passes having read nothing.
+        XCTAssertGreaterThanOrEqual(
+            readingCases.count, 59, "contracts/file-formats.json → pageVisibility.readingCases has shrunk"
+        )
+        for testCase in readingCases {
             let frontmatter: String = try XCTUnwrap(testCase["page"] as? String)
             let page: String = """
             ---
@@ -152,7 +158,7 @@ final class FileFormatsContractTests: XCTestCase {
         // exactly the failure this whole file exists to prevent. Raise it when
         // cases are added; never lower it to make an edit go through.
         XCTAssertGreaterThanOrEqual(
-            cases.count, 13,
+            cases.count, 17,
             "contracts/file-formats.json → pageVisibility.writingCases has shrunk"
         )
 
@@ -180,7 +186,7 @@ final class FileFormatsContractTests: XCTestCase {
         let cases: [[String: Any]] = try XCTUnwrap(group["cases"] as? [[String: Any]])
         // A floor, for the reason the visibility list gives above.
         XCTAssertGreaterThanOrEqual(
-            cases.count, 13, "contracts/file-formats.json → datesAndTitles.writingCases has shrunk"
+            cases.count, 14, "contracts/file-formats.json → datesAndTitles.writingCases has shrunk"
         )
         for testCase in cases {
             let before: String = try XCTUnwrap(testCase["before"] as? String)

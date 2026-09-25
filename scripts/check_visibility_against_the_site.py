@@ -227,7 +227,19 @@ def judge_whole_pages(work, pages):
 def main():
     cases = contracts.section("file-formats", "pageVisibility", "readingCases")
     unreadable_cases = contracts.section("shared-rules", "unreadablePageSettings", "cases")
+    # Writing cases that say what the SITE does before and after the write
+    # (#188 onwards). The byte comparison is each app's suite; this is the
+    # other half — that the bytes it pins do what the case says on the site.
+    judged_writes = []
+    for case in contracts.section("file-formats", "pageVisibility", "writingCases", "cases"):
+        if "expectSiteBefore" in case or "expectSiteAfter" in case:
+            judged_writes.append(case)
     failures = []
+    if len(judged_writes) < 4:
+        failures.append(
+            f"Only {len(judged_writes)} writing cases carry expectSiteBefore/After — the list "
+            f"has shrunk, so this would pass having judged little."
+        )
     the_chain_is_still_the_chain(failures)
 
     work = Path(tempfile.mkdtemp())
@@ -253,6 +265,12 @@ def main():
     processed += judge_whole_pages(
         unreadable, [(case["page"], case["section"]) for case in unreadable_cases]
     )
+    writes = work / "writes"
+    writes.mkdir()
+    write_pages = []
+    for case in judged_writes:
+        write_pages += [(case["before"], case["section"]), (case["after"], case["section"])]
+    processed += judge_whole_pages(writes, write_pages)
 
     pages_json = work / "pages.json"
     pages_json.write_text(json.dumps(processed), encoding="utf-8")
@@ -329,6 +347,25 @@ def main():
                 f"read must be HIDDEN on the site and must never stop the build (#246)."
             )
 
+    writes_start = unreadable_start + len(unreadable_cases)
+    write_verdicts = verdicts[writes_start:]
+    for position, case in enumerate(judged_writes):
+        for offset, (field, text) in enumerate(
+            (("expectSiteBefore", case["before"]), ("expectSiteAfter", case["after"]))
+        ):
+            if field not in case:
+                continue
+            verdict = write_verdicts[position * 2 + offset]
+            actual = "stops" if verdict["error"] is not None else (
+                "visible" if verdict["visible"] else "hidden"
+            )
+            if actual != case[field]:
+                failures.append(
+                    f"{text!r} (pageVisibility.writingCases, {field}, section "
+                    f"{case['section']}): the contract says {case[field]} and the site "
+                    f"says {actual}. why: {case.get('why', '')}"
+                )
+
     for case, after, verdict in zip(cases, processed, verdicts):
         wanted = case["expectVisible"]
         if verdict["error"] is not None:
@@ -359,7 +396,7 @@ def main():
         f"{len(KNOWN_TO_DIFFER)} knowingly-different forms and "
         f"{len(CONTINUATIONS_A_WRITER_MUST_SWEEP)} continuations a writer must sweep "
         f"(three pages each) and {len(unreadable_cases)} unreadable-settings cases "
-        f"down the real chain."
+        f"and {len(judged_writes)} writing cases (before and after) down the real chain."
     )
     if failures:
         for line in failures:

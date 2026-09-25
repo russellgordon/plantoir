@@ -1967,20 +1967,42 @@ def forget_vault_sources(course_folder: Path | None = None) -> None:
 
 
 def _is_frontmatter_fence(line: str) -> bool:
-    """Three or more dashes and nothing else — the app's own fence rule
-    (`PageVisibilityReader.isFence`), so the build writes the block the apps
-    read."""
-    bare = page_visibility.trim(line)
+    """
+    The CLOSING fence: three or more dashes at COLUMN 0, with nothing after
+    them but spaces and tabs (and a Windows line ending's carriage return).
+
+    python-frontmatter's own boundary, `^-{3,}\\s*$` with `re.MULTILINE`, so
+    a line of INDENTED dashes is part of the value above it, not the end of
+    the block — `publish: false` over `  ---` is the string "false ---" and
+    the page is published. The apps' rule since #188
+    (`PageVisibilityReader.isFence`); until then this trimmed both ends, as
+    the apps did, and ended the block at the indented dashes — so a write
+    that read back wrong was dropped by `_write_date_into_the_teachers_page`
+    and the page was quietly left undated.
+    """
+    bare = line.rstrip("\r").rstrip(" \t")
     return len(bare) >= 3 and set(bare) == {"-"}
+
+
+def _is_opening_frontmatter_fence(line: str) -> bool:
+    """
+    The OPENING fence may be indented: `frontmatter.parse` strips the whole
+    document before it matches, so the indent in front of the first line is
+    gone by then (#188). A symmetric "never indented" rule was rejected — it
+    sees no block behind an indented opener, and a writer would then give the
+    page a second one, leaving the teacher's own behind it as body text.
+    """
+    return _is_frontmatter_fence(page_visibility.trim(line))
 
 
 def _frontmatter_fences(lines: list[str]):
     """(open, close) line numbers of a page's frontmatter, or None. Leading
-    blank lines are skipped, as python-frontmatter and the apps skip them."""
+    blank lines are skipped, as python-frontmatter and the apps skip them.
+    The opener may be indented and the close may not (#188)."""
     open_index = 0
     while open_index < len(lines) and page_visibility.trim(lines[open_index]) == "":
         open_index += 1
-    if open_index >= len(lines) or not _is_frontmatter_fence(lines[open_index]):
+    if open_index >= len(lines) or not _is_opening_frontmatter_fence(lines[open_index]):
         return None
     for index in range(open_index + 1, len(lines)):
         if _is_frontmatter_fence(lines[index]):
@@ -2070,7 +2092,7 @@ def _setting_frontmatter_value(text: str, key: str, value_text: str) -> str | No
         for line in lines:
             if page_visibility.trim(line) == "":
                 continue
-            if _is_frontmatter_fence(line):
+            if _is_opening_frontmatter_fence(line):
                 return None
             break
         return f"---{newline}{key}: {value_text}{newline}---{newline}" + text

@@ -401,8 +401,11 @@ then `section1/index.md` given `title: "Section "1"` built with no root
   the page is broken.
 * **Also hiding a block whose END cannot be found** (an indented closing
   fence, a block never closed). It cannot be told from a page that begins
-  with a horizontal rule, which is a case here; it is
-  [#188](https://github.com/russellgordon/plantoir/issues/188)'s.
+  with a horizontal rule, which is a case here. Where such a block ends was
+  [#188](https://github.com/russellgordon/plantoir/issues/188)'s question, and
+  its answer left the build alone: the apps now agree with python-frontmatter
+  that an indented `---` closes nothing, so the page has no block and is
+  published, as before.
 * **Making the apps' readers call such a page hidden.** They would need a twin
   of PyYAML in Swift and C#, and #207's certifier is deliberately stricter, so
   it would flag readable pages. The dangerous disagreement (the app says
@@ -593,14 +596,22 @@ both stay at `2026-09-08T07:00:00.000+0000`.
 
 `_setting_frontmatter_value` changes one key line and nothing else: the apps'
 own fence rule (three or more dashes; blank lines before the opening fence
-skipped — `PageVisibilityReader.fenceIndices`); the LAST line naming the key,
+skipped — `PageVisibilityReader.fenceIndices`; since #188 the CLOSING fence must
+start at column 0, as python-frontmatter's does, while the opening one may be
+indented — so a line of indented dashes is part of the value above it and goes
+with it, where it used to end the block early and make a write that read back
+wrong and was dropped; `documentation/08-course-config-reference.md` has the
+measurement); the LAST line naming the key,
 because it is the one YAML keeps; the lines below it that belong to its value go
 with it (`continuationLineIndices`' rule from #176, which #199 applies to the
 apps' own date and title writers — ported to Python here because #199 had not
 landed on `dev` when this was written; if the two ever disagree, the contract's
 `writingCases` are the arbiter); a missing key goes at the top of the block; a
 page with no frontmatter gets a block. Not touched at all: a block opened and
-never closed, a tab-indented block, a file starting with a byte-order mark.
+never closed (which since #188 includes one whose only closing-looking line is
+INDENTED — the apps' visibility writer prepends a block on that shape instead,
+and 08 says why the two differ), a tab-indented block, a file starting with a
+byte-order mark.
 A `# note` at the end of the key's line stays (a `#` inside quotes, or in the
 middle of a word, is part of the value). Every write is read back the way the
 build reads it before it is saved, and refused unless this section's date is now

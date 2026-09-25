@@ -441,16 +441,20 @@ final class CoursePageCopyTests: XCTestCase {
         }
     }
 
-    /// A source page whose settings block is closed by an INDENTED fence is
-    /// not copied, and nothing is left behind.
+    /// A source page the builder would read differently from this app is not
+    /// copied, and nothing is left behind.
     ///
     /// MUST-FAIL. Without the second question the app's own reader certifies
-    /// the copy hidden, the build reads no settings at all, and Quartz
-    /// publishes the page to students.
+    /// the copy hidden, while the build — which takes a LONE carriage return
+    /// as a line break and this app does not — reads the plain
+    /// `publish: false` as body text, and Quartz publishes the page. (Until
+    /// #188 this test used a block closed by an INDENTED fence; the app now
+    /// agrees with the build that such a block never closes, so that source
+    /// is copied hidden instead — see the test below.)
     func testAPageTheBuilderWouldReadDifferentlyIsNotCopied() async throws {
         let built: Built = try buildPair(
-            in: "indented-fence",
-            pageText: "---\ntitle: X\npublish: true\n  ---\nbody\n",
+            in: "lone-carriage-return",
+            pageText: "---\ntitle: Notes\r---\rpublish: true\n---\nbody\n",
             sourceMedia: []
         )
         let outcome: CoursePageCopyOutcome = await CoursePageCopier.copying(
@@ -466,6 +470,39 @@ final class CoursePageCopyTests: XCTestCase {
             "The page that could not be certified was left on disk."
         )
         XCTAssertEqual(outcome.couldNotBeRemoved, [])
+    }
+
+    /// A source whose ONLY closing-looking line is INDENTED has no settings
+    /// block on its own site — python-frontmatter never closes it, so its
+    /// lines are body text there — and since #188 this app agrees. The copy
+    /// is therefore given a block of its own and arrives HIDDEN in every
+    /// section, with the source's lines kept as its body, exactly as the
+    /// source's own site shows them. Measured 2026-09-25 on the real chain:
+    /// the source is published, the copy hidden in sections 1 and 2.
+    /// [Issue #188](https://github.com/russellgordon/plantoir/issues/188).
+    func testASourceWhoseOnlyCloseIsIndentedIsCopiedHidden() async throws {
+        let built: Built = try buildPair(
+            in: "indented-fence",
+            pageText: "---\ntitle: X\npublish: true\n  ---\nbody\n",
+            sourceMedia: []
+        )
+        let outcome: CoursePageCopyOutcome = await CoursePageCopier.copying(
+            try XCTUnwrap(built.request)
+        )
+        XCTAssertEqual(outcome.pagesCreated, ["Recursion"], "The page was not copied: \(outcome.skipped)")
+        let landed: URL = built.destination.directoryURL
+            .appendingPathComponent("Concepts/Recursion.md")
+        let text: String = try String(contentsOf: landed, encoding: .utf8)
+        for sectionNumber in [1, 2, 3] {
+            XCTAssertEqual(
+                AssistPageVisibility.answer(in: text, forSection: sectionNumber), .hidden,
+                "The copy is not hidden in section \(sectionNumber):\n\(text)"
+            )
+        }
+        XCTAssertTrue(
+            text.hasSuffix("\n---\ntitle: X\npublish: true\n  ---\nbody\n"),
+            "The source's lines were its body, and stay the copy's body:\n\(text)"
+        )
     }
 
     /// A page from the 2024–25 website-folder layout, carrying that layout's
