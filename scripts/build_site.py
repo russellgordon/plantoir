@@ -2647,10 +2647,12 @@ def _line_the_reader_stopped_near(error: Exception, text: str | None) -> int | N
     the newline that ends the opening fence, so counting newlines before the
     index and adding one gives the file's line.
 
-    "near" is honest for every shape measured: 9 of the 14 that carry a mark
-    point AT the wrong line and 5 point one line past it (a key with no space
-    after its colon, an unclosed quote, `-- -`, `%YAML`, U+2028). A bad date, a
-    key that is a number, date or yes/no, and a construct error give no line.
+    "near" is honest for every shape measured: of the 18 in
+    `builderAgreement` the reader refuses, 15 carry a position — 10 point AT
+    the wrong line, 4 one line past it (a key with no space after its colon,
+    `-- -`, `%YAML`, U+2028) and an unclosed quote two past, at the closing
+    fence. A date that cannot be, and a key that is a number, a date or a
+    yes/no, give no line at all.
     """
     if text is None:
         return None
@@ -2697,9 +2699,9 @@ def _hide_a_page_whose_settings_cannot_be_read(file_path: Path, error: Exception
     which is what the app writes, was PUBLISHED whenever Quartz could read
     what PyYAML could not. "A page that wrongly DISAPPEARS is noticed and
     harmless; one that wrongly APPEARS cannot be undone." So the copy's
-    settings are replaced by `publish: false` and its body is kept, and the 15
-    shapes that used to STOP the whole build now build with the page hidden
-    and named.
+    settings are replaced by `publish: false` and its body is kept, and the 14
+    measured shapes that used to STOP the whole build now build with the page
+    hidden and named.
 
     The teacher's own file is never touched: this runs on the copy in
     `content/`, and `_write_the_date_back` refuses a source that cannot be
