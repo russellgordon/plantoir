@@ -377,7 +377,10 @@ final class CourseManagementContractTests: XCTestCase {
             .appendingPathComponent("_backups")
             .appendingPathComponent("ICS3U")
             .appendingPathComponent("ICS3U_backup_2026-01-01_120000.zip")
-        let scheduledURL: URL = ScheduledDeploy.plistURL(courseCode: "ICS3U", sectionNumber: 1)
+        let scheduledURL: URL = ScheduledDeploy.plistURL(
+            courseCode: "ICS3U", sectionNumber: 1,
+            inWorkingFolder: fixture.coursesURL.deletingLastPathComponent()
+        )
 
         let outcome: CourseRenamer.Outcome = try CourseRenamer.rename(
             fixture.course,
@@ -505,14 +508,14 @@ final class CourseManagementContractTests: XCTestCase {
         // A REAL agent rather than the `<plist></plist>` placeholder this used
         // to write. Since 2026-09-20 a rename asks each agent which working
         // folder it belongs to and leaves alone anything belonging to
-        // another — a label is the course code and section and nothing else,
-        // so without that a teacher holding two working folders with the same
+        // another — a label was the course code and section and nothing else
+        // until #237, so without that a teacher holding two working folders with the same
         // course code would have a rename in one cancel the other's live
         // deploy. Every release since v1.0.0 writes `WorkingDirectory`, so a
         // plist that does not name a folder is not something a teacher can
         // have; the placeholder was.
         let agentPlist: [String: Any] = [
-            "Label": ScheduledDeploy.agentLabel(courseCode: "ICS3U", sectionNumber: 1),
+            "Label": ScheduledDeploy.agentLabel(courseCode: "ICS3U", sectionNumber: 1, workingFolder: root),
             "WorkingDirectory": root.path,
             "ProgramArguments": [
                 "/Applications/Plantoir.app/Contents/MacOS/Plantoir",
@@ -526,7 +529,7 @@ final class CourseManagementContractTests: XCTestCase {
         ]
         try PropertyListSerialization.data(
             fromPropertyList: agentPlist, format: .xml, options: 0
-        ).write(to: ScheduledDeploy.plistURL(courseCode: "ICS3U", sectionNumber: 1))
+        ).write(to: ScheduledDeploy.plistURL(courseCode: "ICS3U", sectionNumber: 1, inWorkingFolder: root))
 
         let configuration: CourseConfiguration = try CourseConfiguration(contentsOf: configURL)
         return RenameFixture(

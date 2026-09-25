@@ -15,6 +15,11 @@ final class ScheduledPublishNoticeTests: XCTestCase {
     // MARK: - Stored properties
 
     private var home: URL = URL(fileURLWithPath: "/nonexistent")
+
+    /// The working folder every record and notification here belongs to
+    /// (#237). One fixed id: these cases are about sections and runs, and
+    /// the per-folder key is pinned in `ScheduledDeployTests`.
+    private static let folderID: String = "0a1b2c3d"
     private var trailFolder: URL = URL(fileURLWithPath: "/nonexistent")
     private var previousStore: ProblemReportStore = ActivityTrail.store
 
@@ -107,6 +112,39 @@ final class ScheduledPublishNoticeTests: XCTestCase {
 
     // MARK: - The contract: what stays on show
 
+    /// Two working folders holding the same section (#237) each have their
+    /// own alarm and record, and so their own notification: one folder's run
+    /// does not replace the other's news, and one folder's Dismiss does not
+    /// withdraw it. Fails with the folder id taken out of `identifier`.
+    func testTwoWorkingFoldersKeepTheirOwnNotification() async throws {
+        let fake: RecordingNotifications = RecordingNotifications(permission: .allowed)
+        ScheduledPublishNotice.poster = fake
+        let folders: [String] = ["0a1b2c3d", "deadbeef"]
+        for folder in folders {
+            XCTAssertTrue(ScheduledPublishOutcome.recordStopped(
+                ScheduledPublishOutcome.Stopped(kind: .didNotFinish, destination: Self.destination, when: Date()),
+                inHomeFolder: home, course: "ICS3U", section: 1, folderID: folder
+            ))
+            let announcement: ScheduledPublishNotice.Announcement = await ScheduledPublishNotice.announce(
+                inHomeFolder: home, course: "ICS3U", section: 1, folderID: folder, poster: fake
+            )
+            XCTAssertEqual(announcement, .posted)
+        }
+        XCTAssertEqual(fake.shown.count, 2, "One folder's run replaced the other folder's notification")
+
+        ScheduledPublishNotice.teacherDismissed(
+            inHomeFolder: home, course: "ICS3U", section: 1, folderID: "0a1b2c3d"
+        )
+        XCTAssertEqual(
+            Array(fake.shown.keys),
+            [ScheduledPublishNotice.identifier(course: "ICS3U", section: 1, folderID: "deadbeef")],
+            "Dismissing in one folder withdrew the other folder's notification"
+        )
+        XCTAssertNotNil(ScheduledPublishOutcome.stopped(
+            inHomeFolder: home, course: "ICS3U", section: 1, folderID: "deadbeef"
+        ))
+    }
+
     /// Every row of `notification.onShow`: a later run replaces, sections are
     /// kept apart, and dismissing the band withdraws exactly that section's.
     func testEveryOnShowCaseHolds() async throws {
@@ -124,7 +162,7 @@ final class ScheduledPublishNoticeTests: XCTestCase {
                     let kind: ScheduledPublishOutcome.Kind = try Self.kind(named: try XCTUnwrap(post["kind"] as? String))
                     try writeRecord(kind: kind, course: course, section: section)
                     let announcement: ScheduledPublishNotice.Announcement = await ScheduledPublishNotice.announce(
-                        inHomeFolder: home, course: course, section: section, poster: fake
+                        inHomeFolder: home, course: course, section: section, folderID: Self.folderID, poster: fake
                     )
                     XCTAssertEqual(announcement, .posted, name)
                 } else {
@@ -132,7 +170,8 @@ final class ScheduledPublishNoticeTests: XCTestCase {
                     ScheduledPublishNotice.teacherDismissed(
                         inHomeFolder: home,
                         course: try XCTUnwrap(dismiss["course"] as? String),
-                        section: try XCTUnwrap(dismiss["section"] as? Int)
+                        section: try XCTUnwrap(dismiss["section"] as? Int),
+                        folderID: Self.folderID
                     )
                 }
             }
@@ -141,7 +180,7 @@ final class ScheduledPublishNoticeTests: XCTestCase {
                 let course: String = try XCTUnwrap(shown["course"] as? String)
                 let section: Int = try XCTUnwrap(shown["section"] as? Int)
                 let kind: ScheduledPublishOutcome.Kind = try Self.kind(named: try XCTUnwrap(shown["kind"] as? String))
-                let identifier: String = ScheduledPublishNotice.identifier(course: course, section: section)
+                let identifier: String = ScheduledPublishNotice.identifier(course: course, section: section, folderID: Self.folderID)
                 expected[identifier] = ScheduledPublishOutcome.sentence(
                     for: ScheduledPublishOutcome.Stopped(kind: kind, destination: Self.destination, when: Date()),
                     course: course, section: section
@@ -183,7 +222,7 @@ final class ScheduledPublishNoticeTests: XCTestCase {
         let result: ResultBox = ResultBox()
         Task {
             let announcement: ScheduledPublishNotice.Announcement = await ScheduledPublishNotice.announce(
-                inHomeFolder: home, course: "ICS4U", section: 1, poster: fake, ceiling: .milliseconds(50)
+                inHomeFolder: home, course: "ICS4U", section: 1, folderID: Self.folderID, poster: fake, ceiling: .milliseconds(50)
             )
             result.announcement = announcement
             finished.fulfill()
@@ -204,7 +243,7 @@ final class ScheduledPublishNoticeTests: XCTestCase {
         let home: URL = self.home
         Task {
             _ = await ScheduledPublishNotice.announce(
-                inHomeFolder: home, course: "ICS4U", section: 1, poster: fake, ceiling: .milliseconds(50)
+                inHomeFolder: home, course: "ICS4U", section: 1, folderID: Self.folderID, poster: fake, ceiling: .milliseconds(50)
             )
             finished.fulfill()
         }
@@ -240,7 +279,7 @@ final class ScheduledPublishNoticeTests: XCTestCase {
                 await ScheduledPublishNotice.askPermissionIfNotAskedYet(course: "ICS3U", section: 1)
             case "scheduledRun":
                 try writeRecord(kind: .succeeded, course: "ICS3U", section: 1)
-                _ = await ScheduledPublishNotice.announce(inHomeFolder: home, course: "ICS3U", section: 1)
+                _ = await ScheduledPublishNotice.announce(inHomeFolder: home, course: "ICS3U", section: 1, folderID: Self.folderID)
             case "appAssistant", "outsideAssistant":
                 try await schedule(from: from == "appAssistant" ? .local : .mcp, fake: fake, expectAsking: asks)
             default:
@@ -297,7 +336,7 @@ final class ScheduledPublishNoticeTests: XCTestCase {
             try writeRecord(kind: kind, course: "ICS4U", section: 2)
         }
 
-        _ = await ScheduledPublishNotice.announce(inHomeFolder: home, course: "ICS4U", section: 2, poster: fake)
+        _ = await ScheduledPublishNotice.announce(inHomeFolder: home, course: "ICS4U", section: 2, folderID: Self.folderID, poster: fake)
 
         let label: String = "\(name) — \(kind?.rawValue ?? "no record")"
         let posts: Bool = try XCTUnwrap(oneCase["posts"] as? Bool, name)
@@ -306,7 +345,7 @@ final class ScheduledPublishNoticeTests: XCTestCase {
                 for: ScheduledPublishOutcome.Stopped(kind: kind, destination: Self.destination, when: Date()),
                 course: "ICS4U", section: 2
             )
-            XCTAssertEqual(fake.shown, [ScheduledPublishNotice.identifier(course: "ICS4U", section: 2): expected], label)
+            XCTAssertEqual(fake.shown, [ScheduledPublishNotice.identifier(course: "ICS4U", section: 2, folderID: Self.folderID): expected], label)
         } else {
             XCTAssertEqual(fake.shown, [:], label)
         }
@@ -398,10 +437,10 @@ final class ScheduledPublishNoticeTests: XCTestCase {
     }
 
     private func writeRecord(kind: ScheduledPublishOutcome.Kind, course: String, section: Int) throws {
-        ScheduledPublishOutcome.clear(inHomeFolder: home, course: course, section: section)
+        ScheduledPublishOutcome.clear(inHomeFolder: home, course: course, section: section, folderID: Self.folderID)
         let written: Bool = ScheduledPublishOutcome.recordStopped(
             ScheduledPublishOutcome.Stopped(kind: kind, destination: Self.destination, when: Date()),
-            inHomeFolder: home, course: course, section: section
+            inHomeFolder: home, course: course, section: section, folderID: Self.folderID
         )
         XCTAssertTrue(written)
     }

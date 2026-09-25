@@ -480,7 +480,7 @@ final class ReferenceLockTests: XCTestCase {
 
     func writeAgent(courseCode: String, sectionNumber: Int) throws {
         let label: String = ScheduledDeploy.agentLabel(
-            courseCode: courseCode, sectionNumber: sectionNumber
+            courseCode: courseCode, sectionNumber: sectionNumber, workingFolder: workingFolderURL
         )
         let plist: [String: Any] = [
             "Label": label,
@@ -503,7 +503,7 @@ final class ReferenceLockTests: XCTestCase {
 
     func agentExists(courseCode: String, sectionNumber: Int) -> Bool {
         let label: String = ScheduledDeploy.agentLabel(
-            courseCode: courseCode, sectionNumber: sectionNumber
+            courseCode: courseCode, sectionNumber: sectionNumber, workingFolder: workingFolderURL
         )
         return FileManager.default.fileExists(
             atPath: agentsDirectory.appendingPathComponent("\(label).plist").path

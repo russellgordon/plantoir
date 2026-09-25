@@ -657,10 +657,17 @@ struct SidebarView: View {
         sectionNumber: Int,
         generation: Int
     ) -> ScheduledPublishOutcome.Stopped? {
+        // THIS working folder's record only (#237): the same section in
+        // another working folder keeps its own, and its failure is not this
+        // folder's to show.
+        guard let workingFolderURL = workspace.workspaceURL else {
+            return nil
+        }
         let outcome: ScheduledPublishOutcome.Stopped? = ScheduledPublishOutcome.stopped(
             inHomeFolder: ScheduledDeploy.homeForScheduledNotes,
             course: courseCode,
-            section: sectionNumber
+            section: sectionNumber,
+            workingFolder: workingFolderURL
         )
         // Only a failure earns a badge. A success is news rather than a
         // problem, and a badge beside every section that published fine
@@ -989,10 +996,13 @@ struct SidebarView: View {
     /// after something else happened to redraw the sidebar.
     func scheduledDeployTime(courseCode: String, sectionNumber: Int, generation: Int) -> Date? {
         _ = generation
+        guard let workingFolderURL = workspace.workspaceURL else {
+            return nil
+        }
         return ScheduledDeploy.nextRun(
             courseCode: courseCode,
             sectionNumber: sectionNumber,
-            inWorkingFolder: workspace.workspaceURL
+            inWorkingFolder: workingFolderURL
         )
     }
 

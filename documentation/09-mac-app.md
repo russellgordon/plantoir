@@ -575,6 +575,7 @@ of one folder or a key built from one:
 | `CourseActivity`, `SettingsSaveNotice` | `==` / `standardizedFileURL` | a busy course read as idle |
 | `AssistToolRunner.openWindowModel`, `SectionDetailView`, `SectionScheduleSheet.mine` | `==` / `!=` | the assistant made a second model for an open folder; a lease or a prompt not recognised |
 | `ReferenceImportSource.pathWithSlash` | `resolvingSymlinksInPath` | "the folder you have open" missed by case, so a folder could be copied into itself |
+| `ScheduledDeploy.agentLabel` (#237, after #189) | label had no folder in it | **a PERSISTED key built from the folder id**: a scheduled deploy's launchd label, and its record's file name, end with `folderIdentifier` — on disk for days. So #237 was branched from #189's final tip, never from the `realpath` id, and the id is a way of keeping two folders' files apart rather than how a job is FOUND (every reader scans for the plist's `WorkingDirectory`), so a later change to `canonicalPath` cannot hide a job. See `07-deployment.md` → "One alarm per working folder (#237)". |
 | `WorkLeaseRegistry.Wanted`, `SectionWindowControllers.Key` | raw / `standardizedFileURL` | **dictionary keys**, which never call `isSameFolder`: canonical when the key is BUILT, or one course got two lease files and `buildClaim` missed its own claim. (`Key`'s comment said it was "case-folded on the way IN"; only the course code was.) |
 
 **Left alone, and why.** `FolderActions` compares against OBSIDIAN's record of

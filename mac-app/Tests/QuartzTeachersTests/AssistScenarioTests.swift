@@ -32,7 +32,8 @@ final class AssistScenarioTests: XCTestCase {
     /// **Set for every scenario, because one of them reaches it without
     /// scheduling anything.** "A deploy asked for at a time…" puts a
     /// scheduled card up, and since issue #195 the card reads whether a
-    /// deploy is already set for the section — Mac-wide, by design — so with
+    /// deploy is already set for the section — Mac-wide, by design, until #237
+    /// scoped it to the working folder — so with
     /// no override it read the REAL `ICS3U` section-1 agent of whoever was
     /// running the suite, and its transcript depended on their Mac. Both
     /// folders together: moving one without the other is trapped in Debug.

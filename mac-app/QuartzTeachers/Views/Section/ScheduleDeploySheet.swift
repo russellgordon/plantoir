@@ -34,7 +34,8 @@ struct ScheduleDeploySheet: View {
             sectionNumber: sectionNumber,
             when: when,
             now: Date(),
-            cloudflareAccountID: AppSettings.shared.cloudflareAccountID
+            cloudflareAccountID: AppSettings.shared.cloudflareAccountID,
+            inWorkingFolder: workspaceURL
         )
     }
 

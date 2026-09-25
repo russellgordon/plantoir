@@ -106,7 +106,8 @@ final class PagesDatedByTheBuildTests: XCTestCase {
     /// visible, often at half six in the morning — leaves no trace.
     func testAScheduledPublishRecordsTheNamesFromItsLog() throws {
         let home: URL = scratchFolderURL.appendingPathComponent("home", isDirectory: true)
-        let log: URL = ScheduledDeploy.logURL(courseCode: "ICS4U", sectionNumber: 1, inHomeFolder: home)
+        let label: String = ScheduledDeploy.legacyAgentLabel(courseCode: "ICS4U", sectionNumber: 1) + ".0a1b2c3d"
+        let log: URL = ScheduledDeploy.logURL(label: label, inHomeFolder: home)
         try FileManager.default.createDirectory(
             at: log.deletingLastPathComponent(), withIntermediateDirectories: true
         )
@@ -117,6 +118,7 @@ final class PagesDatedByTheBuildTests: XCTestCase {
         try (lastNight + tonight).write(to: log, atomically: true, encoding: .utf8)
 
         ScheduledDeploy.recordFolderProblems(
+            label: label,
             section: (courseDirectory: URL(fileURLWithPath: "/tmp"), courseCode: "ICS4U", sectionNumber: 1),
             fromByteOffset: UInt64(lastNight.utf8.count),
             inHomeFolder: home
