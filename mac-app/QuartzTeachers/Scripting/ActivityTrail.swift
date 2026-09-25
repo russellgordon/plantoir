@@ -370,7 +370,8 @@ nonisolated enum ActivityTrail {
         /// for.
         ///
         /// Scheduling a section again removes the deploy already set for it —
-        /// on purpose, one per section per Mac — and the old job leaves nothing
+        /// on purpose, one per section per working folder (per Mac until #237)
+        /// — and the old job leaves nothing
         /// behind once it is gone, so "it went on Saturday, I set it for
         /// Friday" had no answer anywhere. The card now says so beforehand;
         /// this is what says so afterwards. Written in

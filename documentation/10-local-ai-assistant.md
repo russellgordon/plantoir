@@ -829,13 +829,14 @@ remember that it is different.
   [#195](https://github.com/russellgordon/plantoir/issues/195) (2026-09-23)
   the card, the schedule sheet, the plan and the tool's own result (the only
   thing an MCP caller sees) name the moment being replaced
-  (`wording.scheduleReplaces`, read Mac-wide) and the trail records it
-  (`scheduled deploy replaced`). A job from another working folder set for
-  the same minute still says nothing, and one from another folder is named
-  with no clock or Cancel for it in this window — both left to
-  [#237](https://github.com/russellgordon/plantoir/issues/237). The reasoning is in
+  (`wording.scheduleReplaces`) and the trail records it
+  (`scheduled deploy replaced`). It was read Mac-wide until
+  [#237](https://github.com/russellgordon/plantoir/issues/237) (2026-09-25)
+  gave each working folder its own alarm; now it names only a deploy set from
+  THIS working folder, since another folder's is a different alarm that
+  scheduling here leaves standing. The reasoning is in
   [`07-deployment.md`](07-deployment.md) → "Scheduling a section that already
-  has a deploy set".
+  has a deploy set" and "One alarm per working folder (#237)".
 - **On the morning the clocks go forward, a wall time may not exist**, and the
   settled text is therefore built from the INSTANT rather than by joining a day
   to a time. Measured, America/Toronto, DST starting 02:00 on 8 March 2026:

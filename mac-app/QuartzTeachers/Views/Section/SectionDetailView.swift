@@ -478,11 +478,12 @@ struct SectionDetailView: View {
             // Guard BEFORE consuming: `takeFolderProblems` deletes the record
             // as it reads it, so taking it while a dialog is already up threw
             // the overnight findings away permanently.
-            guard healthFindings.isEmpty else {
+            guard healthFindings.isEmpty, let workingFolderURL = workspace.workspaceURL else {
                 return
             }
             let waiting: [SiteHealthFinding] = ScheduledDeploy.takeFolderProblems(
-                courseCode: course.code, sectionNumber: sectionNumber
+                courseCode: course.code, sectionNumber: sectionNumber,
+                inWorkingFolder: workingFolderURL
             )
             if !waiting.isEmpty {
                 healthFindings = waiting
@@ -957,12 +958,16 @@ struct SectionDetailView: View {
     /// this view's own state and the workspace.
     func dismissScheduledPublishNotice() {
         // The record AND the macOS notification about it (#212), so the two
-        // never disagree about whether it is still news.
-        ScheduledPublishNotice.teacherDismissed(
-            inHomeFolder: ScheduledDeploy.homeForScheduledNotes,
-            course: course.code,
-            section: sectionNumber
-        )
+        // never disagree about whether it is still news — THIS working
+        // folder's only (#237): the same section's in another folder stays.
+        if let workingFolderURL = workspace.workspaceURL {
+            ScheduledPublishNotice.teacherDismissed(
+                inHomeFolder: ScheduledDeploy.homeForScheduledNotes,
+                course: course.code,
+                section: sectionNumber,
+                folderID: BuildOutputLocation.folderIdentifier(forWorkingFolder: workingFolderURL.path)
+            )
+        }
         stoppedScheduledPublish = nil
         // The sidebar's badge is read during a row's render, so it
         // needs telling that the answer changed — Dismiss happens
@@ -982,10 +987,15 @@ struct SectionDetailView: View {
     /// modification date, so the notice showed the morning the teacher opened
     /// it instead of the half six the run stopped at.
     func loadStoppedScheduledPublish() {
+        guard let workingFolderURL = workspace.workspaceURL else {
+            stoppedScheduledPublish = nil
+            return
+        }
         stoppedScheduledPublish = ScheduledPublishOutcome.stopped(
             inHomeFolder: ScheduledDeploy.homeForScheduledNotes,
             course: course.code,
-            section: sectionNumber
+            section: sectionNumber,
+            workingFolder: workingFolderURL
         )
     }
 

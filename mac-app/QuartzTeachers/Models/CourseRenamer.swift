@@ -241,8 +241,8 @@ enum CourseRenamer {
     ///
     /// **Scoped to the working folder since 2026-09-20**, and it was a real
     /// fault before: this used to walk `course.sectionNumbers` asking whether
-    /// `plistURL` exists, and a label is the course code and section and
-    /// nothing else — so a teacher with last year's working folder and this
+    /// `plistURL` exists, and a label was then the course code and section and
+    /// nothing else (until #237) — so a teacher with last year's working folder and this
     /// year's, both holding ICS3U section 1, would have a rename in the one
     /// cancel the other's live deploy and report success. It also missed a
     /// section whose alarm outlived its entry in the settings, which the agent
@@ -257,7 +257,11 @@ enum CourseRenamer {
             sectionNumber: nil,
             inWorkingFolder: workingFolderURL
         ) {
-            found.append(agent.sectionNumber)
+            // A section can hold two jobs in one folder (one set before #237
+            // beside one set after); the cancel below takes both, once.
+            if !found.contains(agent.sectionNumber) {
+                found.append(agent.sectionNumber)
+            }
         }
         return found
     }

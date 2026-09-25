@@ -124,7 +124,9 @@ final class WorkspaceInUseReportTests: XCTestCase {
     /// this line exists for.
     func testAScheduledPublishRecordsItFromItsLog() throws {
         let home: URL = scratchFolderURL.appendingPathComponent("home", isDirectory: true)
-        let log: URL = ScheduledDeploy.logURL(courseCode: "ICS4U", sectionNumber: 2, inHomeFolder: home)
+        // The job's own label, as the run takes it from its script (#237).
+        let label: String = ScheduledDeploy.legacyAgentLabel(courseCode: "ICS4U", sectionNumber: 2) + ".0a1b2c3d"
+        let log: URL = ScheduledDeploy.logURL(label: label, inHomeFolder: home)
         try FileManager.default.createDirectory(
             at: log.deletingLastPathComponent(), withIntermediateDirectories: true
         )
@@ -133,6 +135,7 @@ final class WorkspaceInUseReportTests: XCTestCase {
         try (lastNight + tonight).write(to: log, atomically: true, encoding: .utf8)
 
         ScheduledDeploy.recordFolderProblems(
+            label: label,
             section: (courseDirectory: URL(fileURLWithPath: "/tmp"), courseCode: "ICS4U", sectionNumber: 2),
             fromByteOffset: UInt64(lastNight.utf8.count),
             inHomeFolder: home
