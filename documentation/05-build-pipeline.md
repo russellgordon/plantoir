@@ -354,6 +354,9 @@ other hidden page costs, so it gets its own words throughout:
   not be read, near line N, so the website has no front page until they are
   fixed, and it cannot be published.`) and the finding's `frontPage` sentence
   added to the detail;
+* a teacher whose site is already live keeps the OLD published site: the
+  refusal comes in the build, before the deploy, so nothing is uploaded and
+  what students see does not change until the front page is fixed;
 * the last built site is CLEARED, exactly as for a missing front page
   (`_clear_a_site_this_build_cannot_replace` → `_clear_stale_host_site`,
   whose 🗑️ line says the front page is hidden rather than missing), so a
