@@ -531,7 +531,11 @@ enum ClassInsertionPlanner {
         var moves: [ClassDateMove] = []
         for index in 0..<shiftedByDate.count {
             let moving: ClassPageSummary = shiftedByDate[index]
-            let destination: CalendarDay = destinations[index]
+            // An undated page has no date to collide with, and is never
+            // given one (see `destinationsKeepingGaps`).
+            guard let destination = destinations[index] else {
+                continue
+            }
             if moving.date == destination {
                 continue
             }
@@ -562,21 +566,47 @@ enum ClassInsertionPlanner {
         )
     }
 
-    /// Pages by date, earliest first; a page with no date after every dated
-    /// one; the number decides a tie. How a numbered course orders (#267).
+    /// Pages by date, earliest first, the number deciding a tie — and a page
+    /// with NO date placed by its NUMBER among its neighbours: just before the
+    /// first dated page numbered above it. How a numbered course orders (#267).
+    ///
+    /// Not "undated last", which the fix round first did: the fix review
+    /// measured Week 1 undated, Week 2 on 09-25, Week 8 on 11-20 and "make
+    /// room at 1" giving the old Week 1 (now Week 2) the date 11-27 — after
+    /// Week 8, so the front page, which follows the latest date, would have
+    /// jumped to it.
     static func inDateOrder(_ pages: [ClassPageSummary]) -> [ClassPageSummary] {
-        var ordered: [ClassPageSummary] = pages
-        ordered.sort { first, second in
+        var dated: [ClassPageSummary] = []
+        var undated: [ClassPageSummary] = []
+        for page in pages {
+            if page.date == nil {
+                undated.append(page)
+            } else {
+                dated.append(page)
+            }
+        }
+        dated.sort { first, second in
             if let left = first.date, let right = second.date, left != right {
                 return left < right
             }
-            if first.date != nil && second.date == nil {
-                return true
-            }
-            if first.date == nil && second.date != nil {
-                return false
-            }
             return (first.unitAndDay?.day ?? 0) < (second.unitAndDay?.day ?? 0)
+        }
+        undated.sort { first, second in
+            return (first.unitAndDay?.day ?? 0) < (second.unitAndDay?.day ?? 0)
+        }
+        var ordered: [ClassPageSummary] = []
+        var nextUndated: Int = 0
+        for page in dated {
+            let number: Int = page.unitAndDay?.day ?? 0
+            while nextUndated < undated.count && (undated[nextUndated].unitAndDay?.day ?? 0) < number {
+                ordered.append(undated[nextUndated])
+                nextUndated += 1
+            }
+            ordered.append(page)
+        }
+        while nextUndated < undated.count {
+            ordered.append(undated[nextUndated])
+            nextUndated += 1
         }
         return ordered
     }
@@ -614,17 +644,24 @@ enum ClassInsertionPlanner {
     /// Where each shifted page goes in a course that keeps its gaps. A page
     /// already dated after the page before it stays where it is; otherwise
     /// it takes the first runway day after that page (the new pages take the
-    /// first `skippingFirst`), which is always later than its own date. Nil
-    /// when a page has nowhere to go. Pure, so the rule can be tested alone.
+    /// first `skippingFirst`), which is always later than its own date. A page
+    /// with NO date stays undated (nil) and is passed over: it has no date to
+    /// collide with, and giving it one would be a move nothing forced. Nil
+    /// overall when a page has nowhere to go. Pure, so the rule can be tested
+    /// alone.
     static func destinationsKeepingGaps(
         for shifted: [ClassPageSummary], after runway: [CalendarDay], skippingFirst: Int
-    ) -> [CalendarDay]? {
-        var destinations: [CalendarDay] = []
+    ) -> [CalendarDay?]? {
+        var destinations: [CalendarDay?] = []
         var previous: CalendarDay? = nil
         if skippingFirst > 0 && skippingFirst <= runway.count {
             previous = runway[skippingFirst - 1]
         }
         for page in shifted {
+            if page.date == nil {
+                destinations.append(nil)
+                continue
+            }
             var chosen: CalendarDay? = nil
             // Already after the page before it: it does not move at all.
             if let own = page.date {

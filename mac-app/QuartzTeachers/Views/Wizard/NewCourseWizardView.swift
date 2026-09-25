@@ -221,11 +221,6 @@ struct NewCourseWizardView: View {
         )
     }
 
-    /// The parsed timetable section numbers, e.g. "1,3" → [1, 3].
-    /// What is wrong with the timetable sections as typed, or nil when
-    /// nothing is. Written for the mistakes people actually make, and it
-    /// matters beyond politeness: the parser silently DROPS pieces it
-    /// cannot read, so "1,3 5" would quietly become just section 1.
     /// Why a club's class-pages folder cannot have this name, in the
     /// sentences a folder rename in Course Settings already uses
     /// (`SpecialFolderRenamer.problem`): empty, a "/" or ":", hidden, Media,
@@ -246,6 +241,11 @@ struct NewCourseWizardView: View {
         return SpecialFolderRenamer.problem(renaming: "", to: typed, existingNames: others)
     }
 
+    /// The parsed timetable section numbers, e.g. "1,3" → [1, 3].
+    /// What is wrong with the timetable sections as typed, or nil when
+    /// nothing is. Written for the mistakes people actually make, and it
+    /// matters beyond politeness: the parser silently DROPS pieces it
+    /// cannot read, so "1,3 5" would quietly become just section 1.
     static func sectionNumbersProblem(_ text: String) -> String? {
         let trimmed: String = text.trimmingCharacters(in: .whitespaces)
         if trimmed.isEmpty {

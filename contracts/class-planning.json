@@ -357,7 +357,92 @@
           "2025-12-11",
           "2025-12-18"
         ],
-        "why": "When the new page DOES land on a name and a day that are taken, the pages it collides with shift — renamed highest first, each onto the first class day after the page before it — and the shift stops at the first page that is already clear on both counts (Week 8: number 6 would be free, and 2025-11-20 is after 2025-10-16). This is the only shape in which a numbered course's plan says pages moved."
+        "why": "When the new page DOES land on a name and a day that are taken, the pages it collides with shift — renamed highest first, each onto the first class day after the page before it — and each half stops on its own terms: renaming stops at the first page whose number is already clear (Week 8: the next free number is 6), and moving stops mattering at the first page whose date is already later than the page before it (2025-11-20 is after 2025-10-16). This is the only shape in which a numbered course's plan says pages moved."
+      },
+      {
+        "scheme": "numbered",
+        "word": "Week",
+        "name": "a numbered page with no date is placed by its number and never given a date",
+        "count": 1,
+        "existingClasses": [
+          {
+            "title": "Week 1"
+          },
+          {
+            "date": "2025-09-25",
+            "title": "Week 2"
+          },
+          {
+            "date": "2025-11-20",
+            "title": "Week 8"
+          }
+        ],
+        "insertAtNumber": 1,
+        "expectRenamesInOrder": [
+          "Week 2 → Week 3",
+          "Week 1 → Week 2"
+        ],
+        "expectAddedOn": {
+          "Week 1": "2025-09-18"
+        },
+        "expectNoMoves": true,
+        "timetable": [
+          "2025-09-18",
+          "2025-09-25",
+          "2025-10-02",
+          "2025-10-09",
+          "2025-10-16",
+          "2025-10-23",
+          "2025-10-30",
+          "2025-11-06",
+          "2025-11-13",
+          "2025-11-20",
+          "2025-11-27",
+          "2025-12-04",
+          "2025-12-11",
+          "2025-12-18"
+        ],
+        "why": "An entry with no `date` is a page with no `created`. The old Week 1 becomes Week 2 and STAYS undated: it has no date to collide with, and nothing forces one on it. The fix round's first version sorted undated pages last and dated the old Week 1 2025-11-27 — after Week 8 — so once published the front page, which follows the latest date, would have jumped to it (#267 fix review). An undated page is placed among the dated ones by its NUMBER."
+      },
+      {
+        "scheme": "numbered",
+        "word": "Week",
+        "name": "when no page has a date, making room dates only the new page",
+        "count": 1,
+        "existingClasses": [
+          {
+            "title": "Week 1"
+          },
+          {
+            "title": "Week 2"
+          },
+          {
+            "title": "Week 8"
+          }
+        ],
+        "insertAtNumber": 3,
+        "expectRenamesInOrder": [],
+        "expectAddedOn": {
+          "Week 3": "2025-09-18"
+        },
+        "expectNoMoves": true,
+        "timetable": [
+          "2025-09-18",
+          "2025-09-25",
+          "2025-10-02",
+          "2025-10-09",
+          "2025-10-16",
+          "2025-10-23",
+          "2025-10-30",
+          "2025-11-06",
+          "2025-11-13",
+          "2025-11-20",
+          "2025-11-27",
+          "2025-12-04",
+          "2025-12-11",
+          "2025-12-18"
+        ],
+        "why": "Nothing collides, so nothing moves: the first version gave Week 8 the date 2025-09-25 and listed it as moved to a later day (#267 fix review). The new page takes the first class day, there being no dated page below it."
       }
     ],
     "note": "Making room for a class in the middle of a unit. The RENAME ORDER is the part to get right and the part that looks like an implementation detail: it is the difference between a course that survives and one that loses a lesson.",
