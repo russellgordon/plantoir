@@ -1773,7 +1773,7 @@ start_the_existing_workspace() {
 # -> buildOutputLocation.aSecondSpellingIsClearedAway, and activityTrail).
 clear_away_this_folders_other_spelling() {
   local old_id="${FOLDER_ID_AS_HANDED:-}"
-  local old_name old_builds everything running names mounted recorded cleared
+  local old_name old_builds everything running names mounted recorded workspace_gone builds_gone what
   case "$old_id" in
     [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
     *) return 0 ;;
@@ -1789,7 +1789,8 @@ clear_away_this_folders_other_spelling() {
   fi
   # Matched as whole lines by `case` rather than by `grep -q`, which can end
   # the pipe early and read as "not there" under pipefail.
-  cleared=false
+  workspace_gone=false
+  builds_gone=false
   case $'\n'"$everything"$'\n' in
     *$'\n'"$old_name"$'\n'*)
       case $'\n'"$running"$'\n' in
@@ -1801,11 +1802,15 @@ clear_away_this_folders_other_spelling() {
       if ! docker rm "$old_name" >/dev/null 2>&1; then
         return 0
       fi
-      cleared=true ;;
+      workspace_gone=true ;;
   esac
   if [ -f "$old_builds/working-folder.txt" ]; then
     recorded="$(head -n 1 "$old_builds/working-folder.txt" 2>/dev/null || true)"
-    recorded="$( (cd "$recorded" 2>/dev/null && /bin/pwd -P) || true)"
+    # An EMPTY note names no folder: `cd ""` stays where it is, and would
+    # read as this one.
+    if [ -n "$recorded" ]; then
+      recorded="$( (cd "$recorded" 2>/dev/null && /bin/pwd -P) || true)"
+    fi
     if [ -n "$recorded" ] && [ "$recorded" = "$(/bin/pwd -P)" ]; then
       # Names are teaching-quartz-<8 hex digits>, so splitting on spaces is
       # safe. A question Docker does not answer counts as "still mounted",
@@ -1824,14 +1829,22 @@ clear_away_this_folders_other_spelling() {
         *$'\n'"$old_builds"$'\n'*) ;;
         *)
           rm -rf -- "$old_builds"
-          cleared=true ;;
+          builds_gone=true ;;
       esac
     fi
   fi
-  if [ "$cleared" = true ]; then
-    echo "🧹 Cleared away a second copy of this folder's workspace and built websites, left behind under another spelling of the folder's name. Nothing in your courses was touched."
-    note_on_the_trail "${WORKSPACE_TRAIL_PLACE:-setup} · cleared away a second copy of this working folder's workspace and built websites, left under another spelling of its name"
+  # The sentence names only what was removed.
+  if [ "$workspace_gone" = true ] && [ "$builds_gone" = true ]; then
+    what="a second copy of this working folder's workspace and built websites"
+  elif [ "$workspace_gone" = true ]; then
+    what="a second copy of this working folder's workspace"
+  elif [ "$builds_gone" = true ]; then
+    what="a second copy of this working folder's built websites"
+  else
+    return 0
   fi
+  echo "🧹 Cleared away ${what}, left behind under another spelling of the folder's name. Nothing in your courses was touched."
+  note_on_the_trail "${WORKSPACE_TRAIL_PLACE:-setup} · cleared away ${what}, left under another spelling of its name"
 }
 # <<< PREVIEW PORT BLOCK <<<
 # Where the refusal above is filed on the trail: this run's course and section.
