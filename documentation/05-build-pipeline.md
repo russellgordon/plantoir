@@ -667,8 +667,9 @@ unambiguous and carries structure a sentence cannot.
   applies to `PLANTOIR_DATED:`, whose trail read is unaffected because it
   reads the raw text, never the transcript. The prompt check also refuses a
   marker line: half a payload cut after `"sentence":` ends in a colon, which
-  it would otherwise have offered as a question (guarded, not tested — the
-  check needs a live run and a three-second pause). The cases are
+  it would otherwise have offered as a question — `looksLikeQuestion`
+  answers false for any marker line, pinned by
+  `SiteHealthFindingTests.testHalfAMarkerIsNeverAQuestion`. The cases are
   `contracts/shared-rules.json` → `siteHealth.marker.consoleCases`.
 
   How a glue could arise: `site_health.py` prints each line whole, so it takes
