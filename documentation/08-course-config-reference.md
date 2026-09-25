@@ -625,20 +625,28 @@ separately from the reader:
   indented-opener writing case are the guard, and they pass on the old finder
   too, on purpose.
 
-  **One shape's STRUCTURE changes, and the two writers answer it differently
-  on purpose.** A page whose only closing-looking line is indented —
+  **One shape's STRUCTURE changes, and the apps and the build answer it
+  differently on purpose.** A page whose only closing-looking line is indented —
   `---` / `title: x` / `  ---` / body — has no closed block to python-frontmatter,
   so every line of it is body text and the page is PUBLISHED. Since #188 the
   apps agree it has no block, and the visibility writer PREPENDS one of its
   own, as it does for any fence that is never closed: measured, the page goes
   from published to HIDDEN. This is the move #140 teaches nobody to make, and
   it is right here because there was never a block for it to push into the
-  body — those lines already were the body. The build's date splice
-  (`_setting_frontmatter_value`) REFUSES the same shape instead, as it refuses
-  every block that is opened and never closed: a date is not worth
-  restructuring a teacher's file for, and the site is dated anyway because the
-  build dates its own copy. Both are contract cases
-  (`pageVisibility.writingCases`, `atBuildTime.writingCases`).
+  body — those lines already were the body. The app's DATE writer
+  (`PageFrontmatter.settingCreated`, re-date and make-room) does the same —
+  measured `.written`, and the site reads the new date — and that was kept
+  rather than refused: those are a teacher's requests, and the app reads the
+  date back to order the section's classes, so a page it declined would drop
+  out of that order. The build's date splice (`_setting_frontmatter_value`)
+  REFUSES the same shape instead, as it refuses every block that is opened and
+  never closed: it runs unattended on every build over the teacher's own
+  files, and the site is dated anyway because the build dates its own copy.
+  All three are contract cases (`pageVisibility.writingCases`,
+  `datesAndTitles.writingCases`, `atBuildTime.writingCases`). (This paragraph
+  said at first that a date is "not worth restructuring a teacher's file
+  for" — true of the build, and contradicted by the app's own date writer, as
+  the review found.)
 
   **What a teacher sees change on upgrade, with nothing written.** The reader
   answers differently on pages it used to close early, and it says so on
@@ -657,10 +665,13 @@ separately from the reader:
   direction and the finding says what is wrong. Pages the app calls hidden
   while the site publishes them: 99 before, **0** after. A `cannot tell` guard
   for the pages that went the other way was considered by the plan's review
-  and not needed on this base. Unicode whitespace after the dashes (a
-  non-breaking space, which python's `\s` matches and the apps' trim does not)
-  and a byte-order mark are not in the fuzz and were not measured on a real
-  page; they are named here rather than coded for.
+  and not needed on this base. Whitespace python's `\s` matches and the apps'
+  trim does not — a non-breaking space, a FORM FEED or a vertical tab after
+  the dashes — closes a block for the build and not for the apps, and a
+  byte-order mark is its own case. The review's extended fuzz (seed 31337,
+  3,000 pages with `---\f` among the fences) disagreed on 199 pages, every one
+  a form feed after the dashes; without it, 0 of 2,663. None of these was
+  measured on a real page; they are named here rather than coded for.
   [Issue #188](https://github.com/russellgordon/plantoir/issues/188).
 
   **Windows fixed all of this — everything above except the indented-dashes

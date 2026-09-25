@@ -195,7 +195,7 @@ final class FileFormatsContractTests: XCTestCase {
         let cases: [[String: Any]] = try XCTUnwrap(group["cases"] as? [[String: Any]])
         // A floor, for the reason the visibility list gives above.
         XCTAssertGreaterThanOrEqual(
-            cases.count, 15, "contracts/file-formats.json → datesAndTitles.writingCases has shrunk"
+            cases.count, 16, "contracts/file-formats.json → datesAndTitles.writingCases has shrunk"
         )
         for testCase in cases {
             let before: String = try XCTUnwrap(testCase["before"] as? String)

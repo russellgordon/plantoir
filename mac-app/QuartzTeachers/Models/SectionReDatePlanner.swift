@@ -262,7 +262,12 @@ enum SectionReDatePlanner {
                 fallbackTail: tail
             )
             var after: String = dated.text
-            var declined: Bool = dated.outcome == .noRoomForAKey
+            // Only the DATE is reported (#186's review, B3): the sentence is
+            // about a new date. A hide declined on a page whose date WAS
+            // written needs a block whose first line is indented with a
+            // column-0 `created:` below it — a block the build cannot read at
+            // all, which the build already hides and names (#246).
+            let declined: Bool = dated.outcome == .noRoomForAKey
             if move.unpublishes {
                 let hidden: (text: String, outcome: FrontmatterWriteOutcome) = AssistPageVisibility.setting(
                     published: false,
@@ -270,9 +275,6 @@ enum SectionReDatePlanner {
                     forSection: sectionNumber,
                     isSectionLocal: move.isSectionLocal
                 )
-                if hidden.outcome == .noRoomForAKey {
-                    declined = true
-                }
                 after = hidden.text
             }
             if declined {

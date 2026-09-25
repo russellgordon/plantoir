@@ -688,9 +688,11 @@ final class AssistToolRunner {
                 planned.plan,
                 forSection: planned.located.sectionNumber,
                 in: planned.located.course,
-                summary: AssistWording.publishedTheClassOn(
-                    planned.day.text, noun: planned.located.course.configuration.classNoun
-                )
+                summary: { written in
+                    return AssistWording.publishedTheClassOn(
+                        planned.day.text, noun: planned.located.course.configuration.classNoun
+                    )
+                }
             )
         }
     }
@@ -776,8 +778,9 @@ final class AssistToolRunner {
                 planned.plan,
                 forSection: planned.located.sectionNumber,
                 in: planned.located.course,
-                summary: "Published \(planned.plan.changes.count) "
-                       + "\(planned.plan.changes.count == 1 ? "page" : "pages")."
+                summary: { written in
+                    return "Published \(written) \(written == 1 ? "page" : "pages")."
+                }
             )
         }
     }
@@ -813,8 +816,9 @@ final class AssistToolRunner {
                 planned.plan,
                 forSection: planned.located.sectionNumber,
                 in: planned.located.course,
-                summary: "Unpublished \(planned.plan.changes.count) "
-                       + "\(planned.plan.changes.count == 1 ? "page" : "pages")."
+                summary: { written in
+                    return "Unpublished \(written) \(written == 1 ? "page" : "pages")."
+                }
             )
         }
     }
@@ -1252,11 +1256,17 @@ final class AssistToolRunner {
     // MARK: - Writing pages
 
     /// Back the course up, write the change, remember it, rebuild the preview.
+    ///
+    /// `summary` is given how many pages' visibility was actually WRITTEN,
+    /// not how many the plan listed: a page declined at the write — edited in
+    /// Obsidian between the card and Go — is not counted as done (#186's
+    /// review, B1). When every page the teacher NAMED was declined, the
+    /// caller's sentence (which is about them) is not said at all.
     private func carryOut(
         _ plan: AssistPublishPlan,
         forSection sectionNumber: Int,
         in course: Course,
-        summary: String
+        summary: (Int) -> String
     ) async -> AssistToolOutcome {
         if plan.changesNothing {
             // Four words, when four words are the whole answer. A teacher who
@@ -1342,7 +1352,50 @@ final class AssistToolRunner {
         detail += "\n\nThis changed the teacher's files and their PREVIEW. It did not put anything in front "
                 + "of students — deploying does that, and only when they ask."
 
-        return AssistToolOutcome.wrote(summary, detail: detail)
+        return AssistToolOutcome.wrote(
+            AssistToolRunner.whatWasDone(
+                plan, declinedNow: declinedNow, summary: summary
+            ),
+            detail: detail
+        )
+    }
+
+    /// The transcript line after a publish or unpublish: the caller's sentence
+    /// about what was WRITTEN, then every page the writer declined — on the
+    /// card or at the write — named (#186). Built from the outcome, never
+    /// from the plan's count, so a declined page cannot be reported as done.
+    static func whatWasDone(
+        _ plan: AssistPublishPlan,
+        declinedNow: [String],
+        summary: (Int) -> String
+    ) -> String {
+        var declined: [String] = []
+        for page in plan.noRoomForAKey {
+            declined.append(page.displayTitle)
+        }
+        for title in declinedNow where !declined.contains(title) {
+            declined.append(title)
+        }
+        var written: Int = 0
+        for change in plan.changes where !declinedNow.contains(change.page.displayTitle) {
+            written += 1
+        }
+        var everyNamedPageDeclined: Bool = !plan.namedPages.isEmpty
+        for page in plan.namedPages where !declined.contains(page.displayTitle) {
+            everyNamedPageDeclined = false
+        }
+        var said: String = ""
+        if !everyNamedPageDeclined {
+            said = summary(written)
+        } else if written > 0 {
+            said = (plan.publishes ? "Published" : "Unpublished")
+                + " \(written) \(written == 1 ? "page" : "pages")."
+        }
+        if !declined.isEmpty {
+            let sentence: String = AssistPublishPlan.sayingPagesWithNoRoomForAKey(named: declined)
+            said = said.isEmpty ? sentence : said + " " + sentence
+        }
+        return said
     }
 
     // MARK: - Preview, undo, deploy
@@ -2983,7 +3036,7 @@ final class AssistToolRunner {
             // Pages the re-date could not date, named — they are not among
             // the classes it moved, whatever the count above says (#186).
             if !leftAlone.isEmpty {
-                let declined: String = AssistPublishPlan.sayingPagesWithNoRoomForAKey(named: leftAlone)
+                let declined: String = AssistPublishPlan.sayingPagesWhoseNewDateCouldNotBeSet(named: leftAlone)
                 said += " " + declined
                 detail += "\n\n" + declined
                 AssistToolRunner.notePagesLeftAsTheyWere(

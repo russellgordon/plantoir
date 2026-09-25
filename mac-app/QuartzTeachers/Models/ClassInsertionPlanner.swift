@@ -402,7 +402,7 @@ enum ClassInsertionPlanner {
 
         var message: String = "Made room for \(created.count) class\(created.count == 1 ? "" : "es") at \(plan.positionTitle). Renamed \(renamed.count), moved \(moved) onto later class days, and updated \(linksRewritten) link\(linksRewritten == 1 ? "" : "s"). The new pages are unpublished until you write them — look the section over before you deploy it."
         if !notDated.isEmpty {
-            message += " " + AssistPublishPlan.sayingPagesWithNoRoomForAKey(named: notDated)
+            message += " " + AssistPublishPlan.sayingPagesWhoseNewDateCouldNotBeSet(named: notDated)
         }
         return ClassChangeOutcome(message: message, backupURL: backupURL, created: created)
     }

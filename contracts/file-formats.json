@@ -365,6 +365,17 @@
             "day": "2026-09-24",
             "key": "created"
           }
+        },
+        {
+          "after": "---\ncreated: 2026-09-24T07:00:00.000-0400\n---\n---\ntitle: x\n  ---\nBody.\n",
+          "before": "---\ntitle: x\n  ---\nBody.\n",
+          "expectOutcome": "written",
+          "expectSiteReads": "2026-09-24T07:00:00.000-0400",
+          "why": "Issue #188's one change of STRUCTURE, met by the date writer (the review of #188/#182/#186, B2): a page whose only closing-looking line is INDENTED has no closed block, to the build or to the apps, so every line of it is body text. The app's date writer gives it a block of its own, as the visibility writer does, and the site reads the new date - measured 2026-09-25. Kept rather than refused because a re-date or a make-room is a teacher's request and the app reads the date back to order the section's classes; nothing is pushed into the body that was not already body text. The build's own splice refuses the same shape (class-planning.json -> atBuildTime) because it runs unattended on every build and dates the site's copy anyway.",
+          "write": {
+            "day": "2026-09-24",
+            "key": "created"
+          }
         }
       ],
       "note": "GitHub #199. The date and title writers — the mac's PageFrontmatter.settingCreated (key + day; the time and offset already on the line are kept, and `T07:00:00.000-0400` is used when none can be read) and settingTitle — take a key's CONTINUATION lines with it, the rule #176 gave the visibility writer (PageVisibilityReader.continuationLineIndices / Windows' ContinuationLines): walk forward over blank lines and `# note`s, stop at the first line that is not indented, take everything to the last indented value line. `expectSiteReads` is what python-frontmatter 1.3.0 / PyYAML 6.0.3 read from `after` — the parse process_frontmatter re-dumps for Quartz — measured 2026-09-25, and checked again inside the image by scripts/check_dates_and_titles_against_the_site.py. Before the fix the same writers replaced the key's line alone: a date or title below its key, folded, or quoted over two lines read as the new value and the old one JOINED (`2026-09-24T07:00:00.000-0400 2026-09-08T07:00:00.000-0400`, `Unit 1, Day 2 Unit 1, Day 1`, `Unit 1, Day 2 Day 1\"`), and a note between key and value STOPPED the build (ParserError) — while the app read the new value, so the two disagreed in silence. The same replacement is made by SectionAdder when a section's landing page is copied into a new section. Compare whole files as bytes."

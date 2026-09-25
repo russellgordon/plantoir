@@ -30,10 +30,13 @@ it finds no block behind an indented OPENER, which python-frontmatter does
 read, and every writer then prepends a second block and turns the teacher's
 own into body text — issue #140's bug.
 
-**What the fuzz does not cover.** Unicode whitespace after the dashes (a
-non-breaking space: python's `\s` matches it, the apps' trim does not, so
-such a line closes the block for the build and not for the apps) and a
-byte-order mark. Neither is generated here; the first attempt's 1,422-page
+**What the fuzz does not cover.** Whitespace after the dashes that python's
+`\s` matches and the apps' trim does not — a non-breaking space, a FORM FEED,
+a vertical tab — so such a line closes the block for the build and not for the
+apps; and a byte-order mark. The review of this piece extended the generator
+(seed 31337, adding `---\f` among other fences) and got **199 of 3,000**
+disagreements, every one a form feed after the dashes; without it, 0 of 2,663,
+and Swift against Python 0 of 3,000. Neither is generated here; the first attempt's 1,422-page
 corpus of 2026-09-19 carried BOMs, and nothing measured either shape on a
 real page. Named in `documentation/08-course-config-reference.md` rather than
 coded for.

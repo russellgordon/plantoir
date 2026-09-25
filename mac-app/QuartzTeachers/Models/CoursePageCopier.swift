@@ -905,6 +905,15 @@ nonisolated struct CoursePageCopyOutcome: Sendable {
     /// because the teacher has to go and remove them.
     let couldNotBeRemoved: [String]
 
+    /// Pages that WERE copied, whose source's settings could not be read — a
+    /// block opened and never closed (since #188 that includes one closed only
+    /// by INDENTED dashes). The copy was given a block of its own and arrived
+    /// hidden, with the source's broken lines as the start of its body; the
+    /// teacher is told, because until #188 such a page was refused with a
+    /// sentence, and a copy that arrives without a word would hide the fact
+    /// that its settings need correcting (#186's review, B6).
+    var sourceSettingsUnreadable: [String] = []
+
     // MARK: - Computed properties
 
     var createdNothing: Bool {
@@ -1020,6 +1029,7 @@ nonisolated enum CoursePageCopier {
         // The pages first, with the media names already settled, so nothing
         // touches a page's bytes after its read-back.
         var pagesCreated: [String] = []
+        var sourceSettingsUnreadable: [String] = []
         var writtenPageURLs: [URL] = []
         for placement in plan.pages {
             let sourceFolder: URL = request.source.directoryURL
@@ -1103,6 +1113,9 @@ nonisolated enum CoursePageCopier {
             }
 
             pagesCreated.append(placement.pageName)
+            if PageVisibilityReader.frontmatterBlock(in: sourceText) == .unreadable {
+                sourceSettingsUnreadable.append(placement.pageName)
+            }
             writtenPageURLs.append(writtenURL)
         }
 
@@ -1164,7 +1177,8 @@ nonisolated enum CoursePageCopier {
             skipped: skipped,
             linksLeadingNowhere: plan.linksLeadingNowhere,
             bytesCopied: bytes,
-            couldNotBeRemoved: stillOnDisk
+            couldNotBeRemoved: stillOnDisk,
+            sourceSettingsUnreadable: sourceSettingsUnreadable
         )
     }
 

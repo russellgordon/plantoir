@@ -207,6 +207,26 @@ nonisolated enum CopyPageWording {
         return "These links will not lead anywhere yet: \(quoted.joined(separator: ", "))."
     }
 
+    /// Pages copied whose SOURCE's settings could not be read (#188, #186's
+    /// review B6). Worded after the build's own `pageSettingsUnreadable`
+    /// finding (#246), so a teacher hears the same thing from both: the
+    /// settings could not be read, the page is hidden, and correcting the
+    /// lines at the top of it in Obsidian is the fix.
+    static func theSourcesSettingsCouldNotBeRead(names: [String]) -> String {
+        var quoted: [String] = []
+        for name in names {
+            quoted.append("“\(name)”")
+        }
+        if names.count == 1 {
+            return "Plantoir could not read the settings at the top of \(quoted[0]) in the course it "
+                 + "came from, so the copy is hidden and those lines are now the start of the page. "
+                 + "Correct them in Obsidian before you publish it."
+        }
+        return "Plantoir could not read the settings at the top of \(quoted.joined(separator: ", ")) "
+             + "in the course they came from, so the copies are hidden and those lines are now the "
+             + "start of each page. Correct them in Obsidian before you publish them."
+    }
+
     static func thatCourseIsDeployingRightNow(course: String) -> String {
         return "Available once \(course)’s deploy has finished"
     }
