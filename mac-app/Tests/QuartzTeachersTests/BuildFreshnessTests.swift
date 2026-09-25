@@ -149,4 +149,108 @@ final class BuildFreshnessTests: XCTestCase {
 
         XCTAssertFalse(BuildFreshness.needsRebuild(course: course, sectionNumber: 1), "Hidden, generated files should be ignored")
     }
+    // MARK: - A Save made while a publish was building (issue #265)
+
+    /// The reviewer's H1: settings saved while a publish was BUILDING are
+    /// older than the page that build writes at its end. Compared with the
+    /// page alone, the site looked built and the next Publish sent the same
+    /// old site. `contracts/app-rules.json` → `buildFreshness`, the rule
+    /// about something saved after the build started.
+    @MainActor
+    func testSettingsSavedWhileThePublishWasBuildingMeanRebuild() throws {
+        let course: Course = try makeCourse(withBuiltSite: true)
+        let builtIndexURL: URL = course.directoryURL
+            .appendingPathComponent(".merged_output/section1/public/index.html")
+        let markerURL: URL = BuildFreshness.buildStartedMarkerURL(course: course, sectionNumber: 1)
+        try Data("started".utf8).write(to: markerURL)
+
+        try backdateEverything(in: course.directoryURL, to: Date(timeIntervalSinceNow: -600))
+        // The build started, the teacher saved, the build finished.
+        try setModificationDate(Date(timeIntervalSinceNow: -400), of: markerURL)
+        try setModificationDate(Date(timeIntervalSinceNow: -350), of: course.configFileURL)
+        try setModificationDate(Date(timeIntervalSinceNow: -300), of: builtIndexURL)
+
+        XCTAssertTrue(
+            BuildFreshness.needsRebuild(course: course, sectionNumber: 1),
+            "A Save after the build started was not in that build, however new the page is"
+        )
+    }
+
+    /// The same for a page saved during the build — the start time covers
+    /// every file, not only the settings.
+    @MainActor
+    func testAPageSavedWhileTheBuildRanMeansRebuild() throws {
+        let course: Course = try makeCourse(withBuiltSite: true)
+        let lessonURL: URL = course.directoryURL.appendingPathComponent("section1/index.md")
+        let builtIndexURL: URL = course.directoryURL
+            .appendingPathComponent(".merged_output/section1/public/index.html")
+        let markerURL: URL = BuildFreshness.buildStartedMarkerURL(course: course, sectionNumber: 1)
+        try Data("started".utf8).write(to: markerURL)
+
+        try backdateEverything(in: course.directoryURL, to: Date(timeIntervalSinceNow: -600))
+        try setModificationDate(Date(timeIntervalSinceNow: -400), of: markerURL)
+        try setModificationDate(Date(timeIntervalSinceNow: -350), of: lessonURL)
+        try setModificationDate(Date(timeIntervalSinceNow: -300), of: builtIndexURL)
+
+        XCTAssertTrue(BuildFreshness.needsRebuild(course: course, sectionNumber: 1))
+    }
+
+    /// Nothing saved after the build started: still up to date — the marker
+    /// must not make every publish rebuild.
+    @MainActor
+    func testNothingSavedSinceTheBuildStartedIsUpToDate() throws {
+        let course: Course = try makeCourse(withBuiltSite: true)
+        let builtIndexURL: URL = course.directoryURL
+            .appendingPathComponent(".merged_output/section1/public/index.html")
+        let markerURL: URL = BuildFreshness.buildStartedMarkerURL(course: course, sectionNumber: 1)
+        try Data("started".utf8).write(to: markerURL)
+
+        try backdateEverything(in: course.directoryURL, to: Date(timeIntervalSinceNow: -600))
+        try setModificationDate(Date(timeIntervalSinceNow: -400), of: markerURL)
+        try setModificationDate(Date(timeIntervalSinceNow: -300), of: builtIndexURL)
+
+        XCTAssertFalse(BuildFreshness.needsRebuild(course: course, sectionNumber: 1))
+    }
+
+    /// The earlier of the two times is the one compared with; with no marker
+    /// the page's own time is, as before.
+    @MainActor
+    func testTheReferenceIsTheEarlierTime() {
+        let page: Date = Date(timeIntervalSince1970: 1_000)
+        XCTAssertEqual(BuildFreshness.referenceDate(builtDate: page, buildStartedDate: nil), page)
+        XCTAssertEqual(
+            BuildFreshness.referenceDate(builtDate: page, buildStartedDate: Date(timeIntervalSince1970: 900)),
+            Date(timeIntervalSince1970: 900)
+        )
+        XCTAssertEqual(
+            BuildFreshness.referenceDate(builtDate: page, buildStartedDate: Date(timeIntervalSince1970: 1_100)),
+            page,
+            "A marker newer than the page is not believed: an early answer only costs a rebuild"
+        )
+    }
+
+    /// The marker's name is the one the build writes and the contract gives.
+    @MainActor
+    func testTheMarkerIsTheOneTheContractNames() throws {
+        let contractURL: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("contracts/app-rules.json")
+        let data: Data = try Data(contentsOf: contractURL)
+        let rules: [String: Any] = try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let freshness: [String: Any] = try XCTUnwrap(rules["buildFreshness"] as? [String: Any])
+        let marker: [String: Any] = try XCTUnwrap(freshness["buildStartedMarker"] as? [String: Any])
+        XCTAssertEqual(marker["file"] as? String, BuildFreshness.buildStartedMarkerName)
+
+        var ruleNamed: Bool = false
+        for rule in try XCTUnwrap(freshness["rules"] as? [[String: Any]]) {
+            let when: String = rule["when"] as? String ?? ""
+            if when.contains("AFTER the build that made the site started") {
+                ruleNamed = rule["expectRebuild"] as? Bool == true
+            }
+        }
+        XCTAssertTrue(ruleNamed, "The contract names the rule these tests pin")
+    }
 }

@@ -9,7 +9,7 @@ by the macOS app from scratch: a class imported from the older
 folder-per-class layout has no settings file at all, so the importer writes
 one (see "Reference courses" below) — **read and auto-extended** by the
 build ([`build_site.py`](05-build-pipeline.md) appends newly discovered
-folders/files), and **statically imported** by the patched Explorer
+folders/files, and never touches `hidden`), and **statically imported** by the patched Explorer
 components at Quartz build time
 ([customizations C2-1](06-quartz-customizations.md#c2-applied-on-every-build)).
 
@@ -59,7 +59,7 @@ A representative example:
 | `shared_files` | string[] | setup + build discovery | build | Course-root loose `.md` files copied into every section's site. |
 | `per_section_folders` | string[] | setup + build discovery | build | Folder names expected inside each `section<N>/`, copied only into that section's site. |
 | `per_section_files` | string[] | setup + build discovery | build | Loose `.md` files inside each `section<N>/`. |
-| `hidden` | string[] | setup + build (auto-adds `Media`) | build → Explorer omit set | Items filtered out of the sidebar. Still built, linkable, and searchable. |
+| `hidden` | string[] | setup + the apps ONLY — the build never changes it (#265); it adds `Media` and `Curriculum Coverage.md` to the sidebar's list in memory, never to this file | build → Explorer omit set | Items filtered out of the sidebar. Still built, linkable, and searchable. Each entry is the STORED name of a TOP-LEVEL item — a file with `.md` (`"Key Links.md"`), a folder by name (`"Tasks"`) — matched ignoring case and Unicode normalisation; a name without `.md` also hides `<name>.md`; nothing nested is hidden by a name. Contract: `file-formats.json` → `sidebarHiding`. |
 | `expandable` | string[] | setup + build discovery | patched Explorer (statically imported) | Folders rendered as collapsible trees; all other folders render as plain links to their index page. |
 | `expandOnFolderClick` | bool | setup | build → `folderClickBehavior` + `data-expand-on-navigate` | `true`: clicking a folder name expands it. `false` (default): name navigates; only the chevron expands. |
 | `footer_html` | string | setup | build → `Footer.tsx` | Raw HTML injected into every page's footer. |
@@ -70,7 +70,7 @@ A representative example:
 | `color_schemes.section<N>` | string | setup | build → `quartz.config.ts` colors + social card | Scheme id from `support/colour_schemes.json` (43 available). The section's social sharing card is drawn in this scheme too. |
 | `custom_domains.sections.section<N>` | object (per-destination-type map, e.g. `{"netlify": "…", "cloudflare_pages": "…"}`) | app (Advanced, per-section settings — one field per configured destination) | app (published-site links, per destination) + `build_site.py` (baseUrl, via the PRIMARY destination's own entry only — one build's sitemap/RSS/social-card links can only follow one domain) | The teacher's own domain for ONE destination of the section's published site. Links after a deploy swap that destination's own host for it (path preserved, https) — never another destination's. An OLDER shape (a bare string, from before a course could have more than one destination) is still read, as the domain for whichever destination is currently primary (`deploy_target`). The domain itself must already be configured with that host (Netlify/Cloudflare Pages) — this key only changes what Plantoir LINKS to. Entries are normalized (scheme and path stripped) on the way in. |
 | `prepopulate_example_content` | bool | setup | setup (remembered on a re-run) | Whether the teacher took the ready-made payload for this course code. |
-| `use_skeleton` | bool | setup | setup (remembered on a re-run) | Whether the teacher took the subject skeleton instead. Mutually exclusive with the key above — a course gets one starting content source or neither. Offered for a code whose prefix has a family AND whose teacher is NOT taking the ready-made payload, which is the 38 payload codes as well as the ~1,900 without one: both apps wrote `false` for a payload code whatever the teacher chose until 2026-09-21, so declining the ready-made pages gave empty folders ([#248](https://github.com/russellgordon/plantoir/issues/248); 18 pages against the skeleton's 47, measured on ICS4U). |
+| `use_skeleton` | bool | setup | setup (remembered on a re-run) | Whether the teacher took the subject skeleton instead. Mutually exclusive with the key above — a course gets one starting content source or neither. Offered for a code whose prefix has a family AND whose teacher is NOT taking the ready-made payload, which is the 39 payload codes as well as the ~1,900 without one: both apps wrote `false` for a payload code whatever the teacher chose until 2026-09-21, so declining the ready-made pages gave empty folders ([#248](https://github.com/russellgordon/plantoir/issues/248); 18 pages against the skeleton's 47, measured on ICS4U). |
 | `include_curriculum_pages` | bool | setup | setup | Whether the curriculum pages written for this course code come with it — every expectation as its own page, and what the coverage map is built from. TWO starting points reach them since [#251](https://github.com/russellgordon/plantoir/issues/251) (2026-09-22): the teacher TAKING the payload gets its Curriculum folder, and the teacher who DECLINES the payload but keeps the subject's skeleton gets those same pages installed into the skeleton's Curriculum folder (ICS4U 2 pages to 61, MCMPR11 to 59 British Columbia standards, ICS2O — no payload — unchanged at 2). Declining it strips the `%%curriculum-start%%`…`%%curriculum-end%%` passages from every payload page and unlinks inline expectation references. |
 | `include_curriculum_coverage` | bool (default `true`) | setup | build | Whether the generated `Curriculum Coverage` map page is produced. A club (#267) is created with it `false` and no Curriculum folder; a teacher who turns it on later in Course Settings gets the build-health advisory `curriculumCoverageFoundNothing` until a curriculum folder with pages exists — advisory and correct, not a fault. |
 | `curriculum_folder` | string or null | setup | build | What this course calls the folder holding one page per expectation. Declared by every payload and skeleton manifest. The build tries it FIRST and only then falls back to scanning for a top-level folder whose name contains `curriculum` — which is still the path a from-scratch course takes, but would never have found a folder called something else entirely. |
@@ -161,8 +161,9 @@ and in `setup_course.py`), and `show_section_marker` false for `section1`
 (every import is section 1, so "S1" would be wrong for an S2).
 
 `hidden` is the set of names the site's sidebar leaves out — the Explorer's
-`omit` set, written by `update_quartz_layout`; the pages are still built and
-still reachable by link. The import writes only `Media`, because pictures are
+`omit` set, written by `update_quartz_layout` with each name as stored
+(`.md` kept, since #265); the pages are still built and still reachable by
+link. The import writes only `Media`, because pictures are
 not pages, and the build adds `Media` itself anyway. It deliberately does NOT
 copy the wizard's own list (`WizardDefaults.hiddenItems`: Private Notes,
 Scratch Page, Key Links, Learning Goals and so on), which would hide seven of
