@@ -1632,12 +1632,23 @@ DEFAULT_UNIT_WORD = class_pages.DEFAULT_UNIT_WORD
 
 _unit_word = DEFAULT_UNIT_WORD
 
+# The SHAPE of this build's class-page names — "<word> 2, Day 3" or, for a
+# club, "<word> 3" (#267). Set beside the word, for the same reason.
+_class_page_scheme = class_pages.UNIT_DAY_SCHEME
+
 
 def set_unit_word(word) -> str:
     """Records what this build's course calls a unit, and returns it."""
     global _unit_word
     _unit_word = class_pages._cleaned(word)
     return _unit_word
+
+
+def set_class_page_scheme(scheme) -> str:
+    """Records the shape this build's class pages take, and returns it."""
+    global _class_page_scheme
+    _class_page_scheme = class_pages._cleaned_scheme(scheme)
+    return _class_page_scheme
 
 
 def unit_word() -> str:
@@ -1652,12 +1663,12 @@ def unit_word_from_config(config: dict) -> str:
 
 def class_page_pattern(word: str | None = None) -> str:
     """This build's class-page pattern, or one for a word given outright."""
-    return class_pages.class_page_pattern(word if word is not None else _unit_word)
+    return class_pages.class_page_pattern(word if word is not None else _unit_word, _class_page_scheme)
 
 
 def first_class_pattern(word: str | None = None) -> str:
     """This build's first-class-of-the-year pattern."""
-    return class_pages.first_class_pattern(word if word is not None else _unit_word)
+    return class_pages.first_class_pattern(word if word is not None else _unit_word, _class_page_scheme)
 
 
 def _is_class_page(path: Path, title: str | None = None, word: str | None = None) -> bool:
@@ -4992,7 +5003,11 @@ def build_section_site(
     # Set once here rather than passed through every caller — one process
     # builds one section of one course, so there is only ever one answer.
     chosen_unit_word = set_unit_word(unit_word_from_config(config))
-    if chosen_unit_word != DEFAULT_UNIT_WORD:
+    chosen_scheme = set_class_page_scheme(class_pages.scheme_from_config(config))
+    if chosen_scheme == class_pages.NUMBERED_SCHEME:
+        print(f"📘 This course numbers its pages one after another, so a class page is "
+              f"“{chosen_unit_word} 3”.")
+    elif chosen_unit_word != DEFAULT_UNIT_WORD:
         print(f"📘 This course calls its units “{chosen_unit_word}”, so a class page is "
               f"“{chosen_unit_word} 2, Day 3”.")
 

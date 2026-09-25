@@ -314,9 +314,15 @@ struct SectionReDatePlan {
 
     /// The plan in words. Same shape as every other plan here: one sentence
     /// per page, no arrows, no markdown.
-    func describe(mostListed: Int = 15) -> String {
+    ///
+    /// `noun` is what the course calls one of its pages (#267). The model is
+    /// always given the `.class` form; a club's CARD says "meeting" — see
+    /// `AssistToolOutcome.planned(_:plan:card:)`.
+    func describe(mostListed: Int = 15, noun: ClassNoun = .class) -> String {
         var lines: [String] = []
-        lines.append("\(courseCode) Section \(sectionNumber): re-dating onto the class dates on file.")
+        lines.append(AssistWording.reDatingOntoTheDatesOnFile(
+            course: courseCode, section: "\(sectionNumber)", noun: noun
+        ))
         lines.append("")
 
         if changesNothing {
@@ -324,19 +330,20 @@ struct SectionReDatePlan {
             return lines.joined(separator: "\n")
         }
 
-        lines.append("\(classCount) \(classCount == 1 ? "class runs" : "classes run") from "
-                     + "\(firstDay.text) (\(firstDay.weekdayName)) to "
-                     + "\(lastDay.text) (\(lastDay.weekdayName)).")
+        lines.append(AssistWording.pagesRunFrom(
+            count: classCount,
+            first: "\(firstDay.text) (\(firstDay.weekdayName))",
+            last: "\(lastDay.text) (\(lastDay.weekdayName))",
+            noun: noun
+        ))
         if spareDates > 0 {
             lines.append("\(spareDates) recorded \(spareDates == 1 ? "date is" : "dates are") "
                          + "left over at the end.")
         }
         if overflowing > 0 {
-            lines.append("\(overflowing) \(overflowing == 1 ? "class has" : "classes have") no day "
-                         + "of \(overflowing == 1 ? "its" : "their") own this year, so "
-                         + "\(overflowing == 1 ? "it goes" : "they all go") on "
-                         + "\(lastDay.text) with the last one as \(overflowing == 1 ? "a draft" : "drafts"). Move, publish or delete "
-                         + "\(overflowing == 1 ? "it" : "them") when you have decided what to do.")
+            lines.append(AssistWording.pagesWithNoDayOfTheirOwn(
+                count: overflowing, lastDay: lastDay.text, noun: noun
+            ))
         }
         lines.append("")
 
@@ -351,15 +358,18 @@ struct SectionReDatePlan {
             switch move.reason {
             case .aClass:
                 if move.unpublishes {
-                    lines.append("“\(move.title)” moves to \(move.to.text) and becomes a draft because it has no class date.")
+                    lines.append(AssistWording.movesAndBecomesADraft(
+                        page: move.title, to: move.to.text, noun: noun
+                    ))
                 } else {
                     lines.append("“\(move.title)” moves to \(move.to.text).")
                 }
             case .broughtBy(let classTitle):
                 lines.append("“\(move.title)” moves to \(move.to.text), with “\(classTitle)”.")
             case .yearRound:
-                lines.append("“\(move.title)” moves to \(move.to.text), the first day of class, "
-                             + "because Key Links points at it.")
+                lines.append(AssistWording.movesToTheFirstDay(
+                    page: move.title, to: move.to.text, noun: noun
+                ))
             }
             listed += 1
         }

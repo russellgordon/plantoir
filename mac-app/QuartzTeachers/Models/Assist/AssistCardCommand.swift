@@ -49,7 +49,13 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     /// requests that only LOOK like a card phrasing ("publish tomorrow's
     /// class, but not the linked pages") and answer the wrong question with
     /// total confidence, which is worse than routing it.
-    static func matching(_ message: String) -> AssistCardCommand? {
+    ///
+    /// `numberedPageWord` is the course's own page word ("Week") when the
+    /// window's course names its pages with ONE number (#267), and nil
+    /// otherwise. Only the one-number make-room frame reads it: that frame
+    /// matches in a numbered course alone, and only on that word or a bare
+    /// number — see `makeRoomAtOneNumber`.
+    static func matching(_ message: String, numberedPageWord: String? = nil) -> AssistCardCommand? {
         let tidied: String = message.trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: ".!"))
             .lowercased()
@@ -65,7 +71,7 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         if let more = AssistCardCommand.moreDays(tidied) {
             return more
         }
-        if let room = AssistCardCommand.makeRoom(tidied) {
+        if let room = AssistCardCommand.makeRoom(tidied, numberedPageWord: numberedPageWord) {
             return room
         }
         if let scheduled = AssistCardCommand.deployAtATime(tidied) {
@@ -310,7 +316,7 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     /// and the parts are read out of it — it does not try to understand a
     /// sentence that merely resembles this one, because answering the wrong
     /// question with total confidence is worse than routing it.
-    private static func makeRoom(_ tidied: String) -> AssistCardCommand? {
+    private static func makeRoom(_ tidied: String, numberedPageWord: String?) -> AssistCardCommand? {
         let spelled: [String: Int] = [
             "a": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
             "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
@@ -326,6 +332,14 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         var words: [String] = []
         for piece in body.split(separator: " ") {
             words.append(String(piece))
+        }
+
+        // <count> class|classes|meeting|meetings at [<word>] <number> — the
+        // one-number shape a numbered course's pages have (#267).
+        if words.count == 4 || words.count == 5 {
+            return AssistCardCommand.makeRoomAtOneNumber(
+                words, spelled: spelled, numberedPageWord: numberedPageWord
+            )
         }
 
         // <count> class|classes at unit <unit> day <day>
@@ -354,6 +368,52 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         )
     }
 
+    /// "Make room for a meeting at Week 5" — one number, the way a club names
+    /// its pages (#267) — or "at 5", the bare number.
+    ///
+    /// **Matched only in a numbered course, and only on that course's own
+    /// word.** The first version could not know the word, so it took any
+    /// single word: "make room for a meeting at period 3", "at block 2", "at
+    /// section 2" were all read as positions in a club and planned as "Week 3"
+    /// (measured by the #267 implementation review), and in a Unit/Day course
+    /// the same sentences stopped reaching the model, which they always had.
+    /// So the window's course says what its word is (`numberedPageWord`), and
+    /// without one — every Unit/Day course — this frame matches nothing and
+    /// the sentence goes to the model exactly as it did before #267. "at unit
+    /// 3" and "at day 5" are therefore model sentences everywhere except a
+    /// numbered course whose word IS "Unit".
+    ///
+    /// The number goes into `unit`, which a numbered course reads as its
+    /// position (`ClassInsertionPlanner.numberedPosition`).
+    private static func makeRoomAtOneNumber(
+        _ words: [String], spelled: [String: Int], numberedPageWord: String?
+    ) -> AssistCardCommand? {
+        guard let numberedPageWord, words[2] == "at" else {
+            return nil
+        }
+        if words.count == 5 {
+            let word: String = numberedPageWord.lowercased()
+            guard !word.isEmpty, words[3] == word else {
+                return nil
+            }
+        }
+        let nouns: [String: Bool] = ["class": true, "meeting": true, "classes": false, "meetings": false]
+        guard let isSingular = nouns[words[1]] else {
+            return nil
+        }
+        guard let howMany = spelled[words[0]] ?? Int(words[0]), howMany > 0,
+              let position = Int(words[words.count - 1]), position > 0 else {
+            return nil
+        }
+        guard (howMany == 1) == isSingular else {
+            return nil
+        }
+        return AssistCardCommand(
+            toolName: "make_room_for_classes",
+            arguments: ["unit": "\(position)", "howMany": "\(howMany)"]
+        )
+    }
+
     /// "Duplicate Unit 3, Day 2 as my next class."
     ///
     /// The page title is the only thing in it, and it sits between two fixed
@@ -370,7 +430,10 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         let typed: String = original.trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: ".!"))
         let body: String = String(tidied.dropFirst(opening.count))
-        for ending in [" as my next class", " as the next class", " as my next lesson"]
+        // "meeting" is a club's word for the same page (#267): the frame is
+        // identical, so it is one more ending rather than another family.
+        for ending in [" as my next class", " as the next class", " as my next lesson",
+                       " as my next meeting", " as the next meeting"]
         where body.hasSuffix(ending) {
             let start: String.Index = typed.index(typed.startIndex, offsetBy: opening.count)
             let end: String.Index = typed.index(typed.endIndex, offsetBy: -ending.count)
@@ -626,6 +689,12 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         /// half that stops a family swallowing requests it should not.
         let notThis: String
         let becauseNotThis: String
+
+        /// The page word of the numbered course the family is matched in,
+        /// for the one family that reads the window's course (#267); nil for
+        /// every family that matches the sentence alone. A runner passes it
+        /// to the matcher for BOTH the example and the near miss.
+        var numberedPageWord: String? = nil
     }
 
     /// Every parsed family, for the contract.
@@ -694,6 +763,38 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
                 notThis: "duplicate Unit 3, Day 2",
                 becauseNotThis: "The closing half is what makes the sentence unambiguous. Without "
                               + "it, 'duplicate' could mean several things and belongs with the model."
+            ),
+            // A club's two (#267). Listed as families of their own rather than
+            // by widening the two above, so the entries Windows already
+            // implements are byte-for-byte what they were.
+            ParsedShape(
+                shape: "make room for <count> class|classes|meeting|meetings at [<word>] <number>",
+                tool: "make_room_for_classes",
+                fills: [
+                    "unit": "<number> — the one number a numbered course's page names carry. "
+                          + "Matched ONLY in a numbered course, and <word> must be that course's own "
+                          + "page word (case-folded) or absent: 'at Week 5' and 'at 5' in a club whose "
+                          + "pages are “Week N”. In a Unit/Day course this family matches nothing and "
+                          + "the sentence goes to the model, as it did before #267",
+                    "howMany": "<count>, as a number — words up to twelve are understood",
+                ],
+                example: "make room for one meeting at Week 5",
+                notThis: "make room for one meeting at period 3",
+                becauseNotThis: "'period' is not this course's page word. The first version took any "
+                              + "single word, and 'at period 3', 'at block 2' and 'at section 2' were "
+                              + "all planned in a club as “Week 3” or “Week 2” — renaming pages the "
+                              + "teacher's links point at, from a sentence about something else. It "
+                              + "goes to the model.",
+                numberedPageWord: "Week"
+            ),
+            ParsedShape(
+                shape: "duplicate <page title> as my next meeting",
+                tool: "add_next_class",
+                fills: ["duplicate": "<page title>, with the capitals the teacher typed"],
+                example: "duplicate Week 3 as my next meeting",
+                notThis: "duplicate Week 3",
+                becauseNotThis: "The closing half is what makes the sentence unambiguous, exactly as "
+                              + "in 'as my next class'."
             ),
             ParsedShape(
                 shape: "[please] deploy [it|this section] [today|tomorrow] at <time> [today|tomorrow]",
@@ -806,6 +907,12 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
 
         ("publish tomorrow's class",
          AssistCardCommand(toolName: "publish_class_on", arguments: ["when": "tomorrow"])),
+        // A club's word for the same page (#267). Every "class" phrasing a
+        // club's shelf offers has its "meeting" twin here, matched in code
+        // exactly like the original, so the club shelf promises nothing that
+        // reaches the model.
+        ("publish tomorrow's meeting",
+         AssistCardCommand(toolName: "publish_class_on", arguments: ["when": "tomorrow"])),
 
         // "Publish Monday's class", and the other six. Same shape as
         // "tomorrow's class" above: the day is not read OUT of the sentence,
@@ -831,6 +938,20 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
          AssistCardCommand(toolName: "publish_class_on", arguments: ["when": "saturday"])),
         ("publish sunday's class",
          AssistCardCommand(toolName: "publish_class_on", arguments: ["when": "sunday"])),
+        ("publish monday's meeting",
+         AssistCardCommand(toolName: "publish_class_on", arguments: ["when": "monday"])),
+        ("publish tuesday's meeting",
+         AssistCardCommand(toolName: "publish_class_on", arguments: ["when": "tuesday"])),
+        ("publish wednesday's meeting",
+         AssistCardCommand(toolName: "publish_class_on", arguments: ["when": "wednesday"])),
+        ("publish thursday's meeting",
+         AssistCardCommand(toolName: "publish_class_on", arguments: ["when": "thursday"])),
+        ("publish friday's meeting",
+         AssistCardCommand(toolName: "publish_class_on", arguments: ["when": "friday"])),
+        ("publish saturday's meeting",
+         AssistCardCommand(toolName: "publish_class_on", arguments: ["when": "saturday"])),
+        ("publish sunday's meeting",
+         AssistCardCommand(toolName: "publish_class_on", arguments: ["when": "sunday"])),
 
         // The three below arrived with the shelf being filled out to match
         // what the assistant can actually do. Each qualifies on the same test
@@ -853,6 +974,8 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
 
         ("add the next class page",
          AssistCardCommand(toolName: "add_next_class", arguments: [:])),
+        ("add the next meeting page",
+         AssistCardCommand(toolName: "add_next_class", arguments: [:])),
 
         // The same tool, told to begin a new unit rather than carry the
         // current one on. Which unit a class belongs to is the one judgement
@@ -871,6 +994,14 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         ("when is my next class?",
          AssistCardCommand(toolName: "read_remembered_timetable", arguments: [:])),
         ("when is my next class",
+         AssistCardCommand(toolName: "read_remembered_timetable", arguments: [:])),
+        ("when are my next meetings?",
+         AssistCardCommand(toolName: "read_remembered_timetable", arguments: [:])),
+        ("when are my next meetings",
+         AssistCardCommand(toolName: "read_remembered_timetable", arguments: [:])),
+        ("when is my next meeting?",
+         AssistCardCommand(toolName: "read_remembered_timetable", arguments: [:])),
+        ("when is my next meeting",
          AssistCardCommand(toolName: "read_remembered_timetable", arguments: [:])),
         ("when do i teach next?",
          AssistCardCommand(toolName: "read_remembered_timetable", arguments: [:])),
@@ -900,6 +1031,14 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
          AssistCardCommand(toolName: "read_remembered_timetable", arguments: ["revise": "yes"])),
         ("change my class dates",
          AssistCardCommand(toolName: "read_remembered_timetable", arguments: ["revise": "yes"])),
+        // The first of these is the sentence `AssistWording.datesNotGivenYet(for:
+        // .meeting)` tells a club's teacher to say, so it must match.
+        ("i have a revised list of meeting dates",
+         AssistCardCommand(toolName: "read_remembered_timetable", arguments: ["revise": "yes"])),
+        ("i have a new list of meeting dates",
+         AssistCardCommand(toolName: "read_remembered_timetable", arguments: ["revise": "yes"])),
+        ("change my meeting dates",
+         AssistCardCommand(toolName: "read_remembered_timetable", arguments: ["revise": "yes"])),
 
         // Re-dating a whole section onto the dates on file — the September
         // job. Matched in code because there is nothing in the sentence to
@@ -908,6 +1047,10 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         ("re-date my classes",
          AssistCardCommand(toolName: "re_date_classes", arguments: [:])),
         ("redate my classes",
+         AssistCardCommand(toolName: "re_date_classes", arguments: [:])),
+        ("re-date my meetings",
+         AssistCardCommand(toolName: "re_date_classes", arguments: [:])),
+        ("redate my meetings",
          AssistCardCommand(toolName: "re_date_classes", arguments: [:])),
         ("re-date this section",
          AssistCardCommand(toolName: "re_date_classes", arguments: [:])),

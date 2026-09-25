@@ -471,6 +471,42 @@ class CourseConfiguration {
         set { values["unit_word"] = ClassPageTerm.cleaned(newValue) }
     }
 
+    /// The shape of this course's class-page names (#267). Absent and unknown
+    /// read as "Unit 2, Day 3"; see `ClassPageScheme`.
+    var classPageScheme: ClassPageScheme {
+        get { return ClassPageScheme.reading(stringValue(forKey: "class_page_scheme")) }
+        set { values["class_page_scheme"] = newValue.rawValue }
+    }
+
+    /// The heading this course's front pages were created with, as
+    /// `front_page_heading` records it — nil when the course has none, which
+    /// is every course made before #267 (CODING included).
+    ///
+    /// **No default is filled in, on purpose.** The first version answered
+    /// "Most Recent Class" for a course without the key, and Course Settings'
+    /// locked row then showed that for CODING, whose front page reads "Most
+    /// Recent Meeting" — a locked row stating something the page does not
+    /// say. Nothing rewrites a heading after creation, so the only honest
+    /// answer for a course without the key is that none was recorded.
+    var recordedFrontPageHeading: String? {
+        let stored: String = stringValue(forKey: "front_page_heading").trimmingCharacters(in: .whitespaces)
+        if stored.isEmpty {
+            return nil
+        }
+        return stored
+    }
+
+    /// What the assistant calls one class page to the teacher (#267).
+    var classNoun: ClassNoun {
+        get { return ClassNoun.reading(stringValue(forKey: "class_noun")) }
+        set { values["class_noun"] = newValue.rawValue }
+    }
+
+    /// The word and the scheme together — what every planner names pages by.
+    var classPageNaming: ClassPageNaming {
+        return ClassPageNaming(word: unitWord, scheme: classPageScheme)
+    }
+
     var sharedFolders: [String] {
         get { return stringListValue(forKey: "shared_folders") }
         set { values["shared_folders"] = newValue }
@@ -945,7 +981,7 @@ class CourseConfiguration {
     ///
     /// ONE rule, read by the three toggles, the config keys and the
     /// coverage rule below, so that the surfaces cannot drift apart — the
-    /// same reason `SkeletonCatalog.hasSkeleton(forCode:takingExampleContent:)`
+    /// same reason `SkeletonCatalog.hasSkeleton(forCode:takingExampleContent:numbered:)`
     /// exists, and `skeletonIsOffered` is that function's own answer rather
     /// than a second copy of its rule.
     static func curriculumPagesOffered(

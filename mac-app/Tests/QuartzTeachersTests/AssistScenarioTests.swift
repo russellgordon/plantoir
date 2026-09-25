@@ -142,15 +142,24 @@ final class AssistScenarioTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(parsed.count, 6, "The contract has lost a parsed family")
         for family in parsed {
             let example: String = try XCTUnwrap(family["example"] as? String)
+            // The one family that reads the window's course (#267) says which
+            // course, and it matches nothing without one.
+            let word: String? = family["inANumberedCourseWhosePagesAre"] as? String
+            if word != nil {
+                XCTAssertNil(
+                    AssistCardCommand.matching(example),
+                    "\"\(example)\" must match only in a numbered course"
+                )
+            }
             let command: AssistCardCommand = try XCTUnwrap(
-                AssistCardCommand.matching(example),
+                AssistCardCommand.matching(example, numberedPageWord: word),
                 "\"\(example)\" is the contract's example for a parsed family and matches nothing"
             )
             XCTAssertEqual(command.toolName, family["tool"] as? String, example)
 
             let notThis: String = try XCTUnwrap(family["notThis"] as? String)
             XCTAssertNil(
-                AssistCardCommand.matching(notThis),
+                AssistCardCommand.matching(notThis, numberedPageWord: word),
                 "\"\(notThis)\" is the near miss the contract says this family must refuse"
             )
             XCTAssertNotNil(family["becauseNotThis"] as? String, notThis)

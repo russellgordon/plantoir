@@ -653,7 +653,8 @@ final class AssistToolRunner {
         case .success(let planned):
             return AssistToolOutcome.planned(
                 "Worked out what publishing the class on \(planned.day.text) would do.",
-                plan: planned.plan.describe()
+                plan: planned.plan.describe(),
+                card: planned.plan.describe(noun: planned.located.course.configuration.classNoun)
             )
         }
     }
@@ -668,8 +669,7 @@ final class AssistToolRunner {
                hasNoTimetable(forSection: number, in: course) {
                 askForTheTimetable(
                     courseCode: code, sectionNumber: number,
-                    because: "Finding the class taught on a given day needs to know which days "
-                           + "this section meets."
+                    because: AssistWording.datesToFindADaysPage(noun: course.configuration.classNoun)
                 )
             }
             return AssistToolOutcome.refused(refusal.message)
@@ -678,7 +678,9 @@ final class AssistToolRunner {
                 planned.plan,
                 forSection: planned.located.sectionNumber,
                 in: planned.located.course,
-                summary: "Published the class on \(planned.day.text)."
+                summary: AssistWording.publishedTheClassOn(
+                    planned.day.text, noun: planned.located.course.configuration.classNoun
+                )
             )
         }
     }
@@ -746,7 +748,8 @@ final class AssistToolRunner {
             }
             return AssistToolOutcome.planned(
                 "Worked out what publishing those pages would do.",
-                plan: planned.plan.describe()
+                plan: planned.plan.describe(),
+                card: planned.plan.describe(noun: planned.located.course.configuration.classNoun)
             )
         }
     }
@@ -782,7 +785,8 @@ final class AssistToolRunner {
             }
             return AssistToolOutcome.planned(
                 "Worked out what unpublishing those pages would do.",
-                plan: planned.plan.describe()
+                plan: planned.plan.describe(),
+                card: planned.plan.describe(noun: planned.located.course.configuration.classNoun)
             )
         }
     }
@@ -842,7 +846,9 @@ final class AssistToolRunner {
             return nil
         }
         let unitWord: String = located.course.configuration.unitWord
-        guard let unit = AssistPublishPlanner.unitNamed(titles[0], term: unitWord) else {
+        guard let unit = AssistPublishPlanner.unitNamed(
+            titles[0], naming: located.course.configuration.classPageNaming
+        ) else {
             return nil
         }
 
@@ -887,7 +893,7 @@ final class AssistToolRunner {
         let becoming: String = publishing ? "visible" : "hidden"
         var lines: [String] = []
         lines.append("\(located.course.code) Section \(located.sectionNumber): "
-                     + "\(publishing ? "publishing" : "unpublishing") Unit \(unit).")
+                     + "\(publishing ? "publishing" : "unpublishing") \(unitWord) \(unit).")
         lines.append("")
         lines.append("\(moving.count) \(word) would become \(becoming), "
                      + "\(publishing ? "starting at" : "starting from") "
@@ -899,7 +905,7 @@ final class AssistToolRunner {
         }
 
         return AssistToolOutcome.planned(
-            "Worked out what \(publishing ? "publishing" : "unpublishing") Unit \(unit) would do.",
+            "Worked out what \(publishing ? "publishing" : "unpublishing") \(unitWord) \(unit) would do.",
             plan: lines.joined(separator: "\n")
         )
     }
@@ -946,7 +952,9 @@ final class AssistToolRunner {
             return nil
         }
         let unitWord: String = located.course.configuration.unitWord
-        guard let unit = AssistPublishPlanner.unitNamed(titles[0], term: unitWord) else {
+        guard let unit = AssistPublishPlanner.unitNamed(
+            titles[0], naming: located.course.configuration.classPageNaming
+        ) else {
             return nil
         }
 
@@ -1573,6 +1581,22 @@ final class AssistToolRunner {
         return lines.joined(separator: "\n")
     }
 
+    /// The page word of this course when it names its pages with ONE number
+    /// ("Week" in a club, #267), and nil for every other course — what the
+    /// card matcher needs to read "make room for a meeting at Week 5" as this
+    /// course's page and nothing else (`AssistCardCommand.matching`). Read
+    /// at the moment of asking, like everything else here.
+    func numberedPageWord(forCourse code: String) -> String? {
+        guard let course = course(withCode: code) else {
+            return nil
+        }
+        let naming: ClassPageNaming = course.configuration.classPageNaming
+        if naming.isNumbered {
+            return naming.word
+        }
+        return nil
+    }
+
     /// The course with this code, or nil when the working folder no longer has
     /// one — a course renamed or archived mid-conversation.
     private func course(withCode code: String) -> Course? {
@@ -1877,7 +1901,9 @@ final class AssistToolRunner {
                 courseCode: located.course.code,
                 sectionNumber: located.sectionNumber,
                 workingFolder: workspace.workspaceURL ?? located.course.directoryURL,
-                because: "Replacing the class dates on file for \(where_)."
+                because: AssistWording.datesToReplace(
+                    for: where_, noun: located.course.configuration.classNoun
+                )
             )
             let opening: String = "Here you are — the dates for \(where_) are open for editing. "
                                 + "What you save replaces what was there."
@@ -1901,7 +1927,11 @@ final class AssistToolRunner {
             )
             let asking: String = "I don't know when \(where_) meets yet. "
                                + AssistWording.mayIAskForYourDates
-            return AssistToolOutcome(summary: asking, detail: asking, shouldContinue: false)
+            // The teacher's copy in the course's own noun (#267); the model's
+            // as it always was.
+            let askingTheTeacher: String = "I don't know when \(where_) meets yet. "
+                + AssistWording.mayIAskForYourDates(for: located.course.configuration.classNoun)
+            return AssistToolOutcome(summary: askingTheTeacher, detail: asking, shouldContinue: false)
         }
 
         // "All of them" is asked for by a fixed phrasing the window offers
@@ -1922,7 +1952,12 @@ final class AssistToolRunner {
             )
         }
 
+        // Written twice (#267): `lines` for the model, which reads "class"
+        // whatever the course says, and `teacherLines` in the course's own
+        // noun for the teacher, who reads the summary.
+        let noun: ClassNoun = located.course.configuration.classNoun
         var lines: [String] = []
+        var teacherLines: [String] = []
 
         // What the dates are actually FOR: map existing class pages by date or schedule index.
         let existing: [ClassPageSummary] = ClassPages.list(
@@ -1943,8 +1978,13 @@ final class AssistToolRunner {
                     upcomingDates.append(date)
                 }
             }
-            let countStr: String = upcomingDates.count == 1 ? "first class is" : "first \(upcomingDates.count) classes are"
-            lines.append("The semester begins on \(remembered.firstDate.weekdayName), \(remembered.firstDate.text). The \(countStr):")
+            let first: CalendarDay = remembered.firstDate
+            lines.append(AssistWording.theSemesterBegins(
+                on: "\(first.weekdayName), \(first.text)", showing: upcomingDates.count
+            ))
+            teacherLines.append(AssistWording.theSemesterBegins(
+                on: "\(first.weekdayName), \(first.text)", showing: upcomingDates.count, noun: noun
+            ))
         } else {
             for date in remembered.dates {
                 if date >= today && upcomingDates.count < 3 {
@@ -1952,10 +1992,18 @@ final class AssistToolRunner {
                 }
             }
             if upcomingDates.isEmpty {
-                lines.append("All \(remembered.dates.count) scheduled classes for \(where_) have concluded (last class was on \(remembered.lastDate.weekdayName), \(remembered.lastDate.text)).")
+                let last: String = "\(remembered.lastDate.weekdayName), \(remembered.lastDate.text)"
+                lines.append(AssistWording.allScheduledDatesHaveConcluded(
+                    count: remembered.dates.count, for: where_, last: last
+                ))
+                teacherLines.append(AssistWording.allScheduledDatesHaveConcluded(
+                    count: remembered.dates.count, for: where_, last: last, noun: noun
+                ))
             } else {
-                let countStr: String = upcomingDates.count == 1 ? "upcoming class" : "\(upcomingDates.count) upcoming classes"
-                lines.append("Your next \(countStr) for \(where_):")
+                lines.append(AssistWording.yourNextUpcoming(count: upcomingDates.count, for: where_))
+                teacherLines.append(AssistWording.yourNextUpcoming(
+                    count: upcomingDates.count, for: where_, noun: noun
+                ))
             }
         }
 
@@ -1969,16 +2017,26 @@ final class AssistToolRunner {
                 classTitle = "(page not yet created)"
             }
             lines.append("• \(date.weekdayName), \(date.text) — \(classTitle)")
+            teacherLines.append("• \(date.weekdayName), \(date.text) — \(classTitle)")
         }
 
         lines.append("")
+        teacherLines.append("")
         let spare: Int = remembered.spareDates(after: existing.count)
-        lines.append("\(where_) has \(existing.count) class \(existing.count == 1 ? "page" : "pages") across \(remembered.dates.count) recorded dates (\(spare) spare).")
+        lines.append(AssistWording.pagesAcrossTheDates(
+            for: where_, pages: existing.count, dates: remembered.dates.count, spare: spare
+        ))
+        teacherLines.append(AssistWording.pagesAcrossTheDates(
+            for: where_, pages: existing.count, dates: remembered.dates.count, spare: spare, noun: noun
+        ))
         if spare == 0 {
-            lines.append("Every recorded date is spoken for, so another class cannot be dated until more dates are recorded.")
+            lines.append(AssistWording.everyDateIsSpokenFor())
+            teacherLines.append(AssistWording.everyDateIsSpokenFor(noun: noun))
         } else {
             let next: CalendarDay = remembered.dates[existing.count]
-            lines.append("The next class would fall on \(next.text) (\(next.weekdayName)).")
+            let when: String = "\(next.text) (\(next.weekdayName))"
+            lines.append(AssistWording.theNextWouldFallOn(when))
+            teacherLines.append(AssistWording.theNextWouldFallOn(when, noun: noun))
         }
 
         var origin: String = "Where they came from: \(remembered.source)."
@@ -1987,16 +2045,21 @@ final class AssistToolRunner {
         }
         lines.append("")
         lines.append(origin)
+        teacherLines.append("")
+        teacherLines.append(origin)
 
         if remembered.dates.count > upcomingDates.count {
             let rest: Int = remembered.dates.count - upcomingDates.count
+            let more: String = "There \(rest == 1 ? "is" : "are") \(rest) more. Say “show me all the dates” to see the full schedule."
             lines.append("")
-            lines.append("There \(rest == 1 ? "is" : "are") \(rest) more. Say “show me all the dates” to see the full schedule.")
+            lines.append(more)
+            teacherLines.append("")
+            teacherLines.append(more)
         }
 
         let fullAnswer: String = lines.joined(separator: "\n")
         return AssistToolOutcome(
-            summary: fullAnswer,
+            summary: teacherLines.joined(separator: "\n"),
             detail: fullAnswer,
             shouldContinue: false
         )
@@ -2164,7 +2227,7 @@ final class AssistToolRunner {
         }
         askForTheTimetable(
             courseCode: code, sectionNumber: number,
-            because: "Adding the next class page needs to know which days this section meets."
+            because: AssistWording.datesForTheNextPage(noun: noun(forCourse: code))
         )
     }
 
@@ -2178,6 +2241,12 @@ final class AssistToolRunner {
     /// forward. A teacher who has never given their dates cannot act on "I
     /// can't find a class on Monday": what they need is not a better sentence,
     /// it is the question nobody asked them.
+    /// What a course calls one of its class pages (#267), for a sentence the
+    /// teacher reads — "class" when the course cannot be found.
+    private func noun(forCourse code: String) -> ClassNoun {
+        return course(withCode: code)?.configuration.classNoun ?? .class
+    }
+
     private func askForTheTimetable(courseCode: String, sectionNumber: Int, because: String) {
         guard let folder = workspace.workspaceURL else {
             return
@@ -2220,7 +2289,8 @@ final class AssistToolRunner {
                 asked.plan.changesNothing
                     ? "The next class page already exists."
                     : "Worked out what the next class page would be.",
-                plan: asked.plan.description
+                plan: asked.plan.description,
+                card: asked.plan.describe(noun: asked.located.course.configuration.classNoun)
             )
         }
     }
@@ -2497,16 +2567,26 @@ final class AssistToolRunner {
         // when a short unit was widened — the plan said not one word about the
         // whole of the rest of the year being re-dated, and this is the card a
         // teacher reads before pressing Go.
+        // The card takes the course's own noun (#267); the model's copy of
+        // the plan says "class" whatever the course calls them.
+        var cardLines: [String] = lines
         if request.plan.movesAnythingElse {
             lines.append("")
             lines.append(AssistWording.otherClassesWouldMove(
                 moving: request.plan.otherClassesMoving,
                 renaming: request.plan.renames.count
             ))
+            cardLines.append("")
+            cardLines.append(AssistWording.otherClassesWouldMove(
+                moving: request.plan.otherClassesMoving,
+                renaming: request.plan.renames.count,
+                noun: request.located.course.configuration.classNoun
+            ))
         }
         return AssistToolOutcome.planned(
             "Worked out what duplicating “\(request.sourceTitle)” would do.",
-            plan: lines.joined(separator: "\n")
+            plan: lines.joined(separator: "\n"),
+            card: cardLines.joined(separator: "\n")
         )
     }
 
@@ -2547,7 +2627,7 @@ final class AssistToolRunner {
             )
         }
         guard let numbers = UnitDay(
-            pageTitle: source.title, term: located.course.configuration.unitWord
+            pageTitle: source.title, naming: located.course.configuration.classPageNaming
         ) else {
             return .failure(AssistWording.notANumberedClassPage(page: source.displayTitle))
         }
@@ -2587,8 +2667,7 @@ final class AssistToolRunner {
         }
         askForTheTimetable(
             courseCode: located.course.code, sectionNumber: located.sectionNumber,
-            because: "Duplicating a class needs to know which days this section meets, "
-                   + "so the copy can be given a date."
+            because: AssistWording.datesToDuplicate(noun: located.course.configuration.classNoun)
         )
     }
 
@@ -2650,17 +2729,21 @@ final class AssistToolRunner {
                 )
             }
             if isRollover, websiteAnswer == "new" {
+                let newWebsite: String =
+                    "\n\nIt would also start a new website for this section, so publishing it "
+                    + "no longer replaces last year's. Last year's details are kept, and any "
+                    + "publish set to happen on its own is turned off."
                 return AssistToolOutcome.planned(
                     "Worked out what rolling that section over would do.",
-                    plan: asked.plan.describe()
-                        + "\n\nIt would also start a new website for this section, so publishing it "
-                        + "no longer replaces last year's. Last year's details are kept, and any "
-                        + "publish set to happen on its own is turned off."
+                    plan: asked.plan.describe() + newWebsite,
+                    card: asked.plan.describe(noun: asked.located.course.configuration.classNoun)
+                        + newWebsite
                 )
             }
             return AssistToolOutcome.planned(
                 "Worked out what re-dating that section would do.",
-                plan: asked.plan.describe()
+                plan: asked.plan.describe(),
+                card: asked.plan.describe(noun: asked.located.course.configuration.classNoun)
             )
         }
     }
@@ -2721,11 +2804,15 @@ final class AssistToolRunner {
             history.record(change)
 
             let moved: Int = asked.plan.moves.count
-            let summary: String = "Re-dated \(asked.plan.classCount) "
-                                + "\(asked.plan.classCount == 1 ? "class" : "classes") and "
-                                + "\(moved - asked.plan.classCount) "
-                                + "\((moved - asked.plan.classCount) == 1 ? "page" : "pages") "
-                                + "they use."
+            // The model's copy says "class" whatever the course calls them;
+            // only the line the teacher reads takes the course's noun (#267).
+            let summary: String = AssistWording.reDated(
+                count: asked.plan.classCount, pagesTheyUse: moved - asked.plan.classCount
+            )
+            let teacherSummary: String = AssistWording.reDated(
+                count: asked.plan.classCount, pagesTheyUse: moved - asked.plan.classCount,
+                noun: asked.located.course.configuration.classNoun
+            )
             var detail: String = summary
             if backedUp {
                 detail += "\n\n" + AssistToolRunner.backedUpNote
@@ -2741,7 +2828,7 @@ final class AssistToolRunner {
             // The website goes in the SUMMARY beside the count of what moved:
             // it is the part a teacher has to answer, and `detail` is not shown
             // to them at all for a write.
-            var said: String = summary
+            var said: String = teacherSummary
             if aboutTheWebsite.isEmpty == false {
                 said += "\n\n" + aboutTheWebsite
                 detail += "\n\n" + aboutTheWebsite
@@ -3063,21 +3150,29 @@ final class AssistToolRunner {
             // promises a teacher will be shown, and a hand-rolled count of
             // renames delivered none of it. The more dangerous tool was the
             // one showing less.
-            var lines: [String] = [asked.plan.description]
-            lines.append("")
-            lines.append("The new pages start hidden, so nothing changes on the site until you publish them.")
-            if asked.plan.movesAnythingElse {
-                lines.append("")
-                lines.append(
-                    "Because other classes move, “Undo that” will not take this back afterwards — "
-                    + "the copy made before any of it is in Plantoir's Backups list."
-                )
-            }
+            //
+            // Written twice: once with "class" for the model, and once in the
+            // course's own noun for the card (#267), so a club changes
+            // nothing the model is given.
+            let noun: ClassNoun = asked.located.course.configuration.classNoun
             return AssistToolOutcome.planned(
                 "Worked out what making room in that unit would do.",
-                plan: lines.joined(separator: "\n")
+                plan: AssistToolRunner.makeRoomPlan(asked.plan, noun: .class),
+                card: AssistToolRunner.makeRoomPlan(asked.plan, noun: noun)
             )
         }
+    }
+
+    /// A make-room plan, in the words a teacher agrees to.
+    private static func makeRoomPlan(_ plan: ClassInsertionPlan, noun: ClassNoun) -> String {
+        var lines: [String] = [plan.describe(noun: noun)]
+        lines.append("")
+        lines.append("The new pages start hidden, so nothing changes on the site until you publish them.")
+        if plan.movesAnythingElse {
+            lines.append("")
+            lines.append(AssistWording.makingRoomCannotBeUndone(noun: noun))
+        }
+        return lines.joined(separator: "\n")
     }
 
     /// Make the room.
@@ -3140,9 +3235,10 @@ final class AssistToolRunner {
                 detail += "\n\n" + AssistToolRunner.backedUpNote
             }
             return AssistToolOutcome.wrote(
-                "Made room for \(asked.count) "
-                + (asked.count == 1 ? "class" : "classes")
-                + " at \(asked.located.course.configuration.unitWord) \(asked.unit), Day \(asked.atDay).",
+                AssistWording.madeRoom(
+                    count: asked.count, at: asked.plan.positionTitle,
+                    noun: asked.located.course.configuration.classNoun
+                ),
                 detail: detail
             )
         }
@@ -3168,13 +3264,37 @@ final class AssistToolRunner {
         guard case .success(let located) = found else {
             return .couldNot(refusal(from: found).message)
         }
-        guard let unit = number("unit", in: arguments) else {
-            return .couldNot(
-                "Which \(located.course.configuration.unitWord.lowercased()) should I make room in?"
-            )
-        }
-        guard let atDay = number("atDay", in: arguments) else {
-            return .couldNot("Which day should the new class take?")
+        let naming: ClassPageNaming = located.course.configuration.classPageNaming
+        var unit: Int = 0
+        var atDay: Int = 0
+        if naming.isNumbered {
+            // A numbered course (#267) has one number and no units, but the
+            // tool's schema — frozen, because routing was measured against
+            // it — still asks for `unit` and `atDay`. Which one a small model
+            // fills for "make room at Week 5" is a routing question, so the
+            // reading accepts either and refuses the one shape it cannot
+            // read: two different numbers.
+            guard let position = ClassInsertionPlanner.numberedPosition(
+                unit: number("unit", in: arguments), atDay: number("atDay", in: arguments)
+            ) else {
+                return .couldNot(
+                    "Which \(naming.word.lowercased()) should I make room at? Name one, like "
+                    + "“\(naming.title(unit: 1, day: 3))”."
+                )
+            }
+            unit = 1
+            atDay = position
+        } else {
+            guard let askedUnit = number("unit", in: arguments) else {
+                return .couldNot(
+                    "Which \(located.course.configuration.unitWord.lowercased()) should I make room in?"
+                )
+            }
+            guard let askedDay = number("atDay", in: arguments) else {
+                return .couldNot("Which day should the new class take?")
+            }
+            unit = askedUnit
+            atDay = askedDay
         }
         // One unless asked for more, matching what the teacher means by "make
         // room for a class".
@@ -3335,8 +3455,7 @@ final class AssistToolRunner {
         }
         askForTheTimetable(
             courseCode: code, sectionNumber: number,
-            because: "Re-dating a section puts its classes onto the days it meets, so it needs "
-                   + "those days first."
+            because: AssistWording.datesToReDate(noun: noun(forCourse: code))
         )
     }
 
@@ -3410,7 +3529,9 @@ final class AssistToolRunner {
                 detail += "\n\n" + AssistToolRunner.backedUpNote
             }
 
-            var summary: String = "Added the next class page."
+            var summary: String = AssistWording.addedTheNextPage(
+                noun: asked.located.course.configuration.classNoun
+            )
             if let created = asked.plan.classes.first {
                 summary = "Added \(created.title), dated \(created.date.text)."
             }

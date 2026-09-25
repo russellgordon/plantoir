@@ -441,16 +441,20 @@ nonisolated enum AssistWording {
     ///
     /// - Parameter moving: how many other class pages move, counted once each.
     /// - Parameter renaming: how many of those are also renamed.
-    static func otherClassesWouldMove(moving: Int, renaming: Int) -> String {
-        let verb: String = moving == 1 ? "class moves" : "classes move"
+    /// - Parameter noun: what the course calls one of them (#267). A club's
+    ///   pages carry one number, so a renamed meeting moves "one along", not
+    ///   "a day along".
+    static func otherClassesWouldMove(moving: Int, renaming: Int, noun: ClassNoun = .class) -> String {
+        let verb: String = moving == 1 ? "\(noun.singular) moves" : "\(noun.plural) move"
         if renaming > 0 {
-            return "\(moving) later \(verb) a day along to make room, and the links that point at "
+            let along: String = noun == .class ? "a day along" : "one along"
+            return "\(moving) later \(verb) \(along) to make room, and the links that point at "
                  + "them are rewritten to match."
         }
         // Nothing is renamed, so nothing links anywhere new — but the dates
         // still move, and that is the half a rename count leaves out.
         let theirs: String = moving == 1 ? "Its name does" : "Their names do"
-        return "\(moving) later \(verb) onto a later class day to make room. \(theirs) not change."
+        return "\(moving) later \(verb) onto a later \(noun.singular) day to make room. \(theirs) not change."
     }
 
     /// Said after a change that shuffled other classes: the undo list cannot
@@ -526,6 +530,133 @@ nonisolated enum AssistWording {
              + "Look the section over in Plantoir."
     }
 
+    // MARK: - Planning pages, in the course's own noun
+
+    // What a club hears (#267). Every sentence in this section was typed
+    // inline in a planner or in the tool runner until then; each moved here
+    // so that its "meeting" form has a NAME, in the contract, beside the
+    // "class" form it has always had. The `.class` rendering of every one is
+    // byte-for-byte the sentence it replaced.
+    //
+    // **These are for the teacher's eyes only.** A plan's card, a write's
+    // one-line summary, a line in the window: never a tool result's detail,
+    // which is what a model reads. The runner renders the detail with
+    // `.class` whatever the course says, so what the model is shown in a club
+    // is byte-for-byte what it is shown anywhere else — see
+    // `AssistToolOutcome.planned(_:plan:card:)` and
+    // documentation/10-local-ai-assistant.md.
+
+    /// The first line of a make-room plan.
+    ///
+    /// - Parameter position: where the room is made, as the course names a
+    ///   page — "Unit 3, Day 4", "Week 5" (`ClassInsertionPlan.positionTitle`).
+    static func wouldMakeRoom(
+        count: Int, at position: String, course: String, section: String, noun: ClassNoun = .class
+    ) -> String {
+        let room: String = count == 1 ? "one new \(noun.singular)" : "\(count) new \(noun.plural)"
+        return "Make room for \(room) at \(position) in \(course) Section \(section)."
+    }
+
+    /// The heading over a plan's list of pages that move to later dates.
+    static func movedToLaterDays(count: Int, noun: ClassNoun = .class) -> String {
+        return "Moved to later \(noun.singular) days — \(count):"
+    }
+
+    /// Said on a make-room plan that moves anything else.
+    static func makingRoomCannotBeUndone(noun: ClassNoun = .class) -> String {
+        return "Because other \(noun.plural) move, “Undo that” will not take this back afterwards — "
+             + "the copy made before any of it is in Plantoir's Backups list."
+    }
+
+    /// The one line a teacher reads when the room has been made.
+    static func madeRoom(count: Int, at position: String, noun: ClassNoun = .class) -> String {
+        return "Made room for \(count) \(noun.counted(count)) at \(position)."
+    }
+
+    /// The one line a teacher reads when a day's page has been published.
+    static func publishedTheClassOn(_ date: String, noun: ClassNoun = .class) -> String {
+        return "Published the \(noun.singular) on \(date)."
+    }
+
+    /// The first line of a plan to add class pages.
+    ///
+    /// - Parameter place: where they go — "Unit 4 of ICS3U Section 1", or in a
+    ///   numbered course just "CODING Section 1" (`PlaceholderClassPlan.whereTheyGo`).
+    static func wouldAddPages(count: Int, to place: String, noun: ClassNoun = .class) -> String {
+        let days: String = count == 1 ? "day" : "days"
+        let who: String = noun == .class ? "this class" : "this group"
+        return "Add \(count) \(noun.singular) page\(count == 1 ? "" : "s") to \(place), on the \(days) "
+             + "\(who) actually meets:"
+    }
+
+    /// How many dates are left on file after a plan's new pages.
+    static func spareDatesAfterThese(count: Int, source: String, noun: ClassNoun = .class) -> String {
+        return "\(count) more \(noun.singular) date\(count == 1 ? "" : "s") \(count == 1 ? "is" : "are") "
+             + "spare after these, out of the timetable recorded from \(source)."
+    }
+
+    /// Said when new pages ran out of dates and share the last one.
+    static func sharingTheLastDay(count: Int, noun: ClassNoun = .class) -> String {
+        return "\(count == 1 ? "This one has" : "\(count) of these have") "
+             + "no \(noun.singular) date left, so \(count == 1 ? "it shares" : "they share") "
+             + "the last day with the \(noun.singular) already on it. Give "
+             + "\(count == 1 ? "it a day" : "them days") of your own when you "
+             + "know what they are."
+    }
+
+    /// The one line a teacher reads when the next page was added and there
+    /// is no title to name — which only a plan that added nothing leaves.
+    static func addedTheNextPage(noun: ClassNoun = .class) -> String {
+        return "Added the next \(noun.singular) page."
+    }
+
+    /// The first line of a re-dating plan.
+    static func reDatingOntoTheDatesOnFile(course: String, section: String, noun: ClassNoun = .class) -> String {
+        return "\(course) Section \(section): re-dating onto the \(noun.singular) dates on file."
+    }
+
+    /// How far a re-dated section's pages run.
+    ///
+    /// - Parameter first: the first day, written "2026-09-08 (Tuesday)".
+    /// - Parameter last: the last day, written the same way.
+    static func pagesRunFrom(count: Int, first: String, last: String, noun: ClassNoun = .class) -> String {
+        let run: String = count == 1 ? "\(noun.singular) runs" : "\(noun.plural) run"
+        return "\(count) \(run) from \(first) to \(last)."
+    }
+
+    /// Pages a re-date cannot give a day of their own.
+    ///
+    /// - Parameter lastDay: the last date on file, e.g. 2027-01-20.
+    static func pagesWithNoDayOfTheirOwn(count: Int, lastDay: String, noun: ClassNoun = .class) -> String {
+        let have: String = count == 1 ? "\(noun.singular) has" : "\(noun.plural) have"
+        return "\(count) \(have) no day "
+             + "of \(count == 1 ? "its" : "their") own this year, so "
+             + "\(count == 1 ? "it goes" : "they all go") on "
+             + "\(lastDay) with the last one as \(count == 1 ? "a draft" : "drafts"). Move, publish or delete "
+             + "\(count == 1 ? "it" : "them") when you have decided what to do."
+    }
+
+    /// One line of a re-dating plan: a page that runs out of dates.
+    static func movesAndBecomesADraft(page: String, to date: String, noun: ClassNoun = .class) -> String {
+        return "“\(page)” moves to \(date) and becomes a draft because it has no \(noun.singular) date."
+    }
+
+    /// One line of a re-dating plan: a page Key Links points at.
+    static func movesToTheFirstDay(page: String, to date: String, noun: ClassNoun = .class) -> String {
+        let firstDay: String = noun == .class ? "the first day of class" : "the first \(noun.singular) day"
+        return "“\(page)” moves to \(date), \(firstDay), "
+             + "because Key Links points at it."
+    }
+
+    /// The one line a teacher reads when a section has been re-dated.
+    static func reDated(count: Int, pagesTheyUse: Int, noun: ClassNoun = .class) -> String {
+        return "Re-dated \(count) "
+             + "\(noun.counted(count)) and "
+             + "\(pagesTheyUse) "
+             + "\(pagesTheyUse == 1 ? "page" : "pages") "
+             + "they use."
+    }
+
     // MARK: - Publishing stops at a class
 
     /// Said when publishing followed a link onto another class and left it
@@ -549,12 +680,13 @@ nonisolated enum AssistWording {
     /// - Parameter listing: the classes, already quoted and joined — "“a” and
     ///   “b”".
     /// - Parameter count: how many classes that listing names.
-    static func linkedClassesWereLeftAlone(_ listing: String, count: Int) -> String {
+    /// - Parameter noun: what the course calls one of them (#267).
+    static func linkedClassesWereLeftAlone(_ listing: String, count: Int, noun: ClassNoun = .class) -> String {
         if count == 1 {
-            return "\(listing) is a class of its own, so it stays as it is — publish it when you "
-                 + "get to that class."
+            return "\(listing) is a \(noun.singular) of its own, so it stays as it is — publish it when you "
+                 + "get to that \(noun.singular)."
         }
-        return "\(listing) are classes of their own, so they stay as they are — publish each one "
+        return "\(listing) are \(noun.plural) of their own, so they stay as they are — publish each one "
              + "when you get to it."
     }
 
@@ -616,6 +748,103 @@ nonisolated enum AssistWording {
     /// is the same courtesy every other write in the window already gets.
     static let mayIAskForYourDates: String = "May I ask you for your class dates?"
 
+    /// The same question in the course's own noun (#267). Only the card in
+    /// the window says it this way: the sentences that carry the question
+    /// back to the model keep `mayIAskForYourDates` as it is.
+    static func mayIAskForYourDates(for noun: ClassNoun) -> String {
+        if noun == .class {
+            return mayIAskForYourDates
+        }
+        return "May I ask you for your \(noun.singular) dates?"
+    }
+
+    // "When are my next classes?" — the answer is the teacher's summary AND,
+    // in its "class" form, the model's copy; only the summary takes the
+    // course's noun (#267).
+
+    /// Before the first date on file.
+    ///
+    /// - Parameter day: the first date, written "Tuesday, 2026-09-08".
+    /// - Parameter count: how many dates are listed below it.
+    static func theSemesterBegins(on day: String, showing count: Int, noun: ClassNoun = .class) -> String {
+        let first: String = count == 1 ? "first \(noun.singular) is" : "first \(count) \(noun.plural) are"
+        return "The semester begins on \(day). The \(first):"
+    }
+
+    /// After the last date on file.
+    ///
+    /// - Parameter last: the last date, written "Tuesday, 2026-12-15".
+    static func allScheduledDatesHaveConcluded(
+        count: Int, for place: String, last: String, noun: ClassNoun = .class
+    ) -> String {
+        return "All \(count) scheduled \(noun.plural) for \(place) have concluded "
+             + "(last \(noun.singular) was on \(last))."
+    }
+
+    /// The heading over the next few dates.
+    static func yourNextUpcoming(count: Int, for place: String, noun: ClassNoun = .class) -> String {
+        let upcoming: String = count == 1
+            ? "upcoming \(noun.singular)"
+            : "\(count) upcoming \(noun.plural)"
+        return "Your next \(upcoming) for \(place):"
+    }
+
+    /// How the pages sit against the dates.
+    static func pagesAcrossTheDates(
+        for place: String, pages: Int, dates: Int, spare: Int, noun: ClassNoun = .class
+    ) -> String {
+        return "\(place) has \(pages) \(noun.singular) \(pages == 1 ? "page" : "pages") across "
+             + "\(dates) recorded dates (\(spare) spare)."
+    }
+
+    /// No date left for another page.
+    static func everyDateIsSpokenFor(noun: ClassNoun = .class) -> String {
+        return "Every recorded date is spoken for, so another \(noun.singular) cannot be dated "
+             + "until more dates are recorded."
+    }
+
+    /// Where the next page would go.
+    ///
+    /// - Parameter day: written "2026-09-14 (Monday)".
+    static func theNextWouldFallOn(_ day: String, noun: ClassNoun = .class) -> String {
+        return "The next \(noun.singular) would fall on \(day)."
+    }
+
+    // Why the dates are being asked for — the line under the question on the
+    // card, and on the sheet. The teacher's alone: none of these is ever part
+    // of a tool result, so each has a "meeting" twin (#267).
+
+    /// Asked for when a day's page was looked for and there are no dates.
+    static func datesToFindADaysPage(noun: ClassNoun = .class) -> String {
+        let taught: String = noun == .class ? "the class taught" : "the \(noun.singular) held"
+        return "Finding \(taught) on a given day needs to know which days "
+             + "this section meets."
+    }
+
+    /// Opened when the teacher offers a revised list.
+    ///
+    /// - Parameter place: "ICS3U Section 1".
+    static func datesToReplace(for place: String, noun: ClassNoun = .class) -> String {
+        return "Replacing the \(noun.singular) dates on file for \(place)."
+    }
+
+    /// Asked for by the next page.
+    static func datesForTheNextPage(noun: ClassNoun = .class) -> String {
+        return "Adding the next \(noun.singular) page needs to know which days this section meets."
+    }
+
+    /// Asked for by a duplicate.
+    static func datesToDuplicate(noun: ClassNoun = .class) -> String {
+        return "Duplicating a \(noun.singular) needs to know which days this section meets, "
+             + "so the copy can be given a date."
+    }
+
+    /// Asked for by a re-date.
+    static func datesToReDate(noun: ClassNoun = .class) -> String {
+        return "Re-dating a section puts its \(noun.plural) onto the days it meets, so it needs "
+             + "those days first."
+    }
+
     /// What the teacher is told after saying no.
     ///
     /// Deliberately does not re-ask or explain again. They declined a
@@ -624,6 +853,18 @@ nonisolated enum AssistWording {
     static let datesNotGivenYet: String =
         "Right you are. I will not be able to date new classes until I have them — "
         + "say “I have a revised list of class dates” whenever you would like to give them."
+
+    /// The same answer in the course's own noun (#267). The sentence it tells
+    /// a teacher to say is matched in code in both nouns
+    /// (`AssistCardCommand.fixedShapes`), so it is never an offer the matcher
+    /// does not understand.
+    static func datesNotGivenYet(for noun: ClassNoun) -> String {
+        if noun == .class {
+            return datesNotGivenYet
+        }
+        return "Right you are. I will not be able to date new \(noun.plural) until I have them — "
+             + "say “I have a revised list of \(noun.singular) dates” whenever you would like to give them."
+    }
 
     // MARK: - When the answer did not finish
 

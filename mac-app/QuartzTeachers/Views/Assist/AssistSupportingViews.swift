@@ -51,6 +51,11 @@ struct AssistPromptShelfView: View {
 
     // MARK: - Stored properties
 
+    /// What this shelf offers: `groups` for an ordinary course, a club's own
+    /// list for a course whose pages carry one number (#267) — see
+    /// `groups(naming:noun:)`.
+    let offered: [(String, [String])]
+
     /// Called with the phrasing the teacher chose, verbatim — the wording
     /// matters, so nothing paraphrases it on the way through.
     let choose: (String) -> Void
@@ -188,6 +193,7 @@ struct AssistPromptShelfView: View {
             ]),
     ]
 
+
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             // Says what tapping one DOES. Without it a teacher either never
@@ -212,7 +218,7 @@ struct AssistPromptShelfView: View {
             // what makes four closed lines occupy four lines.
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
-                    ForEach(AssistPromptShelfView.groups, id: \.0) { group in
+                    ForEach(offered, id: \.0) { group in
                         DisclosureGroup(isExpanded: binding(for: group.0)) {
                             VStack(alignment: .leading, spacing: 4) {
                                 ForEach(group.1, id: \.self) { phrasing in
@@ -269,7 +275,65 @@ struct AssistPromptShelfView: View {
         .background(.bar)
     }
 
+    // MARK: - Initializer
+
+    init(groups: [(String, [String])] = AssistPromptShelfView.groups, choose: @escaping (String) -> Void) {
+        self.offered = groups
+        self.choose = choose
+    }
+
     // MARK: - Functions
+
+    /// The shelf for one course.
+    ///
+    /// An ordinary course gets `groups`, unchanged. A course whose pages carry
+    /// ONE number — a club's "Week 3" (#267) — gets a list of its own, in its
+    /// own noun and with its own page names, because most of `groups` is about
+    /// units and days it does not have: "Publish Unit 5", "Start a new unit",
+    /// "Add five more days to Unit 4" would each be refused there.
+    ///
+    /// **Every card on it is matched in code** (`AssistCardCommand`), so it
+    /// promises nothing a model was never measured on. That is why the club
+    /// shelf has no "Publish Week 2": publishing one page by its title goes to
+    /// the model, and no routing measurement has been made in a club course.
+    /// "Duplicate Week 2 as my next meeting" carries a title too, but its frame
+    /// is parsed in code, the title lifted out rather than read by a model.
+    static func groups(naming: ClassPageNaming, noun: ClassNoun) -> [(String, [String])] {
+        if !naming.isNumbered {
+            return AssistPromptShelfView.groups
+        }
+        let one: String = noun.singular
+        let many: String = noun.plural
+        let second: String = naming.title(unit: 1, day: 2)
+        let third: String = naming.title(unit: 1, day: 3)
+        return [
+            ("Making pages visible", [
+                "Publish tomorrow's \(one)",
+                "Publish Monday's \(one)",
+            ]),
+            ("Taking it back", [
+                "Undo that",
+            ]),
+            ("Checking", [
+                "What would students see in this section right now?",
+                "Preview",
+            ]),
+            ("Planning \(many)", [
+                "Add the next \(one) page",
+                "Duplicate \(second) as my next \(one)",
+                "Make room for one \(one) at \(third)",
+                "When are my next \(many)?",
+                "I have a revised list of \(one) dates",
+                "Re-date my \(many)",
+            ]),
+            ("Putting the site online", [
+                "Deploy now",
+                "Deploy at 6:30 AM",
+                "Cancel scheduled deploy",
+            ]),
+        ]
+    }
+
 
     /// One group's open/shut state, as a binding a `DisclosureGroup` can
     /// drive, written straight back to the stored preference.

@@ -75,7 +75,7 @@ OFFERED is two separate questions:
 **The rule, once, because three surfaces ask it:** a skeleton is OFFERED for
 a code when a family exists for its prefix AND the teacher is not taking the
 example content written for that code. It lives in ONE function —
-`SkeletonCatalog.hasSkeleton(forCode:takingExampleContent:)` on the mac,
+`SkeletonCatalog.hasSkeleton(forCode:takingExampleContent:numbered:)` on the mac (a club, #267, is offered none),
 `SkeletonCatalog.HasSkeleton` on Windows — read by the toggle's visibility,
 by what the structure editor adopts, and by `use_skeleton` in the file.
 Neither app takes a default value for the second argument, so a call site
@@ -575,6 +575,59 @@ next-class button and the curriculum map at whatever folder happened to be
 first. Both wizards write it at creation, and a rename in Course Settings
 writes it even on a course that never had one. The old guess is kept as the
 fallback, never replaced.
+
+**A re-run keeps the RECORDED `class_folder`** (#267, `class_folder_to_record`).
+It used to rebuild the key from the guess alone, and the dict it wrote into
+wins over the saved configuration — measured: `["Resources", "All Meetings"]`
+guesses `Resources`, so a club the app had set up correctly would have been
+rewritten to look for its meetings in the wrong folder. The recorded name wins
+while it is still in the list; the guess is the fallback only.
+
+## A club: one number, its own words, and what it starts with (#267)
+
+A club — a coding club, a debate team — meets rather than holds classes. The
+New Course wizard's **"This is a club"** choice writes
+`class_page_scheme: "numbered"` with `unit_word: "Week"`,
+`class_folder: "All Meetings"`, `front_page_heading: "Most Recent Meeting"` and
+`class_noun: "meeting"` (all editable in the wizard, none switchable
+afterwards — Russell, 2026-09-24), plus `use_skeleton` and
+`prepopulate_example_content` false and the three curriculum keys false. See
+[the config reference](08-course-config-reference.md) for each key.
+
+What `setup_course.py` does with a numbered course (`ClubStart`):
+
+- **No skeleton and no ready-made pages**, even if the configuration asks —
+  a second net behind the wizard. Both are "Unit 1, Day 1" pages, which a
+  numbered course does not read as class pages: every planner would see
+  nothing and the build would report success.
+- **Each section's NEW front page** gets `# <front_page_heading>`, a blank line
+  and `![[<word> 1]]`. Only a front page the run creates; an existing one is
+  never touched.
+- **`<class_folder>/<word> 1.md`**, PUBLISHED, dated at creation, with no
+  `unit-1` tag. Published because the front page embeds it: a landing page
+  showing a withheld page is exactly what the assistant's repointing exists to
+  prevent, and the repointing moves the embed only when a VISIBLE page is newer,
+  so it would never fix this one. No tag because a club has no units, and the
+  tag would make a Quartz tag page listing every meeting. **Written only for a
+  section being MADE** — one whose `index.md` does not exist yet
+  (`ClubStart.write_first_page`, called before the front page is written). A
+  re-run of setup from the command line on an existing club used to recreate a
+  deleted `Week 1.md` in every section, published and dated NOW, so the front
+  page would follow it as the newest meeting (#267 implementation review; the
+  app never re-runs setup on an existing course, so this was command-line
+  only). A new section added to an existing club still gets its first page.
+  `scripts/test_club_start.py` pins both.
+
+REJECTED: a generated "club" skeleton family (more pages to maintain, for a
+code prefix that means nothing); starting completely empty (then the heading
+has no front page to be written into and the embed never exists — the mac's
+repointing never INSERTS one).
+
+**An existing course can never become a club.** Nothing reads the scheme into
+a course that does not already say it, and Course Settings shows the settings
+locked. Russell's `CODING` fixture — pages already named "Week N" in
+`All Meetings`, no `class_page_scheme` — therefore stays exactly as it is: no
+planner sees its pages as class pages, as before #267.
 
 ## Which of a course's folders the build treats specially
 
