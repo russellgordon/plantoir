@@ -1670,8 +1670,8 @@ format an old version can read.
 Added 2026-09-23, [issue #195](https://github.com/russellgordon/plantoir/issues/195).
 
 **The behaviour is unchanged: scheduling a section again REPLACES the deploy
-already set for it.** A job's label is the course code and section number and
-nothing else, so there is one per section per Mac, and
+already set for it.** There is one job per section per WORKING FOLDER (one per
+section per Mac until [#237](#one-alarm-per-working-folder-237)), and
 `ScheduledDeploy.scheduleDeploy` boots the old one out and overwrites its plist
 before writing the new one. What changed is that the teacher is TOLD, before
 and after:
@@ -1696,14 +1696,17 @@ and after:
   Without it, "it went on Saturday, I set it for Friday" has no answer: the old
   job leaves nothing behind.
 
-**Read Mac-wide, on purpose — unlike every other reader of `nextRun` that has a
-folder in hand.** The job being overwritten may belong to ANOTHER working
-folder holding the same code (last year's), because `plistURL` names one file
-per code and section for the whole Mac. `nextRun(…, inWorkingFolder:)` answers
-nil for that job, so a folder-scoped reading — the natural copy of the cancel
-path — stays silent in exactly the case that matters most. The sentence may
-therefore name a deploy this window's sidebar shows no clock for; that is the
-truth about what is being replaced.
+**Read in THIS working folder since #237 — the reversal of what #195 chose.**
+#195 read it Mac-wide on purpose: the job being overwritten could belong to
+ANOTHER working folder holding the same code (last year's), because the label
+then named one file per code and section for the whole Mac, and a folder-scoped
+reading would have stayed silent in exactly the case that mattered most. #237
+gave each folder its own alarm, so scheduling here no longer touches another
+folder's job — and a Mac-wide reading would now name, on this folder's card, a
+deploy this scheduling leaves standing, which is false. `momentBeingReplaced`
+and `momentAlreadySet` take the working folder (required), and so does
+`ScheduledDeploy.plan`. A job this folder set BEFORE #237, under the old label,
+is found by the folder scan and IS replaced — see the #237 section.
 
 **Said nothing, deliberately:** when the old job is set for the SAME minute
 (scheduling the same moment again replaces nothing a teacher would notice), and
@@ -1745,8 +1748,8 @@ writes the plist (atomically) and only then asks macOS to take it.
   since it exists for a deploy turned off by something other than the teacher
   asking. Recorded for the SAME minute too: the card rightly says nothing when
   the moment is unchanged, but a same-minute deploy lost is still lost, so the
-  record reads `momentAlreadySet` (Mac-wide, same minute included) rather than
-  `momentBeingReplaced`.
+  record reads `momentAlreadySet` (this folder's, same minute included) rather
+  than `momentBeingReplaced`.
 - **The new one's files cannot be WRITTEN** (anything that throws before or
   in the plist write): the old plist is still on disk, only booted out — so it
   is handed back to macOS at once (otherwise it would sit unloaded until the
@@ -1764,13 +1767,12 @@ off" on both shapes and nothing for the same minute. Tests:
 `…testAFailedWriteLeavesTheOldDeployStandingAndSaysSo` (the write is made to
 fail by putting the scripts folder under a file).
 
-**Left for [#237](https://github.com/russellgordon/plantoir/issues/237), and
-known:** a job set from ANOTHER working folder for the SAME minute says
-nothing (the suppression compares moments, not folders), though it deploys
-different content; and a job from another folder is NAMED on this window's card
-while this window's sidebar shows no clock for it and its Cancel refuses it.
-Both are the one-deploy-per-Mac fault #237 owns, not something this sentence
-can mend.
+**Closed by [#237](https://github.com/russellgordon/plantoir/issues/237):**
+the two limits this section used to list — a job set from ANOTHER working
+folder for the SAME minute said nothing, and a job from another folder was
+NAMED on this window's card while its sidebar showed no clock and its Cancel
+refused it — were both the one-alarm-per-Mac fault. Another folder's job is now
+a different alarm, neither named nor replaced.
 
 **The suite never reads the real LaunchAgents through this reading.**
 `momentBeingReplaced` answers nil under the test suite unless
@@ -1929,10 +1931,13 @@ for a fault there was not.
 
 ### Everything is scoped to ONE working folder
 
-An agent's label is the course code and the section number and nothing else, so
-`~/Library/LaunchAgents/<label>.plist` names **one file per code and section for
-the whole Mac**. A teacher holding last year's working folder and this year's,
-both with ICS3U section 1, has one alarm between them.
+Until #237 an agent's label was the course code and the section number and
+nothing else, so `~/Library/LaunchAgents/<label>.plist` named **one file per
+code and section for the whole Mac**, and a teacher holding last year's working
+folder and this year's, both with ICS3U section 1, had one alarm between them.
+#237 gave each folder its own (next section) — and this scoping STAYS, because
+it is how every reader FINDS a folder's jobs, including the ones set before
+#237 under the old label.
 
 So every one of these reads the plist's `WorkingDirectory` and leaves alone
 anything belonging to another folder:
@@ -1944,6 +1949,8 @@ anything belonging to another folder:
 | `ScheduledDeployCleanup.warningForConfirmation` | the extra sentence in the confirmation |
 | `CourseRenamer.sectionsWithAScheduledPublish` | what a rename turns off |
 | `ScheduledDeploy.nextRun(inWorkingFolder:)` | the sidebar's clock, and so the Cancel item beside it |
+| `ScheduledDeploy.momentBeingReplaced` / `momentAlreadySet` | the card's "replaces" sentence and the failed-replacement record (Mac-wide until #237) |
+| `ScheduledDeploy.scheduleDeploy` | which of this folder's jobs a new one retires (#237) |
 | `AssistToolRunner.cancelScheduledDeploy` | the assistant's own cancel, and its tidy-up branch |
 | `AssistToolRunner.turnOffAnyScheduledPublish` | the rollover onto a new website |
 | `ScheduledDeploy.cancelScheduledDeploy` | the backstop under all of them |
@@ -1958,18 +1965,21 @@ of the form "everything does X" needs a case behind it or it is prose that reads
 as a gate.
 
 The backstop is why the list cannot grow a hole again. `cancelScheduledDeploy`
-takes the working folder as a **required parameter** and checks the plist
-against it, so the unscoped form cannot be written by accident — a caller that
+takes the working folder as a **required parameter** and cancels only the jobs
+the folder scan finds for it — each by its OWN label and plist
+(`ScheduledDeploy.cancel(agent:runner:)`), never a rebuilt one — so the
+unscoped form cannot be written by accident — a caller that
 had not thought about which folder it meant no longer compiles. A job belonging
 to another folder is left alone and reported as success, deliberately: there is
 nothing of this folder's to turn off, which is the same answer as "there was
 never one set".
 
-Paths are compared with **POSIX `realpath`, never Foundation's
+Paths are compared in **the disk's own spelling — `FolderIdentity.canonicalPath`
+since #189 (POSIX `realpath` before it), never Foundation's
 `resolvingSymlinksInPath()`** — the same trap the container naming met: the
-latter strips `/private` where the former keeps it, and two spellings of one
-folder comparing as DIFFERENT would scope every job out silently, so nothing
-would be cancelled or shown at all.
+latter strips `/private`, and two spellings of one folder comparing as
+DIFFERENT would scope every job out silently, so nothing would be cancelled or
+shown at all.
 
 **A working folder that has MOVED loses its clock and its Cancel item.**
 `nextRun` answers nil when the plist's stored path no longer resolves to the
@@ -1979,9 +1989,152 @@ becomes invisible and un-cancellable from the app. Bounded rather than fixed:
 the job's own wrapper path moved too, so it cannot deploy anything, and the
 lateness check clears it away the next time it tries to fire.
 
-That two working folders share one alarm at all is a separate fault with its own
-issue. A folder-scoped label would orphan every plist a teacher already holds,
-which is its own migration.
+That two working folders shared one alarm at all was a separate fault, closed
+by #237 without orphaning the plists teachers already hold — next section.
+
+### One alarm per working folder (#237)
+
+Added 2026-09-25, [issue #237](https://github.com/russellgordon/plantoir/issues/237).
+The contract's half is `shared-rules.json → scheduledDeployCancellation →
+oneAlarmPerWorkingFolder`, and five cases in that key's `cases` list.
+
+**What was wrong.** A job's label was `…deploy.<CODE>.section<N>` and every
+per-job file was named after it — the plist, the wrapper, the log, the success
+note, the findings file — and the stopped-run record was `stopped/<course>-
+section<N>.txt`. So a teacher with two working folders holding ICS3U section 1
+(last year's and this year's, or a restored copy) had ONE alarm between them:
+scheduling in B booted out and overwrote A's job, A's sidebar lost its clock
+(#236 had scoped it), and B's card named A's moment as "replaced" (#195 read it
+Mac-wide on purpose, above).
+
+**The label now ends with the folder's id:**
+`ca.russellgordon.Plantoir.deploy.<CODE>.section<N>.<folder id>`
+(`ScheduledDeploy.agentLabel(courseCode:sectionNumber:workingFolder:)`, folder
+REQUIRED). The id is `BuildOutputLocation.folderIdentifier` — the eight hex
+characters the folder's container and builds folder already carry, from
+`FolderIdentity.canonicalPath` (#189). **Not a new id**, because a second
+derivation of "which folder" is the exact failure #189 closed; two spellings of
+one folder give one label. Trailing rather than `deploy.<id>.<CODE>…` so the old
+label stays a readable prefix of the new one, `codeAndSection(fromLabel:)`
+needs one strip, and `launchctl list` still groups a course's jobs.
+`folderID(fromLabel:)` reads the tail — exactly eight lowercase hex characters;
+a legacy label's last component always begins `section`, and codes are
+upper-cased by `sanitizedCode`, so the two spellings cannot be confused. The
+parse table was measured before writing it (a scratch probe compiling the
+proposed code) and is pinned by `ScheduledDeployTests.testLabelsAreReadBothWays`:
+
+| label ends | folder id | code, section |
+|---|---|---|
+| `.ICS3U.section1` (before #237) | none | ICS3U, 1 |
+| `.ICS3U.section1.0a1b2c3d` | `0a1b2c3d` | ICS3U, 1 |
+| `.ICS3U.section12.12345678` (all-digit id) | `12345678` | ICS3U, 12 |
+| `.CODING-CLUB.section2.deadbeef` | `deadbeef` | CODING-CLUB, 2 |
+| `.section1.0A1B2C3D` / 7 chars / non-hex | none, and not ours | — |
+
+`plutil -lint` passes a plist with the new label; it is 56 characters for ICS3U.
+
+**The id keeps two folders' files apart; it is NOT how a job is found** (the
+plan review's M2, accepted). Every reader — the clock, the card, the cancel,
+removal, rename, rollover, the sweep — finds a folder's jobs by the plist's
+`WorkingDirectory` through `ScheduledDeploy.agents(inWorkingFolder:courseCode:
+sectionNumber:)`, which passes over any file whose NAME names another course or
+section before opening it (so the sidebar row reads one or two plists, not
+all). Consequences: a job set before #237 is shown, cancelled and replaced with
+no special branch; a later change to `canonicalPath` cannot hide a job; and if a
+folder somehow holds both an old and a new job for one section (an older copy
+of the app still running), the clock shows the EARLIER and Cancel takes both.
+
+**Every file follows, and the record had to.** The wrapper, log and success
+note are named by the label. The stopped-run record is
+`stopped/<course>-section<N>.<folder id>.txt` (and `.txt.partial` beside the
+folder) and the findings file `<old label>.<folder id>.findings`. The record is
+not optional: once two folders can each hold ICS3U section 1, both wrappers can
+run the same morning, and each begins with `rm -f` of LAST time's record — so a
+record named for the course and section alone lets B's run erase A's failure,
+and whichever finishes last wears the badge in BOTH sidebars
+(`ScheduledPublishOutcomeTests.testTwoFoldersRunsKeepTheirOwnRecord` runs the
+two generated wrappers and fails with the id taken out of `recordURL`). The
+readers — the sidebar badge, the section's notice and its Dismiss, the
+section's findings dialog — compute the id of the folder that is open with the
+same `folderIdentifier`.
+
+**The run takes its name from the script it was started with, never a rebuilt
+one.** After an update every pending job is still under the OLD label, with its
+log and success note baked into its plist and wrapper. `runScheduled` reads
+`label(fromScriptPath:)` once and passes it to `logSize(label:)`,
+`recordScheduledPublish(label:…)`, `recordFolderProblems(label:…)` and
+`bootOutAgent(label:)`; the `(courseCode:sectionNumber:)` boot-out is gone. A
+rebuilt label would read an empty log, miss the success note (the section left
+" — Edited" after a good publish) and boot out a job that does not exist,
+leaving the real one loaded (`testTheRunReadsTheNotesOfTheLabelItWasStartedWith`
+runs both spellings). What the run writes ITSELF is filed under the folder's id
+either way (`folderIDForRun`: the id in the label, or — for an old job — the id
+of the working folder it names): the findings, the stand-down record, and the
+record an old wrapper wrote under the old name, which `ScheduledPublishOutcome.
+fileUnderTheFolder` moves to the folder's name straight after the run.
+
+**What a teacher set before the update does: nothing changes for them.** The
+job is left exactly as it is on disk. It shows its clock in its own folder,
+cancels, is removed with its course, is swept when too late, runs correctly,
+and deletes its own plist when it fires, so the old spelling drains away.
+Scheduling the section again IN ITS FOLDER retires it — `scheduleDeploy` boots
+out every job the scan finds for the section, writes the new one, and deletes
+the old plist and wrapper only once macOS has ACCEPTED the new job (review M1:
+the first plan deleted before the write and promised to re-bootstrap a file it
+had just removed). A refusal hands the old job straight back and the trail says
+it still stands (`testARefusedRescheduleHandsTheOldNamedDeployBack`, which fails
+with the delete moved before the bootstrap). An old job in ANOTHER folder is
+not in the scan and is left standing — that is the fix.
+
+**Rejected, in order of how tempting:**
+1. *Re-register old jobs under the new name when a folder opens, keeping the
+   moment.* It rewrites a live alarm the teacher set and never touched, through
+   the boot-out-then-write sequence whose failure #195 found loses the job; it
+   needs the course's CURRENT destinations and Cloudflare account to regenerate
+   the wrapper, so it would change what an already-promised deploy does, not
+   only its name; and a pre-v1.2.0 plist carries no `PLANTOIR_SCHEDULED_FOR`,
+   so "the moment kept" would mean inventing a year. All to rename a file that
+   expires by itself.
+2. *Rename in place* (rewrite `Label`, move plist/script/log, edit the
+   wrapper's baked paths). Four files per job must move together under a launchd
+   that has the job loaded by its old label; a half-done rename is a job nobody
+   can find.
+3. *Not recognising old jobs.* An updated teacher's clock vanishes and Cancel
+   stops working for a job that WILL still fire — #236's "invisible and
+   un-cancellable", reintroduced by an update.
+4. *Keep reading an old-style record in every folder* (the plan's first
+   answer). In the mixed case — an old job in A, a new one in B — A's failure
+   shows in B's badge and B's Dismiss deletes it (review L2; the ruling: never).
+   Such a record is read by NO folder; the run of an old job files its own
+   record under its folder instead.
+
+**When the folder cannot be opened** (review M2: "deterministic, and the same at
+scheduling and reading time"): the id is `folderIdentifier` both times — the
+disk's own spelling, falling back to `realpath` and then to the path as written.
+At scheduling the folder always opens (its `deploy.sh` is checked first), and
+jobs are found by working folder rather than by id, so the fallback can reach
+only the record and findings names, the same way both times
+(`testAFolderThatCannotBeOpenedGetsTheSameIdEveryTime`).
+
+**The trail is unchanged, on purpose.** No new event: scheduling in B now leaves
+A's alarm alone, so silence is correct; retiring THIS folder's old job is a
+replacement and writes the existing `scheduled deploy replaced` line (its `why`
+in `mustRecord` and the comment on `ActivityTrail.Event.scheduledDeployReplaced`
+now say "one per section per working folder"). **Known limits:** trail lines
+carry course and section, not the folder, so two folders' ICS3U section 1 lines
+read alike — naming a folder on the trail is a `LogRedactor` question larger
+than this; and a record or findings file written under the old name BEFORE the
+update, never filed by a later run, is shown in no folder (its trail line was
+written when it ran).
+
+**The real launchd accepts the shape — measured once, by hand, not by the
+suite.** On 2026-09-25 (this Mac, macOS 26, Apple silicon) a throwaway agent
+`ca.russellgordon.claude-probe237.ICS3U.section1.0a1b2c3d` — outside our
+`labelPrefix`, so no Plantoir ever reads it — running `/usr/bin/true` on 29
+February: `plutil -lint` OK, `launchctl bootstrap` exit 0, `launchctl print`
+listed it, `bootout` exit 0, plist deleted, `print` afterwards exit 113 (gone).
+No teacher's job was touched. Every test uses `FakeLaunchControl` and throwaway
+agents folders.
 
 ### What was rejected
 
