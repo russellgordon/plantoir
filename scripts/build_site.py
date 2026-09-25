@@ -22,6 +22,7 @@ import site_health
 import contracts
 import class_pages
 import page_visibility
+import reference_course
 import stop_preview
 import toolchain_paths
 from datetime import date, datetime, timezone
@@ -5750,7 +5751,10 @@ def build_section_site(
     # The front page and the pages a class brings take their CLASS's date
     # (#275, #276) — on every build, whichever way the class was published,
     # in the build's copy AND in the teacher's own files.
-    dating = _date_pages_from_their_classes(content_root, section_number)
+    # A course kept for reference is last year's, frozen on purpose: its site
+    # copy is dated the same way, but its files are never rewritten.
+    frozen_course = reference_course.is_reference(course_dir) or reference_course.cannot_tell(course_dir)
+    dating = _date_pages_from_their_classes(content_root, section_number, write_back=not frozen_course)
     if dating["front_page"] is not None:
         print(f"📆 The front page now carries the date of the class it shows ({dating['front_page']}).")
     print(f"📆 Dated {dating['site_pages']} page(s) from the first class that links to them.")
