@@ -111,7 +111,7 @@ class CourseFolder:
             found[path] = path.read_bytes()
         return found
 
-    def build(self, section: int) -> tuple[Path, dict]:
+    def build(self, section: int, write_back: bool = True) -> tuple[Path, dict]:
         """Copies section `section` the way `build_section_site` does, then
         runs the two date passes. Returns the copy and what was rewritten."""
         content = self.root / f"content{section}"
@@ -156,7 +156,7 @@ class CourseFolder:
         date_pass = getattr(build_site, "_date_pages_from_their_classes", None)
         if date_pass is None:
             return content, {"front_page": None, "site_pages": 0, "rewritten": []}
-        return content, date_pass(content, section)
+        return content, date_pass(content, section, write_back=write_back)
 
 
 class DatesFollowTheClassTests(unittest.TestCase):
@@ -298,6 +298,20 @@ class DatesFollowTheClassTests(unittest.TestCase):
         self.assertEqual(build_site._yaml_text_for_date("2026-09-24"), '"2026-09-24"')
         self.assertEqual(build_site._yaml_text_for_date("2026-09-24T07:00:00.000+0000"),
                          "2026-09-24T07:00:00.000+0000")
+
+    def test_a_course_kept_for_reference_is_dated_on_the_site_only(self):
+        # The build passes write_back=False for a course kept for reference
+        # (reference_course.is_reference): last year's course is frozen on
+        # purpose, so its site copy is dated and its files are not touched.
+        case = self.at_build_time["cases"][0]
+        self.use_the_course_words(case)
+        folder = self.folder_for(case, 99)
+        before = folder.snapshot()
+        content, result = folder.build(1, write_back=False)
+        self.assertEqual(result["rewritten"], [])
+        self.assertEqual(folder.snapshot(), before)
+        self.assertEqual(frontmatter.load(self.copy_of(content, "Using Aggregate Functions")).get("created"),
+                         case["expectCreated"]["Using Aggregate Functions"])
 
     def test_the_build_names_what_it_rewrote_the_way_the_contract_shows(self):
         # The line the apps read, compared with the contract's own example so
