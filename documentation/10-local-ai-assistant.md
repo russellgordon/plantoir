@@ -1180,7 +1180,15 @@ question, "what links to Unit 2, Day 3?" and "which pages link to …", which
 asks which pages point AT this one and is the family's near miss; a plural
 "what do … link to"; "what would … link to"; anything after "link to" that is
 not this window's place, so "… link to, and publish them" is never half
-answered.
+answered. With NO window passed (the contract's parsed example is run that
+way), any place at all goes to the model. The research suite's mirror of the
+grammar (`links_question` in `trimmed-surface-suite.py`) was checked against
+the compiled Swift on **2,178,770 generated sentences — 0 disagreements** —
+after that same fuzz had found the one fault both shared: with no window, "in
+ICS3U section 1" was read as another course. (One known difference is left
+out of that set on purpose: a title whose lower-casing changes its LENGTH,
+like "İstanbul", is compared by grapheme in Swift and by code point in Python,
+so the mirror refuses what the app reads. No probe carries one.)
 
 **The answer is a READ answered in full, and the turn ends there.** The card
 builds `read_page` with `page` and an argument the model is never shown,
