@@ -78,6 +78,9 @@ nonisolated enum ProcessLiveness {
     /// but a longer recorded name is compared on its first sixteen.
     static let namesAreKeptTo: Int = 16
 
+    /// The only program that has ever written an import lease.
+    static let importLeaseWriterName: String = "Plantoir"
+
     // MARK: - Functions
 
     /// Whether the process a lease names is still the one that took it.
@@ -150,6 +153,27 @@ nonisolated enum ProcessLiveness {
             }
             return true
         }
+    }
+
+    /// The name a lease is judged against: the one it recorded, or — for an
+    /// IMPORT lease with no name line — "Plantoir".
+    ///
+    /// Only Plantoir ever wrote a one-line import lease (the import before
+    /// #245, and an older copy of Plantoir today), so the name is known even
+    /// when it is not written. Without this a one-line lease left by a crash
+    /// was judged on its process id alone, and after a restart that id can
+    /// belong to an unrelated process for the whole uptime — which since #245
+    /// REFUSES every import of that course, with a sentence that is not true.
+    /// Other kinds are left as they are: their writers' names are not ours
+    /// to assume.
+    static func nameToCompare(recorded: String?, kind: String) -> String? {
+        if let recorded = recorded, !recorded.isEmpty {
+            return recorded
+        }
+        if kind == "import" {
+            return ProcessLiveness.importLeaseWriterName
+        }
+        return nil
     }
 
     /// Whether the name a lease recorded is the name the system reports.

@@ -27,7 +27,9 @@ extension ReferenceImportTests {
             ReferenceStaging.stagingName(for: "ICS4U-2025")
         )
         try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
-        let lease: URL = try writeLease(for: "ICS4U-2025", pid: 1, body: "1")
+        // Named, because an import lease with no name line is read as
+        // Plantoir's (#245's review, L2), and launchd is not Plantoir.
+        let lease: URL = try writeLease(for: "ICS4U-2025", pid: 1, body: "1\nlaunchd\n")
 
         let swept: [String] = ReferenceStaging.sweepLeftovers(inCoursesDirectory: coursesDirectoryURL)
 
@@ -77,7 +79,7 @@ extension ReferenceImportTests {
         let sentinel: URL = staging.appendingPathComponent("half-made.md")
         try Data("the other copy's work".utf8).write(to: sentinel)
         let theirLease: URL = try writeLease(
-            for: "ICS4U-2025", pid: otherCopy.processIdentifier, body: "\(otherCopy.processIdentifier)"
+            for: "ICS4U-2025", pid: otherCopy.processIdentifier, body: "\(otherCopy.processIdentifier)\nsleep\n"
         )
 
         guard case .found(let source) = read(oldFolderURL) else {
@@ -127,7 +129,7 @@ extension ReferenceImportTests {
         let sentinel: URL = staging.appendingPathComponent("half-made.md")
         try Data("the other copy's work".utf8).write(to: sentinel)
         _ = try writeLease(
-            for: "ICS3U-2025", pid: otherCopy.processIdentifier, body: "\(otherCopy.processIdentifier)"
+            for: "ICS3U-2025", pid: otherCopy.processIdentifier, body: "\(otherCopy.processIdentifier)\nsleep\n"
         )
 
         var refusal: String? = nil
