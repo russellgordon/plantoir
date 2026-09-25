@@ -1103,6 +1103,32 @@ struct SectionDetailView: View {
         }
         previewLease = lease
         previewURL = nil
+        previewBuildWait.begin(
+            folderPath: workspaceURL.path,
+            courseCode: course.code,
+            sectionNumber: sectionNumber
+        )
+        // ANOTHER program on this Mac — an assistant working from another
+        // app, another copy of Plantoir, a deploy set for later — may be
+        // building or previewing this course (#156). Asked only NOW, after
+        // this window's own preview and build leases are on disk and with
+        // nothing awaited since, so that two programs pressing at the same
+        // instant cannot both go ahead, and cannot both back off either:
+        // only a lease taken before this one counts. Nothing has been stopped
+        // or started yet, so declining costs the teacher nothing but the
+        // sentence.
+        if let holding = WorkLeaseRegistry.whatBlocksABuild(
+            folderPath: workspaceURL.path, courseCode: course.code, afterTaking: true
+        ) {
+            previewBuildWait.end()
+            releasePreviewLease()
+            WorkLeaseRegistry.noteDeclined(
+                act: "Preview", courseCode: course.code, sectionNumber: sectionNumber, holding: holding
+            )
+            previewRefusalTitle = "Cannot Preview Yet"
+            previewRefusal = AssistWording.courseIsBeingBuiltElsewhere(course: course.displayCode)
+            return
+        }
         // Every window's copy of this course, not only this window's: the
         // unsaved switches may be in another window's Course Settings.
         let anyWindowHasUnsavedSettings: Bool = course.configuration.hasUnsavedChanges
@@ -1118,11 +1144,6 @@ struct SectionDetailView: View {
                 section: sectionNumber
             )
         }
-        previewBuildWait.begin(
-            folderPath: workspaceURL.path,
-            courseCode: course.code,
-            sectionNumber: sectionNumber
-        )
         previewRunner.milestones = TaskMilestones.preview
 
         Task { @MainActor in
@@ -1350,6 +1371,21 @@ struct SectionDetailView: View {
             )
         }
 
+        // ANOTHER program on this Mac building or previewing the course
+        // (#156) — asked HERE, before the preview below is stopped, because a
+        // refusal placed any later ends the page the teacher was reading for
+        // nothing. This early look is not the guarantee: the stop below
+        // awaits for seconds, and the look that counts is the one made
+        // immediately after this window's own `build` lease is written.
+        if let holding = WorkLeaseRegistry.whatBlocksABuild(
+            folderPath: workspaceURL.path, courseCode: course.code, afterTaking: false
+        ) {
+            WorkLeaseRegistry.noteDeclined(
+                act: "Deploy", courseCode: course.code, sectionNumber: sectionNumber, holding: holding
+            )
+            return AssistSiteWorkResult.builtElsewhere(course: course)
+        }
+
         // Claim the console for the deploy panel before touching the preview
         // runner below. Stopping a running preview here sets its own
         // `wasStoppedByUser`, which — until `deployRunner.run()` gives this a
@@ -1418,6 +1454,22 @@ struct SectionDetailView: View {
                 courseCode: course.code,
                 sectionNumber: sectionNumber
             )
+        }
+
+        // Checked AGAIN, now that this window's own `build` and `publish`
+        // leases are on disk and with no `await` since they were written
+        // (#156). The stop above took seconds, and during them this window
+        // held only a preview lease — so another program could have looked,
+        // found the course free, and started. Only a lease taken before this
+        // window's own counts, so two programs cannot both back off here.
+        if let holding = WorkLeaseRegistry.whatBlocksABuild(
+            folderPath: workspaceURL.path, courseCode: course.code, afterTaking: true
+        ) {
+            isPreparingDeploy = false
+            WorkLeaseRegistry.noteDeclined(
+                act: "Deploy", courseCode: course.code, sectionNumber: sectionNumber, holding: holding
+            )
+            return AssistSiteWorkResult.builtElsewhere(course: course)
         }
 
         // The real progress panel takes over from here — `deployRunner.run()`

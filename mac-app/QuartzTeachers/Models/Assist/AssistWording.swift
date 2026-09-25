@@ -204,6 +204,25 @@ nonisolated enum AssistWording {
              + "Wait for that to finish, then ask again."
     }
 
+    /// Said when ANOTHER program on this computer is previewing, building or
+    /// publishing the course — an assistant working from another app, another
+    /// copy of Plantoir, or a deploy set for later (#156) — to a teacher who
+    /// pressed Preview or Deploy, or asked the in-app assistant for either.
+    ///
+    /// Names the COURSE, not the section, because the lease it comes from
+    /// names only the course (Windows' format). Names no program: the same
+    /// sentence has to be true whichever of the three is in the way, and an
+    /// assistant reached from Claude Code and one reached from Codex are the
+    /// same thing to a teacher. An assistant working from another app is told
+    /// `courseIsBusy` instead — it is the one talking to the program that is
+    /// busy, so "busy in Plantoir" is the true sentence there.
+    static func courseIsBeingBuiltElsewhere(course: String) -> String {
+        return "\(course) is being previewed or published somewhere else on this computer right now — "
+             + "by an assistant working from another app, another copy of Plantoir, or a deploy set "
+             + "for later. Both would build the same pages in the same place, so doing it here as "
+             + "well would spoil both. Try again once that has finished."
+    }
+
     // MARK: - Previewing
 
     /// A section window is open, so its own Preview is what runs.
