@@ -56,9 +56,7 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     /// matches in a numbered course alone, and only on that word or a bare
     /// number — see `makeRoomAtOneNumber`.
     static func matching(_ message: String, numberedPageWord: String? = nil) -> AssistCardCommand? {
-        let tidied: String = message.trimmingCharacters(in: .whitespacesAndNewlines)
-            .trimmingCharacters(in: CharacterSet(charactersIn: ".!"))
-            .lowercased()
+        let tidied: String = AssistCardCommand.tidied(message)
 
         for (phrasing, command) in fixedShapes {
             if tidied == phrasing {
@@ -108,6 +106,121 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     /// appeared to honour another section would answer a different question
     /// with total confidence.
     private static func deployAtATime(_ tidied: String) -> AssistCardCommand? {
+        guard let frame = AssistCardCommand.deployFrame(tidied) else {
+            return nil
+        }
+        guard let time = AssistCardCommand.timeOfDay(frame.timeWords) else {
+            return nil
+        }
+        guard let dayWord = frame.dayWord else {
+            return AssistCardCommand(toolName: "schedule_deploy", arguments: ["when": time])
+        }
+        return AssistCardCommand(
+            toolName: "schedule_deploy", arguments: ["when": "\(dayWord) \(time)"]
+        )
+    }
+
+    /// "Deploy at 6:30" — a time that is morning or evening, and nobody can
+    /// tell which. Answered with a QUESTION, in code, and never sent to the
+    /// model (issue #194).
+    ///
+    /// **Measured, and it is the reason this exists.** The deploy-at-a-time
+    /// family refuses a one-digit hour with no am or pm on purpose — a deploy
+    /// set twelve hours wrong is a site that updates after the class it was
+    /// meant for — and until this, the refusal handed the sentence to the
+    /// model, which on the smaller assistant proposed an IMMEDIATE deploy for
+    /// the same shape of sentence ten trials out of ten. Refusing to guess and
+    /// then letting something else guess was the fault.
+    ///
+    /// **Stateless on purpose.** The question names two sentences the family
+    /// ALREADY accepts, and the teacher types one of them; that turn matches
+    /// in code like any other. There is no "waiting for an answer" state, so
+    /// nothing has to survive or be cleared between turns, and there are no
+    /// answer phrasings of its own to become a near-miss surface — the shape
+    /// the rollover question already chose (`AssistWording.rolloverWebsiteQuestion`).
+    ///
+    /// The frame is `deployFrame`, the one `deployAtATime` reads, so the two
+    /// cannot disagree about what counts as "deploy at a time". Everything the
+    /// frame refuses still goes to the model, and so does every time that is
+    /// not a one-digit hour 1–9 with two digits of minutes: "deploy at 7" (a
+    /// bare number may not be a time at all), "deploy at 0:30" (0 is not an
+    /// hour on a twelve-hour clock, so there is no morning-or-evening to ask
+    /// about) and "deploy at half six" keep their written reasons in
+    /// `contracts/assist-cases.json` → `deployAtATime.refused`.
+    ///
+    /// The answer sentences are built in their canonical form — "deploy
+    /// tomorrow at 6:30 am" — never by echoing the teacher's words, because
+    /// "please", "it" or a trailing "tomorrow" are spellings the frame reads
+    /// but that a sentence rebuilt around them might not.
+    static func morningOrEvening(_ message: String) -> AssistTimeQuestion? {
+        guard let frame = AssistCardCommand.deployFrame(AssistCardCommand.tidied(message)) else {
+            return nil
+        }
+        guard frame.timeWords.count == 1 else {
+            return nil
+        }
+        // Two near-spellings are ASKED about too, rather than sent to the
+        // model, because both still deployed on the spot there: "deploy at
+        // 6.30" (a full stop between the hour and the minutes) and "deploy at
+        // 6:30, please" (a comma after the time, left behind when the frame
+        // takes "please" off). Measured on the smaller assistant, ten trials
+        // each: deploy_section 10 of 10 for both. Asking costs nothing —
+        // nothing is set, and the answers are rebuilt below in the one
+        // canonical "6:30 am" form the family accepts, so neither spelling
+        // is ever offered back. This widens what is ASKED only: "deploy at
+        // 6.30 pm" is still not answered in code.
+        var written: String = frame.timeWords[0]
+        if written.hasSuffix(",") {
+            written = String(written.dropLast())
+        }
+        var separator: String.Index? = written.firstIndex(of: ":")
+        if separator == nil {
+            separator = written.firstIndex(of: ".")
+        }
+        guard let separator else {
+            return nil
+        }
+        let hourText: String = String(written[written.startIndex..<separator])
+        let minuteText: String = String(written[written.index(after: separator)...])
+        guard AssistCardCommand.isPlainDigits(hourText),
+              AssistCardCommand.isPlainDigits(minuteText),
+              hourText.count == 1,
+              minuteText.count == 2,
+              let hour = Int(hourText), hour >= 1,
+              let minute = Int(minuteText), minute <= 59 else {
+            return nil
+        }
+        // Always written with a colon, whatever separator the teacher typed.
+        let clock: String = hourText + ":" + minuteText
+
+        var opening: String = "deploy at "
+        if let dayWord = frame.dayWord {
+            opening = "deploy \(dayWord) at "
+        }
+        return AssistTimeQuestion(
+            clock: clock,
+            sayMorning: opening + clock + " am",
+            sayEvening: opening + clock + " pm"
+        )
+    }
+
+    /// A message trimmed, case-folded, and with a trailing full stop or
+    /// exclamation mark taken off — the one tidying every shape is matched
+    /// after.
+    private static func tidied(_ message: String) -> String {
+        return message.trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: ".!"))
+            .lowercased()
+    }
+
+    /// The day word and the time's words, read out of "[please] deploy
+    /// [it|this section] [today|tomorrow] at <time> [today|tomorrow]
+    /// [please]" — or nil when the sentence is not that frame.
+    ///
+    /// Shared by `deployAtATime` and `morningOrEvening`, so a sentence the
+    /// family would answer and a sentence it would ask about are the same
+    /// frame by construction rather than by two copies kept in step.
+    private static func deployFrame(_ tidied: String) -> (dayWord: String?, timeWords: [String])? {
         // A question mark is dropped HERE rather than by the shared tidier at
         // the top of this file. Widening that would break the fixed shapes
         // whose literal carries one — "what courses do i have?" and "when are
@@ -163,15 +276,7 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
             dayWord = closing
             words.removeLast()
         }
-        guard let time = AssistCardCommand.timeOfDay(words) else {
-            return nil
-        }
-        guard let dayWord else {
-            return AssistCardCommand(toolName: "schedule_deploy", arguments: ["when": time])
-        }
-        return AssistCardCommand(
-            toolName: "schedule_deploy", arguments: ["when": "\(dayWord) \(time)"]
-        )
+        return (dayWord: dayWord, timeWords: words)
     }
 
     /// "6:30 am", "6:30am", "7 pm", "18:30", "noon", "midnight" — as `HH:mm`,
@@ -182,8 +287,8 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     /// for the hour.** That is what 24-hour time looks like, and it is the
     /// form `schedule_deploy`'s own schema asks for. `06:30` and `18:30` are
     /// unambiguous; `6:30` is morning or evening and nobody can tell which, so
-    /// it goes to the model — which has the dateline and is measured reading
-    /// arguments out reliably. A deploy set twelve hours wrong is a site that
+    /// it is not read here — `morningOrEvening` asks the teacher which, in
+    /// code (issue #194). A deploy set twelve hours wrong is a site that
     /// updates after the class it was meant for.
     private static func timeOfDay(_ words: [String]) -> String? {
         guard words.count == 1 || words.count == 2 else {
@@ -802,14 +907,16 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
                 fills: [
                     "when": "<time> as HH:mm, with the day word in front of it when one was said — "
                           + "settled into a whole moment where the call is made, not here. Every "
-                          + "accepted and refused spelling is in deployAtATime.",
+                          + "accepted, asked and refused spelling is in deployAtATime.",
                 ],
                 example: "deploy at 6:30 am",
                 notThis: "deploy at 6:30",
                 becauseNotThis: "A one-digit hour with no am or pm is morning or evening and nobody "
                               + "can tell which. A deploy set twelve hours wrong is a site that "
-                              + "updates after the class it was meant for, so the doubt goes to the "
-                              + "model rather than being resolved by a coin toss."
+                              + "updates after the class it was meant for, so nothing is scheduled: "
+                              + "the app asks which, in code, naming the two sentences this family "
+                              + "accepts, and the model is never sent it. Every sentence that is "
+                              + "asked about rather than answered is in deployAtATime.asked."
             ),
         ]
     }
@@ -1080,4 +1187,26 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
          AssistCardCommand(toolName: "re_date_classes",
                            arguments: ["rollover": "yes", "website": "same"])),
     ]
+}
+
+/// The question "deploy at 6:30" is answered with, and the two sentences that
+/// answer it (issue #194).
+///
+/// Both sentences are ones `AssistCardCommand.matching` already accepts — the
+/// "both halves or neither" rule the rollover question keeps too — and
+/// `ScheduleDeployCardTests` runs every one of them through the matcher, so a
+/// question can never invite a sentence the app then fails to understand.
+nonisolated struct AssistTimeQuestion: Sendable, Equatable {
+
+    // MARK: - Stored properties
+
+    /// The time in its one spelling, "6:30" — written with a colon even
+    /// when the teacher typed "6.30".
+    let clock: String
+
+    /// The sentence that means the morning: "deploy tomorrow at 6:30 am".
+    let sayMorning: String
+
+    /// The sentence that means the evening: "deploy tomorrow at 6:30 pm".
+    let sayEvening: String
 }
