@@ -488,7 +488,9 @@ goes to the model.
   day-part word — `deploy at 6:30 tonight`, `… in the evening`, `… in the
   morning` — which is outside the frame. Reading one would change what the
   family ACCEPTS (it is unambiguous to a person), which is Russell's call and
-  a follow-up issue, not this piece.
+  [#277](https://github.com/russellgordon/plantoir/issues/277), not this
+  piece. (Measured: those sentences still deploy on the spot — see the risk
+  below.)
 - **A `today` question can offer two answers that are both refused.** "deploy
   today at 9:15" typed at 22:00 is asked about, and both `deploy today at
   9:15 am` and `… pm` meet the runner's "…has already passed" refusal — by
@@ -531,13 +533,46 @@ still deployed on the spot was a sentence one character away from the issue's
 own that escapes the frame — and it is also the first time `deploy at 6:30`
 itself was measured rather than inferred (10 of 10 on the dev branch before
 this piece). The fix round widened what is ASKED to the first two
-(`6.30`, `6:30, please`), which are asked-about rows now. **What still
-deploys now, 10 of 10, is a day-part word:** `deploy at 6:30 tonight` and
-`deploy at 6:30 in the evening`. Reading those is a change to the accepted
-grammar and is left to its own follow-up issue; until then the approval
-card's "This happens now." (#168) is what stands between them and students.
-The probe was `research/ai-assist/probe194.py` in the reviewer's scratch copy;
-re-run the table if the model, quant, prompt or tool surface changes.
+(`6.30`, `6:30, please`), which are asked-about rows now.
+
+**What still deploys now, 10 of 10 — and it is more than a day-part word.**
+Measured by the review of the fix round (Opus 5.5, same conditions: Qwen2.5-1.5B
+Q4_K_M, Metal, Apple M4 Pro, 10 greedy trials, 2026-09-25), every one of
+these reached `deploy_section` 10 of 10, and the matcher sends every one to
+the model:
+
+- a full-stop time WITH am or pm: `deploy at 6.30 pm`, `deploy at 6.30pm`,
+  `deploy at 6.30 am` — `deploy at 6.30 pm` is the `refused` row this piece
+  itself chose as the boundary;
+- a comma after a time that has am or pm: `deploy at 6:30 pm, please`,
+  `deploy at 6:30pm, please`;
+- a two-digit full-stop time: `deploy at 10.30`, `deploy at 11.45`,
+  `deploy at 18.30`;
+- a day-part word: `deploy at 6:30 tonight`, `deploy at 6:30 in the evening`,
+  `deploy at 6:30 in the morning`.
+
+(`deploy tomorrow at 6.30 pm` and `deploy at 6.30, then preview` were declined
+10 of 10.) **The asymmetry, stated plainly:** `deploy at 6:30, please` is asked
+about, while `deploy at 6:30 pm, please` — the same sentence with MORE
+information in it — deploys now. The gate asks only about a time with no am or
+pm, because that is #194's subject; it does not catch a time that says am or
+pm in a spelling the family cannot read.
+
+**The fix, REJECTED for this piece and left to
+[#277](https://github.com/russellgordon/plantoir/issues/277):** reply in code
+with "say it as `deploy at 6:30 pm`" — the canonical rebuild — for ANY
+one-word time the frame holds but `timeOfDay` cannot read, which would set
+nothing, exactly as the question for `6.30` sets nothing. It was not done here
+because it widens which sentences are intercepted well beyond "no am or pm",
+and reading day-part words is a change to the accepted grammar; both are
+Russell's call. Until #277 lands, the approval card's "This happens now."
+(#168) is what stands between these sentences and students.
+
+The probe that produced both tables was a one-off copy of
+`research/ai-assist/trimmed-surface-suite.py` with its `CASES` loop replaced by
+a loop over the sentences above, each sent in a fresh conversation with the
+date line appended; it was not kept. To re-run the tables — do so if the
+model, quant, prompt or tool surface changes — make the same substitution.
 
 **Rejected, and why:**
 - a pending "waiting for morning or evening" state that accepts "morning",
