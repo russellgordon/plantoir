@@ -2103,16 +2103,18 @@ because the obvious home is wrong twice over:
   `findCommandLineTool` (`~/.local/bin`, `~/.nvm` …) — outside this issue's
   folders.
 
-  **The limit of the guard, so nobody oversells it.** The redirects are per
+  **The limit of the guard, and what closed it.** The redirects were per
   SUBSYSTEM — `homeForScheduledNotes` for everything a scheduled deploy leaves,
   `supportDirectory`'s own for the launch files, `buildsRoot`'s for builds — and
-  `SuiteStaysOutOfRealFoldersTests` asks the resolvers it names. A NEW product
-  path that resolves the real home by itself would not be caught today; the
-  stopped-record reads were exactly such a path, found by a probe rather than
-  a test. A source-scan tripwire (the `ActivityTrailWiringTests` device) is a
-  follow-up, not part of this piece. Windows owes nothing as an
-  obligation, but the shape is worth a look there: a resolver with no home
-  parameter, fed a fixture course a teacher plausibly has.
+  `SuiteStaysOutOfRealFoldersTests` asks the resolvers it names, so a NEW
+  product path that resolved the real home by itself would not have been
+  caught; the stopped-record reads were exactly such a path, found by a probe
+  rather than a test. Issue #264 closed that: one seam, `RealHome`, is the only
+  product file allowed to ask for the home folder, and a source scan fails the
+  suite when anything else does — see "Testing: the real-home tripwire (#264)"
+  below. It also moved the models folder, `oneShotCommand`'s default and the
+  obsidian.json reads named in this bullet into the throwaway home under the
+  suite.
 - **Not inside `SidebarView.performRemoval` either**, which is where it started.
   Nothing in the suite constructs that view — every reference to it is to a
   static member — so a cancel living there could be proved only by proving the
@@ -4146,6 +4148,211 @@ the reasoning and a Windows-porting note per entry — is
 [`GUI-IMPROVEMENTS.md`](../GUI-IMPROVEMENTS.md). Architecture, build
 instructions (XcodeGen + Xcode), and the test suite are documented in
 [`mac-app/README.md`](../mac-app/README.md).
+
+## Testing: the real-home tripwire (#264)
+
+**One place asks where the home folder is, and a test fails if anything else
+does.** Everything Plantoir keeps on a Mac hangs off the home folder — built
+websites, helper programs, scheduled-publish notes and the assistant's weights
+under `~/Library/Application Support/Plantoir`, the trail under
+`~/Library/Logs/Plantoir`, Obsidian's list of vaults, the Desktop a problem
+report is saved to. Until 2026-09-25, 15 product files asked the system for it
+directly — 27 lookups, in five different spellings — and the suite was kept out
+of the teacher's folders only where somebody had noticed a test reaching one
+and redirected that resolver (#240 above: 482 reaches in one run before its
+fix). A resolver added next month would not have been redirected, and nothing
+would have said so. That is the gap this closes.
+
+### The seam: `RealHome`, two doors
+
+`mac-app/QuartzTeachers/Models/RealHome.swift` is the only product file allowed
+to ask.
+
+- **`RealHome.forFiles`** — the home for anything Plantoir reads, writes or
+  names to a child process as text. The real home in the app; ONE throwaway
+  folder per run (`RealHome.homeWhileTesting`) while the unit suite hosts the
+  process. It needs no allow-list: it cannot answer a real folder under the
+  suite, so it is safe by construction rather than by review. Every default
+  that used to be `= homeDirectoryForCurrentUser` is now `= RealHome.forFiles`
+  — `oneShotCommand`'s included, which sends the 95 script-text hits in #240's
+  final probe to the throwaway home by construction (not re-probed), and
+  closes the case #240 left open: a test that EXECUTES a script built
+  with the default home (as `ScheduledPublishOutcomeTests` does with an
+  explicit one) would have written real `.succeeded` and stopped records.
+  `RealHome.expandingTilde(in:)` replaces `expandingTildeInPath` for the two
+  places a person types `~/…` (a publish destination; the `--mcp-stdio`
+  folder), so a typed `~` under the suite also lands in the throwaway home.
+  It expands `~` and `~/…` only; `~name/…`, another account's home, is left as
+  typed rather than looked up.
+- **`RealHome.real(for: Use)`** — the real home, always, for a reach a TEST
+  must see the real value of. Each `Use` case is allowed only from the files
+  `RealHomeTripwireTests.filesAllowedPerUse` names for it, so reusing a case
+  somewhere new is a diff a reviewer sees; `RealHome.real(` anywhere under
+  `Tests/` fails outright. **`Use` has no cases, and that was measured:** every
+  one of the 27 lookups was moved to `forFiles`, the full suite ran, and every
+  test outside the tripwire itself stayed green — nothing needed the real
+  answer. (The compiler says "will never be executed" about `real(for:)`'s
+  empty `switch`; that is the door being shut, and it goes with the first
+  case.)
+
+**Keyed on XCTest being loaded in THIS process** (`RealHome.isInsideTestBundle`,
+`NSClassFromString("XCTestCase")`), not on `BuildOutputLocation.isRunningTests`,
+which is also true inside the app a UI test drives (it reads
+`UITEST_WORKSPACE`). That app has no XCTest in it — XCTest lives in the UI
+test's runner, a separate process — and the opt-in `AssistantRolloverUITests`
+needs it to load the real assistant weights. The three folders #240 already
+moved for the UI-tested app too (built websites, scheduled-publish notes, the
+assistant's launch files) keep that: their resolvers check `isRunningTests`
+before they fall through to `forFiles`. `WorkspaceModel.isRunningTests` and
+`ProblemReportStore.isRunningTests` now ask `RealHome.isInsideTestBundle` too;
+the second used to read `XCTestConfigurationFilePath` from the environment, a
+third definition of "under test".
+
+What went through it — every product lookup of the home folder that existed on
+`dev` at 43d8e853:
+
+| File | What it resolved |
+|---|---|
+| `Scripting/HelperPrograms.swift` (5) | the pinned helpers' `tools/bin`, the PATH text children get |
+| `Scripting/PreviewStopper.swift` | the stop command's PATH |
+| `Scripting/ProblemReport.swift` | `~/Library/Logs/Plantoir` (the trail and task records) |
+| `Models/PreviewReachability.swift` | the "ask the builder" command's PATH |
+| `Models/FolderContainers.swift` (2) | the quit script's PATH and trail |
+| `Models/ScheduledDeploy.swift` (5) | `homeForScheduledNotes`, the plist and wrapper defaults, the launchd-run paths |
+| `Models/BuildOutputLocation.swift` (2) | `buildsRoot`, the sweep's "under home" rule |
+| `Models/CloudSyncedFolder.swift` | which synced folder a working folder is in |
+| `Models/QuartzCheckoutLayout.swift` (2) | a path written from `~` in a sentence or on the trail |
+| `Models/SectionPublishState.swift` | a typed `~/…` destination |
+| `Models/Assist/AssistMCPServer.swift` | a typed `~/…` working folder |
+| `Models/Assist/ClaudeCodeLauncher.swift` (2) | where `claude`/`codex` might be installed; `…/Plantoir/assist` |
+| `Models/Assist/AssistModelStore.swift` | the assistant's weights |
+| `Views/Helpers/FolderActions.swift` | Obsidian's `obsidian.json` (READ, and WRITTEN when Obsidian is open) |
+| `App/ProblemReportCommands.swift` | the save panel's starting Desktop |
+
+**The models folder is redirected, not allowed** (review H2). #240's probe
+left six stat-only reads of the real weights by three tests, which made a
+panel sentence those tests checked depend on what the Mac running them had
+downloaded. The plan proposed a per-test runtime recorder to allow exactly
+those three; the review showed it would charge a stat from an async warm-up
+that outlived its test to the NEXT test, red at random, and turn red on a
+rename. Sending the folder through `forFiles` made the allowed set zero and
+the recorder unnecessary.
+
+### The tripwire: `RealHomeTripwireTests`
+
+A source scan, the `ActivityTrailWiringTests` device, over every Swift file in
+`QuartzTeachers/` and `Tests/` (1.8 seconds for its three tests):
+
+1. **The product asks only the seam.** Any of 23 lookups outside
+   `RealHome.swift` fails, naming file and line: `homeDirectoryForCurrentUser`,
+   `NSHomeDirectory`, `homeDirectory(forUser`, `URL.homeDirectory`, `urls(for:`,
+   `url(for:`, `NSSearchPathForDirectoriesInDomains`, the `URL` statics
+   `.applicationSupportDirectory` `.desktopDirectory` `.libraryDirectory`
+   `.documentsDirectory` `.downloadsDirectory` `.cachesDirectory`,
+   `expandingTildeInPath`, `abbreviatingWithTildeInPath`, `standardizingPath`,
+   `getpwuid`, `getpwnam`, `CFCopyHomeDirectoryURL`, `environment["HOME"]`,
+   `getenv("HOME")`, a `"~/` literal and a `"/Users/` literal. Three are
+   allowed, counted per file and lookup, each with its reason in the test:
+   `LogRedactor`'s `/Users/` pattern (it REMOVES home paths), two
+   `standardizingPath` calls in `QuartzCheckoutLayout` that collapse `..`
+   before comparing two paths, and one sentence in `ScheduledDeploy` naming
+   `~/Library/LaunchAgents`.
+2. **Tests reach the real home only where named.** The same lookups (minus the
+   generic `/Users/`, since made-up homes like `/Users/teacher` are how a test
+   SHOULD name one), plus `RealHome.real(` and the running account's own home
+   spelt out. Fifteen allowances in twelve files — mostly the guards
+   themselves, which must know where the real folder is to say nothing answered
+   it, and `ToolchainMirrorTests`, whose mirror must sit under `$HOME` because
+   Colima mounts nothing else. Two tests that spelt `/Users/russellgordon` as
+   fixture text (`FinderPathBarTests`, `ProblemReportTests`) now use a made-up
+   account.
+3. **Nothing stale.** An allowance must match exactly as many lines as it
+   says — fewer is a stale entry that would let a new reach back in, more is a
+   new reach beside an allowed one — and every `Use` case must be listed and
+   used, from its listed files only.
+
+Beside it, `SuiteStaysOutOfRealFoldersTests.testEveryDefaultHomeIsTheSuitesThrowawayOne`
+asks thirteen default-home wrappers what they answer under the suite and
+fails if any names the real home — the runtime half, so that "the scan is
+green" and "the one door answers the right home" are separately true.
+
+**Must-fail, by copy-and-restore of the source files.** One run with seven
+deliberate faults (a `homeDirectoryForCurrentUser` in `ScheduledPublishOutcome`,
+`URL.applicationSupportDirectory` in `AssistModelStore`, `HelperPrograms.binDirectory`'s
+default put back to the raw lookup, `NSHomeDirectory()` in `FinderPathBarTests`,
+`RealHome.real(` in `ProblemReportTests`, a stale allowance, and two `Use`
+cases — one used from an unlisted file, one unused): **10 tests, 7 failures**,
+every fault named by file and line, and the reverted default ALSO caught at
+run time (`HelperPrograms.binDirectory named the real home`). A second run with
+`forFiles` made to return the real home under the suite: **7 tests, 18
+failures**, twelve of them naming the wrapper that answered the real home.
+Restored byte-identical (`cmp`) and green.
+
+### What it cannot see — do not oversell it
+
+- **Child processes.** A launcher takes `HOME` from its environment, not from
+  Swift, and `ScriptRunner` hands children this process's environment — the
+  real `HOME` — so a test that drove a real `setup.sh` could reach
+  `~/Library/Application Support/Plantoir/tools` with every check here green.
+  Not live today, measured two ways: every test that executes a launcher or a
+  generated script either sets a scratch `HOME` (`QuitScriptRunsTests.run`),
+  passes a scratch home (`ScheduledPublishOutcomeTests.runWrapper`), runs a
+  stub, or is opt-in and skipped (`ScriptRunnerIntegrationTests`,
+  `NewCourseCreatorIntegrationTests`); and a full suite run on this branch
+  changed nothing under the real `…/Plantoir`, `~/Library/Logs/Plantoir`,
+  `~/Library/LaunchAgents` or Obsidian's list (`find -newer` against a marker
+  touched just before a full run of 1,890 tests: 0 entries — which sees a
+  file or folder written, added or removed, and cannot see a read). The fix — a throwaway `HOME` in the child
+  environment under the suite — is a follow-up, not part of this piece.
+- **A path spelt out with no lookup at all**: another account's `/Users/…`
+  written in full, or `~` expanded from a VARIABLE by `URL(filePath:)` or
+  `.standardized` (both expand it; no scan can see what a variable holds).
+- **`UserDefaults.standard`**, which holds the working-folder path and window
+  claims. Guarded today by `isRunningTests && defaults === .standard` checks in
+  `WorkspaceModel`, `AppSettings` and `WindowFolderMemory`; the scan cannot see
+  that channel.
+- **Block comments.** The scan skips `//` lines and anything after ` //`; it
+  does not understand `/* … */`. A block comment naming a lookup is reported
+  rather than missed — the safe way round.
+- **The tripwire's own file**, which spells every lookup as the text it looks
+  for, and the opt-in UI and integration tests, which name a real workspace or
+  read the real weights on purpose and are outside the gate.
+
+### Rejected, with what was measured
+
+- **A file-system probe as the gate.** DTrace needs System Integrity
+  Protection off (`csrutil status`: enabled on this Mac); `fs_usage` and
+  `eslogger` need root, and `sudo -n` asks for a password, so no agent can run
+  them — Russell could, by hand, as a one-off audit. An `open`/`stat`
+  interposer (`DYLD_INTERPOSE`) saw **12 of 12** Foundation file operations
+  when loaded at launch by `DYLD_INSERT_LIBRARIES` — but loaded the way a test
+  bundle is loaded, by `dlopen`, it intercepted **0**: interposing happens only
+  at launch. It would have to go in the scheme's test environment beside
+  Xcode's own `libXCTestBundleInject.dylib` (coexistence unmeasured), as a C
+  target in a project Russell reads as teaching code, and it still would not
+  see children (SIP strips `DYLD_*` for `/bin/sh` and `/bin/bash`).
+- **`CFFIXED_USER_HOME` in the scheme.** It moves **7 of 7** Foundation answers
+  (`homeDirectoryForCurrentUser`, `NSHomeDirectory`, Application Support,
+  Library, Desktop, `~` expansion, `NSHomeDirectoryForUser`) where `HOME=`
+  moves **none** — so it would redirect tomorrow's resolver too. Rejected
+  because it HIDES a reach rather than reporting one (the issue asked for a
+  failure), breaks the tests that need the real `$HOME` (`ToolchainMirrorTests`:
+  Colima mounts only `$HOME`), and makes "a home named explicitly is used
+  exactly" untestable.
+- **Ten `Use` cases chosen by "touches no file"** (the plan). The only reason
+  for a real door is a test that needs the real value; `forFiles` already
+  answers the real home in the app. See above: measured, none do.
+- **A contract entry.** How a test host finds a home is platform mechanics —
+  not a sentence, a rule with portable inputs and outputs, or an ordered
+  sequence — and `contracts/README.md`'s coverage table already leaves test
+  harness mechanics out. No `GUI-IMPROVEMENTS.md` row and no trail event: a
+  teacher sees none of it.
+
+**Windows.** Its unit suite has the same exposure in its own shape:
+`AppDataRoot` is already the one resolver, but `dotnet test` never redirects
+it, and the scheduled-publish path registers a real Task Scheduler task. The
+`windows` issue for this asks for the intent — redirect `AppDataRoot` in the
+test assembly and add a source-scan test — not the Swift mechanism.
 
 ## A test host that segfaults, and the six levers that look like they should fix it
 

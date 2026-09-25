@@ -1409,7 +1409,9 @@ should mirror it:
   test target is app-hosted (`TEST_HOST`), so the host app writes its launch
   lines before any test-bundle code loads. Instead the redirect lives in the
   product (`ProblemReportStore.standard` returns a throwaway folder when
-  `XCTestConfigurationFilePath` is in the environment), and
+  XCTest is loaded in the process — `RealHome.isInsideTestBundle` since
+  #264; it read `XCTestConfigurationFilePath` from the environment before),
+  and
   `testTheSuiteWritesToAThrowawayTrail` pins it so a refactor cannot lose it
   silently. Worth a matching pin on Windows: one test asserting the trail
   path is the redirected one, so the module initializer's presence is itself
