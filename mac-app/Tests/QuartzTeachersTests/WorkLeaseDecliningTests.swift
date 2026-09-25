@@ -128,7 +128,11 @@ final class WorkLeaseDecliningTests: XCTestCase {
         let url: URL = directory.appendingPathComponent(
             WorkLeaseFiles.fileName(courseCode: "ICS3U", kind: kind, pid: pid)
         )
-        let when: String = moment ?? ProcessLiveness.leaseMomentText(Date())
+        // A second BEFORE now by default: the other program took its lease
+        // first. Taken at `Date()` it can share this process's millisecond,
+        // and the tiebreak then goes by pid — the sleep child's is higher —
+        // which is the rule working, and a test that flickers.
+        let when: String = moment ?? ProcessLiveness.leaseMomentText(Date().addingTimeInterval(-1))
         let start: String = ProcessLiveness.startTime(ofProcess: pid) ?? ""
         try Data("\(pid)\n\(name)\n\(when)\n\(start)\n".utf8).write(to: url)
         return url
