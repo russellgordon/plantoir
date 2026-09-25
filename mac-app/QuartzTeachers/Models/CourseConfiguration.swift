@@ -15,8 +15,9 @@ class CourseConfiguration {
     /// The decoded contents of `course_config.json`.
     var values: [String: Any]
 
-    /// The bytes most recently read from or written to disk, used by
-    /// `discardChanges()` to implement the Cancel button.
+    /// The bytes most recently read from or written to disk: what a Save
+    /// merges against, and what `revertToFile(at:)` falls back to when the
+    /// file cannot be read.
     private var lastSavedData: Data
 
     // MARK: - Computed properties
@@ -1095,12 +1096,165 @@ class CourseConfiguration {
 
     /// Writes the configuration to disk in the same shape the setup wizard
     /// uses: pretty-printed JSON with a trailing newline.
-    func write(to url: URL) throws {
+    ///
+    /// **Only the settings THIS copy changed are written over the file**
+    /// (issue #265). Two windows on one working folder each hold their own
+    /// copy of a course's settings, and this used to be a blind whole-file
+    /// write — so a Save in the window that had not seen the other's Save put
+    /// back every setting as that window last read it. Measured with this
+    /// file compiled standalone and a copy of a real course: window A saved
+    /// three sidebar hides, window B then saved an unrelated setting, and the
+    /// file went back to B's ten hides while both windows said "nothing
+    /// unsaved". Every Save — Course Settings, Add Section, archive, restore,
+    /// rename, school year — comes through here, so all six are covered.
+    ///
+    /// The rule, per top-level key, with `lastSavedData` as what this copy
+    /// last read or wrote:
+    /// - the file has not changed since then → write this copy, as before;
+    /// - otherwise, a key this copy did NOT change keeps the file's value
+    ///   (somebody else's Save, or a build adding a folder it discovered);
+    /// - a key this copy DID change is written, and when the file had also
+    ///   changed it, that is reported so the trail can say so.
+    ///
+    /// Per KEY rather than per list element, deliberately: merging inside a
+    /// list would need rules for order and for an item removed on one side and
+    /// added on the other, and nothing a teacher reported needs them. The same
+    /// read-then-check-then-write loop as `recordOnDisk` guards against a
+    /// build writing between the read and the write.
+    ///
+    /// Afterwards the in-memory copy IS the file, so a form that is open
+    /// shows what was really saved, and every other window's copy of this
+    /// course is brought up to date (`WorkspaceModel.followWrite`).
+    @discardableResult
+    func write(to url: URL) throws -> WriteResult {
         let options: JSONSerialization.WritingOptions = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-        var data: Data = try JSONSerialization.data(withJSONObject: values, options: options)
-        data.append(contentsOf: [0x0A])
-        try data.write(to: url, options: [.atomic])
+        var attempts: Int = 0
+        while true {
+            let before: Data? = try? Data(contentsOf: url)
+            var result: WriteResult = WriteResult()
+            var toWrite: [String: Any] = values
+            if let before, before != lastSavedData {
+                let base: [String: Any]? = CourseConfiguration.decodedDictionary(lastSavedData)
+                let onDisk: [String: Any]? = CourseConfiguration.decodedDictionary(before)
+                if let base, let onDisk {
+                    toWrite = CourseConfiguration.merged(mine: values, base: base, onDisk: onDisk, result: &result)
+                }
+            }
+            var data: Data = try JSONSerialization.data(withJSONObject: toWrite, options: options)
+            data.append(contentsOf: [0x0A])
+
+            // Something wrote the file between the read and here (a build's
+            // preflight, most likely): read it again and redo the merge. After
+            // three tries this Save goes ahead with the last merge, which is
+            // still right for every key except one written in that instant.
+            let nowOnDisk: Data? = try? Data(contentsOf: url)
+            if nowOnDisk != before && attempts < 3 {
+                attempts += 1
+                continue
+            }
+            try data.write(to: url, options: [.atomic])
+            lastSavedData = data
+            values = toWrite
+            WorkspaceModel.followWrite(of: self, at: url)
+            return result
+        }
+    }
+
+    /// What a write found in the file that this copy had not read.
+    struct WriteResult {
+
+        // MARK: - Stored properties
+
+        /// Settings changed in the file since this copy read it, which this
+        /// copy had not touched — kept as the file had them.
+        var keptFromElsewhere: [String] = []
+
+        /// Settings changed BOTH in the file and in this copy. This copy's
+        /// value was written, because it is the Save the teacher just made.
+        var replacedChangesFromElsewhere: [String] = []
+
+        // MARK: - Computed properties
+
+        /// True when the file had been changed by something else since this
+        /// copy read it.
+        var fileHadChangedElsewhere: Bool {
+            return !keptFromElsewhere.isEmpty || !replacedChangesFromElsewhere.isEmpty
+        }
+    }
+
+    /// The per-key merge `write(to:)` describes. `base` is what this copy last
+    /// read or wrote, `mine` is this copy now, `onDisk` is the file now.
+    static func merged(
+        mine: [String: Any],
+        base: [String: Any],
+        onDisk: [String: Any],
+        result: inout WriteResult
+    ) -> [String: Any] {
+        var allKeys: Set<String> = []
+        for key in mine.keys {
+            allKeys.insert(key)
+        }
+        for key in base.keys {
+            allKeys.insert(key)
+        }
+        for key in onDisk.keys {
+            allKeys.insert(key)
+        }
+
+        var output: [String: Any] = [:]
+        for key in allKeys.sorted() {
+            let changedHere: Bool = !sameValue(mine[key], base[key])
+            let changedThere: Bool = !sameValue(onDisk[key], base[key])
+            if changedHere {
+                if let value = mine[key] {
+                    output[key] = value
+                }
+                if changedThere && !sameValue(mine[key], onDisk[key]) {
+                    result.replacedChangesFromElsewhere.append(key)
+                }
+            } else {
+                if let value = onDisk[key] {
+                    output[key] = value
+                }
+                if changedThere {
+                    result.keptFromElsewhere.append(key)
+                }
+            }
+        }
+        return output
+    }
+
+    /// Reads the file again when this copy has nothing unsaved — what Course
+    /// Settings does each time it is opened (issue #265), so a folder the
+    /// build discovered, or a Save made in another window, is on screen
+    /// without relaunching. Unsaved edits are never replaced. Returns whether
+    /// the file was read.
+    @discardableResult
+    func reloadIfNothingUnsaved(url: URL) -> Bool {
+        if hasUnsavedChanges {
+            return false
+        }
+        do {
+            try reloadFromDisk(url: url)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// Replaces this copy with what is in the file now — for a copy with
+    /// nothing unsaved, after something else wrote the file. Callers check
+    /// `hasUnsavedChanges` first: this discards unsaved edits.
+    func reloadFromDisk(url: URL) throws {
+        let data: Data = try Data(contentsOf: url)
+        if data == lastSavedData {
+            return
+        }
+        guard let dictionary = CourseConfiguration.decodedDictionary(data) else {
+            throw CourseConfigurationError.notADictionary
+        }
         lastSavedData = data
+        values = dictionary
     }
 
     /// Records a change that has ALREADY happened on disk — a folder rename —
@@ -1162,12 +1316,37 @@ class CourseConfiguration {
             try written.write(to: url, options: [.atomic])
             lastSavedData = written
             values = change(values)
+            WorkspaceModel.followWrite(of: self, at: url)
             return
         }
     }
 
+    /// What Course Settings' Revert button does: the settings as the FILE
+    /// has them now, not as this copy last read them (issue #265).
+    ///
+    /// A copy with unsaved edits is deliberately left alone when another
+    /// window saves (`WorkspaceModel.followWrite`), so the bytes it last read
+    /// can be older than the file. Reverting to those put the other window's
+    /// Save back on screen as "nothing unsaved" — measured by the review: B
+    /// with an unsaved edit, A saves three hides, B reverts and shows the old
+    /// ten — and B's next Save wrote the old list back over A's, because it
+    /// now looked like a change B had made. Reading the file is what "put it
+    /// back the way it was saved" means when somebody else saved last.
+    ///
+    /// When the file cannot be read, falls back to the bytes this copy last
+    /// read, which is what Revert did before.
+    func revertToFile(at url: URL) throws {
+        if let data = try? Data(contentsOf: url),
+           let dictionary = CourseConfiguration.decodedDictionary(data) {
+            lastSavedData = data
+            values = dictionary
+            return
+        }
+        try discardChanges()
+    }
+
     /// Reverts all in-memory edits back to the last data read from or
-    /// written to disk (the Cancel button).
+    /// written to disk. Course Settings' Revert uses `revertToFile(at:)`.
     func discardChanges() throws {
         let decoded: Any = try JSONSerialization.jsonObject(with: lastSavedData)
         guard let dictionary = decoded as? [String: Any] else {
@@ -1190,6 +1369,27 @@ class CourseConfiguration {
     }
 
     // MARK: - Private helpers
+
+    /// The JSON object in `data`, when it is a dictionary.
+    private static func decodedDictionary(_ data: Data) -> [String: Any]? {
+        guard let decoded = try? JSONSerialization.jsonObject(with: data) else {
+            return nil
+        }
+        return decoded as? [String: Any]
+    }
+
+    /// Whether two values from a decoded (or edited) configuration are the
+    /// same JSON value — a missing key is only the same as a missing key.
+    private static func sameValue(_ first: Any?, _ second: Any?) -> Bool {
+        guard let first else {
+            return second == nil
+        }
+        guard let second else {
+            return false
+        }
+        let firstWrapped: NSArray = [first]
+        return firstWrapped.isEqual(to: [second])
+    }
 
     private func stringValue(forKey key: String) -> String {
         if let stored = values[key] as? String {
