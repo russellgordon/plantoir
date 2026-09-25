@@ -830,6 +830,94 @@ nobody can ever close. The one thing that side does owe is the new
   publishes both ranges. The reachable HOST address is the folder's
   probed block; `preview.sh` prints it.
 
+#### Before building, preview.sh makes sure this Mac can reach the builder (#234)
+
+Between finding the address and announcing it, `preview.sh`
+(`announce_the_preview_address` → `this_mac_can_reach_the_builder`) opens a
+connection to `127.0.0.1:<the announced HOST port>` —
+`curl -q -s -o /dev/null --noproxy '*' --max-time 1`. Nothing is served inside
+the builder yet, so a healthy Mac answers with an empty reply (curl exit 52)
+and the preview goes on exactly as before. **Only a refused connection (exit
+7) on every try stops it**: 20 tries 0.5 s apart, about ten seconds, or 60
+tries (about thirty) when THIS run started the builder's virtual machine. It
+then prints `previewPorts.whenThisMacCannotReachTheBuilder.sentence`, writes
+`launcherLineWhenThisMacCannotReachTheBuilder` on the trail under the existing
+"preview did not appear" event, and exits 1 before building. The numbers and
+ten cases are in `contracts/app-rules.json` →
+`previewPorts.whenThisMacCannotReachTheBuilder`; `scripts/test_preview_reach.py`
+runs every case against the launcher's own functions, with docker, curl and
+sleep stubbed.
+
+**Why.** The fault is #225's (see `09-mac-app.md` → "A preview that never
+appears"): a Mac whose builder has stopped handing NEW addresses through
+(`ssh … -O forward` exit 255, fixed only by a restart) built a preview for
+about two minutes (109 s on the Mac that met it) and the app then waited 45 s
+more before its alert. Asked before the build, the same fault is found in
+about ten seconds with nothing built. The app needed no change: an exit 1 with
+no address announced is #235's shape, so the run ends with the launcher's
+sentence in the window and `PreviewReachability` never starts a wait.
+
+**It fails OPEN, deliberately.** Every answer but 7 goes ahead — a page (0), an
+empty reply (52), a timeout (28), no curl at all (127), anything —
+because none of them proves the forward is missing, and #225's check after the
+build is still there behind it. A listener that is NOT the forwarder (another
+program took the port after the workspace was made) also goes ahead; **do not
+tighten this to require a real page**: nothing is served before the build, so
+that would refuse every healthy Mac.
+
+**Why a connection and not `lsof`.** Measured on the development Mac
+(Apple silicon, Colima vz aarch64, 2026-09-25): curl to a forwarded port with
+nothing inside answers 52 in 0.01–0.03 s; to a port nothing listens on, 7 in
+0.01 s; `lsof -iTCP:<port> -sTCP:LISTEN` takes 0.228 s. Worse, `lsof` run as
+the teacher sees only the teacher's own programs: a root-owned listener (:88,
+`kdc`) is invisible to it and answers curl. A forwarder owned by anybody else
+would read as missing and refuse a healthy Mac. All 48 host ports published by
+six running workspaces had a listener. `-q` comes first so the teacher's
+`~/.curlrc` is never read, and `--noproxy '*'` so a proxy setting cannot
+answer for this Mac.
+
+**The retry is a bounded re-asking of the real question, not a settle-delay.**
+A healthy Mac answers on the first try; #225 measured the listener appearing
+0.10–0.24 s after the builder is created or started (0.15 s under load). The
+bound is for the one case **nobody has measured: the first address after the
+builder's virtual machine starts cold.** That is not rare — since #220,
+quitting Plantoir stops the VM when nothing else uses it, so it is the first
+preview of most days — which is why a run that started the VM
+(`ensure_container_runtime` sets `THIS_RUN_STARTED_THE_BUILDER` in
+`preview.sh`'s copy only, on every path past its "already running" return)
+allows 60 tries. Measuring it would have meant a throwaway second Colima
+profile on Russell's Mac; the director ruled that out, so the number stays
+unmeasured. Instead, **a run that needed more than one try says so in the
+console** (`reachedAfterRetrying`, "…took N tries"), so the next transcript a
+teacher sends carries the figure the bound rests on.
+
+**Rejected:**
+- *`lsof` as the probe* — above: slower, and blind to listeners the teacher
+  does not own.
+- *A check in `setup.sh`, at the builder's creation* (the issue title's literal
+  reading) — it would not have fired on the night: all three previews met a
+  builder that was already running, and `run_container_with_mount()` is reached
+  only on create or recreate. Setup is also exactly the unmeasured cold start.
+- *One probe* — the cold start is unmeasured, so one refusal is not proof.
+- *Skipping the check when this run started the VM* (the fault is an OLD VM
+  refusing NEW forwards) — a VM broken from birth would then build for minutes
+  first; the longer bound covers both.
+- *Asking inside the builder first* — before the build nothing is served
+  there, so it proves nothing; that stays #225's question, after the build.
+- *Checking the live-reload port (+1000) too* — a Mac that refuses new forwards
+  refuses both, and stopping a preview over live-reload alone is a heavier
+  answer than the fault.
+- *A `failureExplanations` case or an app alert* — as for #280's
+  `whenNoBlockIsFree`, the launcher's own sentence is what a teacher reads, and
+  a case would turn Windows' suite red for a failure its app cannot produce.
+- *Putting it in the shared PREVIEW PORT BLOCK* — only `preview.sh` announces
+  an address; the block is left byte-identical across the three launchers.
+
+**Windows** has nothing to mirror: `preview.ps1` serves on the PC itself, so
+there is no forward to lose. If a preview there ever sits behind a forward
+(WSL2's relay has the same failure class), probe with a CONNECTION, not a
+listener list.
+
 ### `deploy.sh`
 
 - Normalizes the course code to uppercase and includes a friendly guard for a
