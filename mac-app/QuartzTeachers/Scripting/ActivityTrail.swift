@@ -65,6 +65,21 @@ nonisolated enum ActivityTrail {
         /// Windows recorded this first (`AssistWindow.xaml.cs`); the mac had
         /// the same button and wrote nothing.
         case sectionRestored = "section restored"
+        /// A teacher added a section to a course ("Add Section…"). Carries
+        /// the course, the new section, and how many pages shared by every
+        /// section were given a date and a published-or-hidden setting for
+        /// it, and how many of those were kept hidden because the setting
+        /// they would copy could not be read — never which pages.
+        ///
+        /// Adding a section writes into pages the teacher did not open: every
+        /// course-level page that carries per-section keys gains a pair for
+        /// the new section, copied from the lowest existing one. When that
+        /// went wrong it went wrong silently — a page hidden in section 1 but
+        /// fenced in a way the old finder missed was PUBLISHED in the new
+        /// section (GitHub #175) — and the trail had nothing at all about the
+        /// section being added, so "why is this page showing in section 2?"
+        /// had no line to start from.
+        case sectionAdded = "section added"
         case assistantAsked = "assistant asked"
         case assistantChoseATool = "assistant chose a tool"
         case assistantCouldNotAnswer = "assistant could not answer"
