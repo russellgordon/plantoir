@@ -343,9 +343,27 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     }
 
     /// What a place named in a links question refers to.
+    ///
+    /// With no window to compare against, every PLACE is one this family
+    /// cannot honour, so it is read as another section — the sentence goes to
+    /// the model. Without that, "in ICS3U section 1" with no window was
+    /// "another course" (measured by differential fuzz against the research
+    /// mirror, which had the same fault).
     private static func place(_ words: String,
                               windowCourse: String?,
                               windowSection: Int?) -> LinksPlace {
+        let read: LinksPlace = AssistCardCommand.placeAgainstTheWindow(
+            words, windowCourse: windowCourse, windowSection: windowSection
+        )
+        if windowCourse == nil || windowSection == nil, read != .notAPlace {
+            return .anotherSection
+        }
+        return read
+    }
+
+    private static func placeAgainstTheWindow(_ words: String,
+                                              windowCourse: String?,
+                                              windowSection: Int?) -> LinksPlace {
         var parts: [String] = []
         for piece in words.replacingOccurrences(of: ",", with: " ").split(separator: " ") {
             parts.append(String(piece))

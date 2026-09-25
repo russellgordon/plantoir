@@ -715,7 +715,17 @@ def links_page_title(slot):
 
 
 def links_place(words, window_course, window_section):
-    """"window", ("another", code), "section" (another section) or None."""
+    """"window", ("another", code), "section" (another section) or None.
+
+    With no window, every place is one the family cannot honour: "section".
+    """
+    read = links_place_against_the_window(words, window_course, window_section)
+    if (window_course is None or window_section is None) and read is not None:
+        return "section"
+    return read
+
+
+def links_place_against_the_window(words, window_course, window_section):
     parts = [part for part in words.replace(",", " ").split(" ") if part]
     folded = [part.lower() for part in parts]
     course_word = section_word = None
