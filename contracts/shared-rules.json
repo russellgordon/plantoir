@@ -188,7 +188,7 @@
       {
         "carries": "which course and section, and a sentence naming what happened with the stable check NAME in brackets — 'found a problem with this course’s folders (curriculumCoverageFoundNothing)'. Never the product wording, which changes, and never anything written on a page",
         "event": "folder problem found",
-        "why": "A teacher who reports 'it stopped showing my curriculum map last month' leaves nothing to look at otherwise: the finding is printed into a build console that is gone by then, and the condition itself is invisible on disk — a renamed folder looks exactly like a folder that was always called that. Recording the check NAME rather than the sentence is deliberate: the sentence is product wording and will be reworded, while the name is what a person searching the trail six months later can match against the contract."
+        "why": "A teacher who reports 'it stopped showing my curriculum map last month' leaves nothing to look at otherwise: the finding is printed into a build console that is gone by then, and the condition itself is invisible on disk — a renamed folder looks exactly like a folder that was always called that. Recording the check NAME rather than the sentence is deliberate: the sentence is product wording and will be reworded, while the name is what a person searching the trail six months later can match against the contract. A scheduled publish's findings are recorded too, dated to the RUN rather than to when somebody next opened the section - or a problem found at half six is filed under the morning somebody looked, and a teacher who never opens that section gets no line at all (the reasoning of scheduledPublishStopped.trail; #153). Who writes it is platform-local: the mac's scheduled run is Plantoir itself and writes the line at the end of the run, from its own log; Windows writes it when the app reads the run's record, dated to that record's write time."
       },
       {
         "carries": "which section, and which destinations it was published to",
@@ -1492,7 +1492,7 @@
     "note": "How the build tells the app which of the teacher's pages it rewrote with their class's date (#275, #276), so the app can put their names on the activity trail. The rewriting rule itself is class-planning.json's; this is only the line that reports it.",
     "marker": {
       "prefix": "PLANTOIR_DATED:",
-      "rule": "One line on stdout, printed only when at least one page was rewritten: the prefix followed by a single-line JSON object carrying course (the course code), section (a number) and pages (each rewritten page's place in the course folder, without .md, e.g. \"section1/index\" or \"Exercises/Using Aggregate Functions\"). A plain sentence for a person reading the console is printed just before it. The apps keep the marker line itself out of the console a teacher reads, as they do PLANTOIR_HEALTH: lines.",
+      "rule": "One line on stdout, printed only when at least one page was rewritten: the prefix followed by a single-line JSON object carrying course (the course code), section (a number) and pages (each rewritten page's place in the course folder, without .md, e.g. \"section1/index\" or \"Exercises/Using Aggregate Functions\"). A plain sentence for a person reading the console is printed just before it. The apps keep the marker line itself out of the console a teacher reads, as they do PLANTOIR_HEALTH: lines - a line carrying it anywhere, hidden whole, including while it is still arriving, and read from the prefix onward (siteHealth.marker.rule).",
       "examples": [
         "PLANTOIR_DATED: {\"course\": \"ICS4U\", \"section\": 1, \"pages\": [\"section1/index\", \"Exercises/Using Aggregate Functions\"]}"
       ],
@@ -1513,8 +1513,38 @@
     "marker": {
       "prefix": "PLANTOIR_HEALTH:",
       "examples": ["PLANTOIR_HEALTH: {\"name\": \"curriculumCoverageFoundNothing\", \"sentence\": \"The curriculum map for ICS3U Section 1 could not be built.\", \"detail\": \"Plantoir looks for a folder whose name mentions the curriculum, holding one page per expectation. It could not find one, so the Curriculum Coverage page has been left out of this build. If you renamed or moved that folder, the map will come back as soon as it can find it again.\", \"fixable\": false, \"course\": \"ICS3U\", \"section\": 1}", "PLANTOIR_HEALTH: {\"name\": \"mediaFolderMissing\", \"sentence\": \"The Media folder for ICS3U is not there.\", \"detail\": \"Images and files you have added to pages live in a folder called Media, beside your course. Plantoir could not find it, so anything on a page that points into it will be missing from the built site.\", \"fixable\": true, \"course\": \"ICS3U\", \"section\": 1}"],
-      "rule": "One line per finding on stdout, the prefix followed by a single-line JSON object carrying name, sentence, detail, fixable, course and section. The apps parse these lines out of the console transcript they are already reading; the teacher-facing SENTENCE travels in the line rather than being re-authored on each platform, so the two apps cannot word the same problem differently.",
-      "why": "A progress marker is matched loosely and getting one wrong is silent (see app-rules.json markerOrigins). A prefixed JSON line is unambiguous, survives being interleaved with ordinary build output, and carries structure a sentence cannot."
+      "rule": "One line per finding on stdout, the prefix followed by a single-line JSON object carrying name, sentence, detail, fixable, course and section. The apps parse these lines out of the console transcript they are already reading; the teacher-facing SENTENCE travels in the line rather than being re-authored on each platform, so the two apps cannot word the same problem differently. A line CARRYING the prefix anywhere is machinery: it is kept out of the console a teacher reads WHOLE - what precedes a glued marker is half a line of progress chatter, not a sentence - including while it is still arriving, before its newline; and its finding is read from the prefix onward, so a marker glued to the tail of somebody else's half line is still found (#153: the mac had dropped it, finding and all, while showing the raw JSON). consoleCases below are the cases.",
+      "why": "A progress marker is matched loosely and getting one wrong is silent (see app-rules.json markerOrigins). A prefixed JSON line is unambiguous, survives being interleaved with ordinary build output, and carries structure a sentence cannot.",
+      "consoleCases": {
+        "howToRunACase": "Feed each case's chunks, in order, to ONE fresh console reader - the object that both reads findings out of arriving output and builds the transcript a teacher sees (the mac's ScriptRunner.receiveOutput) - exactly as a terminal would hand them over: a chunk is NOT a line, and a chunk boundary can fall anywhere. expectShown is the console's text once every chunk has arrived, as lines (joined with a newline, no trailing one). expectShownAfterEachChunk, where a case carries it, is the same thing read after EACH chunk, one entry per chunk - it is what pins a marker still arriving, which a check made only at the end cannot see. expectFindings is the names of the findings read, in order. The marker string is examples[1] verbatim, so the parse half is the toolchain's real output; 'a marker still arriving' cuts it after its first 60 characters, which ends in a colon.",
+        "cases": [
+          {
+            "name": "a marker on its own line",
+            "chunks": ["⚠️  The Media folder for ICS3U is not there.\r\n", "PLANTOIR_HEALTH: {\"name\": \"mediaFolderMissing\", \"sentence\": \"The Media folder for ICS3U is not there.\", \"detail\": \"Images and files you have added to pages live in a folder called Media, beside your course. Plantoir could not find it, so anything on a page that points into it will be missing from the built site.\", \"fixable\": true, \"course\": \"ICS3U\", \"section\": 1}\r\n"],
+            "expectShown": ["⚠️  The Media folder for ICS3U is not there."],
+            "expectFindings": ["mediaFolderMissing"]
+          },
+          {
+            "name": "a marker glued to the tail of a partial line",
+            "chunks": ["Building…", "PLANTOIR_HEALTH: {\"name\": \"mediaFolderMissing\", \"sentence\": \"The Media folder for ICS3U is not there.\", \"detail\": \"Images and files you have added to pages live in a folder called Media, beside your course. Plantoir could not find it, so anything on a page that points into it will be missing from the built site.\", \"fixable\": true, \"course\": \"ICS3U\", \"section\": 1}\r\n", "done\r\n"],
+            "expectShown": ["done"],
+            "expectFindings": ["mediaFolderMissing"]
+          },
+          {
+            "name": "a marker still arriving",
+            "chunks": ["ok\r\n", "PLANTOIR_HEALTH: {\"name\": \"mediaFolderMissing\", \"sentence\": ", "\"The Media folder for ICS3U is not there.\", \"detail\": \"Images and files you have added to pages live in a folder called Media, beside your course. Plantoir could not find it, so anything on a page that points into it will be missing from the built site.\", \"fixable\": true, \"course\": \"ICS3U\", \"section\": 1}\r\n"],
+            "expectShown": ["ok"],
+            "expectShownAfterEachChunk": [["ok"], ["ok"], ["ok"]],
+            "expectFindings": ["mediaFolderMissing"]
+          },
+          {
+            "name": "plain newline endings",
+            "chunks": ["⚠️  The Media folder for ICS3U is not there.\n", "PLANTOIR_HEALTH: {\"name\": \"mediaFolderMissing\", \"sentence\": \"The Media folder for ICS3U is not there.\", \"detail\": \"Images and files you have added to pages live in a folder called Media, beside your course. Plantoir could not find it, so anything on a page that points into it will be missing from the built site.\", \"fixable\": true, \"course\": \"ICS3U\", \"section\": 1}\n"],
+            "expectShown": ["⚠️  The Media folder for ICS3U is not there."],
+            "expectFindings": ["mediaFolderMissing"]
+          }
+        ]
+      }
     },
     "repair": {
       "note": "What Plantoir offers to put right, and what it says afterwards. Only two of the checks are repairable, and the line is the point: a fix must restore the FEATURE, not merely satisfy the check.",

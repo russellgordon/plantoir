@@ -217,4 +217,46 @@ final class SiteHealthContractTests: XCTestCase {
         let rule: String = try XCTUnwrap(siteHealth["scheduledDeployPublishesAnyway"] as? String)
         XCTAssertTrue(rule.lowercased().contains("never refuses"), rule)
     }
+
+    /// `siteHealth.marker.consoleCases` (#153), each played through ONE fresh
+    /// runner chunk by chunk as `howToRunACase` says: what the console shows,
+    /// after every chunk where the case asks, and which findings were read.
+    func testTheConsoleCasesHold() throws {
+        let marker: [String: Any] = try XCTUnwrap(siteHealth["marker"] as? [String: Any])
+        let consoleCases: [String: Any] = try XCTUnwrap(marker["consoleCases"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(consoleCases["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 4, "the contract lost console cases")
+
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let chunks: [String] = try XCTUnwrap(testCase["chunks"] as? [String], name)
+            let expectShown: [String] = try XCTUnwrap(testCase["expectShown"] as? [String], name)
+            let expectFindings: [String] = try XCTUnwrap(testCase["expectFindings"] as? [String], name)
+            let afterEachChunk: [[String]]? = testCase["expectShownAfterEachChunk"] as? [[String]]
+            if let afterEachChunk {
+                XCTAssertEqual(afterEachChunk.count, chunks.count, "\(name): one entry per chunk")
+            }
+
+            let runner: ScriptRunner = ScriptRunner()
+            var chunkIndex: Int = 0
+            for chunk in chunks {
+                runner.receiveOutput(chunk)
+                if let afterEachChunk, chunkIndex < afterEachChunk.count {
+                    XCTAssertEqual(
+                        runner.transcript.displayText,
+                        afterEachChunk[chunkIndex].joined(separator: "\n"),
+                        "\(name): after chunk \(chunkIndex + 1)"
+                    )
+                }
+                chunkIndex += 1
+            }
+            XCTAssertEqual(runner.transcript.displayText, expectShown.joined(separator: "\n"), name)
+
+            var foundNames: [String] = []
+            for finding in runner.healthFindings {
+                foundNames.append(finding.name)
+            }
+            XCTAssertEqual(foundNames, expectFindings, name)
+        }
+    }
 }

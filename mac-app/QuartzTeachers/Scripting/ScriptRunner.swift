@@ -556,6 +556,13 @@ class ScriptRunner {
                 if line.isEmpty {
                     return
                 }
+                // Half a marker line is machinery, not a question — and one
+                // cut after `"sentence":` ends in a colon, which would
+                // otherwise be offered to the teacher as something to answer,
+                // raw JSON and all (#153).
+                if SiteHealthFinding.isMarkerLine(line) || PagesDatedByTheBuild.isMarkerLine(line) {
+                    return
+                }
                 if ScriptRunner.looksLikeQuestion(line) {
                     let asked = ScriptRunner.separateDefaultAnswer(from: line)
                     self.pendingQuestion = asked.question
@@ -734,15 +741,10 @@ class ScriptRunner {
                 continue
             }
             healthFindings.append(finding)
-            // A sentence a teacher would recognise, carrying the stable check
-            // NAME in brackets. Both halves earn their place: rule 5 says a
-            // trail line must read as something that happened rather than as a
-            // function name, while the name is what somebody reading the trail
-            // months later can match against the contract — the product
-            // wording will have been reworded by then.
+            // The sentence and why it is shaped so: `trailSentence`, which the
+            // scheduled run writes too.
             ActivityTrail.note(
-                .folderProblemFound,
-                "found a problem with this course's folders (\(finding.name))",
+                .folderProblemFound, finding.trailSentence,
                 course: finding.course, section: finding.section
             )
         }
