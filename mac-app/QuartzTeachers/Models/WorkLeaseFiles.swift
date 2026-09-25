@@ -225,7 +225,10 @@ nonisolated enum WorkLeaseFiles {
     /// contract's cases run against exactly this.
     ///
     /// **Take, then check, with a tiebreak.** A caller that has already
-    /// written its own `build` lease passes its `claim`; then a holding
+    /// written its own `build` lease passes its `claim` — the moment of that
+    /// BUILD lease, never an earlier lease of another kind (a publish set for
+    /// later does not wait for previews, so a claim taken from an old preview
+    /// would let a window build alongside it); then a holding
     /// counts only if it was taken BEFORE that claim — an earlier moment, or
     /// the same moment and a lower process id. Two processes that write and
     /// then look at the same instant therefore cannot both back off: exactly
@@ -265,7 +268,10 @@ nonisolated enum WorkLeaseFiles {
     /// The moments are compared as TEXT, which is exact for two strings in the
     /// one fixed shape both apps write (`2026-09-25T13:59:23.8960000Z`,
     /// always UTC, always seven fractional digits): the characters sort in
-    /// time order. Anything not in that shape is treated as earlier.
+    /// time order. The mac's `DateFormatter` fills only three of the seven
+    /// (millisecond resolution, measured), so two leases taken in the same
+    /// millisecond tie, and the tie goes to the lower process id — ordinary,
+    /// not rare. Anything not in that shape is treated as earlier.
     static func wasTakenBefore(_ holding: Holding, _ claim: Claim) -> Bool {
         guard let theirs = holding.moment else {
             return true
