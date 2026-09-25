@@ -54,7 +54,8 @@ enum AssistFixture {
                             registeringPreview: Bool = false,
                             alsoCourse: String? = nil,
                             clock: TestClock? = nil,
-                            openMainWindow: (@MainActor () -> Void)? = nil) throws
+                            openMainWindow: (@MainActor () -> Void)? = nil,
+                            surface: AssistToolRunner.Surface = .local) throws
         -> (root: URL, course: Course, runner: AssistToolRunner, siteWork: StubSiteWork) {
         let fileManager: FileManager = FileManager.default
         let root: URL = fileManager.temporaryDirectory
@@ -142,7 +143,8 @@ enum AssistFixture {
             siteWork: siteWork,
             today: { return reading.day },
             launchControl: SilentLaunchControl(),
-            openMainWindow: openMainWindow
+            openMainWindow: openMainWindow,
+            surface: surface
         )
 
         SectionWindowControllers.shared.forgetAll()

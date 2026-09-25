@@ -734,6 +734,18 @@ nonisolated enum ActivityTrail {
         /// minutes late, or not at all, looks from outside exactly like one
         /// that misfired.
         case scheduledPublishWaitedForTheCourse = "scheduled publish waited for the course"
+
+        /// Whether the teacher was told, with a macOS notification, how a
+        /// scheduled publish went (#212) — or why not: notifications turned
+        /// off for Plantoir, never allowed yet, or macOS would not take it.
+        /// Also the question, when a teacher first schedules from the window,
+        /// and their answer. Carries the course and the section, and NEVER the
+        /// notification's text.
+        ///
+        /// "I never got told" is answerable only if the trail says whether the
+        /// notice went out: a notification that was sent and one that was
+        /// blocked look identical from the teacher's side.
+        case scheduledPublishNotification = "scheduled publish notification"
     }
 
     // MARK: - Stored properties
