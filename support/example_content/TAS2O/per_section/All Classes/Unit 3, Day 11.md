@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. Standup — problems locked
-2. Interview your crew as users — the questions from
+2. Interview your crew as users, then one person outside the crew who
+   uses the same gear differently — the questions from
    [[Interview Question Practice]], turned on a problem instead of a
    story
 3. Tutorial: [[Finding Answers Online]] — has somebody already shared

@@ -50,7 +50,7 @@ the apprenticeship runs.
 Technology changes these jobs as well as creating them. Pick one row
 from the table and look it up on the federal government's Job Bank,
 which reports the wages and the job outlook for that work in Ontario —
-whether openings are expected to be good, fair, or limited. Then ask
+on a scale that runs from "very good" to "very limited". Then ask
 the question the shop unit
 raised: does a tool like the 3D printer or the laser cutter remove
 work in this field, create new work, or change what the work is — and
