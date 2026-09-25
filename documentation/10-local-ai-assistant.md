@@ -4070,7 +4070,12 @@ the piece, and every rule below exists because of it:
     below N. A page is RENAMED only when a new number lands on its name, and
     the run stops at the first page whose number is already clear; a later page
     keeps its date when it is already after the page before it, and only a page
-    whose date COLLIDES moves, to the first class day after that page. Measured
+    whose date COLLIDES moves, to the first class day after that page. A page
+    with NO `created` is never given one — it has no date to collide with — and
+    is placed among the dated pages by its NUMBER (`inDateOrder`). The fix
+    round's first version sorted undated pages last: the fix review measured an
+    undated Week 1 renamed Week 2 and dated 2025-11-27, after Week 8, and in an
+    all-undated section an untouched Week 8 "moved" to 09-25. Measured
     on the first version: "make room at Week 3" (a gap) and "duplicate Week 2 as
     my next meeting" dated the new Week 3 2025-11-20 — Week 8's day, with 10-02
     free — and renamed Week 8 → 9 and Week 9 → 10, a week later each: two
@@ -4089,7 +4094,7 @@ the piece, and every rule below exists because of it:
     and renaming published pages is the one thing a teacher cannot see coming).
   `class-planning.json` pins all of it in CODING's shape, dates AND numbers:
   `nextClass` (the dated case), `insertion` (at a gap, at an existing number,
-  and a collision run) and `duplication` (into a gap). The Unit/Day scheme keeps
+  a collision run, and two with undated pages) and `duplication` (into a gap). The Unit/Day scheme keeps
   its slot and position rules; its pages sit on consecutive class days by
   construction, and changing it there is not part of this piece.
 - **Sentences name the course's own shape.** The two make-room sentences, the

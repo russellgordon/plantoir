@@ -152,10 +152,9 @@ final class ClassPlanningContractTests: XCTestCase {
             )
             defer { try? FileManager.default.removeItem(at: root) }
 
+            // An entry with no `date` is a page with no `created` (#267).
             for existing in try XCTUnwrap(testCase["existingClasses"] as? [[String: String]]) {
-                try writeClass(
-                    try XCTUnwrap(existing["title"]), on: try XCTUnwrap(existing["date"]), in: course
-                )
+                try writeClass(try XCTUnwrap(existing["title"]), on: existing["date"], in: course)
             }
 
             let position: (unit: Int, day: Int) = try ClassPlanningContractTests.position(of: testCase)
@@ -924,13 +923,17 @@ final class ClassPlanningContractTests: XCTestCase {
         return (root, coursesURL, course)
     }
 
-    private func writeClass(_ title: String, on date: String, in course: Course, section: Int = 1) throws {
+    /// A class page; `date` nil writes one with no `created` at all.
+    private func writeClass(_ title: String, on date: String?, in course: Course, section: Int = 1) throws {
+        var created: String = ""
+        if let date {
+            created = "created: \(date)T07:00:00.000-0400\n"
+        }
         let page: String = """
         ---
         title: \(title)
         publish: true
-        created: \(date)T07:00:00.000-0400
-        ---
+        \(created)---
 
         \(title)
         """
