@@ -180,7 +180,7 @@ final class FileFormatsContractTests: XCTestCase {
         let cases: [[String: Any]] = try XCTUnwrap(group["cases"] as? [[String: Any]])
         // A floor, for the reason the visibility list gives above.
         XCTAssertGreaterThanOrEqual(
-            cases.count, 10, "contracts/file-formats.json → datesAndTitles.writingCases has shrunk"
+            cases.count, 13, "contracts/file-formats.json → datesAndTitles.writingCases has shrunk"
         )
         for testCase in cases {
             let before: String = try XCTUnwrap(testCase["before"] as? String)
@@ -197,6 +197,34 @@ final class FileFormatsContractTests: XCTestCase {
             }
             XCTAssertEqual(Data(written.utf8), Data(after.utf8), "\(why) — wrote \(written.debugDescription)")
         }
+    }
+
+    /// Shapes of an open value the contract list does not carry, run straight
+    /// against the writer: an escaped `\"` and a doubled `''` do not close
+    /// their quote; a value closed on its own line takes nothing below it; a
+    /// quote that never closes inside the block takes nothing (that page does
+    /// not build either way, and guessing where it ends would be worse).
+    func testAnOpenValueRunsUntilItReallyCloses() {
+        let escaped: String = "---\ntitle: \"Unit \\\" 1,\nDay 1\"\npublish: true\n---\nBody.\n"
+        XCTAssertEqual(
+            PageFrontmatter.settingTitle(in: escaped, to: "Unit 1, Day 2"),
+            "---\ntitle: Unit 1, Day 2\npublish: true\n---\nBody.\n"
+        )
+        let doubled: String = "---\ntitle: 'Unit 1''s,\nDay 1'\npublish: true\n---\nBody.\n"
+        XCTAssertEqual(
+            PageFrontmatter.settingTitle(in: doubled, to: "Unit 1, Day 2"),
+            "---\ntitle: Unit 1, Day 2\npublish: true\n---\nBody.\n"
+        )
+        let closed: String = "---\ntitle: \"Unit 1, Day 1\"\npublish: true\n---\nBody.\n"
+        XCTAssertEqual(
+            PageFrontmatter.settingTitle(in: closed, to: "Unit 1, Day 2"),
+            "---\ntitle: Unit 1, Day 2\npublish: true\n---\nBody.\n"
+        )
+        let neverCloses: String = "---\ntitle: \"Unit 1,\npublish: true\n---\nBody.\n"
+        XCTAssertEqual(
+            PageFrontmatter.settingTitle(in: neverCloses, to: "Unit 1, Day 2"),
+            "---\ntitle: Unit 1, Day 2\npublish: true\n---\nBody.\n"
+        )
     }
 
     /// The two properties the case list cannot state as a before-and-after
