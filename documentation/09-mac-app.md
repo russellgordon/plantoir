@@ -4429,8 +4429,8 @@ so any writer that REPLACES the file on every line loses their lines.
 - **Every launcher's append takes the same lock**: `/usr/bin/lockf -k
   "$trail"` round the `>>`, where `$trail` is the Logs folder. `lockf(1)` on
   macOS locks with `O_EXLOCK`, which is the same lock `flock` takes, so it
-  waits for the app's trim (measured: it waited 2.59 s for a Python `flock` held
-  3 s, and 1 s for one held 1.5 s); `-k` stops it trying to delete the folder
+  waits for the app's trim (measured: it waited 2.59 s for a Python `flock` on
+  the folder held 3 s); `-k` stops it trying to delete the folder
   afterwards. The function is byte-identical in the three launchers
   (`scripts/test_trail_lock.py`), and the generated script's lock and append
   lines are the launchers' own (`ProblemReportTests.testTheGeneratedScriptAppendsTheWayTheLaunchersDo`).
