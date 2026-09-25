@@ -151,7 +151,8 @@ A block is taken when any of its eight ports is:
 | One listing, parsed once | **0.12 s** (0.121–0.153 s over three readings) |
 | `docker run -p P` while a HOST program listens on P (Colima) | exit 0 — Docker cannot see it |
 | Workspace X on P, stopped; Y made on P; `docker start X` | X: exit 1, "Bind for 0.0.0.0:P failed: port is already allocated" |
-| `verify.sh` with the six blocks held, after this change | the fixture folder's workspace got **8141** |
+| The real walk on this Mac, six workspaces running and three stopped (all nine blocks among 8081 … 8131) | **8141**, in 0.25 s end to end (`lsof` + `docker ps` + `docker inspect`) |
+| `verify.sh` with those workspaces alive, after this change | 148 PASS, "All checks passed" (it had failed 5–7 launcher checks) |
 | A first preview after a workspace is remade (#225, a teacher's Mac) | **109.3 s** cold, against seconds warm |
 
 A listing that cannot be read (`lsof` missing or failing) counts as nothing
