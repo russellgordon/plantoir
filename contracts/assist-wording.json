@@ -118,6 +118,8 @@
     "scheduleQuestion" : "Shall I schedule the deploy?",
     "scheduleReplaces" : "This replaces the deploy already set for {moment}.",
     "sectionIsBusy" : "{course}-S{section} is already busy in Plantoir. Wait for that to finish, then deploy.",
+    "sharedPagesWhoseSettingsCouldNotBePutBack" : "2 shared pages kept the settings they have now for Section {section}: the settings at the top of them are written in a way I can’t add to, so I left those pages exactly as they are.",
+    "sharedPageWhoseSettingCouldNotBePutBack" : "One shared page kept the setting it has now for Section {section}: the settings at the top of it are written in a way I can’t add to, so I left that page exactly as it is.",
     "sharingTheLastDay" : "This one has no class date left, so it shares the last day with the class already on it. Give it a day of your own when you know what they are.",
     "sharingTheLastDayForAMeeting" : "This one has no meeting date left, so it shares the last day with the meeting already on it. Give it a day of your own when you know what they are.",
     "spareDatesAfterThese" : "3 more class dates are spare after these, out of the timetable recorded from timetable.xlsx, block H.",

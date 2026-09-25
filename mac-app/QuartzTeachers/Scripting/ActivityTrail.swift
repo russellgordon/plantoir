@@ -699,6 +699,15 @@ nonisolated enum ActivityTrail {
         /// minutes late, or not at all, looks from outside exactly like one
         /// that misfired.
         case scheduledPublishWaitedForTheCourse = "scheduled publish waited for the course"
+        /// Plantoir left some pages' settings exactly as they were, because
+        /// the settings at the top of those pages have no place a new line
+        /// can safely go (#186's shape — indented, or written as a list).
+        /// Carries the course and section, WHAT was being done, and HOW MANY
+        /// pages — never which, because a page's name is the teacher's own
+        /// words. Written by a section restore since #182; the teacher is
+        /// told in the same breath, and this is the line that is still there
+        /// next week, when "why is this page still showing?" arrives.
+        case pageSettingsLeftAsTheyWere = "page settings left as they were"
     }
 
     // MARK: - Stored properties
@@ -746,6 +755,13 @@ nonisolated enum ActivityTrail {
     /// section a line belongs to without every caller remembering to.
     static func note(_ event: Event, _ what: String, course: String, section: Int, at moment: Date = Date()) {
         ActivityTrail.note(event, "\(course)/\(section) · " + what, at: moment)
+    }
+
+    /// The words for `pageSettingsLeftAsTheyWere`: what was being done, and
+    /// how many pages — never which.
+    static func pageSettingsLeftAsTheyWereLine(act: String, pages: Int) -> String {
+        let counted: String = pages == 1 ? "1 page" : "\(pages) pages"
+        return "left the settings of \(counted) as they were while \(act): no room at the top for a new setting"
     }
 
     static func formatter(timeZone: TimeZone = TimeZone.current) -> DateFormatter {

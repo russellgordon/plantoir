@@ -1317,8 +1317,10 @@ VISIBILITY writer — and that qualifier is load-bearing, because two other
 finders are still hand-rolled and were deliberately left alone:
 `CourseRestorer.FrontmatterBounds` (strict here, lenient on the mac since
 #140, so a restore reaches different pages on the two platforms — that is
-[issue #177](https://github.com/russellgordon/plantoir/issues/177), a
-`decision`) and `SectionAdder.FrontmatterLines` (strict here; it was strict
+[issue #177](https://github.com/russellgordon/plantoir/issues/177), which
+Russell decided on 2026-09-19: adopt the shared finder; it is owed together
+with #182's carry-the-value-lines restore, see the `windows` issue from #182)
+and `SectionAdder.FrontmatterLines` (strict here; it was strict
 on the mac too until #175, 2026-09-25, when that strictness was measured to
 PUBLISH a page hidden in section 1 into a newly added section — the mac now
 uses the shared finder and splices by line, and this one owes the same, see

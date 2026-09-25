@@ -234,7 +234,14 @@ def main():
     for case in contracts.section("file-formats", "pageVisibility", "writingCases", "cases"):
         if "expectSiteBefore" in case or "expectSiteAfter" in case:
             judged_writes.append(case)
+    restore_cases = contracts.section(
+        "course-management", "backups", "restoringOneSectionsKeys", "cases"
+    )
     failures = []
+    if len(restore_cases) < 6:
+        failures.append(
+            f"Only {len(restore_cases)} restoringOneSectionsKeys cases - the list has shrunk."
+        )
     if len(judged_writes) < 4:
         failures.append(
             f"Only {len(judged_writes)} writing cases carry expectSiteBefore/After — the list "
@@ -271,6 +278,17 @@ def main():
     for case in judged_writes:
         write_pages += [(case["before"], case["section"]), (case["after"], case["section"])]
     processed += judge_whole_pages(writes, write_pages)
+    # A restore of one section, judged for EVERY section it names: putting
+    # section 1 back must not move section 2 (#182).
+    restores = work / "restores"
+    restores.mkdir()
+    restore_pages = []
+    restore_checks = []
+    for case in restore_cases:
+        for section_text, expected in sorted(case["expectSite"].items()):
+            restore_pages.append((case["after"], int(section_text)))
+            restore_checks.append((case, int(section_text), expected))
+    processed += judge_whole_pages(restores, restore_pages)
 
     pages_json = work / "pages.json"
     pages_json.write_text(json.dumps(processed), encoding="utf-8")
@@ -366,6 +384,20 @@ def main():
                     f"says {actual}. why: {case.get('why', '')}"
                 )
 
+    restores_start = writes_start + 2 * len(judged_writes)
+    for (case, section_number, expected), verdict in zip(
+        restore_checks, verdicts[restores_start:]
+    ):
+        actual = "stops" if verdict["error"] is not None else (
+            "visible" if verdict["visible"] else "hidden"
+        )
+        if actual != expected:
+            failures.append(
+                f"{case['name']!r} (backups.restoringOneSectionsKeys, section "
+                f"{section_number}): the contract says {expected} and the site says "
+                f"{actual}. why: {case.get('why', '')}"
+            )
+
     for case, after, verdict in zip(cases, processed, verdicts):
         wanted = case["expectVisible"]
         if verdict["error"] is not None:
@@ -396,7 +428,8 @@ def main():
         f"{len(KNOWN_TO_DIFFER)} knowingly-different forms and "
         f"{len(CONTINUATIONS_A_WRITER_MUST_SWEEP)} continuations a writer must sweep "
         f"(three pages each) and {len(unreadable_cases)} unreadable-settings cases "
-        f"and {len(judged_writes)} writing cases (before and after) down the real chain."
+        f"and {len(judged_writes)} writing cases (before and after) and "
+        f"{len(restore_checks)} restored pages (per section) down the real chain."
     )
     if failures:
         for line in failures:

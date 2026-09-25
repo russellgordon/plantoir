@@ -176,6 +176,13 @@ enum AssistContract {
             "backedUpCourse": AssistWording.backedUpCourse(
                 course: course, to: "{course}_backup_2026-09-08_190000.zip"
             ),
+            // Two keys for one function: the sentence changes every pronoun
+            // in it between one page and several, and one rendering cannot
+            // show both (#182).
+            "sharedPageWhoseSettingCouldNotBePutBack":
+                AssistWording.sharedPagesWhoseSettingsCouldNotBePutBack(count: 1, section: section),
+            "sharedPagesWhoseSettingsCouldNotBePutBack":
+                AssistWording.sharedPagesWhoseSettingsCouldNotBePutBack(count: 2, section: section),
             "backupSizeCouldNotBeRead": AssistWording.backupSizeCouldNotBeRead,
             "backupSizeCouldNotBeReadShort": AssistWording.backupSizeCouldNotBeReadShort,
             "planWasCancelled": AssistWording.planWasCancelled,

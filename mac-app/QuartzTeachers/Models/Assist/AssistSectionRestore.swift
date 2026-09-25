@@ -89,10 +89,22 @@ enum AssistSectionRestore {
 
     /// What the transcript records afterwards, so the conversation holds the
     /// whole story of what happened during it.
-    static func doneMessage(courseCode: String, sectionNumber: Int) -> String {
-        return "Put \(courseCode) Section \(sectionNumber) back to how it was when this conversation "
+    ///
+    /// `settingsNotPutBack` is how many shared pages kept their current
+    /// setting because there was nowhere on them to put the backup's back
+    /// (`CourseRestorer.restoreSection`, #182). Almost always 0, and then the
+    /// message is exactly what it always was; otherwise it says so, because
+    /// "put back to how it was" would not be true of those pages.
+    static func doneMessage(courseCode: String, sectionNumber: Int, settingsNotPutBack: Int = 0) -> String {
+        let done: String = "Put \(courseCode) Section \(sectionNumber) back to how it was when this conversation "
              + "started. Nothing in your other sections was touched. Ask me to rebuild the preview to "
              + "see it."
+        if settingsNotPutBack <= 0 {
+            return done
+        }
+        return done + " " + AssistWording.sharedPagesWhoseSettingsCouldNotBePutBack(
+            count: settingsNotPutBack, section: String(sectionNumber)
+        )
     }
 
     /// What the breadcrumb trail records afterwards — a different audience
@@ -140,16 +152,37 @@ enum AssistSectionRestore {
         )
     }
 
+    /// What the trail records when some shared pages could not have their
+    /// setting put back — a COUNT, never which pages (`contracts/
+    /// shared-rules.json` → `activityTrail.mustRecord`, `page settings left
+    /// as they were`). Nothing is written when the count is 0.
+    static func notePagesNotPutBack(_ count: Int, courseCode: String, sectionNumber: Int) {
+        if count <= 0 {
+            return
+        }
+        ActivityTrail.note(
+            .pageSettingsLeftAsTheyWere,
+            ActivityTrail.pageSettingsLeftAsTheyWereLine(act: "putting the section back", pages: count),
+            course: courseCode,
+            section: sectionNumber
+        )
+    }
+
     /// Do it — or refuse, when there is nothing saved to go back to.
     ///
     /// A conversation that has only READ has no backup, which is exactly the
     /// case where a restore would be a surprise rather than a rescue.
+    ///
+    /// Returns how many shared pages kept their current setting because
+    /// there was nowhere on them to put the backup's back — see
+    /// `doneMessage`.
+    @discardableResult
     static func restore(
         backupURL: URL?,
         courseCode: String,
         sectionNumber: Int,
         coursesDirectoryURL: URL?
-    ) throws {
+    ) throws -> Int {
         guard let backupURL else {
             throw Problem.nothingToRestore
         }
@@ -166,7 +199,7 @@ enum AssistSectionRestore {
         if !FileManager.default.fileExists(atPath: backupURL.path) {
             throw Problem.unreadableBackup(backupURL.lastPathComponent)
         }
-        try CourseRestorer.restoreSection(
+        return try CourseRestorer.restoreSection(
             sectionNumber, from: item, coursesDirectoryURL: coursesDirectoryURL
         )
     }

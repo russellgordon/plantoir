@@ -151,6 +151,52 @@ final class AssistSectionRestoreTests: XCTestCase {
                        "…and nothing else on the page moves either")
     }
 
+    /// A shared page with no room for a new key cannot take this section's
+    /// setting back: it is left exactly as it is, the restore returns how
+    /// many such pages there were, and the transcript's sentence says so —
+    /// "back to how it was" would not be true of that page (#182).
+    @MainActor
+    func testAPageWhoseSettingCouldNotBePutBackIsCountedAndSaid() throws {
+        let fixture: SectionRestoreFixture = try SectionRestoreFixture()
+        defer { fixture.tearDown() }
+
+        let item: BackupItem = try fixture.backUp()
+        let noRoom: String = "---\n  a: 1\n---\nThe outline every section shares.\n"
+        try noRoom.write(to: fixture.sharedPageURL, atomically: true, encoding: .utf8)
+
+        let notPutBack: Int = try CourseRestorer.restoreSection(
+            1, from: item, coursesDirectoryURL: fixture.coursesDirectoryURL
+        )
+        XCTAssertEqual(notPutBack, 1)
+        XCTAssertEqual(try String(contentsOf: fixture.sharedPageURL, encoding: .utf8), noRoom,
+                       "The page is left byte for byte")
+
+        let said: String = AssistSectionRestore.doneMessage(
+            courseCode: "ICS3U", sectionNumber: 1, settingsNotPutBack: notPutBack
+        )
+        XCTAssertTrue(
+            said.hasSuffix(AssistWording.sharedPagesWhoseSettingsCouldNotBePutBack(count: 1, section: "1")),
+            "The restore must say it left a page's setting as it was: \(said)"
+        )
+        XCTAssertEqual(
+            AssistSectionRestore.doneMessage(courseCode: "ICS3U", sectionNumber: 1, settingsNotPutBack: 0),
+            AssistSectionRestore.doneMessage(courseCode: "ICS3U", sectionNumber: 1),
+            "With nothing left undone the message is exactly what it always was"
+        )
+    }
+
+    /// And a restore that could put everything back returns 0.
+    @MainActor
+    func testAnOrdinaryRestoreLeavesNothingUndone() throws {
+        let fixture: SectionRestoreFixture = try SectionRestoreFixture()
+        defer { fixture.tearDown() }
+        let item: BackupItem = try fixture.backUp()
+        XCTAssertEqual(
+            try CourseRestorer.restoreSection(1, from: item, coursesDirectoryURL: fixture.coursesDirectoryURL),
+            0
+        )
+    }
+
     // MARK: - When there is nothing to go back to
 
     /// A conversation that has only READ has saved no copy. Asking to restore
