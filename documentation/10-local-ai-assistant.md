@@ -1759,6 +1759,17 @@ The thirteen the local model sees:
 | **Schedule** | `add_next_class` |
 | **Recovery** | `undo_last_change` |
 
+**`schedule_deploy` asks one question of macOS, and only from the app's own
+window (#212).** Once a deploy is set, the in-app assistant — like the
+scheduling sheet — calls `ScheduledPublishNotice.askPermissionIfNotAskedYet`,
+so the first time a teacher schedules they are asked whether Plantoir may tell
+them, with a notification, how the run went. It is skipped when `surface ==
+.mcp`: an outside assistant's process has no window to explain the question, so
+a teacher who schedules ONLY that way is never asked and never notified (a known
+limit, `documentation/07-deployment.md` → "When nobody is looking"). No tool's
+description, schema or result changed; the tool-surface hashes are the same
+before and after.
+
 ---
 
 ## Part 5 — How it is measured

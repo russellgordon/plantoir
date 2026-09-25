@@ -806,9 +806,11 @@ backup included.
   worth doing and not here: it raises whether an overnight folder problem should
   throw a dialog at a teacher mid-lesson, which is a product decision.
 
-**The one use of Dispatch in this app**, and it is commented as such where it
-lives. `DispatchSource.makeFileSystemObjectSource` is the kernel's own
-file-system event source and takes a queue as a required parameter — the queue
+**A deliberate use of Dispatch**, and it is commented as such where it
+lives. (This said "the one use of Dispatch in this app" until #212; it never
+was — `AssistMCPServer.serve` parks in `dispatchMain()` — and #212's
+`ScheduledDeploy.announceThenLeave` does the same, for the same reason.)
+`DispatchSource.makeFileSystemObjectSource` is the kernel's own file-system event source and takes a queue as a required parameter — the queue
 is a delivery channel, not somewhere work is thrown. Nothing is deferred,
 nothing waits, and the events are consumed with `for await` on the main actor.
 Both watches are armed *before* `start()` returns, which is what lets the tests
