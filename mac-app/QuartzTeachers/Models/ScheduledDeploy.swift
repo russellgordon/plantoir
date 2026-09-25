@@ -1648,7 +1648,9 @@ enum ScheduledDeploy {
         // have one) — this is hardening, not a fix for something seen.
         for rawLine in SiteHealthFinding.linesOf(text) {
             let line: String = rawLine.trimmingCharacters(in: .whitespaces)
-            if SiteHealthFinding.isMarkerLine(line) {
+            // Once each: a finding the build printed twice is one problem,
+            // and the dialog listed it twice (#153 review).
+            if SiteHealthFinding.isMarkerLine(line) && !markerLines.contains(line) {
                 markerLines.append(line)
             }
         }
