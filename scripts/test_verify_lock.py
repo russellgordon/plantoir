@@ -144,6 +144,62 @@ class OneRunAtATime(unittest.TestCase):
         self.assertIn(f"pid {dead}".encode(), result.stdout)
         self.assertFalse(self.lock.exists())
 
+    def test_two_runs_finding_the_same_dead_holder_never_both_hold(self):
+        """Both read the dead pid, both try to take over. Before the takeover
+        had a lock of its own, the second one's rmdir removed the new lock
+        the first had just made, and both held it. Twenty tries, each with
+        two runs started together; at most one may get through each time."""
+        finished = subprocess.run(["/bin/sh", "-c", "echo $$"], capture_output=True)
+        dead = finished.stdout.decode().strip()
+        for attempt in range(20):
+            with self.subTest(attempt=attempt):
+                self.lock.mkdir()
+                (self.lock / "holder").write_text(f"{dead} /somewhere (started then)\n", encoding="utf-8")
+                starters = []
+                for _ in range(2):
+                    starters.append(subprocess.Popen(
+                        a_run(self.lock, "echo HELD; sleep 0.5"), env=environment(self.lock),
+                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT))
+                held = 0
+                for starter in starters:
+                    out, _ = starter.communicate(timeout=30)
+                    if b"HELD" in out:
+                        held += 1
+                self.assertEqual(held, 1, "two runs held the lock at once, or neither did")
+                self.assertTrue(wait_gone(self.lock))
+                self.assertFalse(Path(str(self.lock) + ".takeover").exists())
+
+    def test_a_takeover_that_lost_the_race_leaves_the_winners_lock_alone(self):
+        """The race made to happen every time: this run reads the dead holder,
+        pauses, and meanwhile another run takes the lock over and holds it
+        (its holder written, or not yet written). Waking, this run must not
+        remove the winner's lock, and must not run."""
+        finished = subprocess.run(["/bin/sh", "-c", "echo $$"], capture_output=True)
+        dead = finished.stdout.decode().strip()
+        for winner_wrote_its_name in (True, False):
+            with self.subTest(winner_wrote_its_name=winner_wrote_its_name):
+                self.lock.mkdir()
+                (self.lock / "holder").write_text(f"{dead} /somewhere (started then)\n", encoding="utf-8")
+                pausing = dict(environment(self.lock))
+                pausing["PLANTOIR_VERIFY_LOCK_TEST_PAUSE"] = "1"
+                loser = subprocess.Popen(a_run(self.lock, "echo LOSER RAN"), env=pausing,
+                                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                time.sleep(0.4)
+                # The winner's takeover, done by hand: the old lock goes, a new one comes.
+                (self.lock / "holder").unlink()
+                self.lock.rmdir()
+                self.lock.mkdir()
+                if winner_wrote_its_name:
+                    (self.lock / "holder").write_text(f"{os.getpid()} /winner (started now)\n", encoding="utf-8")
+                out, _ = loser.communicate(timeout=30)
+                self.assertNotIn(b"LOSER RAN", out, out)
+                self.assertEqual(loser.returncode, 1, out)
+                self.assertTrue(self.lock.is_dir(), "the loser removed the winner's lock")
+                if winner_wrote_its_name:
+                    self.assertIn("/winner", (self.lock / "holder").read_text(encoding="utf-8"))
+                    (self.lock / "holder").unlink()
+                self.lock.rmdir()
+
     def test_every_catchable_ending_lets_go(self):
         for ending in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
             with self.subTest(signal=ending.name):

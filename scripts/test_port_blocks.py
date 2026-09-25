@@ -233,6 +233,14 @@ def published_bases(calls: list) -> list:
     return bases
 
 
+def stopped_workspaces_of(case: dict) -> dict:
+    """The case's stoppedBlocks, as stopped workspaces of other folders."""
+    holding = {}
+    for base in case.get("stoppedBlocks", []):
+        holding[f"teaching-quartz-5{base:07x}"] = block_ports(base)
+    return holding
+
+
 def busy_ports_of(case: dict) -> list:
     ports = []
     for base in case.get("busyBlocks", []):
@@ -295,6 +303,15 @@ class TheThreeLaunchersCarryOneWalk(unittest.TestCase):
         self.assertIn('\nWORKSPACE_TRAIL_PLACE="${COURSE_CODE}/${SECTION_NUM}"\n', launcher_text("deploy.sh"))
         self.assertNotIn("WORKSPACE_TRAIL_PLACE=", launcher_text("setup.sh"))
 
+    def test_the_console_lines_are_the_contracts(self):
+        """previewPorts.hostBlockClash.says…: named by key, never retyped."""
+        block = between(launcher_text("setup.sh"), BLOCK_START, BLOCK_END)
+        clash = the_rules()["hostBlockClash"]
+        lines = [clash["saysWhenCreationClashes"], clash["saysWhenAStartIsRefused"]]
+        lines.extend(clash["saysWhenAStoppedWorkspaceIsRemade"])
+        for line in lines:
+            self.assertIn(f'echo "{line}"', block)
+
     def test_the_sentence_names_no_machinery(self):
         """Rule 1, and the old sentence's fault: it said "ports"."""
         for line in the_rules()["whenNoBlockIsFree"]["sentence"]:
@@ -324,7 +341,8 @@ class TheWalk(unittest.TestCase):
         for case in the_rules()["hostBlockCases"]:
             for launcher in LAUNCHERS:
                 with self.subTest(case=case["name"], launcher=launcher):
-                    result, bases, _, _ = self.walk(launcher, listening=busy_ports_of(case))
+                    result, bases, _, _ = self.walk(launcher, listening=busy_ports_of(case),
+                                                    holding=stopped_workspaces_of(case))
                     if case["expect"] is None:
                         self.assertEqual(result.returncode, 1, output_of(result))
                         self.assertEqual(bases, [], "a workspace was made with nowhere free")
@@ -333,19 +351,18 @@ class TheWalk(unittest.TestCase):
                         self.assertEqual(bases, [case["expect"]], output_of(result))
 
     def test_the_contract_cases_with_other_workspaces_holding_the_blocks(self):
-        """The blocks held by other working folders' workspaces — which are
-        what took all six on the development Mac. Half of them STOPPED: a
-        stopped workspace listens on nothing, and its block is still its own."""
+        """The same cases with the busy blocks held by other working folders'
+        RUNNING workspaces that the listing does not show (lsof blind to
+        them, as it is to a root-owned forwarder) — so it is the workspace
+        count alone that skips them. stoppedBlocks are stopped workspaces, as
+        in every case."""
         for case in the_rules()["hostBlockCases"]:
-            holding = {}
+            holding = stopped_workspaces_of(case)
             running = []
-            index = 0
             for base in case.get("busyBlocks", []):
                 name = f"teaching-quartz-{base:08x}"
                 holding[name] = block_ports(base)
-                if index % 2 == 0:
-                    running.append(name)
-                index += 1
+                running.append(name)
             for launcher in LAUNCHERS:
                 with self.subTest(case=case["name"], launcher=launcher):
                     with tempfile.TemporaryDirectory() as scratch:
@@ -565,7 +582,7 @@ class TheBuildersOwnWalk(unittest.TestCase):
         site port and its websocket, not a block of four, so a single busy
         port elsewhere in a block does not move it (next test)."""
         for case in the_rules()["hostBlockCases"]:
-            if case.get("busyPorts"):
+            if case.get("busyPorts") or case.get("stoppedBlocks"):
                 continue
             busy = set(busy_ports_of(case))
 

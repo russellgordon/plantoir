@@ -116,8 +116,11 @@ preview or no preview; its forwarders listen on all eight ports — so six
 working folders' workspaces alive on one Mac left a seventh folder unable to
 preview or publish. On the development Mac six agent worktrees did it, and
 `verify.sh` failed five to seven launcher checks. A teacher gets there by
-opening six folders since the Mac last restarted, or by scheduled publishes
-in folders that are never opened (`deploy.sh` never stops its workspace).
+using six working folders on one Mac: a workspace exists until something
+removes it, nothing removes another folder's (the app only STOPS them), and
+it survives a restart as a stopped workspace — so the count is folders ever
+used, moved and deleted ones included (the name is a hash of the path, so a
+moved folder's old workspace can never be started again).
 The refusal then said "Stop another preview (or another app using ports
 8081+)", which is false: stopping a preview frees nothing.
 
@@ -144,6 +147,17 @@ A block is taken when any of its eight ports is:
   nothing, so without this a new folder takes its block and the stopped one
   cannot start again; since #220 quitting Plantoir STOPS workspaces, so that
   is an everyday path, not a corner.
+
+**Two passes** (`previewPorts.hostBlockPasses`). The first counts all of the
+above. Only when it finds nothing does a second walk count what is IN USE —
+listening on this Mac, or published by a RUNNING workspace — and take a block
+a stopped workspace was keeping. Without it (review of the first
+implementation, 2026-09-25, measured: nine workspaces on the development Mac,
+four stopped, for 20 minutes to two weeks, uptime 56 days) a block would be
+kept for as long as its workspace exists — for ever, for a folder that was
+moved or deleted — and neither remedy the refusal names would free anything, since both
+only stop workspaces. The folder whose block was taken pays one slow preview:
+its workspace is remade on free ports by the path below when it next starts.
 
 | Measured on the development Mac, 2026-09-25 | Result |
 |---|---|
@@ -179,8 +193,8 @@ the run with Docker's words and a sentence. Before this, `setup.sh` and
 `deploy.sh` ended at the bare `docker start` under `set -e` with Docker's
 words alone, and `preview.sh` (no `set -e`) carried on to fail at `docker
 exec` with nothing a teacher could read. With the stopped-workspace skip in
-the walk, this path is the residual case: workspaces made before #280, or by
-a launcher that did not skip them.
+the first pass, this path is reached when the SECOND pass has taken a stopped
+workspace's block, or for workspaces made before #280.
 
 **Never `docker rm -f` in either path.** A failed start proves nothing runs in
 that workspace, but two launchers on the same folder (a scheduled publish and
@@ -193,8 +207,9 @@ refuses a running workspace, and the start path then uses it as it is.
 remedies that are true: closing Plantoir's windows for the other folders
 (the app stops a folder's workspace when its last window closes, and at quit),
 and restarting the Mac (workspaces are made with no restart policy, so after a
-restart they come back stopped — which frees their ports on the host, though
-the walk still counts their blocks as theirs). A publish that cannot get a
+restart they come back stopped). Both are true because of the second pass,
+which takes a stopped workspace's block when nothing else is free; what is
+left after both is ports other apps are listening on. A publish that cannot get a
 workspace prints it too, which is why it says "a preview". The trail gets the
 existing `preview did not appear` event's second launcher line,
 `launcherLineWhenEveryAddressIsTaken` in `contracts/shared-rules.json`, with
