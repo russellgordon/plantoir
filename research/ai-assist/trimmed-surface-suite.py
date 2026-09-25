@@ -819,6 +819,8 @@ def respelling_reading(tidied):
             return None
         frame_day = words[-1]
         words = words[:-1]
+        if asked_outright(words):
+            return ("ask", words[0].rstrip(",").replace(".", ":"))
     part = None
     for candidate in DAY_PARTS:
         if len(words) > len(candidate[0]) and words[-len(candidate[0]):] == candidate[0]:

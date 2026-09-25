@@ -332,6 +332,13 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
             }
             frameDayWord = last
             words.removeLast()
+            // …and a one-digit time left on its own is the #194 question, as
+            // it is when the day word stands where the frame reads it:
+            // "deploy at 6:30 tomorrow, please" asks like "deploy at 6:30
+            // tomorrow" does.
+            if let question = AssistCardCommand.askedOutright(words, dayWord: frameDayWord) {
+                return .ask(question)
+            }
         }
 
         // 2. A part of the day at the end — exact words only.

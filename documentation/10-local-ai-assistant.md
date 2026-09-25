@@ -426,7 +426,7 @@ the MODEL writes is a different matter entirely — it is guarded rather than
 bound; see "Never ask the model for something the window already knows".)
 
 Every accepted, asked and refused spelling is DATA, in
-`contracts/assist-cases.json` → `deployAtATime` (23 accepted, 22 asked, 45
+`contracts/assist-cases.json` → `deployAtATime` (23 accepted, 25 asked, 45
 answered with the spelling to use (`sayItAs`), 51 refused, 11 resolving rows —
 count them rather than trusting this line),
 authored rather than generated and preserved across `--write-contracts`. One
@@ -636,9 +636,12 @@ The rule, which `deployAtATime.note` states as data:
   have passed. "Today" and "tonight" in one sentence agree and tonight
   decides (the fix review's L3), so `deploy today at 12:30 tonight` gets the
   same answer and `deploy today at 1:30 tonight` asks with no day word.
-- **A day word the comma kept from the frame is read** (the fix review's L1):
-  `deploy at 6:30 pm tomorrow, please` is answered like `deploy at 6:30 pm,
-  tomorrow` — the order of the day word does not decide.
+- **A day word the comma kept from the frame is read** (the fix reviews' L1
+  and L1'): `deploy at 6:30 pm tomorrow, please` is answered like `deploy at
+  6:30 pm, tomorrow`, and `deploy at 6:30 tomorrow, please` is ASKED like
+  `deploy at 6:30 tomorrow` — for a time with am or pm and for a one-digit time
+  without, whether the day word comes before the comma or after it does not
+  decide what the teacher gets. (A day word on BOTH sides is still refused.)
 - **With neither am/pm nor a part of the day** the hour must be two digits (the
   24-hour reading: `18.30` → 6:30 pm, `00.30` → 12:30 am). A one-digit hour is
   already the #194 question, and a dotted 10–12 is asked too (above). A COLON
@@ -666,9 +669,9 @@ The rule, which `deployAtATime.note` states as data:
 
 Measured before it was relied on, against the COMPILED Swift
 (`AssistCardCommand.swift` built on its own, 2026-09-25, re-run after the fix
-round): a grid of 1,268,064 sentences (14 frames, including four with a part
+round): a grid of 1,342,656 sentences (14 frames, including four with a part
 of the day before "at" × 37 hour spellings × 6 minute spellings × `:`/`.`/`,`
-× 8 am/pm spellings × 17 tails) — 4,878 accepted, 3,036 asked, 61,872 given a
+× 8 am/pm spellings × 18 tails) — 4,878 accepted, 4,044 asked, 66,228 given a
 spelling, the rest to the model. **0** sentences in two of the three; **0**
 differences from the research guard's Python MIRROR (`respelling_reading` —
 written by the same hand from the same rules, so agreement shows the two say
