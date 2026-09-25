@@ -1243,7 +1243,8 @@ The rule now: resolve links by hand, ONE hop.
 
 Nothing stops a teacher choosing `courses/ICS3U/site` as their "publish to
 a folder on this computer" destination — `deployFolderProblem` checks only
-that the folder exists and is writable. `deploy.py` then writes the entire
+that the path is a full one (#227), that the folder exists and that it is
+writable. `deploy.sh` then writes the entire
 built site there, INSIDE the folder being fingerprinted, so each publish
 would differ from the last and the window would say " — Edited"
 permanently. Exclude the configured local destination, and everything under
