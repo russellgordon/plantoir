@@ -249,6 +249,33 @@ final class CourseManagementContractTests: XCTestCase {
 
     // MARK: - What a course code may be
 
+    /// `WORK` is kept for Plantoir's own use (GitHub issue #101): refused in
+    /// any case the teacher types it, by the rule BOTH the wizard and a
+    /// rename ask, and in words that never say what Plantoir uses it for.
+    /// The contract cases pin the sentence; this pins the reason is a kept
+    /// name rather than some other refusal that happens to match.
+    func testWorkIsKeptForPlantoirWhateverCaseItIsTypedIn() {
+        let typings: [String] = ["work", "Work", "WORK", "  wOrK  "]
+        for typed in typings {
+            XCTAssertEqual(
+                CourseCodeRule.trouble(typed, existingCodes: []),
+                CourseCodeRule.Trouble.keptForPlantoir("WORK"),
+                "typed “\(typed)”"
+            )
+        }
+        XCTAssertNil(CourseCodeRule.trouble("WORKS", existingCodes: []))
+        XCTAssertNil(CourseCodeRule.trouble("HOMEWORK", existingCodes: []))
+
+        // Rule 1: the refusal names no machinery, in either length.
+        let refusal: CourseCodeRule.Trouble = CourseCodeRule.Trouble.keptForPlantoir("WORK")
+        let machineryWords: [String] = ["workspace", "build", "folder", "toolchain", "script", "container", "docker"]
+        for word in machineryWords {
+            XCTAssertFalse(refusal.sentence.lowercased().contains(word), word)
+            XCTAssertFalse(refusal.short.lowercased().contains(word), word)
+        }
+        XCTAssertLessThanOrEqual(refusal.short.count, 25, "The sidebar row cuts off around twenty-five characters")
+    }
+
     /// The rule the New Course wizard and renaming BOTH ask. They used to
     /// ask separately, and a wizard that accepts a code renaming refuses is
     /// a course a teacher can create and then never re-type.
