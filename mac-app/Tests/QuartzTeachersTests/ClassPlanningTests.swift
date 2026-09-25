@@ -472,17 +472,17 @@ final class ClassPlanningTests: XCTestCase {
         ---
         Body.
         """
-        let result: (text: String, changed: Bool) = PageFrontmatter.settingCreated(
+        let result: (text: String, outcome: FrontmatterWriteOutcome) = PageFrontmatter.settingCreated(
             in: page, key: "created", to: CalendarDay(year: 2026, month: 9, day: 22)!
         )
-        XCTAssertTrue(result.changed)
+        XCTAssertEqual(result.outcome, .written)
         XCTAssertTrue(result.text.contains("created: 2026-09-22T09:15:00.000-0500"),
                       "Only the date in front of the time moves")
         XCTAssertTrue(result.text.contains("- unit-1"), "Every other byte is left alone")
 
-        let again: (text: String, changed: Bool) = PageFrontmatter.settingCreated(
+        let again: (text: String, outcome: FrontmatterWriteOutcome) = PageFrontmatter.settingCreated(
             in: result.text, key: "created", to: CalendarDay(year: 2026, month: 9, day: 22)!
         )
-        XCTAssertFalse(again.changed, "Setting the date it already has is not a change")
+        XCTAssertEqual(again.outcome, .alreadyRight, "Setting the date it already has is not a change")
     }
 }

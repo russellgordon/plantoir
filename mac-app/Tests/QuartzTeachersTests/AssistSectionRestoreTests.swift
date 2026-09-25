@@ -136,10 +136,10 @@ final class AssistSectionRestoreTests: XCTestCase {
         let item: BackupItem = try fixture.backUp()
 
         let added: String = try String(contentsOf: fixture.plainSharedPageURL, encoding: .utf8)
-        let published: (text: String, changed: Bool) = AssistPageVisibility.setting(
+        let published: (text: String, outcome: FrontmatterWriteOutcome) = AssistPageVisibility.setting(
             published: false, in: added, forSection: 1, isSectionLocal: false
         )
-        XCTAssertTrue(published.changed)
+        XCTAssertEqual(published.outcome, .written)
         try published.text.write(to: fixture.plainSharedPageURL, atomically: true, encoding: .utf8)
 
         try CourseRestorer.restoreSection(1, from: item, coursesDirectoryURL: fixture.coursesDirectoryURL)

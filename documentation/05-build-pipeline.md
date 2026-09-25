@@ -609,7 +609,10 @@ because it is the one YAML keeps; the lines below it that belong to its value go
 with it (`continuationLineIndices`' rule from #176, which #199 applies to the
 apps' own date and title writers — ported to Python here because #199 had not
 landed on `dev` when this was written; if the two ever disagree, the contract's
-`writingCases` are the arbiter); a missing key goes at the top of the block; a
+`writingCases` are the arbiter); a missing key goes at the top of the block,
+and only into a block with a column-0 level for it — the apps' rule from #186,
+`_place_for_a_new_top_level_key`, so a block whose first line is indented or
+is not a key is refused rather than given a key that adopts that line; a
 page with no frontmatter gets a block. Not touched at all: a block opened and
 never closed (which since #188 includes one whose only closing-looking line is
 INDENTED — the apps' visibility writer prepends a block on that shape instead,

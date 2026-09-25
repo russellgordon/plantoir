@@ -777,6 +777,36 @@ nonisolated enum AssistWording {
              + "when you get to it."
     }
 
+    /// Pages nothing could be written to, NAMED rather than counted (#186).
+    ///
+    /// The settings at the top of a page can be written in a way that leaves
+    /// no safe place for a new line: indented, or written as a list, so a line
+    /// added there either folds into the one below it or makes settings the
+    /// website builder cannot read. Measured 2026-09-25 — and in the shape
+    /// that matters most, the fold leaves the page PUBLISHED while the teacher
+    /// is told it was hidden. So nothing is written, and this is what says so.
+    ///
+    /// **One sentence for both tenses, deliberately.** It is said on a plan
+    /// card before anything is done and again in a reply afterwards, and the
+    /// page stays exactly as the teacher wrote it either way — so a sentence
+    /// in the present tense is true in both places, and two nearly identical
+    /// sentences are two sentences to keep in step. (The section restore's
+    /// own sentence, `sharedPagesWhoseSettingsCouldNotBePutBack`, is past
+    /// tense because it is only ever said afterwards, and counts rather than
+    /// names.)
+    ///
+    /// - Parameter listing: the pages, already quoted and joined, at most a
+    ///   few named — `AssistPublishPlan.listingAFew`.
+    /// - Parameter count: how many pages that listing stands for.
+    static func pagesWhoseSettingsCannotBeAddedTo(_ listing: String, count: Int) -> String {
+        if count == 1 {
+            return "I can’t add to the settings at the top of \(listing), so that page stays exactly "
+                 + "as it is. Open it in Obsidian to set it there."
+        }
+        return "I can’t add to the settings at the top of \(listing), so those pages stay exactly "
+             + "as they are. Open them in Obsidian to set them there."
+    }
+
     // MARK: - What publishing means here
 
     /// The two acts, in a teacher's words, said once.

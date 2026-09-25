@@ -786,21 +786,52 @@ separately from the reader:
     `check_visibility_against_the_site.py`: `course-management.json` →
     `backups.restoringOneSectionsKeys`.
     [Issue #182](https://github.com/russellgordon/plantoir/issues/182).
-  * **`setting`'s own INSERT branch** — the third branch of the very function
-    the sweep was added to, and the surprising one. It CREATES an orphan
-    rather than leaving one: a block whose first line is indented gets the new
-    key inserted above it at `openIndex + 1`, and that indented line becomes
-    the new key's value. Measured, `---` / `  a: 1` / `---` is VISIBLE (no
-    flag at all) and after a hide it STOPS the build — `bad indentation of a
-    mapping entry (3:4)`. There is nothing to SWEEP there; the fix is where to
-    insert, which is a decision about a teacher's hand-edited YAML rather than
-    a mechanical one.
+  * ~~**`setting`'s own INSERT branch** CREATES an orphan~~ — **fixed
+    2026-09-25 by #186.** A block whose first line is indented got the new
+    key inserted above it at `openIndex + 1`, and that indented line became
+    the new key's value. Measured on #246's build: `---` / `  a: 1` / `---` is
+    VISIBLE, and after a hide it was a block the build cannot read (it stopped
+    the build until #246; since, it is hidden and named — so the same write
+    asked to SHOW the page hid it); `---` / `  false` / `---` after a hide was
+    `"false false"` and stayed PUBLISHED while the teacher was told it was
+    hidden. There is nothing to SWEEP there; the fix is WHERE a new key may
+    go. `PageVisibilityReader.placeForANewTopLevelKey` answers the first line
+    inside the block, as before — and nil when the block's own first line,
+    blank lines and `# note`s aside, is indented or names no key (a flow
+    collection, `- a`, a bare scalar, `a:1`; a quoted key and `? key` DO name
+    one). Nil means nothing is written: `setting` and
+    `PageFrontmatter.settingCreated` return `.noRoomForAKey` — a three-way
+    `FrontmatterWriteOutcome` (`written` / `alreadyRight` / `noRoomForAKey`)
+    replaced their `changed` flag, because `changed: false` could not tell
+    "already hidden" from "declined", which is the lie this issue was about.
+    Every caller says so: the publish/unpublish plan asks the real writer at
+    plan time and names the page on the card and in the reply
+    (`AssistWording.pagesWhoseSettingsCannotBeAddedTo`), a whole unit no
+    longer answers "already hidden" about pages it declined, a re-date and a
+    make-room name the pages they could not date, the section restore counts
+    them (#182), the page copier's plain-key append declines too (its
+    read-back then refuses the copy), and the trail records
+    `page settings left as they were` with the act and the count. The build's
+    date splice follows the same rule (`_place_for_a_new_top_level_key`).
+    **Rejected** (measured by the first attempt, 2026-09-19, over 384 block
+    shapes): inserting at the END of the block (fixes none and moves a shared
+    case's bytes), writing the key at the block's own indent (the site hides
+    the page and this app reads it visible for ever; a second write
+    duplicates the key), refusing whenever ANY line is indented (refuses
+    `tags:` over `  - a`, the commonest page there is), and re-indenting the
+    teacher's block (rewriting their YAML is what `PageFrontmatter` exists not
+    to do). The honest cost: on `---` / `  a: 1` / `---` a HIDE now leaves the
+    page visible, where #246's build had been hiding it by accident, because
+    the orphan made the block unreadable — the teacher is told instead, and
+    told which page. Contract cases: four `pageVisibility.writingCases` (with
+    `expectOutcome`), one `datesAndTitles.writingCases`, one
+    `atBuildTime.writingCases`.
     [Issue #186](https://github.com/russellgordon/plantoir/issues/186).
 
   All three were pre-existing and all three are shared with Windows (which
-  inserts at `open + 1` too). The first two are not reached by the fixed
-  reader or writer at all — neither calls `setting`. The rule above is the
-  app's rule; the third is where it is not yet kept.
+  inserts at `open + 1` too, and owes #182 and #186 with #188 — one `windows`
+  issue). The first two are not reached by the fixed reader or writer at all
+  — neither calls `setting`. The rule above is now kept by every one of them.
 
   **The same rule for the DATE and TITLE writers (#199, 2026-09-25, mac).**
   `PageFrontmatter.settingCreated` (every re-date, move, insert and the
@@ -847,9 +878,10 @@ separately from the reader:
   up to a ` #` comment (`scalarText(ofRawValue:)`); the quotes and the note go
   with the old value. Three more cases (13 in all).
   **Not in it, recorded:** an all-indented block — `settingTitle` declines it
-  silently, and `settingCreated` INSERTS `created:` at `openIndex + 1`, above
-  the indented line, which is #186's orphan shape (the #186 decision about an
-  indented root mapping — `rawValue` cannot read that page's date either); duplicate keys — the writer and `rawValue` take the
+  silently, and `settingCreated` INSERTED `created:` at `openIndex + 1`, above
+  the indented line, which was #186's orphan shape; since #186 (2026-09-25) it
+  declines too and says `.noRoomForAKey` (`rawValue` cannot read that page's
+  date either, so nothing a teacher could see is lost); duplicate keys — the writer and `rawValue` take the
   FIRST `created:`, PyYAML keeps the LAST (measured) — is a separate
   disagreement; and the time of a folded or below-key date is not read, so the
   rewrite uses the fallback `T07:00:00.000-0400`, which is harmless. Windows'
