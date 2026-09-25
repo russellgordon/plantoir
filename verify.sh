@@ -330,6 +330,13 @@ else
   cat /tmp/verify_port_blocks_test.log
 fi
 
+if (cd scripts && python3 test_trail_lock.py) >/tmp/verify_trail_lock_test.log 2>&1; then
+  pass "every launcher adds its line to the activity trail holding the app's lock, so a trim never loses it (scripts/test_trail_lock.py)"
+else
+  fail "every launcher adds its line to the activity trail holding the app's lock, so a trim never loses it (scripts/test_trail_lock.py)"
+  cat /tmp/verify_trail_lock_test.log
+fi
+
 if (cd scripts && python3 test_verify_lock.py) >/tmp/verify_lock_test.log 2>&1; then
   pass "verify.sh lets one run at a time hold this Mac, names the holder to a second, and lets go on every exit (scripts/test_verify_lock.py)"
 else
