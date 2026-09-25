@@ -29,6 +29,13 @@ final class ScheduledDeployCleanupTests: XCTestCase {
 
     var launchControl: FakeLaunchControl = FakeLaunchControl()
 
+    // MARK: - Computed properties
+
+    /// The working folder's id, which its records and new labels carry (#237).
+    var folderID: String {
+        return BuildOutputLocation.folderIdentifier(forWorkingFolder: workingFolderURL.path)
+    }
+
     // MARK: - Functions
 
     /// A working folder, an agents folder and a throwaway trail.
@@ -105,21 +112,51 @@ final class ScheduledDeployCleanupTests: XCTestCase {
         return Course(code: code, directoryURL: courseURL, configuration: configuration)
     }
 
+    /// Which label an agent a test writes carries.
+    enum Labelled {
+        /// `…section<N>.<folder id>`, what this release writes (#237).
+        case current
+        /// `…section<N>`, what every release before #237 wrote — still on
+        /// teachers' Macs, recognised and never migrated.
+        case beforeFolderScoping
+    }
+
+    /// The label a test agent carries.
+    func labelFor(
+        courseCode: String = "ICS3U",
+        sectionNumber: Int,
+        workingFolder: URL? = nil,
+        labelled: Labelled = .current
+    ) -> String {
+        switch labelled {
+        case .current:
+            return ScheduledDeploy.agentLabel(
+                courseCode: courseCode, sectionNumber: sectionNumber,
+                workingFolder: workingFolder ?? workingFolderURL
+            )
+        case .beforeFolderScoping:
+            return ScheduledDeploy.legacyAgentLabel(courseCode: courseCode, sectionNumber: sectionNumber)
+        }
+    }
+
     /// One agent on disk, exactly as `propertyList` writes one.
     ///
     /// `legacy` writes what a v1.1.0 build wrote: three `ProgramArguments`, no
     /// `--scheduled-section`, so the course code can only come back out of the
-    /// label.
+    /// label. `labelled` chooses the label spelling (#237) — a v1.1.0 plist is
+    /// necessarily `.beforeFolderScoping` too.
     func writeAgent(
         courseCode: String = "ICS3U",
         sectionNumber: Int,
         workingFolder: URL? = nil,
         when: Date? = Date().addingTimeInterval(3600),
-        legacy: Bool = false
+        legacy: Bool = false,
+        labelled: Labelled = .current
     ) throws {
         let folder: URL = workingFolder ?? workingFolderURL
-        let label: String = ScheduledDeploy.agentLabel(
-            courseCode: courseCode, sectionNumber: sectionNumber
+        let label: String = labelFor(
+            courseCode: courseCode, sectionNumber: sectionNumber, workingFolder: folder,
+            labelled: legacy ? .beforeFolderScoping : labelled
         )
         var plist: [String: Any] = [:]
         plist["Label"] = label
@@ -148,13 +185,30 @@ final class ScheduledDeployCleanupTests: XCTestCase {
         try data.write(to: agentsDirectory.appendingPathComponent("\(label).plist"))
     }
 
-    func agentExists(courseCode: String = "ICS3U", sectionNumber: Int) -> Bool {
-        let label: String = ScheduledDeploy.agentLabel(
-            courseCode: courseCode, sectionNumber: sectionNumber
+    func agentExists(
+        courseCode: String = "ICS3U",
+        sectionNumber: Int,
+        workingFolder: URL? = nil,
+        labelled: Labelled = .current
+    ) -> Bool {
+        let label: String = labelFor(
+            courseCode: courseCode, sectionNumber: sectionNumber, workingFolder: workingFolder,
+            labelled: labelled
         )
         return FileManager.default.fileExists(
             atPath: agentsDirectory.appendingPathComponent("\(label).plist").path
         )
+    }
+
+    /// A second working folder beside this test's own.
+    func makeOtherWorkingFolder() throws -> URL {
+        let otherFolder: URL = workingFolderURL
+            .deletingLastPathComponent()
+            .appendingPathComponent("other-workspace")
+        try FileManager.default.createDirectory(
+            at: otherFolder.appendingPathComponent("courses"), withIntermediateDirectories: true
+        )
+        return otherFolder
     }
 
     func trailText() -> String {
@@ -172,7 +226,7 @@ final class ScheduledDeployCleanupTests: XCTestCase {
     func testEveryCancellationCaseInTheContractHolds() throws {
         let rule: [String: Any] = try Self.section("scheduledDeployCancellation")
         let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 10, "The case list has lost cases.")
+        XCTAssertGreaterThanOrEqual(cases.count, 15, "The case list has lost cases.")
 
         for oneCase in cases {
             let act: String = try XCTUnwrap(oneCase["act"] as? String)
@@ -258,7 +312,10 @@ final class ScheduledDeployCleanupTests: XCTestCase {
 
         case "remove a course whose code also exists in another working folder":
             // THE ONE THAT MUST NOT REGRESS. One alarm exists Mac-wide for
-            // ICS3U section 1, and it belongs to the OTHER folder.
+            // ICS3U section 1, and it belongs to the OTHER folder. Written
+            // under the label every release before #237 used — the one name a
+            // section had for the whole Mac, which is where a lookup by NAME
+            // would find it from this folder too.
             let otherFolder: URL = workingFolderURL
                 .deletingLastPathComponent()
                 .appendingPathComponent("other-workspace")
@@ -266,14 +323,14 @@ final class ScheduledDeployCleanupTests: XCTestCase {
                 at: otherFolder.appendingPathComponent("courses"), withIntermediateDirectories: true
             )
             let course: Course = try makeCourse(sections: [1])
-            try writeAgent(sectionNumber: 1, workingFolder: otherFolder)
+            try writeAgent(sectionNumber: 1, workingFolder: otherFolder, labelled: .beforeFolderScoping)
             let result = ScheduledDeployCleanup.removeCourse(
                 course, coursesDirectoryURL: coursesDirectoryURL, runner: launchControl
             )
             XCTAssertTrue(result.didRemove, act)
             XCTAssertEqual(result.stoppedSections, [], act)
             XCTAssertTrue(
-                agentExists(sectionNumber: 1),
+                agentExists(sectionNumber: 1, labelled: .beforeFolderScoping),
                 "\(act): the other folder's live deploy was destroyed"
             )
             XCTAssertEqual(launchControl.bootedOutLabels, [], act)
@@ -321,6 +378,95 @@ final class ScheduledDeployCleanupTests: XCTestCase {
             XCTAssertEqual(outcome.stoppedScheduledSections, [1, 2], act)
             XCTAssertFalse(agentExists(sectionNumber: 1), act)
             XCTAssertFalse(agentExists(sectionNumber: 2), act)
+            XCTAssertEqual(cancels, "everyAlarmThisFolderHasForTheCourse")
+
+        case "schedule a section whose code and number another working folder has also scheduled":
+            let course: Course = try makeCourse(sections: [1])
+            try Data("#!/bin/bash\n".utf8).write(to: workingFolderURL.appendingPathComponent("deploy.sh"))
+            let otherFolder: URL = try makeOtherWorkingFolder()
+            try writeAgent(sectionNumber: 1, workingFolder: otherFolder)
+            XCTAssertNil(ScheduledDeploy.scheduleDeploy(
+                course: course, sectionNumber: 1, when: Date().addingTimeInterval(7200),
+                workspaceURL: workingFolderURL, cloudflareAccountID: "", runner: launchControl
+            ), act)
+            XCTAssertTrue(agentExists(sectionNumber: 1, workingFolder: otherFolder), "\(act): theirs went")
+            XCTAssertTrue(agentExists(sectionNumber: 1), "\(act): ours was not set")
+            XCTAssertFalse(
+                launchControl.bootedOutLabels.contains(labelFor(sectionNumber: 1, workingFolder: otherFolder)), act
+            )
+            XCTAssertEqual(cancels, "nothing")
+
+        case "schedule a section this working folder has already scheduled":
+            let course: Course = try makeCourse(sections: [1, 2])
+            try Data("#!/bin/bash\n".utf8).write(to: workingFolderURL.appendingPathComponent("deploy.sh"))
+            try writeAgent(sectionNumber: 1)
+            try writeAgent(sectionNumber: 2)
+            let later: Date = Date().addingTimeInterval(7200)
+            XCTAssertNil(ScheduledDeploy.scheduleDeploy(
+                course: course, sectionNumber: 1, when: later,
+                workspaceURL: workingFolderURL, cloudflareAccountID: "", runner: launchControl
+            ), act)
+            XCTAssertEqual(
+                ScheduledDeploy.agents(inWorkingFolder: workingFolderURL, courseCode: "ICS3U", sectionNumber: 1).count,
+                1, "\(act): two alarms for one section"
+            )
+            XCTAssertTrue(agentExists(sectionNumber: 2), "\(act): only that section's")
+            XCTAssertEqual(
+                ScheduledDeploy.nextRun(courseCode: "ICS3U", sectionNumber: 1, inWorkingFolder: workingFolderURL)?
+                    .timeIntervalSince1970 ?? 0,
+                later.timeIntervalSince1970, accuracy: 1, act
+            )
+            XCTAssertEqual(cancels, "thatSectionOnly")
+
+        case "schedule a section this working folder scheduled before deploys were kept per working folder":
+            let course: Course = try makeCourse(sections: [1, 2])
+            try Data("#!/bin/bash\n".utf8).write(to: workingFolderURL.appendingPathComponent("deploy.sh"))
+            try writeAgent(sectionNumber: 1, labelled: .beforeFolderScoping)
+            try writeAgent(sectionNumber: 2, labelled: .beforeFolderScoping)
+            let otherFolder: URL = try makeOtherWorkingFolder()
+            try writeAgent(courseCode: "MCV4U", sectionNumber: 1, workingFolder: otherFolder, labelled: .beforeFolderScoping)
+            XCTAssertNil(ScheduledDeploy.scheduleDeploy(
+                course: course, sectionNumber: 1, when: Date().addingTimeInterval(7200),
+                workspaceURL: workingFolderURL, cloudflareAccountID: "", runner: launchControl
+            ), act)
+            XCTAssertFalse(agentExists(sectionNumber: 1, labelled: .beforeFolderScoping), "\(act): two alarms")
+            XCTAssertTrue(agentExists(sectionNumber: 1), act)
+            XCTAssertTrue(agentExists(sectionNumber: 2, labelled: .beforeFolderScoping), "\(act): only that section's")
+            XCTAssertTrue(
+                agentExists(courseCode: "MCV4U", sectionNumber: 1, workingFolder: otherFolder, labelled: .beforeFolderScoping),
+                act
+            )
+            XCTAssertEqual(cancels, "thatSectionOnly")
+
+        case "remove a course that another working folder has also scheduled":
+            let course: Course = try makeCourse(sections: [1])
+            let otherFolder: URL = try makeOtherWorkingFolder()
+            try writeAgent(sectionNumber: 1)
+            try writeAgent(sectionNumber: 1, workingFolder: otherFolder)
+            let result = ScheduledDeployCleanup.removeCourse(
+                course, coursesDirectoryURL: coursesDirectoryURL, runner: launchControl
+            )
+            XCTAssertTrue(result.didRemove, act)
+            XCTAssertEqual(result.stoppedSections, [1], act)
+            XCTAssertFalse(agentExists(sectionNumber: 1), act)
+            XCTAssertTrue(agentExists(sectionNumber: 1, workingFolder: otherFolder), "\(act): theirs went")
+            XCTAssertEqual(cancels, "everyAlarmThisFolderHasForTheCourse")
+
+        case "remove a course whose deploy was scheduled before deploys were kept per working folder":
+            let course: Course = try makeCourse(sections: [1, 2])
+            try writeAgent(sectionNumber: 1, labelled: .beforeFolderScoping)
+            try writeAgent(sectionNumber: 2)
+            let result = ScheduledDeployCleanup.removeCourse(
+                course, coursesDirectoryURL: coursesDirectoryURL, runner: launchControl
+            )
+            XCTAssertTrue(result.didRemove, act)
+            XCTAssertEqual(result.stoppedSections, [1, 2], act)
+            XCTAssertFalse(agentExists(sectionNumber: 1, labelled: .beforeFolderScoping), act)
+            XCTAssertFalse(agentExists(sectionNumber: 2), act)
+            XCTAssertTrue(
+                launchControl.bootedOutLabels.contains(labelFor(sectionNumber: 1, labelled: .beforeFolderScoping)),
+                "\(act): booted out by the name it really has"
+            )
             XCTAssertEqual(cancels, "everyAlarmThisFolderHasForTheCourse")
 
         default:
@@ -868,7 +1014,7 @@ final class ScheduledDeployCleanupTests: XCTestCase {
             inWorkingFolder: workingFolderURL, now: Date(), runner: launchControl
         )
         XCTAssertTrue(outcome.isQuiet)
-        XCTAssertTrue(agentExists(sectionNumber: 1))
+        XCTAssertTrue(agentExists(sectionNumber: 1, labelled: .beforeFolderScoping))
     }
 
     /// And it never reaches into another working folder, however overdue that
@@ -877,16 +1023,19 @@ final class ScheduledDeployCleanupTests: XCTestCase {
         try prepare()
         let otherFolder: URL = workingFolderURL
             .deletingLastPathComponent().appendingPathComponent("other-workspace")
+        // Under the label every release before #237 wrote, which a job of
+        // this folder's could share by name.
         try writeAgent(
             sectionNumber: 1,
             workingFolder: otherFolder,
-            when: Date().addingTimeInterval(-365 * 24 * 3600)
+            when: Date().addingTimeInterval(-365 * 24 * 3600),
+            labelled: .beforeFolderScoping
         )
         let outcome = ScheduledDeployCleanup.sweepDeploysThatAreTooLate(
             inWorkingFolder: workingFolderURL, now: Date(), runner: launchControl
         )
         XCTAssertTrue(outcome.isQuiet)
-        XCTAssertTrue(agentExists(sectionNumber: 1))
+        XCTAssertTrue(agentExists(sectionNumber: 1, labelled: .beforeFolderScoping))
     }
 
     // MARK: - Standing down at fire time
@@ -897,7 +1046,7 @@ final class ScheduledDeployCleanupTests: XCTestCase {
         try prepare()
         let when: Date = Date().addingTimeInterval(-3600)
         try writeAgent(sectionNumber: 1, when: when)
-        let label: String = ScheduledDeploy.agentLabel(courseCode: "ICS3U", sectionNumber: 1)
+        let label: String = labelFor(sectionNumber: 1)
         let script: String = "/tmp/\(label).sh"
 
         let fromEnvironment: Date? = ScheduledDeploy.intendedMoment(
@@ -922,7 +1071,7 @@ final class ScheduledDeployCleanupTests: XCTestCase {
     /// Neither says, so it FAILS OPEN.
     func testAnUnknownMomentRuns() throws {
         try prepare()
-        let label: String = ScheduledDeploy.agentLabel(courseCode: "ICS3U", sectionNumber: 1)
+        let label: String = labelFor(sectionNumber: 1)
         XCTAssertNil(ScheduledDeploy.intendedMoment(
             forScript: "/tmp/\(label).sh", environment: [:]
         ))
@@ -934,7 +1083,7 @@ final class ScheduledDeployCleanupTests: XCTestCase {
     /// The label comes out of the wrapper script's own path — the only route a
     /// pre-v1.2.0 job leaves, since it names no course and no section.
     func testTheLabelComesOutOfTheScriptPath() {
-        let label: String = ScheduledDeploy.agentLabel(courseCode: "ICS3U", sectionNumber: 1)
+        let label: String = labelFor(sectionNumber: 1)
         XCTAssertEqual(
             ScheduledDeploy.label(
                 fromScriptPath: "/Users/x/Library/Application Support/Plantoir/scheduled/\(label).sh"
@@ -994,10 +1143,10 @@ final class ScheduledDeployCleanupTests: XCTestCase {
                 destination: ScheduledPublishOutcome.nothingWasDeployedName,
                 when: Date()
             ),
-            inHomeFolder: home, course: "ICS3U", section: 1
+            inHomeFolder: home, course: "ICS3U", section: 1, folderID: folderID
         )
         XCTAssertTrue(ScheduledPublishOutcome.noteOnTrail(
-            inHomeFolder: home, course: "ICS3U", section: 1
+            inHomeFolder: home, course: "ICS3U", section: 1, folderID: folderID
         ))
         XCTAssertTrue(trailText().contains(
             "turned off a scheduled deploy "
@@ -1057,7 +1206,7 @@ final class ScheduledDeployCleanupTests: XCTestCase {
             inWorkingFolder: workingFolderURL, now: now, runner: launchControl
         )
         XCTAssertTrue(outcome.isQuiet, "\(outcome)")
-        XCTAssertTrue(agentExists(courseCode: "Chess Club", sectionNumber: 1))
+        XCTAssertTrue(agentExists(courseCode: "Chess Club", sectionNumber: 1, labelled: .beforeFolderScoping))
     }
 
     /// Two codes that sanitise the same way are ambiguous, and the default is
@@ -1087,7 +1236,9 @@ final class ScheduledDeployCleanupTests: XCTestCase {
         try prepare()
         let otherFolder: URL = workingFolderURL
             .deletingLastPathComponent().appendingPathComponent("other-workspace")
-        try writeAgent(sectionNumber: 1, workingFolder: otherFolder)
+        // Under the label every release before #237 wrote — the one name the
+        // section had on the whole Mac, so the one a cancel by NAME would hit.
+        try writeAgent(sectionNumber: 1, workingFolder: otherFolder, labelled: .beforeFolderScoping)
 
         XCTAssertNil(ScheduledDeploy.cancelScheduledDeploy(
             courseCode: "ICS3U",
@@ -1095,8 +1246,15 @@ final class ScheduledDeployCleanupTests: XCTestCase {
             inWorkingFolder: workingFolderURL,
             runner: launchControl
         ))
-        XCTAssertTrue(agentExists(sectionNumber: 1))
-        XCTAssertEqual(launchControl.bootedOutLabels, [], "It must not even boot it out")
+        XCTAssertTrue(agentExists(sectionNumber: 1, labelled: .beforeFolderScoping))
+        // Nothing of this folder's is on disk, so the only label it may boot
+        // out is THIS folder's own (a job still loaded with its plist gone),
+        // which since #237 cannot name another folder's job.
+        XCTAssertFalse(
+            launchControl.bootedOutLabels.contains(labelFor(sectionNumber: 1, labelled: .beforeFolderScoping)),
+            "It must not even boot it out"
+        )
+        XCTAssertEqual(launchControl.bootedOutLabels, [labelFor(sectionNumber: 1)])
     }
 
     // MARK: - The wrapper scripts live inside the test's own tree
@@ -1113,7 +1271,7 @@ final class ScheduledDeployCleanupTests: XCTestCase {
     func testTheWrapperScriptPathStaysInsideTheTestsOwnFolder() throws {
         try prepare()
         let scriptPath: String = ScheduledDeploy.scriptURL(
-            courseCode: "ICS3U", sectionNumber: 1
+            courseCode: "ICS3U", sectionNumber: 1, inWorkingFolder: workingFolderURL
         ).path
         let realPath: String = ("~/Library/Application Support/Plantoir/scheduled" as NSString)
             .expandingTildeInPath

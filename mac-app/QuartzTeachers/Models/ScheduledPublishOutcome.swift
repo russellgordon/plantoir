@@ -196,7 +196,7 @@ nonisolated enum ScheduledPublishOutcome {
     /// teacher's sentence as though it were a destination.)
     ///
     /// The line is still written so every record has ONE shape — two lines, the kind and
-    /// then a name — which is what `stopped(inHomeFolder:course:section:)`
+    /// then a name — which is what `stopped(inHomeFolder:course:section:folderID:)`
     /// reads and what a person opening the file in TextEdit sees. A record
     /// whose second line was sometimes absent would be a second format for a
     /// shell script to get right at half six in the morning.
@@ -237,10 +237,62 @@ nonisolated enum ScheduledPublishOutcome {
             .appendingPathComponent("stopped")
     }
 
-    /// The file that stands for one section.
-    static func recordURL(inHomeFolder home: URL, course: String, section: Int) -> URL {
+    /// The file that stands for one section IN ONE WORKING FOLDER:
+    /// `<course>-section<N>.<folder id>.txt` (#237).
+    ///
+    /// The folder's id is `BuildOutputLocation.folderIdentifier`, the one a
+    /// scheduled deploy's label ends with. Until #237 the record was named for
+    /// the course and section alone — harmless while a section could have only
+    /// one alarm on the Mac, and a race once two working folders could each
+    /// hold one: both wrappers begin by clearing the record, so one folder's
+    /// run erased the other's failure, and whichever finished last wore the
+    /// badge in BOTH sidebars.
+    static func recordURL(inHomeFolder home: URL, course: String, section: Int, folderID: String) -> URL {
+        return directory(inHomeFolder: home)
+            .appendingPathComponent("\(course)-section\(section).\(folderID).txt")
+    }
+
+    /// The name a record had before #237, which a wrapper written then still
+    /// writes. Read only by `fileUnderTheFolder`, which moves it to the
+    /// folder's own name straight after such a run — never by a badge or a
+    /// notice, because nothing in it says which folder it belongs to, and
+    /// reading it would show folder A's failure in folder B.
+    static func legacyRecordURL(inHomeFolder home: URL, course: String, section: Int) -> URL {
         return directory(inHomeFolder: home)
             .appendingPathComponent("\(course)-section\(section).txt")
+    }
+
+    /// Straight after a run of a job set before #237: move the record its
+    /// wrapper wrote under the old, folder-less name to this folder's name.
+    ///
+    /// Safe to attribute HERE and nowhere else, because this is the one moment
+    /// the owner is known — the run was started for this folder's section, and
+    /// the record was written by it a moment ago. (Only one job per section
+    /// can carry the old label on a Mac, so no other run is writing that name
+    /// at the same time.) A job whose label carries a folder id wrote the new
+    /// name itself and this does nothing.
+    static func fileUnderTheFolder(
+        inHomeFolder home: URL,
+        course: String,
+        section: Int,
+        folderID: String,
+        jobLabel: String?
+    ) {
+        if let jobLabel, ScheduledDeploy.folderID(fromLabel: jobLabel) != nil {
+            return
+        }
+        let legacy: URL = legacyRecordURL(inHomeFolder: home, course: course, section: section)
+        if !FileManager.default.fileExists(atPath: legacy.path) {
+            return
+        }
+        let destination: URL = recordURL(
+            inHomeFolder: home, course: course, section: section, folderID: folderID
+        )
+        // This run's record replaces an older one of this folder's, as the
+        // wrapper's own first line would have cleared it. `rename(2)` in one
+        // folder, so the watcher sees one whole file arrive.
+        try? FileManager.default.removeItem(at: destination)
+        try? FileManager.default.moveItem(at: legacy, to: destination)
     }
 
     /// Where a record is assembled before it is moved into place, so that it is
@@ -270,10 +322,10 @@ nonisolated enum ScheduledPublishOutcome {
     ///
     /// So: do NOT "tidy" this next to its target, and do not replace the move
     /// with a single write however much shorter it looks.
-    static func partialRecordURL(inHomeFolder home: URL, course: String, section: Int) -> URL {
+    static func partialRecordURL(inHomeFolder home: URL, course: String, section: Int, folderID: String) -> URL {
         return directory(inHomeFolder: home)
             .deletingLastPathComponent()
-            .appendingPathComponent("\(course)-section\(section).txt.partial")
+            .appendingPathComponent("\(course)-section\(section).\(folderID).txt.partial")
     }
 
     /// Write down that a scheduled publish stopped, unless one is already
@@ -287,9 +339,10 @@ nonisolated enum ScheduledPublishOutcome {
         _ stopped: Stopped,
         inHomeFolder home: URL,
         course: String,
-        section: Int
+        section: Int,
+        folderID: String
     ) -> Bool {
-        let url: URL = recordURL(inHomeFolder: home, course: course, section: section)
+        let url: URL = recordURL(inHomeFolder: home, course: course, section: section, folderID: folderID)
         if FileManager.default.fileExists(atPath: url.path) {
             return false
         }
@@ -313,8 +366,17 @@ nonisolated enum ScheduledPublishOutcome {
     /// The date comes from the FILE, not from the app: it is when the run
     /// wrote its record, and reading it later must not re-date an overnight
     /// problem to the morning somebody noticed it.
-    static func stopped(inHomeFolder home: URL, course: String, section: Int) -> Stopped? {
-        return record(at: recordURL(inHomeFolder: home, course: course, section: section))
+    static func stopped(inHomeFolder home: URL, course: String, section: Int, folderID: String) -> Stopped? {
+        return record(at: recordURL(inHomeFolder: home, course: course, section: section, folderID: folderID))
+    }
+
+    /// The same, for the working folder the teacher has open — the id
+    /// computed by the one function the scheduling side baked in.
+    static func stopped(inHomeFolder home: URL, course: String, section: Int, workingFolder: URL) -> Stopped? {
+        return stopped(
+            inHomeFolder: home, course: course, section: section,
+            folderID: BuildOutputLocation.folderIdentifier(forWorkingFolder: workingFolder.path)
+        )
     }
 
     /// The same read, of one record file, for a caller that has the path rather
@@ -350,8 +412,8 @@ nonisolated enum ScheduledPublishOutcome {
     /// run, which leaves the message standing after a teacher has already
     /// fixed the problem themselves — and the next scheduled run that would
     /// clear it could be a week away.
-    static func clear(inHomeFolder home: URL, course: String, section: Int) {
-        let url: URL = recordURL(inHomeFolder: home, course: course, section: section)
+    static func clear(inHomeFolder home: URL, course: String, section: Int, folderID: String) {
+        let url: URL = recordURL(inHomeFolder: home, course: course, section: section, folderID: folderID)
         try? FileManager.default.removeItem(at: url)
     }
 
@@ -380,8 +442,8 @@ nonisolated enum ScheduledPublishOutcome {
     /// and a line naming a credential prompt would put a teacher's own words
     /// on the trail.
     @discardableResult
-    static func noteOnTrail(inHomeFolder home: URL, course: String, section: Int) -> Bool {
-        guard let stopped = stopped(inHomeFolder: home, course: course, section: section) else {
+    static func noteOnTrail(inHomeFolder home: URL, course: String, section: Int, folderID: String) -> Bool {
+        guard let stopped = stopped(inHomeFolder: home, course: course, section: section, folderID: folderID) else {
             return false
         }
         // One `ActivityTrail.note(.event, …)` per branch rather than a

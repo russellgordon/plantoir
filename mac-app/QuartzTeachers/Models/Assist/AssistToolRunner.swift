@@ -291,9 +291,13 @@ final class AssistToolRunner {
             for course in workspace.courses where course.code.lowercased() == code.lowercased() {
                 filedCode = course.code
             }
-            guard let replacing = ScheduledDeploy.momentBeingReplaced(
-                courseCode: filedCode, sectionNumber: number, by: newMoment
-            ) else {
+            // This working folder's deploy only (#237): another folder's of
+            // the same section is left standing, so it is not "replaced".
+            guard let workingFolderURL = workspace.workspaceURL,
+                  let replacing = ScheduledDeploy.momentBeingReplaced(
+                      courseCode: filedCode, sectionNumber: number, by: newMoment,
+                      inWorkingFolder: workingFolderURL
+                  ) else {
                 return card
             }
             return card + " " + AssistWording.scheduleReplaces(
@@ -1959,7 +1963,8 @@ final class AssistToolRunner {
             sectionNumber: located.sectionNumber,
             when: when,
             now: Date(),
-            cloudflareAccountID: AppSettings.shared.cloudflareAccountID
+            cloudflareAccountID: AppSettings.shared.cloudflareAccountID,
+            inWorkingFolder: workspace.workspaceURL ?? located.course.directoryURL
         )
         return .success(ScheduleRequest(located: located, when: when, plan: plan))
     }
@@ -2031,7 +2036,8 @@ final class AssistToolRunner {
         let replacing: Date? = ScheduledDeploy.momentBeingReplaced(
             courseCode: asked.located.course.code,
             sectionNumber: asked.located.sectionNumber,
-            by: asked.when
+            by: asked.when,
+            inWorkingFolder: workspaceURL
         )
 
         if let problem = ScheduledDeploy.scheduleDeploy(
@@ -2082,7 +2088,7 @@ final class AssistToolRunner {
         let pending: Date? = ScheduledDeploy.nextRun(
             courseCode: located.course.code,
             sectionNumber: located.sectionNumber,
-            inWorkingFolder: workspace.workspaceURL
+            inWorkingFolder: workspace.workspaceURL ?? located.course.directoryURL
         )
         if pending == nil {
             // Safe to call when nothing is scheduled — and it still tidies
@@ -3261,8 +3267,8 @@ final class AssistToolRunner {
     ///
     /// **Scoped to THIS working folder since 2026-09-20 (issue #236), and it
     /// was the one cancel path that was not.** It used to ask whether
-    /// `plistURL` exists, which is a Mac-wide question: a label is the course
-    /// code and the section number and nothing else. So a teacher holding last
+    /// `plistURL` exists, which was a Mac-wide question: a label was the course
+    /// code and the section number and nothing else (until #237). So a teacher holding last
     /// year's working folder and this year's, both with ICS3U section 1, with
     /// the live deploy in last year's, would roll section 1 over in THIS
     /// year's folder and have the OTHER folder's deploy deleted — and be told

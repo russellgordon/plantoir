@@ -97,9 +97,10 @@ nonisolated enum AssistWording {
     /// removes the one already set, on purpose, and until this sentence the
     /// teacher was told nothing about it. The fact and nothing else, in the
     /// house style of `deployWasCancelled`. A FIRST DRAFT for Russell's
-    /// wording pass. It may name a deploy set from ANOTHER working folder —
-    /// one this window's sidebar shows no clock for — because that is the
-    /// one being replaced: a section's scheduled deploy is one per Mac.
+    /// wording pass. It names only a deploy set from THIS working folder —
+    /// since #237 a section's scheduled deploy is one per working folder, and
+    /// another folder's is a different alarm that scheduling here leaves
+    /// standing. (Until #237 it could name another folder's, one per Mac.)
     static func scheduleReplaces(moment: String) -> String {
         return "This replaces the deploy already set for \(moment)."
     }

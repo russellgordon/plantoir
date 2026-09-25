@@ -385,8 +385,22 @@ final class ScheduledDeployFolderProblemTests: XCTestCase {
         """
     }
 
+    /// The working folder the scheduled job belongs to, and the label its
+    /// plist would carry there (#237).
+    private var workingFolderURL: URL {
+        return homeFolderURL.appendingPathComponent("Teaching", isDirectory: true)
+    }
+
+    private var jobLabel: String {
+        return ScheduledDeploy.agentLabel(courseCode: "ICS3U", sectionNumber: 1, workingFolder: workingFolderURL)
+    }
+
+    private var courseDirectoryURL: URL {
+        return workingFolderURL.appendingPathComponent("courses").appendingPathComponent("ICS3U")
+    }
+
     private func writableLogURL() throws -> URL {
-        let log: URL = ScheduledDeploy.logURL(courseCode: "ICS3U", sectionNumber: 1, inHomeFolder: homeFolderURL)
+        let log: URL = ScheduledDeploy.logURL(label: jobLabel, inHomeFolder: homeFolderURL)
         try FileManager.default.createDirectory(
             at: log.deletingLastPathComponent(), withIntermediateDirectories: true
         )
@@ -398,19 +412,21 @@ final class ScheduledDeployFolderProblemTests: XCTestCase {
         try("Deploying ICS3U…\n" + markerLine("mediaFolderMissing") + "\nDeploy complete\n")
             .write(to: log, atomically: true, encoding: .utf8)
 
-        ScheduledDeploy.recordFolderProblems(section: (
-            courseDirectory: URL(fileURLWithPath: "/tmp"), courseCode: "ICS3U", sectionNumber: 1
+        ScheduledDeploy.recordFolderProblems(label: jobLabel, section: (
+            courseDirectory: courseDirectoryURL, courseCode: "ICS3U", sectionNumber: 1
         ), fromByteOffset: 0, inHomeFolder: homeFolderURL)
 
         let first: [SiteHealthFinding] = ScheduledDeploy.takeFolderProblems(
-            courseCode: "ICS3U", sectionNumber: 1, inHomeFolder: homeFolderURL
+            courseCode: "ICS3U", sectionNumber: 1, inWorkingFolder: workingFolderURL,
+            inHomeFolder: homeFolderURL
         )
         XCTAssertEqual(first.count, 1)
         XCTAssertEqual(first.first?.name, "mediaFolderMissing")
 
         // Consumed: reported once, not every time the app opens.
         XCTAssertTrue(ScheduledDeploy.takeFolderProblems(
-            courseCode: "ICS3U", sectionNumber: 1, inHomeFolder: homeFolderURL
+            courseCode: "ICS3U", sectionNumber: 1, inWorkingFolder: workingFolderURL,
+            inHomeFolder: homeFolderURL
         ).isEmpty)
     }
 
@@ -434,8 +450,8 @@ final class ScheduledDeployFolderProblemTests: XCTestCase {
             + "Deploy complete\n"
         try (lastNight + tonight).write(to: log, atomically: true, encoding: .utf8)
 
-        ScheduledDeploy.recordFolderProblems(section: (
-            courseDirectory: URL(fileURLWithPath: "/tmp"), courseCode: "ICS3U", sectionNumber: 1
+        ScheduledDeploy.recordFolderProblems(label: jobLabel, section: (
+            courseDirectory: courseDirectoryURL, courseCode: "ICS3U", sectionNumber: 1
         ), fromByteOffset: UInt64(lastNight.utf8.count), inHomeFolder: homeFolderURL)
 
         let media: SiteHealthFinding = try XCTUnwrap(
@@ -454,7 +470,8 @@ final class ScheduledDeployFolderProblemTests: XCTestCase {
         // one run's finding is one line, whether or not anybody looks.
         let linesBefore: Int = trail.components(separatedBy: "\n").count
         let taken: [SiteHealthFinding] = ScheduledDeploy.takeFolderProblems(
-            courseCode: "ICS3U", sectionNumber: 1, inHomeFolder: homeFolderURL
+            courseCode: "ICS3U", sectionNumber: 1, inWorkingFolder: workingFolderURL,
+            inHomeFolder: homeFolderURL
         )
         XCTAssertEqual(taken.count, 2, "a finding printed twice is kept once, so the dialog lists it once")
         let linesAfter: Int = store.activityText(includingPrompts: false).components(separatedBy: "\n").count
@@ -463,12 +480,14 @@ final class ScheduledDeployFolderProblemTests: XCTestCase {
 
     func testAProblemPutRightStopsBeingReported() throws {
         let log: URL = try writableLogURL()
-        let section = (courseDirectory: URL(fileURLWithPath: "/tmp"),
+        let section = (courseDirectory: courseDirectoryURL,
                        courseCode: "ICS3U", sectionNumber: 1)
 
         let firstNight: String = markerLine("mediaFolderMissing") + "\n"
         try firstNight.write(to: log, atomically: true, encoding: .utf8)
-        ScheduledDeploy.recordFolderProblems(section: section, fromByteOffset: 0, inHomeFolder: homeFolderURL)
+        ScheduledDeploy.recordFolderProblems(
+            label: jobLabel, section: section, fromByteOffset: 0, inHomeFolder: homeFolderURL
+        )
 
         // The next night's run is clean — and launchd APPENDS to this log, it
         // never truncates it, so the first night's marker line is still in the
@@ -479,12 +498,13 @@ final class ScheduledDeployFolderProblemTests: XCTestCase {
         let sizeBeforeSecondRun: UInt64 = UInt64(firstNight.utf8.count)
         try (firstNight + "Deploy complete\n").write(to: log, atomically: true, encoding: .utf8)
         ScheduledDeploy.recordFolderProblems(
-            section: section, fromByteOffset: sizeBeforeSecondRun, inHomeFolder: homeFolderURL
+            label: jobLabel, section: section, fromByteOffset: sizeBeforeSecondRun, inHomeFolder: homeFolderURL
         )
 
         XCTAssertTrue(
             ScheduledDeploy.takeFolderProblems(
-                courseCode: "ICS3U", sectionNumber: 1, inHomeFolder: homeFolderURL
+                courseCode: "ICS3U", sectionNumber: 1, inWorkingFolder: workingFolderURL,
+                inHomeFolder: homeFolderURL
             ).isEmpty,
             "a problem that has been put right must stop being reported"
         )

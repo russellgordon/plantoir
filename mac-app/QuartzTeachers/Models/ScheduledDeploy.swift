@@ -43,11 +43,101 @@ enum ScheduledDeploy {
 
     // MARK: - Functions
 
-    /// This section's agent label — the course code AND the section number,
-    /// so two sections of one course can never collide, nor two courses.
-    nonisolated static func agentLabel(courseCode: String, sectionNumber: Int) -> String {
+    /// This section's agent label, in the working folder it is set from:
+    /// `…deploy.<CODE>.section<N>.<folder id>` (GitHub #237).
+    ///
+    /// The course code AND the section number, so two sections of one course
+    /// can never collide, nor two courses — and, since #237, the working
+    /// folder's id, so the same course in two working folders (last year's
+    /// and this year's, or a restored copy) is two alarms rather than one.
+    /// Until then the label ended at the section, so scheduling ICS3U section
+    /// 1 in one folder booted out and overwrote the other folder's job.
+    ///
+    /// **The id is `BuildOutputLocation.folderIdentifier`** — the eight hex
+    /// characters the folder's container and builds folder are already named
+    /// by, from `FolderIdentity.canonicalPath` (#189). ONE derivation of
+    /// "which folder" across the product, rather than a second one here that
+    /// could disagree with it; two spellings of one folder give one label.
+    ///
+    /// **The id is a way of keeping two folders' files apart, not how a job
+    /// is FOUND.** Every reader finds a folder's jobs by the plist's
+    /// `WorkingDirectory` (`agents(inWorkingFolder:courseCode:sectionNumber:)`),
+    /// never by rebuilding this label — so a job set before #237, or one
+    /// whose id a later change to `canonicalPath` would compute differently,
+    /// is still shown, cancelled and replaced.
+    ///
+    /// The working folder is REQUIRED, the argument #236 made for the cancel:
+    /// an unscoped form of this must not compile.
+    nonisolated static func agentLabel(
+        courseCode: String,
+        sectionNumber: Int,
+        workingFolder workingFolderURL: URL
+    ) -> String {
+        let folderID: String = BuildOutputLocation.folderIdentifier(
+            forWorkingFolder: workingFolderURL.path
+        )
+        return legacyAgentLabel(courseCode: courseCode, sectionNumber: sectionNumber) + "." + folderID
+    }
+
+    /// The label every release before #237 wrote: the course code and the
+    /// section and nothing else, one per section for the whole Mac.
+    ///
+    /// **Never written any more; kept because such jobs are still on
+    /// teachers' Macs.** A deploy set before the update is left exactly as it
+    /// is on disk — not re-registered, not renamed — and it keeps working:
+    /// it is found by the folder scan like any other, shown, cancelled,
+    /// swept when too late, run, and replaced by the next schedule in its
+    /// own folder. One-shot jobs delete their own plist, so the old spelling
+    /// drains away by itself. See documentation/07-deployment.md, "One alarm
+    /// per working folder (#237)", for the three migrations rejected.
+    nonisolated static func legacyAgentLabel(courseCode: String, sectionNumber: Int) -> String {
         let code: String = sanitizedCode(courseCode)
         return "\(labelPrefix).\(code).section\(sectionNumber)"
+    }
+
+    /// The working folder's id a label ends with, or nil for a label written
+    /// before #237 (which ends `section<N>`).
+    ///
+    /// Exactly eight lowercase hex characters after the last dot. A legacy
+    /// label's last component always begins `section`, and course codes are
+    /// upper-cased by `sanitizedCode`, so the two spellings cannot be taken
+    /// for each other.
+    nonisolated static func folderID(fromLabel label: String) -> String? {
+        guard let lastDot = label.range(of: ".", options: .backwards) else {
+            return nil
+        }
+        let tail: String = String(label[lastDot.upperBound...])
+        if tail.count != 8 {
+            return nil
+        }
+        for character in tail {
+            let isDigit: Bool = character >= "0" && character <= "9"
+            let isLowerHex: Bool = character >= "a" && character <= "f"
+            if !isDigit && !isLowerHex {
+                return nil
+            }
+        }
+        return tail
+    }
+
+    /// The id a scheduled RUN keeps its notes under: the one baked into its
+    /// own label, or — for a job set before #237, whose label carries none —
+    /// the id of the working folder it names.
+    ///
+    /// The second is computed by the same `folderIdentifier` the app's
+    /// readers use on the open folder, so a record a pre-#237 job leaves is
+    /// filed where that folder's badge looks for it and nowhere else.
+    nonisolated static func folderIDForRun(
+        label: String?,
+        section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)
+    ) -> String {
+        if let label, let baked = folderID(fromLabel: label) {
+            return baked
+        }
+        let workingFolderURL: URL = section.courseDirectory
+            .deletingLastPathComponent()   // courses
+            .deletingLastPathComponent()   // the working folder
+        return BuildOutputLocation.folderIdentifier(forWorkingFolder: workingFolderURL.path)
     }
 
     /// A course code reduced to what a launchd label may carry. Codes are
@@ -159,9 +249,22 @@ enum ScheduledDeploy {
     ///
     /// A file rather than a line inside the plist, because launchd no longer
     /// runs it directly — see `agentPlist` for why. The app runs this file.
-    nonisolated static func scriptURL(courseCode: String, sectionNumber: Int) -> URL {
-        let label: String = agentLabel(courseCode: courseCode, sectionNumber: sectionNumber)
+    ///
+    /// Named by its LABEL, as every per-job file is: the label is the one
+    /// name a job carries on disk, and a job set before #237 has the old one.
+    nonisolated static func scriptURL(label: String) -> URL {
         return scheduledScriptsDirectoryURL().appendingPathComponent("\(label).sh")
+    }
+
+    /// The same, for the job this working folder would set now.
+    nonisolated static func scriptURL(
+        courseCode: String,
+        sectionNumber: Int,
+        inWorkingFolder workingFolderURL: URL
+    ) -> URL {
+        return scriptURL(label: agentLabel(
+            courseCode: courseCode, sectionNumber: sectionNumber, workingFolder: workingFolderURL
+        ))
     }
 
     /// The flag the agent launches the app with.
@@ -179,12 +282,15 @@ enum ScheduledDeploy {
     /// than an exit code because the script ends by booting its own agent
     /// out of launchd, so its status is `launchctl`'s and not the
     /// deploy's.
+    ///
+    /// Keyed by the job's LABEL: the wrapper has this path baked into it, so
+    /// the run that reads it back must take the label from the script it was
+    /// started with (`label(fromScriptPath:)`) and never rebuild one — a job
+    /// set before #237 writes the old name.
     nonisolated static func successSentinelURL(
-        courseCode: String,
-        sectionNumber: Int,
+        label: String,
         inHomeFolder home: URL? = nil
     ) -> URL {
-        let label: String = agentLabel(courseCode: courseCode, sectionNumber: sectionNumber)
         return (home ?? homeForScheduledNotes)
             .appendingPathComponent("Library")
             .appendingPathComponent("Application Support")
@@ -217,19 +323,14 @@ enum ScheduledDeploy {
     /// agent left registered cannot fire again — it is untidy rather than
     /// dangerous, and a failure here must not take a publish's own exit code
     /// with it.
-    nonisolated static func bootOutAgent(courseCode: String?, sectionNumber: Int?) {
-        guard let courseCode, let sectionNumber else {
-            return
-        }
-        bootOutAgent(label: agentLabel(courseCode: courseCode, sectionNumber: sectionNumber))
-    }
-
-    /// The same, for a caller that has the LABEL and not the pair.
     ///
-    /// A plist written before v1.2.0 carries no course code and no section
-    /// number — three `ProgramArguments`, no `--scheduled-section` — so the
-    /// stand-down path has only the label, taken from the wrapper script's own
-    /// name. Every plist any release ever wrote is named after its label.
+    /// By the LABEL, taken from the wrapper script's own name, and never
+    /// rebuilt from a course and section. A plist written before v1.2.0
+    /// carries no course code and no section number — three
+    /// `ProgramArguments`, no `--scheduled-section` — and one written before
+    /// #237 has the label without the folder id, so a rebuilt one would boot
+    /// out a job that does not exist and leave the real one loaded. Every
+    /// plist any release ever wrote is named after its label.
     ///
     /// It runs `/bin/launchctl` directly rather than through `LaunchControl`,
     /// so the refusal that guards every other launchctl call does not guard
@@ -258,9 +359,22 @@ enum ScheduledDeploy {
     /// Where this section's agent is written. `~/Library/LaunchAgents` is
     /// the teacher's own folder — no administrator rights, and nothing of
     /// ours outside it.
-    nonisolated static func plistURL(courseCode: String, sectionNumber: Int) -> URL {
-        let label: String = agentLabel(courseCode: courseCode, sectionNumber: sectionNumber)
+    nonisolated static func plistURL(label: String) -> URL {
         return launchAgentsDirectoryURL().appendingPathComponent("\(label).plist")
+    }
+
+    /// The same, for the job this working folder would set now. A job
+    /// already on disk is found by `agents(inWorkingFolder:…)` and carries
+    /// its own `plistURL`; rebuilding a name here would miss one set before
+    /// #237.
+    nonisolated static func plistURL(
+        courseCode: String,
+        sectionNumber: Int,
+        inWorkingFolder workingFolderURL: URL
+    ) -> URL {
+        return plistURL(label: agentLabel(
+            courseCode: courseCode, sectionNumber: sectionNumber, workingFolder: workingFolderURL
+        ))
     }
 
     /// A folder to write agents into instead of the teacher's own.
@@ -307,12 +421,13 @@ enum ScheduledDeploy {
     /// Where the agent's own output goes. A deploy that ran at half six
     /// with nobody watching has to have left something behind, or a
     /// failure is invisible until a student says the site is stale.
+    ///
+    /// Keyed by the LABEL, because launchd writes to the path baked into the
+    /// plist's `StandardOutPath` — the old name, for a job set before #237.
     nonisolated static func logURL(
-        courseCode: String,
-        sectionNumber: Int,
+        label: String,
         inHomeFolder home: URL? = nil
     ) -> URL {
-        let label: String = agentLabel(courseCode: courseCode, sectionNumber: sectionNumber)
         return (home ?? homeForScheduledNotes)
             .appendingPathComponent("Library")
             .appendingPathComponent("Logs")
@@ -410,12 +525,16 @@ enum ScheduledDeploy {
     ///
     /// The words are meant to be read aloud, so they say what has to be
     /// true of the Mac and what happens when it isn't.
+    ///
+    /// The working folder is the one the deploy would be set from: what it
+    /// would replace is read there and nowhere else (#237).
     static func plan(
         course: Course,
         sectionNumber: Int,
         when: Date,
         now: Date,
         cloudflareAccountID: String,
+        inWorkingFolder workingFolderURL: URL,
         locale: Locale = Locale.current
     ) -> ScheduledDeployPlan {
         return ScheduledDeployPlan(
@@ -433,7 +552,8 @@ enum ScheduledDeploy {
                 locale: locale
             ),
             replacing: momentBeingReplaced(
-                courseCode: course.code, sectionNumber: sectionNumber, by: when, now: now
+                courseCode: course.code, sectionNumber: sectionNumber, by: when,
+                inWorkingFolder: workingFolderURL, now: now
             ),
             locale: locale
         )
@@ -476,7 +596,9 @@ enum ScheduledDeploy {
         calendar: Calendar = Calendar.current,
         homeFolder: URL = RealHome.forFiles
     ) -> [String: Any] {
-        let label: String = agentLabel(courseCode: courseCode, sectionNumber: sectionNumber)
+        let label: String = agentLabel(
+            courseCode: courseCode, sectionNumber: sectionNumber, workingFolder: workspaceURL
+        )
         let components: DateComponents = calendar.dateComponents([.month, .day, .hour, .minute], from: when)
 
         var schedule: [String: Any] = [:]
@@ -543,7 +665,7 @@ enum ScheduledDeploy {
         plist["ProgramArguments"] = [
             Bundle.main.executableURL?.path ?? "/bin/bash",
             runFlag,
-            scriptURL(courseCode: courseCode, sectionNumber: sectionNumber).path,
+            scriptURL(label: label).path,
             sectionFlag,
             workspaceURL.path,
             courseCode,
@@ -552,8 +674,8 @@ enum ScheduledDeploy {
         plist["StartCalendarInterval"] = schedule
         plist["WorkingDirectory"] = workspaceURL.path
         plist["EnvironmentVariables"] = environment
-        plist["StandardOutPath"] = logURL(courseCode: courseCode, sectionNumber: sectionNumber).path
-        plist["StandardErrorPath"] = logURL(courseCode: courseCode, sectionNumber: sectionNumber).path
+        plist["StandardOutPath"] = logURL(label: label).path
+        plist["StandardErrorPath"] = logURL(label: label).path
         // Loading the agent must not deploy on the spot: the teacher's
         // "Go ahead" set an alarm, it did not consent to a deploy now.
         plist["RunAtLoad"] = false
@@ -591,11 +713,17 @@ enum ScheduledDeploy {
         // with the default writes its records there, not into real ones.
         homeFolder: URL = RealHome.forFiles
     ) -> String {
-        let label: String = agentLabel(courseCode: courseCode, sectionNumber: sectionNumber)
-        let plistPath: String = plistURL(courseCode: courseCode, sectionNumber: sectionNumber).path
+        let label: String = agentLabel(
+            courseCode: courseCode, sectionNumber: sectionNumber, workingFolder: workspaceURL
+        )
+        // The folder's id, baked in once, so every record this wrapper writes
+        // is the one THIS folder's badge reads (#237). Taken from the label
+        // rather than computed a second time, so the two cannot differ.
+        let thisFolderID: String = folderID(fromLabel: label) ?? ""
+        let plistPath: String = plistURL(label: label).path
         let scriptPath: String = workspaceURL.appendingPathComponent(DeployCommand.scriptName).path
         let logDirectory: String = logURL(
-            courseCode: courseCode, sectionNumber: sectionNumber, inHomeFolder: homeFolder
+            label: label, inHomeFolder: homeFolder
         ).deletingLastPathComponent().path
 
         // One line per configured destination. Deliberately NOT chained
@@ -725,10 +853,16 @@ enum ScheduledDeploy {
         // instant it was built and rebuild every single time.
         let stoppedDirectory: String = ScheduledPublishOutcome
             .directory(inHomeFolder: homeFolder).path
+        // Per working folder since #237. Once two folders can each hold ICS3U
+        // section 1, both wrappers can run the same morning, and the line
+        // below that clears LAST time's record would otherwise erase the
+        // other folder's failure — whichever finished last wearing the badge
+        // in both sidebars.
         let stoppedRecord: String = ScheduledPublishOutcome.recordURL(
             inHomeFolder: homeFolder,
             course: courseCode,
-            section: sectionNumber
+            section: sectionNumber,
+            folderID: thisFolderID
         ).path
         // Every record is assembled here and MOVED into place, so the app's
         // watch on the record folder sees one event carrying a whole file. See
@@ -737,7 +871,8 @@ enum ScheduledDeploy {
         let stoppedPartialRecord: String = ScheduledPublishOutcome.partialRecordURL(
             inHomeFolder: homeFolder,
             course: courseCode,
-            section: sectionNumber
+            section: sectionNumber,
+            folderID: thisFolderID
         ).path
 
         // Clear LAST time's record before this run does anything.
@@ -808,7 +943,7 @@ enum ScheduledDeploy {
         // published. The sentinel is what tells the app that, since this
         // script's own exit status belongs to `launchctl bootout` below.
         let sentinelPath: String = successSentinelURL(
-            courseCode: courseCode, sectionNumber: sectionNumber, inHomeFolder: homeFolder
+            label: label, inHomeFolder: homeFolder
         ).path
         lines.append("/bin/rm -f \(shellQuoted(sentinelPath))")
         lines.append("ALL_OK=\"$READY\"")
@@ -1001,9 +1136,11 @@ enum ScheduledDeploy {
     /// Sets the alarm. Returns nil on success, or what went wrong in words
     /// the teacher can act on.
     ///
-    /// Scheduling the same section twice replaces rather than stacks: the
-    /// label is fixed per section, and the previous agent is booted out
-    /// before the new one is written.
+    /// Scheduling the same section twice IN ONE WORKING FOLDER replaces rather
+    /// than stacks: the label is fixed per section and folder, and the
+    /// previous agent is booted out before the new one is written. The same
+    /// section in another working folder is another alarm, and is left alone
+    /// (#237).
     @discardableResult
     static func scheduleDeploy(
         course: Course,
@@ -1053,34 +1190,52 @@ enum ScheduledDeploy {
             workspaceURL: workspaceURL,
             deployArguments: deployArgumentsList.first ?? []
         )
-        let destinationURL: URL = plistURL(courseCode: course.code, sectionNumber: sectionNumber)
+        let label: String = agentLabel(
+            courseCode: course.code, sectionNumber: sectionNumber, workingFolder: workspaceURL
+        )
+        let destinationURL: URL = plistURL(label: label)
 
         // What is about to be replaced, read BEFORE it goes (issue #195): once
         // the old agent is booted out and its plist overwritten, nothing
         // anywhere remembers it was ever set. Read here, in the one function
         // the sheet, the assistant and an outside assistant all reach, so the
-        // trail line cannot be missing from one of them.
+        // trail line cannot be missing from one of them. THIS folder's only
+        // since #237 — another folder's deploy of the same section is not
+        // touched by what follows, so it is not being replaced.
         let replacing: Date? = momentBeingReplaced(
-            courseCode: course.code, sectionNumber: sectionNumber, by: when
+            courseCode: course.code, sectionNumber: sectionNumber, by: when,
+            inWorkingFolder: workspaceURL
         )
-        // What is on this Mac for the section AT ALL, same minute included —
-        // for the record of a replacement that fails, which must say what was
-        // lost even when the card rightly said nothing.
+        // What is on this Mac for the section in this folder AT ALL, same
+        // minute included — for the record of a replacement that fails, which
+        // must say what was lost even when the card rightly said nothing.
         let alreadySet: Date? = momentAlreadySet(
-            courseCode: course.code, sectionNumber: sectionNumber
+            courseCode: course.code, sectionNumber: sectionNumber, inWorkingFolder: workspaceURL
+        )
+        // Every job THIS folder already has for the section, found by the
+        // folder scan rather than by name: the one under this label, and one
+        // set before #237 under the old label, which would otherwise be left
+        // beside the new one and publish the section twice. Another folder's
+        // job of the same section is not in this list, and is left standing —
+        // that is the fix.
+        let existing: [Agent] = agents(
+            inWorkingFolder: workspaceURL, courseCode: course.code, sectionNumber: sectionNumber
         )
 
         // Anything already scheduled for this section goes first, so the
-        // replacement is never briefly a second agent.
-        runner.bootOut(label: agentLabel(courseCode: course.code, sectionNumber: sectionNumber))
+        // replacement is never briefly a second agent. Booted out only: the
+        // plists stay on disk until the new job is ACCEPTED, so a failure
+        // below can hand them straight back to macOS (#237's review, M1).
+        runner.bootOut(label: label)
+        for agent in existing where agent.label != label {
+            runner.bootOut(label: agent.label)
+        }
 
         do {
             // The script the app will run, written beside nothing else and
             // executable, so launchd's job is only "start Plantoir with this
             // file" and every decision stays in one place.
-            let commandURL: URL = ScheduledDeploy.scriptURL(
-                courseCode: course.code, sectionNumber: sectionNumber
-            )
+            let commandURL: URL = ScheduledDeploy.scriptURL(label: label)
             try FileManager.default.createDirectory(
                 at: commandURL.deletingLastPathComponent(),
                 withIntermediateDirectories: true
@@ -1110,11 +1265,11 @@ enum ScheduledDeploy {
             try data.write(to: destinationURL, options: [.atomic])
         } catch {
             // Every step that can throw comes before, or IS, the atomic plist
-            // write — so the OLD plist is still on disk, only booted out. Put
-            // it back in front of macOS, so that "it still stands" is true now
-            // rather than from the next login, and say so.
+            // write — so every OLD plist is still on disk, only booted out.
+            // Put them back in front of macOS, so that "it still stands" is
+            // true now rather than from the next login, and say so.
             noteTheOldDeployAfterAFailedWrite(
-                alreadySet, at: destinationURL, runner: runner,
+                alreadySet, plists: plistURLs(of: existing), runner: runner,
                 when: when, course: course, sectionNumber: sectionNumber
             )
             return "The scheduled deploy could not be written: \(error.localizedDescription)"
@@ -1128,8 +1283,35 @@ enum ScheduledDeploy {
                 course: course.code,
                 section: sectionNumber
             )
-            noteTheReplacedDeployWasLost(alreadySet, course: course, sectionNumber: sectionNumber)
+            // A job under ANOTHER name — one set before #237 — still has its
+            // plist, because nothing is deleted until the new job is accepted.
+            // Hand it back rather than lose it. A job under THIS label was
+            // overwritten by the write above and is gone, as it always was.
+            var otherNames: [URL] = []
+            for agent in existing where agent.label != label {
+                otherNames.append(agent.plistURL)
+            }
+            if !otherNames.isEmpty && bootstrapEveryOne(of: otherNames, runner: runner),
+               let alreadySet {
+                ActivityTrail.note(
+                    .scheduledDeployCouldNotBeSet,
+                    "could not set a scheduled deploy for \(dayAndTimeText(when)); "
+                        + "the one set for \(dayAndTimeText(alreadySet)) still stands",
+                    course: course.code,
+                    section: sectionNumber
+                )
+            } else {
+                noteTheReplacedDeployWasLost(alreadySet, course: course, sectionNumber: sectionNumber)
+            }
             return "macOS would not accept the scheduled deploy: \(failure)"
+        }
+
+        // The new job is in. NOW the old ones under other names go — plist and
+        // wrapper both, the way a cancel takes them, so no runnable copy is
+        // left on disk.
+        for agent in existing where agent.label != label {
+            try? FileManager.default.removeItem(at: agent.plistURL)
+            try? FileManager.default.removeItem(at: ScheduledDeploy.scriptURL(label: agent.label))
         }
         if let replacing {
             // "It went on Saturday; I set it for Friday" is otherwise a report
@@ -1145,19 +1327,47 @@ enum ScheduledDeploy {
         return nil
     }
 
-    /// The new deploy's files could not be written. The old one's plist is
+    /// The plist of every job in a list.
+    private static func plistURLs(of agents: [Agent]) -> [URL] {
+        var result: [URL] = []
+        for agent in agents {
+            result.append(agent.plistURL)
+        }
+        return result
+    }
+
+    /// Hands every plist still on disk back to macOS. True only when there was
+    /// at least one and every one was accepted.
+    private static func bootstrapEveryOne(of plists: [URL], runner: LaunchControlRunning) -> Bool {
+        var anyRestored: Bool = false
+        var allRestored: Bool = true
+        for plist in plists {
+            if !FileManager.default.fileExists(atPath: plist.path) {
+                continue
+            }
+            if runner.bootstrap(plistURL: plist) == nil {
+                anyRestored = true
+            } else {
+                allRestored = false
+            }
+        }
+        return anyRestored && allRestored
+    }
+
+    /// The new deploy's files could not be written. The old ones' plists are
     /// untouched on disk (the write that failed is atomic, and everything
-    /// before it writes elsewhere), but it was booted out a moment ago — so it
-    /// is handed back to macOS, and the trail says what is TRUE: the deploy
-    /// already set still stands, or, if macOS would not take it back, that it
-    /// was turned off. Silent when nothing was set.
+    /// before it writes elsewhere), but they were booted out a moment ago — so
+    /// they are handed back to macOS, and the trail says what is TRUE: the
+    /// deploy already set still stands, or, if macOS would not take it back,
+    /// that it was turned off. Silent when nothing was set.
     ///
     /// Known and left as it was: the one-shot script is written BEFORE the
     /// plist, at the same path for the section, so an old plist restored here
-    /// runs whatever script the failed attempt managed to write.
+    /// runs whatever script the failed attempt managed to write. (Only for a
+    /// job under THIS label; one set before #237 has its own script.)
     private static func noteTheOldDeployAfterAFailedWrite(
         _ alreadySet: Date?,
-        at plistURL: URL,
+        plists: [URL],
         runner: LaunchControlRunning,
         when: Date,
         course: Course,
@@ -1170,8 +1380,7 @@ enum ScheduledDeploy {
             )
             return
         }
-        if FileManager.default.fileExists(atPath: plistURL.path)
-            && runner.bootstrap(plistURL: plistURL) == nil {
+        if bootstrapEveryOne(of: plists, runner: runner) {
             ActivityTrail.note(
                 .scheduledDeployCouldNotBeSet,
                 notSet + "; the one set for \(dayAndTimeText(alreadySet)) still stands",
@@ -1285,6 +1494,15 @@ enum ScheduledDeploy {
             }
         }
 
+        // The job's own name, from the script it was started with — NEVER
+        // rebuilt from the course, section and folder (#237). On a Mac that
+        // has just been updated every pending job carries the label from
+        // before #237, and its wrapper has that label's log and success note
+        // baked in: a rebuilt label would read an empty log, miss the success
+        // note (the section left " — Edited" after a good publish) and boot
+        // out a job that does not exist, leaving the real one loaded.
+        let label: String? = ScheduledDeploy.label(fromScriptPath: script)
+
         // Taken BEFORE anything runs, for the same reason the Deploy
         // button takes it before its own build: a page edited while an
         // overnight publish is running did not go out, and stamping the
@@ -1298,9 +1516,9 @@ enum ScheduledDeploy {
             )
             // launchd APPENDS to this log and nothing truncates it, so where it
             // ends now is where this run's own output begins.
-            logSizeBeforeRunning = logSize(
-                courseCode: section.courseCode, sectionNumber: section.sectionNumber
-            )
+            if let label {
+                logSizeBeforeRunning = logSize(label: label)
+            }
         }
 
         let process: Process = Process()
@@ -1315,10 +1533,14 @@ enum ScheduledDeploy {
         do {
             try process.run()
             process.waitUntilExit()
-            recordScheduledPublish(section: section, fingerprint: fingerprintBeforeRunning)
+            recordScheduledPublish(
+                label: label, section: section, fingerprint: fingerprintBeforeRunning
+            )
             // Publishes regardless; the findings are kept for somebody to read
             // when they are next at the machine.
-            recordFolderProblems(section: section, fromByteOffset: logSizeBeforeRunning)
+            recordFolderProblems(
+                label: label, section: section, fromByteOffset: logSizeBeforeRunning
+            )
             // The trail line for a run that stopped, written HERE rather than
             // when a teacher opens the section. This process IS Plantoir
             // (--run-scheduled-deploy), so the redactor and the trail are
@@ -1326,10 +1548,23 @@ enum ScheduledDeploy {
             // the one who reports "my site did not update", so a line that
             // waits for them to look is a line they never get.
             if let section {
+                let folderID: String = folderIDForRun(label: label, section: section)
+                // A job set before #237 ran a wrapper that wrote the record
+                // under the old, folder-less name. File it under this folder's
+                // before anything reads it, so the badge that shows it is this
+                // folder's and never another's.
+                ScheduledPublishOutcome.fileUnderTheFolder(
+                    inHomeFolder: RealHome.forFiles,
+                    course: section.courseCode,
+                    section: section.sectionNumber,
+                    folderID: folderID,
+                    jobLabel: label
+                )
                 ScheduledPublishOutcome.noteOnTrail(
                     inHomeFolder: RealHome.forFiles,
                     course: section.courseCode,
-                    section: section.sectionNumber
+                    section: section.sectionNumber,
+                    folderID: folderID
                 )
             }
             // The build and the publish are over, so the leases go before
@@ -1342,11 +1577,20 @@ enum ScheduledDeploy {
             // oneShotCommand: this used to be the wrapper's final line, which
             // killed this process before any of the three calls above ran.
             // The notification (#212) goes out first, for the same reason.
+            // The job is booted out by the LABEL it was started with (#237).
             let status: Int32 = process.terminationStatus
             let courseCode: String? = section?.courseCode
             let sectionNumber: Int? = section?.sectionNumber
-            announceThenLeave(courseCode: courseCode, sectionNumber: sectionNumber) {
-                bootOutAgent(courseCode: courseCode, sectionNumber: sectionNumber)
+            var noticeFolderID: String?
+            if let section {
+                noticeFolderID = folderIDForRun(label: label, section: section)
+            }
+            announceThenLeave(
+                courseCode: courseCode, sectionNumber: sectionNumber, folderID: noticeFolderID
+            ) {
+                if let label {
+                    bootOutAgent(label: label)
+                }
                 exit(status)
             }
         } catch {
@@ -1573,12 +1817,14 @@ enum ScheduledDeploy {
 
         if let section {
             let home: URL = RealHome.forFiles
+            let folderID: String = folderIDForRun(label: label(fromScriptPath: script), section: section)
             // Anything an earlier run left is cleared first — the same thing
             // the wrapper does with its own first line, and for the same
             // reason: `recordStopped` keeps the FIRST record, so last week's
             // would block today's from being written at all.
             ScheduledPublishOutcome.clear(
-                inHomeFolder: home, course: section.courseCode, section: section.sectionNumber
+                inHomeFolder: home, course: section.courseCode, section: section.sectionNumber,
+                folderID: folderID
             )
             ScheduledPublishOutcome.recordStopped(
                 ScheduledPublishOutcome.Stopped(
@@ -1588,15 +1834,23 @@ enum ScheduledDeploy {
                 ),
                 inHomeFolder: home,
                 course: section.courseCode,
-                section: section.sectionNumber
+                section: section.sectionNumber,
+                folderID: folderID
             )
             ScheduledPublishOutcome.noteOnTrail(
-                inHomeFolder: home, course: section.courseCode, section: section.sectionNumber
+                inHomeFolder: home, course: section.courseCode, section: section.sectionNumber,
+                folderID: folderID
             )
         }
 
         let jobLabel: String? = label(fromScriptPath: script)
-        announceThenLeave(courseCode: section?.courseCode, sectionNumber: section?.sectionNumber) {
+        var noticeFolderID: String?
+        if let section {
+            noticeFolderID = folderIDForRun(label: jobLabel, section: section)
+        }
+        announceThenLeave(
+            courseCode: section?.courseCode, sectionNumber: section?.sectionNumber, folderID: noticeFolderID
+        ) {
             if let jobLabel {
                 bootOutAgent(label: jobLabel)
             }
@@ -1629,17 +1883,22 @@ enum ScheduledDeploy {
     /// The wait is bounded (`ScheduledPublishNotice.ceiling`), so a
     /// notification service that never answers cannot keep a finished run
     /// alive.
+    ///
+    /// `folderID` is the working folder's id the run's record is filed under
+    /// (`folderIDForRun`, #237) — the notification is keyed by it too.
     nonisolated static func announceThenLeave(
         courseCode: String?,
         sectionNumber: Int?,
+        folderID: String?,
         leave: @escaping @Sendable () -> Never
     ) -> Never {
-        guard let courseCode, let sectionNumber else {
+        guard let courseCode, let sectionNumber, let folderID else {
             leave()
         }
         Task { @MainActor in
             await ScheduledPublishNotice.announce(
-                inHomeFolder: RealHome.forFiles, course: courseCode, section: sectionNumber
+                inHomeFolder: RealHome.forFiles, course: courseCode, section: sectionNumber,
+                folderID: folderID
             )
             leave()
         }
@@ -1661,12 +1920,21 @@ enum ScheduledDeploy {
     /// Beside the success sentinel and consumed the same way, because the
     /// shape is already proven here: a one-shot run writes a small file, the
     /// app reads it and deletes it.
+    ///
+    /// Named after the section AND the working folder (#237), whatever label
+    /// the run that wrote it had: the run writes it in Swift, so a job set
+    /// before #237 files its findings under the new name too
+    /// (`folderIDForRun`), and the section's window reads only that. Two
+    /// folders holding the same section therefore never read — and consume —
+    /// each other's.
     nonisolated static func findingsSentinelURL(
         courseCode: String,
         sectionNumber: Int,
+        folderID: String,
         inHomeFolder home: URL? = nil
     ) -> URL {
-        let label: String = agentLabel(courseCode: courseCode, sectionNumber: sectionNumber)
+        let label: String = legacyAgentLabel(courseCode: courseCode, sectionNumber: sectionNumber)
+            + "." + folderID
         return (home ?? homeForScheduledNotes)
             .appendingPathComponent("Library")
             .appendingPathComponent("Application Support")
@@ -1705,17 +1973,20 @@ enum ScheduledDeploy {
     /// is read whole (`textOfLog`), so after a rotation mid-run an older
     /// night's findings are noted again — the sentinel has always had the
     /// same edge.
+    ///
+    /// The LOG is the job's own (its label, from the script); the findings go
+    /// under the section and the working FOLDER (`folderIDForRun`), so that a
+    /// job set before #237 files them where this folder's window looks.
     nonisolated static func recordFolderProblems(
+        label: String?,
         section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)?,
         fromByteOffset offset: UInt64,
         inHomeFolder home: URL? = nil
     ) {
-        guard let section else {
+        guard let label, let section else {
             return
         }
-        let log: URL = logURL(
-            courseCode: section.courseCode, sectionNumber: section.sectionNumber, inHomeFolder: home
-        )
+        let log: URL = logURL(label: label, inHomeFolder: home)
         guard let text = textOfLog(at: log, fromByteOffset: offset) else {
             return
         }
@@ -1736,7 +2007,10 @@ enum ScheduledDeploy {
             }
         }
         let sentinel: URL = findingsSentinelURL(
-            courseCode: section.courseCode, sectionNumber: section.sectionNumber, inHomeFolder: home
+            courseCode: section.courseCode,
+            sectionNumber: section.sectionNumber,
+            folderID: folderIDForRun(label: label, section: section),
+            inHomeFolder: home
         )
         if markerLines.isEmpty {
             // Nothing wrong this time: clear anything an earlier run left, so
@@ -1798,11 +2072,10 @@ enum ScheduledDeploy {
     /// teacher who fixed the folder would have gone on being told about it
     /// forever.
     nonisolated static func logSize(
-        courseCode: String,
-        sectionNumber: Int,
+        label: String,
         inHomeFolder home: URL? = nil
     ) -> UInt64 {
-        let log: URL = logURL(courseCode: courseCode, sectionNumber: sectionNumber, inHomeFolder: home)
+        let log: URL = logURL(label: label, inHomeFolder: home)
         let attributes = try? FileManager.default.attributesOfItem(atPath: log.path)
         return (attributes?[.size] as? UInt64) ?? 0
     }
@@ -1826,13 +2099,22 @@ enum ScheduledDeploy {
     /// Notes NOTHING on the trail: the run itself already did, dated to the
     /// run (`recordFolderProblems`), so a finding is one trail line whether or
     /// not anybody ever opens the section.
+    ///
+    /// THIS working folder's only (#237): another folder holding the same
+    /// section keeps its own, and is not robbed of it by this one opening
+    /// first. A findings file written before #237 carries no folder and is not
+    /// read — it would be another folder's as often as this one's.
     nonisolated static func takeFolderProblems(
         courseCode: String,
         sectionNumber: Int,
+        inWorkingFolder workingFolderURL: URL,
         inHomeFolder home: URL? = nil
     ) -> [SiteHealthFinding] {
         let sentinel: URL = findingsSentinelURL(
-            courseCode: courseCode, sectionNumber: sectionNumber, inHomeFolder: home
+            courseCode: courseCode,
+            sectionNumber: sectionNumber,
+            folderID: BuildOutputLocation.folderIdentifier(forWorkingFolder: workingFolderURL.path),
+            inHomeFolder: home
         )
         guard let text = try? String(contentsOf: sentinel, encoding: .utf8) else {
             return []
@@ -1844,17 +2126,19 @@ enum ScheduledDeploy {
     /// Marks the section's pages as published, if the script said every
     /// destination worked. The sentinel is consumed either way, so a run
     /// that failed cannot be read as a success by the next one.
+    ///
+    /// Read under the job's own LABEL — the name its wrapper wrote — never a
+    /// rebuilt one (#237; see `runScheduled`).
     nonisolated static func recordScheduledPublish(
+        label: String?,
         section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)?,
         fingerprint: String?,
         inHomeFolder home: URL? = nil
     ) {
-        guard let section, let fingerprint else {
+        guard let label, let section, let fingerprint else {
             return
         }
-        let sentinel: URL = successSentinelURL(
-            courseCode: section.courseCode, sectionNumber: section.sectionNumber, inHomeFolder: home
-        )
+        let sentinel: URL = successSentinelURL(label: label, inHomeFolder: home)
         guard let written = try? String(contentsOf: sentinel, encoding: .utf8) else {
             return
         }
@@ -1874,24 +2158,20 @@ enum ScheduledDeploy {
     /// Takes the alarm off. Returns nil on success.
     ///
     /// **The working folder is REQUIRED, and that is the point of it.** A
-    /// label is the course code and the section number and nothing else, so
-    /// this names one file per code and section for the whole Mac — and a
-    /// caller that did not think about which folder it meant would cancel
-    /// another working folder's live deploy and report success. Every caller
-    /// used to have to remember to ask first; one of them did not
+    /// caller that did not think about which folder it meant would once have
+    /// cancelled another working folder's live deploy and reported success.
+    /// Every caller used to have to remember to ask first; one of them did not
     /// (`AssistToolRunner.turnOffAnyScheduledPublish`, the rollover path, until
     /// 2026-09-20), and a rule enforced by everybody remembering is a rule
     /// with a hole in it. Making the parameter mandatory means the unscoped
     /// form cannot be written by accident.
     ///
-    /// **A job belonging to another folder is LEFT ALONE and reported as
-    /// success**, deliberately. It is not a failure — there is nothing of this
-    /// folder's to turn off, which is the same answer as "there was never one
-    /// set", and that is already what this returns for a missing agent. Saying
-    /// otherwise would put a problem in front of a teacher about a course they
-    /// are not looking at. In practice no caller reaches it: each one asks
-    /// `ScheduledDeployCleanup.agentsOwnedBy` or a folder-scoped `nextRun`
-    /// first, and this is the backstop under those.
+    /// **Everything this folder has for the section goes**, found by the
+    /// folder scan: the job under this folder's label and one set before #237
+    /// under the old label, each by the name it really has. **A job belonging
+    /// to another folder is LEFT ALONE and reported as success**, deliberately
+    /// — there is nothing of this folder's to turn off, which is the same
+    /// answer as "there was never one set".
     @discardableResult
     static func cancelScheduledDeploy(
         courseCode: String,
@@ -1899,21 +2179,41 @@ enum ScheduledDeploy {
         inWorkingFolder workingFolderURL: URL,
         runner: LaunchControlRunning = LaunchControl()
     ) -> String? {
-        let destinationURL: URL = plistURL(courseCode: courseCode, sectionNumber: sectionNumber)
-        if let agent = agent(readingPlistAt: destinationURL) {
-            if physicalPath(agent.workingFolderPath) != physicalPath(workingFolderURL.path) {
-                return nil
+        let ours: [Agent] = agents(
+            inWorkingFolder: workingFolderURL, courseCode: courseCode, sectionNumber: sectionNumber
+        )
+        if ours.isEmpty {
+            // Nothing on disk, but a job can still be LOADED with its plist
+            // already gone — a wrapper removes its own plist first. Only this
+            // folder's own label is safe to boot out blind: since #237 it
+            // cannot name another folder's job.
+            let label: String = agentLabel(
+                courseCode: courseCode, sectionNumber: sectionNumber, workingFolder: workingFolderURL
+            )
+            runner.bootOut(label: label)
+            try? FileManager.default.removeItem(at: scriptURL(label: label))
+            return nil
+        }
+        for agent in ours {
+            if let problem = cancel(agent: agent, runner: runner) {
+                return problem
             }
         }
-        runner.bootOut(label: agentLabel(courseCode: courseCode, sectionNumber: sectionNumber))
+        return nil
+    }
+
+    /// Takes one job off, by the name it really has — its own label and its
+    /// own plist, read off disk — rather than one rebuilt from the course,
+    /// which for a job set before #237 would name a job that does not exist.
+    @discardableResult
+    static func cancel(agent: Agent, runner: LaunchControlRunning) -> String? {
+        runner.bootOut(label: agent.label)
         // The script goes with the alarm. A cancelled deploy that left its
         // command behind would leave a runnable copy of itself on disk.
-        try? FileManager.default.removeItem(
-            at: scriptURL(courseCode: courseCode, sectionNumber: sectionNumber)
-        )
-        if FileManager.default.fileExists(atPath: destinationURL.path) {
+        try? FileManager.default.removeItem(at: scriptURL(label: agent.label))
+        if FileManager.default.fileExists(atPath: agent.plistURL.path) {
             do {
-                try FileManager.default.removeItem(at: destinationURL)
+                try FileManager.default.removeItem(at: agent.plistURL)
             } catch {
                 return "The scheduled deploy could not be removed: \(error.localizedDescription)"
             }
@@ -1921,82 +2221,67 @@ enum ScheduledDeploy {
         return nil
     }
 
-    /// When this section is next set to deploy on its own, or nil when
-    /// nothing is scheduled.
+    /// When this section is next set to deploy on its own IN THIS WORKING
+    /// FOLDER, or nil when nothing is scheduled there.
     ///
-    /// Read back from the agent itself rather than from a note of our own.
-    /// The teacher can delete the agent from `~/Library/LaunchAgents`
+    /// Read back from the agents themselves rather than from a note of our
+    /// own. The teacher can delete an agent from `~/Library/LaunchAgents`
     /// without telling us, and a badge promising a deploy that will never
     /// happen is worse than no badge at all.
     ///
-    /// **Pass the working folder wherever there is one.** A label is the
-    /// course code and section and nothing else, so without it this answers
-    /// about the one agent that code and section have Mac-wide — which, for a
-    /// teacher holding last year's working folder and this year's, is a clock
-    /// shown in the folder that does not own it and a Cancel item beside it.
-    /// It stays optional because a few tests ask the question with no folder
-    /// in hand.
+    /// **Found by the folder scan, not by rebuilding the label** (#237): a
+    /// job set before #237 has the old label and is shown all the same. When
+    /// the folder somehow holds two jobs for the section — one set before the
+    /// update, left by an older copy of the app still running — the EARLIER
+    /// is the one shown, since that is the next thing that will happen.
     static func nextRun(
         courseCode: String,
         sectionNumber: Int,
         now: Date = Date(),
-        inWorkingFolder workingFolderURL: URL? = nil
+        inWorkingFolder workingFolderURL: URL
     ) -> Date? {
-        let destinationURL: URL = plistURL(courseCode: courseCode, sectionNumber: sectionNumber)
-        guard let data = try? Data(contentsOf: destinationURL) else {
-            return nil
-        }
-        guard let decoded = try? PropertyListSerialization.propertyList(from: data, format: nil) else {
-            return nil
-        }
-        guard let plist = decoded as? [String: Any] else {
-            return nil
-        }
-        if let workingFolderURL {
-            let named: String = plist["WorkingDirectory"] as? String ?? ""
-            if physicalPath(named) != physicalPath(workingFolderURL.path) {
-                return nil
+        var earliest: Date?
+        for agent in agents(
+            inWorkingFolder: workingFolderURL, courseCode: courseCode, sectionNumber: sectionNumber
+        ) {
+            // An agent whose moment has passed has either just fired and is
+            // clearing itself away, or was left behind by a Mac that was off.
+            // Either way it is not a promise worth showing.
+            guard let moment = agent.scheduledFor, moment > now else {
+                continue
             }
+            if let soonestSoFar = earliest, soonestSoFar <= moment {
+                continue
+            }
+            earliest = moment
         }
-        guard let environment = plist["EnvironmentVariables"] as? [String: String] else {
-            return nil
-        }
-        guard let stamp = environment[scheduledForKey] else {
-            return nil
-        }
-        guard let moment = ISO8601DateFormatter().date(from: stamp) else {
-            return nil
-        }
-        // An agent whose moment has passed has either just fired and is
-        // clearing itself away, or was left behind by a Mac that was off.
-        // Either way it is not a promise worth showing.
-        if moment <= now {
-            return nil
-        }
-        return moment
+        return earliest
     }
 
-    /// When the one deploy this section has on this Mac is set for — from
-    /// ANY working folder — or nil when there is none or its moment has gone
-    /// by. The reading behind both `momentBeingReplaced` (which then leaves
-    /// out the same minute, for what a teacher is TOLD) and the record of a
-    /// replacement that failed (which must not: a same-minute job lost is
-    /// still lost).
+    /// When the deploy this section has in THIS working folder is set for, or
+    /// nil when there is none or its moment has gone by. The reading behind
+    /// both `momentBeingReplaced` (which then leaves out the same minute, for
+    /// what a teacher is TOLD) and the record of a replacement that failed
+    /// (which must not: a same-minute job lost is still lost).
+    ///
+    /// **Folder-scoped since #237, reversing #195's "read Mac-wide, on
+    /// purpose".** That reading existed because scheduling overwrote the one
+    /// job the section had on the whole Mac, whichever folder set it; now it
+    /// cannot, so a Mac-wide reading would name, on this folder's card, a
+    /// deploy this folder's scheduling no longer touches.
     ///
     /// Under the test suite this reads ONLY a folder a test chose. The card
     /// reads this whenever a scheduled deploy is proposed, and tests that put
     /// one up without moving the agents folder would otherwise read the real
-    /// `~/Library/LaunchAgents` of whoever runs the suite — passing whatever
-    /// that Mac has scheduled, which is the #240 fault arriving through a new
-    /// door. A test that wants one sets `launchAgentsDirectoryOverride`, as
-    /// every scheduling test already does. (Since #240
-    /// `launchAgentsDirectoryURL()` itself answers an empty throwaway folder
-    /// under the suite, so this is now the second of two guards; it stays
-    /// because it also keeps a plist some other test left in that shared
-    /// throwaway folder from being read as a deploy to replace.)
+    /// `~/Library/LaunchAgents` of whoever runs the suite — the #240 fault
+    /// arriving through a new door. (Since #240 `launchAgentsDirectoryURL()`
+    /// itself answers an empty throwaway folder under the suite, so this is
+    /// the second of two guards; it stays because it also keeps a plist some
+    /// other test left in that shared throwaway folder from being read.)
     static func momentAlreadySet(
         courseCode: String,
         sectionNumber: Int,
+        inWorkingFolder workingFolderURL: URL,
         now: Date = Date()
     ) -> Date? {
         if WorkspaceModel.isRunningTests && launchAgentsDirectoryOverride == nil {
@@ -2006,32 +2291,32 @@ enum ScheduledDeploy {
             courseCode: courseCode,
             sectionNumber: sectionNumber,
             now: now,
-            inWorkingFolder: nil
+            inWorkingFolder: workingFolderURL
         )
     }
 
-    /// When the deploy that scheduling this section for `when` would REPLACE
-    /// is set for — or nil when there is none, or when it is set for that
-    /// same minute and so replaces nothing a teacher would notice (issue #195).
+    /// When the deploy that scheduling this section for `when` in this working
+    /// folder would REPLACE is set for — or nil when there is none, or when it
+    /// is set for that same minute and so replaces nothing a teacher would
+    /// notice (issue #195).
     ///
-    /// **Deliberately NOT scoped to a working folder**, unlike every other
-    /// reader of `nextRun` that has a folder in hand. `scheduleDeploy` writes
-    /// to `plistURL`, which is one file per course code and section for the
-    /// whole Mac, so the job it overwrites may have been set from ANOTHER
-    /// working folder — last year's, holding the same code. Asking with this
-    /// folder would answer nil in exactly that case, and stay silent about
-    /// the replacement nobody could see coming. A moment already past is nil
-    /// here as it is in `nextRun`: a job that has fired, or was left by a Mac
-    /// that was off, is not a promise being broken.
+    /// **Scoped to the working folder since #237.** It used to be read
+    /// Mac-wide on purpose, because `scheduleDeploy` overwrote the one job a
+    /// section had on the whole Mac; now another folder's job of the same
+    /// section is a different alarm that scheduling here leaves standing, so
+    /// saying it is "replaced" would be false. A moment already past is nil
+    /// here as it is in `nextRun`.
     static func momentBeingReplaced(
         courseCode: String,
         sectionNumber: Int,
         by when: Date,
+        inWorkingFolder workingFolderURL: URL,
         now: Date = Date(),
         calendar: Calendar = Calendar.current
     ) -> Date? {
         guard let existing = momentAlreadySet(
-            courseCode: courseCode, sectionNumber: sectionNumber, now: now
+            courseCode: courseCode, sectionNumber: sectionNumber,
+            inWorkingFolder: workingFolderURL, now: now
         ) else {
             return nil
         }
@@ -2072,25 +2357,33 @@ enum ScheduledDeploy {
     /// Every scheduled deploy that belongs to ONE working folder.
     ///
     /// **Scoped by the plist's `WorkingDirectory`, and this is the half that
-    /// is easy to leave out.** A label is the course code and the section
-    /// number and nothing else, so `plistURL` names ONE file per code and
-    /// section for the whole Mac. A teacher with last year's working folder
-    /// and this year's, both holding ICS3U section 1, has one alarm between
-    /// them — and asking "does this course have a scheduled deploy?" by
-    /// looking for a file would answer yes in the folder that does not own it.
-    /// Removing the course there would then cancel THIS year's deploy and
-    /// report success.
-    ///
-    /// (That the two folders share one alarm at all is a separate fault, filed
-    /// as its own issue: a folder-scoped label would orphan every plist a
-    /// teacher already holds, which is its own migration. What is fixed here
-    /// is that nothing acts on, or shows, a job belonging to a folder that is
-    /// not open.)
+    /// is easy to leave out.** Until #237 a label was the course code and the
+    /// section number and nothing else, so one file per code and section
+    /// stood for the whole Mac, and asking "does this course have a scheduled
+    /// deploy?" by looking for a file answered yes in the folder that did not
+    /// own it. Since #237 a new label carries the folder's id — but a job set
+    /// before the update still has the old one, and the id is a way of keeping
+    /// two folders' files apart, never how a folder's jobs are FOUND. This
+    /// scan is how they are found, by every reader: the clock, the card, the
+    /// cancel, a removal, a rename, the sweep.
     ///
     /// Nothing is asked of launchd and nothing outside `labelPrefix` is read —
     /// the prefix exists for exactly this reason.
     nonisolated static func agents(inWorkingFolder workingFolderURL: URL) -> [Agent] {
-        let wanted: String = physicalPath(workingFolderURL.path)
+        return agents(inWorkingFolder: workingFolderURL, courseCode: nil, sectionNumber: nil)
+    }
+
+    /// The same, for one course — and, given one, one section.
+    ///
+    /// A file whose NAME names another course or section is passed over
+    /// without being opened (both codes sanitised, since a pre-v1.2.0 plist's
+    /// code comes back only from its label), so the sidebar's clock reads the
+    /// one or two plists that can be this section's rather than every one.
+    nonisolated static func agents(
+        inWorkingFolder workingFolderURL: URL,
+        courseCode: String?,
+        sectionNumber: Int?
+    ) -> [Agent] {
         guard let entries = try? FileManager.default.contentsOfDirectory(
             at: launchAgentsDirectoryURL(),
             includingPropertiesForKeys: nil,
@@ -2098,6 +2391,11 @@ enum ScheduledDeploy {
         ) else {
             return []
         }
+        var wantedCode: String?
+        if let courseCode {
+            wantedCode = sanitizedCode(courseCode)
+        }
+        let wanted: String = physicalPath(workingFolderURL.path)
 
         var found: [Agent] = []
         for entry in entries {
@@ -2105,7 +2403,22 @@ enum ScheduledDeploy {
             if !name.hasPrefix(labelPrefix) || !name.hasSuffix(".plist") {
                 continue
             }
-            guard let agent = agent(readingPlistAt: entry) else {
+            if wantedCode != nil || sectionNumber != nil {
+                let labelFromName: String = String(name.dropLast(".plist".count))
+                guard let named = codeAndSection(fromLabel: labelFromName) else {
+                    continue
+                }
+                if let wantedCode, sanitizedCode(named.courseCode) != wantedCode {
+                    continue
+                }
+                if let sectionNumber, named.sectionNumber != sectionNumber {
+                    continue
+                }
+            }
+            // Named in the agents folder's own spelling, the one every other
+            // path here is built from, rather than the listing's (which can
+            // come back with `/private` added).
+            guard let agent = agent(readingPlistAt: launchAgentsDirectoryURL().appendingPathComponent(name)) else {
                 continue
             }
             if physicalPath(agent.workingFolderPath) != wanted {
@@ -2115,6 +2428,9 @@ enum ScheduledDeploy {
         }
         found.sort { first, second in
             if first.courseCode == second.courseCode {
+                if first.sectionNumber == second.sectionNumber {
+                    return first.label < second.label
+                }
                 return first.sectionNumber < second.sectionNumber
             }
             return first.courseCode < second.courseCode
@@ -2185,11 +2501,17 @@ enum ScheduledDeploy {
 
     /// The course code and section a LABEL carries, for a plist that does not
     /// carry them itself.
+    ///
+    /// Reads both spellings: `…<CODE>.section<N>` (before #237) and
+    /// `…<CODE>.section<N>.<folder id>`, whose id is taken off first.
     nonisolated static func codeAndSection(fromLabel label: String) -> (courseCode: String, sectionNumber: Int)? {
         guard label.hasPrefix(labelPrefix + ".") else {
             return nil
         }
-        let remainder: String = String(label.dropFirst(labelPrefix.count + 1))
+        var remainder: String = String(label.dropFirst(labelPrefix.count + 1))
+        if let idAtTheEnd = folderID(fromLabel: label) {
+            remainder = String(remainder.dropLast(idAtTheEnd.count + 1))
+        }
         guard let separator = remainder.range(of: ".section", options: .backwards) else {
             return nil
         }
@@ -2265,8 +2587,8 @@ struct ScheduledDeployPlan {
     let problem: String?
 
     /// When the deploy this would replace is set for, or nil when it replaces
-    /// nothing (issue #195). Read Mac-wide — see
-    /// `ScheduledDeploy.momentBeingReplaced`.
+    /// nothing (issue #195). Read in the working folder the deploy would be
+    /// set from (Mac-wide until #237) — see `ScheduledDeploy.momentBeingReplaced`.
     let replacing: Date?
 
     let locale: Locale

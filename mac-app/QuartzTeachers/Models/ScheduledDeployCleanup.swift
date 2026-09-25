@@ -196,21 +196,13 @@ enum ScheduledDeployCleanup {
         sectionNumber: Int?,
         inWorkingFolder workingFolderURL: URL
     ) -> [ScheduledDeploy.Agent] {
-        let wanted: String = ScheduledDeploy.sanitizedCode(courseCode)
-        var result: [ScheduledDeploy.Agent] = []
-        for agent in ScheduledDeploy.agents(inWorkingFolder: workingFolderURL) {
-            // Both sides sanitised, never raw: a plist written before v1.2.0
-            // has no course code of its own, so its code comes back out of the
-            // LABEL in sanitised form, and a raw comparison would miss it.
-            if ScheduledDeploy.sanitizedCode(agent.courseCode) != wanted {
-                continue
-            }
-            if let sectionNumber, agent.sectionNumber != sectionNumber {
-                continue
-            }
-            result.append(agent)
-        }
-        return result
+        // Both codes sanitised, never raw, inside the scan: a plist written
+        // before v1.2.0 has no course code of its own, so its code comes back
+        // out of the LABEL in sanitised form, and a raw comparison would miss
+        // it. Both label spellings (before and after #237) are read.
+        return ScheduledDeploy.agents(
+            inWorkingFolder: workingFolderURL, courseCode: courseCode, sectionNumber: sectionNumber
+        )
     }
 
     /// The extra sentence the removal confirmation carries, or nil when there
@@ -251,15 +243,17 @@ enum ScheduledDeployCleanup {
         var stopped: [Int] = []
         var unstopped: [Int] = []
         for agent in agents {
-            let problem: String? = ScheduledDeploy.cancelScheduledDeploy(
-                courseCode: agent.courseCode,
-                sectionNumber: agent.sectionNumber,
-                // The agent's own answer, so the backstop inside the cancel
-                // cannot disagree with the list this was chosen from.
-                inWorkingFolder: URL(fileURLWithPath: agent.workingFolderPath),
-                runner: runner
-            )
+            // By the agent's OWN name and plist, read off disk — never a label
+            // rebuilt from the course, which for a job set before #237 would
+            // name a job that does not exist and leave the real one standing.
+            let problem: String? = ScheduledDeploy.cancel(agent: agent, runner: runner)
             if problem == nil {
+                // One section can hold two jobs in one folder — one set before
+                // #237 beside one set after, left by an older copy of the app —
+                // and both go. The teacher is told about the SECTION once.
+                if stopped.contains(agent.sectionNumber) {
+                    continue
+                }
                 stopped.append(agent.sectionNumber)
                 ActivityTrail.note(
                     .scheduledDeployTurnedOff,
