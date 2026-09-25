@@ -846,6 +846,7 @@ grew — so `activityTrail.mustRecord` is unchanged at **75**, and
 `shared-rules.json` now has thirty-one top-level keys.
 Re-taken at the merge into `dev`: **198** lists on the merged tree, `activityTrail.mustRecord` **76**.
 Re-taken at the merge into `dev`: **198** lists on the merged tree, `activityTrail.mustRecord` **76**.
+Re-taken at the merge into `dev`: **198** lists on the merged tree, `activityTrail.mustRecord` **76**.
 
 **Re-take it rather than trusting this paragraph** — a census nobody can repeat
 is a number that rots. A case list is *an array of objects reached through
