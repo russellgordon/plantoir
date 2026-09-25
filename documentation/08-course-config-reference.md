@@ -727,12 +727,27 @@ separately from the reader:
   from the reader's matcher), removes bottom-up, and keeps the line's `\r`;
   `SectionAdder` walks its replacements from the bottom of the block so a
   removal never moves a key still to come. Cases: `file-formats.json` →
-  `datesAndTitles.writingCases` (10, whole-file, with `expectSiteReads`),
+  `datesAndTitles.writingCases` (13, whole-file, with `expectSiteReads`),
   run as bytes by `FileFormatsContractTests` and re-checked against the real
   build in the image by `scripts/check_dates_and_titles_against_the_site.py`.
-  **Not in it, recorded:** an all-indented block still declines silently (the
-  #186 decision about an indented root mapping — `rawValue` cannot read that
-  page's date either); duplicate keys — the writer and `rawValue` take the
+  **Two more shapes, from its review:** a quoted or flow value continued at
+  COLUMN 0 (`title: "Unit 1,` / `Day 1"`, `title: [Unit 1,` / `Day 1]`) —
+  PyYAML reads each as one value, the indentation rule stopped at the second
+  line, and leaving `Day 1"` behind made the page unreadable to the build
+  (ScannerError). `replacingKeyLine` now also takes lines until an open
+  quote or bracket closes, at any indent (`linesUntilOpenValueCloses`: `"`
+  honours a backslash escape and `'` a doubled quote; a quote that never
+  closes inside the block takes nothing). And a QUOTED date with a note after
+  it (`created: "2026-09-08T09:30:00.000-0400" # moved`) was rewritten as
+  `…-0400"` — `timeAndOffset` stripped quotes only from the two ends, so the
+  closing quote stayed on the tail, and Quartz replaces a date it cannot read
+  with today. It now reads a quoted value INSIDE its quotes and an unquoted one
+  up to a ` #` comment (`scalarText(ofRawValue:)`); the quotes and the note go
+  with the old value. Three more cases (13 in all).
+  **Not in it, recorded:** an all-indented block — `settingTitle` declines it
+  silently, and `settingCreated` INSERTS `created:` at `openIndex + 1`, above
+  the indented line, which is #186's orphan shape (the #186 decision about an
+  indented root mapping — `rawValue` cannot read that page's date either); duplicate keys — the writer and `rawValue` take the
   FIRST `created:`, PyYAML keeps the LAST (measured) — is a separate
   disagreement; and the time of a folded or below-key date is not read, so the
   rewrite uses the fallback `T07:00:00.000-0400`, which is harmless. Windows'

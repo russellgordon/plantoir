@@ -66,10 +66,15 @@ enum PageFrontmatter {
 
     /// Everything after the calendar date in a stored timestamp
     /// (`T07:00:00.000-0400`), or nil when there is no date there at all.
+    ///
+    /// A quoted value is read INSIDE its quotes, whatever follows them: a
+    /// `created: "2026-09-08T09:30:00.000-0400" # moved` used to have only its
+    /// two ENDS stripped of quotes, so the closing quote stayed on the tail and
+    /// the rewritten date ended in `"` — a date Quartz cannot read, which it
+    /// silently replaces with today (the review of #199). An unquoted value
+    /// stops at a ` #` comment for the same reason.
     static func timeAndOffset(inRawValue raw: String) -> String? {
-        let value: String = raw
-            .trimmingCharacters(in: .whitespaces)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+        let value: String = PageFrontmatter.scalarText(ofRawValue: raw)
         guard value.count >= 10 else {
             return nil
         }
@@ -84,6 +89,28 @@ enum PageFrontmatter {
             }
         }
         return String(value.dropFirst(10))
+    }
+
+    /// A raw `key:` value as the scalar it is: the text inside its quotes when
+    /// it is quoted (anything after the closing quote — a comment — dropped),
+    /// otherwise the text before any ` #` comment, trimmed.
+    static func scalarText(ofRawValue raw: String) -> String {
+        let trimmed: String = raw.trimmingCharacters(in: .whitespaces)
+        guard let first = trimmed.first else {
+            return trimmed
+        }
+        if first == "\"" || first == "'" {
+            let inside: Substring = trimmed.dropFirst()
+            if let closing = inside.firstIndex(of: first) {
+                return String(inside[inside.startIndex..<closing])
+            }
+            return String(inside)
+        }
+        if let comment = trimmed.range(of: " #") {
+            return String(trimmed[trimmed.startIndex..<comment.lowerBound])
+                .trimmingCharacters(in: .whitespaces)
+        }
+        return trimmed
     }
 
     /// The page text with `key` set to this day, and whether that changed
@@ -166,6 +193,39 @@ enum PageFrontmatter {
     /// line keeps the carriage return of the line it replaces. Returns how
     /// many lines were taken away, so a caller editing further down can move
     /// its own positions up by as many.
+    /// How many lines below the key a quoted or bracketed value that the key's
+    /// line leaves open runs on for, until its quote or bracket closes — 0 when
+    /// the value is not open (or never closes inside the block, when nothing
+    /// is taken: that page does not build either way, and guessing where its
+    /// value ends would be the larger mistake).
+    ///
+    /// `"` honours a backslash escape and `'` a doubled quote, as YAML does;
+    /// inside `[`/`{`, quoted strings are skipped and brackets counted.
+    nonisolated static func linesUntilOpenValueCloses(
+        startingWith valueText: String,
+        below keyIndex: Int,
+        in lines: [String],
+        closeIndex: Int
+    ) -> Int {
+        let trimmed: String = valueText.trimmingCharacters(in: .whitespaces)
+        guard let first = trimmed.first, first == "\"" || first == "'" || first == "[" || first == "{" else {
+            return 0
+        }
+        var scanner: OpenValueScanner = OpenValueScanner()
+        if scanner.readAndSayIfClosed(trimmed) || scanner.endsWithAClosedSingleQuote() {
+            return 0
+        }
+        var position: Int = keyIndex + 1
+        while position < closeIndex && position < lines.count {
+            let line: String = trimmingCarriageReturn(lines[position])
+            if scanner.readAndSayIfClosed("\n" + line) || scanner.endsWithAClosedSingleQuote() {
+                return position - keyIndex
+            }
+            position += 1
+        }
+        return 0
+    }
+
     @discardableResult
     nonisolated static func replacingKeyLine(
         at index: Int,
@@ -175,9 +235,28 @@ enum PageFrontmatter {
         closeIndex: Int
     ) -> Int {
         let wasEmpty: Bool = AssistPageVisibility.valueIsEmpty(ofKey: key, inLine: lines[index])
-        let taken: [Int] = PageVisibilityReader.continuationLineIndices(
+        var taken: [Int] = PageVisibilityReader.continuationLineIndices(
             belowKeyAt: index, in: lines, closeIndex: closeIndex, keyValueWasEmpty: wasEmpty
         )
+        // A quote or a `[`/`{` the key's line opens and does not close runs
+        // on until it closes — at ANY indent: PyYAML reads
+        // `title: "Unit 1,` / `Day 1"` (the second line at column 0) as one
+        // title, and the indentation rule above stops at that line, leaving
+        // `Day 1"` behind and the build unable to read the page at all
+        // (measured by the review of #199). Whichever reaches further wins.
+        let bare: String = trimmingCarriageReturn(lines[index])
+        let valueText: String = PageVisibilityReader.valuePart(ofKey: key, inLine: bare) ?? ""
+        let linesUntilClosed: Int = PageFrontmatter.linesUntilOpenValueCloses(
+            startingWith: valueText, below: index, in: lines, closeIndex: closeIndex
+        )
+        if linesUntilClosed > taken.count {
+            taken = []
+            var position: Int = index + 1
+            while position <= index + linesUntilClosed {
+                taken.append(position)
+                position += 1
+            }
+        }
         lines[index] = newLine + (lines[index].hasSuffix("\r") ? "\r" : "")
         var position: Int = taken.count - 1
         while position >= 0 {
@@ -217,5 +296,105 @@ enum PageFrontmatter {
             return String(line.dropLast())
         }
         return line
+    }
+}
+
+/// Reads a YAML value a line at a time and says when an open quote or
+/// bracket has closed. Deliberately small: it finds where a value ENDS and
+/// nothing else — the same limit `continuationLineIndices` keeps.
+nonisolated struct OpenValueScanner {
+
+    // MARK: - Stored properties
+
+    /// The quote currently open, if any.
+    private var openQuote: Character?
+
+    /// How many `[` and `{` are open.
+    private var depth: Int = 0
+
+    /// Whether anything has been read yet.
+    private var started: Bool = false
+
+    /// A `'` inside single quotes that may be the first of a doubled pair
+    /// (a quote character) or the closing quote — the next character decides.
+    private var singleQuoteMayClose: Bool = false
+
+    /// A backslash inside double quotes escapes the next character.
+    private var escaping: Bool = false
+
+    // MARK: - Functions
+
+    /// Reads more of the value; true once whatever the first character
+    /// opened has closed. A `'` that ends one chunk is decided by the next,
+    /// or by the end of the value.
+    mutating func readAndSayIfClosed(_ text: String) -> Bool {
+        for character in text {
+            if singleQuoteMayClose {
+                singleQuoteMayClose = false
+                if character == "'" {
+                    // Doubled: a quote character, still inside.
+                    continue
+                }
+                openQuote = nil
+                if depth == 0 {
+                    return true
+                }
+                if closesOrOpensOutsideQuotes(character) {
+                    return true
+                }
+                continue
+            }
+            if !started {
+                started = true
+                if character == "\"" || character == "'" {
+                    openQuote = character
+                } else if character == "[" || character == "{" {
+                    depth = 1
+                }
+                continue
+            }
+            if let quote = openQuote {
+                if quote == "\"" {
+                    if escaping {
+                        escaping = false
+                    } else if character == "\\" {
+                        escaping = true
+                    } else if character == "\"" {
+                        openQuote = nil
+                        if depth == 0 {
+                            return true
+                        }
+                    }
+                } else if character == "'" {
+                    singleQuoteMayClose = true
+                }
+                continue
+            }
+            if closesOrOpensOutsideQuotes(character) {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Whether the end of the line leaves a pending single quote closed.
+    func endsWithAClosedSingleQuote() -> Bool {
+        return singleQuoteMayClose && depth == 0
+    }
+
+    /// Outside any quote: opens a quote or a bracket, or closes a bracket.
+    /// True when the outermost bracket has closed.
+    private mutating func closesOrOpensOutsideQuotes(_ character: Character) -> Bool {
+        if character == "\"" || character == "'" {
+            openQuote = character
+        } else if character == "[" || character == "{" {
+            depth += 1
+        } else if character == "]" || character == "}" {
+            depth -= 1
+            if depth == 0 {
+                return true
+            }
+        }
+        return false
     }
 }
