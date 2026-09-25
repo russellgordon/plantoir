@@ -156,7 +156,7 @@ class WhereARelativeFolderLands(unittest.TestCase):
         self.assertGreaterEqual(len(cases), 6)
         ran = 0
         for case in cases:
-            if case.get("notOnWindows") and ON_WINDOWS:
+            if ON_WINDOWS and "windows" not in case.get("appliesOn", ["mac", "windows"]):
                 continue
             to_folder = self._substitute(case["toFolder"])
             expected = self._substitute(case["expectTarget"])
