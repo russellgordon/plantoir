@@ -193,6 +193,19 @@ nonisolated enum ActivityTrail {
         /// joins when it is closed, without a rename on either platform.
         case folderProblemNotRepaired = "folder problem not repaired"
 
+        /// A preview or a publish rewrote some of the teacher's own pages
+        /// with the date of their class: the front page takes the date of the
+        /// class it shows, and a page a class brings takes the date of the
+        /// earliest visible class that brings it (#275, #276). Carries the
+        /// course, the section, how many, and their NAMES — never anything
+        /// written on them. Read from the build's `PLANTOIR_DATED:` line
+        /// (`PagesDatedByTheBuild`), which is printed only when something was
+        /// rewritten, so a build whose dates were already right adds nothing.
+        /// Recorded because this is a change to the teacher's files nobody
+        /// asked for in so many words, and "why did this page's date change?"
+        /// is asked long after the console that said so has gone.
+        case pagesDatedByTheBuild = "pages dated by the build"
+
         /// A teacher asked for a class to be duplicated, the room for it was
         /// made, and then no copy appeared.
         ///

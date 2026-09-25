@@ -1455,6 +1455,7 @@ enum ScheduledDeploy {
         guard let text = textOfLog(at: log, fromByteOffset: offset) else {
             return
         }
+        notePagesDatedByTheBuild(in: text)
         var markerLines: [String] = []
         for rawLine in text.split(separator: "\n", omittingEmptySubsequences: false) {
             let line: String = String(rawLine).trimmingCharacters(in: .whitespaces)
@@ -1475,6 +1476,25 @@ enum ScheduledDeploy {
             at: sentinel.deletingLastPathComponent(), withIntermediateDirectories: true
         )
         try? markerLines.joined(separator: "\n").write(to: sentinel, atomically: true, encoding: .utf8)
+    }
+
+    /// The pages this run's build gave their class's date (#275, #276), on
+    /// the activity trail — the same line a preview or a publish from the app
+    /// leaves, read from the same `PLANTOIR_DATED:` line, but out of this
+    /// run's own log rather than a console, because nobody is watching one.
+    ///
+    /// Recorded here rather than left out because a scheduled publish is
+    /// often the FIRST build after a class goes visible, so it is the build
+    /// likeliest to rewrite a teacher's files — and a change to their files
+    /// nobody asked for in so many words is what "why did this page's date
+    /// change?" is asked about, long after the night it ran.
+    nonisolated static func notePagesDatedByTheBuild(in text: String) {
+        for report in PagesDatedByTheBuild.reports(in: text) {
+            ActivityTrail.note(
+                .pagesDatedByTheBuild, report.trailSentence,
+                course: report.course, section: report.section
+            )
+        }
     }
 
     /// How big the log is right now.

@@ -699,6 +699,15 @@ class ScriptRunner {
     }
 
     private func rememberHealthFindings(in text: String) {
+        // The pages the build gave their class's date (#275, #276), by name.
+        // Read here because this is where finished lines of output arrive,
+        // carried over a chunk boundary like the health lines below.
+        for report in PagesDatedByTheBuild.reports(in: text) {
+            ActivityTrail.note(
+                .pagesDatedByTheBuild, report.trailSentence,
+                course: report.course, section: report.section
+            )
+        }
         for finding in SiteHealthFinding.findings(in: text) {
             if healthFindings.contains(finding) {
                 continue
