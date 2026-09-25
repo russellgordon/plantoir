@@ -68,6 +68,21 @@ nonisolated enum PreviewReachability {
         case plantoirCouldNotTell
     }
 
+    /// What the preview wait does next, once the build is behind it.
+    enum NextStep: Equatable {
+
+        /// Ask this Mac for the site at the address the launcher announced.
+        case tryTheAddress(URL)
+
+        /// Nothing to try yet, and nothing has gone wrong yet either.
+        case keepWaiting
+
+        /// The builder has said its server is up and no address for it was
+        /// ever announced: there is nothing to try, nothing to ask the
+        /// builder about, and nothing left to wait for.
+        case stopBecauseNothingWasAnnounced
+    }
+
     /// How long a run has been saying nothing.
     ///
     /// A run that is still printing is not stalled, however long it has been
@@ -309,6 +324,40 @@ nonisolated enum PreviewReachability {
         return PreviewReachability.answer(from: answer)
     }
 
+    /// What the wait does next.
+    ///
+    /// **There is no road from "no address" to a port.** The wait used to
+    /// start from `http://127.0.0.1:<the section's port>/`, and that port is
+    /// the one INSIDE the builder: this Mac's own working folder publishes
+    /// 8091 for the builder's 8081, so the guess was wrong for every working
+    /// folder after the first, and a guess can land on ANOTHER section's
+    /// preview and show it as this one (GitHub #235).
+    ///
+    /// And once the builder has said its server started, a missing address
+    /// is final rather than late. The launcher announces the address BEFORE
+    /// it starts the build, and output is read in the order it arrives, so
+    /// by the time Quartz's line is in, any announcement is already in too.
+    /// Waiting on would reach the ten-minute bound with the run still going
+    /// — the "still building for ever" state `stopWaitingForThePreview`
+    /// exists to prevent.
+    static func nextStep(announced: URL?, theBuilderSaysItsServerStarted: Bool) -> NextStep {
+        if let announced {
+            return .tryTheAddress(announced)
+        }
+        if theBuilderSaysItsServerStarted {
+            return .stopBecauseNothingWasAnnounced
+        }
+        return .keepWaiting
+    }
+
+    /// What the teacher is told when no address was ever announced.
+    ///
+    /// The third sentence, not a new one: it is exactly true. Plantoir could
+    /// not get the site to appear, and it cannot tell why — the builder is
+    /// NOT asked, because the question is about an address and there is none
+    /// to ask about.
+    static let verdictWhenNothingWasAnnounced: Verdict = .plantoirCouldNotTell
+
     /// Which of the three things happened.
     static func verdict(for answer: Answer) -> Verdict {
         switch answer {
@@ -429,4 +478,13 @@ nonisolated enum PreviewReachability {
                  + "not be asked whether it was serving the site"
         }
     }
+
+    /// The trail's line for a preview that never said where it would be.
+    ///
+    /// Its own line rather than `trailLine(for:secondsOfSilence:)`'s third,
+    /// because that one would say two untrue things: nothing waited out any
+    /// silence, and nobody tried to ask the builder anything.
+    static let trailLineWhenNothingWasAnnounced: String =
+        "the preview never appeared — its website started, but no address for it "
+        + "was ever announced, so there was nothing to open"
 }
