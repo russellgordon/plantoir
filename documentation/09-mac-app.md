@@ -316,8 +316,10 @@ draws. `testThePickerDrawsEveryNameWhenTheWindowHasRoom` offers 1,400 points
 and requires the width of the full row (a fixture path deeper than 520, with a
 precondition that fails, rather than passing vacuously, if it ever fits);
 `testThePickerStillCollapsesWhenTheWindowHasNoRoom` offers a width between the
-two rows and requires the icons-only row. Put the 520 back and the first
-fails, the bar claiming 520 against the full row's width.
+two rows and requires the icons-only row. Put the 520 back and both fail
+(measured, 2 of the class's 8): the first with the bar claiming 520 against
+the fixture's full row of 687, the second with 503.5 against its icons-only
+row of 320 — the limit had turned the midpoint into the scrolling form.
 
 **Rejected:**
 
