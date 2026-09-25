@@ -157,6 +157,28 @@ enum WorkLeaseRegistry {
         return WorkLeaseFiles.blocking(among: holdings, asker: .aBuild, claim: claim)
     }
 
+    /// Records a publish of one section and, with nothing awaited in
+    /// between, looks at the other programs' leases — take, then check.
+    ///
+    /// Returns what stands in the way, having already taken the publish back
+    /// off the books; or nil, when the publish is recorded, its `build` and
+    /// `publish` leases are on disk, and the caller owns ending it
+    /// (`CourseActivity.endPublish`). The window's Deploy calls this BEFORE
+    /// it stops the teacher's preview, so its `build` lease is up for the
+    /// whole of that stop (#156's review, M1).
+    static func claimAPublish(
+        folderPath: String,
+        courseCode: String,
+        sectionNumber: Int
+    ) -> WorkLeaseFiles.Holding? {
+        CourseActivity.beginPublish(folderPath: folderPath, courseCode: courseCode, sectionNumber: sectionNumber)
+        if let holding = whatBlocksABuild(folderPath: folderPath, courseCode: courseCode, afterTaking: true) {
+            CourseActivity.endPublish(folderPath: folderPath, courseCode: courseCode, sectionNumber: sectionNumber)
+            return holding
+        }
+        return nil
+    }
+
     /// Puts a declined build on the trail.
     ///
     /// `act` is what was asked for, in a teacher's words — "Preview",

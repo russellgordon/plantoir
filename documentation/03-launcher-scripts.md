@@ -916,15 +916,28 @@ was done for the descendant walk. A green suite proves nothing about a case
 that cannot fail.
 
 
-**A preview another program is building is declined before any stop (#156).**
-Since 2026-09-25 the mac reads the work leases under `courses/.internal/activity/`,
-so a Preview, a Deploy or an assistant's rebuild that another program — an
-outside assistant, another copy of Plantoir, a publish set for later — is in
-the way of is declined BEFORE this stop runs, never after it. The stop reaches
-builds as well as servers (above), so a stop placed first would end the other
-program's build for a press that was going to be refused anyway. The rule and
-its cases are `contracts/shared-rules.json` → `workLeases.declining`;
-`09-mac-app.md` → "Two programs, one course" is the manual.
+**Leases and this stop (#156).** Since 2026-09-25 the mac reads and writes the
+work leases under `courses/.internal/activity/`. Because this stop ends BUILDS
+as well as servers, by working directory, the order around it matters:
+
+- **Deploy** takes its claim — its own `build` and `publish` leases, then a look
+  at everyone else's — BEFORE it runs this stop. A refusal therefore stops
+  nothing, and while the stop runs the window's `build` lease is up, so no other
+  program (an outside assistant, another copy of Plantoir, a publish set for
+  later) can be told the course is free and start a build that the stop then
+  kills.
+- **The in-app assistant** looks before it stops a window's preview, and
+  declines without stopping anything when another program is in the way.
+- **What is NOT covered:** the plain Stop button, a window closing, and the
+  assistant's stop-then-start release the window's preview lease the moment
+  the stop begins, while the stop itself runs on (waited up to 20 s). An outside
+  build started in those seconds can be ended by it. Nobody builds twice — the
+  outside program is told its build failed, and a retry works — and it is a
+  known limit in `09-mac-app.md` rather than a guarantee.
+
+The rule and its cases are `contracts/shared-rules.json` →
+`workLeases.declining`; `09-mac-app.md` → "Two programs, one course" is the
+manual.
 
 ## A course kept for reference is refused in the launcher, early
 

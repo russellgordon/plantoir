@@ -1714,7 +1714,7 @@ sidebar table asks the course anything while drawn (the #266 rule above).
 Written 2026-09-25 for [issue #156](https://github.com/russellgordon/plantoir/issues/156).
 Russell's decision: **both ways** — the mac READS the leases other programs
 write and WRITES its own. The rules are `contracts/shared-rules.json` →
-`workLeases.declining` (23 cases); the format is `contracts/file-formats.json`
+`workLeases.declining` (28 cases); the format is `contracts/file-formats.json`
 → `workLease`; who counts as alive is #245's `workLeases.liveness`, above under
 "Who counts as alive". This section is why it is shaped the way it is.
 
@@ -1763,8 +1763,8 @@ another live program holds `build`, `publish` or `preview` on the course:
 
 | door | where it asks | what is said |
 |---|---|---|
-| Preview (button, repair dialog, Course Settings' restart, the assistant's restart) | `startPreview()`, after its own preview and build leases are on disk | `wording.courseIsBeingBuiltElsewhere` in the Cannot Preview Yet alert |
-| Deploy (button, and the assistant pressing it) | `deployAndWait()` — early, before the preview is stopped, and AGAIN straight after `beginPublish` | the same sentence, in the Cannot Deploy Yet alert (#156's M5: `isAboutTheDestination`, as the reference-course refusal uses it — nothing ran, so the console has nothing to say) |
+| Preview (button, repair dialog, Course Settings' restart, the assistant's restart) | `startPreview()`, after its own build lease and THEN its preview lease are on disk (that order is load-bearing — below) | `wording.courseIsBeingBuiltElsewhere` in the Cannot Preview Yet alert |
+| Deploy (button, and the assistant pressing it) | `deployAndWait()` — `WorkLeaseRegistry.claimAPublish` (`beginPublish`, then the look) BEFORE the preview is stopped, so the window's `build` lease is up through the stop | the same sentence, in the Cannot Deploy Yet alert (#156's M5: `isAboutTheDestination`, as the reference-course refusal uses it — nothing ran, so the console has nothing to say) |
 | the in-app assistant's rebuild and deploy | `AssistToolRunner`, before any window is opened or preview stopped | `courseIsBeingBuiltElsewhere` |
 | an outside assistant's rebuild and deploy | the same, and the headless backstops `AssistToolchainWork.rebuildPreview` / `.deploy` after taking | `wording.courseIsBusy` — the existing key: the client is talking to the program that is busy, and that sentence tells it to wait and ask again |
 | `publish_pages` / `undo_last_change` | the write goes ahead (Markdown never conflicts with a build); the stop before it and the restart after it do not | the preview note is the sentence above for the surface |
@@ -1775,19 +1775,48 @@ declined, so an outside assistant's refusal is on the trail too.
 
 **Take, then check, with a tiebreak** (the plan review's H1, accepted). The
 plan had "check, then take, in one synchronous stretch", and that is false for
-the window's Deploy: it stops the teacher's preview between any early check
-and `beginPublish` — `await stopPreviewAndWait()`, seconds of `docker exec` —
-and during those seconds the window holds only a `preview` lease. So every door
-writes its own `build` lease FIRST and then looks, with nothing awaited in
-between, and counts only a lease taken BEFORE its own: an earlier line-3
-moment, or the same moment and a lower process id. Two programs that press at
-once cannot both go ahead, and cannot both back off — exactly one sees the
-other as earlier (`WorkLeaseDecliningTests.testTwoProgramsThatLookAtOnceCannot…`
-walks every order, a tie included). The moments are compared as TEXT, which is
-exact for the one fixed shape both apps write (UTC, seven fractional digits,
-28 characters); anything else counts as earlier. The Deploy's EARLY look
-remains, only so that a refusal does not end the teacher's preview for
-nothing. **The residual:** a program that looks BEFORE it takes — Windows
+the window's Deploy: it stops the teacher's preview — `await
+stopPreviewAndWait()`, seconds of `docker exec` — between any early check and
+its own lease. So every door writes its own `build` lease FIRST and then looks,
+with nothing awaited in between, and counts only a lease taken BEFORE its own
+build lease: an earlier line-3 moment, or the same moment and a lower process
+id. **Never both go ahead** is the guarantee: of two programs that each take a
+build and look at once, exactly one sees the other as earlier
+(`testTwoProgramsThatLookAtOnceCannot…` walks every order, a tie included).
+
+*Where the Deploy takes it* (the implementation review's M1, 2026-09-25). The
+first cut took the claim straight AFTER the stop, with an early look before it.
+The stop is `preview.sh --stop`, which ends builds as well as servers by working
+directory, and the window released its preview lease the moment it began — so
+for those seconds it held NO lease, and an outside build started then was told
+the course was free and was killed by the stop. The claim now comes BEFORE the
+stop (`WorkLeaseRegistry.claimAPublish`), which also means a refusal stops
+nothing and the console never shows the last deploy's panel behind the alert.
+
+*What the claim is compared from* (the same review's M2). Other programs compare
+their build against EVERY lease this window holds, the `preview` included, while
+this window compares from its BUILD. A Preview used to write its preview lease
+first, so an outside build landing between the two files made both back off —
+measured by the reviewer on the real `WorkLeaseFiles`. `startPreview` now
+records the build first (`testAPreviewAndAnOutsideBuildThatRaceCannotBothBackOff`
+measures it on real files). The review proposed the other cure — claim from the
+EARLIEST of this program's leases — and it was **REJECTED on a measured
+counterexample**: a publish set for later does not wait for previews, so with
+the window's preview up since 06:00 it takes `build` at 06:30 and runs; a
+Deploy pressed at 06:31 claimed from 06:00 reads the 06:30 build as LATER and
+goes ahead — two builds at once, the fault itself
+(`testWhyTheClaimIsTheBuildMomentAndNotTheEarliestLease`, and the last case in
+`workLeases.declining`). What is left is one harmless shape: a Deploy pressed
+while this window ALREADY has a preview up, racing an outside build that lands
+between that preview and the Deploy's build — both back off, nothing runs, a
+retry works. Closing it would need a lease to say whether its owner waits for
+previews, which is a format change.
+
+The moments are compared as TEXT, exact for the one fixed 28-character shape
+both apps write (UTC, seven fractional digits); the mac's `DateFormatter` fills
+only three of them — millisecond resolution, measured `…57.9620000Z` — so a
+same-moment tie is ordinary, and goes to the lower pid. Anything else counts as
+earlier. **The residual:** a program that looks BEFORE it takes — Windows
 today, an older mac — can start in the instant between another's take and its
 own look. That is Windows' own shape, and it is recorded rather than closed.
 
@@ -1900,21 +1929,38 @@ mac writes.
 **Known limits, beyond the ones above.**
 
 - A preview stop ("everything" mode, by working folder) from THIS window —
-  Stop, `onDisappear`, quit's `stopSectionProcessesOnTheWayOut` — on a section
-  an outside assistant is building would end that build too. Narrow: the
-  outside build first ends this window's serve (`stop_preview_serving`), so the
-  window's runner ends and its preview lease comes down before a teacher is
-  likely to press anything.
+  Stop, `onDisappear`, the assistant's stop-then-start, quit's
+  `stopSectionProcessesOnTheWayOut` — releases the window's preview lease as it
+  begins while the stop itself runs on (waited up to 20 s). An outside build
+  started in those seconds is told the course is free and is then ended by the
+  stop. Nobody builds twice; the outside program is told its build failed and a
+  retry works. The Deploy no longer has this gap (its build lease is up through
+  its stop — above); the others were left, because holding the preview lease
+  until the stop returns means keeping a lease for a preview that is gone.
+- A Plantoir that quits during a publish leaves its reparented `deploy.sh`
+  running (quitting deliberately does not end a publish) with no live lease —
+  the same shape as an outside assistant's process being KILLED, or sent
+  SIGTERM, rather than having its input closed: both skip the orderly leave.
+  Before #156 there was no lease at all, so this is a limit, not a regression.
+- The outside assistant's orderly leave waits for each section's stop through
+  `PreviewStopper.stopSectionProcessesAndWait`, whose stop reads the launcher's
+  count through a pipe; a stop that outlives its 20 s bound is still writing
+  when the process exits, which risks the SIGPIPE `stopSectionProcessesOnTheWayOut`
+  exists to avoid. Left as it is: the stop prints one line, at its end.
+- When the in-app assistant restarts a window's preview and that restart is then
+  declined at the window's own take-then-check (a race only — its early look
+  passed), the assistant still says the preview is rebuilding; the window's
+  alert is the truth.
 - A lease synced in from another Mac or a Windows PC through a cloud-synced
   working folder names a pid that means nothing here. #245's liveness limit;
   a Windows lease has no line 4, so a match rests on the name alone.
 - `CourseActivity.busyDescription` (menus, Add Section…) stays in-process on
   purpose — declining at the press is the guarantee, not the menu's grey.
 
-**Tests.** `WorkLeaseDecliningTests` (21): the contract's 23 cases through the
+**Tests.** `WorkLeaseDecliningTests` (25): the contract's 28 cases through the
 pure `WorkLeaseFiles.blocking`; the bytes written; the derivation; a real
 `/bin/sleep` as the other program (held, recycled name ignored, gone ignored);
-the race, pure and on files; every door; the scheduled wait with an injected
+the race, pure and on files, and the two orders the review measured; the Deploy's claim and the window's lease ORDER (read from the source, which the suite cannot construct); every door; the scheduled wait with an injected
 clock (45 s then go ahead; 40 looks then stand down; losing the race; a
 preview not waited for); the stand-down record and its trail line; the MCP
 leaving order. It resets process-wide stores and relies on the scheme's

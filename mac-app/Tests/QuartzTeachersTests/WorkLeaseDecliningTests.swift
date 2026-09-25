@@ -184,7 +184,7 @@ final class WorkLeaseDecliningTests: XCTestCase {
     func testTheDeclineRuleIsTheContracts() throws {
         let block: [String: Any] = try WorkLeaseLivenessTests.sharedRules(["workLeases", "declining"])
         let cases: [[String: Any]] = try XCTUnwrap(block["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 23, "Cases went missing from the contract.")
+        XCTAssertGreaterThanOrEqual(cases.count, 28, "Cases went missing from the contract.")
 
         var ran: Int = 0
         for item in cases {
@@ -419,6 +419,150 @@ final class WorkLeaseDecliningTests: XCTestCase {
             WorkLeaseRegistry.whatBlocksABuild(folderPath: root.path, courseCode: "ICS3U", afterTaking: false),
             "The early look, before anything is taken, counts every lease."
         )
+    }
+
+    /// The Preview door's order, measured on real files: its BUILD lease goes
+    /// down before its preview lease, so an outside build that lands between
+    /// the two loses to the window and exactly one of them goes ahead (#156's
+    /// review, M2).
+    func testAPreviewAndAnOutsideBuildThatRaceCannotBothBackOff() throws {
+        let pid: Int32 = try startTheOtherProgram()
+        // The window's press, in the order `startPreview` takes it.
+        CourseActivity.beginPreviewBuild(folderPath: root.path, courseCode: "ICS3U", sectionNumber: 1)
+        let windowsBuild: WorkLeaseFiles.Claim = try XCTUnwrap(
+            WorkLeaseRegistry.buildClaim(folderPath: root.path, courseCode: "ICS3U")
+        )
+        // The outside build lands a millisecond after the window's build…
+        let outsideMoment: String = try WorkLeaseDecliningTests.moment(windowsBuild.moment, plusMilliseconds: 1)
+        try writeOthersLease(kind: "build", pid: pid, moment: outsideMoment)
+        // …and the window's preview lease after that.
+        _ = try PreviewLeases.lease(folderPath: root.path, courseCode: "ICS3U", sectionNumber: 1)
+
+        let windowGoesAhead: Bool = WorkLeaseRegistry.whatBlocksABuild(
+            folderPath: root.path, courseCode: "ICS3U", afterTaking: true
+        ) == nil
+
+        // What the outside program sees: the window's two lease files, read
+        // back from disk as that program would read them.
+        var windowsLeases: [WorkLeaseFiles.Holding] = []
+        for kind in ["build", "preview"] {
+            let text: String = try String(contentsOf: leaseURL(kind: kind), encoding: .utf8)
+            windowsLeases.append(WorkLeaseFiles.Holding(
+                kind: kind, pid: getpid(), moment: WorkLeaseFiles.momentLine(in: text)
+            ))
+        }
+        let outsideGoesAhead: Bool = WorkLeaseFiles.blocking(
+            among: windowsLeases, asker: .aBuild,
+            claim: WorkLeaseFiles.Claim(moment: outsideMoment, pid: pid)
+        ) == nil
+
+        XCTAssertTrue(windowGoesAhead, "The window's build was first.")
+        XCTAssertFalse(outsideGoesAhead, "The outside build was second.")
+    }
+
+    /// The pair the review measured for a Deploy pressed with a preview
+    /// already up (window preview < outside build < window build): both back
+    /// off — and the claim that would stop that, the EARLIEST of the window's
+    /// leases, lets a window build alongside a publish set for later, which
+    /// does not wait for previews. Measured both ways on the real rule.
+    func testWhyTheClaimIsTheBuildMomentAndNotTheEarliestLease() {
+        let t1: String = "2026-09-25T06:30:00.1000000Z"
+        let t2: String = "2026-09-25T06:30:00.2000000Z"
+        let t3: String = "2026-09-25T06:30:00.3000000Z"
+
+        // The window (claim = its build, t3) against an outside build at t2.
+        let windowSees: [WorkLeaseFiles.Holding] = [WorkLeaseFiles.Holding(kind: "build", pid: 4321, moment: t2)]
+        XCTAssertNotNil(WorkLeaseFiles.blocking(
+            among: windowSees, asker: .aBuild, claim: WorkLeaseFiles.Claim(moment: t3, pid: 100)
+        ))
+        // The outside build (claim t2) against the window's preview t1 and build t3.
+        let outsideSees: [WorkLeaseFiles.Holding] = [
+            WorkLeaseFiles.Holding(kind: "preview", pid: 100, moment: t1),
+            WorkLeaseFiles.Holding(kind: "build", pid: 100, moment: t3),
+        ]
+        XCTAssertNotNil(WorkLeaseFiles.blocking(
+            among: outsideSees, asker: .aBuild, claim: WorkLeaseFiles.Claim(moment: t2, pid: 4321)
+        ), "Both back off: nothing runs, a retry works.")
+
+        // The same timeline with a publish set for later as the other
+        // program: it does not wait for the preview, so it is running.
+        let scheduledSees: [WorkLeaseFiles.Holding] = [WorkLeaseFiles.Holding(kind: "preview", pid: 100, moment: t1)]
+        XCTAssertNil(WorkLeaseFiles.blocking(
+            among: scheduledSees, asker: .aScheduledPublish, claim: WorkLeaseFiles.Claim(moment: t2, pid: 4321)
+        ), "The scheduled publish goes ahead past a preview.")
+        // The window must then decline its Deploy — and does, claimed from its build…
+        XCTAssertNotNil(WorkLeaseFiles.blocking(
+            among: windowSees, asker: .aBuild, claim: WorkLeaseFiles.Claim(moment: t3, pid: 100)
+        ))
+        // …where a claim from its earliest lease (the preview, t1) would let
+        // it build alongside: the fault itself.
+        XCTAssertNil(WorkLeaseFiles.blocking(
+            among: windowSees, asker: .aBuild, claim: WorkLeaseFiles.Claim(moment: t1, pid: 100)
+        ), "If this ever declines, the earliest-lease claim is safe and the note in takeThenCheck is stale.")
+    }
+
+    /// A moment `milliseconds` after another, in the lease's own shape.
+    static func moment(_ text: String, plusMilliseconds milliseconds: Int) throws -> String {
+        let formatter: DateFormatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSSS'Z'"
+        let date: Date = try XCTUnwrap(formatter.date(from: text), text)
+        return ProcessLiveness.leaseMomentText(date.addingTimeInterval(Double(milliseconds) / 1000))
+    }
+
+    // MARK: - The Deploy's claim (#156's review, M1)
+
+    /// The claim the window's Deploy takes: on success its build and publish
+    /// leases are up (and the publish is recorded), on a refusal nothing of
+    /// it is left behind.
+    func testTheDeploysClaimHoldsTheBuildOrLeavesNothing() throws {
+        XCTAssertNil(WorkLeaseRegistry.claimAPublish(folderPath: root.path, courseCode: "ICS3U", sectionNumber: 1))
+        XCTAssertTrue(exists(leaseURL(kind: "build")) && exists(leaseURL(kind: "publish")))
+        XCTAssertEqual(CourseActivity.activePublishes.count, 1)
+        CourseActivity.endPublish(folderPath: root.path, courseCode: "ICS3U", sectionNumber: 1)
+
+        let pid: Int32 = try startTheOtherProgram()
+        try writeOthersLease(kind: "build", pid: pid)
+        XCTAssertNotNil(WorkLeaseRegistry.claimAPublish(folderPath: root.path, courseCode: "ICS3U", sectionNumber: 1))
+        XCTAssertFalse(exists(leaseURL(kind: "build")) || exists(leaseURL(kind: "publish")))
+        XCTAssertTrue(CourseActivity.activePublishes.isEmpty)
+    }
+
+    /// The ORDER inside the view, which the suite cannot construct: the
+    /// Deploy claims before it stops the preview (so its build lease is up
+    /// through a stop that ends builds by working directory), and the
+    /// Preview records its build before it takes its preview lease. Read
+    /// from the source, the way `ActivityTrailWiringTests` reads call sites.
+    func testTheWindowTakesItsLeasesInTheOrderThatIsSafe() throws {
+        let url: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("QuartzTeachers/Views/Section/SectionDetailView.swift")
+        let source: String = try String(contentsOf: url, encoding: .utf8)
+
+        let deploy: String = try WorkLeaseDecliningTests.body(of: "func deployAndWait()", in: source)
+        let claim: Range<String.Index> = try XCTUnwrap(deploy.range(of: "WorkLeaseRegistry.claimAPublish("))
+        let stop: Range<String.Index> = try XCTUnwrap(deploy.range(of: "await stopPreviewAndWait()"))
+        XCTAssertLessThan(claim.lowerBound, stop.lowerBound, "The Deploy stops the preview before claiming the course.")
+        XCTAssertNil(deploy.range(of: "CourseActivity.beginPublish("), "A second, later bracket crept back.")
+
+        let preview: String = try WorkLeaseDecliningTests.body(of: "func startPreview()", in: source)
+        let build: Range<String.Index> = try XCTUnwrap(preview.range(of: "previewBuildWait.begin("))
+        let lease: Range<String.Index> = try XCTUnwrap(preview.range(of: "PreviewLeases.lease("))
+        let look: Range<String.Index> = try XCTUnwrap(preview.range(of: "WorkLeaseRegistry.whatBlocksABuild("))
+        XCTAssertLessThan(build.lowerBound, lease.lowerBound, "The preview lease goes down before the build lease.")
+        XCTAssertLessThan(lease.lowerBound, look.lowerBound, "The Preview looks before it has taken both.")
+    }
+
+    /// The text of a function, from its signature to the next `    func `.
+    static func body(of signature: String, in source: String) throws -> String {
+        let start: Range<String.Index> = try XCTUnwrap(source.range(of: signature), signature)
+        let rest: Substring = source[start.upperBound...]
+        if let next = rest.range(of: "\n    func ", options: .regularExpression) {
+            return String(rest[..<next.lowerBound])
+        }
+        return String(rest)
     }
 
     // MARK: - The doors

@@ -671,8 +671,10 @@ nonisolated enum ActivityTrail {
         ///
         /// Recorded because the other program is invisible from here: a
         /// teacher who reports "Preview said somebody else was using it"
-        /// can be answered only by the process id, which the trail's own
-        /// "app opened" lines then name.
+        /// can be answered only by the process id — carried on the lease
+        /// file and on this line. The app's own "app opened" line names it
+        /// too when the other program is a copy of the app; the
+        /// `--mcp-stdio` and scheduled processes write no opening line.
         case buildDeclinedBusyElsewhere = "build declined, course busy elsewhere"
 
         /// A publish set for later found the course being built or published
