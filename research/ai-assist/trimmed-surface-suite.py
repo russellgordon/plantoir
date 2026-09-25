@@ -527,7 +527,7 @@ if MAC_SHELF_ONLY:
     PROMISED = []
 
 
-def intercepted(message):
+def intercepted(message, window_course=None, window_section=None):
     """The tool `AssistCardCommand.matching` would run without the model.
 
     A probe the app answers in code measures nothing about routing, so the
@@ -535,14 +535,19 @@ def intercepted(message):
     CONTRACT rather than from a hand-copied list, which is how
     `narrow-tools.py` went stale for three days without anyone noticing.
     Same tidying as the Swift: trim, strip leading and trailing `.` and `!`,
-    lower-case, then EQUALITY — never a substring. Then the six parsed
-    families, which cannot be listed because the number, title or TIME in them
-    is unbounded. TWO of them are checked against the contract's own accepted
-    and refused rows before any probe is sent — "deploy at <time>" by
-    `assert_deploy_at_a_time_matches_contract()` and the hide/unpublish frame
-    by `assert_hide_is_unpublish_matches_contract()`, both below. This guard
-    went one family stale once already, and a stale guard scores a routing
-    result for a sentence the app never routes.
+    lower-case, then EQUALITY — never a substring. Then the parsed families
+    (nine in `cardPhrasings.parsed` since #167), which cannot be listed because
+    the number, title or TIME in them is unbounded. THREE of them are checked
+    against the contract's own rows before any probe is sent — "deploy at
+    <time>" by `assert_deploy_at_a_time_matches_contract()`, the hide/unpublish
+    frame by `assert_hide_is_unpublish_matches_contract()` and "what does
+    <page> link to?" by `assert_links_question_matches_contract()`, all below.
+    This guard went one family stale once already, and a stale guard scores a
+    routing result for a sentence the app never routes.
+
+    `window_course` and `window_section` are the window the sentence is typed
+    in, read by the links family only (#167): a place it names is accepted
+    only when it is that window's. The probes pass COURSE and SECTION.
 
     Widened 2026-09-19 with issue #215: "hide" means what "unpublish" means and
     is answered in code, and both verbs take a class page as well as a whole
@@ -582,9 +587,219 @@ def intercepted(message):
         # not set ("deploy at 6.30 pm") is answered with the one sentence to
         # type instead, and nothing is sent to the model (#277).
         return SAID_AS_IN_CODE
+    links = links_question(message, window_course, window_section)
+    if links is not None and links[0] == "page":
+        return "read_page"
+    # ("ifcalled", title) is a card only when the section has that page, which
+    # this guard cannot see; the probes carry none, so it is not intercepted.
+    if links is not None and links[0] == "another":
+        # Not a tool: another course named in a links question is refused in
+        # code with the sentence a model-named course gets (#167).
+        return REFUSED_IN_CODE
     if re.fullmatch(r"duplicate .+ as (my next class|the next class|my next lesson)", tidied):
         return "add_next_class"
     return None
+
+
+# What `intercepted` answers for a links question naming another course,
+# which the app refuses in code — deliberately not a tool name (#167).
+REFUSED_IN_CODE = "(refused in code: another course named)"
+
+
+def links_question(message, window_course, window_section):
+    """Mirror of `AssistCardCommand.linksQuestion` (#167).
+
+    ("page", title) for a question the app answers in code — the title as the
+    Swift extracts it, so a fuzz can compare TITLES as well as outcomes —
+    ("another", code) for one naming another course, None for one that goes
+    to the model. Pinned
+    against `linksQuestion` in the contract by
+    `assert_links_question_matches_contract()` before anything is measured.
+    """
+    typed = message.strip().strip(".!")
+    while typed.endswith("?"):
+        typed = typed[:-1].strip(" \t")
+    typed = links_without_please(typed)
+    lowered = typed.lower()
+    if len(lowered) != len(typed):
+        return None
+    title_slot, tail = None, ""
+    verb_frames = [("what does ", [" link to", " point to"]), ("which pages does ", [" link to"]),
+                   ("what pages does ", [" link to"]), ("where does ", [" link to", " point to"])]
+    for opening, closings in verb_frames:
+        if title_slot is not None or not lowered.startswith(opening):
+            continue
+        end, length = None, 0
+        for closing in closings:
+            at = lowered.rfind(closing)
+            if at >= 0 and (end is None or at > end):
+                end, length = at, len(closing)
+        start = len(opening)
+        if end is None or not start < end:
+            return None
+        title_slot, tail = typed[start:end], typed[end + length:]
+    for opening in ["what links are on ", "what links are in ", "show me the links on ",
+                    "show me the links in ", "show me the links from ", "list the links on ",
+                    "list the links in ", "list the links from "]:
+        if title_slot is None and lowered.startswith(opening):
+            title_slot = typed[len(opening):]
+    if title_slot is None:
+        return None
+    places = 0
+    tail = tail.strip(" \t")
+    if tail:
+        if not tail.lower().startswith("in "):
+            return None
+        place = links_place(tail[3:], window_course, window_section)
+        if place == "window":
+            places += 1
+        elif isinstance(place, tuple):
+            return place
+        else:
+            return None
+    title = title_slot
+    at = title.lower().rfind(" in ")
+    if at >= 0:
+        place = links_place(title[at + 4:], window_course, window_section)
+        if place == "window":
+            places += 1
+            title = title[:at]
+        elif isinstance(place, tuple):
+            return place
+        elif place == "section":
+            return None
+    if places > 1:
+        return None
+    reading = links_page_title(title)
+    if not reading:
+        return None
+    # A title slot that is itself a place asks about a section or a course,
+    # not a page (#167 review R1).
+    place = links_place(reading[1], window_course, window_section)
+    if isinstance(place, tuple):
+        return place
+    if place is not None:
+        return None
+    return reading
+
+
+def links_without_please(typed):
+    lowered = typed.lower()
+    for opening in ("please, ", "please "):
+        if lowered.startswith(opening):
+            typed = typed[len(opening):]
+            break
+    lowered = typed.lower()
+    for closing in (", please", " please"):
+        if lowered.endswith(closing):
+            typed = typed[:-len(closing)]
+            break
+    while typed.endswith("?") or typed.endswith(","):
+        typed = typed[:-1].strip(" \t")
+    return typed.strip(" \t")
+
+
+def links_page_title(slot):
+    title = slot.strip(" \t")
+    while title.endswith(","):
+        title = title[:-1].strip(" \t")
+    for open_, close in (('"', '"'), ("\u201c", "\u201d"), ("'", "'"), ("\u2018", "\u2019")):
+        if len(title) >= 2 and title.startswith(open_) and title.endswith(close):
+            title = title[1:-1].strip(" \t")
+            break
+    if not title:
+        return None
+    folded = title.lower().replace("\u2019", "'")
+    if folded in ("it", "this", "that", "this one", "that one", "this page", "that page", "the page",
+                  "these", "those", "them", "these pages", "those pages"):
+        return None
+    if folded.startswith(("the page ", "this page ", "that page ")):
+        return None
+    for day in ("today", "tomorrow", "yesterday", "tonight", "monday", "tuesday", "wednesday",
+                "thursday", "friday", "saturday", "sunday"):
+        if folded == day or folded.startswith(day + "'s "):
+            return None
+    for word in ("next ", "last ", "previous ", "first ", "upcoming "):
+        for opening in ("", "my ", "the "):
+            if folded.startswith(opening + word):
+                return None
+    if folded.startswith("the "):
+        if folded.endswith(" page") and len(folded) > len("the  page"):
+            inner = links_page_title(title[len("the "):len(title) - len(" page")].strip(" \t"))
+            if inner and inner[0] == "page" and len(inner) == 2:
+                return ("page", inner[1], title)
+            return None
+        if links_two_requests(folded):
+            return None
+        return ("ifcalled", title)
+    if links_two_requests(folded):
+        return None
+    return ("page", title)
+
+
+def links_two_requests(folded):
+    if " link to" in folded or " point to" in folded:
+        return True
+    for verb in ("publish", "unpublish", "hide", "deploy", "delete"):
+        if (" and " + verb + " ") in folded or folded.endswith(" and " + verb):
+            return True
+    return False
+
+
+def known_course_codes():
+    """The codes the app ships (Ontario and BC lists), upper-cased (#167 L2)."""
+    codes = set()
+    for name in ("ontario_secondary_courses.json", "british_columbia_secondary_courses.json"):
+        with open(ROOT / "support" / name, encoding="utf-8") as handle:
+            codes.update(code.upper() for code in json.load(handle))
+    return codes
+
+
+KNOWN_COURSE_CODES = known_course_codes()
+
+
+def links_place(words, window_course, window_section):
+    """"window", ("another", code), "section" (another section) or None.
+
+    With no window, every place is one the family cannot honour: "section".
+    """
+    read = links_place_against_the_window(words, window_course, window_section)
+    if (window_course is None or window_section is None) and read is not None:
+        return "section"
+    return read
+
+
+def links_place_against_the_window(words, window_course, window_section):
+    parts = [part for part in words.replace(",", " ").split(" ") if part]
+    folded = [part.lower() for part in parts]
+    course_word = section_word = None
+    if folded in (["my", "course"], ["this", "course"], ["our", "course"], ["my", "class"],
+                  ["this", "class"]):
+        return "window"
+    if folded == ["this", "section"]:
+        return "section" if window_section is None else "window"
+    elif len(folded) == 2 and folded[0] == "section":
+        section_word = folded[1]
+    elif len(folded) == 3 and folded[1] == "section":
+        course_word, section_word = parts[0], folded[2]
+    elif len(folded) == 4 and folded[0] == "section" and folded[2] == "of":
+        course_word, section_word = parts[3], folded[1]
+    elif len(folded) == 1:
+        if window_course and parts[0].lower() == window_course.lower():
+            return "window"
+        if parts[0].upper() in KNOWN_COURSE_CODES:
+            return ("another", parts[0])
+        return None
+    else:
+        return None
+    if not re.fullmatch(r"[0-9]+", section_word or ""):
+        return None
+    if course_word is not None:
+        if not window_course or course_word.lower() != window_course.lower():
+            return ("another", course_word)
+    if window_section is None or int(section_word) != window_section:
+        return "section"
+    return "window"
 
 
 def unit_or_class_page(tidied):
@@ -1061,6 +1276,52 @@ def assert_hide_is_unpublish_matches_contract():
     return len(family["accepted"]) + len(family["refused"])
 
 
+def assert_links_question_matches_contract():
+    """Fail the run if the links family (#167) has drifted from the contract.
+
+    The same argument as the two functions above. The #167 probe itself —
+    `What does "Unit 2, Day 3" in EXC2O section 1 link to?` — is answered in
+    code in its own window, so a guard that missed a row would send it to the
+    model and score a routing result for a sentence the app never routes.
+    """
+    with open(ROOT / "contracts" / "assist-cases.json", encoding="utf-8") as handle:
+        family = json.load(handle).get("linksQuestion")
+    if not family:
+        sys.exit("contracts/assist-cases.json carries no linksQuestion rows to check against.")
+    course, section = family["window"]["course"], family["window"]["section"]
+    wrong = []
+    for row in family["accepted"]:
+        if intercepted(row["input"], course, section) != "read_page":
+            wrong.append("accepted and NOT intercepted: %r" % row["input"])
+    for row in family["accepted"]:
+        expected = ("page", row["expectPage"])
+        if "expectAsTyped" in row:
+            expected = ("page", row["expectPage"], row["expectAsTyped"])
+        if links_question(row["input"], course, section) != expected:
+            wrong.append("accepted with another title than %r: %r" % (row["expectPage"], row["input"]))
+    for row in family["onlyIfAPageIsCalled"]:
+        if links_question(row["input"], course, section) != ("ifcalled", row["expectPage"]):
+            wrong.append("not a title-if-a-page-is-called %r: %r" % (row["expectPage"], row["input"]))
+        if intercepted(row["input"], course, section) is not None:
+            wrong.append("title-if-a-page-is-called intercepted as a card: %r" % row["input"])
+    for row in family["anotherCourse"]:
+        if links_question(row["input"], course, section) != ("another", row["expectCourse"]):
+            wrong.append("another course and not refused naming %s: %r" % (row["expectCourse"], row["input"]))
+    for row in family["refused"]:
+        if links_question(row["input"], course, section) is not None:
+            wrong.append("refused and read as a links question anyway: %r" % row["input"])
+        if intercepted(row["input"], course, section) in ("read_page", REFUSED_IN_CODE):
+            wrong.append("refused and intercepted anyway: %r" % row["input"])
+    if wrong:
+        sys.exit(
+            "links_question() no longer agrees with contracts/assist-cases.json "
+            "-> linksQuestion:\n  %s\nFix it before quoting a number from this suite."
+            % "\n  ".join(wrong)
+        )
+    return (len(family["accepted"]) + len(family["anotherCourse"]) + len(family["refused"])
+            + len(family["onlyIfAPageIsCalled"]))
+
+
 def ask(prompt):
     payload = {
         "model": "local", "temperature": TEMPERATURE,
@@ -1118,9 +1379,11 @@ CARD_LABELS = [probe for _, _, probe, _ in PROMISED]
 # pinned against the contract before anything is measured.
 DEPLOY_ROWS_CHECKED = assert_deploy_at_a_time_matches_contract()
 HIDE_ROWS_CHECKED = assert_hide_is_unpublish_matches_contract()
+LINKS_ROWS_CHECKED = assert_links_question_matches_contract()
 INTERCEPTED = {}
 for acceptable, prompt, probe, needs_date in CASES:
-    tool = intercepted(prompt.replace("EXC2O", COURSE).replace("exc2o", COURSE.lower()))
+    tool = intercepted(prompt.replace("EXC2O", COURSE).replace("exc2o", COURSE.lower()),
+                       COURSE, SECTION)
     if tool is not None:
         INTERCEPTED[probe] = tool
 
@@ -1145,6 +1408,8 @@ print("### deploy-at-a-time guard agrees with %d contract rows"
       % DEPLOY_ROWS_CHECKED)
 print("### hide-is-unpublish guard agrees with %d contract rows"
       % HIDE_ROWS_CHECKED)
+print("### links-question guard agrees with %d contract rows"
+      % LINKS_ROWS_CHECKED)
 print("### intercepted in code before the model (%d of %d probes): %s" % (
     len(INTERCEPTED), len(CASES),
     ", ".join("%s -> %s" % (p, t) for p, t in INTERCEPTED.items())))
