@@ -365,6 +365,16 @@ else
   cat /tmp/verify_build_started_marker_test.log
 fi
 
+# Issue #136: one rule for "this built site is a preview's" — deploy.sh's
+# check and deploy.py's, run against contracts/app-rules.json ->
+# buildFreshness.previewBuild, the cases the apps read too.
+if (cd scripts && python3 test_preview_build_detection.py) >/tmp/verify_preview_build_detection_test.log 2>&1; then
+  pass "deploy.sh and deploy.py call a site a preview's by every page, as the apps do (scripts/test_preview_build_detection.py)"
+else
+  fail "deploy.sh and deploy.py call a site a preview's by every page, as the apps do (scripts/test_preview_build_detection.py)"
+  cat /tmp/verify_preview_build_detection_test.log
+fi
+
 if (cd scripts && python3 test_publishable_site.py) >/tmp/verify_publishable_site_test.log 2>&1; then
   pass "build_site.py: a build with no front page produces no site, and clears the last one (scripts/test_publishable_site.py)"
 else
