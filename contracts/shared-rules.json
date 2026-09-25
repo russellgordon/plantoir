@@ -340,7 +340,7 @@
         "why": "Added 2026-09-24 with issue #195's fix review. 'I set it for Friday and it never went' is otherwise answered only by the refusal that was on screen at the time, which nobody quotes a week later. The two ways it fails leave DIFFERENT things behind, and the line has to say which: when the new deploy's files could not be WRITTEN, the old deploy's plist is still on disk (the failed write is atomic and everything before it writes elsewhere), so it is handed back to macOS and the line says it still stands - saying 'turned off' there would be false, because the old job would still fire; when macOS REFUSED the new one after its plist was written, the old one's plist has been overwritten, so it is gone, and 'scheduled deploy turned off' says so beside this line - including when the old one was set for the same minute, which the card rightly leaves unsaid but whose loss is still a loss."
       },
       {
-        "carries": "the folder it was given, the code and school year it shows, how many sections came across, and which course it was copied from",
+        "carries": "the folder it was given, the code and school year it shows, how many sections came across, and which course it was copied from - and, only when the copy was made without any (#255), the Obsidian add-ons left behind by FOLDER name, or that the add-ons folder or the settings folder was a link or could not be read, or that Obsidian Publish's site setting stayed behind (referenceCourses.obsidianAddOns). A course with none leaves a line byte-identical to before. Never anything read from inside an add-on",
         "event": "course kept for reference",
         "why": "A reference course is a course that appeared in the sidebar without the teacher creating one, and which can never be deployed. Without this line a report of 'where did ICS3U-2025 come from' or 'why will this one not publish' has nothing anywhere behind it. It names the FOLDER and the displayed code separately because they deliberately differ, and that difference is the first thing somebody reading a report will want to check. The source path never appears raw - a course is named, not a path - and the contents of a page never appear at all."
       },
@@ -355,7 +355,7 @@
         "why": "Written ONLY when a pass actually did something, so a folder in a steady state leaves no lines at all. It is the answer to the one report this feature can produce that would otherwise be unexplainable: 'my reference course let me edit a page'. A count of 37 after a restore is a backup coming back unlocked, because a zip carries the mode and not the flag; a handful that would not stay locked, over and over, is usually a folder kept in a cloud drive whose file provider clears the locked bit while a file uploads - but the LINE says only the count, deliberately, because a volume with no support for the flag at all produces the same count and naming a cause would be a confident wrong diagnosis. Neither is a failure to put in front of the teacher, and neither is retried after a delay - the next pass is the mechanism."
       },
       {
-        "carries": "the NAME of the folder it was read from, the folder it was given here, the code and school year it shows, and how many sections came across",
+        "carries": "the NAME of the folder it was read from, the folder it was given here, the code and school year it shows, and how many sections came across - and, for a course in the MODERN layout only and only when there were any (#255), the Obsidian add-ons left behind by FOLDER name (or that a folder was a link, could not be read, or Obsidian Publish's site setting stayed behind). The two older layouts say theirs on their own second line, so this line adds nothing for them; a course with none leaves a line byte-identical to before. Never anything read from inside an add-on",
         "event": "course imported for reference",
         "why": "The folder it was READ from is the half a copy does not have, and it is the answer to 'where did this ICS4U come from' - a folder somewhere else on this Mac, which the teacher may have moved or deleted since. Named rather than written as a path, the same way every other line here names a course rather than a path. The contents of a page never appear."
       },
@@ -4432,6 +4432,7 @@
       "neverDeployed": "{course} is kept for reference. Preview it to read its pages; it is never deployed.",
       "copyAlreadyBeingMade": "A copy called {folder} is already being made in another window, or in another copy of Plantoir.",
       "copyIsASnapshot": "This records {course} as it is today. You can keep teaching it as usual \u2014 nothing here changes. To take a fresher copy later, delete this one first, then copy again.",
+      "keepACopyLeavesAddOnsBehind": "The copy is made without {course}'s Obsidian add-ons and their settings, so nothing in them can publish it. {course} keeps them.",
       "codeAlreadyInThatYear": "You already have a {code} kept for reference from {year}. Choose a different school year.",
       "codeAlreadyWithNoYear": "You already have a {code} kept for reference with no school year. Choose a school year for this one.",
       "groupTitle": "Reference Courses",
@@ -4464,7 +4465,7 @@
         },
         {
           "name": ".obsidian",
-          "why": "Obsidian writes workspace.json the moment a vault is opened, and opening the course in Obsidian is the whole point of keeping it. The folder and everything under it - plugins, themes, snippets - are outside the lock."
+          "why": "Obsidian writes workspace.json the moment a vault is opened, and opening the course in Obsidian is the whole point of keeping it. The folder and everything under it - themes, snippets, the workspace, and the add-ons of a course kept before #255 - are outside the lock."
         },
         {
           "name": ".merged_output",
@@ -4526,6 +4527,346 @@
         "why": "Everything that finds a course walks courses/ — discovery, the launchers, the build output link, the backups list. A second home would be a second answer to 'where are the courses', and the marker gives the same separation for one key."
       }
     ],
+    "obsidianAddOns": {
+      "note": "#255 (2026-09-25). EVERY route that makes a reference course - Keep a Copy for Reference..., and Import Courses for Reference... reading a modern working folder, the older folder-per-class layout (importing.olderLayout) or the 2024-25 website-folder-per-class layout (importing.quartzCheckoutLayout) - leaves the same three entries of the course's .obsidian behind and brings the rest. Before #255 only the two older layouts did; a modern import and Keep a Copy brought plugins/ and community-plugins.json across whole.",
+      "rule": "Anchored at the course's OWN top-level .obsidian (content/.obsidian in the 2024-25 layout) and compared as a PATH, never matched as a name: a teacher's own folder of pages called plugins, anywhere in the course, comes across. Each entry is skipped WITHOUT being looked inside - before it is so much as lstat-ed - so nothing inside an add-on can refuse a course (an unreadable folder in there is not an unreadable folder of the course). On the two MODERN routes a .obsidian that is itself a LINK does not come at all: it is never copied as a link, because the reference course would then be reading - and the reading-view default WRITING into - the live settings it points at. The older layout already leaves every link out, and the 2024-25 layout judges every link at the top of content/ on its own, so neither needs that half. Keep a Copy of a LIVE course follows the same rule (Russell, 2026-09-25): the copy is never published, so an add-on in it is only ever a way to publish it outside the refusals, and the course being taught keeps its add-ons untouched.",
+      "leftBehindInsideObsidian": [
+        {
+          "path": "plugins",
+          "why": "Every community add-on: its code and its settings. An add-on runs code with network access, and a publishing add-on keeps its credential in its own data.json - every real 2023-24 class folder carries digitalgarden/data.json with a non-empty githubToken (importing.olderLayout.placement.whyTheAddOnsStayBehind). Copied, the credential lands in the working folder and in every backup and archive zip, and once Obsidian trusts the vault's add-ons it is a publish command outside all fifteen of Plantoir's refusals."
+        },
+        {
+          "path": "community-plugins.json",
+          "why": "The list of add-ons Obsidian switches on. Nothing to switch on without plugins/, and a list naming an add-on that is not there is only clutter."
+        },
+        {
+          "path": "publish.json",
+          "why": "Core Obsidian Publish's connection to a LIVE site - {siteId, host, included, excluded}. MEASURED in Obsidian 1.13.6's own bundle: a core add-on's loadData is vault.readConfigJson(id), which reads <configDir>/<id>.json. With the teacher signed in to Obsidian, a copied publish.json is one click from publishing the reference course over the site it came from. Core Sync is NOT here: its remote is kept in Obsidian's own storage keyed by the vault (IndexedDB '<appId>-sync', measured in the same bundle), so a copied folder carries nothing of it. 0 publish.json files in Russell's 2023-24 folders and 0 in the 2025-26 backup."
+        }
+      ],
+      "kept": [
+        {
+          "what": "app.json",
+          "why": "Editor and appearance settings, the teacher's own; ReferenceReadingView writes defaultViewMode here after the copy."
+        },
+        {
+          "what": "appearance.json, themes/, snippets/",
+          "why": "How the vault looks. CSS cannot publish anything, and a theme is CSS."
+        },
+        {
+          "what": "core-plugins.json",
+          "why": "Which of Obsidian's own features are on. It holds switches (\"sync\": true, \"publish\": false in Russell's four), never an account or a site - the site lives in publish.json, left behind above."
+        },
+        {
+          "what": "workspace.json and its conflicted copies",
+          "why": "Every path in workspace.json is vault-relative (importing.leftBehind.kept). The conflicted copies - 63 of them in MPM2DE's .obsidian, 'workspace (<name>'s conflicted copy <date>).json' - are a sync provider's clutter, not a danger, and matching them would mean matching every provider's naming in every language. They come (Russell, 2026-09-25)."
+        },
+        {
+          "what": "graph.json, hotkeys.json, bookmarks.json, anything else",
+          "why": "Folder state and preferences. Nothing in them runs code or reaches a website."
+        }
+      ],
+      "hasAddOnsWhen": "The sheets say it, and the modern trail lines name it, ONLY when there is something: plugins/ holds at least one entry whose name does not start with '.', or plugins/ is itself a link, or plugins/ is a folder that could not be listed, or .obsidian is itself a link, or publish.json is there. An empty plugins/ and a community-plugins.json of [] - Russell's own ICS3U, measured - say NOTHING: telling a teacher their add-ons were left behind when they had none is false. Add-ons are named by FOLDER name only; nothing inside an add-on is ever opened, and nothing read from one is ever written down.",
+      "whereItIsSaid": "Import sheet, under the list and in the summary: wording.addOnsAreLeftBehind when a MODERN course in the list has add-ons - true of every route, so it is said INSTEAD of wording.olderLayoutAddOnsAreLeftBehind, which beside a modern course with an add-on would read as if that one's add-ons came; otherwise the older sentence for any older-layout class, as before; otherwise nothing. Keep a Copy sheet, in the calm note before the copy is made: referenceCourses.wording.keepACopyLeavesAddOnsBehind, only when the live course has add-ons. The trail: 'course kept for reference' and, for a modern course, 'course imported for reference' end with what was left behind when there was anything, and are byte-identical to before when there was not. The older layouts keep counting theirs on their own second line, which is why the shared import line adds nothing for them.",
+      "treeEntries": "The grammar of importing.olderLayout.treeEntries: a plain string is a file (content 'something'), except a path ending course_config.json, which is written as settings naming the folder as its course_code with section_numbers [1]; one ending '/' is an empty folder; {\"file\": path, \"text\": \"...\"} is a file with that content; {\"link\": path, \"to\": \"<path in the tree>\"} is a link to that path. Each case is built at a root, and its course is root/<course>. On Windows a directory link can be a junction (a symlink needs Developer Mode); any reparse point must be treated as a link - never followed, never copied.",
+      "cases": [
+        {
+          "name": "a publishing add-on, with everything else Obsidian keeps beside it",
+          "course": "courses/ICS3U",
+          "tree": [
+            "courses/ICS3U/course_config.json",
+            "courses/ICS3U/section1/index.md",
+            "courses/ICS3U/.obsidian/app.json",
+            "courses/ICS3U/.obsidian/appearance.json",
+            "courses/ICS3U/.obsidian/workspace.json",
+            "courses/ICS3U/.obsidian/snippets/x.css",
+            "courses/ICS3U/.obsidian/themes/T/theme.css",
+            "courses/ICS3U/.obsidian/plugins/digitalgarden/main.js",
+            {
+              "file": "courses/ICS3U/.obsidian/plugins/digitalgarden/data.json",
+              "text": "{\"githubToken\": \"not-a-real-credential\"}"
+            },
+            {
+              "file": "courses/ICS3U/.obsidian/community-plugins.json",
+              "text": "[\"digitalgarden\"]"
+            }
+          ],
+          "expectAbsent": [
+            ".obsidian/plugins",
+            ".obsidian/community-plugins.json"
+          ],
+          "expectUnchanged": [
+            ".obsidian/appearance.json",
+            ".obsidian/workspace.json",
+            ".obsidian/snippets/x.css",
+            ".obsidian/themes/T/theme.css",
+            "section1/index.md"
+          ],
+          "expectFound": {
+            "addOnNames": [
+              "digitalgarden"
+            ],
+            "addOnsFolderIsALink": false,
+            "settingsFolderIsALink": false,
+            "publishSiteIsSet": false
+          },
+          "expectSaid": true
+        },
+        {
+          "name": "a course Plantoir made: no add-ons, and nothing said",
+          "course": "courses/ICS4U",
+          "tree": [
+            "courses/ICS4U/course_config.json",
+            "courses/ICS4U/section1/index.md",
+            "courses/ICS4U/.obsidian/app.json",
+            "courses/ICS4U/.obsidian/appearance.json",
+            "courses/ICS4U/.obsidian/core-plugins.json",
+            "courses/ICS4U/.obsidian/workspace.json",
+            "courses/ICS4U/.obsidian/themes/Minimal/theme.css"
+          ],
+          "expectAbsent": [],
+          "expectUnchanged": [
+            ".obsidian/appearance.json",
+            ".obsidian/core-plugins.json",
+            ".obsidian/workspace.json",
+            ".obsidian/themes/Minimal/theme.css",
+            "section1/index.md"
+          ],
+          "expectFound": {
+            "addOnNames": [],
+            "addOnsFolderIsALink": false,
+            "settingsFolderIsALink": false,
+            "publishSiteIsSet": false
+          },
+          "expectSaid": false
+        },
+        {
+          "name": "Russell's ICS3U as measured: an empty add-ons folder and an empty list",
+          "course": "courses/ICS3U",
+          "tree": [
+            "courses/ICS3U/course_config.json",
+            "courses/ICS3U/section1/index.md",
+            "courses/ICS3U/.obsidian/app.json",
+            "courses/ICS3U/.obsidian/core-plugins.json",
+            "courses/ICS3U/.obsidian/snippets/one.css",
+            "courses/ICS3U/.obsidian/plugins/",
+            {
+              "file": "courses/ICS3U/.obsidian/community-plugins.json",
+              "text": "[]"
+            }
+          ],
+          "expectAbsent": [
+            ".obsidian/plugins",
+            ".obsidian/community-plugins.json"
+          ],
+          "expectUnchanged": [
+            ".obsidian/core-plugins.json",
+            ".obsidian/snippets/one.css",
+            "section1/index.md"
+          ],
+          "expectFound": {
+            "addOnNames": [],
+            "addOnsFolderIsALink": false,
+            "settingsFolderIsALink": false,
+            "publishSiteIsSet": false
+          },
+          "expectSaid": false
+        },
+        {
+          "name": "a teacher's own pages called plugins come: the rule is a place, not a name",
+          "course": "courses/ICS3U",
+          "tree": [
+            "courses/ICS3U/course_config.json",
+            "courses/ICS3U/.obsidian/app.json",
+            "courses/ICS3U/plugins/Plugin Notes.md",
+            "courses/ICS3U/Unit 1/plugins/notes.md",
+            "courses/ICS3U/Unit 1/community-plugins.json",
+            "courses/ICS3U/Unit 1/publish.json",
+            "courses/ICS3U/section1/plugins/index.md"
+          ],
+          "expectAbsent": [],
+          "expectUnchanged": [
+            "plugins/Plugin Notes.md",
+            "Unit 1/plugins/notes.md",
+            "Unit 1/community-plugins.json",
+            "Unit 1/publish.json",
+            "section1/plugins/index.md"
+          ],
+          "expectFound": {
+            "addOnNames": [],
+            "addOnsFolderIsALink": false,
+            "settingsFolderIsALink": false,
+            "publishSiteIsSet": false
+          },
+          "expectSaid": false
+        },
+        {
+          "name": "the add-ons folder is a link: left behind, never followed, and said",
+          "course": "courses/ICS3U",
+          "tree": [
+            "courses/ICS3U/course_config.json",
+            "courses/ICS3U/section1/index.md",
+            "courses/ICS3U/.obsidian/app.json",
+            "Shared Add-ons/digitalgarden/main.js",
+            {
+              "link": "courses/ICS3U/.obsidian/plugins",
+              "to": "Shared Add-ons"
+            }
+          ],
+          "expectAbsent": [
+            ".obsidian/plugins"
+          ],
+          "expectUnchanged": [
+            "section1/index.md"
+          ],
+          "expectFound": {
+            "addOnNames": [],
+            "addOnsFolderIsALink": true,
+            "settingsFolderIsALink": false,
+            "publishSiteIsSet": false
+          },
+          "expectSaid": true
+        },
+        {
+          "name": "a sync provider's conflicted copies of the workspace come along",
+          "course": "courses/MPM2DE",
+          "tree": [
+            "courses/MPM2DE/course_config.json",
+            "courses/MPM2DE/section1/index.md",
+            "courses/MPM2DE/.obsidian/app.json",
+            "courses/MPM2DE/.obsidian/workspace.json",
+            "courses/MPM2DE/.obsidian/workspace (Jimmy Frickey's conflicted copy 2025-09-08).json"
+          ],
+          "expectAbsent": [],
+          "expectUnchanged": [
+            ".obsidian/workspace.json",
+            ".obsidian/workspace (Jimmy Frickey's conflicted copy 2025-09-08).json"
+          ],
+          "expectFound": {
+            "addOnNames": [],
+            "addOnsFolderIsALink": false,
+            "settingsFolderIsALink": false,
+            "publishSiteIsSet": false
+          },
+          "expectSaid": false
+        },
+        {
+          "name": "the settings folder itself is a link: not copied, and the live settings are not written through it",
+          "course": "courses/ICS3U",
+          "tree": [
+            "courses/ICS3U/course_config.json",
+            "courses/ICS3U/section1/index.md",
+            "Shared Settings/app.json",
+            "Shared Settings/plugins/digitalgarden/main.js",
+            {
+              "file": "Shared Settings/community-plugins.json",
+              "text": "[\"digitalgarden\"]"
+            },
+            {
+              "link": "courses/ICS3U/.obsidian",
+              "to": "Shared Settings"
+            }
+          ],
+          "expectAbsent": [
+            ".obsidian/plugins",
+            ".obsidian/community-plugins.json"
+          ],
+          "expectNotALink": [
+            ".obsidian"
+          ],
+          "expectUnchanged": [
+            "section1/index.md"
+          ],
+          "expectFound": {
+            "addOnNames": [],
+            "addOnsFolderIsALink": false,
+            "settingsFolderIsALink": true,
+            "publishSiteIsSet": false
+          },
+          "expectSaid": true
+        },
+        {
+          "name": "core Obsidian Publish connected to a live site: its setting stays behind",
+          "course": "courses/ICS4U",
+          "tree": [
+            "courses/ICS4U/course_config.json",
+            "courses/ICS4U/section1/index.md",
+            "courses/ICS4U/.obsidian/app.json",
+            {
+              "file": "courses/ICS4U/.obsidian/core-plugins.json",
+              "text": "{\"publish\": true}"
+            },
+            {
+              "file": "courses/ICS4U/.obsidian/publish.json",
+              "text": "{\"siteId\": \"not-a-real-site\", \"host\": \"publish.example.org\"}"
+            }
+          ],
+          "expectAbsent": [
+            ".obsidian/publish.json"
+          ],
+          "expectUnchanged": [
+            ".obsidian/core-plugins.json",
+            "section1/index.md"
+          ],
+          "expectFound": {
+            "addOnNames": [],
+            "addOnsFolderIsALink": false,
+            "settingsFolderIsALink": false,
+            "publishSiteIsSet": true
+          },
+          "expectSaid": true
+        }
+      ],
+      "howToRunACase": "Build the tree, then make a reference course from root/<course> BOTH ways - Keep a Copy (the course as a live one) and a modern import (choosing root, a working folder holding courses/) - into a different working folder. Every expectAbsent path is not in the made course (not as a file, a folder or a link); every expectUnchanged path is byte-identical to its source; every expectNotALink path is not a link; the ENTIRE source tree, links' targets included, is byte-identical afterwards; what was found is expectFound; the sheet's note is said exactly when expectSaid. Two things are Swift-only because they are platform mechanics rather than data: a folder inside an add-on that nobody can read does not refuse the course on any of the four routes, and the sheet's size leaves the add-ons out.",
+      "knownLimits": [
+        {
+          "what": "A vault inside the course",
+          "why": "The rule is anchored at the course's own top-level .obsidian, so a nested one (section1/.obsidian/plugins) comes across whole. MEASURED: the 2025-26 backup holds exactly four .obsidian folders, found case-insensitively and at any depth, all at a course's top; the 2023-24 class folders are routed through importing.olderLayout. None is met today."
+        },
+        {
+          "what": "Another spelling of the folder names",
+          "why": "Compared exactly: .Obsidian/Plugins would come across although APFS would let Obsidian load it. The same measurement found only the lower-case spelling; matching case-insensitively was weighed and left for when a real folder needs it, because a rule that is exactly the file system's spelling is the one both platforms can run as data."
+        },
+        {
+          "what": "A renamed settings folder",
+          "why": "Obsidian can be told to keep a vault's settings in a folder other than .obsidian ('Override config folder'). Such a folder is copied as the teacher's own. Not met in any folder measured."
+        }
+      ],
+      "rejected": [
+        {
+          "what": "An allow-list of 'harmless' add-ons (Excalidraw, Dataview)",
+          "why": "Any add-on runs arbitrary code with network access. Plantoir cannot judge third-party code, and the list would rot the day an add-on it named shipped an update."
+        },
+        {
+          "what": "Copying the add-ons but stripping credentials from data.json",
+          "why": "Every add-on names its settings differently - githubToken is one of thousands - so which key is a credential cannot be known."
+        },
+        {
+          "what": "Copying plugins/ but not community-plugins.json, so the add-ons arrive switched off",
+          "why": "The credential still lands in the folder and in every zip, and one toggle in Obsidian switches the add-on back on."
+        },
+        {
+          "what": "Walking the add-ons and filtering them out afterwards",
+          "why": "The walk would still go inside plugins/, so an unreadable folder in an add-on would refuse the whole course for something never going to be copied. This is what the two older layouts did until #255; they skip now."
+        },
+        {
+          "what": "Adding plugins to the by-name list (importing.leftBehind.names)",
+          "why": "That list matches at every depth, so it would drop a teacher's own folder of pages called plugins anywhere in the course (case 4)."
+        },
+        {
+          "what": "A different rule for Keep a Copy of a live course",
+          "why": "The copy is a reference course and is never published, whoever installed the add-on; the live course keeps its add-ons untouched. Russell, 2026-09-25."
+        },
+        {
+          "what": "Leaving the conflicted workspace copies behind",
+          "why": "Clutter, not danger, and matching a sync provider's naming means matching every provider in every language. Russell, 2026-09-25: they come."
+        },
+        {
+          "what": "Leaving the modern route as it was because Plantoir-made courses carry no add-ons",
+          "why": "True today, and exactly the quiet difference between routes that nobody chose: a teacher who installs one add-on in a live course would have it copied into every reference copy of it."
+        }
+      ]
+    },
     "importing": {
       "note": "The SECOND way a reference course is made: the teacher points at the folder they kept last year's classes in and ticks the courses they want. It is the same act as 'Keep a Copy for Reference…' with a different source, and it ends in the same code — cut loose from last year's websites, marked, filed under a school year, left with nowhere to deploy to, locked. Everything in the referenceCourses block above therefore applies to an imported course without exception: the same marker, the same neutralisation, the same fifteen refusals, the same lock.",
       "theSourceIsNeverWritten": {
@@ -4617,7 +4958,7 @@
         ]
       },
       "leftBehind": {
-        "rule": "Composed from the lists that already exist rather than written out again: what an archive leaves behind, plus what a reference copy leaves behind, plus what only an import meets. A name in the list is skipped WITHOUT being looked inside. On this route a symlink is copied as a link and never followed - the only one a modern course holds is .merged_output, which is left behind by name anyway; changing that here was rejected (olderLayout.rejected). The older-layout route never copies a link at all: olderLayout.placement.whyNoLinkComesAcross.",
+        "rule": "Composed from the lists that already exist rather than written out again: what an archive leaves behind, plus what a reference copy leaves behind, plus what only an import meets. A name in the list is skipped WITHOUT being looked inside, at any depth. The Obsidian add-ons are NOT on this list, because they are a place rather than a name: referenceCourses.obsidianAddOns. On this route a symlink is copied as a link and never followed - the only one a modern course holds is .merged_output, which is left behind by name anyway; changing that here was rejected (olderLayout.rejected). The older-layout route never copies a link at all: olderLayout.placement.whyNoLinkComesAcross.",
         "why": "On a folder made by an older Plantoir, .merged_output is a real directory holding last year's entire built website - measured at 1.9 GB per course against 489 MB of course, four fifths of what is on disk. Walking it to not copy it would cost more time than copying the course. On a folder made by a current Plantoir it is a symlink pointing out of the working folder, and following it would copy the built site back into the course it came from.",
         "names": [
           {"name": ".merged_output", "why": "Last year's built website. Rebuilt on demand; a real directory in an old folder, a symlink in a new one, skipped either way."},
@@ -4640,7 +4981,7 @@
           {"what": ".internal/activity", "why": "Leases name processes on whichever machine wrote them, so a copied one names a process that was never doing anything here."}
         ],
         "kept": [
-          {"what": ".obsidian", "why": "The course may be opened in Obsidian, and Plantoir opens the course folder AS a vault. Without it the vault opens with first-run prompts, none of the teacher's plugins or appearance, and none of the folder state that makes last year's material navigable. 312 KB against a 489 MB course. Its workspace.json was MEASURED on a real imported course rather than assumed: every path in it is vault-relative (main/left/right/left-ribbon/active/lastOpenFiles), with no absolute path and no mention of the old folder, so it resolves inside the new course as it stands. Nothing needs stripping and nothing needs registering - the app opens a vault by path and registers nothing itself. This is the MODERN route; a class in the older folder-per-class layout comes WITHOUT .obsidian/plugins and community-plugins.json, because every real one carries a publishing add-on holding a live credential (olderLayout.placement.whyTheAddOnsStayBehind)."},
+          {"what": ".obsidian", "why": "The course may be opened in Obsidian, and Plantoir opens the course folder AS a vault. Without it the vault opens with first-run prompts, none of the teacher's appearance, and none of the folder state that makes last year's material navigable. 312 KB against a 489 MB course. Its workspace.json was MEASURED on a real imported course rather than assumed: every path in it is vault-relative (main/left/right/left-ribbon/active/lastOpenFiles), with no absolute path and no mention of the old folder, so it resolves inside the new course as it stands. Nothing needs stripping and nothing needs registering - the app opens a vault by path and registers nothing itself. Since #255 it comes WITHOUT its add-ons on this route too - plugins/, community-plugins.json and publish.json, the rule every route keeps (referenceCourses.obsidianAddOns) - and not at all when .obsidian is itself a link. Until then only the older folder-per-class layout left them behind."},
           {"what": "the site markers", "why": "Copied, then renamed aside by the same neutralisation route 1 uses. The file holds the site id and the admin address, which a teacher may still want."},
           {"what": "every page's own visibility", "why": "A reference course is a faithful record of what students actually saw. The frontmatter of a page is NEVER rewritten on import - the build already reads the older draft: true/false correctly."}
         ]
@@ -5147,7 +5488,7 @@
           "whyThreadFoldersSitAtSection1": "Home.md embeds ![[Thread 4/Day 15]] - a PATH link, which Quartz resolves from the content root. The build copies each per_section_folders entry to content/<name>, so section1/Thread 4/ becomes content/Thread 4/ and the link resolves as it did in the class folder. Measured, simulating Quartz v4.5.0's shortest resolution over the planned content root: ICS3U S1 + shared, 1,586 of 1,587 links and embeds resolve (the one is an absolute path to a folder that no longer exists); without the shared folder, 57 of 186. Nesting them under section1/All Classes/ was REJECTED: it breaks every one of those path embeds.",
           "whyTheFrontPageIsRenamed": "With no section1/index.md the build writes no index.html and the preview's watcher waits for it forever. 0 links in the real pages name Home, so nothing points at the old name.",
           "whyNoLinkComesAcross": "A reference course must hold no link: the lock cannot lock through one, the census does not count one (so a course holding a live link into iCloud reported 'everything that should be locked is'), and the preview cannot follow one out of courses/. MEASURED, before this change: the copier copied a symlink AS a link, dangling or not, and counted it as a file - pointed at an ICD2O class, today's route would have made a reference course whose shared content was live links into iCloud. The planner leaves every link out and the copier REFUSES one on this route as well, so a future planner bug fails loudly.",
-          "whyTheAddOnsStayBehind": "MEASURED (key names only, never a value): every real class folder carries .obsidian/plugins/digitalgarden/data.json with a non-empty githubToken, and community-plugins.json enables that add-on. Copied, the credential would land in the working folder, travel into every backup and archive zip of the course, and - once Obsidian trusts the vault's add-ons - give a publish command outside all fifteen of Plantoir's refusals. The rest of .obsidian (appearance, app.json, themes) comes, so the course opens normally and ReferenceReadingView still sets reading view. The shared folder's own .obsidian never comes.",
+          "whyTheAddOnsStayBehind": "MEASURED (key names only, never a value): every real class folder carries .obsidian/plugins/digitalgarden/data.json with a non-empty githubToken, and community-plugins.json enables that add-on. Copied, the credential would land in the working folder, travel into every backup and archive zip of the course, and - once Obsidian trusts the vault's add-ons - give a publish command outside all fifteen of Plantoir's refusals. The rest of .obsidian (appearance, app.json, themes) comes, so the course opens normally and ReferenceReadingView still sets reading view. The shared folder's own .obsidian never comes. Since #255 this is the rule EVERY route keeps (referenceCourses.obsidianAddOns), which also leaves publish.json, and the add-ons are skipped by the walk rather than filtered after it, so an unreadable folder inside one no longer refuses the class.",
           "cases": [
             {
               "name": "a class with a shared folder, add-ons, a shared FILE and a link inside a shared folder",
@@ -6528,7 +6869,7 @@
           ]
         },
         "placement": {
-          "rule": "Read ONLY from the website folder pointed at (or the one its shortcut leads to): its own source-<code>/s1 and source-<code>/shared, BY NAME, walked with lstat and never followed. s1/* goes to section1/ unchanged (index.md is already the front page, so nothing is renamed; All Classes lands at section1/All Classes, the modern layout's own place); shared/* goes to the course root, Media included; content/.obsidian comes WITHOUT plugins/ and community-plugins.json. A real entry at the top of content/ other than .obsidian, source-* and vault-* (0 measured) comes to the root as shared. The links at the top of content/ are a MANIFEST: each link's TEXT, worked out against content/ as a path, must be source-<code>/shared/<its own name> or source-<code>/s1/<its own name>, and that entry must be there - then it is 'replaced by what it showed', machinery; otherwise it is a LOSS. Also a loss, and named: a link anywhere inside the pages or inside .obsidian (outside plugins/), a shared entry with the same name as one of the section's own (nameTheSectionUses - the build would put both at content/<name>), a shared entry named index.md, section1 or course_config.json (nameTheCourseUses), and no s1/index.md (noFrontPage). Settings: course_code, course_name '<CODE> S1', one section, shared_folders (top folders except Media and dot-folders), shared_files (top regular files except dot-files), per_section_folders and per_section_files (s1's top folders, and its files except index.md), expandable, hidden [Media], include_curriculum_coverage false, show_section_marker section1 false - #254's - and unit_word when unitWord finds one. An empty Media is made when shared/ has none. Every page is byte-identical.",
+          "rule": "Read ONLY from the website folder pointed at (or the one its shortcut leads to): its own source-<code>/s1 and source-<code>/shared, BY NAME, walked with lstat and never followed. s1/* goes to section1/ unchanged (index.md is already the front page, so nothing is renamed; All Classes lands at section1/All Classes, the modern layout's own place); shared/* goes to the course root, Media included; content/.obsidian comes WITHOUT plugins/, community-plugins.json and publish.json (referenceCourses.obsidianAddOns, the rule every route keeps; skipped, never walked). A real entry at the top of content/ other than .obsidian, source-* and vault-* (0 measured) comes to the root as shared. The links at the top of content/ are a MANIFEST: each link's TEXT, worked out against content/ as a path, must be source-<code>/shared/<its own name> or source-<code>/s1/<its own name>, and that entry must be there - then it is 'replaced by what it showed', machinery; otherwise it is a LOSS. Also a loss, and named: a link anywhere inside the pages or inside .obsidian (outside plugins/), a shared entry with the same name as one of the section's own (nameTheSectionUses - the build would put both at content/<name>), a shared entry named index.md, section1 or course_config.json (nameTheCourseUses), and no s1/index.md (noFrontPage). Settings: course_code, course_name '<CODE> S1', one section, shared_folders (top folders except Media and dot-folders), shared_files (top regular files except dot-files), per_section_folders and per_section_files (s1's top folders, and its files except index.md), expandable, hidden [Media], include_curriculum_coverage false, show_section_marker section1 false - #254's - and unit_word when unitWord finds one. An empty Media is made when shared/ has none. Every page is byte-identical.",
           "whyTheCopyInThisFolder": "S1's and S2's copies of source-ics3u DIFFER (335 entries, measured by SHA-1). S2's publish script (synclink) rsyncs S1's content into S2 before each S2 publish and re-points the section links, so each copy is exactly what that website folder's site was last built from; S1's is where both sections were edited and carries 2025-26 changes. Russell, 2026-09-23: the folder pointed at, its own copy.",
           "whyNoLinkComesAcross": "As olderLayout.placement.whyNoLinkComesAcross, and here the links would even resolve: that is exactly why the copier still never copies one. The pages are selected by name; a link is a manifest entry and nothing more.",
           "whyUnitWord": "The build's post-pass (_sync_non_class_pages_created) restamps the created date of every page it does not recognise as a class page by class_page_pattern(unit_word). With the key absent the word is Unit, no page of these is a class page, and every lesson in the preview gets the same date. So the import writes unit_word when the class folder's pages agree on one word.",
@@ -6557,7 +6898,7 @@
               },
               {
                 "kind": "addOns",
-                "what": ".obsidian/plugins and .obsidian/community-plugins.json, one each (0 in Russell's folders: core plugins only)"
+                "what": ".obsidian/plugins, .obsidian/community-plugins.json and .obsidian/publish.json, one each, never looked inside (0 in Russell's folders: core plugins only)"
               }
             ]
           },
@@ -6956,6 +7297,7 @@
         "olderLayoutLeftOut": "{count} of its files and folders were not brought across: {names}.",
         "olderLayoutChooseOneCourseAtATime": "{folder} holds courses rather than classes. Choose the Class Website folder inside one of them, or one class folder.",
         "olderLayoutAddOnsAreLeftBehind": "Obsidian add-ons and their settings are not brought across from older class folders, so nothing in them can publish these pages.",
+        "addOnsAreLeftBehind": "Obsidian add-ons and their settings are not brought across, so nothing in them can publish these pages.",
         "checkoutLayoutReadFrom": "Pages and pictures from {place}.",
         "checkoutLayoutReadThroughShortcut": "{shortcut} is a shortcut. Its pages and pictures are read from {place}.",
         "checkoutLayoutOnlyPagesComeAcross": "From a class website folder, only the pages and pictures of its first section come across. The files that built the website, the extra folders kept for editing, and the other sections' pages stay where they are.",
