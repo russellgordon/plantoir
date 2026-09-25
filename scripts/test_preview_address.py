@@ -27,6 +27,8 @@ Pure stdlib. Run with:
     python3 scripts/test_preview_address.py
 """
 
+import json
+import os
 import re
 import subprocess
 import sys
@@ -61,17 +63,24 @@ def function_named(name: str) -> str:
     return match.group(0)
 
 
-def announce(answers: list, build_only: str = "") -> subprocess.CompletedProcess:
+def announce(answers: list, build_only: str = "", trail_home: Path = None) -> subprocess.CompletedProcess:
     """Runs the launcher's own announcement with `docker port` answering each
     time with the next of `answers` (an empty string is an empty answer), and
     reports how many times it was asked.
 
+    `HOME` is always a scratch folder — the launcher's trail helper writes
+    under `$HOME/Library/Logs/Plantoir`, and a test must never add a line to
+    the real trail. Pass `trail_home` to read what was written there.
+
     The count is kept in a file because the launcher asks inside `$( … )`,
     which is a subshell: a variable counted there is gone when it returns."""
     with tempfile.TemporaryDirectory() as scratch:
+        home = trail_home if trail_home is not None else Path(scratch) / "home"
+        home.mkdir(parents=True, exist_ok=True)
         counter = Path(scratch) / "asked"
         counter.write_text("0", encoding="utf-8")
         program = "\n".join([
+            function_named("note_on_the_trail"),
             function_named("say_the_preview_address_is_unknown"),
             function_named("announce_the_preview_address"),
             "_answers=(" + " ".join("'" + answer + "'" for answer in answers) + ")",
@@ -84,6 +93,8 @@ def announce(answers: list, build_only: str = "") -> subprocess.CompletedProcess
             '  if [[ -n "$answer" ]]; then printf "%b\\n" "$answer"; fi',
             '}',
             'CONTAINER_NAME="teaching-quartz-test"',
+            'COURSE="ICS4U"',
+            'SECTION="2"',
             'PREVIEW_PORT=8081',
             'BUILD_ONLY="' + build_only + '"',
             'announce_the_preview_address',
@@ -95,6 +106,7 @@ def announce(answers: list, build_only: str = "") -> subprocess.CompletedProcess
             ["bash", "-c", program, "announce", str(counter)],
             capture_output=True,
             timeout=30,
+            env={"HOME": str(home), "PATH": os.environ.get("PATH", "")},
         )
 
 
@@ -128,6 +140,38 @@ class TheAddressIsAnnouncedOrTheLauncherStops(unittest.TestCase):
         self.assertNotIn("8081", output_of(result))
         self.assertIn("❌", output_of(result))
         self.assertIn("ASKED=2", output_of(result))
+
+    def test_the_refusal_leaves_its_line_on_the_trail(self):
+        """Rule 5: the refusal a teacher will actually meet says why on the
+        trail, in the contract's words, with the course and section — and a
+        preview that found its address, or a build for publishing, adds
+        nothing."""
+        rules = json.loads(
+            (REPOSITORY_ROOT / "contracts" / "shared-rules.json").read_text(encoding="utf-8")
+        )
+        line = None
+        for entry in rules["activityTrail"]["mustRecord"]:
+            if entry["event"] == "preview did not appear":
+                line = entry["launcherLine"]
+        self.assertIsNotNone(line, "the contract no longer pins the launcher's line")
+        expected = line.replace("{course}", "ICS4U").replace("{section}", "2")
+
+        with tempfile.TemporaryDirectory() as scratch:
+            home = Path(scratch)
+            announce(["", ""], trail_home=home)
+            trail = (home / "Library" / "Logs" / "Plantoir" / "activity.txt").read_text(encoding="utf-8")
+            lines = trail.splitlines()
+            self.assertEqual(len(lines), 1, trail)
+            self.assertTrue(lines[0].endswith(" · " + expected), trail)
+
+        for answers, build_only in ((["0.0.0.0:8091"], ""), (["", ""], "--build-only")):
+            with tempfile.TemporaryDirectory() as scratch:
+                home = Path(scratch)
+                announce(answers, build_only=build_only, trail_home=home)
+                self.assertFalse(
+                    (home / "Library" / "Logs" / "Plantoir" / "activity.txt").exists(),
+                    f"nothing to record for {answers} {build_only!r}",
+                )
 
     def test_the_sentence_names_no_machinery(self):
         """Rule 1: a teacher reads this line in the console."""

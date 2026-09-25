@@ -363,11 +363,11 @@ final class PreviewReachabilityTests: XCTestCase {
     func testAnAnnouncedAddressIsWhatIsTried() throws {
         let announced: URL = try XCTUnwrap(URL(string: "http://127.0.0.1:8091/"))
         XCTAssertEqual(
-            PreviewReachability.nextStep(announced: announced, theBuilderSaysItsServerStarted: false),
+            PreviewReachability.nextStep(announced: announced, theBuilderSaysItsServerStarted: false, theTeacherStoppedIt: false),
             .tryTheAddress(announced)
         )
         XCTAssertEqual(
-            PreviewReachability.nextStep(announced: announced, theBuilderSaysItsServerStarted: true),
+            PreviewReachability.nextStep(announced: announced, theBuilderSaysItsServerStarted: true, theTeacherStoppedIt: false),
             .tryTheAddress(announced)
         )
     }
@@ -376,7 +376,7 @@ final class PreviewReachabilityTests: XCTestCase {
     /// guessed — there is no case that makes up an address.
     func testNoAddressBeforeTheServerStartsIsWaitedFor() {
         XCTAssertEqual(
-            PreviewReachability.nextStep(announced: nil, theBuilderSaysItsServerStarted: false),
+            PreviewReachability.nextStep(announced: nil, theBuilderSaysItsServerStarted: false, theTeacherStoppedIt: false),
             .keepWaiting
         )
     }
@@ -386,10 +386,31 @@ final class PreviewReachabilityTests: XCTestCase {
     /// would end at the ten-minute bound with the run still going.
     func testNoAddressAfterTheServerStartsStopsAtOnce() {
         XCTAssertEqual(
-            PreviewReachability.nextStep(announced: nil, theBuilderSaysItsServerStarted: true),
+            PreviewReachability.nextStep(announced: nil, theBuilderSaysItsServerStarted: true, theTeacherStoppedIt: false),
             .stopBecauseNothingWasAnnounced
         )
         XCTAssertEqual(PreviewReachability.verdictWhenNothingWasAnnounced, .plantoirCouldNotTell)
+    }
+
+    /// A teacher who pressed Stop is never told their preview did not
+    /// appear: Stop only signals the run, so the wait can wake while it is
+    /// still "running" — and then it waits, and finds the run over.
+    func testAPreviewTheTeacherStoppedIsNeverReported() throws {
+        XCTAssertEqual(
+            PreviewReachability.nextStep(
+                announced: nil, theBuilderSaysItsServerStarted: true, theTeacherStoppedIt: true
+            ),
+            .keepWaiting
+        )
+        let source: String = try String(
+            contentsOf: PreviewReachabilityTests.repositoryRoot()
+                .appendingPathComponent("mac-app/QuartzTeachers/Views/Section/SectionDetailView.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(
+            source.contains("theTeacherStoppedIt: previewRunner.wasStoppedByUser"),
+            "The preview wait no longer tells the decision whether the teacher pressed Stop."
+        )
     }
 
     /// The wait no longer starts from an address made out of the section's
@@ -458,6 +479,13 @@ final class PreviewReachabilityTests: XCTestCase {
             PreviewReachability.theBuilderSaysItsServerStarted
         )
         XCTAssertEqual(try XCTUnwrap(noAddress["anAddressIsEverGuessed"] as? Bool), false)
+        XCTAssertEqual(try XCTUnwrap(noAddress["evenAfterTheTeacherPressedStop"] as? Bool), false)
+        XCTAssertNotEqual(
+            PreviewReachability.nextStep(
+                announced: nil, theBuilderSaysItsServerStarted: true, theTeacherStoppedIt: true
+            ),
+            .stopBecauseNothingWasAnnounced
+        )
     }
 
     // MARK: - The contract both apps read

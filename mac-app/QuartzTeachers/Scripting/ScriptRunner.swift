@@ -637,6 +637,13 @@ class ScriptRunner {
     /// Deliberately no fallback to the tail, and none to a port: nothing
     /// reaches this runner by any road but `receiveOutput`, so a second
     /// reader could only ever find a staler or a wronger answer.
+    ///
+    /// Read it only WHILE the run is going. A run that ends in the middle of
+    /// the announcement — right after `…localhost:8`, say — has that half
+    /// line read as finished when the run ends, and it parses as an address.
+    /// Harmless today (measured by the review: the preview wait returns on
+    /// the run's end before it looks), and written here so nobody trusts it
+    /// after the fact.
     private(set) var announcedPreviewAddress: URL?
 
     /// Whatever arrived after the last newline, kept until the rest of the

@@ -1475,6 +1475,7 @@
       "whenNoAddressWasAnnounced" : {
         "anAddressIsEverGuessed" : false,
         "builderIsAsked" : false,
+        "evenAfterTheTeacherPressedStop" : false,
         "stopsWhen" : "Started a Quartz server",
         "trailEvent" : "previewNeverAppeared",
         "verdict" : "plantoirCouldNotTell",

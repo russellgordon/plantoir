@@ -340,9 +340,23 @@ nonisolated enum PreviewReachability {
     /// Waiting on would reach the ten-minute bound with the run still going
     /// — the "still building for ever" state `stopWaitingForThePreview`
     /// exists to prevent.
-    static func nextStep(announced: URL?, theBuilderSaysItsServerStarted: Bool) -> NextStep {
+    ///
+    /// **A preview the teacher has just stopped is never reported.** Stop
+    /// only signals the run; it is still "running" until it has actually
+    /// ended, so a wait that wakes in between would otherwise raise "your
+    /// preview did not appear" over a preview they ended themselves (the
+    /// review of #235). It waits instead, and the next turn finds the run
+    /// over — the same way every other ending of the wait is noticed.
+    static func nextStep(
+        announced: URL?,
+        theBuilderSaysItsServerStarted: Bool,
+        theTeacherStoppedIt: Bool
+    ) -> NextStep {
         if let announced {
             return .tryTheAddress(announced)
+        }
+        if theTeacherStoppedIt {
+            return .keepWaiting
         }
         if theBuilderSaysItsServerStarted {
             return .stopBecauseNothingWasAnnounced

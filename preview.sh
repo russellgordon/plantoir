@@ -1141,6 +1141,10 @@ announce_the_preview_address() {
   fi
   if [[ -z "$host_port" ]]; then
     say_the_preview_address_is_unknown
+    # Rule 5: without this the trail says only that preview.sh failed, and
+    # the reason is in a transcript nobody opens. The words are pinned —
+    # contracts/shared-rules.json -> activityTrail.mustRecord."preview did not appear".launcherLine
+    note_on_the_trail "${COURSE}/${SECTION} · the preview stopped before building — Plantoir could not find out where it would be"
     return 1
   fi
   echo "🌐 Preview will be available at: http://localhost:${host_port}/"

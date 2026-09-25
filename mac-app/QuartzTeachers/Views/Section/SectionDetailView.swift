@@ -1684,7 +1684,8 @@ struct SectionDetailView: View {
             }
             let next: PreviewReachability.NextStep = PreviewReachability.nextStep(
                 announced: serverURL,
-                theBuilderSaysItsServerStarted: silence != nil
+                theBuilderSaysItsServerStarted: silence != nil,
+                theTeacherStoppedIt: previewRunner.wasStoppedByUser
             )
             let addressToOpen: URL
             switch next {
@@ -1775,7 +1776,9 @@ struct SectionDetailView: View {
     /// for why stopping is right rather than merely giving up), with the
     /// third sentence, and without its question: that question is about an
     /// address. Nothing is awaited here, so the run cannot change underneath
-    /// it, which is why it needs none of that function's re-checking.
+    /// it; the one thing that CAN have happened since the wait last slept —
+    /// the teacher pressing Stop — is ruled out before this is reached
+    /// (`PreviewReachability.nextStep`'s `theTeacherStoppedIt`).
     func stopBecauseNoAddressWasAnnounced() {
         ActivityTrail.note(
             .previewNeverAppeared,
