@@ -1745,16 +1745,19 @@ class WorkspaceModel {
         _ items: [BackupItem],
         following otherWindows: [WorkspaceModel] = WorkspaceModel.windowModels
     ) -> BackupDeletion {
+        // Compared as RESOLVED paths: the runner names its backup from the
+        // folder it was given, the list from what the folder enumerates, and
+        // `/var` against `/private/var` is the same file spelt twice.
         var heldPaths: Set<String> = []
         for heldURL in AssistActivity.backupsAnOpenConversationHolds() {
-            heldPaths.insert(heldURL.standardizedFileURL.path)
+            heldPaths.insert(heldURL.standardizedFileURL.resolvingSymlinksInPath().path)
         }
 
         var deleted: [BackupItem] = []
         var kept: [BackupItem] = []
         var failed: [(item: BackupItem, reason: String)] = []
         for item in items {
-            if heldPaths.contains(item.fileURL.standardizedFileURL.path) {
+            if heldPaths.contains(item.fileURL.standardizedFileURL.resolvingSymlinksInPath().path) {
                 kept.append(item)
                 continue
             }
