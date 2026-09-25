@@ -758,6 +758,93 @@ nonisolated enum AssistWording {
         return "May I ask you for your \(noun.singular) dates?"
     }
 
+    // "When are my next classes?" — the answer is the teacher's summary AND,
+    // in its "class" form, the model's copy; only the summary takes the
+    // course's noun (#267).
+
+    /// Before the first date on file.
+    ///
+    /// - Parameter day: the first date, written "Tuesday, 2026-09-08".
+    /// - Parameter count: how many dates are listed below it.
+    static func theSemesterBegins(on day: String, showing count: Int, noun: ClassNoun = .class) -> String {
+        let first: String = count == 1 ? "first \(noun.singular) is" : "first \(count) \(noun.plural) are"
+        return "The semester begins on \(day). The \(first):"
+    }
+
+    /// After the last date on file.
+    ///
+    /// - Parameter last: the last date, written "Tuesday, 2026-12-15".
+    static func allScheduledDatesHaveConcluded(
+        count: Int, for place: String, last: String, noun: ClassNoun = .class
+    ) -> String {
+        return "All \(count) scheduled \(noun.plural) for \(place) have concluded "
+             + "(last \(noun.singular) was on \(last))."
+    }
+
+    /// The heading over the next few dates.
+    static func yourNextUpcoming(count: Int, for place: String, noun: ClassNoun = .class) -> String {
+        let upcoming: String = count == 1
+            ? "upcoming \(noun.singular)"
+            : "\(count) upcoming \(noun.plural)"
+        return "Your next \(upcoming) for \(place):"
+    }
+
+    /// How the pages sit against the dates.
+    static func pagesAcrossTheDates(
+        for place: String, pages: Int, dates: Int, spare: Int, noun: ClassNoun = .class
+    ) -> String {
+        return "\(place) has \(pages) \(noun.singular) \(pages == 1 ? "page" : "pages") across "
+             + "\(dates) recorded dates (\(spare) spare)."
+    }
+
+    /// No date left for another page.
+    static func everyDateIsSpokenFor(noun: ClassNoun = .class) -> String {
+        return "Every recorded date is spoken for, so another \(noun.singular) cannot be dated "
+             + "until more dates are recorded."
+    }
+
+    /// Where the next page would go.
+    ///
+    /// - Parameter day: written "2026-09-14 (Monday)".
+    static func theNextWouldFallOn(_ day: String, noun: ClassNoun = .class) -> String {
+        return "The next \(noun.singular) would fall on \(day)."
+    }
+
+    // Why the dates are being asked for — the line under the question on the
+    // card, and on the sheet. The teacher's alone: none of these is ever part
+    // of a tool result, so each has a "meeting" twin (#267).
+
+    /// Asked for when a day's page was looked for and there are no dates.
+    static func datesToFindADaysPage(noun: ClassNoun = .class) -> String {
+        let taught: String = noun == .class ? "the class taught" : "the \(noun.singular) held"
+        return "Finding \(taught) on a given day needs to know which days "
+             + "this section meets."
+    }
+
+    /// Opened when the teacher offers a revised list.
+    ///
+    /// - Parameter place: "ICS3U Section 1".
+    static func datesToReplace(for place: String, noun: ClassNoun = .class) -> String {
+        return "Replacing the \(noun.singular) dates on file for \(place)."
+    }
+
+    /// Asked for by the next page.
+    static func datesForTheNextPage(noun: ClassNoun = .class) -> String {
+        return "Adding the next \(noun.singular) page needs to know which days this section meets."
+    }
+
+    /// Asked for by a duplicate.
+    static func datesToDuplicate(noun: ClassNoun = .class) -> String {
+        return "Duplicating a \(noun.singular) needs to know which days this section meets, "
+             + "so the copy can be given a date."
+    }
+
+    /// Asked for by a re-date.
+    static func datesToReDate(noun: ClassNoun = .class) -> String {
+        return "Re-dating a section puts its \(noun.plural) onto the days it meets, so it needs "
+             + "those days first."
+    }
+
     /// What the teacher is told after saying no.
     ///
     /// Deliberately does not re-ask or explain again. They declined a

@@ -669,8 +669,7 @@ final class AssistToolRunner {
                hasNoTimetable(forSection: number, in: course) {
                 askForTheTimetable(
                     courseCode: code, sectionNumber: number,
-                    because: "Finding the class taught on a given day needs to know which days "
-                           + "this section meets."
+                    because: AssistWording.datesToFindADaysPage(noun: course.configuration.classNoun)
                 )
             }
             return AssistToolOutcome.refused(refusal.message)
@@ -1886,7 +1885,9 @@ final class AssistToolRunner {
                 courseCode: located.course.code,
                 sectionNumber: located.sectionNumber,
                 workingFolder: workspace.workspaceURL ?? located.course.directoryURL,
-                because: "Replacing the class dates on file for \(where_)."
+                because: AssistWording.datesToReplace(
+                    for: where_, noun: located.course.configuration.classNoun
+                )
             )
             let opening: String = "Here you are — the dates for \(where_) are open for editing. "
                                 + "What you save replaces what was there."
@@ -1910,7 +1911,11 @@ final class AssistToolRunner {
             )
             let asking: String = "I don't know when \(where_) meets yet. "
                                + AssistWording.mayIAskForYourDates
-            return AssistToolOutcome(summary: asking, detail: asking, shouldContinue: false)
+            // The teacher's copy in the course's own noun (#267); the model's
+            // as it always was.
+            let askingTheTeacher: String = "I don't know when \(where_) meets yet. "
+                + AssistWording.mayIAskForYourDates(for: located.course.configuration.classNoun)
+            return AssistToolOutcome(summary: askingTheTeacher, detail: asking, shouldContinue: false)
         }
 
         // "All of them" is asked for by a fixed phrasing the window offers
@@ -1931,7 +1936,12 @@ final class AssistToolRunner {
             )
         }
 
+        // Written twice (#267): `lines` for the model, which reads "class"
+        // whatever the course says, and `teacherLines` in the course's own
+        // noun for the teacher, who reads the summary.
+        let noun: ClassNoun = located.course.configuration.classNoun
         var lines: [String] = []
+        var teacherLines: [String] = []
 
         // What the dates are actually FOR: map existing class pages by date or schedule index.
         let existing: [ClassPageSummary] = ClassPages.list(
@@ -1952,8 +1962,13 @@ final class AssistToolRunner {
                     upcomingDates.append(date)
                 }
             }
-            let countStr: String = upcomingDates.count == 1 ? "first class is" : "first \(upcomingDates.count) classes are"
-            lines.append("The semester begins on \(remembered.firstDate.weekdayName), \(remembered.firstDate.text). The \(countStr):")
+            let first: CalendarDay = remembered.firstDate
+            lines.append(AssistWording.theSemesterBegins(
+                on: "\(first.weekdayName), \(first.text)", showing: upcomingDates.count
+            ))
+            teacherLines.append(AssistWording.theSemesterBegins(
+                on: "\(first.weekdayName), \(first.text)", showing: upcomingDates.count, noun: noun
+            ))
         } else {
             for date in remembered.dates {
                 if date >= today && upcomingDates.count < 3 {
@@ -1961,10 +1976,18 @@ final class AssistToolRunner {
                 }
             }
             if upcomingDates.isEmpty {
-                lines.append("All \(remembered.dates.count) scheduled classes for \(where_) have concluded (last class was on \(remembered.lastDate.weekdayName), \(remembered.lastDate.text)).")
+                let last: String = "\(remembered.lastDate.weekdayName), \(remembered.lastDate.text)"
+                lines.append(AssistWording.allScheduledDatesHaveConcluded(
+                    count: remembered.dates.count, for: where_, last: last
+                ))
+                teacherLines.append(AssistWording.allScheduledDatesHaveConcluded(
+                    count: remembered.dates.count, for: where_, last: last, noun: noun
+                ))
             } else {
-                let countStr: String = upcomingDates.count == 1 ? "upcoming class" : "\(upcomingDates.count) upcoming classes"
-                lines.append("Your next \(countStr) for \(where_):")
+                lines.append(AssistWording.yourNextUpcoming(count: upcomingDates.count, for: where_))
+                teacherLines.append(AssistWording.yourNextUpcoming(
+                    count: upcomingDates.count, for: where_, noun: noun
+                ))
             }
         }
 
@@ -1978,16 +2001,26 @@ final class AssistToolRunner {
                 classTitle = "(page not yet created)"
             }
             lines.append("• \(date.weekdayName), \(date.text) — \(classTitle)")
+            teacherLines.append("• \(date.weekdayName), \(date.text) — \(classTitle)")
         }
 
         lines.append("")
+        teacherLines.append("")
         let spare: Int = remembered.spareDates(after: existing.count)
-        lines.append("\(where_) has \(existing.count) class \(existing.count == 1 ? "page" : "pages") across \(remembered.dates.count) recorded dates (\(spare) spare).")
+        lines.append(AssistWording.pagesAcrossTheDates(
+            for: where_, pages: existing.count, dates: remembered.dates.count, spare: spare
+        ))
+        teacherLines.append(AssistWording.pagesAcrossTheDates(
+            for: where_, pages: existing.count, dates: remembered.dates.count, spare: spare, noun: noun
+        ))
         if spare == 0 {
-            lines.append("Every recorded date is spoken for, so another class cannot be dated until more dates are recorded.")
+            lines.append(AssistWording.everyDateIsSpokenFor())
+            teacherLines.append(AssistWording.everyDateIsSpokenFor(noun: noun))
         } else {
             let next: CalendarDay = remembered.dates[existing.count]
-            lines.append("The next class would fall on \(next.text) (\(next.weekdayName)).")
+            let when: String = "\(next.text) (\(next.weekdayName))"
+            lines.append(AssistWording.theNextWouldFallOn(when))
+            teacherLines.append(AssistWording.theNextWouldFallOn(when, noun: noun))
         }
 
         var origin: String = "Where they came from: \(remembered.source)."
@@ -1996,16 +2029,21 @@ final class AssistToolRunner {
         }
         lines.append("")
         lines.append(origin)
+        teacherLines.append("")
+        teacherLines.append(origin)
 
         if remembered.dates.count > upcomingDates.count {
             let rest: Int = remembered.dates.count - upcomingDates.count
+            let more: String = "There \(rest == 1 ? "is" : "are") \(rest) more. Say “show me all the dates” to see the full schedule."
             lines.append("")
-            lines.append("There \(rest == 1 ? "is" : "are") \(rest) more. Say “show me all the dates” to see the full schedule.")
+            lines.append(more)
+            teacherLines.append("")
+            teacherLines.append(more)
         }
 
         let fullAnswer: String = lines.joined(separator: "\n")
         return AssistToolOutcome(
-            summary: fullAnswer,
+            summary: teacherLines.joined(separator: "\n"),
             detail: fullAnswer,
             shouldContinue: false
         )
@@ -2173,7 +2211,7 @@ final class AssistToolRunner {
         }
         askForTheTimetable(
             courseCode: code, sectionNumber: number,
-            because: "Adding the next class page needs to know which days this section meets."
+            because: AssistWording.datesForTheNextPage(noun: noun(forCourse: code))
         )
     }
 
@@ -2187,6 +2225,12 @@ final class AssistToolRunner {
     /// forward. A teacher who has never given their dates cannot act on "I
     /// can't find a class on Monday": what they need is not a better sentence,
     /// it is the question nobody asked them.
+    /// What a course calls one of its class pages (#267), for a sentence the
+    /// teacher reads — "class" when the course cannot be found.
+    private func noun(forCourse code: String) -> ClassNoun {
+        return course(withCode: code)?.configuration.classNoun ?? .class
+    }
+
     private func askForTheTimetable(courseCode: String, sectionNumber: Int, because: String) {
         guard let folder = workspace.workspaceURL else {
             return
@@ -2607,8 +2651,7 @@ final class AssistToolRunner {
         }
         askForTheTimetable(
             courseCode: located.course.code, sectionNumber: located.sectionNumber,
-            because: "Duplicating a class needs to know which days this section meets, "
-                   + "so the copy can be given a date."
+            because: AssistWording.datesToDuplicate(noun: located.course.configuration.classNoun)
         )
     }
 
@@ -3396,8 +3439,7 @@ final class AssistToolRunner {
         }
         askForTheTimetable(
             courseCode: code, sectionNumber: number,
-            because: "Re-dating a section puts its classes onto the days it meets, so it needs "
-                   + "those days first."
+            because: AssistWording.datesToReDate(noun: noun(forCourse: code))
         )
     }
 
