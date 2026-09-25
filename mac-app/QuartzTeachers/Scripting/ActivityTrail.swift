@@ -463,6 +463,13 @@ nonisolated enum ActivityTrail {
         /// all it stops before building and says so on the trail itself —
         /// the ending a teacher will actually meet, since the app's own
         /// no-address stop only fires if a launcher ever announced nothing.
+        /// Since issue #280 the launchers write it on one more ending, in
+        /// words pinned as `launcherLineWhenEveryAddressIsTaken`: every
+        /// address Plantoir can use for a preview was taken, so no workspace
+        /// could be made for the folder — from a preview, a publish, or
+        /// setup (which files it under the word "setup", having no course
+        /// yet). Deliberately not a new event: to a teacher it is the same
+        /// outcome, a preview that never appeared.
         ///
         /// This is the line whose absence produced the report it exists for
         /// (issue #225). A teacher built three previews in four minutes, none

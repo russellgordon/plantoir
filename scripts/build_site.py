@@ -6174,18 +6174,46 @@ def build_section_site(
                 except OSError:
                     return False
 
-            for candidate in range(port, port + 60, 10):
-                if _port_is_free(candidate) and _port_is_free(candidate + 1000):
-                    if candidate != port:
-                        print(f"Port {port} is busy with another preview; using {candidate} instead.")
-                        port = candidate
-                        ws_port = port + 1000
-                    break
+            candidate = first_free_preview_port(port, _port_is_free)
+            if candidate != port:
+                print(f"Port {port} is busy with another preview; using {candidate} instead.")
+                port = candidate
+                ws_port = port + 1000
             print(f"Preview will be available at: http://localhost:{port}/")
         print(f"\n🚀 Launching Quartz preview on http://localhost:{port}\n")
         safe_clean_public_dir(output_dir / "public")
         _start_public_sync_watcher(output_dir, host_output_dir)
         subprocess.run(["node", str(output_dir / "quartz" / "bootstrap-cli.mjs"), "build", "--concurrency", "1", "--serve", "--port", str(port), "--wsPort", str(ws_port)], cwd=output_dir, env=env, check=True)
+
+# How many 10-apart blocks a preview's port is walked through before giving
+# up — the same forty the launchers walk (contracts/app-rules.json ->
+# previewPorts.hostBlockCount, pinned against this by
+# scripts/test_port_blocks.py). Counted from the REQUESTED port, not from
+# 8081, because the requested port can be any of 8081-8084. It was six
+# (`range(port, port + 60, 10)`) until GitHub #280, the same fixed ceiling
+# the launchers had.
+PREVIEW_HOST_BLOCK_COUNT = 40
+PREVIEW_HOST_BLOCK_STEP = 10
+
+
+def first_free_preview_port(port: int, is_free) -> int:
+    """The first port at or above `port`, stepping by ten through forty
+    blocks, whose site port and websocket port (+1000) `is_free` says are
+    both free — or `port` itself when none is, which is what the old walk
+    fell back to as well (the bind then fails loudly rather than a preview
+    being announced somewhere nobody asked for).
+
+    Only Windows runs this: natively, ports are host-global and the
+    launcher's probe ran minutes before the bind. In the container the port
+    is a fixed mapping and is never walked."""
+    last = port + (PREVIEW_HOST_BLOCK_COUNT - 1) * PREVIEW_HOST_BLOCK_STEP
+    candidate = port
+    while candidate <= last:
+        if is_free(candidate) and is_free(candidate + 1000):
+            return candidate
+        candidate += PREVIEW_HOST_BLOCK_STEP
+    return port
+
 
 def main():
     parser = argparse.ArgumentParser(description="Build Quartz site for a course section (preview by default; use --build-only for a static build without preview).")

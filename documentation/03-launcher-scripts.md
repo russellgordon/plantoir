@@ -68,9 +68,10 @@ Each working folder gets its own container, named
 `teaching-quartz-<hash>` where the hash is the first eight characters of
 `pwd -P | shasum -a 256` — so two folders (this year's courses and last
 year's, say) never repoint each other's mounts, and can preview at the same
-time. At creation the launcher probes for a free block of HOST ports
-(bases 8081, 8091, 8101, 8111, 8121, 8131 — four site ports each, plus a
-matching +1000 websocket block for Quartz's live reload) and maps it to
+time. At creation the launcher walks upward for a free block of HOST ports
+(bases 8081, 8091, 8101 … 8471 — forty blocks of four site ports each, plus a
+matching +1000 websocket block for Quartz's live reload; see "How a folder
+finds its ports, and when it cannot" below) and maps it to
 the container's fixed ports 8081–8084 and 9081–9084; `preview.sh` prints the
 resolved address ("Preview will be available at: …"), which is what the app
 and a terminal teacher should open. It asks the container for that mapping
@@ -98,6 +99,148 @@ it refuses to free, and why".
 The scripts then ensure a container runtime is available (next section)
 and build the image locally if the recipe's tag is missing — nothing is
 ever pulled from a registry.
+
+### How a folder finds its ports, and when it cannot
+
+GitHub #280, 2026-09-25. The rule is data in
+[`contracts/app-rules.json`](../contracts/app-rules.json) → `previewPorts`
+(`hostBlockCount`, `hostBlockProbe`, `hostBlockCases`, `hostBlockClash`,
+`whenNoBlockIsFree`); the code is one marked block, `# >>> PREVIEW PORT BLOCK
+>>>`, byte-identical in `setup.sh`, `preview.sh` and `deploy.sh`, and
+`scripts/test_port_blocks.py` runs it against a pretend Mac (fake `lsof` and
+`docker` on PATH) under `/bin/bash` 3.2 with `set -euo pipefail`.
+
+**What went wrong.** The launchers tried six blocks (8081 … 8131) and gave up.
+A block is held by a workspace that EXISTS — running `tail -f /dev/null`,
+preview or no preview; its forwarders listen on all eight ports — so six
+working folders' workspaces alive on one Mac left a seventh folder unable to
+preview or publish. On the development Mac six agent worktrees did it, and
+`verify.sh` failed five to seven launcher checks. A teacher gets there by
+opening six folders since the Mac last restarted, or by scheduled publishes
+in folders that are never opened (`deploy.sh` never stops its workspace).
+The refusal then said "Stop another preview (or another app using ports
+8081+)", which is false: stopping a preview frees nothing.
+
+**The walk.** Forty blocks, 8081 … 8471 (websockets 9081 … 9474), the first
+whose eight ports are all free. **Forty is a chosen number, not a measured
+one.** The arithmetic bounds it: block 100's first port is 9081, the first
+block's websocket, so anything up to 99 works; forty keeps the walk under
+8888, and the websockets land only on the x1–x4 of each ten, clear of 9090,
+9200 and 9229. A ceiling at all keeps the refusal reachable, so it is tested
+and its sentence stays true.
+
+A block is taken when any of its eight ports is:
+
+- **listening on this Mac, by anybody** — read from ONE `lsof -nP -iTCP
+  -sTCP:LISTEN -Fn` listing, port = what follows the last colon (`n*:8081`,
+  `n127.0.0.1:8443`, `n[::1]:8443`). This check has to stay: a python server
+  on 127.0.0.1:18556 and then `docker run -p 18556:8081` → **exit 0**, both
+  listening. Docker cannot see a host program on a port, so this is the only
+  guard against another app (Supabase holds 8443 on the development Mac, so
+  block 8441 is skipped there);
+- **published by another working folder's workspace, stopped ones
+  included** — one `docker inspect` of every `teaching-quartz-*` workspace's
+  `HostConfig.PortBindings` (0.07 s for nine). A stopped workspace listens on
+  nothing, so without this a new folder takes its block and the stopped one
+  cannot start again; since #220 quitting Plantoir STOPS workspaces, so that
+  is an everyday path, not a corner.
+
+| Measured on the development Mac, 2026-09-25 | Result |
+|---|---|
+| The old probe: one `lsof -iTCP:<port>` per port, 80 calls for 40 blocks | **9.84 s** — 0.123 s a call |
+| One listing, parsed once | **0.12 s** (0.121–0.153 s over three readings) |
+| `docker run -p P` while a HOST program listens on P (Colima) | exit 0 — Docker cannot see it |
+| Workspace X on P, stopped; Y made on P; `docker start X` | X: exit 1, "Bind for 0.0.0.0:P failed: port is already allocated" |
+| `verify.sh` with the six blocks held, after this change | the fixture folder's workspace got **8141** |
+| A first preview after a workspace is remade (#225, a teacher's Mac) | **109.3 s** cold, against seconds warm |
+
+A listing that cannot be read (`lsof` missing or failing) counts as nothing
+listening — the old probe's answer too, pinned by a test so nobody changes it
+quietly; the other workspaces are still skipped, and a clash with one is
+caught below.
+
+**A clash at the moment of making.** The probe and `docker run` are two steps,
+so two launchers starting together can both see a block free. A `docker run`
+refused in any of `port is already allocated` (Colima), `Ports are not
+available` or `address already in use` (Docker Desktop, which the launchers
+use as-is when it is what works) removes the half-made workspace with a
+plain `docker rm` and walks on from the NEXT block, up to the same ceiling.
+Any other refusal prints Docker's words (the app's failure explanations match
+on them) and keeps `say_this_folder_cannot_be_reached`.
+
+**A stopped workspace whose block was taken.** `start_the_existing_workspace`
+replaces the bare `docker start` in all three launchers. Refused for a port —
+only then — it removes the workspace (plain `docker rm`) and makes it again on
+free ports, and says in the console that the next preview will be slower,
+about two minutes: the warm copy of the website builder lives in the
+workspace's own `/tmp/quartz-builds` and goes with it. Any other refusal stops
+the run with Docker's words and a sentence. Before this, `setup.sh` and
+`deploy.sh` ended at the bare `docker start` under `set -e` with Docker's
+words alone, and `preview.sh` (no `set -e`) carried on to fail at `docker
+exec` with nothing a teacher could read. With the stopped-workspace skip in
+the walk, this path is the residual case: workspaces made before #280, or by
+a launcher that did not skip them.
+
+**Never `docker rm -f` in either path.** A failed start proves nothing runs in
+that workspace, but two launchers on the same folder (a scheduled publish and
+a Preview) can both find it stopped; the second one's `-f` would kill the
+workspace the first had just remade, mid-publish — #94's shape. Plain `rm`
+refuses a running workspace, and the start path then uses it as it is.
+
+**When all forty are taken.** Exit 1, and
+`previewPorts.whenNoBlockIsFree.sentence` word for word. It names the two
+remedies that are true: closing Plantoir's windows for the other folders
+(the app stops a folder's workspace when its last window closes, and at quit),
+and restarting the Mac (workspaces are made with no restart policy, so after a
+restart they come back stopped — which frees their ports on the host, though
+the walk still counts their blocks as theirs). A publish that cannot get a
+workspace prints it too, which is why it says "a preview". The trail gets the
+existing `preview did not appear` event's second launcher line,
+`launcherLineWhenEveryAddressIsTaken` in `contracts/shared-rules.json`, with
+the course and section (or the word `setup`). A walk that FOUND a high block
+writes nothing: the announced address already carries the port.
+
+**Known limits, written down rather than fixed:**
+
+- `lsof` run as the teacher cannot see listeners owned by root (unchanged from
+  the old probe; `netstat -an -p tcp` would). A root-owned server in the range
+  is found only when Docker refuses — under Docker Desktop, which then walks
+  on; under Colima, not at all.
+- A STOPPED workspace restarted onto a block a HOST program took while it was
+  stopped starts anyway (Colima's `docker start` succeeds, as `docker run`
+  did above), and on macOS a 127.0.0.1 bind wins over `*`, so the announced
+  address could show the other program — the #235 hazard. Pre-existing;
+  checking the workspace's block against the listing before `docker start`
+  would close it.
+
+**What was rejected, and why:**
+
+- **A workspace with no ports for a publish** (Russell's comment on #280: "a
+  publish-only folder should not need a port block at all"). Rejected by the
+  director on 2026-09-25, reversibly: the workspace is made once per folder
+  and serves both, so the next Preview in that folder would have to remake it
+  — a remake stops the workspace without asking what runs in it, so a
+  scheduled publish of another section in progress would be killed (#94 made
+  routine), and it throws away the warm website builder (109 s cold). It also
+  only moves the wall: that folder's next preview meets the same ceiling.
+- **A throwaway `docker run --rm` workspace per publish.** A second workspace
+  cannot see the first's processes, so a publish could no longer stop a
+  preview of the same section before building (`shared-rules.json`, the
+  `--stop` cases) — the regression that rule exists for.
+- **A per-run image tag in `verify.sh`** (the issue's first idea). The tag is
+  one of at least six things concurrent runs share (the image, 78 fixed
+  `/tmp/verify_*.log` paths, `$HOME/.plantoir-verify-26:27` and its workspace,
+  `$HOME/.plantoir-verify-locked`, the prune fixtures); a per-run tag fixes
+  one, breaks `--skip-build`, and makes every document naming
+  `quartz-teacher:dev-test` wrong. `verify.sh` takes a LOCK instead
+  (`/tmp/plantoir-verify-<uid>.lock`, section 0.2): a second run names the
+  holder and exits 1 rather than queueing silently; a lock whose holder is gone
+  is taken over; a lock with no holder written yet is held; it is let go on
+  every exit, Ctrl-C and hang-up included, and only by its own run.
+  `scripts/test_verify_lock.py` proves each.
+- **One `lsof` per port** (the old probe) — 9.8 s for forty blocks.
+- **No ceiling** — the refusal would be unreachable and untestable, and past
+  block 99 the site ports sit on the first block's websockets.
 
 ### Staying up to date
 
@@ -393,29 +536,32 @@ own long-lived container (see "One container per working folder" above),
 started as:
 
 ```bash
-if ! docker run -dit --name "teaching-quartz-${WORKDIR_ID}" \
+docker run -dit --name "teaching-quartz-${WORKDIR_ID}" \
     --mount "$(bind_mount_argument "$HOST_COURSES" /teaching/courses)" \
     --mount "$(bind_mount_argument "$BUILD_ROOT" "$BUILD_ROOT")" \
-    -p ${HOST_BASE}-$((HOST_BASE+3)):8081-8084 \
-    -p $((HOST_BASE+1000))-$((HOST_BASE+1003)):9081-9084 \
-    "$IMAGE" tail -f /dev/null; then
-  say_this_folder_cannot_be_reached
-  exit 1
-fi
+    -p "${base}-$((base + 3)):8081-8084" \
+    -p "$((base + 1000))-$((base + 1003)):9081-9084" \
+    "$IMAGE" tail -f /dev/null
 ```
 
-where `WORKDIR_ID` is the folder hash and `HOST_BASE` the probed port
-block. **Why `--mount` and not `-v`** has its own section below; the short
-version is that `-v` cannot name a folder called "Comm Tech 26:27" at all.
+where `WORKDIR_ID` is the folder hash and `base` the walked port block. Since
+#280 this is made in ONE place, `create_the_workspace_on_free_ports` in the
+PREVIEW PORT BLOCK the three launchers share, so the mounts and ports cannot
+drift apart; a refusal naming a taken port walks on to the next block (see
+"How a folder finds its ports, and when it cannot" above), and any other
+prints Docker's words and `say_this_folder_cannot_be_reached`. **Why
+`--mount` and not `-v`** has its own section below; the short version is that
+`-v` cannot name a folder called "Comm Tech 26:27" at all.
 
 **The launcher's refusal is broader than the app's matcher, knowingly.** The
-`if ! docker run` branch above speaks for ANY failure to create the
-workspace, while the app's explanation
+refusal branch speaks for any failure to create the workspace other than a
+taken port (which, since #280, walks on instead), while the app's explanation
 (`contracts/app-rules.json` → `failureExplanations`) matches only
 `bind source path does not exist`. Measured 2026-09-19: an address already
 in use and a name already taken also end in exit 125 with the folder safely
 inside the home folder, and a command-line user then reads advice about the
-home folder that is not their trouble. Accepted for now because both are
+home folder that is not their trouble. (The address-in-use half is no longer
+reached: since #280 it walks on to the next block.) Accepted for now because both are
 transient — the free-address probe sees the virtual machine's forwarder
 0.11 s after `docker run` returns, so the window is about 0.2 s — and "then
 try again" is the right next step for them; narrowing the launcher's
@@ -438,9 +584,16 @@ Every launcher inspects the existing container before using it:
    `preview.sh` implements the other four checks but not this one, and no
    comment in it says why. Recreate. This catches macOS
    permission/ACL oddities after folder moves or restores.
-6. Otherwise, start the container if stopped, or reuse it as-is.
+6. Otherwise, start the container if stopped (`start_the_existing_workspace`
+   — which, only when the start is refused because its ports were taken,
+   recreates it on free ones; see "How a folder finds its ports" above), or
+   reuse it as-is.
 
-Recreating the container is cheap because all state lives in the bind mount.
+Recreating the container loses nothing of the teacher's, because their
+content lives in the bind mounts — but it is not free: the warm Quartz
+scaffold and `node_modules` live in the container's own `/tmp/quartz-builds`,
+so the next preview is a first preview again (109.3 s measured on a teacher's
+Mac for #225).
 
 ### How a folder is NAMED to the container, and why it is not `-v`
 
