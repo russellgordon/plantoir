@@ -46,9 +46,15 @@ struct FailureExplainer {
 
     /// What a teacher reads when a publish to a folder could not copy every
     /// page. Contract data: `app-rules.json` → `failureExplanations`.
+    ///
+    /// It names no single cause on purpose: the same "finished in part" comes
+    /// from a folder that will not take a file AND from a page on this side
+    /// that cannot be read (measured in review: one unreadable page, 312 of
+    /// 313 copied), so blaming the folder would be a confident wrong guess.
     static let folderCopyDidNotFinish: String =
         "Plantoir could not copy every page into your publishing folder, so it is not up to date. "
-        + "Check that the folder is still there and that you can save files in it, then try again."
+        + "Try publishing again; if the same thing happens, one of your pages may not open "
+        + "or the folder may not be taking new files."
 
     /// A publish to a folder stopped part way (GitHub issue #227).
     ///
