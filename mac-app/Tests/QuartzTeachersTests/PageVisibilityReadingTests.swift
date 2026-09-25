@@ -200,14 +200,14 @@ final class PageVisibilityReadingTests: XCTestCase {
         let published = AssistPageVisibility.setting(
             published: true, in: unreadable, forSection: 1, isSectionLocal: true
         )
-        XCTAssertTrue(published.changed,
+        XCTAssertEqual(published.outcome, .written,
                       "Reporting says this page is visible; the writer must not act on that")
         XCTAssertEqual(published.text, "---\npublish: true\n---\nBody.\n")
 
         let hidden = AssistPageVisibility.setting(
             published: false, in: unreadable, forSection: 1, isSectionLocal: true
         )
-        XCTAssertTrue(hidden.changed)
+        XCTAssertEqual(hidden.outcome, .written)
         XCTAssertEqual(hidden.text, "---\npublish: false\n---\nBody.\n")
     }
 
@@ -219,7 +219,7 @@ final class PageVisibilityReadingTests: XCTestCase {
             let result = AssistPageVisibility.setting(
                 published: true, in: text, forSection: 1, isSectionLocal: true
             )
-            XCTAssertFalse(result.changed, "publish: \(value) already publishes this page")
+            XCTAssertEqual(result.outcome, .alreadyRight, "publish: \(value) already publishes this page")
             XCTAssertEqual(result.text, text)
         }
         for value in ["no", "off", "FALSE", "false # not ready"] {
@@ -227,7 +227,7 @@ final class PageVisibilityReadingTests: XCTestCase {
             let result = AssistPageVisibility.setting(
                 published: false, in: text, forSection: 1, isSectionLocal: true
             )
-            XCTAssertFalse(result.changed, "publish: \(value) already holds this page back")
+            XCTAssertEqual(result.outcome, .alreadyRight, "publish: \(value) already holds this page back")
             XCTAssertEqual(result.text, text)
         }
     }
@@ -485,7 +485,7 @@ final class PageVisibilityReadingTests: XCTestCase {
                 published: row.publish, in: file(row.frontmatter), forSection: 1,
                 isSectionLocal: true
             )
-            XCTAssertTrue(result.changed, row.frontmatter)
+            XCTAssertEqual(result.outcome, .written, row.frontmatter)
             XCTAssertEqual(result.text, file(row.expected), row.frontmatter)
             XCTAssertEqual(
                 PageVisibilityReader.answer(in: result.text, forSection: 1),
@@ -526,8 +526,8 @@ final class PageVisibilityReadingTests: XCTestCase {
             let hidden = AssistPageVisibility.setting(
                 published: false, in: pageText, forSection: 1, isSectionLocal: true
             )
-            XCTAssertTrue(
-                hidden.changed,
+            XCTAssertEqual(
+                hidden.outcome, .written,
                 "publish: \(value) — asking to hide this page must not be a no-op"
             )
             XCTAssertEqual(hidden.text, file("publish: false\ntitle: x"), value)
@@ -550,7 +550,7 @@ final class PageVisibilityReadingTests: XCTestCase {
         let hidden = AssistPageVisibility.setting(
             published: false, in: pageText, forSection: 1, isSectionLocal: true
         )
-        XCTAssertTrue(hidden.changed)
+        XCTAssertEqual(hidden.outcome, .written)
         XCTAssertEqual(hidden.text, file("publish: false\ntitle: x"))
         XCTAssertEqual(PageVisibilityReader.answer(in: hidden.text, forSection: 1), .hidden)
     }
@@ -577,7 +577,7 @@ final class PageVisibilityReadingTests: XCTestCase {
             let hidden = AssistPageVisibility.setting(
                 published: false, in: file(row.frontmatter), forSection: 1, isSectionLocal: true
             )
-            XCTAssertTrue(hidden.changed, row.frontmatter)
+            XCTAssertEqual(hidden.outcome, .written, row.frontmatter)
             XCTAssertEqual(hidden.text, file(row.expected), row.frontmatter)
             XCTAssertEqual(
                 PageVisibilityReader.answer(in: hidden.text, forSection: 1), .hidden,
@@ -598,7 +598,7 @@ final class PageVisibilityReadingTests: XCTestCase {
             published: false, in: file("publish: true\n- a\ntitle: x"), forSection: 1,
             isSectionLocal: true
         )
-        XCTAssertTrue(hidden.changed)
+        XCTAssertEqual(hidden.outcome, .written)
         XCTAssertEqual(hidden.text, file("publish: false\n- a\ntitle: x"))
         XCTAssertEqual(
             PageVisibilityReader.answer(in: hidden.text, forSection: 1), .hidden,
@@ -615,7 +615,7 @@ final class PageVisibilityReadingTests: XCTestCase {
         let hidden = AssistPageVisibility.setting(
             published: false, in: windowsWritten, forSection: 1, isSectionLocal: true
         )
-        XCTAssertTrue(hidden.changed)
+        XCTAssertEqual(hidden.outcome, .written)
         XCTAssertEqual(hidden.text, "---\r\npublish: false\r\ntitle: x\r\n---\r\nBody.\r\n")
         XCTAssertEqual(PageVisibilityReader.answer(in: hidden.text, forSection: 1), .hidden)
     }
@@ -724,7 +724,7 @@ final class PageVisibilityReadingTests: XCTestCase {
             let hidden = AssistPageVisibility.setting(
                 published: false, in: file(frontmatter), forSection: 1, isSectionLocal: true
             )
-            XCTAssertTrue(hidden.changed, "\(frontmatter) — asking to hide this page must not be a no-op")
+            XCTAssertEqual(hidden.outcome, .written, "\(frontmatter) — asking to hide this page must not be a no-op")
             XCTAssertEqual(hidden.text, file("publish: false\ntitle: x"), frontmatter)
             XCTAssertEqual(PageVisibilityReader.answer(in: hidden.text, forSection: 1), .hidden, frontmatter)
         }
@@ -785,7 +785,7 @@ final class PageVisibilityReadingTests: XCTestCase {
             let hidden = AssistPageVisibility.setting(
                 published: false, in: pageText, forSection: 1, isSectionLocal: true
             )
-            XCTAssertFalse(hidden.changed, "\(pageText) — this page already says what was asked")
+            XCTAssertEqual(hidden.outcome, .alreadyRight, "\(pageText) — this page already says what was asked")
             XCTAssertEqual(hidden.text, pageText, pageText)
         }
     }
@@ -797,7 +797,7 @@ final class PageVisibilityReadingTests: XCTestCase {
         let hidden = AssistPageVisibility.setting(
             published: false, in: windowsWritten, forSection: 1, isSectionLocal: true
         )
-        XCTAssertTrue(hidden.changed)
+        XCTAssertEqual(hidden.outcome, .written)
         XCTAssertEqual(Data(hidden.text.utf8), Data("---\r\npublish: false\r\ntitle: x\r\n---\r\nBody.\r\n".utf8))
         XCTAssertEqual(PageVisibilityReader.answer(in: hidden.text, forSection: 1), .hidden)
     }
@@ -826,7 +826,7 @@ final class PageVisibilityReadingTests: XCTestCase {
         let hidden = AssistPageVisibility.setting(
             published: false, in: neverClosed, forSection: 1, isSectionLocal: true
         )
-        XCTAssertTrue(hidden.changed)
+        XCTAssertEqual(hidden.outcome, .written)
         XCTAssertEqual(hidden.text, "---\npublish: false\n---\n" + neverClosed)
         XCTAssertEqual(PageVisibilityReader.answer(in: hidden.text, forSection: 1), .hidden)
     }
@@ -930,6 +930,37 @@ final class PageVisibilityReadingTests: XCTestCase {
                 row.place,
                 "\(row.inside)"
             )
+        }
+    }
+
+    /// Both writers DECLINE to add a key where the block has no column-0
+    /// level for one, and say so with `.noRoomForAKey` rather than the
+    /// `changed: false` that could not be told from "already right" (#186).
+    /// The page comes back byte for byte.
+    func testTheWritersDeclineWhereThereIsNoRoomForAKey() {
+        let day: CalendarDay = CalendarDay(text: "2026-09-24")!
+        for inside in ["  a: 1", "  false", "{a: 1}", "- a", "just text", "# note\n  a: 1"] {
+            let page: String = "---\n" + inside + "\n---\nBody.\n"
+            for publish in [true, false] {
+                let written = AssistPageVisibility.setting(
+                    published: publish, in: page, forSection: 1, isSectionLocal: true
+                )
+                XCTAssertEqual(written.outcome, .noRoomForAKey, inside)
+                XCTAssertEqual(written.text, page, inside)
+            }
+            let dated = PageFrontmatter.settingCreated(in: page, key: "created", to: day)
+            XCTAssertEqual(dated.outcome, .noRoomForAKey, inside)
+            XCTAssertEqual(dated.text, page, inside)
+        }
+        // The guard: a block of notes only is an empty mapping, and takes the
+        // key — as does an ordinary page.
+        for inside in ["  # note", "", "title: x"] {
+            let page: String = "---\n" + inside + "\n---\nBody.\n"
+            XCTAssertEqual(
+                AssistPageVisibility.setting(published: false, in: page, forSection: 1, isSectionLocal: true).outcome,
+                .written, inside
+            )
+            XCTAssertEqual(PageFrontmatter.settingCreated(in: page, key: "created", to: day).outcome, .written, inside)
         }
     }
 

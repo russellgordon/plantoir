@@ -749,6 +749,16 @@
             },
             "after": null,
             "why": "Issue #188. With no column-0 close the page has no frontmatter to python-frontmatter, and this writer refuses a block that is opened and never closed rather than prepend one. The apps' visibility writer PREPENDS on the same shape (file-formats.json -> pageVisibility.writingCases), which is right for a hide; a date is not worth restructuring a teacher's file for, and the SITE is dated anyway, because the build dates its own copy whether or not the teacher's file is written. documentation/08-course-config-reference.md says why the two differ."
+          },
+          {
+            "name": "a block whose first line is INDENTED has no place for a new key, and is not written",
+            "before": "---\n  a: 1\n---\nBody\n",
+            "write": {
+              "key": "createdSection1",
+              "value": "2026-09-24T07:00:00.000+0000"
+            },
+            "after": null,
+            "why": "Issue #186, the apps' rule (PageVisibilityReader.placeForANewTopLevelKey): a new key goes at the top of the block only when the block's own first line - blank lines and notes aside - names a top-level key. Written above `  a: 1` it would adopt that line as its value and make settings the build cannot read. The read-back refused that write already, so the page was left undated either way; now the splice says so itself."
           }
         ]
       }

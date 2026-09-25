@@ -2010,6 +2010,57 @@ def _frontmatter_fences(lines: list[str]):
     return None
 
 
+def _names_a_top_level_key(line: str) -> bool:
+    """
+    Does this column-0 line name a key of the page's own mapping? The apps'
+    rule (`PageVisibilityReader.namesATopLevelKey`, #186): `? key` does; a flow
+    collection (`{a: 1}`, `[a, b]`), a sequence entry (`- a`), a bare scalar and
+    `a:1` do not; a quoted key does.
+    """
+    if line.startswith("? "):
+        return True
+    if line.startswith("{") or line.startswith("["):
+        return False
+    if line.startswith("-") and (len(line) == 1 or line[1] in " \t"):
+        return False
+    rest = line
+    quoted = False
+    if rest[:1] in ("'", '"'):
+        quote = rest[0]
+        closing = rest[1:].find(quote)
+        if closing < 0:
+            return False
+        rest = rest[1 + closing + 1:]
+        quoted = True
+    colon = rest.find(":")
+    if colon < 0:
+        return False
+    if colon == 0 and not quoted:
+        return False
+    return rest[colon + 1:colon + 2] in ("", " ", "\t")
+
+
+def _place_for_a_new_top_level_key(lines: list[str], open_index: int, close_index: int):
+    """
+    Where a brand-new key may go — the first line inside the block — or None
+    when the block has no column-0 level for one (#186): its first line, blank
+    lines and `# note`s aside, is indented or names no key. A key written
+    there anyway adopts the indented line as its value, or makes settings
+    YAML cannot read. The apps' `placeForANewTopLevelKey`.
+    """
+    position = open_index + 1
+    while position < close_index and position < len(lines):
+        bare = lines[position].rstrip("\r")
+        content = page_visibility.trim(bare)
+        if content == "" or content.startswith("#"):
+            position += 1
+            continue
+        if bare[:1] in (" ", "\t"):
+            return None
+        return open_index + 1 if _names_a_top_level_key(bare) else None
+    return open_index + 1
+
+
 def _continuation_line_indices(lines: list[str], key_index: int, close_index: int,
                                key_value_was_empty: bool) -> list[int]:
     """
@@ -2080,10 +2131,11 @@ def _setting_frontmatter_value(text: str, key: str, value_text: str) -> str | No
     The LAST line naming the key is the one rewritten, because it is the one
     PyYAML keeps when a page carries the same key twice. Its continuation lines
     go with it. A missing key is inserted at the top of the block, where the
-    apps and the installer put `created`. A page with no frontmatter block
-    gets one. A `# note` at the end of the key's line stays there. A block
-    opened and never closed, or indented with a tab (which YAML refuses), is
-    not touched.
+    apps and the installer put `created` — and only into a block with a
+    column-0 level for it (#186). A page with no frontmatter block gets one. A
+    `# note` at the end of the key's line stays there. A block opened and never
+    closed (since #188 that includes one closed only by INDENTED dashes), or
+    indented with a tab (which YAML refuses), is not touched.
     """
     newline = "\r\n" if "\r\n" in text else "\n"
     lines = text.split("\n")
@@ -2106,8 +2158,11 @@ def _setting_frontmatter_value(text: str, key: str, value_text: str) -> str | No
         if key_line.match(bare):
             found = index
     if found is None:
+        place = _place_for_a_new_top_level_key(lines, open_index, close_index)
+        if place is None:
+            return None
         carriage = "\r" if lines[open_index].endswith("\r") else ""
-        lines.insert(open_index + 1, f"{key}: {value_text}{carriage}")
+        lines.insert(place, f"{key}: {value_text}{carriage}")
         return "\n".join(lines)
     raw_value = key_line.match(lines[found].rstrip("\r")).group(1)
     trimmed_value = page_visibility.trim(raw_value)

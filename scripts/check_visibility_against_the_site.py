@@ -242,7 +242,7 @@ def main():
         failures.append(
             f"Only {len(restore_cases)} restoringOneSectionsKeys cases - the list has shrunk."
         )
-    if len(judged_writes) < 4:
+    if len(judged_writes) < 8:
         failures.append(
             f"Only {len(judged_writes)} writing cases carry expectSiteBefore/After — the list "
             f"has shrunk, so this would pass having judged little."

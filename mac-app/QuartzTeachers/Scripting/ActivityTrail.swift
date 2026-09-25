@@ -708,9 +708,10 @@ nonisolated enum ActivityTrail {
         /// can safely go (#186's shape — indented, or written as a list).
         /// Carries the course and section, WHAT was being done, and HOW MANY
         /// pages — never which, because a page's name is the teacher's own
-        /// words. Written by a section restore since #182; the teacher is
-        /// told in the same breath, and this is the line that is still there
-        /// next week, when "why is this page still showing?" arrives.
+        /// words. Written by a section restore since #182, and by publishing,
+        /// hiding, re-dating and making room since #186; the teacher is told
+        /// in the same breath, and this is the line that is still there next
+        /// week, when "why is this page still showing?" arrives.
         case pageSettingsLeftAsTheyWere = "page settings left as they were"
     }
 

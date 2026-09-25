@@ -66,12 +66,22 @@ nonisolated enum CopiedPageText {
 
     /// The text with a plain `publish: false` as the last line of its
     /// frontmatter.
+    ///
+    /// Not into a block with no column-0 level for a new key (#186): the text
+    /// comes back unchanged, and the read-back that follows refuses the copy
+    /// because it is not certainly hidden. The `setting` calls before this
+    /// one decline the same pages, so this is consistency, not a new refusal.
     static func appendingPlainHiddenKey(to pageText: String) -> String {
         let line: String = "publish: false"
         guard let block = PageFrontmatter.block(in: pageText) else {
             return "---\n" + line + "\n---\n" + pageText
         }
         var lines: [String] = pageText.components(separatedBy: "\n")
+        if PageVisibilityReader.placeForANewTopLevelKey(
+            in: lines, openIndex: block.openIndex, closeIndex: block.closeIndex
+        ) == nil {
+            return pageText
+        }
         lines.insert(line, at: block.closeIndex)
         return lines.joined(separator: "\n")
     }

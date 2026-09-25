@@ -113,26 +113,30 @@ enum PageFrontmatter {
         return trimmed
     }
 
-    /// The page text with `key` set to this day, and whether that changed
-    /// anything. The time of day and UTC offset already on the page are kept —
-    /// only the date in front of them moves.
+    /// The page text with `key` set to this day, and what the write came to.
+    /// The time of day and UTC offset already on the page are kept — only the
+    /// date in front of them moves.
+    ///
+    /// `.noRoomForAKey` when the key is missing and the block has no column-0
+    /// level for a new one (`PageVisibilityReader.placeForANewTopLevelKey`):
+    /// the page comes back unchanged, and the caller says so (#186).
     static func settingCreated(
         in pageText: String,
         key: String,
         to day: CalendarDay,
         fallbackTail: String = "T07:00:00.000-0400"
-    ) -> (text: String, changed: Bool) {
+    ) -> (text: String, outcome: FrontmatterWriteOutcome) {
         let existing: String = rawValue(forKey: key, in: pageText) ?? ""
         let tail: String = timeAndOffset(inRawValue: existing) ?? fallbackTail
         let value: String = day.text + tail
         if existing == value {
-            return (pageText, false)
+            return (pageText, .alreadyRight)
         }
 
         let line: String = key + ": " + value
         guard let block = block(in: pageText) else {
             // No frontmatter at all: give the page a block of its own.
-            return ("---\n" + line + "\n---\n" + pageText, true)
+            return ("---\n" + line + "\n---\n" + pageText, .written)
         }
 
         var lines: [String] = pageText.components(separatedBy: "\n")
@@ -142,13 +146,22 @@ enum PageFrontmatter {
                 replacingKeyLine(
                     at: index, key: key, with: line, in: &lines, closeIndex: block.closeIndex
                 )
-                return (lines.joined(separator: "\n"), true)
+                return (lines.joined(separator: "\n"), .written)
             }
         }
         // Missing: inserted at the top of the block, where the course
-        // installer puts it and where it can never land inside a nested list.
-        lines.insert(line, at: block.openIndex + 1)
-        return (lines.joined(separator: "\n"), true)
+        // installer puts it and where it can never land inside a nested list —
+        // and only into a block with a column-0 level for it. Measured
+        // 2026-09-25: `created:` written above `  a: 1` makes a block the build
+        // cannot read (until #246 it stopped the build; since, the page is
+        // hidden and named), so a re-date of a published class HID it (#186).
+        guard let place = PageVisibilityReader.placeForANewTopLevelKey(
+            in: lines, openIndex: block.openIndex, closeIndex: block.closeIndex
+        ) else {
+            return (pageText, .noRoomForAKey)
+        }
+        lines.insert(line, at: place)
+        return (lines.joined(separator: "\n"), .written)
     }
 
     /// The page text with its `title:` set. A page with no title line is
@@ -397,4 +410,26 @@ nonisolated struct OpenValueScanner {
         }
         return false
     }
+}
+
+/// What one write of a frontmatter key came to (#186).
+///
+/// Three outcomes rather than a `changed` flag, because a flag cannot tell
+/// "the page already said that" from "the writer declined" — both were
+/// `false`, and every caller was trusted to have thought about the second.
+/// They had not: a plan card counted a page it never wrote, a whole unit
+/// reported itself "already hidden" when every page in it had been declined,
+/// and a re-date said it had moved classes it had left alone.
+nonisolated enum FrontmatterWriteOutcome: Sendable, Equatable {
+
+    /// The page was rewritten.
+    case written
+
+    /// The page already said what was asked, and was left alone.
+    case alreadyRight
+
+    /// The key is missing and the page's settings have no column-0 level for
+    /// a new one — indented, or written as a list or a flow collection — so
+    /// nothing was written, and the teacher is told.
+    case noRoomForAKey
 }

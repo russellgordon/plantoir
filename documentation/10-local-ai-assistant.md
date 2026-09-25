@@ -3323,17 +3323,19 @@ shapes that reach it were measured rather than argued:
 | the source's frontmatter | why the copy still answers `cannotTell` |
 |---|---|
 | a TAB used as indentation anywhere in the block | `PageVisibilityReader.frontmatterBlock` answers `.unreadable`, because the build's own parser throws on the same page. Nothing written here can mend it: the strip and `setting` both find the fences and neither cares about tabs. |
-| the block's FIRST line indented, with a top-level `created:` and no publish or draft key | `setting` inserts `publish: false` at the top of the block, the first line that could be its value is the indented one, and `reading(ofValue:followedBy:)` will not guess at that. |
+| the block's FIRST line indented, with a top-level `created:` and no publish or draft key | Until #186, `setting` inserted `publish: false` at the top of the block, where the first line that could be its value is the indented one, and `reading(ofValue:followedBy:)` will not guess at that. Since #186 it declines (`.noRoomForAKey`) and the page is not hidden either way. |
 
 Both are pages the BUILD refuses as well — measured in the image, source and
 copy alike raise `while scanning for the next token` / `mapping values are not
 allowed` — so stopping is the honest answer rather than a shrug, and a copy of
 a lesson students can already see is the one thing not to write on a guess.
 The branch ALSO covers
-[#186](https://github.com/russellgordon/plantoir/issues/186), which may make
-`AssistPageVisibility.setting` decline to write; a check on its `changed` flag
-would be weaker, since `changed: false` cannot tell "already hidden" from
-"declined".
+[#186](https://github.com/russellgordon/plantoir/issues/186), which since
+2026-09-25 makes `AssistPageVisibility.setting` DECLINE to write on the second
+row above (`.noRoomForAKey`) rather than insert a key that adopts the indented
+line; the read-back still sees a page that is not hidden and abandons the
+copy, and it stays the stronger check, because it also catches what the
+outcome cannot see (the tab row).
 
 Abandoning is safe by construction: `ClassInsertionPlanner.apply` has already
 written the blank class page at that path and `ClassPages.skeleton` writes

@@ -281,7 +281,7 @@ class DatesFollowTheClassTests(unittest.TestCase):
 
     def test_the_splice_writes_one_key_and_nothing_else(self):
         cases = self.at_build_time["writingCases"]["cases"]
-        self.assertGreaterEqual(len(cases), 12)
+        self.assertGreaterEqual(len(cases), 13)
         for case in cases:
             with self.subTest(case=case["name"]):
                 written = build_site._setting_frontmatter_value(
