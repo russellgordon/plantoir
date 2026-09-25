@@ -656,7 +656,9 @@ hand-checked (so the 102 is not re-derived by this entry):
 `insertion.positionInSentences.cases`, `wholeUnit.cases`,
 `sectionIndexPointer.cases`; `file-formats.json` →
 `sidebarHiding.matchRule.cases`, `sidebarHiding.buildKeepsHidden.cases`;
-`shared-rules.json` → `wizard.clubToggle.cases`, `savingSettings.cases`.
+`shared-rules.json` → `wizard.clubToggle.cases`, `savingSettings.cases`. And
+`activityTrail.mustRecord` grew from 70 to 71, `section added` — not a new list, but
+an event Windows has to record or ledger.
 
 **Re-take it rather than trusting this paragraph** — a census nobody can repeat
 is a number that rots. A case list is *an array of objects reached through
