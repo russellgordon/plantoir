@@ -310,6 +310,12 @@ nonisolated enum ActivityTrail {
         /// token under it would make the trail say something untrue about the
         /// one run a teacher is trying to understand. Both are the same
         /// silence from the teacher's side; only one of them is a question.
+        ///
+        /// A BUILD that failed outright files here too
+        /// (`ScheduledPublishOutcome.Kind.buildDidNotFinish`, #137), with a
+        /// line that says the pages could not be built and names no
+        /// destination, because none was reached — the way
+        /// `buildNeededAnAnswer` files under the event above.
         case scheduledPublishDidNotFinish = "scheduled publish did not finish"
 
         /// A publish set to happen on its own went out.

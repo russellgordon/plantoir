@@ -278,6 +278,12 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         )
     }
 
+    /// A build that failed OUTRIGHT is recorded as its own kind (#137), not
+    /// as a destination that stopped — and nothing is published.
+    ///
+    /// Until #137 this was `didNotFinish`, whose sentence named
+    /// `buildDestinationName` as though it were a destination and sent the
+    /// teacher to Publish.
     func testABuildThatFailedOutrightIsRecordedToo() throws {
         try writeStubLaunchers(deployExit: 0, previewExit: 1)
         try runWrapper(
@@ -288,8 +294,99 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
             ScheduledPublishOutcome.stopped(
                 inHomeFolder: home, course: "ZZQ8U", section: 1
             )?.kind,
-            .didNotFinish
+            .buildDidNotFinish
         )
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: ScheduledDeploy.successSentinelURL(
+                courseCode: "ZZQ8U", sectionNumber: 1, inHomeFolder: home
+            ).path),
+            "the build failed, so nothing was published and nothing may say it was"
+        )
+    }
+
+    /// The contract's own table of which LEG and which exit code give which
+    /// kind, played through the REAL generated wrapper.
+    ///
+    /// `scheduledPublishStopped.whichKind.cases` is the list Windows runs
+    /// against its own wrapper too, so the rule has one home. Each case gets a
+    /// course code of its own (fixture names no real course uses), so one
+    /// case's record or success mark cannot answer for another's. The kind
+    /// named by the contract is found by walking `Kind.allCases` through
+    /// `SharedRulesContractTests.contractKey(for:)` rather than a list retyped
+    /// here.
+    func testEveryLegAndExitCodeIsFiledAsTheContractSays() throws {
+        let rule: [String: Any] = try SharedRulesContractTests.section("scheduledPublishStopped")
+        let whichKind: [String: Any] = try XCTUnwrap(rule["whichKind"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(whichKind["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 6, "the whichKind case list has lost cases")
+
+        var buildKindsSeen: Set<String> = []
+        var caseNumber: Int = 0
+        for testCase in cases {
+            let leg: String = try XCTUnwrap(testCase["leg"] as? String)
+            let exitCode: Int = try XCTUnwrap(testCase["exitCode"] as? Int)
+            let kindKey: String = try XCTUnwrap(testCase["kind"] as? String)
+            let namesADestination: Bool = try XCTUnwrap(testCase["namesADestination"] as? Bool)
+            let anythingPublished: Bool = try XCTUnwrap(testCase["anythingPublished"] as? Bool)
+            let why: String = try XCTUnwrap(testCase["why"] as? String)
+            let label: String = "\(leg) exit \(exitCode) — \(why)"
+
+            var expectedKind: ScheduledPublishOutcome.Kind?
+            for kind in ScheduledPublishOutcome.Kind.allCases {
+                if SharedRulesContractTests.contractKey(for: kind) == kindKey {
+                    expectedKind = kind
+                }
+            }
+            let expected: ScheduledPublishOutcome.Kind = try XCTUnwrap(
+                expectedKind, "the contract names a kind the app does not have: \(kindKey)"
+            )
+
+            var previewExit: Int32 = 0
+            var deployExit: Int32 = 0
+            if leg == "build" {
+                previewExit = Int32(exitCode)
+                buildKindsSeen.insert(kindKey)
+            } else if leg == "destination" {
+                deployExit = Int32(exitCode)
+            } else {
+                XCTAssertEqual(leg, "none", "unknown leg in \(label)")
+                XCTAssertEqual(exitCode, 0, "a run where nothing stopped exits 0: \(label)")
+            }
+
+            let course: String = "ZZR\(caseNumber)U"
+            caseNumber += 1
+            try writeStubLaunchers(deployExit: deployExit, previewExit: previewExit)
+            try runWrapper(
+                course: course, section: 1,
+                destinations: ["netlify"], descriptions: ["Netlify"]
+            )
+
+            let stopped: ScheduledPublishOutcome.Stopped = try XCTUnwrap(
+                ScheduledPublishOutcome.stopped(inHomeFolder: home, course: course, section: 1),
+                "no record at all for \(label)"
+            )
+            XCTAssertEqual(stopped.kind, expected, label)
+
+            let sentence: String = ScheduledPublishOutcome.sentence(
+                for: stopped, course: course, section: 1
+            )
+            XCTAssertEqual(
+                sentence.contains(stopped.destination), namesADestination,
+                "whether the sentence names the record's destination (\(stopped.destination)): \(label)"
+            )
+
+            let published: Bool = FileManager.default.fileExists(
+                atPath: ScheduledDeploy.successSentinelURL(
+                    courseCode: course, sectionNumber: 1, inHomeFolder: home
+                ).path
+            )
+            XCTAssertEqual(published, anythingPublished, "whether it counts as published: \(label)")
+        }
+
+        // Both build kinds must stay in the table, so the list cannot quietly
+        // shrink back to one that no longer tells them apart.
+        XCTAssertTrue(buildKindsSeen.contains("buildNeededAnAnswer"))
+        XCTAssertTrue(buildKindsSeen.contains("buildDidNotFinish"))
     }
 
     // MARK: - Last night's record
@@ -466,7 +563,79 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         )
     }
 
+    /// A build that failed outright is noted under the EXISTING "did not
+    /// finish" event, with a line naming no destination (#137).
+    ///
+    /// Reads the trail FILE, for the reason the test above does: the return
+    /// value is `true` for any record that parses, so only the line itself
+    /// can show that no destination was named.
+    func testABuildThatFailedOutrightIsNotedOnTheTrailWithoutADestination() throws {
+        let scratch: URL = home.appendingPathComponent("trail-build-failed", isDirectory: true)
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: scratch)
+        defer { ActivityTrail.store = previousStore }
+
+        ScheduledPublishOutcome.recordStopped(
+            ScheduledPublishOutcome.Stopped(
+                kind: .buildDidNotFinish,
+                destination: ScheduledPublishOutcome.buildDestinationName,
+                when: Date()
+            ),
+            inHomeFolder: home, course: "ZZQDU", section: 1
+        )
+        XCTAssertTrue(ScheduledPublishOutcome.noteOnTrail(
+            inHomeFolder: home, course: "ZZQDU", section: 1
+        ))
+
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(
+            trail.contains("the pages could not be built"),
+            "the line a teacher's problem report would carry: \(trail)"
+        )
+        XCTAssertFalse(
+            trail.contains(ScheduledPublishOutcome.buildDestinationName),
+            "no destination was reached, so the trail may not name one"
+        )
+    }
+
     // MARK: - What a teacher reads
+
+    /// A build that failed outright names no destination, and is not the
+    /// destination-failure sentence with a stand-in filled in (#137).
+    ///
+    /// The sentence itself is pinned whole against the contract by
+    /// `SharedRulesContractTests`; what this pins is the SHAPE — the
+    /// contract's template has no destination slot at all, and the rendered
+    /// sentence does not carry the record's second line.
+    func testTheSentenceForAFailedBuildNamesNoDestination() throws {
+        let rule: [String: Any] = try SharedRulesContractTests.section("scheduledPublishStopped")
+        let sentences: [String: Any] = try XCTUnwrap(rule["sentences"] as? [String: Any])
+        let template: String = try XCTUnwrap(sentences["buildDidNotFinish"] as? String)
+        XCTAssertFalse(template.contains("{destination}"))
+
+        let failedBuild = ScheduledPublishOutcome.Stopped(
+            kind: .buildDidNotFinish,
+            destination: ScheduledPublishOutcome.buildDestinationName,
+            when: Date()
+        )
+        let failedDestination = ScheduledPublishOutcome.Stopped(
+            kind: .didNotFinish,
+            destination: ScheduledPublishOutcome.buildDestinationName,
+            when: Date()
+        )
+        let sentence: String = ScheduledPublishOutcome.sentence(
+            for: failedBuild, course: "ICS3U", section: 2
+        )
+        XCTAssertFalse(
+            sentence.contains(ScheduledPublishOutcome.buildDestinationName),
+            "no destination was reached, so none may be named"
+        )
+        XCTAssertNotEqual(
+            sentence,
+            ScheduledPublishOutcome.sentence(for: failedDestination, course: "ICS3U", section: 2)
+        )
+        XCTAssertTrue(failedBuild.kind.needsAttention)
+    }
 
     func testTheSentenceForAnUnansweredQuestionIsTheContractsOwn() throws {
         let stopped = ScheduledPublishOutcome.Stopped(
