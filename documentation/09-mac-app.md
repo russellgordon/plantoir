@@ -4303,6 +4303,39 @@ pruner" above for why.
   Windows list until they ship the same reader. Its own small piece, Windows
   first or together.
 
+## Notifications: the one permission, and where it is asked (#212)
+
+A scheduled publish tells the teacher how it went with a macOS notification,
+sent by the RUN (`Plantoir --run-scheduled-deploy`, started by launchd) — not by
+the window, which may not be open. What it says, why, what was measured and what
+was rejected is in `documentation/07-deployment.md` → "When nobody is looking";
+this is the app-side wiring.
+
+- **Asked once, from the window.** `ScheduleDeploySheet.schedule()` and the
+  in-app assistant's `schedule_deploy` (`AssistToolRunner`, `surface == .local`)
+  call `ScheduledPublishNotice.askPermissionIfNotAskedYet` after a deploy is
+  set. It does nothing unless macOS says nobody has been asked yet. Never at
+  launch, never from an outside assistant over `--mcp-stdio` (no window to
+  explain the question), never from the run. The question asks for alerts only
+  — no sound, no badge.
+- **`AppDelegate` is the notification centre's delegate**, set in
+  `applicationWillFinishLaunching` (where Apple asks for it), and answers
+  `willPresent` with `[.banner, .list]` so a notification still shows when
+  Plantoir is the app in front. Not set under the suite.
+- **Dismiss withdraws it.** `SectionDetailView.dismissScheduledPublishNotice`
+  goes through `ScheduledPublishNotice.teacherDismissed`, which clears the
+  record AND withdraws that section's notification.
+- **The suite never reaches the real notification centre.** The test host is
+  Plantoir.app — the very bundle whose permission this is — so
+  `ScheduledPublishNotice.poster` is `QuietNotifications` under XCTest,
+  `SystemNotifications` refuses there too, and tests that need to see a post use
+  a recording stand-in (`ScheduledPublishNoticeTests`). A test that forgot the
+  stand-in would otherwise be able to put the permission question on the screen
+  of the Mac running the suite.
+- **One permission for every copy.** The Debug build in DerivedData and an
+  installed copy share the bundle identifier, so the answer given to one is the
+  answer for both.
+
 ## Reporting a problem
 
 Plantoir keeps a note of every task it runs — in
