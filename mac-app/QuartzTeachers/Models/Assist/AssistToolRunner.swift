@@ -2039,6 +2039,19 @@ final class AssistToolRunner {
             return AssistToolOutcome.refused("Nothing was scheduled. \(problem)")
         }
 
+        // Ask whether Plantoir may tell the teacher how it went (#212), the
+        // first time — but only from Plantoir's own assistant. An outside
+        // assistant over MCP runs this same binary with no window: the
+        // question would appear with nothing on screen to say why, so that
+        // teacher is not asked, and not told (a known limit, docs 07).
+        if surface != .mcp {
+            let courseCode: String = asked.located.course.code
+            let section: Int = asked.located.sectionNumber
+            Task {
+                await ScheduledPublishNotice.askPermissionIfNotAskedYet(course: courseCode, section: section)
+            }
+        }
+
         let moment: String = ScheduledDeploy.dayAndTimeText(asked.when)
         var summary: String = "Scheduled: \(asked.located.course.code) Section "
             + "\(asked.located.sectionNumber) deploys to \(asked.plan.destination) at \(moment)."
