@@ -250,6 +250,109 @@ final class AppRulesContractTests: XCTestCase {
         }
     }
 
+    /// The test above pins two phrases; this one pins the whole first-run
+    /// block. Everything from `_download() {` to the bare
+    /// `ensure_container_runtime` call is what a teacher on a new Mac (or with
+    /// a wedged builder) reads in the details: downloading, first start,
+    /// waiting, restarting, failing. Until GitHub #263 it named Colima,
+    /// Docker, the container runtime and the image builder. The block is
+    /// written once and copied into all three launchers, so it also asks that
+    /// the three copies are still the SAME text — a fix made in one copy only
+    /// is how the first-run lines drift apart.
+    ///
+    /// The rest of each launcher still names the machinery in places; that is
+    /// a separate, larger piece, and the whole-file scan belongs to it.
+    func testTheFirstRunLinesNameNoMachinery() throws {
+        let repository: URL = AppRulesContractTests.repositoryRoot()
+        let forbiddenWords: [String] = [
+            "toolchain", "toolchains", "script", "scripts",
+            "docker", "container", "containers",
+            "colima", "lima", "buildx", "buildkit",
+            "virtual machine", "disk image", "image",
+        ]
+        var firstBlock: String? = nil
+        for launcher in ["setup.sh", "preview.sh", "deploy.sh"] {
+            let url: URL = repository.appendingPathComponent(launcher)
+            let text: String = try String(contentsOf: url, encoding: .utf8)
+            let block: [String] = AppRulesContractTests.firstRunBlock(in: text)
+            let blockText: String = block.joined(separator: "\n")
+            if let firstBlock {
+                XCTAssertEqual(
+                    blockText, firstBlock,
+                    "\(launcher)'s first-run block differs from setup.sh's; the three copies must stay identical."
+                )
+            } else {
+                firstBlock = blockText
+            }
+
+            let printed: [String] = AppRulesContractTests.printedText(of: block)
+            XCTAssertGreaterThanOrEqual(
+                printed.count, 10,
+                "Found only \(printed.count) printed lines in \(launcher)'s first-run block; the extraction has lost its way."
+            )
+            for line in printed {
+                for word in forbiddenWords {
+                    XCTAssertFalse(
+                        AppRulesContractTests.containsWholeWord(word, in: line),
+                        "\(launcher) names the machinery (\"\(word)\") to a teacher: \(line)"
+                    )
+                }
+            }
+        }
+    }
+
+    /// The lines from `_download() {` up to and including the line that is
+    /// exactly `ensure_container_runtime`. Empty when either end is missing.
+    static func firstRunBlock(in text: String) -> [String] {
+        var block: [String] = []
+        var inside: Bool = false
+        for line in text.components(separatedBy: "\n") {
+            if line.hasPrefix("_download() {") {
+                inside = true
+            }
+            if inside {
+                block.append(line)
+                if line == "ensure_container_runtime" {
+                    return block
+                }
+            }
+        }
+        return []
+    }
+
+    /// What a teacher can read from these lines: every `echo`, and the label
+    /// each `_download` call passes (its last quoted argument), which
+    /// `_download` prints. `$( … )` substitutions are removed first, because
+    /// `$(_colima_cpus)` prints a number, not the word Colima.
+    static func printedText(of block: [String]) -> [String] {
+        var printed: [String] = []
+        for line in block {
+            let trimmed: String = line.trimmingCharacters(in: .whitespaces)
+            var shown: String? = nil
+            if trimmed.hasPrefix("echo ") {
+                shown = trimmed
+            } else if trimmed.hasPrefix("_download ") {
+                let pieces: [String] = trimmed.components(separatedBy: "\"")
+                // `_download "url" "path" "label"` splits into
+                // ["_download ", url, " ", path, " ", label, ""].
+                if pieces.count >= 3 {
+                    shown = pieces[pieces.count - 2]
+                }
+            }
+            if let shown {
+                printed.append(shown.replacingOccurrences(
+                    of: #"\$\([^)]*\)"#, with: "", options: .regularExpression
+                ))
+            }
+        }
+        return printed
+    }
+
+    static func containsWholeWord(_ word: String, in line: String) -> Bool {
+        let pattern: String = "\\b" + NSRegularExpression.escapedPattern(for: word) + "\\b"
+        return line.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
+    }
+
     // MARK: - What a teacher is told when something fails
 
     /// Both apps read the SAME output from the same shared scripts, so both
@@ -311,22 +414,31 @@ final class AppRulesContractTests: XCTestCase {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let previewBuilt: URL = root.appendingPathComponent("preview.html")
+        // Each built site is a `public/` folder: the check reads every page
+        // in it (issue #136, `buildFreshness.previewBuild`), the front page
+        // first.
+        let previewBuilt: URL = root.appendingPathComponent("preview/public")
+        try FileManager.default.createDirectory(at: previewBuilt, withIntermediateDirectories: true)
         try "<script>new WebSocket('ws://localhost:9081')</script>".write(
-            to: previewBuilt, atomically: true, encoding: .utf8
+            to: previewBuilt.appendingPathComponent("index.html"), atomically: true, encoding: .utf8
         )
-        let deployBuilt: URL = root.appendingPathComponent("deploy.html")
-        try "<html>no live reload here</html>".write(to: deployBuilt, atomically: true, encoding: .utf8)
+        let deployBuilt: URL = root.appendingPathComponent("deploy/public")
+        try FileManager.default.createDirectory(at: deployBuilt, withIntermediateDirectories: true)
+        try "<html>no live reload here</html>".write(
+            to: deployBuilt.appendingPathComponent("index.html"), atomically: true, encoding: .utf8
+        )
 
         XCTAssertEqual(
-            BuildFreshness.builtForPreview(previewBuilt), true,
+            BuildFreshness.builtForPreview(publicDirectory: previewBuilt), true,
             expectations["the built site was made by a PREVIEW"] == true
                 ? "A preview build must be rebuilt before deploying"
                 : "The contract and the app disagree about preview builds"
         )
-        XCTAssertFalse(BuildFreshness.builtForPreview(deployBuilt))
-        XCTAssertTrue(
-            BuildFreshness.builtForPreview(root.appendingPathComponent("nothing-here.html")),
+        XCTAssertFalse(BuildFreshness.builtForPreview(publicDirectory: deployBuilt))
+        // No front page at all — and no public/ folder either.
+        XCTAssertEqual(
+            BuildFreshness.builtForPreview(publicDirectory: root.appendingPathComponent("nothing-here/public")),
+            expectations["the built index cannot be read"],
             "An unreadable built index is rebuilt rather than trusted"
         )
     }

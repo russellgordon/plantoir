@@ -1864,9 +1864,10 @@ struct NewCourseWizardView: View {
             // skeleton given up — but the terminology switch does not, so a
             // teacher who ticked College Board Curriculum and then turned LCS
             // off would otherwise have that folder written into a course that
-            // has no such folder. `setup_course.py` reconciles the key again
-            // when it reads it, so this is the second net rather than the
-            // only one; what it buys is that both apps write the same file.
+            // has no such folder. This is the ONLY net: since GitHub issue
+            // #192 `setup_course.py` writes a saved pool back as it was
+            // (gradedFolders.rerunningSetup), and it also makes both apps
+            // write the same file.
             config["graded_folders"] = GradedFolderRule.reconciled(
                 chosenGradedFolders,
                 toFolders: chosenSharedFolders + chosenPerSectionFolders

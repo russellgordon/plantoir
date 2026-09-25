@@ -363,18 +363,31 @@ final class ReferenceCopierTests: XCTestCase {
         try FileManager.default.removeItem(at: frozen.configFileURL)
         ReferenceLock.lock(courseDirectory: frozenURL)
 
+        var refusal: String? = nil
         XCTAssertThrowsError(
             try ReferenceCopier.keepACopy(
                 of: frozen, named: "ICS3U-2024", schoolYear: 2024,
                 coursesDirectoryURL: coursesDirectoryURL
             )
-        )
+        ) { error in
+            refusal = error.localizedDescription
+        }
         XCTAssertFalse(
             FileManager.default.fileExists(
                 atPath: coursesDirectoryURL.appendingPathComponent("ICS3U-2024").path
             ),
             "A half-written copy must be an ordinary folder that goes away cleanly."
         )
+
+        // A copy that failed leaves a line saying so (#287), naming the course
+        // it was copied from and the folder it was to be given.
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        let expectedStart: String = "could not keep a copy of \(frozen.displayCode) for reference as ICS3U-2024 — "
+        XCTAssertTrue(trail.contains(expectedStart), trail)
+        XCTAssertNotNil(refusal)
+        if let refusal = refusal {
+            XCTAssertTrue(trail.contains(expectedStart + refusal), trail)
+        }
     }
 
     func testAFolderNameAlreadyTakenIsRefusedBeforeAnythingIsWritten() throws {
@@ -392,6 +405,14 @@ final class ReferenceCopierTests: XCTestCase {
         ) { error in
             XCTAssertEqual(error as? ReferenceCopier.Problem, .folderAlreadyExists("ICS3U-2025"))
         }
+
+        // The refusal is on the trail with the sentence the sheet showed (#287).
+        let reason: String = ReferenceCopier.Problem.folderAlreadyExists("ICS3U-2025").localizedDescription
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(
+            trail.contains("could not keep a copy of \(live.displayCode) for reference as ICS3U-2025 — \(reason)"),
+            trail
+        )
     }
 
     func testTheTrailSaysWhatWasKeptAndWhereItCameFrom() throws {
@@ -405,6 +426,8 @@ final class ReferenceCopierTests: XCTestCase {
         XCTAssertTrue(trail.contains("ICS3U-2025"), trail)
         XCTAssertTrue(trail.contains("2025–26"), trail)
         XCTAssertTrue(trail.contains("2 sections"), trail)
+        // A copy that was made writes no failure line (#287).
+        XCTAssertFalse(trail.contains("could not keep a copy of"), trail)
     }
 
     /// A copy filed under no year is filed under "Other", and says so.

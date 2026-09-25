@@ -132,4 +132,30 @@ final class PagesDatedByTheBuildTests: XCTestCase {
         XCTAssertTrue(PagesDatedByTheBuild.reports(in: "PLANTOIR_DATED: {not json").isEmpty)
         XCTAssertTrue(PagesDatedByTheBuild.reports(in: "PLANTOIR_DATED: {\"course\": \"X\", \"section\": 1, \"pages\": []}").isEmpty)
     }
+
+    /// The same two console leaks #153 found in the health line (the director
+    /// ruled this marker gets the same fix): a marker glued to the tail of
+    /// somebody else's half line was DROPPED — no trail line — while the raw
+    /// JSON was shown; and half a marker was shown until its newline arrived.
+    func testAGluedOrHalfArrivedLineIsReadAndNeverShown() throws {
+        let marker: String = "PLANTOIR_DATED: {\"course\": \"ICS4U\", \"section\": 1, \"pages\": [\"section1/index\"]}"
+        let runner: ScriptRunner = ScriptRunner()
+        runner.receiveOutput("Building…")
+        runner.receiveOutput(marker + "\r\n")
+        runner.receiveOutput("ok\r\n")
+        let cut: String.Index = marker.index(marker.startIndex, offsetBy: 30)
+        runner.receiveOutput(String(marker[..<cut]))
+        let whileArriving: String = runner.transcript.displayText
+        XCTAssertFalse(whileArriving.contains("PLANTOIR_DATED"), whileArriving)
+        XCTAssertFalse(runner.transcript.recentText(maximumCharacters: 8000).contains("PLANTOIR_DATED"))
+        runner.receiveOutput(String(marker[cut...]) + "\r\n")
+
+        let shown: String = runner.transcript.displayText
+        XCTAssertEqual(shown, "ok", "the glued line goes whole, and the finished half line with it")
+
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        let expected: String = "ICS4U/1 · the build gave 1 page the date of their class: section1/index"
+        XCTAssertEqual(trail.components(separatedBy: expected).count - 1, 2,
+                       "the glued line and the split line are each read once: \(trail)")
+    }
 }

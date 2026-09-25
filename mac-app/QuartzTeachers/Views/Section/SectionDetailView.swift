@@ -956,7 +956,9 @@ struct SectionDetailView: View {
     /// that a test can measure it; what stays here is the part that touches
     /// this view's own state and the workspace.
     func dismissScheduledPublishNotice() {
-        ScheduledPublishOutcome.clear(
+        // The record AND the macOS notification about it (#212), so the two
+        // never disagree about whether it is still news.
+        ScheduledPublishNotice.teacherDismissed(
             inHomeFolder: ScheduledDeploy.homeForScheduledNotes,
             course: course.code,
             section: sectionNumber

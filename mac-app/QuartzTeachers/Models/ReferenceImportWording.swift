@@ -276,6 +276,15 @@ nonisolated enum ReferenceImportWording {
         "Obsidian add-ons and their settings are not brought across from older class folders, "
         + "so nothing in them can publish these pages."
 
+    /// Said under the list and in the summary when a course in the modern
+    /// layout has Obsidian add-ons (#255). True of EVERY route, so when this
+    /// is said the older-layout sentence is not: beside a modern course with
+    /// an add-on, "…from older class folders…" would read as if that one's
+    /// add-ons DID come. `ImportCoursesForReferenceSheet.addOnsNote` chooses.
+    static let addOnsAreLeftBehind: String =
+        "Obsidian add-ons and their settings are not brought across, "
+        + "so nothing in them can publish these pages."
+
     // MARK: - The 2024–25 layout (a website folder per class, #256)
 
     /// Russell's 2024–25 way of keeping a course — one whole website folder

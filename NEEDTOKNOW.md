@@ -309,5 +309,9 @@ sync watcher.
 The activity trail is `~/Library/Logs/Plantoir/activity.txt`, which is the
 path `CLAUDE.md` rule 5 gives. (An earlier draft of this file offered two
 paths a line apart; this is the one.) A folder problem writes
-`found a problem with this course's folders (name)` and a repair writes
+the sentence `SiteHealthFinding.trailSentence` gives (the check's name in
+brackets, in the shape `contracts/shared-rules.json` →
+`activityTrail.mustRecord` → "folder problem found" → `carries` shows) — from
+a build the app runs, and since #153 from a scheduled publish too — and a
+repair writes
 `put the Media folder back` / `put the front page back`.

@@ -560,6 +560,35 @@ final class OlderLayoutImportTests: XCTestCase {
         XCTAssertTrue(appSettings.contains("defaultViewMode"), "Reading view was not set: \(appSettings)")
     }
 
+    /// #255: the add-ons are SKIPPED by the walk, not walked and filtered
+    /// after it, so a folder inside one that nobody can read does not refuse
+    /// the class — it was never going to be copied. The same test runs on
+    /// every route (`ObsidianAddOnsTests`, `QuartzCheckoutImportTests`).
+    func testAnUnreadableFolderInsideAnAddOnDoesNotRefuseTheClass() async throws {
+        try prepare()
+        let made: (classURL: URL, sharedURL: URL) = try makeICS3U()
+        let shut: URL = made.classURL.appendingPathComponent(".obsidian/plugins/digitalgarden/cache")
+        try FileManager.default.createDirectory(at: shut, withIntermediateDirectories: true)
+        try Data("cached".utf8).write(to: shut.appendingPathComponent("blob"))
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: shut.path)
+        addTeardownBlock {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: shut.path)
+        }
+
+        let plan: OlderCourseLayout.Plan = OlderCourseLayout.plan(
+            classFolderURL: made.classURL, sharedFolderURL: made.sharedURL,
+            howFound: .byItsName, leavingBehind: ReferenceImporter.leftBehindNames
+        )
+        XCTAssertEqual(plan.unreadableFolders, [], "A folder inside an add-on refuses the class.")
+        var addOns: [String] = []
+        for entry in plan.leftOut where entry.reason == .addOns {
+            addOns.append(entry.path)
+        }
+        addOns.sort()
+        XCTAssertEqual(addOns, [".obsidian/community-plugins.json", ".obsidian/plugins"])
+        _ = try await importTheClass(made.classURL)
+    }
+
     /// Every page is the same bytes — `Home.md` as `section1/index.md`, the
     /// one rename — and every shared file is the shared folder's, under
     /// exactly its own name bytes, an accent either way.

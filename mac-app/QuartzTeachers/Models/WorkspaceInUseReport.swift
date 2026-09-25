@@ -78,12 +78,14 @@ struct WorkspaceInUseReport: Equatable {
     /// A line that does not have the marker's shape reports nothing.
     nonisolated static func reports(in text: String) -> [WorkspaceInUseReport] {
         var found: [WorkspaceInUseReport] = []
-        for rawLine in SiteHealthFinding.linesOf(text) {
-            let line: String = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard line.hasPrefix(markerPrefix) else {
+        for line in SiteHealthFinding.linesOf(text) {
+            // From the prefix onward, as `PagesDatedByTheBuild.reports(in:)`
+            // reads its own: a marker glued to the tail of somebody else's
+            // half line must still be read (#153).
+            guard let prefixRange = line.range(of: markerPrefix) else {
                 continue
             }
-            let payload: String = String(line.dropFirst(markerPrefix.count))
+            let payload: String = String(line[prefixRange.upperBound...])
             var words: [String] = []
             for word in payload.split(separator: " ", omittingEmptySubsequences: true) {
                 words.append(String(word))
@@ -115,9 +117,11 @@ struct WorkspaceInUseReport: Equatable {
     }
 
     /// Whether a line is this machine-readable one, so the console can keep it
-    /// out of what a teacher reads (rule 1).
+    /// out of what a teacher reads (rule 1). A line CARRYING the prefix
+    /// anywhere is hidden whole, and never offered as a question — the rule
+    /// #153 set for every marker: the prefix ends in a colon, so a line cut
+    /// just after it would otherwise look like a prompt.
     nonisolated static func isMarkerLine(_ line: String) -> Bool {
-        return line.trimmingCharacters(in: .whitespacesAndNewlines)
-            .hasPrefix(markerPrefix)
+        return line.contains(markerPrefix)
     }
 }

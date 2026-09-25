@@ -145,6 +145,36 @@ final class WorkspaceInUseReportTests: XCTestCase {
         XCTAssertFalse(trailText().contains("setup ·"), "an earlier night's line was recorded again")
     }
 
+    /// #153's three guards, for this marker too. Glued to the tail of another
+    /// line it is still read and still hidden; cut just after the colon, the
+    /// half-arrived line is neither shown nor offered as a question.
+    func testAMarkerGluedToAPartialLineIsReadAndHidden() throws {
+        let example: String = try examples()[0]
+        let glued: String = "Building ICS4U" + example
+        XCTAssertEqual(WorkspaceInUseReport.reports(in: glued).count, 1, glued)
+        XCTAssertTrue(WorkspaceInUseReport.isMarkerLine(glued))
+
+        let runner: ScriptRunner = ScriptRunner()
+        runner.receiveOutput(glued + "\r\n")
+        XCTAssertFalse(runner.transcript.displayText.contains(WorkspaceInUseReport.markerPrefix))
+        let expected: String = try contractLine("lineWhenItWaited")
+            .replacingOccurrences(of: "{place}", with: "ICS4U/1")
+            .replacingOccurrences(of: "{seconds}", with: "14")
+        XCTAssertTrue(trailText().contains(expected), trailText())
+    }
+
+    func testAMarkerCutAfterItsColonIsNeitherShownNorAQuestion() {
+        let half: String = "Building ICS4U " + WorkspaceInUseReport.markerPrefix
+        XCTAssertFalse(ScriptRunner.looksLikeQuestion(half), "a half-arrived marker ends in a colon")
+        XCTAssertFalse(ScriptRunner.looksLikeQuestion(WorkspaceInUseReport.markerPrefix))
+
+        let runner: ScriptRunner = ScriptRunner()
+        runner.receiveOutput(half)
+        XCTAssertFalse(runner.transcript.displayText.contains(WorkspaceInUseReport.markerPrefix),
+                       runner.transcript.displayText)
+        XCTAssertFalse(runner.transcript.recentText(maximumCharacters: 4000).contains(WorkspaceInUseReport.markerPrefix))
+    }
+
     func testOrdinaryOutputAndBrokenLinesReportNothing() {
         let prefix: String = WorkspaceInUseReport.markerPrefix
         XCTAssertTrue(WorkspaceInUseReport.reports(in: "Something in this folder is still running.").isEmpty)

@@ -47,14 +47,45 @@ struct TranscriptBuilder {
 
     // MARK: - Computed properties
 
+    /// The line under construction, as a teacher may see it: nothing at all
+    /// while it carries a marker (#153).
+    ///
+    /// A marker line is hidden when it FINISHES (`appendUnlessMachineReadable`),
+    /// but the health payload is the longest line a build prints, so it is the
+    /// likeliest to arrive in two chunks — and until the newline turned up, the
+    /// first half was shown as raw JSON through both `displayText` and
+    /// `recentText`, measured by feeding the first 60 characters of a real
+    /// marker. Windows hides the line under construction the same way
+    /// (`VisibleCurrentLine`). `currentLine` itself is untouched: the prompt
+    /// check reads it, and refuses a marker line itself
+    /// (`ScriptRunner.looksLikeQuestion`).
+    ///
+    /// Named residual, the same on Windows: a chunk that ends in the middle of
+    /// the PREFIX ("…PLANTOIR_HE") shows that fragment until the next chunk.
+    /// It is not JSON, it lasts one refresh, and a rule that hid every line
+    /// ending in a prefix of a prefix would hide ordinary text ending in "P".
+    private var visibleCurrentLine: String {
+        if SiteHealthFinding.isMarkerLine(currentLine) {
+            return ""
+        }
+        if PagesDatedByTheBuild.isMarkerLine(currentLine) {
+            return ""
+        }
+        if WorkspaceInUseReport.isMarkerLine(currentLine) {
+            return ""
+        }
+        return currentLine
+    }
+
     /// The full transcript as one display string (cached).
     var displayText: String {
         if let text = cache.text {
             return text
         }
         var allLines: [String] = lines
-        if !currentLine.isEmpty {
-            allLines.append(currentLine)
+        let shownCurrentLine: String = visibleCurrentLine
+        if !shownCurrentLine.isEmpty {
+            allLines.append(shownCurrentLine)
         }
         let text: String = allLines.joined(separator: "\n")
         cache.text = text
@@ -67,9 +98,10 @@ struct TranscriptBuilder {
     func recentText(maximumCharacters: Int) -> String {
         var collected: [String] = []
         var characterCount: Int = 0
-        if !currentLine.isEmpty {
-            collected.append(currentLine)
-            characterCount += currentLine.count
+        let shownCurrentLine: String = visibleCurrentLine
+        if !shownCurrentLine.isEmpty {
+            collected.append(shownCurrentLine)
+            characterCount += shownCurrentLine.count
         }
         var index: Int = lines.count - 1
         while index >= 0 && characterCount < maximumCharacters {
@@ -137,6 +169,9 @@ struct TranscriptBuilder {
     ///
     /// One function called from BOTH line endings, because having the check in
     /// only one of them is exactly the bug this replaced.
+    ///
+    /// A line CARRYING a marker goes whole, including whatever was glued in
+    /// front of it (#153): see `SiteHealthFinding.isMarkerLine`.
     private mutating func appendUnlessMachineReadable(_ line: String) {
         if SiteHealthFinding.isMarkerLine(line) {
             return

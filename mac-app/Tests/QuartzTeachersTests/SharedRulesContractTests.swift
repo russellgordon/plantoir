@@ -2471,6 +2471,7 @@ final class SharedRulesContractTests: XCTestCase {
         switch kind {
         case .neededAnAnswer: return "neededAnAnswer"
         case .buildNeededAnAnswer: return "buildNeededAnAnswer"
+        case .buildDidNotFinish: return "buildDidNotFinish"
         case .didNotFinish: return "didNotFinish"
         case .succeeded: return "succeeded"
         case .tooLateToRun: return "tooLateToRun"
@@ -2478,7 +2479,7 @@ final class SharedRulesContractTests: XCTestCase {
         }
     }
 
-    private static func section(_ name: String) throws -> [String: Any] {
+    static func section(_ name: String) throws -> [String: Any] {
         let url: URL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()

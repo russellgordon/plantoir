@@ -621,6 +621,9 @@ enum ScheduledDeploy {
         // shell, because the app is closed when this runs and cannot be
         // asked. It has to stay in step with the Swift, so all three of its
         // parts are here — and the second is the one that matters most.
+        // Its preview check reads the same tree as the Swift's
+        // (`contracts/app-rules.json` → `buildFreshness.previewBuild`), and
+        // `ScheduledPublishOutcomeTests` runs it against every case there.
         let previewPath: String = workspaceURL.appendingPathComponent("preview.sh").path
         let builtIndexPath: String = workspaceURL
             .appendingPathComponent("courses")
@@ -629,6 +632,14 @@ enum ScheduledDeploy {
             .appendingPathComponent("section\(sectionNumber)")
             .appendingPathComponent("public")
             .appendingPathComponent("index.html")
+            .path
+        // The whole built site, for the preview check (issue #136).
+        let builtPublicPath: String = workspaceURL
+            .appendingPathComponent("courses")
+            .appendingPathComponent(courseCode)
+            .appendingPathComponent(".merged_output")
+            .appendingPathComponent("section\(sectionNumber)")
+            .appendingPathComponent("public")
             .path
         // Where the build notes when it STARTED (issue #265) — the time the
         // course's files are compared with, so a Save made while an earlier
@@ -679,7 +690,23 @@ enum ScheduledDeploy {
         // deploying that makes a visitor's browser knock on their own
         // machine. Rebuilding is the only way to be rid of it, however
         // recent the build looks.
-        lines.append("  if /usr/bin/grep -q 'ws://localhost:' \(shellQuoted(builtIndexPath)); then")
+        //
+        // EVERY page, not the front page alone (issue #136) — the same tree
+        // `BuildFreshness.builtForPreview` reads and deploy.sh greps, or a
+        // clean front page in front of a preview's pages skips this build and
+        // deploy.sh rebuilds it under the DESTINATION's leg below. The three
+        // parts of the line are each the Swift's:
+        //   `! [ -r index ]` — a front page that cannot be read is rebuilt,
+        //     which grep alone cannot say (its exit 2 reads as "no" in an if);
+        //   `-s` — any other page that cannot be read is passed over quietly:
+        //     measured, BSD grep exits 0 on a match elsewhere and 2 otherwise;
+        //   `LC_ALL=C` — a byte match. Under a UTF-8 locale macOS's grep does
+        //     not find the signature on a line that also holds a byte that is
+        //     not valid UTF-8 (measured, grep 2.6.0-FreeBSD), and the Swift
+        //     compares bytes.
+        lines.append("  if ! [ -r \(shellQuoted(builtIndexPath)) ] || LC_ALL=C /usr/bin/grep -rqs"
+            + " --include='*.html' \(shellQuoted(BuildFreshness.liveReloadSignature))"
+            + " \(shellQuoted(builtPublicPath)); then")
         lines.append("    NEEDS_BUILD=1")
         lines.append("  elif [ -z \"$(/usr/bin/find \(shellQuoted(courseDirectoryPath))"
             + " -type f -newer \"$FRESH_SINCE\" -not -path '*/.*' -print -quit)\" ]; then")
@@ -748,12 +775,19 @@ enum ScheduledDeploy {
         lines.append("      /bin/echo \(shellQuoted(ScheduledPublishOutcome.Kind.buildNeededAnAnswer.rawValue))"
             + " > \(shellQuoted(stoppedPartialRecord))")
         lines.append("    else")
-        lines.append("      /bin/echo \(shellQuoted(ScheduledPublishOutcome.Kind.didNotFinish.rawValue))"
+        // Any OTHER code from the build is its own kind too (#137): the
+        // pages could not be built, nothing was contacted, and the sentence
+        // names no destination and sends the teacher to Preview. `else`, not
+        // `-eq 1` — a launcher that could not be run at all, or was stopped
+        // by a signal, exits with another code, and
+        // `scheduledPublishStopped.whichKind` carries a case for exactly
+        // that. Until #137 this wrote `didNotFinish`, whose sentence put
+        // buildDestinationName where a destination goes and said Publish.
+        lines.append("      /bin/echo \(shellQuoted(ScheduledPublishOutcome.Kind.buildDidNotFinish.rawValue))"
             + " > \(shellQuoted(stoppedPartialRecord))")
         lines.append("    fi")
-        // Written for BOTH build branches. The outright failure puts it in
-        // the teacher's sentence; buildNeededAnAnswer never shows it, and it
-        // is written anyway so every record has one shape for the reader — see
+        // Written for BOTH build branches and shown by NEITHER: it is written
+        // anyway so every record has one shape for the reader — see
         // ScheduledPublishOutcome.buildDestinationName.
         for completion in recordCompletionLines(
             indentedBy: "    ",
@@ -800,22 +834,22 @@ enum ScheduledDeploy {
         // not the build's own kind: deploy.sh was reached, and the question it
         // refused is one the Publish button asks.
         //
-        // ONE path through deploy.sh escapes that and is filed rather than
-        // fixed here (GitHub issue #136). Publishing to a FOLDER — and only to
+        // ONE path through deploy.sh could escape that, and no longer can
+        // from here (GitHub issue #136). Publishing to a FOLDER — and only to
         // a folder — reruns preview.sh --build-only itself when any page under
-        // the section's `public/` carries `ws://localhost:`, and passes its
-        // exit 3 straight through: a BUILD question, reported from here as
-        // though the folder had asked it. Netlify and Cloudflare go through
-        // deploy.py, whose rebuild runs build_site.py directly, asks nothing
-        // and fails with 1, so they land in `didNotFinish` honestly. It needs
-        // NEEDS_BUILD=0 above, which is BuildFreshness.needsRebuild written
-        // out in shell and looks at `index.html` ALONE, while deploy.sh greps
-        // the whole tree. So a clean front page in front of a stale preview
-        // page reaches it. Bringing the two checks into step is a change to
-        // BuildFreshness as well as to this script and belongs to its own
-        // piece of work; the exit code cannot tell the two apart, and giving
-        // the rebuild its own code is a launcher contract change Windows
-        // shares.
+        // the section's `public/` carries the live-reload client, and passes
+        // its exit 3 straight through: a BUILD question, which from here would
+        // read as though the folder had asked it. (Netlify and Cloudflare go
+        // through deploy.py, whose rebuild runs build_site.py directly, asks
+        // nothing and fails with 1, so they land in `didNotFinish` honestly.)
+        // It needs NEEDS_BUILD=0 above, and the check above now reads the same
+        // tree deploy.sh greps, so whenever deploy.sh would rebuild, this
+        // script has already built — and a build question is `buildNeeded-
+        // AnAnswer`, from the build leg. The rerun in deploy.sh stays: it is
+        // what protects `./preview.sh` then `./deploy.sh --to-folder` typed at
+        // a command line. Rejected: giving that rerun its own exit code, a
+        // launcher contract change Windows shares for a fault that was this
+        // check being narrower than the launcher's.
         //
         // The FIRST destination that stopped is the one kept: a course can
         // publish to several and only one may have gone wrong, so overwriting
@@ -1307,8 +1341,14 @@ enum ScheduledDeploy {
             // LAST, once the work above is done. See the note in
             // oneShotCommand: this used to be the wrapper's final line, which
             // killed this process before any of the three calls above ran.
-            bootOutAgent(courseCode: section?.courseCode, sectionNumber: section?.sectionNumber)
-            exit(process.terminationStatus)
+            // The notification (#212) goes out first, for the same reason.
+            let status: Int32 = process.terminationStatus
+            let courseCode: String? = section?.courseCode
+            let sectionNumber: Int? = section?.sectionNumber
+            announceThenLeave(courseCode: courseCode, sectionNumber: sectionNumber) {
+                bootOutAgent(courseCode: courseCode, sectionNumber: sectionNumber)
+                exit(status)
+            }
         } catch {
             for lease in leasesTaken {
                 WorkLeaseFiles.remove(at: lease)
@@ -1555,14 +1595,55 @@ enum ScheduledDeploy {
             )
         }
 
-        if let label = label(fromScriptPath: script) {
-            bootOutAgent(label: label)
+        let jobLabel: String? = label(fromScriptPath: script)
+        announceThenLeave(courseCode: section?.courseCode, sectionNumber: section?.sectionNumber) {
+            if let jobLabel {
+                bootOutAgent(label: jobLabel)
+            }
+            // Zero, not a failure: nothing went wrong. The job was asked to do
+            // something that no longer made sense and declined, which is the
+            // feature rather than a fault, and a non-zero exit here would land
+            // in the section's log as an error nobody can act on.
+            exit(0)
         }
-        // Zero, not a failure: nothing went wrong. The job was asked to do
-        // something that no longer made sense and declined, which is the
-        // feature rather than a fault, and a non-zero exit here would land in
-        // the section's log as an error nobody can act on.
-        exit(0)
+    }
+
+    /// Tell the teacher how the run went (#212), then leave. Never returns.
+    ///
+    /// Called with the record written and the trail line down, and BEFORE the
+    /// job is booted out, because booting it out ends this process. A plist
+    /// written before v1.2.0 names no section, writes no record, and so has
+    /// nothing to announce: it leaves at once, as it always did.
+    ///
+    /// **`dispatchMain()` is a deliberate exception to the no-GCD rule**, the
+    /// same one `AssistMCPServer.serve` makes and #216's `DispatchSource`
+    /// was given. This function is synchronous and never returns — it runs
+    /// inside `App.init`, before any run loop exists — and the notification
+    /// centre only answers asynchronously. Something has to keep the process
+    /// alive while it does, and parking the main thread in `dispatchMain()`
+    /// is what lets the task below (and the main actor) run at all.
+    /// REJECTED: `RunLoop.main.run()`, which returns at once when no input
+    /// source is attached; a semaphore, which is worse GCD and would block the
+    /// very thread the answer may need.
+    ///
+    /// The wait is bounded (`ScheduledPublishNotice.ceiling`), so a
+    /// notification service that never answers cannot keep a finished run
+    /// alive.
+    nonisolated static func announceThenLeave(
+        courseCode: String?,
+        sectionNumber: Int?,
+        leave: @escaping @Sendable () -> Never
+    ) -> Never {
+        guard let courseCode, let sectionNumber else {
+            leave()
+        }
+        Task { @MainActor in
+            await ScheduledPublishNotice.announce(
+                inHomeFolder: RealHome.forFiles, course: courseCode, section: sectionNumber
+            )
+            leave()
+        }
+        dispatchMain()
     }
 
     /// Which destination types this course publishes to, in deploy order.
@@ -1608,6 +1689,22 @@ enum ScheduledDeploy {
     /// launchd points its stdout and stderr at that log and the process
     /// inherits them — and an unread pipe is exactly what wedged the Windows
     /// assistant's server, so this reads the file launchd already wrote.
+    ///
+    /// **It also leaves the `folder problem found` trail line, here, at the
+    /// end of the run (#153)** — one per distinct finding. Until then a
+    /// scheduled run's findings reached the trail only if somebody later
+    /// opened the section, and `takeFolderProblems` noted nothing even then,
+    /// so the overnight path — the one the check exists for — left no line at
+    /// all. Written by THIS process rather than when the section is opened
+    /// (Windows' shape), for the reason `scheduledPublishStopped.trail`
+    /// gives: a problem found at half six must be dated to half six, and a
+    /// teacher who never opens that section must still get the line. Two
+    /// imprecisions accepted: the line is stamped when the run FINISHES, not
+    /// when the build printed the finding (minutes apart, the same as
+    /// `notePagesDatedByTheBuild`); and a log found SHORTER than the offset
+    /// is read whole (`textOfLog`), so after a rotation mid-run an older
+    /// night's findings are noted again — the sentinel has always had the
+    /// same edge.
     nonisolated static func recordFolderProblems(
         section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)?,
         fromByteOffset offset: UInt64,
@@ -1628,10 +1725,18 @@ enum ScheduledDeploy {
         // from the log for the same reason as the line above: nobody is
         // watching a console at half six in the morning.
         WorkspaceInUseReport.noteOnTheTrail(from: text)
+        noteFolderProblems(in: text)
         var markerLines: [String] = []
-        for rawLine in text.split(separator: "\n", omittingEmptySubsequences: false) {
-            let line: String = String(rawLine).trimmingCharacters(in: .whitespaces)
-            if SiteHealthFinding.isMarkerLine(line) {
+        // Split on scalars, not Characters: Swift folds "\r\n" into one
+        // Character, so `split(separator: "\n")` would not split a PTY's
+        // output at all. launchd hands the child a plain file, so the log has
+        // "\n" endings today (the launchers ask for a terminal only when they
+        // have one) — this is hardening, not a fix for something seen.
+        for rawLine in SiteHealthFinding.linesOf(text) {
+            let line: String = rawLine.trimmingCharacters(in: .whitespaces)
+            // Once each: a finding the build printed twice is one problem,
+            // and the dialog listed it twice (#153 review).
+            if SiteHealthFinding.isMarkerLine(line) && !markerLines.contains(line) {
                 markerLines.append(line)
             }
         }
@@ -1665,6 +1770,24 @@ enum ScheduledDeploy {
             ActivityTrail.note(
                 .pagesDatedByTheBuild, report.trailSentence,
                 course: report.course, section: report.section
+            )
+        }
+    }
+
+    /// This run's folder problems, on the activity trail: one
+    /// `folder problem found` line per DISTINCT finding, in the words the
+    /// console path writes (`SiteHealthFinding.trailSentence`). Why here and
+    /// not when the section is opened: `recordFolderProblems`.
+    nonisolated static func noteFolderProblems(in text: String) {
+        var noted: [SiteHealthFinding] = []
+        for finding in SiteHealthFinding.findings(in: text) {
+            if noted.contains(finding) {
+                continue
+            }
+            noted.append(finding)
+            ActivityTrail.note(
+                .folderProblemFound, finding.trailSentence,
+                course: finding.course, section: finding.section
             )
         }
     }
@@ -1704,6 +1827,10 @@ enum ScheduledDeploy {
 
     /// What the last scheduled run found, if anything, consuming the record so
     /// it is reported once rather than every time the app opens.
+    ///
+    /// Notes NOTHING on the trail: the run itself already did, dated to the
+    /// run (`recordFolderProblems`), so a finding is one trail line whether or
+    /// not anybody ever opens the section.
     nonisolated static func takeFolderProblems(
         courseCode: String,
         sectionNumber: Int,

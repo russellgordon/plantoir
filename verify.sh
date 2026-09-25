@@ -238,6 +238,13 @@ else
   cat /tmp/verify_starting_content_test.log
 fi
 
+if (cd scripts && python3 test_graded_folders_rerun.py) >/tmp/verify_graded_rerun_test.log 2>&1; then
+  pass "setup_course.py: a re-run writes a saved marks pool back as it was (scripts/test_graded_folders_rerun.py)"
+else
+  fail "setup_course.py: a re-run writes a saved marks pool back as it was (scripts/test_graded_folders_rerun.py)"
+  cat /tmp/verify_graded_rerun_test.log
+fi
+
 if (cd scripts && python3 test_contracts.py) >/tmp/verify_contracts_test.log 2>&1; then
   pass "contracts.py: the scripts can read the Plantoir contract (scripts/test_contracts.py)"
 else
@@ -323,6 +330,23 @@ else
   cat /tmp/verify_port_blocks_test.log
 fi
 
+if (cd scripts && python3 test_trail_lock.py) >/tmp/verify_trail_lock_test.log 2>&1; then
+  pass "every launcher adds its line to the activity trail holding the app's lock, so a trim never loses it (scripts/test_trail_lock.py)"
+else
+  fail "every launcher adds its line to the activity trail holding the app's lock, so a trim never loses it (scripts/test_trail_lock.py)"
+  cat /tmp/verify_trail_lock_test.log
+fi
+
+# RUNS deploy.sh's folder publish from a working folder whose own name has a
+# colon, to relative folders with colons in them (GitHub issue #227): where
+# each one lands, and that a copy that did not finish is never "Published".
+if (cd scripts && python3 test_deploy_folder_target.py) >/tmp/verify_deploy_folder_target_test.log 2>&1; then
+  pass "deploy.sh: a publish to a folder lands in the folder it names, and a copy that did not finish says so (scripts/test_deploy_folder_target.py)"
+else
+  fail "deploy.sh: a publish to a folder lands in the folder it names, and a copy that did not finish says so (scripts/test_deploy_folder_target.py)"
+  cat /tmp/verify_deploy_folder_target_test.log
+fi
+
 if (cd scripts && python3 test_verify_lock.py) >/tmp/verify_lock_test.log 2>&1; then
   pass "verify.sh lets one run at a time hold this Mac, names the holder to a second, and lets go on every exit (scripts/test_verify_lock.py)"
 else
@@ -338,6 +362,19 @@ if (cd scripts && python3 test_preview_address.py) >/tmp/verify_preview_address_
 else
   fail "preview.sh announces the preview's real address or stops, never a guessed one (scripts/test_preview_address.py)"
   cat /tmp/verify_preview_address_test.log
+fi
+
+# preview.sh makes sure this Mac can reach the builder before it builds, and
+# stops in seconds when every try is refused (GitHub #234). Runs the launcher's
+# own functions with docker, curl and sleep answering as told — no Docker, no
+# network, no waiting. The previews verify.sh runs are --build-only, which
+# asks nothing, so none of them exercises the probe against a real forward;
+# a serving preview checked by hand is that proof (documentation/03).
+if (cd scripts && python3 test_preview_reach.py) >/tmp/verify_preview_reach_test.log 2>&1; then
+  pass "preview.sh checks this Mac can reach the builder before building, and stops only on a refusal (scripts/test_preview_reach.py)"
+else
+  fail "preview.sh checks this Mac can reach the builder before building, and stops only on a refusal (scripts/test_preview_reach.py)"
+  cat /tmp/verify_preview_reach_test.log
 fi
 
 if (cd scripts && python3 test_preflight_exclusions.py) >/tmp/verify_preflight_exclusions_test.log 2>&1; then
@@ -363,6 +400,16 @@ if (cd scripts && python3 test_build_started_marker.py) >/tmp/verify_build_start
 else
   fail "build_site.py: the build notes when it started, for the freshness check (scripts/test_build_started_marker.py)"
   cat /tmp/verify_build_started_marker_test.log
+fi
+
+# Issue #136: one rule for "this built site is a preview's" — deploy.sh's
+# check and deploy.py's, run against contracts/app-rules.json ->
+# buildFreshness.previewBuild, the cases the apps read too.
+if (cd scripts && python3 test_preview_build_detection.py) >/tmp/verify_preview_build_detection_test.log 2>&1; then
+  pass "deploy.sh and deploy.py call a site a preview's by every page, as the apps do (scripts/test_preview_build_detection.py)"
+else
+  fail "deploy.sh and deploy.py call a site a preview's by every page, as the apps do (scripts/test_preview_build_detection.py)"
+  cat /tmp/verify_preview_build_detection_test.log
 fi
 
 if (cd scripts && python3 test_publishable_site.py) >/tmp/verify_publishable_site_test.log 2>&1; then
@@ -646,6 +693,23 @@ if docker run --rm \
 else
   fail "build_site.py: the front page and linked pages take their class's date, per section (scripts/test_dates_follow_the_class.py)"
   cat /tmp/verify_dates_follow_the_class_test.log
+fi
+
+# ---- build_site.py: a page whose settings cannot be read is hidden ----
+# GitHub #246. Every case in contracts/shared-rules.json ->
+# unreadablePageSettings through the real process_frontmatter, in the image
+# because it needs python-frontmatter: hidden, named with its line, its body
+# kept, the teacher's file untouched, and an unreadable front page clearing
+# the last site and saying so in its own words.
+echo ""
+echo "🔎 Checking that a page whose settings cannot be read is hidden and named…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/test_unreadable_page_settings.py" /opt/scripts/test_unreadable_page_settings.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_unreadable_page_settings.py >/tmp/verify_unreadable_page_settings_test.log 2>&1; then
+  pass "build_site.py: a page whose settings cannot be read is hidden and named (scripts/test_unreadable_page_settings.py)"
+else
+  fail "build_site.py: a page whose settings cannot be read is hidden and named (scripts/test_unreadable_page_settings.py)"
+  cat /tmp/verify_unreadable_page_settings_test.log
 fi
 
 # ---- Whether the site shows a page: the contract, run down the REAL chain ----
@@ -1418,6 +1482,35 @@ if [[ "$COLON_MOUNT_SRC" == "$VERIFY_COLON_DIR/courses" ]]; then
   pass "and the workspace was given the colon-named folder itself, byte for byte"
 else
   fail "the workspace was given [${COLON_MOUNT_SRC:-nothing}], not $VERIFY_COLON_DIR/courses"
+fi
+# And PUBLISH it, from inside the colon folder, to a folder whose name has a
+# colon too, given the way a teacher might type it: relative (GitHub issue
+# #227). rsync reads a colon before the first slash as another COMPUTER; the
+# launcher used to say "Published" over an empty folder here. The folder
+# publish needs no container, so this runs before the one above is removed
+# only because that is the tidier order. PUBLISHED_FOLDER= is compared with
+# the working folder as `/bin/pwd -P` spells it, which is how the launcher
+# spells it.
+VERIFY_COLON_PUBLISHED="$(cd "$VERIFY_COLON_DIR" && /bin/pwd -P)/out 26:27/section1"
+if (cd "$VERIFY_COLON_DIR" && ./deploy.sh EXC2O 1 --to-folder "out 26:27" --non-interactive --image "$DEV_TEST_IMAGE") \
+     >/tmp/verify_colon_folder_publish.log 2>&1; then
+  pass "a folder publish from it, to a relative folder with a colon, finished"
+else
+  fail "a folder publish from it, to a relative folder with a colon, did not finish"
+  tail -20 /tmp/verify_colon_folder_publish.log
+fi
+COLON_BUILT_PAGES="$(find "$VERIFY_COLON_BUILDS/EXC2O/section1/public" -name '*.html' 2>/dev/null | wc -l | tr -d ' ')"
+COLON_PUBLISHED_PAGES="$(find "$VERIFY_COLON_DIR/out 26:27/section1" -name '*.html' 2>/dev/null | wc -l | tr -d ' ')"
+if [[ -f "$VERIFY_COLON_DIR/out 26:27/section1/index.html" && "$COLON_PUBLISHED_PAGES" == "$COLON_BUILT_PAGES" ]]; then
+  pass "and every page (${COLON_PUBLISHED_PAGES} of ${COLON_BUILT_PAGES}) is in that folder, inside the working folder"
+else
+  fail "the published folder holds ${COLON_PUBLISHED_PAGES:-0} of ${COLON_BUILT_PAGES:-0} pages"
+fi
+if grep -Fxq "PUBLISHED_FOLDER=${VERIFY_COLON_PUBLISHED}" /tmp/verify_colon_folder_publish.log; then
+  pass "and the launcher named that folder by its full path"
+else
+  fail "the launcher did not name ${VERIFY_COLON_PUBLISHED} as the published folder"
+  grep '^PUBLISHED_FOLDER=' /tmp/verify_colon_folder_publish.log || true
 fi
 docker rm -f "$VERIFY_COLON_CONTAINER" >/dev/null 2>&1 || true
 rm -rf "$VERIFY_COLON_DIR" "$VERIFY_COLON_BUILDS"

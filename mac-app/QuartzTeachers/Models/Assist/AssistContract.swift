@@ -18,9 +18,10 @@ import Foundation
 /// no longer matches, so a changed sentence fails HERE, in the same test run
 /// that changed it — not on a Windows machine three weeks later.
 ///
-/// **What it deliberately does NOT generate.** Five top-level keys of the
+/// **What it deliberately does NOT generate.** Eight top-level keys of the
 /// cases file are hand-written and are preserved on every run: `nearMisses`,
-/// `scenarios`, `promptHistory`, `deployAtATime` and `windowBinding`. Nothing
+/// `scenarios`, `promptHistory`, `deployAtATime`, `windowBinding`,
+/// `hideIsUnpublish`, `echoedRequest` and `linksQuestion` (#167). Nothing
 /// in the code says which near-miss phrasings are worth guarding, which ORDER
 /// events must happen in, which spellings of a time a teacher actually types,
 /// or which arguments a window takes back from the model and which it refuses
@@ -236,6 +237,18 @@ enum AssistContract {
             // render, and `backedUpCourse` above already passes a real file
             // name for the same reason.
             "duplicated": AssistWording.duplicated(page: pagePlaceholder, as: copyPlaceholder),
+            // "What does <page> link to?", answered in code (#167).
+            "pageLinksTo": AssistWording.pageLinksTo(page: pagePlaceholder),
+            "pageLinksToNothing": AssistWording.pageLinksToNothing(page: pagePlaceholder),
+            "linkedPageIsADraft": AssistWording.linkedPageIsADraft,
+            "linkedPageIsMissing": AssistWording.linkedPageIsMissing,
+            "noPageCalled": AssistWording.noPageCalled(
+                page: pagePlaceholder, course: course, section: section
+            ),
+            "morePagesThanOneAreCalled": AssistWording.morePagesThanOneAreCalled(
+                page: pagePlaceholder, course: course, section: section
+            ),
+            "pageCouldNotBeRead": AssistWording.pageCouldNotBeRead(page: pagePlaceholder),
             "copiedTo": AssistWording.copiedTo(
                 page: pagePlaceholder, as: copyPlaceholder, on: "2026-09-14"
             ),
@@ -712,7 +725,8 @@ enum AssistContract {
             "note": "These top-level keys are written by `Plantoir --write-contracts` from the app's own "
                   + "types and will be overwritten: " + generatedCaseKeys.joined(separator: ", ")
                   + ". Every other top-level key — nearMisses, scenarios, promptHistory, "
-                  + "deployAtATime, windowBinding, hideIsUnpublish, echoedRequest — is hand-written "
+                  + "deployAtATime, windowBinding, hideIsUnpublish, echoedRequest, linksQuestion — "
+                  + "is hand-written "
                   + "intent and is PRESERVED by a regeneration, so "
                   + "a case may be proposed from either platform. Listing them rather than naming "
                   + "two: the list was already two short when this was noticed, and a key nobody "

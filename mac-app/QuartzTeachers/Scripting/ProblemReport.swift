@@ -731,6 +731,36 @@ nonisolated struct ProblemReportStore {
     /// started and finished, the assistant answering — because the trail is
     /// what turns a pile of records into an account of what somebody was
     /// doing. The task records hold the DETAIL; this holds the order.
+    ///
+    /// **Several writers share this file, and none of them may lose a line
+    /// (#238).** The app, a scheduled publish (its own process), the
+    /// `--mcp-stdio` server and every launcher (`note_on_the_trail`, which
+    /// appends with `>>`) can all write within the same second. This used to
+    /// read the whole file, add the line and rename a rewritten copy over it
+    /// — so a line another writer added between the read and the rename was
+    /// silently thrown away: 446 of 900 lines lost across 100 bursts of three
+    /// processes writing three lines each, measured.
+    ///
+    /// So, two things:
+    ///
+    /// - The line is ADDED to the end of the file (`O_APPEND`, one `write`),
+    ///   never by rewriting it. An append cannot discard somebody else's
+    ///   append, including a launcher's that takes no lock at all.
+    /// - Everything is done holding an exclusive `flock` on the Logs FOLDER,
+    ///   and the trim — which DOES rewrite the file — happens only under it.
+    ///   The launchers take the same lock round their `>>` (`/usr/bin/lockf
+    ///   -k` on the folder), so a trim can never land between their check
+    ///   and their write either. The folder is the lock so that no extra
+    ///   file appears in the folder a teacher is shown.
+    ///
+    /// The line is redacted BEFORE any of this, so nothing unredacted is ever
+    /// held or written. If the folder cannot be opened, or `flock` refuses
+    /// (`ENOTSUP` on some network volumes), the line is still written, just
+    /// unlocked — which is exactly the old behaviour, and better than
+    /// dropping it. The lock is held for one append and, rarely, one trim:
+    /// about a millisecond. It dies with its process, so nothing can leave it
+    /// held. ``documentation/09-mac-app.md` → "Two writers at once"` has the measurements and what
+    /// was rejected.
     func appendActivityLine(_ line: String) {
         let safeLine: String = LogRedactor.redacting(line)
         do {
@@ -740,10 +770,96 @@ nonisolated struct ProblemReportStore {
         } catch {
             return
         }
+        let folderLock: Int32 = ProblemReportStore.takeTheTrailLock(onFolder: folderURL)
+        defer {
+            ProblemReportStore.releaseTheTrailLock(folderLock)
+        }
         let url: URL = folderURL.appendingPathComponent(ProblemReportStore.activityFileName)
-        var existing: String = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
-        existing += safeLine + "\n"
-        try? ProblemReportStore.trimmed(existing).write(to: url, atomically: true, encoding: .utf8)
+        ProblemReportStore.addToTheEnd(of: url, text: safeLine + "\n")
+        ProblemReportStore.trimIfTooLong(url)
+    }
+
+    /// Opens the Logs folder and takes an exclusive lock on it, waiting for
+    /// whoever holds it. Returns the open folder, or -1 when there is nothing
+    /// to release.
+    ///
+    /// The lock belongs to this open folder rather than to the process, so
+    /// two threads of the app wait for each other exactly as two processes
+    /// do. `O_CLOEXEC` keeps a launcher the app starts from inheriting it.
+    /// A refusal from `flock` other than an interruption is ignored and the
+    /// write goes ahead unlocked (see `appendActivityLine`).
+    static func takeTheTrailLock(onFolder folderURL: URL) -> Int32 {
+        let folder: Int32 = folderURL.withUnsafeFileSystemRepresentation { path in
+            guard let path else {
+                return -1
+            }
+            return open(path, O_RDONLY | O_CLOEXEC)
+        }
+        if folder < 0 {
+            return -1
+        }
+        var result: Int32 = flock(folder, LOCK_EX)
+        while result != 0 && errno == EINTR {
+            result = flock(folder, LOCK_EX)
+        }
+        return folder
+    }
+
+    /// Lets the next writer in. Closing the folder would release the lock on
+    /// its own; unlocking first says so.
+    static func releaseTheTrailLock(_ folder: Int32) {
+        if folder < 0 {
+            return
+        }
+        flock(folder, LOCK_UN)
+        close(folder)
+    }
+
+    /// Adds `text` to the end of the file in ONE write, creating the file if
+    /// it is not there.
+    ///
+    /// One `write` on a file opened `O_APPEND` lands whole at the end even
+    /// with other appenders at work: measured on APFS with four processes
+    /// writing lines of 60 bytes up to 1 MB, not one torn or lost.
+    static func addToTheEnd(of url: URL, text: String) {
+        let file: Int32 = url.withUnsafeFileSystemRepresentation { path in
+            guard let path else {
+                return -1
+            }
+            return open(path, O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, 0o644)
+        }
+        if file < 0 {
+            return
+        }
+        defer {
+            close(file)
+        }
+        let bytes: [UInt8] = Array(text.utf8)
+        bytes.withUnsafeBytes { buffer in
+            _ = Darwin.write(file, buffer.baseAddress, buffer.count)
+        }
+    }
+
+    /// Rewrites the file without its oldest lines once it has grown past the
+    /// limit. Call it only while holding the trail lock: this is the one
+    /// write that replaces the file, and a line added between its read and
+    /// its rename would be lost.
+    ///
+    /// Read as bytes and decoded leniently, because a launcher can `printf`
+    /// anything into this file: a strict UTF-8 read used to come back empty
+    /// on one bad byte, and the next write then replaced the whole trail with
+    /// its own single line. A file that needs no trimming is never
+    /// rewritten, so its bytes are left exactly as they were.
+    static func trimIfTooLong(_ url: URL) {
+        guard let data = try? Data(contentsOf: url) else {
+            return
+        }
+        let text: String = String(decoding: data, as: UTF8.self)
+        let kept: String = ProblemReportStore.trimmed(text)
+        if kept.utf8.count == text.utf8.count {
+            return
+        }
+        try? kept.write(to: url, atomically: true, encoding: .utf8)
     }
 
     /// Whether there is anything worth gathering.
