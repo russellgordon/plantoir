@@ -12,8 +12,9 @@ tags:
 
 1. Standup — crew 6 prints first thing (30 printer minutes); 45 minutes
    of printer kept free for a reprint
-2. Test the first versions against every criterion, and log the
-   numbers — [[Quality Control]] for what a good test looks like
+2. Crews 1 to 5 test their first versions against every criterion, and
+   log the numbers — [[Quality Control]] for what a good test looks
+   like (crew 6 tests next class)
 3. **Checkpoint conference**, crew by crew: your test log, and what
    you will change
 4. Revision after feedback, begun: after your conference, model your
