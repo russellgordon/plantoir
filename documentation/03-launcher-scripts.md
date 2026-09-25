@@ -1119,8 +1119,11 @@ deployed"; three things belong here, beside the launchers themselves:
 
 - **It is in the launcher because the FOLDER destination never reaches the
   container.** That branch copies with `rsync` on the host and exits 0 before
-  `deploy.py` is entered, so a refusal written only in the shared Python would
-  not run on it. Measured with the guard removed: the launcher published the
+  `deploy.py` is entered — or, since #227, exits 1 when the copy did not
+  finish, and makes a relative `--to-folder` a full path from the working
+  folder first (see [`07-deployment.md`](07-deployment.md) → "A relative
+  folder, and a copy that did not finish") — so a refusal written only in the
+  shared Python would not run on it. Measured with the guard removed: the launcher published the
   frozen course and reported `✅ Published: 1 file(s) updated.`
 - **Plain shell, not `python3`.** Nothing on that path needs a host
   interpreter today, and the launchers' whole first-run promise is that a
