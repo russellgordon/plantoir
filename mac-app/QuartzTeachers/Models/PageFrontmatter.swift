@@ -172,27 +172,6 @@ enum PageFrontmatter {
         return pageText
     }
 
-    /// Puts `newLine` where a key's line is, and takes away the lines below it
-    /// that were part of the key's OLD value — the one way to change a key
-    /// whose value continues below it without leaving half of it behind.
-    ///
-    /// **What leaving it behind cost, measured (GitHub #199, python-frontmatter
-    /// 1.3.0 / PyYAML 6.0.3):** a `created:` with its date on the line below,
-    /// or folded (`created: >-`), re-dated by rewriting the key's line alone,
-    /// read on the site as the NEW date and the OLD one joined into one string
-    /// — while the app read the new date, so the two disagreed about the
-    /// class's day in silence; with a `# note` between key and value the build
-    /// STOPPED. A title the same way read `Unit 1, Day 2 Unit 1, Day 1`. Only
-    /// the visibility writer took the value with the key (#176); this is the
-    /// same rule, `PageVisibilityReader.continuationLineIndices`, for every
-    /// other key.
-    ///
-    /// The continuation is asked for BEFORE the line is replaced (the new line
-    /// always has a value, so asking afterwards always answers "nothing"), and
-    /// removed from the bottom up so no index moves under another. The new
-    /// line keeps the carriage return of the line it replaces. Returns how
-    /// many lines were taken away, so a caller editing further down can move
-    /// its own positions up by as many.
     /// How many lines below the key a quoted or bracketed value that the key's
     /// line leaves open runs on for, until its quote or bracket closes — 0 when
     /// the value is not open (or never closes inside the block, when nothing
@@ -226,6 +205,27 @@ enum PageFrontmatter {
         return 0
     }
 
+    /// Puts `newLine` where a key's line is, and takes away the lines below it
+    /// that were part of the key's OLD value — the one way to change a key
+    /// whose value continues below it without leaving half of it behind.
+    ///
+    /// **What leaving it behind cost, measured (GitHub #199, python-frontmatter
+    /// 1.3.0 / PyYAML 6.0.3):** a `created:` with its date on the line below,
+    /// or folded (`created: >-`), re-dated by rewriting the key's line alone,
+    /// read on the site as the NEW date and the OLD one joined into one string
+    /// — while the app read the new date, so the two disagreed about the
+    /// class's day in silence; with a `# note` between key and value the build
+    /// STOPPED. A title the same way read `Unit 1, Day 2 Unit 1, Day 1`. Only
+    /// the visibility writer took the value with the key (#176); this is the
+    /// same rule, `PageVisibilityReader.continuationLineIndices`, for every
+    /// other key.
+    ///
+    /// The continuation is asked for BEFORE the line is replaced (the new line
+    /// always has a value, so asking afterwards always answers "nothing"), and
+    /// removed from the bottom up so no index moves under another. The new
+    /// line keeps the carriage return of the line it replaces. Returns how
+    /// many lines were taken away, so a caller editing further down can move
+    /// its own positions up by as many.
     @discardableResult
     nonisolated static func replacingKeyLine(
         at index: Int,
