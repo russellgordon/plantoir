@@ -410,8 +410,8 @@ written with two digits for the hour.** That is what 24-hour time looks like
 and it is the form `schedule_deploy`'s own schema asks for, so `06:30` and
 `18:30` are read and **`6:30` is not** — morning or evening, and nobody can
 tell which. A deploy set twelve hours wrong is a site that updates after the
-class it was meant for, so the doubt goes to the model, which has the dateline
-and is measured reading arguments out reliably. `noon` and `midnight` are both
+class it was meant for, so nothing is scheduled: since issue #194 the app ASKS
+which, in code (below), and until then the doubt went to the model. `noon` and `midnight` are both
 accepted, alike, and so are `12 pm` and `12 am`: one rule rather than two, and
 the card names the day it landed on. **The hour is one or two digits either
 way**, which is stated rather than inherited: `Int` does not care how a number
@@ -425,12 +425,86 @@ total confidence. (That is about the SECTION, and about a card. A course code
 the MODEL writes is a different matter entirely — it is guarded rather than
 bound; see "Never ask the model for something the window already knows".)
 
-Every accepted and refused spelling is DATA, in `contracts/assist-cases.json`
-→ `deployAtATime` (23 accepted, 25 refused, 11 resolving rows), authored rather
-than generated and preserved across `--write-contracts`. One example and one
-near-miss — all `cardPhrasings.parsed` can carry — would have described a
-grammar of times as a single spelling, and the other platform would have built
-one spelling.
+Every accepted, asked and refused spelling is DATA, in
+`contracts/assist-cases.json` → `deployAtATime` (23 accepted, 9 asked, 28
+refused, 11 resolving rows — count them rather than trusting this line),
+authored rather than generated and preserved across `--write-contracts`. One
+example and one near-miss — all `cardPhrasings.parsed` can carry — would have
+described a grammar of times as a single spelling, and the other platform would
+have built one spelling.
+
+**"Deploy at 6:30" is ASKED about, in code, and never reaches the model (issue
+#194, 2026-09-25).** Refusing to read a one-digit hour with no am or pm was
+right; handing the sentence to the model instead was the fault, because the
+smaller assistant answered "Deploy at 6:30 AM" — the same sentence with MORE
+information in it — with an immediate `deploy_section` 10 trials out of 10
+(Qwen2.5-1.5B, ctx 8192, Metal, 2026-09-18). So a sentence the family would
+read if it carried am or pm, and whose time is a one-digit hour 1–9 with two
+digits of minutes, now gets `AssistWording.morningOrEvening` in reply: the
+question, "nothing is set yet", and two sentences to type — built by
+`AssistCardCommand.morningOrEvening` through `deployFrame`, the SAME frame
+`deployAtATime` reads, so the two cannot disagree about what counts as "deploy
+at a time". Nothing is scheduled and no card goes up.
+
+- **Both answers are sentences the family already accepts**, in one canonical
+  form — `deploy [today |tomorrow ]at H:MM am|pm` — never an echo of the
+  teacher's words ("please", "it", a trailing "tomorrow" all move or go).
+  Measured with the real matcher (`AssistCardCommand.swift` compiled on its
+  own, 2026-09-25): all 24 canonical answer sentences (1:00, 6:30, 9:59 and
+  12:30 × no day, today, tomorrow × am, pm) reach `schedule_deploy` with the
+  right `when`. (12:30 is never ASKED about — two digits of hour are read as
+  24-hour time — but its answers are the same grammar.) `ScheduleDeployCardTests` runs every
+  `asked` row's two sentences through `matching` — the "both halves or neither"
+  rule the rollover question already keeps.
+- **Stateless.** `AssistAgent.say` checks for the question right after the
+  matcher returns nothing and BEFORE the message is appended for the model; the
+  teacher's sentence and the question go into `entries` (the transcript) only,
+  never into `messages`, so the model sees neither on this turn or any later
+  one. The teacher answers by typing one of the two sentences, which matches in
+  code on that turn. Nothing waits for an answer, so there is nothing to clear
+  when the teacher asks something else instead.
+- **The trail** reuses `assistant matched a fixed phrase` with the line
+  `AssistAgent.askedMorningOrEveningLine` — no clock in it, because the clock
+  is something the teacher wrote; `assistant asked` already has the sentence.
+  Its `carries` in `contracts/shared-rules.json` says so (rule 5's
+  changed-behaviour clause). No new event name, so Windows' by-name trail test
+  does not move.
+- **Not asked, deliberately:** `deploy at 7` (a bare number may not be a time
+  at all — the contract row's written reason stands), `deploy at 0:30` (0 is
+  not an hour on a twelve-hour clock, so there is no morning or evening to
+  choose between), `deploy at 6:3`, and anything the frame refuses — a day word
+  on both sides, a section, `can you…`. Those still go to the model, and each
+  is a `refused` row that asserts it is neither answered nor asked.
+- **The MCP path is unaffected.** `AssistAgent.say` is called only from
+  `AssistWindowView`; an MCP client calls `schedule_deploy` directly with its
+  own `when`, and no tool, schema, description or system-prompt byte moved (both
+  tool-surface hashes identical before and after, `--write-contracts` run
+  twice).
+
+**The risk this leaves, recorded rather than measured.** A teacher who answers
+the question in their own words — "pm", "evening", "in the evening", "6:30 pm",
+"at 6:30 pm" — types a sentence the matcher does not read (the plan review
+checked all five, and so did this piece's own run: each returns nil from
+both `matching` and `morningOrEvening`), so it goes to the MODEL, and because the
+question was never put in `messages` the model gets that reply with no context
+at all. That is the same fault one turn later, with even less to go on. The
+stateless design is still the right one — the question names the exact
+sentences to type, and a stateful reply-reader would be a new near-miss surface
+with state to carry and clear across turns — but what the smaller assistant
+does with a bare "pm" has NOT been measured; routing is measured by hand
+(`research/ai-assist/`), and that measurement is owed before anybody calls this
+closed. On the smaller assistant a misroute there still lands on an approval
+card — "This happens now." (#168) — rather than on students.
+
+**Rejected, and why:**
+- a pending "waiting for morning or evening" state that accepts "morning",
+  "evening" or "pm" as replies — a new near-miss surface, state that must
+  survive or clear across turns, and a larger Windows mirror, to save a few
+  keystrokes; the rollover question already chose the stateless form;
+- asking about `deploy at 7` too — the contract's written reason for refusing a
+  bare number is a decision, and changing it is Russell's;
+- guessing morning, or loosening the refusal in any way — issue #194 says it
+  "should NOT be loosened".
 
 **Which day a bare time means: the next such time, forwards, counting today
 while it is still to come.** Word for word the rule `dayNamedByWeekday` already
