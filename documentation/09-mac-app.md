@@ -2361,6 +2361,69 @@ is kept OUT of the built site, so a rename that missed it silently un-hid the
 folder and the next publish put pages the teacher had hidden in front of
 students.
 
+## Renaming a course in the sidebar: two claims on the keyboard (#293)
+
+Return, Edit ▸ Rename Course or the row's context menu turns a course's row
+into a field (`CourseCodeField` in `SidebarView.swift`). What it shows under
+itself and what Return refuses are ONE function,
+`WorkspaceModel.renameFieldProblem(_:typed:)`; Return goes through
+`renameFromTheField(_:typed:)`, which refuses (and the field beeps) or hands
+on to `rename(_:to:)`. Clicking away commits, as in Finder, and a code that
+cannot be used reverts instead — unless the app is not active, because a field
+cannot hold focus in an inactive app and would otherwise close itself the
+moment the teacher looks at Obsidian.
+
+**Two things want the keyboard when the field opens.** The field takes focus
+as it appears; the sidebar's `.onChange(of: workspace.selection)` takes it
+back one turn after ANY selection change, deferred so the detail pane's first
+text field — which SwiftUI focuses as the pane rebuilds — has landed first.
+That deferral waits for focus rather than being told it arrived, and the
+comment on it says so. It is harmless for a teacher, because a click (or an
+arrow key) that changes the selection and the Return or menu item that opens
+the field are separate events, and the deferred focus has run before the
+second is handled.
+
+A test is not a teacher. `CourseRenameInterfaceTests.testAnUnusableCodeIsShownUnderTheFieldRatherThanInAnAlert`
+selected the course and opened the field in the SAME turn, then waited 0.8 s.
+The field lost focus to the list ~100 ms later, called `commitOnLeaving`,
+and what happened next depended on which app was frontmost:
+
+| Test host | Old test | Why |
+|---|---|---|
+| another app frontmost | passed 4/4 (planner), 2/2 (implementer) | `commitOnLeaving` returns at its `isActive` guard |
+| the test host activated by pid | **failed 2/2 (planner), 2/2 (implementer)** | commits the unchanged code; the no-op rename closes the field |
+| activated, selection set ≥ 0.5 s before opening | passed 2/2 (planner) | the deferred focus had already run |
+
+So "passes alone, fails in the full run" was whether the test host happened
+to be in front. The test now asserts in the same turn it opens the field —
+no `await` between `beginRenamingSelectedCourse()` and the last assertion —
+and presses Return through `renameFromTheField` rather than only checking the
+field survived a wait. Measured after: 3/3 class runs with the host activated
+by pid and 3/3 with iTerm in front.
+
+**The one teacher path that opens the field on an UNSELECTED row, driven
+once (2026-09-25).** The context menu's Rename Course sets
+`renamingCourseCode` without touching the selection. With EXC2O selected,
+right-click EXC3O ▸ Rename Course opened the field on EXC3O; clicking INTO
+the field left the selection on EXC2O and the field focused, and two typed
+characters stayed in it — the suspected second race (a click in the field
+changing the selection and the deferred list focus committing half-typed
+text) did not happen. Clicking empty sidebar space then committed what was
+typed (`EXC3OZQ`), which is the Finder-like click-away commit, by design.
+
+**Rejected:** a longer settle, or waiting for `NSApp.isActive` (a delay and an
+activation state are what made it flaky; macOS 14's cooperative activation
+also refuses `NSApp.activate(ignoringOtherApps:)` from the test host, 2/2);
+waiting on the window's `firstResponder` (tests the focus plumbing, not the
+claim); and a product guard "do not focus the list while a rename field is
+open" (the rebuilt detail pane's own initial focus would still race, and it
+changes focus behaviour for a case no teacher reaches). The two
+`DispatchQueue.main.async` deferrals in `SidebarView.swift` became
+`Task { @MainActor in … }` in the same piece — house style, and behaviour-
+equivalent: both are jobs on the main queue at the same point (the old test
+still failed 2/2 with the Task version). `Task.immediate` would run inline and
+lose to the detail pane; do not reach for it.
+
 ## "This is a club": the wizard's choice, and the settings it locks (#267)
 
 The New Course wizard shows **This is a club** under Basics for every code. It
