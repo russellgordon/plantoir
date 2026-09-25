@@ -48,7 +48,7 @@ final class ProblemReportTests: XCTestCase {
             finishedAt: startedAt.addingTimeInterval(seconds),
             scriptName: scriptName,
             arguments: arguments,
-            workingFolderPath: "/Users/russellgordon/Documents/Teaching",
+            workingFolderPath: "/Users/jordanteacher/Documents/Teaching",
             outcome: outcome,
             wasFailure: wasFailure,
             explanation: explanation,
@@ -94,9 +94,9 @@ final class ProblemReportTests: XCTestCase {
     /// added later is covered without anybody remembering to.
     func testTheWholeRecordIsRedactedNotJustTheTranscript() {
         let text: String = record(
-            transcript: "reading /Users/russellgordon/Documents/Teaching/ICS3U\nCLOUDFLARE_API_TOKEN=abc123XYZ_secret"
+            transcript: "reading /Users/jordanteacher/Documents/Teaching/ICS3U\nCLOUDFLARE_API_TOKEN=abc123XYZ_secret"
         ).text(timeZone: utc)
-        XCTAssertFalse(text.contains("russellgordon"), text)
+        XCTAssertFalse(text.contains("jordanteacher"), text)
         XCTAssertFalse(text.contains("abc123XYZ_secret"), text)
         XCTAssertTrue(text.contains("/Users/person/Documents/Teaching"), text)
         XCTAssertTrue(text.contains("CLOUDFLARE_API_TOKEN=" + LogRedactor.removedToken), text)
@@ -318,8 +318,8 @@ final class ProblemReportTests: XCTestCase {
     /// sentence is their words, not a licence to write their home folder out.
     func testTrailLinesAreRedactedOnTheWayIn() {
         let store: ProblemReportStore = ProblemReportStore(folderURL: folderURL)
-        store.appendActivityLine("looked in /Users/russellgordon/Documents")
-        XCTAssertFalse(store.activityText(includingPrompts: true).contains("russellgordon"))
+        store.appendActivityLine("looked in /Users/jordanteacher/Documents")
+        XCTAssertFalse(store.activityText(includingPrompts: true).contains("jordanteacher"))
     }
 
     func testTheTrailStopsGrowing() {

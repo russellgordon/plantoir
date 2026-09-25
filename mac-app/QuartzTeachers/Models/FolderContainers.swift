@@ -182,7 +182,7 @@ enum FolderContainers {
         occasion: Occasion = .quitting,
         includingTheSharedSetup: Bool = true,
         secondsToWaitForWork: Int = secondsToWaitForWorkToFinish,
-        inHomeFolder homeFolder: URL = FileManager.default.homeDirectoryForCurrentUser
+        inHomeFolder homeFolder: URL = RealHome.forFiles
     ) -> String {
         var lines: [String] = []
         lines.append(HelperPrograms.exportLine(inHomeFolder: homeFolder))
@@ -262,7 +262,7 @@ enum FolderContainers {
         occasion: Occasion = .quitting,
         includingTheSharedSetup: Bool = true,
         inheriting inherited: [String: String] = ProcessInfo.processInfo.environment,
-        inHomeFolder homeFolder: URL = FileManager.default.homeDirectoryForCurrentUser
+        inHomeFolder homeFolder: URL = RealHome.forFiles
     ) -> HelperPrograms.Command {
         return HelperPrograms.Command(
             executablePath: "/bin/sh",
