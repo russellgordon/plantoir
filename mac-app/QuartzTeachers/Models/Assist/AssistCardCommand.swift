@@ -139,13 +139,18 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     /// answer phrasings of its own to become a near-miss surface — the shape
     /// the rollover question already chose (`AssistWording.rolloverWebsiteQuestion`).
     ///
-    /// The frame is `deployFrame`, the one `deployAtATime` reads, so the two
-    /// cannot disagree about what counts as "deploy at a time". Everything the
-    /// frame refuses still goes to the model, and so does every time that is
-    /// not a one-digit hour 1–9 with two digits of minutes: "deploy at 7" (a
-    /// bare number may not be a time at all), "deploy at 0:30" (0 is not an
-    /// hour on a twelve-hour clock, so there is no morning-or-evening to ask
-    /// about) and "deploy at half six" keep their written reasons in
+    /// Asked for two kinds of sentence. The first is one time word in
+    /// `deployFrame` — see `askedOutright`. The second is a time with a
+    /// part of the day that does not fit it, "deploy at 2:30 in the evening":
+    /// `timeToSayAs` reads those (issue #277), and a one-digit hour that falls
+    /// outside the part of the day it names is asked about here rather than
+    /// given a spelling, because the sentence says two things that disagree
+    /// and choosing one is a guess.
+    ///
+    /// Everything else still goes to the model, or to `timeToSayAs`: "deploy
+    /// at 7" (a bare number may not be a time at all), "deploy at 0:30" (0 is
+    /// not an hour on a twelve-hour clock, so there is no morning-or-evening
+    /// to ask about) and "deploy at half six" keep their written reasons in
     /// `contracts/assist-cases.json` → `deployAtATime.refused`.
     ///
     /// The answer sentences are built in their canonical form — "deploy
@@ -153,23 +158,91 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     /// "please", "it" or a trailing "tomorrow" are spellings the frame reads
     /// but that a sentence rebuilt around them might not.
     static func morningOrEvening(_ message: String) -> AssistTimeQuestion? {
-        guard let frame = AssistCardCommand.deployFrame(AssistCardCommand.tidied(message)) else {
+        let tidied: String = AssistCardCommand.tidied(message)
+        if let frame = AssistCardCommand.deployFrame(tidied),
+           let question = AssistCardCommand.askedOutright(frame.timeWords, dayWord: frame.dayWord) {
+            return question
+        }
+        guard let reading = AssistCardCommand.respellingReading(tidied, original: message) else {
             return nil
         }
-        guard frame.timeWords.count == 1 else {
+        switch reading {
+        case .ask(let question):
+            return question
+        case .sayAs:
             return nil
         }
-        // Two near-spellings are ASKED about too, rather than sent to the
-        // model, because both still deployed on the spot there: "deploy at
-        // 6.30" (a full stop between the hour and the minutes) and "deploy at
-        // 6:30, please" (a comma after the time, left behind when the frame
-        // takes "please" off). Measured on the smaller assistant, ten trials
-        // each: deploy_section 10 of 10 for both. Asking costs nothing —
-        // nothing is set, and the answers are rebuilt below in the one
-        // canonical "6:30 am" form the family accepts, so neither spelling
-        // is ever offered back. This widens what is ASKED only: "deploy at
-        // 6.30 pm" is still not answered in code.
-        var written: String = frame.timeWords[0]
+    }
+
+    /// "Deploy at 6.30 pm", "deploy at 6:30 tonight", "deploy tomorrow
+    /// morning at 7:00" — a time the family CAN read, written a way it does
+    /// not set. Answered in code with the one sentence to type instead, and
+    /// never sent to the model (issue #277).
+    ///
+    /// **Measured, and it is the reason this exists.** Every one of these
+    /// reached `deploy_section` ten trials out of ten on the smaller assistant
+    /// (the #194 fix review): a deploy to students on the spot, for a teacher
+    /// who had named a time. Russell's decision (2026-09-25) was to ASK, in
+    /// code — rejected were accepting these spellings outright (every accepted
+    /// spelling widens what is SCHEDULED, which is a decision of its own) and
+    /// leaving it to the approval card.
+    ///
+    /// **Caught only for a reason**, and there are three: a full stop between
+    /// the hour and the minutes, a comma after the time (what the frame leaves
+    /// of ", please"), or a part of the day — "in the morning", "this
+    /// afternoon", "tonight", "tomorrow evening" — after the time or before
+    /// "at". A spelling the family refuses for a reason of its own ("13:30
+    /// pm", "6:75 pm", "deploy at 7") is not caught: its refused row's written
+    /// reason stands, and it goes to the model as before.
+    ///
+    /// **A part of the day is a window.** Morning is 12 (12 am) and 1 to 11,
+    /// afternoon 12 to 5, evening 5 to 11, and tonight the same with 12 as
+    /// midnight. A time
+    /// outside its window is a sentence disagreeing with itself — "2:30 in the
+    /// evening" — so it is never given a spelling: a one-digit hour with no am
+    /// or pm is asked about (`morningOrEvening`), and anything else goes to
+    /// the model, where it went before.
+    ///
+    /// The sentence handed back is rebuilt in the family's canonical form
+    /// ("deploy [today |tomorrow ]at H:MM am|pm"), never an echo of the
+    /// teacher's words, and every one is a sentence `matching` accepts —
+    /// pinned by `ScheduleDeployCardTests` for every contract row.
+    static func timeToSayAs(_ message: String) -> AssistTimeRespelling? {
+        let tidied: String = AssistCardCommand.tidied(message)
+        guard let reading = AssistCardCommand.respellingReading(tidied, original: message) else {
+            return nil
+        }
+        switch reading {
+        case .sayAs(let respelling):
+            return respelling
+        case .ask:
+            return nil
+        }
+    }
+
+    /// The one-word time `morningOrEvening` has always asked about: a
+    /// one-digit hour 1–9 with two digits of minutes and no am or pm, with a
+    /// colon or a full stop between them — and a dotted two-digit hour 10 to
+    /// 12, "deploy at 10.30" (issue #277).
+    ///
+    /// Two near-spellings are ASKED about, rather than sent to the model,
+    /// because both still deployed on the spot there: "deploy at 6.30" (a
+    /// full stop between the hour and the minutes) and "deploy at 6:30,
+    /// please" (a comma after the time, left behind when the frame takes
+    /// "please" off). Measured on the smaller assistant, ten trials each:
+    /// deploy_section 10 of 10 for both, and 10 of 10 for "deploy at 10.30"
+    /// and "deploy at 11.45" too. A dotted 10, 11 or 12 is asked rather than
+    /// read as 24-hour time, because "10.30" is how a teacher writes half
+    /// past ten in the evening as often as in the morning; a COLON 10:30 is
+    /// not asked, because the family already reads "deploy at 10:30" as the
+    /// morning. Asking costs nothing — nothing is set, and the answers are
+    /// rebuilt below in the one canonical "6:30 am" form the family accepts,
+    /// so neither spelling is ever offered back.
+    private static func askedOutright(_ timeWords: [String], dayWord: String?) -> AssistTimeQuestion? {
+        guard timeWords.count == 1 else {
+            return nil
+        }
+        var written: String = timeWords[0]
         if written.hasSuffix(",") {
             written = String(written.dropLast())
         }
@@ -180,21 +253,31 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         guard let separator else {
             return nil
         }
+        let separatorIsAFullStop: Bool = written[separator] == "."
         let hourText: String = String(written[written.startIndex..<separator])
         let minuteText: String = String(written[written.index(after: separator)...])
         guard AssistCardCommand.isPlainDigits(hourText),
               AssistCardCommand.isPlainDigits(minuteText),
-              hourText.count == 1,
               minuteText.count == 2,
-              let hour = Int(hourText), hour >= 1,
+              let hour = Int(hourText),
               let minute = Int(minuteText), minute <= 59 else {
+            return nil
+        }
+        let isOneDigitHour: Bool = hourText.count == 1 && hour >= 1
+        let isDottedTenToTwelve: Bool = separatorIsAFullStop && hourText.count == 2
+            && hour >= 10 && hour <= 12
+        guard isOneDigitHour || isDottedTenToTwelve else {
             return nil
         }
         // Always written with a colon, whatever separator the teacher typed.
         let clock: String = hourText + ":" + minuteText
+        return AssistCardCommand.question(about: clock, dayWord: dayWord)
+    }
 
+    /// The question for `clock`, with its two canonical answers.
+    private static func question(about clock: String, dayWord: String?) -> AssistTimeQuestion {
         var opening: String = "deploy at "
-        if let dayWord = frame.dayWord {
+        if let dayWord {
             opening = "deploy \(dayWord) at "
         }
         return AssistTimeQuestion(
@@ -202,6 +285,357 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
             sayMorning: opening + clock + " am",
             sayEvening: opening + clock + " pm"
         )
+    }
+
+    /// What `timeToSayAs` found in a sentence: a spelling to hand back, or —
+    /// for a one-digit hour outside the part of the day the sentence names —
+    /// the morning-or-evening question after all. Nil for everything else,
+    /// which goes to the model as it always has.
+    ///
+    /// One reading behind both public functions, so a sentence is given a
+    /// spelling or asked about, never both — the two cannot disagree because
+    /// there is only one of them.
+    private static func respellingReading(_ tidied: String, original: String) -> RespellingReading? {
+        guard let frame = AssistCardCommand.respellingFrame(tidied) else {
+            return nil
+        }
+        // Only what the family neither answers nor already asks about.
+        if AssistCardCommand.timeOfDay(frame.timeWords) != nil {
+            return nil
+        }
+        if AssistCardCommand.askedOutright(frame.timeWords, dayWord: frame.dayWord) != nil {
+            return nil
+        }
+
+        var words: [String] = frame.timeWords
+        var tookOffAComma: Bool = false
+
+        // 1. One comma after the last word: what the frame leaves of
+        //    "6:30 pm, please".
+        if let last = words.last, last.hasSuffix(",") {
+            let withoutTheComma: String = String(last.dropLast())
+            if withoutTheComma.isEmpty {
+                return nil
+            }
+            words[words.count - 1] = withoutTheComma
+            tookOffAComma = true
+        }
+
+        // 1b. A day word the comma kept away from the frame: "deploy at 6:30
+        //     pm tomorrow, please" is the same sentence as "…, tomorrow" and
+        //     "tomorrow at 6:30 pm", so the order of the day word must not
+        //     decide whether it is read.
+        var frameDayWord: String? = frame.dayWord
+        if tookOffAComma, let last = words.last, last == "today" || last == "tomorrow" {
+            if frameDayWord != nil {
+                return nil
+            }
+            frameDayWord = last
+            words.removeLast()
+            // …and a one-digit time left on its own is the #194 question, as
+            // it is when the day word stands where the frame reads it:
+            // "deploy at 6:30 tomorrow, please" asks like "deploy at 6:30
+            // tomorrow" does.
+            if let question = AssistCardCommand.askedOutright(words, dayWord: frameDayWord) {
+                return .ask(question)
+            }
+        }
+
+        // 2. A part of the day at the end — exact words only.
+        var dayPart: DayPart? = nil
+        for candidate in DayPart.all {
+            let length: Int = candidate.words.count
+            if words.count > length, Array(words.suffix(length)) == candidate.words {
+                dayPart = candidate
+                words.removeLast(length)
+                break
+            }
+        }
+
+        // 3. …and one comma before it: "6:30 pm, tonight".
+        if dayPart != nil, let last = words.last, last.hasSuffix(",") {
+            let withoutTheComma: String = String(last.dropLast())
+            if withoutTheComma.isEmpty {
+                return nil
+            }
+            words[words.count - 1] = withoutTheComma
+            tookOffAComma = true
+        }
+
+        // "Today" and "tonight" in one sentence agree, and "tonight" says
+        // more (its midnight is tomorrow's first minute), so it decides.
+        if dayPart?.kind == .tonight, frameDayWord == "today" {
+            frameDayWord = nil
+        }
+
+        // 4. What is left is a clock, with or without am or pm.
+        guard words.count == 1 || words.count == 2 else {
+            return nil
+        }
+        var clock: String = words[0]
+        var meridiem: String? = nil
+        if words.count == 2 {
+            guard let named = AssistCardCommand.meridiem(named: words[1]) else {
+                return nil
+            }
+            meridiem = named
+        } else {
+            // The same endings, in the same order, as `timeOfDay`.
+            for ending in ["a.m.", "p.m.", "a.m", "p.m", "am", "pm"]
+            where meridiem == nil && clock.hasSuffix(ending) {
+                meridiem = AssistCardCommand.meridiem(named: ending)
+                clock = String(clock.dropLast(ending.count))
+            }
+        }
+
+        var hourText: String = clock
+        var minuteText: String = "00"
+        var writtenWithAFullStop: Bool = false
+        var separator: String.Index? = clock.firstIndex(of: ":")
+        if separator == nil {
+            separator = clock.firstIndex(of: ".")
+        }
+        if let separator {
+            writtenWithAFullStop = clock[separator] == "."
+            hourText = String(clock[clock.startIndex..<separator])
+            minuteText = String(clock[clock.index(after: separator)...])
+        } else if meridiem == nil && dayPart == nil {
+            // "deploy at 7," — a bare number with nothing to say it is a time.
+            return nil
+        }
+        guard AssistCardCommand.isPlainDigits(hourText),
+              AssistCardCommand.isPlainDigits(minuteText),
+              hourText.count <= 2,
+              minuteText.count == 2,
+              let hour = Int(hourText),
+              let minute = Int(minuteText), minute <= 59 else {
+            return nil
+        }
+
+        // 5. A reason must be present. Without one, the spelling is one the
+        //    family refuses for a reason of its own, which stands.
+        guard writtenWithAFullStop || tookOffAComma || dayPart != nil else {
+            return nil
+        }
+
+        // 6. The day. A part of the day that names one must agree with a day
+        //    word the sentence also carries.
+        var dayWord: String? = frameDayWord
+        if let partDay = dayPart?.dayWord {
+            if let said = dayWord, said != partDay {
+                return nil
+            }
+            dayWord = partDay
+        }
+
+        // 7. The moment, on the 24-hour clock.
+        var onTheClock: Int = hour
+        if let meridiem {
+            guard hour >= 1, hour <= 12 else {
+                return nil
+            }
+            if meridiem == "pm", hour != 12 {
+                onTheClock = hour + 12
+            }
+            if meridiem == "am", hour == 12 {
+                onTheClock = 0
+            }
+            if let dayPart {
+                // "6:30 am in the evening" and "2:30 pm in the evening" both
+                // disagree with themselves; am or pm was said, so there is
+                // nothing to ask.
+                guard dayPart.holds(onTheClock) else {
+                    return nil
+                }
+            }
+        } else if let dayPart {
+            let isTwentyFourHourClock: Bool = hourText.count == 2
+                && (hourText.hasPrefix("0") || hour >= 13)
+            if isTwentyFourHourClock {
+                // "18:30 in the evening", "06:30 in the morning".
+                guard hour <= 23, dayPart.holds(hour) else {
+                    return nil
+                }
+                onTheClock = hour
+            } else if let placed = dayPart.place(hour) {
+                onTheClock = placed
+            } else {
+                // Outside the window: "2:30 in the evening". A one-digit
+                // hour is the #194 question after all — the day word kept
+                // only when it is one the sentence said plainly.
+                guard hourText.count == 1, hour >= 1 else {
+                    return nil
+                }
+                var askingDay: String? = frameDayWord
+                if dayPart.dayWord == "tomorrow" {
+                    askingDay = "tomorrow"
+                }
+                return .ask(AssistCardCommand.question(about: hourText + ":" + minuteText, dayWord: askingDay))
+            }
+        } else {
+            // A full stop or a comma, and nothing else to go on: the 24-hour
+            // reading, which needs two digits of hour. A one-digit hour here
+            // is #194's question, and a dotted 10–12 is asked too
+            // (`askedOutright`), so neither reaches this line.
+            guard hourText.count == 2, hour <= 23 else {
+                return nil
+            }
+            onTheClock = hour
+        }
+
+        // Midnight "tonight" is the start of TOMORROW, so no day word can be
+        // said for it: a bare time settles onto the next midnight, which is
+        // the one meant.
+        if dayPart?.words == ["tonight"], onTheClock < 12 {
+            if frameDayWord != nil {
+                return nil
+            }
+            dayWord = nil
+        }
+
+        var twelveHour: Int = onTheClock % 12
+        if twelveHour == 0 {
+            twelveHour = 12
+        }
+        var halfOfTheDay: String = "am"
+        if onTheClock >= 12 {
+            halfOfTheDay = "pm"
+        }
+        var say: String = "deploy at "
+        if let dayWord {
+            say = "deploy \(dayWord) at "
+        }
+        say += "\(twelveHour):\(minuteText) \(halfOfTheDay)"
+
+        return .sayAs(AssistTimeRespelling(
+            written: AssistCardCommand.asTheTeacherWroteIt(frame.writtenWords, in: original),
+            say: say,
+            onlyDifference: AssistCardCommand.onlyDifference(between: tidied, and: say)
+        ))
+    }
+
+    /// `deployFrame`, and one more place for a part of the day: before "at",
+    /// "deploy tonight at 6:30", "deploy tomorrow morning at 7:00".
+    ///
+    /// Read by `timeToSayAs` ONLY. `deployFrame` itself is not widened, so
+    /// nothing the family ANSWERS moves; a part of the day found in front is
+    /// moved to the end, where `respellingReading` reads it, and the rebuilt
+    /// sentence is read by `deployFrame` itself — one frame, not two copies.
+    /// `writtenWords` is what the teacher wrote for the time, part of the day
+    /// included, in their order.
+    private static func respellingFrame(
+        _ tidied: String
+    ) -> (dayWord: String?, timeWords: [String], writtenWords: [String])? {
+        if let frame = AssistCardCommand.deployFrame(tidied) {
+            return (dayWord: frame.dayWord, timeWords: frame.timeWords, writtenWords: frame.timeWords)
+        }
+        var text: String = tidied
+        while text.hasSuffix("?") {
+            text = String(text.dropLast())
+        }
+        var words: [String] = []
+        for piece in text.split(separator: " ") {
+            words.append(String(piece))
+        }
+        guard let atIndex = words.firstIndex(of: "at") else {
+            return nil
+        }
+        let before: [String] = Array(words[words.startIndex..<atIndex])
+        var after: [String] = Array(words[(atIndex + 1)...])
+        for candidate in DayPart.leading {
+            let length: Int = candidate.words.count
+            guard before.count > length, Array(before.suffix(length)) == candidate.words else {
+                continue
+            }
+            // "please" stays last, where the frame looks for it.
+            var closingPlease: Bool = false
+            if after.last == "please" {
+                after.removeLast()
+                closingPlease = true
+            }
+            var rebuilt: [String] = Array(before.dropLast(length))
+            rebuilt.append("at")
+            rebuilt.append(contentsOf: after)
+            rebuilt.append(contentsOf: candidate.words)
+            if closingPlease {
+                rebuilt.append("please")
+            }
+            guard let frame = AssistCardCommand.deployFrame(rebuilt.joined(separator: " ")) else {
+                return nil
+            }
+            var written: [String] = candidate.words
+            written.append("at")
+            written.append(contentsOf: after)
+            return (dayWord: frame.dayWord, timeWords: frame.timeWords, writtenWords: written)
+        }
+        return nil
+    }
+
+    /// The teacher's own words for the time, as they typed them — their
+    /// capitals, and the full stop that ends "p.m." — found in the message
+    /// they sent. A trailing comma is left off. When the words cannot be
+    /// found as typed (two spaces between them, say), the tidied words are
+    /// used instead: they are the same letters in lower case.
+    private static func asTheTeacherWroteIt(_ writtenWords: [String], in original: String) -> String {
+        var tidiedWritten: String = writtenWords.joined(separator: " ")
+        if tidiedWritten.hasSuffix(",") {
+            tidiedWritten = String(tidiedWritten.dropLast())
+        }
+        guard let found = original.range(
+            of: tidiedWritten, options: [.caseInsensitive, .backwards]
+        ) else {
+            return tidiedWritten
+        }
+        var end: String.Index = found.upperBound
+        // "p.m." — the tidier takes the last full stop off the sentence, and
+        // with it the one that belongs to the abbreviation.
+        if tidiedWritten.hasSuffix(".m"), end < original.endIndex, original[end] == "." {
+            end = original.index(after: end)
+        }
+        return String(original[found.lowerBound..<end])
+    }
+
+    /// Whether the teacher's sentence needs only its comma taken out to be a
+    /// sentence the family SETS, for the same
+    /// moment as the one handed back; so the reply can say that rather than
+    /// seem to name back a time the teacher wrote perfectly well.
+    ///
+    /// Decided by the MATCHER and the moment, not by comparing text with
+    /// `say` (the fix review's M1, ruled 2026-09-25): "deploy it at 6:30 pm,
+    /// please" and "deploy at 7 am, please" differ from the canonical sentence
+    /// by more than a comma, and are still only a comma away from one the
+    /// family sets.
+    private static func onlyDifference(
+        between tidied: String, and say: String
+    ) -> AssistTimeRespelling.OnlyDifference {
+        guard let handedBack = AssistCardCommand.matching(say),
+              let moment = handedBack.arguments["when"] else {
+            return .spelling
+        }
+        var withoutCommas: [String] = []
+        for piece in tidied.split(separator: " ") {
+            let word: String = piece.replacingOccurrences(of: ",", with: "")
+            if !word.isEmpty {
+                withoutCommas.append(word)
+            }
+        }
+        // Only the comma is tried. Taking "please" out as well was ruled too,
+        // and measured unreachable (113,400 sentences, 0): the frame already
+        // takes "please" off either end, so a sentence the family sets
+        // without its commas never needs "please" removed as well.
+        if AssistCardCommand.setsTheSameMoment(withoutCommas, as: moment) {
+            return .theComma
+        }
+        return .spelling
+    }
+
+    /// Whether `words`, as a sentence, is one the family schedules for
+    /// `moment`.
+    private static func setsTheSameMoment(_ words: [String], as moment: String) -> Bool {
+        guard let command = AssistCardCommand.matching(words.joined(separator: " ")) else {
+            return false
+        }
+        return command.toolName == "schedule_deploy" && command.arguments["when"] == moment
     }
 
     /// A message trimmed, case-folded, and with a trailing full stop or
@@ -1209,4 +1643,151 @@ nonisolated struct AssistTimeQuestion: Sendable, Equatable {
 
     /// The sentence that means the evening: "deploy tomorrow at 6:30 pm".
     let sayEvening: String
+}
+
+/// A deploy time written a way the family can read but does not set — "6.30
+/// pm", "6:30 tonight" — and the one sentence to type instead (issue #277).
+///
+/// `say` is always a sentence `AssistCardCommand.matching` accepts, in the
+/// family's canonical form, and `ScheduleDeployCardTests` runs every contract
+/// row's through the matcher, so the reply can never name a sentence the app
+/// then fails to understand.
+nonisolated struct AssistTimeRespelling: Sendable, Equatable {
+
+    /// What the reply can say about the difference between what was typed
+    /// and `say`, so it does not seem to name back a time the teacher wrote
+    /// perfectly well when all that stood in the way was a comma.
+    nonisolated enum OnlyDifference: Sendable, Equatable {
+
+        /// The time itself is spelled differently: "6.30 pm", "6:30 tonight".
+        case spelling
+
+        /// Nothing but a comma: without it, the teacher's own sentence is
+        /// one the family sets for the same moment — "deploy at 6:30 pm,
+        /// please", "deploy at 7 am,".
+        case theComma
+    }
+
+    // MARK: - Stored properties
+
+    /// The time as the teacher wrote it — their capitals, their full stops —
+    /// with a trailing comma left off: "6.30 PM", "6:30 tonight",
+    /// "tomorrow morning at 7:00".
+    let written: String
+
+    /// The sentence to type instead: "deploy today at 6:30 pm".
+    let say: String
+
+    /// Whether a comma is all that stood in the way.
+    let onlyDifference: OnlyDifference
+}
+
+/// What `AssistCardCommand`'s respelling reading found: a sentence to hand
+/// back, or the morning-or-evening question after all.
+nonisolated private enum RespellingReading: Sendable, Equatable {
+    case sayAs(AssistTimeRespelling)
+    case ask(AssistTimeQuestion)
+}
+
+/// A part of the day a teacher may say with a deploy time, and the hours it
+/// holds (issue #277; the windows are the director's ruling of 2026-09-25).
+///
+/// A window, not just "am" or "pm": "2:30 in the evening" is not 2:30 pm,
+/// it is a sentence disagreeing with itself, and handing back "deploy at 2:30
+/// pm" for it would be the twelve-hours-wrong suggestion #194 exists to
+/// avoid. So a time outside its part of the day is never given a spelling.
+nonisolated private struct DayPart: Sendable, Equatable {
+
+    /// Which part of the day, for its hours.
+    nonisolated enum Kind: Sendable, Equatable {
+        case morning
+        case afternoon
+        case evening
+        case tonight
+    }
+
+    // MARK: - Stored properties
+
+    /// Every part of the day that is read, in the words a teacher types.
+    /// "At night", "in the night" and "tomorrow night" are not among them:
+    /// they go to the model, as before.
+    static let all: [DayPart] = [
+        DayPart(words: ["in", "the", "morning"], dayWord: nil, kind: .morning),
+        DayPart(words: ["in", "the", "afternoon"], dayWord: nil, kind: .afternoon),
+        DayPart(words: ["in", "the", "evening"], dayWord: nil, kind: .evening),
+        DayPart(words: ["this", "morning"], dayWord: "today", kind: .morning),
+        DayPart(words: ["this", "afternoon"], dayWord: "today", kind: .afternoon),
+        DayPart(words: ["this", "evening"], dayWord: "today", kind: .evening),
+        DayPart(words: ["tonight"], dayWord: "today", kind: .tonight),
+        DayPart(words: ["tomorrow", "morning"], dayWord: "tomorrow", kind: .morning),
+        DayPart(words: ["tomorrow", "afternoon"], dayWord: "tomorrow", kind: .afternoon),
+        DayPart(words: ["tomorrow", "evening"], dayWord: "tomorrow", kind: .evening),
+    ]
+
+    /// The same words, where they may also stand before "at": "deploy
+    /// tonight at 6:30", "deploy tomorrow morning at 7:00".
+    static let leading: [DayPart] = DayPart.all
+
+    /// The words, exactly.
+    let words: [String]
+
+    /// The day it names — "today" for "this evening" and "tonight",
+    /// "tomorrow" for "tomorrow morning" — or nil for "in the evening".
+    let dayWord: String?
+
+    /// Which part of the day.
+    let kind: Kind
+
+    // MARK: - Functions
+
+    /// Whether an hour on the 24-hour clock falls inside this part of the
+    /// day: morning 0–11 (12 am and 1–11), afternoon 12–17, evening 17–23,
+    /// tonight 17–23 and midnight.
+    func holds(_ onTheClock: Int) -> Bool {
+        switch kind {
+        case .morning:
+            return onTheClock >= 0 && onTheClock <= 11
+        case .afternoon:
+            return onTheClock >= 12 && onTheClock <= 17
+        case .evening:
+            return onTheClock >= 17 && onTheClock <= 23
+        case .tonight:
+            return (onTheClock >= 17 && onTheClock <= 23) || onTheClock == 0
+        }
+    }
+
+    /// An hour written 1 to 12 with no am or pm, placed on the 24-hour clock
+    /// by this part of the day — or nil when it falls outside it. Morning
+    /// 12 (12 am, the fix review's M2) and 1–11; afternoon 12–5; evening 5–11;
+    /// tonight 5–11, and 12 as midnight.
+    func place(_ hour: Int) -> Int? {
+        switch kind {
+        case .morning:
+            if hour == 12 {
+                return 0
+            }
+            if hour >= 1 && hour <= 11 {
+                return hour
+            }
+        case .afternoon:
+            if hour == 12 {
+                return 12
+            }
+            if hour >= 1 && hour <= 5 {
+                return hour + 12
+            }
+        case .evening:
+            if hour >= 5 && hour <= 11 {
+                return hour + 12
+            }
+        case .tonight:
+            if hour == 12 {
+                return 0
+            }
+            if hour >= 5 && hour <= 11 {
+                return hour + 12
+            }
+        }
+        return nil
+    }
 }

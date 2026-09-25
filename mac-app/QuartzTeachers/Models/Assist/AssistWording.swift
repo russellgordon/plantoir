@@ -120,6 +120,37 @@ nonisolated enum AssistWording {
             + "Say “\(sayMorning)” or “\(sayEvening)”."
     }
 
+    /// The answer to a deploy time written a way the app can read but does
+    /// not set — "deploy at 6.30 pm", "deploy at 6:30 tonight" (issue #277).
+    /// Answered in code; nothing is scheduled and nothing is sent to the
+    /// model.
+    ///
+    /// ONE sentence to type, never two: the time is already placed (the am
+    /// or pm, or the part of the day, says which), so there is nothing to
+    /// choose between, only a spelling to use. `say` is built by
+    /// `AssistCardCommand.timeToSayAs` and is a sentence the matcher accepts,
+    /// so typing it puts the scheduled deploy's card up on the very next
+    /// turn. It names the time as the teacher wrote it — unless all that
+    /// stood in the way was a comma (without it, their own sentence sets the
+    /// same moment), when naming their time back would look like calling it
+    /// the problem: then it says to leave the comma out instead (the
+    /// director's rulings, 2026-09-25; a "without “please”" form was ruled
+    /// too and measured unreachable, see `onlyDifference`). "Nothing is
+    /// set yet" for the reason `morningOrEvening` gives it. A FIRST DRAFT for
+    /// Russell's wording pass.
+    static func sayTheTimeAs(
+        written: String,
+        say: String,
+        onlyDifference: AssistTimeRespelling.OnlyDifference
+    ) -> String {
+        switch onlyDifference {
+        case .spelling:
+            return "To set a deploy for “\(written)”, say it as “\(say)”. Nothing is set yet."
+        case .theComma:
+            return "To set that deploy, say it as “\(say)”, without the comma. Nothing is set yet."
+        }
+    }
+
     /// The question under a plan card.
     static let planQuestion: String = "Shall I go ahead?"
 
