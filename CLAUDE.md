@@ -684,7 +684,9 @@ each working folder's `.toolchain/`. The launchers:
   websites live — `courses/<CODE>/.merged_output` is a symlink to it, so the
   link has to resolve to the same string on both sides. A container missing
   that mount is recreated, because a mount cannot be added to one that
-  already exists. Every launcher creates the same mount set; if one of them
+  already exists — and, since #94, only once nothing is running in it: every
+  recreation waits for a build or publish and refuses while a preview from
+  the folder is open (`documentation/03-launcher-scripts.md`). Every launcher creates the same mount set; if one of them
   stopped, two launchers would recreate the container away from each other
   on alternate runs. The rule, and what was rejected, is in
   [`contracts/shared-rules.json`](contracts/shared-rules.json) →
