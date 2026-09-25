@@ -1248,5 +1248,120 @@
         }
       ]
     }
+  },
+  "sectionIndexPointer": {
+    "note": "Which line of a section's front page (`sectionN/index.md`) is repointed when a newer class page becomes visible (#267). The front page opens by transcluding ONE class page — the newest one students can see — under a heading the course chose when it was created: “# Most Recent Class” for a course, “# Most Recent Meeting” for a club (`course_config.json` → `front_page_heading`), and whatever the teacher typed in a course made by hand (CODING's is “## Most Recent Meeting”, an h2). The embed is FOUND BY WHICH PAGE IT NAMES — the first line that transcludes one of the section's class pages — never by the heading. The heading is written once, at creation, and is never read or rewritten by repointing: that is why a hand-worded front page keeps working, and why an existing course keeps its heading. `indexBody` is the page BELOW its frontmatter; the cases carry no dates, so the frontmatter's `created:` (which follows the class it points at) is out of scope here — the date rule is the mac's own test. `expectBody: null` means the page is left exactly as it is. Which page is newest (date, then the course's own numbering) is also out of scope: `pointAt` names it.",
+    "found": "The first line, anywhere in the page, whose trimmed text is `![[…]]` and whose target — before any `|` display name or `#` heading, and after any folder path — is one of the section's class-page titles (case-insensitive). That one line becomes `![[<pointAt>]]`; every other byte is left alone.",
+    "neverFoundBy": "The heading text. A front page headed anything, at any level, or with no heading at all, is repointed the same way; a transclusion of a page that is NOT a class page (Help Sessions, Key Links) is never replaced, whatever heading it sits under.",
+    "whenNoClassIsTransclusion": {
+      "mac": "Left as it is. The mac never inserts an embed: it cannot know where on a teacher's page one belongs, and a club's front page is created WITH its first embed (`setup_course.py` → the club start), so a page with none is one the teacher emptied on purpose.",
+      "windows": "Inserts `![[<pointAt>]]` on the line directly after the course's front-page heading — the line whose trimmed text is `#`s, a space and `front_page_heading` (absent → “Most Recent Class”), at any level, case-insensitive — and leaves the page alone when there is no such heading. This is Windows' shipped behaviour for “# Most Recent Class” (`SectionIndex.WithMostRecent`), kept, and widened to the course's own heading.",
+      "why": "Stated rather than settled, on purpose: the two apps already differ here and neither behaviour has cost a teacher anything, so the contract pins BOTH and says which is which (`expectBodyOnWindows`), rather than breaking one app's shipped behaviour to make them match. A case whose `expectBodyOnWindows` is present is the ONLY place the two may differ; everywhere else `expectBody` binds both."
+    },
+    "cases": [
+      {
+        "name": "the ordinary course front page",
+        "classTitles": [
+          "Unit 1, Day 1",
+          "Unit 1, Day 2",
+          "Unit 1, Day 3"
+        ],
+        "pointAt": "Unit 1, Day 3",
+        "indexBody": "# Most Recent Class\n\n![[Unit 1, Day 2]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+        "expectBody": "# Most Recent Class\n\n![[Unit 1, Day 3]]\n\n![[Help Sessions]]\n![[Key Links]]\n"
+      },
+      {
+        "name": "CODING's hand-made front page: an h2 in the teacher's own words, no blank line, no final newline",
+        "classTitles": [
+          "Week 1",
+          "Week 2",
+          "Week 8",
+          "Week 9",
+          "Week 10"
+        ],
+        "pointAt": "Week 10",
+        "indexBody": "## Most Recent Meeting\n![[Week 9]]",
+        "expectBody": "## Most Recent Meeting\n![[Week 10]]",
+        "why": "The fixture this issue came from. Its heading is neither the course default nor at h1, and it carries no `front_page_heading` key — found by the page it names, it repoints; found by heading, it would never move."
+      },
+      {
+        "name": "a club's front page as it is created",
+        "frontPageHeading": "Most Recent Meeting",
+        "classTitles": [
+          "Week 1",
+          "Week 2"
+        ],
+        "pointAt": "Week 2",
+        "indexBody": "# Most Recent Meeting\n\n![[Week 1]]\n",
+        "expectBody": "# Most Recent Meeting\n\n![[Week 2]]\n"
+      },
+      {
+        "name": "a transclusion of a page that is not a class is never replaced, even directly under the heading",
+        "classTitles": [
+          "Unit 1, Day 1"
+        ],
+        "pointAt": "Unit 1, Day 1",
+        "indexBody": "# Most Recent Class\n\n![[Help Sessions]]\n\n![[Key Links]]\n",
+        "expectBody": null,
+        "expectBodyOnWindows": "# Most Recent Class\n![[Unit 1, Day 1]]\n\n![[Help Sessions]]\n\n![[Key Links]]\n",
+        "why": "The “far worse bug” `SectionIndexPointer`'s own comment names: repointing Help Sessions at a lesson removes it from the page every student lands on. Neither app may replace it. The mac leaves the page alone; Windows inserts the class embed above it (`whenNoClassIsTransclusion`)."
+      },
+      {
+        "name": "a front page with no heading at all",
+        "classTitles": [
+          "Unit 1, Day 1",
+          "Unit 1, Day 2"
+        ],
+        "pointAt": "Unit 1, Day 2",
+        "indexBody": "Welcome to section 1.\n\n![[Unit 1, Day 1]]\n",
+        "expectBody": "Welcome to section 1.\n\n![[Unit 1, Day 2]]\n",
+        "why": "A course set up from scratch writes a front page with frontmatter only; a teacher who adds a class embed to it without a heading gets it repointed like any other."
+      },
+      {
+        "name": "an embed with a folder path and a display name",
+        "classTitles": [
+          "Week 3",
+          "Week 4"
+        ],
+        "pointAt": "Week 4",
+        "indexBody": "# Most Recent Meeting\n\n![[All Meetings/Week 3|This week]]\n",
+        "expectBody": "# Most Recent Meeting\n\n![[Week 4]]\n",
+        "frontPageHeading": "Most Recent Meeting",
+        "why": "The target is what comes before `|` or `#`, after the last `/`. The replacement is the bare title: the display name and path are not carried over."
+      },
+      {
+        "name": "already pointing at the newest",
+        "classTitles": [
+          "Unit 1, Day 1",
+          "Unit 1, Day 2"
+        ],
+        "pointAt": "Unit 1, Day 2",
+        "indexBody": "# Most Recent Class\n\n![[Unit 1, Day 2]]\n",
+        "expectBody": null
+      },
+      {
+        "name": "a club front page whose embed the teacher removed",
+        "frontPageHeading": "Most Recent Meeting",
+        "classTitles": [
+          "Week 1",
+          "Week 2"
+        ],
+        "pointAt": "Week 2",
+        "indexBody": "# Most Recent Meeting\n\nNo meeting this week.\n",
+        "expectBody": null,
+        "expectBodyOnWindows": "# Most Recent Meeting\n![[Week 2]]\n\nNo meeting this week.\n",
+        "why": "The difference in `whenNoClassIsTransclusion`, at a club's own heading."
+      },
+      {
+        "name": "a heading that only begins with the course's words is not the heading",
+        "classTitles": [
+          "Unit 1, Day 1"
+        ],
+        "pointAt": "Unit 1, Day 1",
+        "indexBody": "# Most Recent Class Recordings\n\nSee the links below.\n",
+        "expectBody": null,
+        "why": "Neither app inserts here: the mac never inserts, and the heading Windows inserts under must equal the course's heading, not begin with it."
+      }
+    ]
   }
 }

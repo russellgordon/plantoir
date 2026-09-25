@@ -21,6 +21,15 @@ import Foundation
 /// The date moves with it because the landing page's date IS the class's date
 /// to a reader: a section whose front page says August while its newest lesson
 /// is in January reads as abandoned.
+///
+/// **The heading above the embed is never read and never written.** A course
+/// writes "# Most Recent Class", a club "# Most Recent Meeting"
+/// (`front_page_heading`, #267), and a course made by hand says whatever its
+/// teacher typed — CODING's is an h2. The embed is found by the page it names,
+/// so all of them repoint the same way, and an existing course keeps its
+/// heading. Nor does this ever INSERT an embed into a page that has none;
+/// Windows does, under the course's own heading, and
+/// `contracts/class-planning.json` → `sectionIndexPointer` pins both.
 enum SectionIndexPointer {
 
     // MARK: - Types
