@@ -333,7 +333,8 @@ Notes:
 - --target chooses where the built site goes: netlify (the default) or cloudflare.
 - With --to-folder <path>, the site is published to <path>/section<N> on THIS
   computer instead of Netlify — an incremental copy (only changed files move),
-  for teachers who upload to their own web host (e.g. over SFTP).
+  for teachers who upload to their own web host (e.g. over SFTP). A relative
+  <path> is taken from this working folder.
 - The Netlify Personal Access Token (PAT) is stored in the macOS Keychain and injected securely at runtime.
   Netlify and Cloudflare tokens live under separate Keychain entries, so keeping both is fine.
 - A Cloudflare token needs one permission: Account - Cloudflare Pages - Edit.
@@ -689,6 +690,21 @@ fi
 # deleted from the folder. Each section lands in its own subfolder so
 # sections can never overwrite one another. Netlify is not involved.
 if [[ -n "$TO_FOLDER" ]]; then
+  # A relative folder is taken from THIS working folder (line 5 already
+  # cd'd here), and made a full path before anything reads it. Three
+  # things go wrong with a relative one, all measured (GitHub issue #227):
+  #   * rsync reads anything with a colon before its first slash as a
+  #     REMOTE host: "out 26:27" became host "out 26", and "localhost:site"
+  #     opened an ssh connection to this Mac — with a real host name it
+  #     would copy the site to another machine. Both printed "Published".
+  #   * mkdir reads a name starting with "-" as an option.
+  #   * PUBLISHED_FOLDER= must be a path the app can open, and the app's
+  #     own current folder is "/", not this one.
+  # A full path starts with "/", so none of the three can happen to it.
+  case "$TO_FOLDER" in
+    /*) ;;
+    *) TO_FOLDER="$(pwd)/${TO_FOLDER}" ;;
+  esac
   TARGET_DIR="${TO_FOLDER%/}/section${SECTION_NUM}"
   mkdir -p "$TARGET_DIR" || {
     echo "❌ Cannot create the publish folder:"
@@ -809,7 +825,25 @@ if [[ -n "$TO_FOLDER" ]]; then
   echo "📦 Publishing ${COURSE_CODE} section ${SECTION_NUM} to a folder…"
   # -a preserves what matters, --delete mirrors removals, and the
   # itemized output is counted so the teacher sees how little moved.
-  CHANGED_COUNT="$(rsync -a --delete --itemize-changes "${PUBLIC_DIR_HOST}/" "${TARGET_DIR}/" | grep -c '^[<>ch.]f' || true)"
+  #
+  # rsync's OWN exit status decides, not the count. It used to be piped
+  # straight into `grep -c … || true`, which threw the status away: a copy
+  # that failed outright, or finished only in part (exit 23, 24 — a page
+  # that could not be written, or a stale page --delete could not remove),
+  # printed "Published" and PUBLISHED_FOLDER= all the same. A partial copy
+  # is a FAILURE here on purpose: the page left behind may be one the
+  # teacher took down. No PUBLISHED_FOLDER= line follows a failure, so the
+  # app offers no folder to open. The sentence below is matched by the
+  # app (app-rules.json -> failureExplanations), so keep its first line.
+  _rsync_rc=0
+  _rsync_said="$(rsync -a --delete --itemize-changes "${PUBLIC_DIR_HOST}/" "${TARGET_DIR}/")" || _rsync_rc=$?
+  if [[ $_rsync_rc -ne 0 ]]; then
+    echo "❌ Not every page could be copied into the publishing folder, so it is not up to date."
+    echo "   Folder: ${TARGET_DIR}"
+    echo "   (copy error ${_rsync_rc})"
+    exit 1
+  fi
+  CHANGED_COUNT="$(printf '%s\n' "$_rsync_said" | grep -c '^[<>ch.]f' || true)"
   echo "✅ Published: ${CHANGED_COUNT} file(s) updated."
   echo "   Folder: ${TARGET_DIR}"
   echo "   Upload that folder to your web host however you prefer (e.g. SFTP)."

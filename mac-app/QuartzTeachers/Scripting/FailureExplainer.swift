@@ -20,6 +20,9 @@ struct FailureExplainer {
         if let reason = vaultLinkExplanation(in: output) {
             return reason
         }
+        if let reason = folderCopyDidNotFinishExplanation(in: output) {
+            return reason
+        }
         if let reason = rateLimitExplanation(in: output) {
             return reason
         }
@@ -37,6 +40,31 @@ struct FailureExplainer {
         }
         if let reason = workspaceCouldNotBeMadeExplanation(in: output) {
             return reason
+        }
+        return nil
+    }
+
+    /// What a teacher reads when a publish to a folder could not copy every
+    /// page. Contract data: `app-rules.json` → `failureExplanations`.
+    static let folderCopyDidNotFinish: String =
+        "Plantoir could not copy every page into your publishing folder, so it is not up to date. "
+        + "Check that the folder is still there and that you can save files in it, then try again."
+
+    /// A publish to a folder stopped part way (GitHub issue #227).
+    ///
+    /// `deploy.sh` now reads the copy's own exit status instead of throwing
+    /// it away, and fails — rather than saying "Published" — when the copy
+    /// did not finish, INCLUDING when it finished in part: a page left behind
+    /// may be one the teacher took down. Its line names the copy's error
+    /// number, which means nothing to a teacher, so the line is matched here
+    /// and replaced with a sentence they can act on.
+    ///
+    /// Asked before the connection check on purpose: the copy's own error
+    /// lines can carry words that check matches, and this output is about a
+    /// folder on this Mac, not the internet.
+    static func folderCopyDidNotFinishExplanation(in output: String) -> String? {
+        if output.contains("could be copied into the publishing folder") {
+            return folderCopyDidNotFinish
         }
         return nil
     }
