@@ -1701,6 +1701,14 @@ BC code no) and follows the code until the teacher touches it. Ticking it:
   ONLY, so every other course's file stays byte-identical (the golden
   `testTheFileForEveryPathThatExistedBeforeIsUnchanged` holds it) — and records
   `class_folder` from the club's own row rather than the guess.
+- checks that row's name with the sentences a folder rename in Course Settings
+  uses (`NewCourseWizardView.clubClassFolderProblem` →
+  `SpecialFolderRenamer.problem`): empty, "/" or ":", hidden, Media, a section
+  folder's name, or another per-section folder's name — a red caption under the
+  field and a refusal at Create. The row is typed, not added through the list,
+  so the list's own checks never saw it; the #267 implementation review found
+  an empty name, a duplicate and a "/" all written straight into
+  `per_section_folders` and `class_folder`.
 - protects the chosen class folder in the structure editor by name; the literal
   "All Classes" test left "All Meetings" deletable.
 
@@ -1716,6 +1724,16 @@ can never become a club from the app. REJECTED: a scheme picker in Settings that
 renames pages between shapes (not asked for, and converting 80 "Unit 2, Day 3"
 pages to week numbers is its own piece); a front-page heading rename across
 every section (dropped with the same answer).
+
+**The heading row shows what the course RECORDED**
+(`CourseConfiguration.recordedFrontPageHeading`), and for a course with no
+`front_page_heading` — every course made before #267, CODING included — the
+named sentence `WizardWording.settingsFrontPageHeadingNotSet`. The first version
+filled in "Most Recent Class", so CODING's locked row contradicted its own
+front page ("## Most Recent Meeting"). Nothing rewrites a heading after
+creation, so the row does not guess one. REJECTED: reading the heading off
+section 1's `index.md` (a row about the course would then report one section's
+page, and a teacher may have edited it on purpose).
 
 Every sentence is in `WizardWording` / `UnitWordRenameWording` and pinned in
 `shared-rules.json` (`wizard.clubToggle`, `specialNames.renameUnitWord`).

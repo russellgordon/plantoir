@@ -4050,19 +4050,48 @@ the piece, and every rule below exists because of it:
   a small model fills for "make room at Week 5" is a ROUTING question, and is
   NOT measured: nothing in this piece changed what the model is shown, and the
   club's own card, "Make room for one meeting at Week 5", is matched in code
-  and never reaches the model (below). A teacher who types their own phrasing
+  and never reaches the model (below) — in a numbered course, on that course's
+  own word, only. A teacher who types their own phrasing
   reaches the model on the frozen schema, and the reading above is what makes
   either filling safe.
-- **Make room keeps a numbered course's date GAPS.** Clubs are sparse: CODING's
-  pages are Week 1 (2025-09-18), Week 2 (09-25), Week 8 (11-20), Week 9
-  (11-27). The ordinary slot rule packs later pages onto the next free days and
-  moved old Week 8 to 2025-10-09 — six weeks EARLIER, under a plan saying
-  "moved onto later class days" (measured by putting the slot rule back). A
-  numbered page now stays where it is when it is already after the page before
-  it, and otherwise takes the first class day after that page. For a section
-  with no gaps both rules give the same dates. The Unit/Day scheme keeps the
-  slot rule; its pages sit on consecutive class days by construction, and
-  changing it there is not part of this piece.
+- **A numbered course orders by DATE, and its numbers may have gaps.** Clubs
+  are sparse: CODING's pages are Week 1 (2025-09-18), Week 2 (09-25), Week 8
+  (11-20), Week 9 (11-27), on weekly Thursdays; weeks 3–7 were never written.
+  Three rules follow, each measured wrong on that exact shape first:
+  - **The next page** (`NextClassPlanner.plan`) is one past the highest number,
+    dated on the first class day after the LATEST dated page
+    (`positionAfterTheLatestPage`). The Unit/Day rule dates by POSITION — four
+    pages, so the fifth date — and wrote "Week 10" on 2025-10-16, five weeks
+    BEFORE Week 8, where the front page (which follows the latest visible date)
+    never showed it. Past the end of the timetable it shares the last day, as
+    every planner here does.
+  - **Make room at N, and duplicate as N** (`ClassInsertionPlanner.planNumbered`)
+    put the new pages on the first free class days after the pages numbered
+    below N. A page is RENAMED only when a new number lands on its name, and
+    the run stops at the first page whose number is already clear; a later page
+    keeps its date when it is already after the page before it, and only a page
+    whose date COLLIDES moves, to the first class day after that page. Measured
+    on the first version: "make room at Week 3" (a gap) and "duplicate Week 2 as
+    my next meeting" dated the new Week 3 2025-11-20 — Week 8's day, with 10-02
+    free — and renamed Week 8 → 9 and Week 9 → 10, a week later each: two
+    published meetings renamed, links rewritten, to fill a slot that was empty.
+    Now the new Week 3 is on 10-02 and nothing else changes, so the plan lists
+    no move and the duplicate can be undone. Making room at an EXISTING number
+    (Week 2) renames Week 2 → 3 and moves it to 10-02; Week 8 and 9 keep their
+    names and dates. For a section with no gaps these give the same answer as
+    the Unit/Day rules.
+  - The first fix kept only the LATER pages' gaps (a page after the insertion
+    stays put when it is already after the page before it). REJECTED as
+    incomplete: it left the new page on the insertion point's day and every
+    later page renamed, which is where the damage was. Also REJECTED: dating by
+    position but skipping dated days (still five weeks early in CODING), and
+    renumbering the section to close the gaps (a club's numbers count meetings,
+    and renaming published pages is the one thing a teacher cannot see coming).
+  `class-planning.json` pins all of it in CODING's shape, dates AND numbers:
+  `nextClass` (the dated case), `insertion` (at a gap, at an existing number,
+  and a collision run) and `duplication` (into a gap). The Unit/Day scheme keeps
+  its slot and position rules; its pages sit on consecutive class days by
+  construction, and changing it there is not part of this piece.
 - **Sentences name the course's own shape.** The two make-room sentences, the
   whole-unit card, the placeholder plans and the "no pages named …" problems
   used to type "Unit … Day …" by hand — which also told a Module course "at
@@ -4165,15 +4194,25 @@ list of meeting dates — the sentence `datesNotGivenYet(for: .meeting)` tells a
 club to say, and a test holds the two together — re-date my meetings), and two
 new PARSED families, added beside the old ones so the entries Windows already
 implements are byte-for-byte unchanged: "make room for <count>
-class|classes|meeting|meetings at <word> <number>" and "duplicate <page title>
-as my next meeting". The one-number make-room family puts the number in `unit`,
-the slot both kinds of course read safely — a numbered course reads a lone
-`unit` as its position, and a Unit/Day course given a unit and no day ASKS
-which day (`testTheOneNumberShapeInAnOrdinaryCourseAsksRatherThanGuesses`); "at
-day 5" is refused because it would land in the unit slot, and "at unit 3" is
-refused because it is a shipped near-miss (it names no day, and has always gone
-to the model — `MakeRoomForClassesTests.testNearMissesAreNotSwallowed` caught
-the first version of this family swallowing it). A numbered course
+class|classes|meeting|meetings at [<word>] <number>" and "duplicate <page title>
+as my next meeting". **The one-number make-room family reads the window's
+course**, the only family that does: `AssistCardCommand.matching(_:numberedPageWord:)`
+is given the course's page word by `AssistAgent` (via
+`AssistToolRunner.numberedPageWord(forCourse:)`) when, and only when, the course
+is numbered, and the family matches that word (case-folded) or a bare number —
+"at Week 5", "at 5" — and nothing else. The number goes into `unit`, which a
+numbered course reads as its position. In a Unit/Day course the family matches
+NOTHING, so "make room for a class at unit 3" and "at week 5" reach the model
+exactly as they did before #267. The first version could not know the word and
+took any single word except "day" and "unit": the #267 implementation review
+measured "make room for a meeting at period 3" / "at block 2" / "at section 2"
+planned in a club as Week 3 / Week 2 — pages renamed on a sentence about
+something else — and in a Unit/Day course those sentences had stopped reaching
+the model. REJECTED: a deny-list of words (period, block, section, lesson …),
+which is the any-word rule with holes in it. `assist-cases.json` carries the
+family with `inANumberedCourseWhosePagesAre: "Week"`, its near miss "at period
+3", and three `nearMisses` that a runner walks both without a course and in a
+club. A numbered course
 gets its OWN shelf (`AssistPromptShelfView.groups(naming:noun:)`): every card
 on it is matched in code except "Cancel scheduled deploy", which was already
 measured. There is deliberately no "Publish Week 2" or "Unpublish Week 2" on

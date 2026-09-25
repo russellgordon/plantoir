@@ -608,7 +608,15 @@ What `setup_course.py` does with a numbered course (`ClubStart`):
   showing a withheld page is exactly what the assistant's repointing exists to
   prevent, and the repointing moves the embed only when a VISIBLE page is newer,
   so it would never fix this one. No tag because a club has no units, and the
-  tag would make a Quartz tag page listing every meeting.
+  tag would make a Quartz tag page listing every meeting. **Written only for a
+  section being MADE** — one whose `index.md` does not exist yet
+  (`ClubStart.write_first_page`, called before the front page is written). A
+  re-run of setup from the command line on an existing club used to recreate a
+  deleted `Week 1.md` in every section, published and dated NOW, so the front
+  page would follow it as the newest meeting (#267 implementation review; the
+  app never re-runs setup on an existing course, so this was command-line
+  only). A new section added to an existing club still gets its first page.
+  `scripts/test_club_start.py` pins both.
 
 REJECTED: a generated "club" skeleton family (more pages to maintain, for a
 code prefix that means nothing); starting completely empty (then the heading
