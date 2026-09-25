@@ -329,8 +329,13 @@ enum FolderContainers {
 
     // MARK: - The script, a piece at a time
 
-    /// Appends one line to the trail, the way the launchers do.
-    private static func trailFunction(inHomeFolder homeFolder: URL) -> String {
+    /// Appends one line to the trail, the way the launchers do — holding the
+    /// same lock on the Logs folder that the app holds while it trims the
+    /// file, so the append cannot land in the instant the trim replaces it
+    /// (#238; `note_on_the_trail` in `setup.sh` carries the same lines).
+    /// Without `lockf`, or on a volume that refuses locks, the line is
+    /// appended unlocked rather than dropped.
+    static func trailFunction(inHomeFolder homeFolder: URL) -> String {
         let trailFolder: String = homeFolder
             .appendingPathComponent("Library")
             .appendingPathComponent("Logs")
@@ -340,8 +345,13 @@ enum FolderContainers {
         lines.append("note() {")
         lines.append("  trail=" + HelperPrograms.shellQuoted(trailFolder))
         lines.append("  mkdir -p \"$trail\" 2>/dev/null || return 0")
-        lines.append("  printf '%s · %s\\n' \"$(date '+%Y-%m-%d %H:%M:%S')\" \"$1\""
-            + " >> \"$trail/activity.txt\" 2>/dev/null || true")
+        lines.append("  trail_line=\"$(date '+%Y-%m-%d %H:%M:%S') · $1\"")
+        lines.append("  if [ -x /usr/bin/lockf ] && /usr/bin/lockf -k \"$trail\" /bin/sh -c"
+            + " 'printf \"%s\\n\" \"$1\" >> \"$2/activity.txt\"' note \"$trail_line\" \"$trail\""
+            + " 2>/dev/null; then")
+        lines.append("    return 0")
+        lines.append("  fi")
+        lines.append("  printf '%s\\n' \"$trail_line\" >> \"$trail/activity.txt\" 2>/dev/null || true")
         lines.append("}")
         return lines.joined(separator: "\n")
     }

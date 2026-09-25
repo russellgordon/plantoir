@@ -4388,6 +4388,108 @@ arrives as EXC2O unless that code is taken, so a line written up front would
 name a course that may not exist, and a failed run writes nothing. Windows
 creates courses too, so the contract entry carries no `appliesOn`.
 
+### Two writers at once: the trail never loses a line
+
+Since 2026-09-25 ([#238](https://github.com/russellgordon/plantoir/issues/238)).
+`activity.txt` has more writers than the app: a scheduled publish runs as its
+own process, `Plantoir --mcp-stdio` is a third, and every launcher appends its
+own lines with `note_on_the_trail` (setup.sh, preview.sh, deploy.sh, and the
+`note` function in the script `FolderContainers` writes for quitting). They
+routinely write within the same second — the app notes "started preview.sh"
+while the launcher it just started notes its own first line.
+
+**What was wrong.** `ProblemReportStore.appendActivityLine` read the whole
+file, added its line, trimmed, and renamed a rewritten copy over the original
+— with no lock. Two writers that read the same file both wrote a whole file,
+and the later rename won; a launcher's `>>` landing between the read and the
+rename went into the file being thrown away. Every write was atomic, so
+nothing ever looked broken. Measured on an M-series Mac, APFS, macOS 26, with
+a standalone replica of the exact lines, each writer its own process:
+
+| Writers | Lost |
+|---|---|
+| 3 app processes × 3 lines onto an 800-line trail, 100 bursts (the realistic case) | **446 of 900 lines; every burst lost some** |
+| the same with 2 app processes and one launcher × 3 lines each | 302 of 900; every burst lost some |
+| 2 processes × 500 | 483 of 1,000 |
+| 4 threads in ONE process × 250 | 747 of 1,000 |
+| 2 app writers, the lock on the folder added round the same rewrite, + a launcher `>>` × 300 | app 600/600, **launcher 52 of 300 kept** |
+
+The last row is why a lock round the old rewrite was NOT enough (it was the
+first plan, and review measured it): the launchers take no lock of their own,
+so any writer that REPLACES the file on every line loses their lines.
+
+**What it does now — two changes, one on each side.**
+
+- **The app adds its line to the END of the file** (`open` with `O_APPEND`,
+  one `write`), never by rewriting it, all while holding an exclusive `flock`
+  on the **Logs folder itself**. The trim — the one write that does replace the
+  file — runs only under that lock, and only when the file is past its limit
+  (1,200 lines, cut to 600, unchanged). The line is redacted by `LogRedactor`
+  BEFORE any of this, so nothing unredacted is ever held or written.
+- **Every launcher's append takes the same lock**: `/usr/bin/lockf -k
+  "$trail"` round the `>>`, where `$trail` is the Logs folder. `lockf(1)` on
+  macOS locks with `O_EXLOCK`, which is the same lock `flock` takes, so it
+  waits for the app's trim (measured: it waited 2.59 s for a Python `flock` held
+  3 s, and 1 s for one held 1.5 s); `-k` stops it trying to delete the folder
+  afterwards. The function is byte-identical in the three launchers
+  (`scripts/test_trail_lock.py`), and the generated script's lock and append
+  lines are the launchers' own (`ProblemReportTests.testTheGeneratedScriptAppendsTheWayTheLaunchersDo`).
+
+Measured after the change: the app-and-launcher burst, 0 of 900 lost in 100
+bursts (the replica of the new writer against the launchers' real
+`note_on_the_trail`); 4 threads × 100 in
+one process, 400 of 400 (`testWritersAtTheSameInstantEachKeepTheirLine`); two
+app writers and a launcher, 900 of 900 (`testALauncherWritingAtTheSameTimeKeepsEveryLine`);
+forty trims raced against a launcher mid-append, every line kept
+(`testTheTrimNeverLosesALauncherLine`). With the OLD launcher and the new app
+writer — the gap that remains until a working folder's launchers are
+refreshed — a line was lost in 2 runs of 10 (1,500 app + 1,500 launcher lines
+across several trims per run), because only a trim can lose one now. With the
+new launcher, 0 in 10. Cost: 0.54 ms a line for the app, down from 0.97
+(the rewrite is gone from all but one line in six hundred); a launcher's line
+takes about 10 ms instead of 5, for a handful of lines a run.
+
+**Why the FOLDER is the lock.** It creates no file. A sidecar
+`activity.txt.lock` would work identically, but it would sit in the folder
+Console shows a teacher, a mystery file with nothing in it. Both `flock` and
+`lockf` belong to the open file rather than to the process, so two threads of
+the app wait for each other exactly as two processes do, and the kernel
+releases the lock when its holder exits — a `kill -9` cannot leave it held.
+`O_CLOEXEC` keeps a launcher the app starts from inheriting the app's lock.
+
+**When the lock cannot be had, the line is written anyway.** If the folder
+cannot be opened, or `flock` refuses (`ENOTSUP` on some network volumes), the
+app appends unlocked — an append still cannot discard another append, so only
+a trim at that exact instant could lose a line, which is the old behaviour at
+its best. The launchers do the same where there is no `/usr/bin/lockf` or it
+fails. Refusing or dropping the line would be worse than the race.
+
+**Rejected, and why:**
+
+- **A lock round the old read-modify-write** (the first plan). Closes the
+  race between app processes and threads, but leaves the launchers' lines
+  exactly as exposed as before — 52 of 300 kept, measured above.
+- **`O_APPEND` alone, with no lock.** Appends were measured whole on APFS
+  even for 1 MB lines, four processes at once, none torn. But something still
+  has to TRIM, and a trim rewrites the file: unlocked, it lost 2 lines in
+  4 × 1,000. Moving the trim to whoever READS the trail was rejected too — the
+  file would grow without bound between reports.
+- **One file per process, merged when a report is gathered.** The issue's own
+  three lines share one second, so a merge by timestamp cannot order them; the
+  trail is one file precisely because order is its point (see the comment on
+  `activityFileName`).
+- **Waiting for the lock with a timeout.** The lock is held for one append and,
+  one line in six hundred, one rewrite — about a millisecond, 104 ms at worst
+  under a contrived four-way hammer — and it dies with its holder. A timeout
+  would be a guessed delay, which this codebase does not use to paper over a
+  race; blocking is correct.
+
+**Found on the way and fixed with it.** The trim used to read the trail as
+strict UTF-8, and one byte that was not UTF-8 — a launcher can `printf`
+anything — made the read come back empty, so the next write REPLACED the whole
+trail with its single line. The trim now reads bytes and decodes leniently, and
+a file that needs no trimming is never rewritten at all.
+
 ## The local assistant
 
 A teacher can open an assistant for one section — a window of its own, so the
