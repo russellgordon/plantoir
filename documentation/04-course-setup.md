@@ -75,7 +75,7 @@ OFFERED is two separate questions:
 **The rule, once, because three surfaces ask it:** a skeleton is OFFERED for
 a code when a family exists for its prefix AND the teacher is not taking the
 example content written for that code. It lives in ONE function —
-`SkeletonCatalog.hasSkeleton(forCode:takingExampleContent:)` on the mac,
+`SkeletonCatalog.hasSkeleton(forCode:takingExampleContent:numbered:)` on the mac (a club, #267, is offered none),
 `SkeletonCatalog.HasSkeleton` on Windows — read by the toggle's visibility,
 by what the structure editor adopts, and by `use_skeleton` in the file.
 Neither app takes a default value for the second argument, so a call site
