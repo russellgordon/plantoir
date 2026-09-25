@@ -112,7 +112,9 @@ enum PageFrontmatter {
         let prefix: String = key + ":"
         for index in (block.openIndex + 1)..<block.closeIndex {
             if trimmingCarriageReturn(lines[index]).hasPrefix(prefix) {
-                lines[index] = line + (lines[index].hasSuffix("\r") ? "\r" : "")
+                replacingKeyLine(
+                    at: index, key: key, with: line, in: &lines, closeIndex: block.closeIndex
+                )
                 return (lines.joined(separator: "\n"), true)
             }
         }
@@ -133,11 +135,56 @@ enum PageFrontmatter {
         var lines: [String] = pageText.components(separatedBy: "\n")
         for index in (block.openIndex + 1)..<block.closeIndex {
             if trimmingCarriageReturn(lines[index]).hasPrefix("title:") {
-                lines[index] = "title: " + title + (lines[index].hasSuffix("\r") ? "\r" : "")
+                replacingKeyLine(
+                    at: index, key: "title", with: "title: " + title,
+                    in: &lines, closeIndex: block.closeIndex
+                )
                 return lines.joined(separator: "\n")
             }
         }
         return pageText
+    }
+
+    /// Puts `newLine` where a key's line is, and takes away the lines below it
+    /// that were part of the key's OLD value — the one way to change a key
+    /// whose value continues below it without leaving half of it behind.
+    ///
+    /// **What leaving it behind cost, measured (GitHub #199, python-frontmatter
+    /// 1.3.0 / PyYAML 6.0.3):** a `created:` with its date on the line below,
+    /// or folded (`created: >-`), re-dated by rewriting the key's line alone,
+    /// read on the site as the NEW date and the OLD one joined into one string
+    /// — while the app read the new date, so the two disagreed about the
+    /// class's day in silence; with a `# note` between key and value the build
+    /// STOPPED. A title the same way read `Unit 1, Day 2 Unit 1, Day 1`. Only
+    /// the visibility writer took the value with the key (#176); this is the
+    /// same rule, `PageVisibilityReader.continuationLineIndices`, for every
+    /// other key.
+    ///
+    /// The continuation is asked for BEFORE the line is replaced (the new line
+    /// always has a value, so asking afterwards always answers "nothing"), and
+    /// removed from the bottom up so no index moves under another. The new
+    /// line keeps the carriage return of the line it replaces. Returns how
+    /// many lines were taken away, so a caller editing further down can move
+    /// its own positions up by as many.
+    @discardableResult
+    nonisolated static func replacingKeyLine(
+        at index: Int,
+        key: String,
+        with newLine: String,
+        in lines: inout [String],
+        closeIndex: Int
+    ) -> Int {
+        let wasEmpty: Bool = AssistPageVisibility.valueIsEmpty(ofKey: key, inLine: lines[index])
+        let taken: [Int] = PageVisibilityReader.continuationLineIndices(
+            belowKeyAt: index, in: lines, closeIndex: closeIndex, keyValueWasEmpty: wasEmpty
+        )
+        lines[index] = newLine + (lines[index].hasSuffix("\r") ? "\r" : "")
+        var position: Int = taken.count - 1
+        while position >= 0 {
+            lines.remove(at: taken[position])
+            position -= 1
+        }
+        return taken.count
     }
 
     /// Where the frontmatter block starts and ends, and the lines inside it.
