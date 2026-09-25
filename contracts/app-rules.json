@@ -1850,6 +1850,123 @@
       },
       "why" : "GitHub issue #225. A teacher pressed Preview, the progress bar filled, the builder said its server was listening, and the app then waited ten minutes and said nothing at all — no sentence, no line on the trail, the section still reporting itself as building. The website was built and was being served the whole time; that Mac had stopped passing new addresses through. Every part of this rule exists because of one half of that: the bound is on the quiet because the run was not slow, the question is put to the builder because guessing between the two causes would have told a teacher their pages were broken when they were not, and the run is stopped because leaving it holding a port while saying nothing is the state the report was made about."
     },
+    "whenThisMacCannotReachTheBuilder" : {
+      "attempts" : 20,
+      "attemptsWhenThisRunStartedTheBuilder" : 60,
+      "cases" : [
+        {
+          "outcome" : "announces",
+          "pauses" : 0,
+          "probes" : 1,
+          "refusedFirst" : 0,
+          "thenCurlExits" : 52,
+          "thisRunStartedTheBuilder" : false,
+          "why" : "A healthy Mac: the forward is there and nothing is served inside yet."
+        },
+        {
+          "outcome" : "announces",
+          "pauses" : 2,
+          "probes" : 3,
+          "refusedFirst" : 2,
+          "saysTries" : 3,
+          "thenCurlExits" : 52,
+          "thisRunStartedTheBuilder" : false,
+          "why" : "A forward that arrives late is waited for, and the console says how many tries it took."
+        },
+        {
+          "outcome" : "announces",
+          "pauses" : 0,
+          "probes" : 1,
+          "refusedFirst" : 0,
+          "thenCurlExits" : 0,
+          "thisRunStartedTheBuilder" : false,
+          "why" : "Something answered with a page: reachable."
+        },
+        {
+          "outcome" : "announces",
+          "pauses" : 0,
+          "probes" : 1,
+          "refusedFirst" : 0,
+          "thenCurlExits" : 28,
+          "thisRunStartedTheBuilder" : false,
+          "why" : "A connection that hangs is not a refusal. Fails open; the check after the build is the backstop."
+        },
+        {
+          "outcome" : "announces",
+          "pauses" : 0,
+          "probes" : 1,
+          "refusedFirst" : 0,
+          "thenCurlExits" : 127,
+          "thisRunStartedTheBuilder" : false,
+          "why" : "No curl on this Mac: the question cannot be put, so nothing is refused over it."
+        },
+        {
+          "outcome" : "announces",
+          "pauses" : 0,
+          "probes" : 1,
+          "refusedFirst" : 0,
+          "thenCurlExits" : 6,
+          "thisRunStartedTheBuilder" : false,
+          "why" : "Any other failure is not proof of a missing forward."
+        },
+        {
+          "outcome" : "refuses",
+          "pauses" : 19,
+          "probes" : 20,
+          "refusedFirst" : 20,
+          "thenCurlExits" : null,
+          "thisRunStartedTheBuilder" : false,
+          "why" : "The fault from #225: the builder is running and this Mac has no way through to it. Stopped in about ten seconds, before building."
+        },
+        {
+          "outcome" : "announces",
+          "pauses" : 20,
+          "probes" : 21,
+          "refusedFirst" : 20,
+          "saysTries" : 21,
+          "thenCurlExits" : 52,
+          "thisRunStartedTheBuilder" : true,
+          "why" : "A run that started the builder's virtual machine allows it longer to hand over its first address - the case nobody has timed."
+        },
+        {
+          "outcome" : "refuses",
+          "pauses" : 59,
+          "probes" : 60,
+          "refusedFirst" : 60,
+          "thenCurlExits" : null,
+          "thisRunStartedTheBuilder" : true,
+          "why" : "Even a newly started builder that never hands over an address is stopped, after about thirty seconds."
+        },
+        {
+          "buildOnly" : true,
+          "outcome" : "asksNothing",
+          "pauses" : 0,
+          "probes" : 0,
+          "refusedFirst" : 60,
+          "thenCurlExits" : null,
+          "thisRunStartedTheBuilder" : false,
+          "why" : "A build for publishing opens no preview, so it is never asked and never refused - a publish runs this first."
+        }
+      ],
+      "exitCode" : 1,
+      "measured" : "Development Mac (Apple silicon, Colima vz aarch64), 2026-09-25: a connection to a forwarded port with nothing serving inside answers curl exit 52 in 0.01-0.03 s; to a port nothing listens on, exit 7 in 0.01 s; lsof -iTCP:<port> -sTCP:LISTEN takes 0.228 s. All 48 host ports published by six running workspaces had a listener. #225's own numbers: the listener appears 0.10-0.24 s after the builder is created or started, 0.15 s under load. NOT measured: the first address after the builder's virtual machine starts cold - hence the longer bound when this run started it, and the console line that reports the tries a slow reach took.",
+      "pauseSeconds" : 0.5,
+      "probe" : "preview.sh only, after the address is known and BEFORE it is announced or anything is built: a connection to 127.0.0.1 at the announced HOST port (never the port inside the builder), made with curl's own settings file ignored (-q, first) and no proxy (--noproxy '*'), at most one second each (--max-time 1). Only 'connection refused' (curl exit 7) counts as the builder being out of reach; every other answer - 0, an empty reply (52, what a healthy Mac gives, since nothing is served yet), a timeout (28), no curl at all (127), anything - goes ahead exactly as before. A build for publishing (--build-only) announces nothing and asks nothing. A run that needed more than one try prints reachedAfterRetrying in the console (not on the trail).",
+      "reachedAfterRetrying" : "Reaching your website builder took {tries} tries.",
+      "rejected" : [
+        "lsof as the probe: ten times slower, and run as the teacher it sees only the teacher's own programs - a listener owned by root (:88, kdc) is invisible to lsof and answers curl, so a forwarder owned by anybody else would read as missing and refuse a healthy Mac.",
+        "A check in setup.sh, at the builder's creation: it would not have fired on the night (all three previews met a builder that was already running), and setup is exactly the cold start nobody has timed.",
+        "A single probe: the cold start is unmeasured, so one refusal is not proof.",
+        "Asking inside the builder first: before the build nothing is served inside, so it proves nothing; that question stays whenThePreviewNeverAppears', after the build.",
+        "Checking the live-reload port as well: a Mac that refuses new forwards refuses both, and stopping a preview over live-reload alone would be a heavier answer than the fault.",
+        "Skipping the check when this run started the builder: the fault is an old virtual machine refusing new forwards, but one broken from birth would then build for minutes first; the longer bound catches both."
+      ],
+      "sentence" : [
+        "This Mac cannot reach your website builder, so Plantoir stopped before building the preview.",
+        "Nothing is wrong with your pages. Restarting your Mac puts it right."
+      ],
+      "why" : "GitHub #234, split out of #225. On 2026-09-19 a Mac whose builder had stopped handing new addresses through to it (the forward command failed with exit 255; only a restart cured it) built a preview for about two minutes (109 s measured), and the app then waited 45 s more before whenThePreviewNeverAppears said this Mac could not reach it. Asked before the build, the same fault is found in about ten seconds with nothing built. The sentence reuses the vocabulary of whenThePreviewNeverAppears' thisMacCannotReachIt, because it is the same fault found earlier and the remedy is the same one watched working. Written on the trail as a launcher line of the existing 'preview did not appear' event (shared-rules.json -> activityTrail.mustRecord, launcherLineWhenThisMacCannotReachTheBuilder), not as a new event. No failureExplanations case and no app alert: the launcher's own sentence is what a teacher reads, as for whenNoBlockIsFree. Windows' preview.ps1 serves on the PC itself, with no forward to lose, so these cases describe the mac launcher only. No machinery words (rule 1)."
+    },
     "why" : "Quartz's live-reload websocket needs its own port (--wsPort = port + 1000). Without it, two previews collide on the websocket even when their site ports differ — which looks like one preview randomly failing to refresh rather than like a port clash."
   },
   "publishedFreshness" : {

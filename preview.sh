@@ -802,6 +802,13 @@ ensure_container_runtime() {
     return 0
   fi
 
+  # preview.sh's copy only (GitHub #234): from here on, this run is the one
+  # that starts the builder's virtual machine, and the reach check before the
+  # build (this_mac_can_reach_the_builder) allows it longer to hand over its
+  # first address. setup.sh and deploy.sh never ask that question, so their
+  # copies of this function do not set it.
+  THIS_RUN_STARTED_THE_BUILDER=1
+
   # "Setting up this Mac" is a progress marker the app matches word for word
   # (contracts/app-rules.json → milestones); keep those four words. It is not
   # "a one-time step": quitting Plantoir stops this machinery when nothing else
@@ -840,6 +847,8 @@ ensure_container_runtime() {
   exit 1
 }
 
+# Set by ensure_container_runtime when this run starts the builder (#234).
+THIS_RUN_STARTED_THE_BUILDER=""
 ensure_container_runtime
 CURRENT_CONTEXT=$(docker context show 2>/dev/null || echo "unknown")
 HOST_ARCH=$(docker info --format '{{.Architecture}}' 2>/dev/null || echo "unknown")
@@ -1316,6 +1325,70 @@ say_the_preview_address_is_unknown() {
   echo "   before building it. Nothing has been lost — try the preview again."
 }
 
+# Before building, make sure this Mac can reach the address it is about to
+# announce (GitHub #234). The fault this catches was met on 2026-09-19
+# (#225): a Mac whose builder had stopped handing NEW addresses through to
+# the Mac — fixed only by restarting it — built a preview for about two
+# minutes, and the app then waited 45 seconds more before saying the Mac could
+# not reach it. Here it is found in about ten seconds, before anything is
+# built. documentation/03-launcher-scripts.md -> "Before building, preview.sh
+# makes sure this Mac can reach the builder" has the measurements and the
+# designs rejected.
+#
+# The question is a CONNECTION to the announced port, not a listing of
+# listening ports: `lsof` run as the teacher sees only the teacher's own
+# programs, so a forwarder owned by anybody else would read as missing
+# (measured: a root-owned listener on :88 is invisible to lsof and answers
+# curl). Nothing is served inside yet, so a healthy Mac answers with an empty
+# reply (curl exit 52) in about 0.02 s; a Mac with no forward refuses the
+# connection (exit 7). ONLY a refusal counts as absent — every other answer,
+# including no curl at all, goes ahead exactly as before, and #225's check
+# after the build stays the backstop. A listener that is NOT the forwarder
+# (another program took the port) also goes ahead; do not tighten this to
+# require a real page, since nothing is being served yet.
+#
+# The retry is a bounded, deliberately paced re-asking of the real question,
+# not a wait for something to settle: a healthy Mac answers on the first try,
+# and the bound exists for the first address after the builder's virtual
+# machine starts, which nobody has timed. That start is the first preview of
+# most days (quitting Plantoir stops it when nothing else uses it), so a run
+# that started it allows three times as long — and a run that needed more than
+# one try says so, so the number that bound rests on arrives with the next
+# report. The numbers are pinned in contracts/app-rules.json ->
+# previewPorts.whenThisMacCannotReachTheBuilder.
+PREVIEW_REACH_ATTEMPTS=20
+PREVIEW_REACH_ATTEMPTS_WHEN_THIS_RUN_STARTED_THE_BUILDER=60
+PREVIEW_REACH_PAUSE_SECONDS=0.5
+this_mac_can_reach_the_builder() {
+  local port="$1"
+  local attempts="$PREVIEW_REACH_ATTEMPTS"
+  if [[ -n "${THIS_RUN_STARTED_THE_BUILDER:-}" ]]; then
+    attempts="$PREVIEW_REACH_ATTEMPTS_WHEN_THIS_RUN_STARTED_THE_BUILDER"
+  fi
+  local attempt=1
+  local answer
+  while [ "$attempt" -le "$attempts" ]; do
+    answer=0
+    curl -q -s -o /dev/null --noproxy '*' --max-time 1 "http://127.0.0.1:${port}/" || answer=$?
+    if [ "$answer" -ne 7 ]; then
+      if [ "$attempt" -gt 1 ]; then
+        echo "   Reaching your website builder took ${attempt} tries."
+      fi
+      return 0
+    fi
+    attempt=$((attempt + 1))
+    if [ "$attempt" -le "$attempts" ]; then
+      sleep "$PREVIEW_REACH_PAUSE_SECONDS"
+    fi
+  done
+  return 1
+}
+
+say_this_mac_cannot_reach_the_builder() {
+  echo "❌ This Mac cannot reach your website builder, so Plantoir stopped before building the preview."
+  echo "   Nothing is wrong with your pages. Restarting your Mac puts it right."
+}
+
 announce_the_preview_address() {
   if [[ -n "$BUILD_ONLY" ]]; then
     return 0
@@ -1331,6 +1404,13 @@ announce_the_preview_address() {
     # the reason is in a transcript nobody opens. The words are pinned —
     # contracts/shared-rules.json -> activityTrail.mustRecord."preview did not appear".launcherLine
     note_on_the_trail "${COURSE}/${SECTION} · the preview stopped before building — Plantoir could not find out where it would be"
+    return 1
+  fi
+  if ! this_mac_can_reach_the_builder "$host_port"; then
+    say_this_mac_cannot_reach_the_builder
+    # Rule 5, words pinned in contracts/shared-rules.json ->
+    # activityTrail.mustRecord."preview did not appear".launcherLineWhenThisMacCannotReachTheBuilder
+    note_on_the_trail "${COURSE}/${SECTION} · the preview stopped before building — this Mac could not reach the website builder"
     return 1
   fi
   echo "🌐 Preview will be available at: http://localhost:${host_port}/"

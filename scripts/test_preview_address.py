@@ -81,6 +81,15 @@ def announce(answers: list, build_only: str = "", trail_home: Path = None) -> su
         counter.write_text("0", encoding="utf-8")
         program = "\n".join([
             function_named("note_on_the_trail"),
+            # Since #234 the announcement first makes sure this Mac can reach
+            # the address (scripts/test_preview_reach.py). Here curl always
+            # answers the way a healthy Mac does, and nothing sleeps, so this
+            # file tests the address alone and never touches the network.
+            "\n".join(re.findall(r"^PREVIEW_REACH_[A-Z_]+=.*$", the_launcher_text(), flags=re.MULTILINE)),
+            function_named("this_mac_can_reach_the_builder"),
+            function_named("say_this_mac_cannot_reach_the_builder"),
+            'curl() { return 52; }',
+            'sleep() { :; }',
             function_named("say_the_preview_address_is_unknown"),
             function_named("announce_the_preview_address"),
             "_answers=(" + " ".join("'" + answer + "'" for answer in answers) + ")",
