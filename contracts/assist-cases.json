@@ -494,14 +494,15 @@
         "tool" : "add_next_class"
       },
       {
-        "becauseNotThis" : "'day' would put the number in the unit slot, so a Unit/Day course would read 'at day 5' as Unit 5. It goes to the model, which can ask which unit.",
+        "becauseNotThis" : "'period' is not this course's page word. The first version took any single word, and 'at period 3', 'at block 2' and 'at section 2' were all planned in a club as “Week 3” or “Week 2” — renaming pages the teacher's links point at, from a sentence about something else. It goes to the model.",
         "example" : "make room for one meeting at Week 5",
         "fills" : {
           "howMany" : "<count>, as a number — words up to twelve are understood",
-          "unit" : "<number> — the one number a numbered course's page names carry. <word> is not read: this table cannot know a course's own word, so any single word except 'day' and 'unit' is taken ('at unit 3' names no day and goes to the model, as it always has), and a Unit/Day course given a unit and no day asks which day rather than guessing one"
+          "unit" : "<number> — the one number a numbered course's page names carry. Matched ONLY in a numbered course, and <word> must be that course's own page word (case-folded) or absent: 'at Week 5' and 'at 5' in a club whose pages are “Week N”. In a Unit/Day course this family matches nothing and the sentence goes to the model, as it did before #267"
         },
-        "notThis" : "make room for one meeting at day 5",
-        "shape" : "make room for <count> class|classes|meeting|meetings at <word> <number>",
+        "inANumberedCourseWhosePagesAre" : "Week",
+        "notThis" : "make room for one meeting at period 3",
+        "shape" : "make room for <count> class|classes|meeting|meetings at [<word>] <number>",
         "tool" : "make_room_for_classes"
       },
       {
@@ -525,7 +526,7 @@
         "tool" : "schedule_deploy"
       }
     ],
-    "parsedNote" : "Families the matcher PARSES rather than compares, because the number or title in them is unbounded. They are matched in code for the same reason the literals are — the whole sentence IS the request, and reading an integer or a title off a fixed shape is not a judgement anybody needs a language model for. `notThis` is the near-miss each family must REFUSE, and it is the half that stops a family swallowing requests that belong to the model."
+    "parsedNote" : "Families the matcher PARSES rather than compares, because the number or title in them is unbounded. They are matched in code for the same reason the literals are — the whole sentence IS the request, and reading an integer or a title off a fixed shape is not a judgement anybody needs a language model for. `notThis` is the near-miss each family must REFUSE, and it is the half that stops a family swallowing requests that belong to the model. A family carrying `inANumberedCourseWhosePagesAre` matches only in a window whose course names its pages with one number and that word (#267): a runner passes the word to its matcher for the example AND the near miss, and the family matches nothing in any other course."
   },
   "deployAtATime" : {
     "accepted" : [
