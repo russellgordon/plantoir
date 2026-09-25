@@ -1212,6 +1212,45 @@ enum ScheduledDeploy {
             standDown(script: script, section: section, now: now)
         }
 
+        // IS ANOTHER PROGRAM BUILDING THIS COURSE? (#156) An assistant working
+        // from another app, the teacher's own window, another copy of
+        // Plantoir: two builds of one section clear the same folder, so this
+        // waits for the other to finish — up to ten minutes, looking every
+        // fifteen seconds — and then takes `build` and `publish` leases of its
+        // own so the others wait for IT. Still busy after ten minutes, it
+        // stands down and says so rather than spoil both. A pre-v1.2.0 plist
+        // names no section, so there is no course to ask about and it goes
+        // ahead as it always did.
+        var leasesTaken: [URL] = []
+        if let section {
+            let coursesDirectory: URL = section.courseDirectory.deletingLastPathComponent()
+            let answer: CourseWait = waitForTheCourse(
+                courseCode: section.courseCode, coursesDirectory: coursesDirectory
+            )
+            switch answer {
+            case .goAhead(let leases, let waited, let waitedFor):
+                leasesTaken = leases
+                if let waitedFor {
+                    ActivityTrail.note(
+                        .scheduledPublishWaitedForTheCourse,
+                        "a scheduled publish waited \(Int(waited.rounded())) seconds while the course was "
+                        + WorkLeaseFiles.describe(waitedFor) + ", then went ahead",
+                        course: section.courseCode,
+                        section: section.sectionNumber
+                    )
+                }
+            case .standDown(let holding, let waited):
+                ActivityTrail.note(
+                    .scheduledPublishWaitedForTheCourse,
+                    "a scheduled publish waited \(Int(waited.rounded())) seconds while the course was "
+                    + WorkLeaseFiles.describe(holding) + ", and stood down",
+                    course: section.courseCode,
+                    section: section.sectionNumber
+                )
+                standDown(script: script, section: section, now: Date(), kind: .courseWasBusy)
+            }
+        }
+
         // Taken BEFORE anything runs, for the same reason the Deploy
         // button takes it before its own build: a page edited while an
         // overnight publish is running did not go out, and stamping the
@@ -1259,17 +1298,142 @@ enum ScheduledDeploy {
                     section: section.sectionNumber
                 )
             }
+            // The build and the publish are over, so the leases go before
+            // anything that could end this process — booting the job out
+            // below ends it.
+            for lease in leasesTaken {
+                WorkLeaseFiles.remove(at: lease)
+            }
             // LAST, once the work above is done. See the note in
             // oneShotCommand: this used to be the wrapper's final line, which
             // killed this process before any of the three calls above ran.
             bootOutAgent(courseCode: section?.courseCode, sectionNumber: section?.sectionNumber)
             exit(process.terminationStatus)
         } catch {
+            for lease in leasesTaken {
+                WorkLeaseFiles.remove(at: lease)
+            }
             FileHandle.standardError.write(Data(
                 "Plantoir could not run the scheduled deploy: \(error.localizedDescription)\n".utf8
             ))
             exit(1)
         }
+    }
+
+    // MARK: - Waiting for another build of the course (#156)
+
+    /// What `waitForTheCourse` decided.
+    enum CourseWait: Equatable {
+
+        /// The course is free and this run's own leases are on disk.
+        /// `waitedFor` is the holding it waited on, or nil when it did not
+        /// have to wait at all.
+        case goAhead(leases: [URL], waited: TimeInterval, waitedFor: WorkLeaseFiles.Holding?)
+
+        /// Still busy at the cap. Nothing of this run's is on disk.
+        case standDown(WorkLeaseFiles.Holding, waited: TimeInterval)
+    }
+
+    /// The longest a publish set for later waits for another build of its
+    /// course: ten minutes (#156, director's ruling, 2026-09-25 — reversible).
+    /// Long enough for any ordinary build or deploy to finish; short enough
+    /// that a run which then stands down is still early in the teacher's
+    /// morning, when there is time to publish by hand.
+    nonisolated static let longestWaitForTheCourse: TimeInterval = 600
+
+    /// How often it looks again while waiting.
+    nonisolated static let lookAgainEvery: TimeInterval = 15
+
+    /// Waits until no other live program holds `build` or `publish` on the
+    /// course, then takes this run's own `build` and `publish` leases and
+    /// looks once more — take, then check — so that two runs, or a run and
+    /// the window, cannot both go ahead.
+    ///
+    /// **The cap is measured on the WALL clock** (`now`, a `Date`): a Mac
+    /// that sleeps part way through would otherwise pause the count, and a
+    /// run woken at eight would still be "waiting" for the build it found at
+    /// half six. It is synchronous because the scheduled run is (it never
+    /// returns and has no app around it); the pause between looks is a
+    /// blocking sleep of the interval, which is the intended behaviour — a
+    /// paced re-check — rather than a guess at when something settles.
+    ///
+    /// Holds NOTHING while it waits, so the program it is waiting for is not
+    /// itself made to wait. Every seam is injectable so a test can run the
+    /// whole ten minutes in no time and stage the race exactly.
+    nonisolated static func waitForTheCourse(
+        courseCode: String,
+        coursesDirectory: URL,
+        now: () -> Date = { return Date() },
+        pause: (TimeInterval) -> Void = { seconds in Thread.sleep(forTimeInterval: seconds) },
+        heldElsewhere: (() -> [WorkLeaseFiles.Holding])? = nil,
+        longest: TimeInterval = ScheduledDeploy.longestWaitForTheCourse,
+        every: TimeInterval = ScheduledDeploy.lookAgainEvery
+    ) -> CourseWait {
+        let started: Date = now()
+        let deadline: Date = started.addingTimeInterval(longest)
+        var lastSeen: WorkLeaseFiles.Holding? = nil
+
+        while true {
+            let holdings: [WorkLeaseFiles.Holding] = ScheduledDeploy.readHoldings(
+                heldElsewhere: heldElsewhere, courseCode: courseCode, coursesDirectory: coursesDirectory
+            )
+            if let inTheWay = WorkLeaseFiles.blocking(among: holdings, asker: .aScheduledPublish, claim: nil) {
+                lastSeen = inTheWay
+            } else {
+                // Free: take, then check.
+                var taken: [URL] = []
+                var claim: WorkLeaseFiles.Claim? = nil
+                if let build = WorkLeaseFiles.write(
+                    kind: WorkLeaseFiles.buildKind, courseCode: courseCode, coursesDirectory: coursesDirectory
+                ) {
+                    taken.append(build.url)
+                    claim = WorkLeaseFiles.Claim(moment: build.moment, pid: getpid())
+                }
+                if let publish = WorkLeaseFiles.write(
+                    kind: WorkLeaseFiles.publishKind, courseCode: courseCode, coursesDirectory: coursesDirectory
+                ) {
+                    taken.append(publish.url)
+                }
+                let waited: TimeInterval = now().timeIntervalSince(started)
+                guard let claim else {
+                    // Nothing could be written. A lease that cannot be written
+                    // must not stop the publish (Windows' rule too).
+                    return .goAhead(leases: taken, waited: waited, waitedFor: lastSeen)
+                }
+                let afterTaking: [WorkLeaseFiles.Holding] = ScheduledDeploy.readHoldings(
+                    heldElsewhere: heldElsewhere, courseCode: courseCode, coursesDirectory: coursesDirectory
+                )
+                if let earlier = WorkLeaseFiles.blocking(
+                    among: afterTaking, asker: .aScheduledPublish, claim: claim
+                ) {
+                    for url in taken {
+                        WorkLeaseFiles.remove(at: url)
+                    }
+                    lastSeen = earlier
+                } else {
+                    return .goAhead(leases: taken, waited: waited, waitedFor: lastSeen)
+                }
+            }
+
+            let current: Date = now()
+            if current >= deadline, let lastSeen {
+                return .standDown(lastSeen, waited: current.timeIntervalSince(started))
+            }
+            let remaining: TimeInterval = deadline.timeIntervalSince(current)
+            pause(min(every, max(remaining, 0)))
+        }
+    }
+
+    /// The other programs' holdings, from the injected source or from disk.
+    nonisolated private static func readHoldings(
+        heldElsewhere: (() -> [WorkLeaseFiles.Holding])?,
+        courseCode: String,
+        coursesDirectory: URL
+    ) -> [WorkLeaseFiles.Holding] {
+        if let heldElsewhere {
+            return heldElsewhere()
+        }
+        return WorkLeaseFiles.heldElsewhere(courseCode: courseCode, coursesDirectory: coursesDirectory)
     }
 
     // MARK: - Standing down: a job whose day has gone by
@@ -1353,7 +1517,8 @@ enum ScheduledDeploy {
     nonisolated static func standDown(
         script: String,
         section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)?,
-        now: Date = Date()
+        now: Date = Date(),
+        kind: ScheduledPublishOutcome.Kind = .tooLateToRun
     ) -> Never {
         let fileManager: FileManager = FileManager.default
         if let label = label(fromScriptPath: script) {
@@ -1377,7 +1542,7 @@ enum ScheduledDeploy {
             )
             ScheduledPublishOutcome.recordStopped(
                 ScheduledPublishOutcome.Stopped(
-                    kind: .tooLateToRun,
+                    kind: kind,
                     destination: ScheduledPublishOutcome.nothingWasDeployedName,
                     when: now
                 ),

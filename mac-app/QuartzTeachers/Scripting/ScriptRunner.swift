@@ -137,6 +137,23 @@ class ScriptRunner {
     /// be reset between tests either.
     private(set) static var runsInFlight: [ScriptRunner] = []
 
+    /// Set once a process has begun to leave — the MCP server whose client
+    /// went away (#156) — so no launcher starts after the ones in flight have
+    /// been stopped. A deploy's next leg would otherwise begin the moment its
+    /// build was stopped, and outlive the process with no lease saying so.
+    static var refusesNewRuns: Bool = false
+
+    /// The launcher's process id while it runs, or nil.
+    var processIdentifier: Int32? {
+        guard let process else {
+            return nil
+        }
+        if !process.isRunning {
+            return nil
+        }
+        return process.processIdentifier
+    }
+
     /// Ends every live PREVIEW, host side, the way the Stop button does.
     ///
     /// Called at quit, and deliberately narrow. A preview server's launcher
@@ -208,6 +225,10 @@ class ScriptRunner {
         keepingTranscript: Bool = false
     ) {
         if isRunning {
+            return
+        }
+        if ScriptRunner.refusesNewRuns {
+            launchProblem = "Plantoir is closing, so nothing new was started."
             return
         }
 

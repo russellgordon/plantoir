@@ -8,6 +8,10 @@ import Observation
 /// a port when it starts and returns it when it stops; the same section can
 /// only be previewed in one place, because two builds of one section would
 /// race over the same output folder.
+///
+/// A preview here is also a `preview` lease on disk (#156), derived by
+/// `WorkLeaseRegistry` from this list, so that a build started by ANOTHER
+/// process declines rather than ending the page the teacher is reading.
 @MainActor
 enum PreviewLeases {
 
@@ -89,6 +93,7 @@ enum PreviewLeases {
                     sectionNumber: sectionNumber
                 )
                 store.active.append(lease)
+                WorkLeaseRegistry.reconcile()
                 return lease
             }
         }
@@ -104,10 +109,12 @@ enum PreviewLeases {
             }
         }
         store.active = remaining
+        WorkLeaseRegistry.reconcile()
     }
 
     /// Starts from nothing — for tests.
     static func reset() {
         store.active = []
+        WorkLeaseRegistry.reconcile()
     }
 }

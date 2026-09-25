@@ -31,6 +31,7 @@
     "copiedTo" : "“{page}” was copied to “{copy}”, dated 2026-09-14. It is hidden, so nothing changed on the site — write it, then publish when it is ready.",
     "couldNotBuildBeforeDeploying" : "{course} Section {section} could not be built, so nothing was sent to students. The output is in that section's window in Plantoir.",
     "couldNotUndo" : "Earlier, you {change}, and you have asked me to undo that — but I have not changed anything, because those 2 pages have been edited since. Putting my old copy back would throw away that newer work.",
+    "courseIsBeingBuiltElsewhere" : "{course} is being previewed or published somewhere else on this computer right now — by an assistant working from another app, another copy of Plantoir, or a deploy set for later. Both would build the same pages in the same place, so doing it here as well would spoil both. Try again once that has finished.",
     "courseIsBusy" : "{course} is busy in Plantoir — a preview or a deploy is running. Wait for that to finish, then ask again.",
     "datesForTheNextPage" : "Adding the next class page needs to know which days this section meets.",
     "datesForTheNextPageForAMeeting" : "Adding the next meeting page needs to know which days this section meets.",

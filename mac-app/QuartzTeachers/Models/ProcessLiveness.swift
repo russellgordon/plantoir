@@ -279,10 +279,27 @@ nonisolated enum ProcessLiveness {
     /// The first three are Windows' `WorkLease` shape exactly, so its reader
     /// (which reads the first two) understands a mac lease; the fourth is the
     /// mac's addition and is ignored there.
+    ///
+    /// **The name is the one the process table reports, not
+    /// `ProcessInfo.processName`** (#156). The two differ when the program is
+    /// started through a link — measured: a binary run through a symbolic
+    /// link called `other-link` has `processName` "other-link" and a table
+    /// name of its real file's — and the table's is the name every reader
+    /// compares against, so writing it makes the comparison agree by
+    /// construction instead of reading this process's own live lease as a
+    /// recycled one. `processName` is the fallback only when the table cannot
+    /// be asked.
     static func leaseBody(at moment: Date = Date()) -> String {
         let pid: Int32 = getpid()
-        let name: String = ProcessInfo.processInfo.processName
-        let started: String = ProcessLiveness.startTime(ofProcess: pid) ?? ""
+        var name: String = ProcessInfo.processInfo.processName
+        var started: String = ""
+        let table: TableAnswer = ProcessLiveness.askTheProcessTable(pid: pid)
+        if case .found(let tableName, _, let startTime) = table {
+            if !tableName.isEmpty {
+                name = tableName
+            }
+            started = startTime
+        }
         return "\(pid)\n\(name)\n\(ProcessLiveness.leaseMomentText(moment))\n\(started)\n"
     }
 

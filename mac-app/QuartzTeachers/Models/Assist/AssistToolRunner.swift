@@ -1284,6 +1284,34 @@ final class AssistToolRunner {
         return AssistToolOutcome.wrote(message, detail: message)
     }
 
+    /// What another program on this Mac holds that stands in the way of
+    /// building this course — the EARLY look, before anything is stopped
+    /// (#156). Nil when the way is clear or there is no working folder.
+    private func whatBlocksABuild(of course: Course) -> WorkLeaseFiles.Holding? {
+        guard let folder = workspace.workspaceURL else {
+            return nil
+        }
+        return WorkLeaseRegistry.whatBlocksABuild(
+            folderPath: folder.path, courseCode: course.code, afterTaking: false
+        )
+    }
+
+    /// What is said when another program is in the way (#156).
+    ///
+    /// An assistant working from another app is told `courseIsBusy`: it is
+    /// talking to the program whose course is busy, and that sentence tells
+    /// it to wait and ask again, which is what it can do. The teacher, in the
+    /// app, is told `courseIsBeingBuiltElsewhere`, which says where the other
+    /// work might be — somewhere they cannot see from this window.
+    func builtElsewhereSentence(for course: Course) -> String {
+        switch surface {
+        case .mcp:
+            return AssistWording.courseIsBusy(course: course.code)
+        case .local:
+            return AssistWording.courseIsBeingBuiltElsewhere(course: course.displayCode)
+        }
+    }
+
     /// The window this section is open in, if one is on screen.
     private func sectionWindow(
         for course: Course, sectionNumber: Int
@@ -1402,6 +1430,15 @@ final class AssistToolRunner {
         guard let window = sectionWindow(for: course, sectionNumber: sectionNumber) else {
             return false
         }
+        // Another program is building or previewing this course (#156), so
+        // the restart after the write would be declined — and a preview
+        // stopped now would then stay down. The write itself never conflicts
+        // with a build (Markdown is not what a build clears), so it goes
+        // ahead and the teacher's preview is left up; the note after the
+        // write says why it was not refreshed.
+        if whatBlocksABuild(of: course) != nil {
+            return false
+        }
         if !window.isPreviewRunning() {
             return false
         }
@@ -1437,6 +1474,16 @@ final class AssistToolRunner {
     private func bringThePreviewUpToDate(
         for course: Course, sectionNumber: Int
     ) async -> String {
+        // FIRST, before a window is opened or a preview stopped (#156): a
+        // build another program is running, or a preview it is showing, is
+        // not this conversation's to end.
+        if let holding = whatBlocksABuild(of: course) {
+            WorkLeaseRegistry.noteDeclined(
+                act: WorkLeaseRegistry.assistantsAct("rebuild"), courseCode: course.code,
+                sectionNumber: sectionNumber, holding: holding
+            )
+            return builtElsewhereSentence(for: course)
+        }
         if sectionWindow(for: course, sectionNumber: sectionNumber) == nil {
             _ = await revealSectionOnScreen(course: course, sectionNumber: sectionNumber)
         }
@@ -1464,6 +1511,9 @@ final class AssistToolRunner {
             course: course, sectionNumber: sectionNumber
         )
         if !rebuild.succeeded {
+            if rebuild.wasBuiltElsewhere {
+                return builtElsewhereSentence(for: course)
+            }
             return rebuild.message
         }
         return AssistWording.builtWithNoWindowOpen(
@@ -1663,6 +1713,18 @@ final class AssistToolRunner {
             )
         }
 
+        // Another program building or previewing the course (#156) — asked
+        // here for the same reason, before anything is stopped. The window's
+        // Deploy and the headless deploy each check again after taking their
+        // own lease; this look only spares the preview.
+        if let holding = whatBlocksABuild(of: located.course) {
+            WorkLeaseRegistry.noteDeclined(
+                act: WorkLeaseRegistry.assistantsAct("deploy"), courseCode: located.course.code,
+                sectionNumber: located.sectionNumber, holding: holding
+            )
+            return AssistToolOutcome.refused(builtElsewhereSentence(for: located.course))
+        }
+
         _ = await stopThePreviewBeforeWriting(
             for: located.course, sectionNumber: located.sectionNumber
         )
@@ -1685,6 +1747,9 @@ final class AssistToolRunner {
         }
 
         if !result.succeeded {
+            if result.wasBuiltElsewhere {
+                return AssistToolOutcome.refused(builtElsewhereSentence(for: located.course))
+            }
             return AssistToolOutcome.refused(result.message)
         }
         // The stopped preview is NOT mentioned, and that was a decision.
