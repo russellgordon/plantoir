@@ -13,6 +13,14 @@ the shared contracts**, not by reading Swift.
 
 ---
 
+> **Start with [`WINDOWS-PARITY.md`](WINDOWS-PARITY.md)** (added 2026-09-25): the
+> strategy for bringing this app to parity with what the mac ships in v1.3.2 —
+> every issue on the milestone "Windows: parity with mac v1.3.2" placed in one
+> ordered phase, what is inherited free from the shared Python, the traps, and
+> the first week. Read it before the open issues, then come back here for the
+> rules while working.
+
+
 ## 0. Outline the plan before implementing
 
 **Read everything in section 1, then stop and write the plan out for Russell.**
