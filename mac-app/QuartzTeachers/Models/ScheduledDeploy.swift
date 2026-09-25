@@ -1608,6 +1608,22 @@ enum ScheduledDeploy {
     /// launchd points its stdout and stderr at that log and the process
     /// inherits them — and an unread pipe is exactly what wedged the Windows
     /// assistant's server, so this reads the file launchd already wrote.
+    ///
+    /// **It also leaves the `folder problem found` trail line, here, at the
+    /// end of the run (#153)** — one per distinct finding. Until then a
+    /// scheduled run's findings reached the trail only if somebody later
+    /// opened the section, and `takeFolderProblems` noted nothing even then,
+    /// so the overnight path — the one the check exists for — left no line at
+    /// all. Written by THIS process rather than when the section is opened
+    /// (Windows' shape), for the reason `scheduledPublishStopped.trail`
+    /// gives: a problem found at half six must be dated to half six, and a
+    /// teacher who never opens that section must still get the line. Two
+    /// imprecisions accepted: the line is stamped when the run FINISHES, not
+    /// when the build printed the finding (minutes apart, the same as
+    /// `notePagesDatedByTheBuild`); and a log found SHORTER than the offset
+    /// is read whole (`textOfLog`), so after a rotation mid-run an older
+    /// night's findings are noted again — the sentinel has always had the
+    /// same edge.
     nonisolated static func recordFolderProblems(
         section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)?,
         fromByteOffset offset: UInt64,
@@ -1623,9 +1639,15 @@ enum ScheduledDeploy {
             return
         }
         notePagesDatedByTheBuild(in: text)
+        noteFolderProblems(in: text)
         var markerLines: [String] = []
-        for rawLine in text.split(separator: "\n", omittingEmptySubsequences: false) {
-            let line: String = String(rawLine).trimmingCharacters(in: .whitespaces)
+        // Split on scalars, not Characters: Swift folds "\r\n" into one
+        // Character, so `split(separator: "\n")` would not split a PTY's
+        // output at all. launchd hands the child a plain file, so the log has
+        // "\n" endings today (the launchers ask for a terminal only when they
+        // have one) — this is hardening, not a fix for something seen.
+        for rawLine in SiteHealthFinding.linesOf(text) {
+            let line: String = rawLine.trimmingCharacters(in: .whitespaces)
             if SiteHealthFinding.isMarkerLine(line) {
                 markerLines.append(line)
             }
@@ -1660,6 +1682,24 @@ enum ScheduledDeploy {
             ActivityTrail.note(
                 .pagesDatedByTheBuild, report.trailSentence,
                 course: report.course, section: report.section
+            )
+        }
+    }
+
+    /// This run's folder problems, on the activity trail: one
+    /// `folder problem found` line per DISTINCT finding, in the words the
+    /// console path writes (`SiteHealthFinding.trailSentence`). Why here and
+    /// not when the section is opened: `recordFolderProblems`.
+    nonisolated static func noteFolderProblems(in text: String) {
+        var noted: [SiteHealthFinding] = []
+        for finding in SiteHealthFinding.findings(in: text) {
+            if noted.contains(finding) {
+                continue
+            }
+            noted.append(finding)
+            ActivityTrail.note(
+                .folderProblemFound, finding.trailSentence,
+                course: finding.course, section: finding.section
             )
         }
     }
@@ -1699,6 +1739,10 @@ enum ScheduledDeploy {
 
     /// What the last scheduled run found, if anything, consuming the record so
     /// it is reported once rather than every time the app opens.
+    ///
+    /// Notes NOTHING on the trail: the run itself already did, dated to the
+    /// run (`recordFolderProblems`), so a finding is one trail line whether or
+    /// not anybody ever opens the section.
     nonisolated static func takeFolderProblems(
         courseCode: String,
         sectionNumber: Int,
