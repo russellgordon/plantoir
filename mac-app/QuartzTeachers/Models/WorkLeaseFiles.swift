@@ -210,7 +210,16 @@ nonisolated enum WorkLeaseFiles {
             }
             let text: String = String(decoding: data, as: UTF8.self)
             let facts: (name: String?, start: String?) = ProcessLiveness.recordedFacts(inLeaseText: text)
-            if !ownerIsAlive(parsed.pid, facts.name, facts.start) {
+            // A build, preview or publish lease with no name line is not one
+            // either app writes, and Windows' reader treats fewer than two
+            // lines as stale; judged on its id alone it could block a course
+            // for the whole life of whatever was handed that id. #245's
+            // `nameToCompare` supplies a name only for the IMPORT kind, whose
+            // one-line shape an older Plantoir really wrote.
+            guard let judgedName = ProcessLiveness.nameToCompare(recorded: facts.name, kind: parsed.kind) else {
+                continue
+            }
+            if !ownerIsAlive(parsed.pid, judgedName, facts.start) {
                 continue
             }
             holdings.append(
