@@ -132,7 +132,7 @@ enum SectionAdder {
         // for. A page that has those keys for the existing sections needs a
         // pair for this one too, or the new section builds it with no date
         // and no publishing state at all.
-        extendCourseLevelPages(in: course, toInclude: sectionNumber, created: created)
+        let pagesGivenKeys: Int = extendCourseLevelPages(in: course, toInclude: sectionNumber, created: created)
 
         // Only once the folder is safely in place does the section join the
         // course's settings — the same order restore uses, so a failure
@@ -142,6 +142,23 @@ enum SectionAdder {
         numbers.sort()
         course.configuration.setSectionNumbers(numbers)
         try course.configuration.write(to: course.configFileURL)
+
+        // Rule 5: this writes into pages the teacher never opened, so the
+        // trail says it happened and how many — never which.
+        ActivityTrail.note(
+            .sectionAdded,
+            SectionAdder.trailLine(sectionNumber: sectionNumber, pagesGivenKeys: pagesGivenKeys),
+            course: course.code,
+            section: sectionNumber
+        )
+    }
+
+    /// The trail's line for a section added: what a teacher would say they
+    /// did, and how many shared pages it touched.
+    static func trailLine(sectionNumber: Int, pagesGivenKeys: Int) -> String {
+        let pages: String = pagesGivenKeys == 1 ? "1 page" : "\(pagesGivenKeys) pages"
+        return "added section \(sectionNumber); \(pages) shared by every section "
+            + "given a date and a published-or-hidden setting for it"
     }
 
     /// Finds the directory of the lowest-numbered section in the course that exists on disk.
@@ -273,7 +290,10 @@ enum SectionAdder {
     /// fresh, because the page did not appear in this section until now.
     /// Pages with no per-section keys are left alone — a plain `created:`
     /// already applies to every section, including this one.
-    static func extendCourseLevelPages(in course: Course, toInclude sectionNumber: Int, created: String) {
+    ///
+    /// Returns how many pages were given keys, for the trail.
+    @discardableResult
+    static func extendCourseLevelPages(in course: Course, toInclude sectionNumber: Int, created: String) -> Int {
         var sectionFolderNames: Set<String> = Set<String>()
         for number in course.sectionNumbers {
             sectionFolderNames.insert("section\(number)")
@@ -282,8 +302,9 @@ enum SectionAdder {
         guard let enumerator = fileManager.enumerator(
             at: course.directoryURL, includingPropertiesForKeys: nil
         ) else {
-            return
+            return 0
         }
+        var pagesGivenKeys: Int = 0
         while let entry = enumerator.nextObject() as? URL {
             if sectionFolderNames.contains(entry.lastPathComponent) {
                 enumerator.skipDescendants()
@@ -292,21 +313,27 @@ enum SectionAdder {
             if entry.pathExtension != "md" {
                 continue
             }
-            extendFrontmatter(ofPageAt: entry, toInclude: sectionNumber, created: created)
+            if extendFrontmatter(ofPageAt: entry, toInclude: sectionNumber, created: created) {
+                pagesGivenKeys += 1
+            }
         }
+        return pagesGivenKeys
     }
 
     /// One page's frontmatter, given a pair for the new section. Only the
     /// frontmatter block is read: a `publish: false` shown inside a fenced code
     /// block further down the page is documentation, not metadata.
-    static func extendFrontmatter(ofPageAt url: URL, toInclude sectionNumber: Int, created: String) {
+    ///
+    /// True when the page was given keys and written.
+    @discardableResult
+    static func extendFrontmatter(ofPageAt url: URL, toInclude sectionNumber: Int, created: String) -> Bool {
         guard let text = try? String(contentsOf: url, encoding: .utf8),
               let block = PageFrontmatter.block(in: text) else {
-            return
+            return false
         }
         let lines: [String] = block.lines
         if alreadyHasKeys(for: sectionNumber, in: lines) {
-            return
+            return false
         }
 
         var lowestSection: Int? = nil
@@ -319,7 +346,7 @@ enum SectionAdder {
             }
         }
         guard let source = lowestSection else {
-            return
+            return false
         }
 
         var addition: [String] = ["createdSection\(sectionNumber): \(created)"]
@@ -340,7 +367,7 @@ enum SectionAdder {
             lastKeyIndex = index
         }
         if lastKeyIndex < 0 {
-            return
+            return false
         }
 
         // Spliced in by LINE, at the position the shared finder reported —
@@ -366,7 +393,12 @@ enum SectionAdder {
             insertAt += 1
         }
         let rewritten: String = allLines.joined(separator: "\n")
-        try? rewritten.write(to: url, atomically: true, encoding: .utf8)
+        do {
+            try rewritten.write(to: url, atomically: true, encoding: .utf8)
+        } catch {
+            return false
+        }
+        return true
     }
 
     /// Does this page already carry the new section's keys?
