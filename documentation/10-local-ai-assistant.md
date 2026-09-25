@@ -4016,6 +4016,61 @@ Both identical afterwards. Nothing here is a routing change, so the 29-probe
 suite does not need re-running: the gate is code in front of the dispatch, and
 the sentences are tool OUTPUT rather than definitions.
 
+## A numbered course has no units (#267)
+
+A club's pages are "Week 1", "Week 2" — `class_page_scheme: "numbered"`, see
+[08](08-course-config-reference.md). Inside the mac app a numbered page is a
+`UnitDay` with `unit == 1` and `day == N`, which is what lets next-class,
+make-room, duplicate, the placeholder planner and the front-page tie-break count
+one number with no planner rewrite of their own. REJECTED: a second type
+threaded through seven planners (seven places to forget, and the rename order
+of make-room and duplicate is exactly the subtle part that would be re-derived);
+storing "Week N" as unit N, day 1 (next-class would start a new unit every time
+and make-room would move nothing).
+
+The seam has one consequence that would otherwise have been the worst bug in
+the piece, and every rule below exists because of it:
+
+- **No whole-unit path.** `AssistPublishPlanner.unitNamed` returns nil in a
+  numbered course, and `classPages(inUnit:)` skips numbered pages. Before the
+  fix the real parser read "Week 1" as unit 1, so `publish_pages(pages:
+  "Week 1")` — the most ordinary request a club has — published EVERY meeting
+  in the section (measured: four of four, `NumberedCourseTests`, by putting the
+  old guard back), with a card that said "publishing Unit 1"; "Week 3" found
+  no unit and was REFUSED. Now every title goes to the page path, which acts on
+  the one page named. `class-planning.json` → `wholeUnit` pins it for Windows.
+- **Start a new unit, and add days to a unit, are refused**
+  (`NextClassPlanner.Problem.noUnitsInANumberedCourse`) BEFORE the timetable is
+  read, so nobody is asked for their dates on the way to being told no. The
+  card phrasings reach the same refusal.
+- **Make room reads ONE number** from the frozen schema's `unit`/`atDay`
+  (`ClassInsertionPlanner.numberedPosition`): either argument alone, `1` plus
+  the other, or the Unit/Day habit `unit: 5, atDay: 1` all mean 5; two
+  different numbers, neither 1, are refused so the teacher is asked. Which one
+  a small model fills for "make room at Week 5" is a ROUTING question, and is
+  not measured yet (owed with the noun slice, by hand, per `research/`).
+- **Make room keeps a numbered course's date GAPS.** Clubs are sparse: CODING's
+  pages are Week 1 (2025-09-18), Week 2 (09-25), Week 8 (11-20), Week 9
+  (11-27). The ordinary slot rule packs later pages onto the next free days and
+  moved old Week 8 to 2025-10-09 — six weeks EARLIER, under a plan saying
+  "moved onto later class days" (measured by putting the slot rule back). A
+  numbered page now stays where it is when it is already after the page before
+  it, and otherwise takes the first class day after that page. For a section
+  with no gaps both rules give the same dates. The Unit/Day scheme keeps the
+  slot rule; its pages sit on consecutive class days by construction, and
+  changing it there is not part of this piece.
+- **Sentences name the course's own shape.** The two make-room sentences, the
+  whole-unit card, the placeholder plans and the "no pages named …" problems
+  used to type "Unit … Day …" by hand — which also told a Module course "at
+  Unit 3, Day 4" (#268, fixed here). They go through `ClassPageNaming.title`,
+  `shapeDescription` and `unitName`; `insertion.positionInSentences` pins it.
+- **What the model is shown does not move.** No tool description, schema or
+  prompt byte changed: `toolhash.py` over the regenerated `assist-cases.json`
+  gives `local 13 tools 46b96562…2cd96cb6` and `mcp 32 tools 9bcc7eb7…9cef36f7`,
+  identical before and after. Refusal sentences that go back to the model say
+  "page", never "meeting". What the assistant calls a page in a club
+  (`class_noun`) is a later slice; until then its sentences still say "class".
+
 ## Further reading in this repository
 
 - [`09-mac-app.md`](09-mac-app.md) — the app the assistant lives in

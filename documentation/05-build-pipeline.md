@@ -240,6 +240,24 @@ file inside any folder whose name contains "curriculum" up to that
 timestamp (only if older). Curriculum pages thus float alongside current
 content without the teacher ever editing them.
 
+### Which pages are class pages: the word AND the scheme (#267)
+
+What the build counts as a class page — for the curriculum coverage map's
+"pages the course teaches", and for the first-class date non-class pages
+inherit — is `class_pages.class_page_pattern(word, scheme)`, set once per build
+by `set_unit_word` and `set_class_page_scheme` from `course_config.json`.
+`unit_day` (absent, empty or unknown) is `^<word>\s+(\d+),\s*Day\s+(\d+)$`;
+`numbered` — a club — is `^<word>\s+(\d+)$`, and its first class is
+`<word> 1` (leading zeros allowed). The same rule both apps read through
+`class-planning.json` → `pageNaming`. The build prints which scheme it is using.
+
+**No build patch, so no ALWAYS-section rule applies**: the pattern is read
+fresh on every build, and nothing is written into a course. REJECTED: a
+free-form pattern key (`"{word} {n}"`) — every planner would need a parser for
+a regex a teacher wrote. A course whose pages are "Week N" but whose file names
+no scheme (Russell's `CODING`) is read as `unit_day` and so finds no class
+pages, exactly as before: nothing converts a course by building it.
+
 ## Stage 3.5: Checking the folders this course depends on
 
 Once the shared and per-section folders have been merged into `content/`, and
