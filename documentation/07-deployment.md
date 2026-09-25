@@ -666,9 +666,12 @@ does its own post-run work.
 - **Exit 3 is tested before the general non-zero branch**, because it is also
   non-zero. Three means `NEEDS_AN_ANSWER` and nothing else; anything else is an
   ordinary failure.
-- **Which LEG stopped decides the kind, not just the code.** Exit 3 from the
-  build is `buildNeededAnAnswer`; exit 3 from a destination is
-  `neededAnAnswer`. See the section below.
+- **Which LEG stopped decides the kind, not just the code.** From the BUILD,
+  exit 3 is `buildNeededAnAnswer` and any other non-zero code is
+  `buildDidNotFinish` (#137); from a DESTINATION, exit 3 is `neededAnAnswer`
+  and any other is `didNotFinish`. The table is data —
+  `contracts/shared-rules.json` → `scheduledPublishStopped` → `whichKind` —
+  and the sections below explain both build kinds.
 - The **first** destination that stopped is the one kept. A course can publish
   to several and only one may have gone wrong, so *"it published to the folder
   and not to Netlify"* is the report a teacher makes; overwriting would tell
@@ -918,8 +921,9 @@ reading it. The line names no destination, and
 **The record's second line is still written and never shown.** Every record has
 one shape — the kind, then a name — because it is a shell script writing two
 `echo` lines at half six, and `stopped(inHomeFolder:course:section:)` refuses a
-record whose second line is empty. A build that failed OUTRIGHT still puts that
-name in the teacher's sentence.
+record whose second line is empty. Since #137 (below) neither build kind shows
+it; until then a build that failed OUTRIGHT still put that name in the
+teacher's sentence.
 
 **A section already scheduled keeps the wrapper it was scheduled with.**
 `oneShotCommand` is called from `scheduleDeploy` and nowhere else, and nothing
@@ -928,6 +932,93 @@ the launchers. So a teacher with a publish already pending when they update
 reads the old sentence once, for that run. Records already on disk stay
 readable — the old kind is still a kind — which is why the fix could be made
 without a migration.
+
+### …and so is a build that failed outright (#137)
+
+Decided by Russell on 2026-09-23 (GitHub
+[#137](https://github.com/russellgordon/plantoir/issues/137)) and landed on the
+mac 2026-09-25. A scheduled publish whose BUILD exits non-zero with any code
+but 3 — a page Quartz cannot build, a build launcher that could not run — used
+to be recorded as `didNotFinish`, the kind a DESTINATION gets. On the mac the
+record's destination line was `buildDestinationName`, and `didNotFinish`'s
+sentence put that phrase where a destination goes — so the teacher read that
+publishing to something that is not a destination had stopped, and was sent to
+**Publish**. On Windows the wrapper joins every configured destination instead,
+so a teacher read that publishing to Netlify and Cloudflare Pages stopped when
+neither had been contacted — the shape #132 had already recorded as REJECTED.
+
+It is now its own kind, `buildDidNotFinish`, and its sentence is
+`scheduledPublishStopped.sentences.buildDidNotFinish` — Russell's starting
+wording, used verbatim and his to polish. It names **no destination** and sends
+the teacher to **Preview**, because previewing is what rebuilds the pages and
+shows the build's output; its last clause echoes
+`AssistWording.couldNotBuildBeforeDeploying`, the assistant's sentence for the
+same failure. The badge is unchanged (it needs attention, like every failure).
+The trail line files under the existing `scheduled publish did not finish`
+event — the run did not finish, which is what that event is about — and names
+no destination; `activityTrail.mustRecord` → that event's `carries` says so.
+No new event.
+
+**The wrapper's test is "not 3", never "is 1".** `preview.sh` itself exits
+only 0, 1 and 3, but a build that never ran exits with whatever stopped it:
+127 from bash for a launcher that could not be run, 143 or 137 for a signal,
+125 from Docker. Every one of those means no pages were built and nothing was
+contacted, which is the only claim the sentence makes. The contract's
+`whichKind.cases` carries a 127 row precisely so a port that tests `-eq 1`
+fails there.
+
+**Rejected, and recorded so they are not proposed again:**
+
+- **Merging the two build kinds** into one. It loses what `buildNeededAnAnswer`
+  promises — answer the question once and the section publishes on its own
+  after that — which is true of a question and false of a broken page.
+- **Leaving it.** It pointed at the wrong button and named a place nobody
+  contacted.
+- **Rewording `didNotFinish` to cover both.** A sentence that fits "Netlify
+  refused your token" and "your pages would not build" names neither the place
+  nor the fix.
+- **Telling the two apart in the app by the record's destination text**
+  (`destination == buildDestinationName`). That makes a display string carry
+  meaning, and it could then never be reworded.
+- **Renaming `buildDestinationName`** now that nobody sees it (the issue
+  floated "the pages could not be built"). Only a person opening the record in
+  TextEdit would notice, the record format is platform-local, and keeping the
+  value means a record from a wrapper scheduled before #137 and one from after
+  differ only in the kind line.
+- **A read-side shim** mapping an old `(did not finish, buildDestinationName)`
+  record to the new kind. It is the display-string inference above, bought for
+  one run's wording.
+
+**Known limits, stated rather than coded for:**
+
+- **A section already scheduled keeps its old wrapper**, as it did for #132:
+  `oneShotCommand` runs only when a deploy is scheduled, and nothing rewrites a
+  pending one. Its one remaining run records a failed build as `didNotFinish`
+  and the teacher reads the old sentence once. Records already on disk stay
+  readable.
+- **A build that fails INSIDE a destination's own rebuild** reaches the
+  wrapper as that destination's exit 1 and is still `didNotFinish` naming the
+  destination, because the exit code is all the wrapper has. Two such rebuilds
+  exist. `deploy.py` rebuilds for production whenever the built site's
+  `baseUrl` is not the destination's address (`ensure_base_url_and_rebuild`) —
+  on a first publish to an address, or after the address changes — so that one
+  stays reachable whatever happens to #136. And both `deploy.py` and `deploy.sh` rebuild a site they
+  find carrying the preview's live-reload client — reachable in a scheduled run
+  only while the wrapper's is-the-site-stale check is narrower than the
+  launchers' (the gap described under "How it is tested" below,
+  [#136](https://github.com/russellgordon/plantoir/issues/136)). Whichever of
+  #136 and #137 lands second re-reads this paragraph. Giving a destination's
+  rebuild its own exit code was rejected there as a launcher contract change
+  Windows shares.
+- **A failure that was only passing** — Docker or Colima not answering, the
+  build stopped by a signal — is `buildDidNotFinish` too. The teacher previews,
+  it simply works, and "the reason will be in that section's window" is then not
+  literally true: there is no reason left to see. Accepted: Preview is still the
+  right thing to do, and it is strictly better than a destination nobody
+  contacted.
+- **An older build of the app reading a new record** does not recognise the
+  kind and treats the record as half-written (`record(at:)` returns `nil`).
+  Only reachable by downgrading, and true of every kind added since #132.
 
 ### The two widenings, and what still differs between the platforms
 
@@ -953,6 +1044,13 @@ in issue #132's work, described in full in the section above. That sentence
 used to end "this suite is red on `kinds`/`sentences` until the mac adopts it",
 which was true when it was written on the Windows branch and stopped being true
 the moment these two merged.
+
+**`buildDidNotFinish` is on the mac only, as of 2026-09-25** (#137, above), and
+Windows owes it: their wrapper still records a failed build as `DidNotFinish`
+with every destination joined, and their suite goes red on `kinds` and
+`sentences` until it adopts the kind, which is the request rather than damage.
+So do `tooLateToRun` and `courseWasBusy`, on the conditions the contract gives
+for each; `platformDifferences` is where that is kept current.
 
 **One difference remains, and it is deliberate: who writes the trail line,
 which cannot be the same on both.** Here the
@@ -993,6 +1091,11 @@ has run, and only when every one succeeded.
 it — a stub workspace, the real script through `/bin/bash`, and then a look at
 the file it left. A test that only asserts the generated TEXT proves the string
 is what we meant to write and nothing about what bash does with it.
+`testEveryLegAndExitCodeIsFiledAsTheContractSays` plays every
+`scheduledPublishStopped.whichKind` case that way — which leg stopped, with
+which code — and checks the kind, whether the sentence names the record's
+destination, and whether the run counts as published; Windows runs the same
+cases against its own wrapper.
 
 The limit worth stating: those runs use **stub launchers** that exit with a
 chosen code. That the real `deploy.sh` exits 3 in the states we think it does is
