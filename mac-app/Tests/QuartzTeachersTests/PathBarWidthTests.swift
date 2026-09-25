@@ -25,6 +25,11 @@ final class PathBarWidthTests: XCTestCase {
     /// A path short enough to fit any ordinary window.
     let shortPath: String = "/Users"
 
+    /// A path deeper than the 520 points the folder picker's bar used to be
+    /// held to (issue #295), like an ordinary folder on the Desktop — which
+    /// needs about 554.
+    let pickerPath: String = "/Users/teacher/Desktop/Class Websites - 2026-27/Semester One Sections"
+
     // MARK: - Functions
 
     /// Proposes a width to the view and reports the width it claims in it.
@@ -185,6 +190,59 @@ final class PathBarWidthTests: XCTestCase {
             measured, 320, accuracy: 1,
             "Squeezed to 320 points, a path too long even to collapse claimed \(measured) — "
             + "it should take the space it is given and scroll inside it, showing its END."
+        )
+    }
+
+    /// Given the room, the bar under a chosen folder names EVERY folder in
+    /// its path, not only the chosen one.
+    ///
+    /// Measured through `WorkspacePickerView.chosenFolderPathBar(for:)`, the
+    /// function the confirmation screen itself calls, so this reads the width
+    /// of what a teacher sees. Checked by putting the fault back — the old
+    /// `.frame(maxWidth: 520)` on that function — and watching this fail with
+    /// the bar claiming 520 against the full row's width.
+    @MainActor
+    func testThePickerDrawsEveryNameWhenTheWindowHasRoom() {
+        let url: URL = URL(fileURLWithPath: pickerPath)
+        let fullWidth: CGFloat = measuredWidth(of: FinderPathBarView(folderURL: url).pathRow, proposing: 4000)
+        XCTAssertGreaterThan(
+            fullWidth, 530,
+            "This fixture now fits in 520 points, so it no longer shows whether the picker "
+            + "holds its bar to a width narrower than the window. Deepen the path rather "
+            + "than relaxing the check."
+        )
+
+        let measured: CGFloat = measuredWidth(of: WorkspacePickerView.chosenFolderPathBar(for: url), proposing: 1400)
+        XCTAssertEqual(
+            measured, fullWidth, accuracy: 1,
+            "Offered 1,400 points, the folder picker's bar claimed \(measured) for a path whose "
+            + "every name fits in \(fullWidth) — so it is being held narrower than the window "
+            + "and hides the folders' names when there is room for them."
+        )
+    }
+
+    /// And without the room it still collapses: offered a width between the
+    /// full row and the icons-only row, the picker's bar draws the icons-only
+    /// row. In the picker that needs a path over about 820 points, since the
+    /// window is at least 900 wide and padded by 40 each side — so this
+    /// guards long paths, not ordinary ones.
+    @MainActor
+    func testThePickerStillCollapsesWhenTheWindowHasNoRoom() {
+        let url: URL = URL(fileURLWithPath: pickerPath)
+        let plainBar: FinderPathBarView = FinderPathBarView(folderURL: url)
+        let fullWidth: CGFloat = measuredWidth(of: plainBar.pathRow, proposing: 4000)
+        let collapsedWidth: CGFloat = measuredWidth(of: plainBar.collapsedRow, proposing: 4000)
+        XCTAssertGreaterThan(
+            fullWidth, collapsedWidth + 10,
+            "This path is not long enough for the two forms to differ meaningfully."
+        )
+
+        let between: CGFloat = (fullWidth + collapsedWidth) / 2
+        let measured: CGFloat = measuredWidth(of: WorkspacePickerView.chosenFolderPathBar(for: url), proposing: between)
+        XCTAssertEqual(
+            measured, collapsedWidth, accuracy: 1,
+            "Offered \(between) points — between the full row's \(fullWidth) and the "
+            + "icons-only row's \(collapsedWidth) — the picker's bar claimed \(measured)."
         )
     }
 }

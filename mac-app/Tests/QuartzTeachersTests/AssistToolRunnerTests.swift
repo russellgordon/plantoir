@@ -2785,6 +2785,101 @@ final class AssistToolRunnerTests: XCTestCase {
         XCTAssertEqual(outcome.summary, "It's already hidden.")
     }
 
+    /// A page whose settings have no place a new line can go is NOT "already
+    /// hidden": nothing is written, and the teacher is told which page and
+    /// why, on the card and in the answer (#186).
+    ///
+    /// Measured 2026-09-25: `publish: false` written above `  false` is the
+    /// string "false false" and the page stays PUBLISHED — so the old answer,
+    /// "Unpublished Unit 4, Day 23", was the failure that reports success.
+    @MainActor
+    func testHidingAPageWithNoRoomForAKeySaysSoAndWritesNothing() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        try write(page: "Unit 4, Day 23", publish: "true", date: "2026-09-08",
+                  body: "Nothing yet.", in: made.course)
+        let noRoom: String = "---\n  false\n---\nNothing yet.\n"
+        try noRoom.write(to: pageURL(of: "Unit 4, Day 23", in: made.course), atomically: true, encoding: .utf8)
+
+        let outcome: AssistToolOutcome = await made.runner.run(call: call(
+            "unpublish_pages", arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4, Day 23"]
+        ))
+        let said: String = AssistPublishPlan.sayingPagesWithNoRoomForAKey(named: ["Unit 4, Day 23"])
+        XCTAssertEqual(outcome.summary, said)
+        XCTAssertTrue(outcome.detail.contains(said), "The plan says it too: \(outcome.detail)")
+        XCTAssertEqual(text(ofPage: "Unit 4, Day 23", in: made.course), noRoom, "Nothing was written")
+    }
+
+    /// And a whole unit whose every page was declined is not "already hidden"
+    /// either (#186).
+    @MainActor
+    func testAUnitWhosePagesHaveNoRoomIsNotCalledAlreadyHidden() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        try write(page: "Unit 4, Day 1", publish: "true", date: "2026-09-08",
+                  body: "One.", in: made.course)
+        let noRoom: String = "---\n  a: 1\n---\nOne.\n"
+        try noRoom.write(to: pageURL(of: "Unit 4, Day 1", in: made.course), atomically: true, encoding: .utf8)
+
+        let outcome: AssistToolOutcome = await made.runner.run(call: call(
+            "unpublish_pages", arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4"]
+        ))
+        XCTAssertEqual(outcome.summary, AssistPublishPlan.sayingPagesWithNoRoomForAKey(named: ["Unit 4, Day 1"]))
+        XCTAssertEqual(text(ofPage: "Unit 4, Day 1", in: made.course), noRoom, "Nothing was written")
+    }
+
+    /// The transcript line after a publish is built from what was WRITTEN: a
+    /// page declined only at the write — edited in Obsidian between the card
+    /// and Go — is named and not counted as done, and when the page the
+    /// teacher NAMED is the declined one, the sentence about it is not said
+    /// (#186's review, B1).
+    @MainActor
+    func testTheTranscriptLineCountsOnlyWhatWasWritten() {
+        func page(_ title: String) -> AssistSectionPage {
+            return AssistSectionPage(
+                title: title.lowercased(), displayTitle: title,
+                fileURL: URL(fileURLWithPath: "/c/ICS3U/section1/All Classes/\(title).md"),
+                relativePath: "section1/All Classes/\(title).md", isSectionLocal: true,
+                isVisibleToStudents: true, visibilityIsCertain: true, date: nil,
+                linkedTitles: [], classFolderNames: ["All Classes"],
+                pathWithinSection: "All Classes/\(title).md"
+            )
+        }
+        func change(_ title: String) -> AssistPublishChange {
+            return AssistPublishChange(
+                page: page(title), key: "publish", wasVisible: true, willBeVisible: false, becauseLinked: false
+            )
+        }
+        let plan: AssistPublishPlan = AssistPublishPlan(
+            courseCode: "ICS3U", sectionNumber: 1, publishes: false, unknownNames: [],
+            namedPages: [page("Unit 4, Day 1"), page("Unit 4, Day 2")],
+            changes: [change("Unit 4, Day 1"), change("Unit 4, Day 2")],
+            alreadyRight: [], noRoomForAKey: [page("Unit 4, Day 3")], kept: [],
+            linkedClassesLeftAlone: [], dateMoves: []
+        )
+        let mixed: String = AssistToolRunner.whatWasDone(plan, declinedNow: ["Unit 4, Day 2"]) { written in
+            return "Unpublished \(written) \(written == 1 ? "page" : "pages")."
+        }
+        XCTAssertEqual(
+            mixed,
+            "Unpublished 1 page. "
+                + AssistPublishPlan.sayingPagesWithNoRoomForAKey(named: ["Unit 4, Day 3", "Unit 4, Day 2"])
+        )
+
+        let classPlan: AssistPublishPlan = AssistPublishPlan(
+            courseCode: "ICS3U", sectionNumber: 1, publishes: true, unknownNames: [],
+            namedPages: [page("Unit 4, Day 1")],
+            changes: [change("Unit 4, Day 1")],
+            alreadyRight: [], noRoomForAKey: [], kept: [], linkedClassesLeftAlone: [], dateMoves: []
+        )
+        let declinedClass: String = AssistToolRunner.whatWasDone(classPlan, declinedNow: ["Unit 4, Day 1"]) { _ in
+            return AssistWording.publishedTheClassOn("2026-09-24")
+        }
+        XCTAssertEqual(declinedClass, AssistPublishPlan.sayingPagesWithNoRoomForAKey(named: ["Unit 4, Day 1"]))
+    }
+
     /// Two pages, both already done, get the plural.
     @MainActor
     func testTwoPagesAlreadyPublishedGetThePlural() async throws {
@@ -4007,7 +4102,7 @@ final class AssistToolRunnerTests: XCTestCase {
         XCTAssertTrue(planned.detail.contains("Nothing has been changed."))
 
         // Nothing is set by planning it.
-        XCTAssertNil(ScheduledDeploy.nextRun(courseCode: "ICS3U", sectionNumber: 1))
+        XCTAssertNil(ScheduledDeploy.nextRun(courseCode: "ICS3U", sectionNumber: 1, inWorkingFolder: made.root))
 
         let set: AssistToolOutcome = await made.runner.run(call: call(
             "schedule_deploy",
@@ -4015,18 +4110,21 @@ final class AssistToolRunnerTests: XCTestCase {
         ))
         XCTAssertFalse(set.shouldContinue)
         XCTAssertTrue(set.summary.contains("Scheduled:"))
-        XCTAssertNotNil(ScheduledDeploy.nextRun(courseCode: "ICS3U", sectionNumber: 1))
+        XCTAssertNotNil(ScheduledDeploy.nextRun(courseCode: "ICS3U", sectionNumber: 1, inWorkingFolder: made.root))
 
         let cancelled: AssistToolOutcome = await made.runner.run(call: call(
             "cancel_scheduled_deploy", arguments: ["course": "ICS3U", "section": 1]
         ))
         XCTAssertTrue(cancelled.summary.contains("Cancelled"))
-        XCTAssertNil(ScheduledDeploy.nextRun(courseCode: "ICS3U", sectionNumber: 1))
+        XCTAssertNil(ScheduledDeploy.nextRun(courseCode: "ICS3U", sectionNumber: 1, inWorkingFolder: made.root))
     }
 
     /// The scheduled card says when it would REPLACE a deploy already set for
-    /// the section — including one set from ANOTHER working folder, which is
-    /// the case a folder-scoped reading would stay silent about (issue #195).
+    /// the section IN THIS WORKING FOLDER (issue #195) — and, since #237, says
+    /// nothing about one set from ANOTHER working folder, which scheduling
+    /// here no longer touches. The second half inverts what #195 pinned (it
+    /// read Mac-wide on purpose, because the write then overwrote the other
+    /// folder's job); it fails against the Mac-wide reading.
     @MainActor
     func testTheScheduledCardSaysWhatItReplaces() throws {
         let made = try makeRunner(hasDeployedBefore: true)
@@ -4047,22 +4145,33 @@ final class AssistToolRunnerTests: XCTestCase {
 
         // Nothing set: the card is what it always was.
         let plain: String = made.runner.explain(call: scheduling)
-
-        // A deploy already set for the section, from a DIFFERENT working
-        // folder, at a moment still ahead.
         let alreadySet: Date = Date().addingTimeInterval(3 * 24 * 60 * 60)
-        let old: [String: Any] = ScheduledDeploy.propertyList(
-            courseCode: "ICS3U", sectionNumber: 1, when: alreadySet,
-            workspaceURL: made.root.appendingPathComponent("last-years-folder"),
-            deployArguments: []
-        )
-        try PropertyListSerialization.data(fromPropertyList: old, format: .xml, options: 0)
-            .write(to: ScheduledDeploy.plistURL(courseCode: "ICS3U", sectionNumber: 1))
-
-        let replacing: String = made.runner.explain(call: scheduling)
         let expected: String = AssistWording.scheduleReplaces(
             moment: ScheduledDeploy.dayAndTimeText(alreadySet)
         )
+
+        // A deploy set for the section from ANOTHER working folder: a
+        // different alarm, left standing — nothing is replaced, nothing said.
+        let otherFolder: URL = made.root.appendingPathComponent("last-years-folder")
+        let theirs: [String: Any] = ScheduledDeploy.propertyList(
+            courseCode: "ICS3U", sectionNumber: 1, when: alreadySet,
+            workspaceURL: otherFolder, deployArguments: []
+        )
+        try PropertyListSerialization.data(fromPropertyList: theirs, format: .xml, options: 0)
+            .write(to: ScheduledDeploy.plistURL(courseCode: "ICS3U", sectionNumber: 1, inWorkingFolder: otherFolder))
+        XCTAssertEqual(
+            made.runner.explain(call: scheduling), plain,
+            "The card named another working folder's deploy as replaced"
+        )
+
+        // One set from THIS folder, at a moment still ahead.
+        let ours: [String: Any] = ScheduledDeploy.propertyList(
+            courseCode: "ICS3U", sectionNumber: 1, when: alreadySet,
+            workspaceURL: made.root, deployArguments: []
+        )
+        try PropertyListSerialization.data(fromPropertyList: ours, format: .xml, options: 0)
+            .write(to: ScheduledDeploy.plistURL(courseCode: "ICS3U", sectionNumber: 1, inWorkingFolder: made.root))
+        let replacing: String = made.runner.explain(call: scheduling)
         XCTAssertTrue(
             replacing.hasSuffix(expected),
             "The card did not say it replaces the deploy already set: \(replacing)"
@@ -4076,7 +4185,7 @@ final class AssistToolRunnerTests: XCTestCase {
             workspaceURL: made.root, deployArguments: []
         )
         try PropertyListSerialization.data(fromPropertyList: gone, format: .xml, options: 0)
-            .write(to: ScheduledDeploy.plistURL(courseCode: "ICS3U", sectionNumber: 1))
+            .write(to: ScheduledDeploy.plistURL(courseCode: "ICS3U", sectionNumber: 1, inWorkingFolder: made.root))
         XCTAssertEqual(made.runner.explain(call: scheduling), plain)
     }
 
@@ -4097,14 +4206,15 @@ final class AssistToolRunnerTests: XCTestCase {
             try? FileManager.default.removeItem(at: made.root)
         }
 
+        // Set from THIS working folder (#237: another folder's is not replaced).
         let alreadySet: Date = Date().addingTimeInterval(3 * 24 * 60 * 60)
         let old: [String: Any] = ScheduledDeploy.propertyList(
             courseCode: "ICS3U", sectionNumber: 1, when: alreadySet,
-            workspaceURL: made.root.appendingPathComponent("last-years-folder"),
+            workspaceURL: made.root,
             deployArguments: []
         )
         try PropertyListSerialization.data(fromPropertyList: old, format: .xml, options: 0)
-            .write(to: ScheduledDeploy.plistURL(courseCode: "ICS3U", sectionNumber: 1))
+            .write(to: ScheduledDeploy.plistURL(courseCode: "ICS3U", sectionNumber: 1, inWorkingFolder: made.root))
 
         let set: AssistToolOutcome = await made.runner.run(call: call(
             "schedule_deploy",
@@ -4149,7 +4259,7 @@ final class AssistToolRunnerTests: XCTestCase {
         ))
         XCTAssertTrue(refused.summary.contains("Nothing was scheduled."))
         XCTAssertTrue(refused.summary.contains("never been deployed"))
-        XCTAssertNil(ScheduledDeploy.nextRun(courseCode: "ICS3U", sectionNumber: 1))
+        XCTAssertNil(ScheduledDeploy.nextRun(courseCode: "ICS3U", sectionNumber: 1, inWorkingFolder: made.root))
 
         // Cancelling when nothing is set is safe, and says so.
         let cancelled: AssistToolOutcome = await made.runner.run(call: call(

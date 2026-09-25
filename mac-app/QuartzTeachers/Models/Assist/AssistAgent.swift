@@ -194,9 +194,38 @@ final class AssistAgent {
             wholeLine: true
         )
 
+        // "What does Unit 2, Day 3 in SPH3U section 1 link to?", typed in
+        // another course's window (#167). A card binds THIS window's course
+        // into its call unconditionally, so the question is refused here, in
+        // code, with the sentence a model-named course gets — nothing is read,
+        // and the model is not asked.
+        if case .anotherCourse(let named) = AssistCardCommand.linksQuestion(
+            trimmed, windowCourse: courseCode, windowSection: sectionNumber
+        ) {
+            sayALinksQuestionNamedAnotherCourse(named)
+            return
+        }
+
         // The fixed shapes never reach the model — see AssistCardCommand for
         // the measurement that decided this.
-        if let command = AssistCardCommand.matching(trimmed) {
+        var matched: AssistCardCommand? = AssistCardCommand.matching(
+            trimmed,
+            numberedPageWord: tools.numberedPageWord(forCourse: courseCode),
+            windowCourse: courseCode,
+            windowSection: sectionNumber
+        )
+        // "What does The Water Cycle link to?" — a phrase beginning "the" is a
+        // page title when this section has a page called that, and is then
+        // answered in code like any other; otherwise it is a description
+        // ("the quiz") and goes to the model (#167 fix review F2).
+        if matched == nil,
+           case .onlyIfAPageIsCalled(let title) = AssistCardCommand.linksQuestion(
+               trimmed, windowCourse: courseCode, windowSection: sectionNumber
+           ),
+           tools.sectionHasAPage(called: title, course: courseCode, section: sectionNumber) {
+            matched = AssistCardCommand.readLinks(of: title)
+        }
+        if let command = matched {
             // Built and SETTLED before the line is written, and then run
             // without being settled again. The order is the whole point: the
             // matcher is clock-free, so "deploy at 6:30 am" arrives here as
@@ -224,6 +253,58 @@ final class AssistAgent {
             return
         }
 
+        // "Deploy at 6:30" — morning or evening, and nobody can tell which.
+        // Asked here, in code, rather than handed to the model, which answered
+        // that shape of sentence with an IMMEDIATE deploy on the smaller
+        // assistant (issue #194). The teacher's sentence and the question go
+        // into the transcript only — never into `messages` — so the model
+        // never sees either, on this turn or any later one: the answer is one
+        // of the two sentences the question names, and that turn matches in
+        // code above. Nothing is waiting afterwards, so there is no state to
+        // clear if the teacher asks something else instead.
+        if let question = AssistCardCommand.morningOrEvening(trimmed) {
+            entries.append(Entry(
+                speaker: .assistant,
+                text: AssistWording.morningOrEvening(
+                    clock: question.clock,
+                    sayMorning: question.sayMorning,
+                    sayEvening: question.sayEvening
+                )
+            ))
+            ActivityTrail.note(
+                .assistantMatchedAFixedPhrase,
+                AssistAgent.askedMorningOrEveningLine,
+                course: courseCode,
+                section: sectionNumber
+            )
+            return
+        }
+
+        // "Deploy at 6.30 pm", "deploy at 6:30 tonight" — a time the app can
+        // read but does not set, answered with the one sentence to type
+        // instead (issue #277). The same shape as the question above, for the
+        // same reason: every such sentence reached deploy_section 10 of 10 on
+        // the smaller assistant. Transcript only, never `messages`; nothing is
+        // set, and nothing waits for the answer — the sentence it names
+        // matches in code on the next turn.
+        if let respelling = AssistCardCommand.timeToSayAs(trimmed) {
+            entries.append(Entry(
+                speaker: .assistant,
+                text: AssistWording.sayTheTimeAs(
+                    written: respelling.written,
+                    say: respelling.say,
+                    onlyDifference: respelling.onlyDifference
+                )
+            ))
+            ActivityTrail.note(
+                .assistantMatchedAFixedPhrase,
+                AssistAgent.askedToSayTheTimeAsLine,
+                course: courseCode,
+                section: sectionNumber
+            )
+            return
+        }
+
         // The date goes on the END of the message. Prepended, the same line
         // cost 15 points of routing accuracy on the Windows measurements —
         // the position really is the finding, not the presence.
@@ -233,9 +314,13 @@ final class AssistAgent {
 
     /// The teacher declined to give their class dates. Said back in the
     /// transcript, so a conversation reads as one somebody took part in.
-    func noteDatesDeclined() {
+    ///
+    /// `noun` is what the course calls one of its pages (#267). The line goes
+    /// into the transcript only — never into `messages` — so a club's
+    /// "meeting" never reaches the model.
+    func noteDatesDeclined(noun: ClassNoun = .class) {
         entries.append(Entry(speaker: .teacher, text: AssistWording.cancelled))
-        entries.append(Entry(speaker: .assistant, text: AssistWording.datesNotGivenYet))
+        entries.append(Entry(speaker: .assistant, text: AssistWording.datesNotGivenYet(for: noun)))
     }
 
     /// Approve the waiting deploy.
@@ -753,6 +838,41 @@ final class AssistAgent {
         activity = .idle
     }
 
+    /// A links question named another course (#167): refused in code, with
+    /// the same two sentences `sayTheRequestNamedAnotherCourse` chooses
+    /// between, and nothing read.
+    ///
+    /// Its own function rather than a call to that one, because that one's
+    /// trail line says what the MODEL chose, and here no model was asked. The
+    /// event is the same — the teacher's side of it is the same refusal.
+    private func sayALinksQuestionNamedAnotherCourse(_ otherCourse: String) {
+        var said: String = AssistWording.askedAboutACourseThatIsNotHere(
+            course: courseCode, otherCourse: otherCourse
+        )
+        if let known = tools.knownCourseCode(matching: otherCourse) {
+            said = AssistWording.askedAboutAnotherCourse(course: courseCode, otherCourse: known)
+        }
+        entries.append(Entry(speaker: .assistant, text: said))
+        ActivityTrail.note(
+            .assistantWasAskedAboutAnotherCourse,
+            AssistAgent.linksQuestionNamedAnotherCourseLine(
+                otherCourse: otherCourse, windowCourse: courseCode
+            ),
+            course: courseCode,
+            section: sectionNumber
+        )
+        activity = .idle
+    }
+
+    /// The trail's line for a links question refused because it named another
+    /// course (#167). Both codes, as the other one was TYPED — the evidence the
+    /// event's entry asks for — and never the page title.
+    static func linksQuestionNamedAnotherCourseLine(otherCourse: String, windowCourse: String) -> String {
+        return "the assistant was asked about " + otherCourse + " in this window, which is for "
+            + windowCourse + " — matched in code, not sent to the model: a question about what a "
+            + "page links to; nothing was read"
+    }
+
     /// A tool's name as somebody reading the trail would say it.
     private static func inWords(_ toolName: String) -> String {
         return toolName.replacingOccurrences(of: "_", with: " ")
@@ -964,6 +1084,28 @@ final class AssistAgent {
     private func settled(_ rawCall: AssistToolCall) -> AssistToolCall {
         return withTheMomentSettled(withTheDaySettled(boundToThisSection(rawCall)))
     }
+
+    /// The trail's line for a time asked about rather than answered.
+    ///
+    /// No clock in it, deliberately: "6:30" is something the teacher wrote,
+    /// and the trail never carries that (`assistantAsked` already has the
+    /// sentence, which is where it belongs). "Nothing was set" is the half a
+    /// reader of the trail needs — the line sits where a scheduled deploy's
+    /// line would, and must not be mistaken for one.
+    static let askedMorningOrEveningLine: String =
+        "matched in code, not sent to the model — asked whether the time was morning or evening; "
+        + "nothing was set"
+
+    /// The trail's line for a time answered with the spelling to use
+    /// (issue #277).
+    ///
+    /// No clock and nothing the teacher wrote, for the reason
+    /// `askedMorningOrEveningLine` gives: `assistantAsked` already carries
+    /// the sentence. "Nothing was set" because the line sits where a
+    /// scheduled deploy's would, and must not be mistaken for one.
+    static let askedToSayTheTimeAsLine: String =
+        "matched in code, not sent to the model — asked for the time in a spelling it can set; "
+        + "nothing was set"
 
     /// The trail line for a sentence answered in code, naming the tool — and
     /// the MOMENT, when the sentence carried one.

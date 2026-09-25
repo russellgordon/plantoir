@@ -452,9 +452,8 @@ final class SectionPublishRecordingTests: XCTestCase {
         let homeFolderURL: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("scheduled-publish-home-" + UUID().uuidString, isDirectory: true)
         defer { try? FileManager.default.removeItem(at: homeFolderURL) }
-        let sentinel: URL = ScheduledDeploy.successSentinelURL(
-            courseCode: "ICS3U", sectionNumber: 1, inHomeFolder: homeFolderURL
-        )
+        let label: String = ScheduledDeploy.legacyAgentLabel(courseCode: "ICS3U", sectionNumber: 1) + ".0a1b2c3d"
+        let sentinel: URL = ScheduledDeploy.successSentinelURL(label: label, inHomeFolder: homeFolderURL)
         try FileManager.default.createDirectory(
             at: sentinel.deletingLastPathComponent(), withIntermediateDirectories: true
         )
@@ -463,11 +462,15 @@ final class SectionPublishRecordingTests: XCTestCase {
             (course.directoryURL, "ICS3U", 1)
 
         // No sentinel: the script did not say every destination worked.
-        ScheduledDeploy.recordScheduledPublish(section: section, fingerprint: "abc", inHomeFolder: homeFolderURL)
+        ScheduledDeploy.recordScheduledPublish(
+            label: label, section: section, fingerprint: "abc", inHomeFolder: homeFolderURL
+        )
         XCTAssertNil(SectionPublishState.stamp(courseDirectory: course.directoryURL, sectionNumber: 1))
 
         try "netlify cloudflare_pages\n".write(to: sentinel, atomically: true, encoding: .utf8)
-        ScheduledDeploy.recordScheduledPublish(section: section, fingerprint: "abc", inHomeFolder: homeFolderURL)
+        ScheduledDeploy.recordScheduledPublish(
+            label: label, section: section, fingerprint: "abc", inHomeFolder: homeFolderURL
+        )
         let stamp = SectionPublishState.stamp(courseDirectory: course.directoryURL, sectionNumber: 1)
         XCTAssertEqual(stamp?.fingerprint, "abc")
         XCTAssertEqual(stamp?.destinations, ["netlify", "cloudflare_pages"])
@@ -514,7 +517,8 @@ final class SectionPublishRecordingTests: XCTestCase {
         XCTAssertTrue(script.contains("netlify cloudflare_pages"))
         XCTAssertTrue(
             script.contains(ScheduledDeploy.successSentinelURL(
-                courseCode: "ICS3U", sectionNumber: 1, inHomeFolder: homeFolderURL
+                label: ScheduledDeploy.agentLabel(courseCode: "ICS3U", sectionNumber: 1, workingFolder: workspace),
+                inHomeFolder: homeFolderURL
             ).path)
         )
     }

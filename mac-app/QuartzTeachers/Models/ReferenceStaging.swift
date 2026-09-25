@@ -39,7 +39,44 @@ import Foundation
 @MainActor
 enum ReferenceStaging {
 
+    // MARK: - Types
+
+    /// What a claim came to.
+    enum Claim: Equatable {
+        /// The folder is made, empty, and this caller owns it until
+        /// `giveBack`. Only an owner ever removes a staging folder.
+        case claimed
+        /// Somebody else is making this course right now — another window of
+        /// this app, or another copy of Plantoir. Nothing was removed.
+        case someoneElseIsMakingIt
+        /// It could not be started, for the reason given — said to the
+        /// teacher as it stands.
+        case couldNotStart(String)
+    }
+
+    /// How the step that makes the folder went. Separate from the thrown
+    /// error so the rule can be run from the contract's cases without a disk
+    /// that misbehaves on cue.
+    enum CreateAnswer: Equatable {
+        case made
+        case alreadyThere
+        case failed(String)
+    }
+
     // MARK: - Stored properties
+
+    /// Staging folders THIS process is making right now, by
+    /// `claimKey(for:inCoursesDirectory:)`.
+    ///
+    /// Two windows are ONE process with one process id, so a lease file
+    /// cannot tell them apart: window B would read window A's lease as its
+    /// own. This can. Keyed by the folder's CANONICAL path rather than by the
+    /// path as a window spelled it, because two windows can reach one working
+    /// folder through a link, through `/private`, or in another case on a
+    /// case-insensitive disk — and a set that missed would let window B clear
+    /// window A's half-made copy away as a leftover, which is the fault this
+    /// exists to close.
+    static var claimedStagingKeys: Set<String> = []
 
     /// What every staging folder's name begins with.
     ///
@@ -83,7 +120,9 @@ enum ReferenceStaging {
             .appendingPathComponent(".internal").appendingPathComponent("activity")
     }
 
-    /// `<FOLDER>.import.<pid>.lease` — the shape `WorkLease` already uses.
+    /// `<FOLDER>.import.<pid>.lease` — the NAME shape every work lease has
+    /// (`contracts/file-formats.json` → `workLease`). Its contents are the
+    /// shared four lines `ProcessLiveness.leaseBody` writes.
     static func leaseName(for folderName: String, pid: Int32 = getpid()) -> String {
         return "\(folderName).import.\(pid).lease"
     }
@@ -91,14 +130,18 @@ enum ReferenceStaging {
     /// Says that THIS process is importing into that staging folder.
     ///
     /// Written outside the staging folder on purpose, so removing the folder
-    /// does not remove the claim to it.
+    /// does not remove the claim to it. The name is unchanged from before
+    /// #245, so an older copy of Plantoir — which reads names only — still
+    /// leaves the folder alone; the contents gained the process's name and
+    /// start time, which is what lets a reader tell a recycled process id
+    /// from the process that wrote the lease.
     static func takeLease(for folderName: String, inCoursesDirectory coursesDirectoryURL: URL) {
         let activity: URL = ReferenceStaging.activityDirectory(
             inCoursesDirectory: coursesDirectoryURL
         )
         try? FileManager.default.createDirectory(at: activity, withIntermediateDirectories: true)
         let lease: URL = activity.appendingPathComponent(ReferenceStaging.leaseName(for: folderName))
-        try? Data("\(getpid())".utf8).write(to: lease)
+        try? Data(ProcessLiveness.leaseBody().utf8).write(to: lease, options: .atomic)
     }
 
     /// Gives it back. A lease that outlives its process is ignored rather
@@ -113,12 +156,24 @@ enum ReferenceStaging {
     /// Whether some LIVE process says it is importing into this staging
     /// folder.
     ///
-    /// `kill(pid, 0)` asks the system whether the process exists without
-    /// sending it anything. A recycled process id is the one case this cannot
-    /// see through, and it is the same caveat every lease in this product
-    /// carries; the direction it errs in is leaving a folder alone, which
-    /// costs disk space until the next open rather than destroying work.
-    static func someoneIsWorkingOn(_ stagingName: String, inCoursesDirectory coursesDirectoryURL: URL) -> Bool {
+    /// Who counts as alive is `ProcessLiveness`'s question, asked of the
+    /// process id in the lease's name and the name and start time inside it:
+    /// another account's process is alive (the system says it exists and is
+    /// not ours to signal — until #245 that answer read as "gone" and the
+    /// folder was swept), a process that has finished is gone, and a process
+    /// id handed on to a different process is gone. A lease whose owner is
+    /// gone is removed as it is read, because it goes with the folder it was
+    /// about.
+    ///
+    /// - Parameter ignoredPid: a process id whose leases are not counted and
+    ///   not removed — the claim passes its own, because a process is never
+    ///   in its own way across processes (two windows are told apart by
+    ///   `claimedStagingKeys`, not by a lease, since they share one id).
+    static func someoneIsWorkingOn(
+        _ stagingName: String,
+        inCoursesDirectory coursesDirectoryURL: URL,
+        ignoring ignoredPid: Int32? = nil
+    ) -> Bool {
         let folderName: String = ReferenceStaging.courseFolderName(fromStaging: stagingName)
         let activity: URL = ReferenceStaging.activityDirectory(
             inCoursesDirectory: coursesDirectoryURL
@@ -142,7 +197,17 @@ enum ReferenceStaging {
             guard let pid = Int32(middle) else {
                 continue
             }
-            if kill(pid, 0) == 0 {
+            if let ignoredPid = ignoredPid, pid == ignoredPid {
+                continue
+            }
+            let text: String = (try? String(contentsOf: lease, encoding: .utf8)) ?? ""
+            let recorded: (name: String?, start: String?) = ProcessLiveness.recordedFacts(
+                inLeaseText: text
+            )
+            let judgedName: String? = ProcessLiveness.nameToCompare(recorded: recorded.name, kind: "import")
+            if ProcessLiveness.ownerIsAlive(
+                pid: pid, recordedName: judgedName, recordedStart: recorded.start
+            ) {
                 someoneIsAlive = true
                 continue
             }
@@ -151,6 +216,136 @@ enum ReferenceStaging {
             try? FileManager.default.removeItem(at: lease)
         }
         return someoneIsAlive
+    }
+
+    // MARK: - Claiming a staging folder
+
+    /// The key a staging folder is known by in `claimedStagingKeys`: the
+    /// `courses/` folder's real path (links resolved, `/private` kept, the
+    /// disk's own spelling of each name — `FolderIdentity.canonicalPath`,
+    /// the one answer every folder comparison uses since #189) and the
+    /// staging name in lower case.
+    static func claimKey(for folderName: String, inCoursesDirectory coursesDirectoryURL: URL) -> String {
+        let coursesPath: String = FolderIdentity.canonicalPath(coursesDirectoryURL.path)
+        return coursesPath + "/" + ReferenceStaging.stagingName(for: folderName).lowercased()
+    }
+
+    /// Takes the staging folder for `folderName`, or says why not.
+    ///
+    /// **One act, on the main actor, with no suspension inside it**, so two
+    /// windows cannot interleave in it. In order:
+    ///
+    /// 1. Already claimed in this process → someone else (another window).
+    /// 2. Take our lease, THEN look for another process's live lease. Of two
+    ///    processes, the one that looks second always sees the first one's
+    ///    lease, so they can never both go on; at worst both step back and
+    ///    both say so, which is a refusal a teacher can retry, never a copy
+    ///    removed under somebody.
+    /// 3. A leftover of that name — nobody live owns it now — is cleared;
+    ///    one that will not go is a reason not to start.
+    /// 4. The folder is made EXCLUSIVELY. Already there means somebody slipped
+    ///    in between 3 and 4: someone else, and nothing is removed.
+    ///
+    /// Every answer but `.claimed` gives the lease back and removes nothing
+    /// it did not put there.
+    static func claim(
+        _ folderName: String,
+        inCoursesDirectory coursesDirectoryURL: URL,
+        removingLeftover removeLeftover: (URL) -> Bool = { stagingURL in
+            return ReferenceStaging.remove(at: stagingURL)
+        },
+        creating create: (URL) -> CreateAnswer = { stagingURL in
+            return ReferenceStaging.createExclusively(at: stagingURL)
+        }
+    ) -> Claim {
+        let key: String = ReferenceStaging.claimKey(
+            for: folderName, inCoursesDirectory: coursesDirectoryURL
+        )
+        if ReferenceStaging.claimedStagingKeys.contains(key) {
+            return .someoneElseIsMakingIt
+        }
+
+        let stagingName: String = ReferenceStaging.stagingName(for: folderName)
+        let stagingURL: URL = coursesDirectoryURL.appendingPathComponent(stagingName)
+
+        ReferenceStaging.takeLease(for: folderName, inCoursesDirectory: coursesDirectoryURL)
+        if ReferenceStaging.someoneIsWorkingOn(
+            stagingName, inCoursesDirectory: coursesDirectoryURL, ignoring: getpid()
+        ) {
+            ReferenceStaging.releaseLease(for: folderName, inCoursesDirectory: coursesDirectoryURL)
+            return .someoneElseIsMakingIt
+        }
+
+        if FileManager.default.fileExists(atPath: stagingURL.path) {
+            if !removeLeftover(stagingURL) {
+                ReferenceStaging.releaseLease(
+                    for: folderName, inCoursesDirectory: coursesDirectoryURL
+                )
+                return .couldNotStart(ReferenceImportWording.leftoverInTheWay)
+            }
+        }
+
+        let answer: CreateAnswer = create(stagingURL)
+        switch answer {
+        case .made:
+            ReferenceStaging.claimedStagingKeys.insert(key)
+            return .claimed
+        case .alreadyThere:
+            ReferenceStaging.releaseLease(for: folderName, inCoursesDirectory: coursesDirectoryURL)
+            return .someoneElseIsMakingIt
+        case .failed(let reason):
+            ReferenceStaging.releaseLease(for: folderName, inCoursesDirectory: coursesDirectoryURL)
+            return .couldNotStart(reason)
+        }
+    }
+
+    /// Gives a claimed staging folder back: out of this process's set, lease
+    /// released. It does NOT remove the folder — by now its owner has either
+    /// renamed it into place or tidied it away, and if the tidy failed it is
+    /// ordinary litter for the next sweep.
+    static func giveBack(_ folderName: String, inCoursesDirectory coursesDirectoryURL: URL) {
+        let key: String = ReferenceStaging.claimKey(
+            for: folderName, inCoursesDirectory: coursesDirectoryURL
+        )
+        ReferenceStaging.claimedStagingKeys.remove(key)
+        ReferenceStaging.releaseLease(for: folderName, inCoursesDirectory: coursesDirectoryURL)
+    }
+
+    /// Makes the staging folder, refusing one that is already there —
+    /// making a folder is exclusive, which is what makes it the last word
+    /// between two processes that both passed the lease check.
+    ///
+    /// Asked through `FileManager` rather than `mkdir` so any OTHER failure
+    /// is said in the same sentence the import has always given for it.
+    /// Measured: an existing folder — or an existing file of that name —
+    /// throws Cocoa error 516 over POSIX 17 (`EEXIST`).
+    static func createExclusively(at stagingURL: URL) -> CreateAnswer {
+        do {
+            try FileManager.default.createDirectory(
+                at: stagingURL, withIntermediateDirectories: false
+            )
+            return .made
+        } catch let error as NSError {
+            if ReferenceStaging.saysAlreadyThere(error) {
+                return .alreadyThere
+            }
+            return .failed(error.localizedDescription)
+        }
+    }
+
+    /// Whether an error from making a folder means "something of that name is
+    /// already there".
+    static func saysAlreadyThere(_ error: NSError) -> Bool {
+        if error.domain == NSCocoaErrorDomain && error.code == NSFileWriteFileExistsError {
+            return true
+        }
+        if error.domain == NSPOSIXErrorDomain && error.code == Int(EEXIST) {
+            return true
+        }
+        if let underlying = error.userInfo[NSUnderlyingErrorKey] as? NSError {
+            return underlying.domain == NSPOSIXErrorDomain && underlying.code == Int(EEXIST)
+        }
+        return false
     }
 
     /// Clears away staging folders left by an import that never finished —
@@ -190,11 +385,21 @@ enum ReferenceStaging {
             guard ReferenceStaging.isStagingName(name) else {
                 continue
             }
+            // This app's own claims first: they do not depend on a lease file
+            // having been written, which is `try?` and can fail on a folder
+            // whose `.internal` cannot be made.
+            let folderName: String = ReferenceStaging.courseFolderName(fromStaging: name)
+            let key: String = ReferenceStaging.claimKey(
+                for: folderName, inCoursesDirectory: coursesDirectoryURL
+            )
+            if ReferenceStaging.claimedStagingKeys.contains(key) {
+                continue
+            }
             if ReferenceStaging.someoneIsWorkingOn(name, inCoursesDirectory: coursesDirectoryURL) {
                 continue
             }
             if ReferenceStaging.remove(at: child) {
-                swept.append(ReferenceStaging.courseFolderName(fromStaging: name))
+                swept.append(folderName)
             }
         }
         return swept

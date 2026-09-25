@@ -47,10 +47,14 @@ import contracts
 # wrong in the same direction. The measurement still has to be pinned
 # somewhere: these are the lines each reader's REFUSAL is justified by, and a
 # PyYAML or Quartz change that moved any of them would make those refusals
-# wrong without failing anything. "stops" means the build cannot parse the
-# page at all, which is why there is no verdict to mirror.
+# wrong without failing anything.
 #
-# Measured 2026-09-18 against python-frontmatter 1.3.0 / PyYAML 6.0.3.
+# Measured 2026-09-18 against python-frontmatter 1.3.0 / PyYAML 6.0.3. The
+# ten forms the build's reader cannot read at all were "stops" until #246
+# (2026-09-25): Quartz could not read them either, so the whole build stopped.
+# Since #246 the build hides a page whose settings it cannot read, so they are
+# "hidden" — which is still not the "visible" each app reports, and so still
+# not a shared case. "stops" is now a failure wherever it appears.
 FORMS_THE_CONTRACT_CANNOT_CARRY = [
     ("publish:\n  false", "hidden"),
     ("publish:\n\n  false", "hidden"),
@@ -66,22 +70,22 @@ FORMS_THE_CONTRACT_CANNOT_CARRY = [
     ("publish: [false]", "visible"),
     ("publish: {a: false}", "visible"),
     ("publish: 'fal''se'", "visible"),
-    ("title: x\n\tpublish: false", "stops"),
-    ("publish: \"false", "stops"),
-    ("publish: - false", "stops"),
-    ("publish: %", "stops"),
-    ("publish: @x", "stops"),
-    ("publish: `x", "stops"),
-    ("publish: false: true", "stops"),
-    ("title: x\npublish:false", "stops"),
+    ("title: x\n\tpublish: false", "hidden"),
+    ("publish: \"false", "hidden"),
+    ("publish: - false", "hidden"),
+    ("publish: %", "hidden"),
+    ("publish: @x", "hidden"),
+    ("publish: `x", "hidden"),
+    ("publish: false: true", "hidden"),
+    ("title: x\npublish:false", "hidden"),
     # Added 2026-09-19 with issue #176. Each is a CONTINUATION form where the
     # reader's refusal is justified and the site's answer is not "visible", so
     # a shared case would oblige the other platform to be wrong. (The two
     # continuation forms the site PUBLISHES are shared cases now — they are in
     # `readingCases`, because there the reporting answer and the site agree.)
     ("publish:\n# note\n  false", "hidden"),
-    ("publish: false\n  # note\n  false", "stops"),
-    ("publish: false # why\n  false", "stops"),
+    ("publish: false\n  # note\n  false", "hidden"),
+    ("publish: false # why\n  false", "hidden"),
 ]
 
 # What a WRITER's continuation sweep is justified by — the page BEFORE the
@@ -93,6 +97,13 @@ FORMS_THE_CONTRACT_CANNOT_CARRY = [
 # students went on reading it, or the page stopped building. If the library
 # ever stops folding these, the argument has changed and this is where that
 # shows up.
+#
+# Since #246 the three left-behind pages that STOPPED the build are hidden
+# instead, because the build hides a page whose settings it cannot read. That
+# is what these writes asked for, and the sweep is still owed: the page is
+# named as unreadable on every build, and the same orphan left behind by a
+# write that SHOWS a page (`publish: true` over `publish:\n  a: 1`) would now
+# hide the page the teacher asked to show.
 #
 # **What this does NOT pin is the sweep itself.** Nothing in `verify.sh` runs
 # Swift or C#: delete `PageVisibilityReader.continuationLineIndices` and every
@@ -109,9 +120,9 @@ CONTINUATIONS_A_WRITER_MUST_SWEEP = [
     ("publish: >-\n  false", "hidden", "publish: false\n  false", "visible", "publish: false", "hidden"),
     ("publish: |-\n  false", "hidden", "publish: false\n  false", "visible", "publish: false", "hidden"),
     ("publish:\n  false", "hidden", "publish: false\n  false", "visible", "publish: false", "hidden"),
-    ("publish:\n  a: 1", "visible", "publish: false\n  a: 1", "stops", "publish: false", "hidden"),
-    ("publish:\n# note\n  false", "hidden", "publish: false\n# note\n  false", "stops", "publish: false", "hidden"),
-    ("publish:\n- a", "visible", "publish: false\n- a", "stops", "publish: false", "hidden"),
+    ("publish:\n  a: 1", "visible", "publish: false\n  a: 1", "hidden", "publish: false", "hidden"),
+    ("publish:\n# note\n  false", "hidden", "publish: false\n# note\n  false", "hidden", "publish: false", "hidden"),
+    ("publish:\n- a", "visible", "publish: false\n- a", "hidden", "publish: false", "hidden"),
     ("publish: false\n  false", "visible", "publish: false\n  false", "visible", "publish: false", "hidden"),
     ("publish: false\n\n  false", "visible", "publish: false\n\n  false", "visible", "publish: false", "hidden"),
     # The guard: a note with no value under it is NOT a continuation, and the
@@ -199,9 +210,43 @@ def judge(work, frontmatters):
     return processed
 
 
+def judge_whole_pages(work, pages):
+    """Like `judge`, for cases that carry the WHOLE page, fences and all,
+    written byte for byte."""
+    processed = []
+    for index, (text, section) in enumerate(pages):
+        page = work / f"page{index}.md"
+        with open(page, "w", encoding="utf-8", newline="") as handle:
+            handle.write(text)
+        build_site.process_frontmatter(page, section)
+        with open(page, "r", encoding="utf-8", newline="") as handle:
+            processed.append({"text": handle.read()})
+    return processed
+
+
 def main():
     cases = contracts.section("file-formats", "pageVisibility", "readingCases")
+    unreadable_cases = contracts.section("shared-rules", "unreadablePageSettings", "cases")
+    # Writing cases that say what the SITE does before and after the write
+    # (#188 onwards). The byte comparison is each app's suite; this is the
+    # other half — that the bytes it pins do what the case says on the site.
+    judged_writes = []
+    for case in contracts.section("file-formats", "pageVisibility", "writingCases", "cases"):
+        if "expectSiteBefore" in case or "expectSiteAfter" in case:
+            judged_writes.append(case)
+    restore_cases = contracts.section(
+        "course-management", "backups", "restoringOneSectionsKeys", "cases"
+    )
     failures = []
+    if len(restore_cases) < 6:
+        failures.append(
+            f"Only {len(restore_cases)} restoringOneSectionsKeys cases - the list has shrunk."
+        )
+    if len(judged_writes) < 8:
+        failures.append(
+            f"Only {len(judged_writes)} writing cases carry expectSiteBefore/After — the list "
+            f"has shrunk, so this would pass having judged little."
+        )
     the_chain_is_still_the_chain(failures)
 
     work = Path(tempfile.mkdtemp())
@@ -222,6 +267,28 @@ def main():
     for before, _, left, _, swept, _ in CONTINUATIONS_A_WRITER_MUST_SWEEP:
         sweep_fragments += [(before, 1), (left, 1), (swept, 1)]
     processed += judge(sweeps, sweep_fragments)
+    unreadable = work / "unreadable"
+    unreadable.mkdir()
+    processed += judge_whole_pages(
+        unreadable, [(case["page"], case["section"]) for case in unreadable_cases]
+    )
+    writes = work / "writes"
+    writes.mkdir()
+    write_pages = []
+    for case in judged_writes:
+        write_pages += [(case["before"], case["section"]), (case["after"], case["section"])]
+    processed += judge_whole_pages(writes, write_pages)
+    # A restore of one section, judged for EVERY section it names: putting
+    # section 1 back must not move section 2 (#182).
+    restores = work / "restores"
+    restores.mkdir()
+    restore_pages = []
+    restore_checks = []
+    for case in restore_cases:
+        for section_text, expected in sorted(case["expectSite"].items()):
+            restore_pages.append((case["after"], int(section_text)))
+            restore_checks.append((case, int(section_text), expected))
+    processed += judge_whole_pages(restores, restore_pages)
 
     pages_json = work / "pages.json"
     pages_json.write_text(json.dumps(processed), encoding="utf-8")
@@ -285,6 +352,52 @@ def main():
                     f"writer."
                 )
 
+    unreadable_start = sweep_start + 3 * len(CONTINUATIONS_A_WRITER_MUST_SWEEP)
+    for case, verdict in zip(unreadable_cases, verdicts[unreadable_start:]):
+        actual = "stops" if verdict["error"] is not None else (
+            "visible" if verdict["visible"] else "hidden"
+        )
+        expected = "hidden" if case["expectHidden"] else "visible"
+        if actual != expected:
+            failures.append(
+                f"{case['name']!r} (unreadablePageSettings): the contract says {expected} "
+                f"and the site says {actual}. A page whose settings the build cannot "
+                f"read must be HIDDEN on the site and must never stop the build (#246)."
+            )
+
+    writes_start = unreadable_start + len(unreadable_cases)
+    write_verdicts = verdicts[writes_start:]
+    for position, case in enumerate(judged_writes):
+        for offset, (field, text) in enumerate(
+            (("expectSiteBefore", case["before"]), ("expectSiteAfter", case["after"]))
+        ):
+            if field not in case:
+                continue
+            verdict = write_verdicts[position * 2 + offset]
+            actual = "stops" if verdict["error"] is not None else (
+                "visible" if verdict["visible"] else "hidden"
+            )
+            if actual != case[field]:
+                failures.append(
+                    f"{text!r} (pageVisibility.writingCases, {field}, section "
+                    f"{case['section']}): the contract says {case[field]} and the site "
+                    f"says {actual}. why: {case.get('why', '')}"
+                )
+
+    restores_start = writes_start + 2 * len(judged_writes)
+    for (case, section_number, expected), verdict in zip(
+        restore_checks, verdicts[restores_start:]
+    ):
+        actual = "stops" if verdict["error"] is not None else (
+            "visible" if verdict["visible"] else "hidden"
+        )
+        if actual != expected:
+            failures.append(
+                f"{case['name']!r} (backups.restoringOneSectionsKeys, section "
+                f"{section_number}): the contract says {expected} and the site says "
+                f"{actual}. why: {case.get('why', '')}"
+            )
+
     for case, after, verdict in zip(cases, processed, verdicts):
         wanted = case["expectVisible"]
         if verdict["error"] is not None:
@@ -314,7 +427,9 @@ def main():
         f"{len(FORMS_THE_CONTRACT_CANNOT_CARRY)} refused forms and "
         f"{len(KNOWN_TO_DIFFER)} knowingly-different forms and "
         f"{len(CONTINUATIONS_A_WRITER_MUST_SWEEP)} continuations a writer must sweep "
-        f"(three pages each) down the real chain."
+        f"(three pages each) and {len(unreadable_cases)} unreadable-settings cases "
+        f"and {len(judged_writes)} writing cases (before and after) and "
+        f"{len(restore_checks)} restored pages (per section) down the real chain."
     )
     if failures:
         for line in failures:

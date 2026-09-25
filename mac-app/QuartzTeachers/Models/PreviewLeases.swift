@@ -8,6 +8,10 @@ import Observation
 /// a port when it starts and returns it when it stops; the same section can
 /// only be previewed in one place, because two builds of one section would
 /// race over the same output folder.
+///
+/// A preview here is also a `preview` lease on disk (#156), derived by
+/// `WorkLeaseRegistry` from this list, so that a build started by ANOTHER
+/// process declines rather than ending the page the teacher is reading.
 @MainActor
 enum PreviewLeases {
 
@@ -62,9 +66,14 @@ enum PreviewLeases {
 
     /// Leases a port for a preview of one section, refusing politely when
     /// the section is already live elsewhere or every port is taken.
+    ///
+    /// Two leases are in the same folder however either was spelled (#189):
+    /// the folder's one workspace publishes the ports, so a second spelling
+    /// counted as another folder would be handed a port already in use.
     static func lease(folderPath: String, courseCode: String, sectionNumber: Int) throws -> Lease {
+        let wantedFolder: String = FolderIdentity.canonicalPath(folderPath)
         for existing in active {
-            let samePlace: Bool = existing.folderPath == folderPath
+            let samePlace: Bool = FolderIdentity.canonicalPath(existing.folderPath) == wantedFolder
                 && existing.courseCode == courseCode
                 && existing.sectionNumber == sectionNumber
             if samePlace {
@@ -76,7 +85,7 @@ enum PreviewLeases {
         // so only previews in the SAME folder contend for them.
         var takenPorts: [Int] = []
         for existing in active {
-            if existing.folderPath == folderPath {
+            if FolderIdentity.canonicalPath(existing.folderPath) == wantedFolder {
                 takenPorts.append(existing.port)
             }
         }
@@ -89,6 +98,7 @@ enum PreviewLeases {
                     sectionNumber: sectionNumber
                 )
                 store.active.append(lease)
+                WorkLeaseRegistry.reconcile()
                 return lease
             }
         }
@@ -104,10 +114,12 @@ enum PreviewLeases {
             }
         }
         store.active = remaining
+        WorkLeaseRegistry.reconcile()
     }
 
     /// Starts from nothing — for tests.
     static func reset() {
         store.active = []
+        WorkLeaseRegistry.reconcile()
     }
 }

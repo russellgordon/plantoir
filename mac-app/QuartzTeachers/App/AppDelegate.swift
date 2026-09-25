@@ -1,9 +1,21 @@
 import AppKit
+import UserNotifications
 
 /// The few things that still need an application delegate.
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Functions
+
+    /// Takes on the notification centre's questions before launch finishes,
+    /// which is where Apple asks for it to be done.
+    ///
+    /// Behind the test guard: the test host IS Plantoir.app, and the suite
+    /// must not touch the real notification centre at all (#212).
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        if !WorkspaceModel.isRunningTests {
+            UNUserNotificationCenter.current().delegate = self
+        }
+    }
 
     /// Opens the trail for this launch.
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -93,6 +105,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             ScriptRunner.stopEveryLivePreview()
 
+            // This app's work leases come down with it (#156) — tidiness
+            // rather than safety: a lease whose process has gone is ignored
+            // by every reader. A publish left running is not ended here (see
+            // `stopEveryLivePreview`), and its lease goes anyway, because
+            // the process that holds it is leaving; the quit script below
+            // still refuses to rest the machine while its launcher runs.
+            WorkLeaseRegistry.releaseEverything()
+
             // Let every folder's container rest — and if that leaves the
             // shared VM with nothing running at all, let the VM rest too.
             // Sequenced in one script: the emptiness check must come after
@@ -153,5 +173,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return QuitConfirmation.choice(
             atButtonIndex: response.rawValue - NSApplication.ModalResponse.alertFirstButtonReturn.rawValue
         )
+    }
+}
+
+// MARK: - Notifications about scheduled publishes
+
+extension AppDelegate: UNUserNotificationCenterDelegate {
+
+    /// Show a scheduled publish's notification even when Plantoir is the app
+    /// in front (#212).
+    ///
+    /// macOS asks the app in front whether to show a notification of its own,
+    /// and the default answer is not to. The notification is posted by the
+    /// scheduled RUN — a separate Plantoir process — so a teacher working in
+    /// Plantoir at half six should still see it arrive. Shown as a banner and
+    /// kept in Notification Center; no sound, for the reason the permission
+    /// asks for none.
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification
+    ) async -> UNNotificationPresentationOptions {
+        return [.banner, .list]
     }
 }

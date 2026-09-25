@@ -650,11 +650,11 @@ final class WizardStructureTests: XCTestCase {
     func testACodeWhoseExampleContentIsBeingTakenIsNeverAdoptedOrRestored() throws {
         let payloadCode: String = "ADA1O"
         XCTAssertTrue(ExampleContentCatalog.hasContent(forCode: payloadCode))
-        XCTAssertFalse(SkeletonCatalog.hasSkeleton(forCode: payloadCode, takingExampleContent: true))
+        XCTAssertFalse(SkeletonCatalog.hasSkeleton(forCode: payloadCode, takingExampleContent: true, numbered: false))
 
         XCTAssertNil(
             SkeletonCatalog.structureToAdopt(
-                forCode: payloadCode, takingExampleContent: true,
+                forCode: payloadCode, takingExampleContent: true, numbered: false,
                 currentSharedFolders: WizardDefaults.sharedFolders
             ),
             "The example content chooses the folders for a teacher who is taking it"

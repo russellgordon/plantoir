@@ -19,12 +19,40 @@ struct AssistSiteWorkResult {
     /// says through its console, which is already on screen.
     let isAboutTheDestination: Bool
 
+    /// Whether what stopped it was ANOTHER program building or previewing the
+    /// same course (#156). The message is then
+    /// `AssistWording.courseIsBeingBuiltElsewhere`; `AssistToolRunner` swaps
+    /// it for `courseIsBusy` when the one asking is an assistant working from
+    /// another app, since the program that is busy is the one it talks to.
+    let wasBuiltElsewhere: Bool
+
     // MARK: - Initializer
 
-    init(succeeded: Bool, message: String, isAboutTheDestination: Bool = false) {
+    init(
+        succeeded: Bool,
+        message: String,
+        isAboutTheDestination: Bool = false,
+        wasBuiltElsewhere: Bool = false
+    ) {
         self.succeeded = succeeded
         self.message = message
         self.isAboutTheDestination = isAboutTheDestination
+        self.wasBuiltElsewhere = wasBuiltElsewhere
+    }
+
+    // MARK: - Functions
+
+    /// The refusal for a build another program is in the way of — raised as
+    /// the window's alert (`isAboutTheDestination`, the flag the window reads
+    /// for "say this in an alert", as the reference-course refusal uses it:
+    /// the console has nothing to show, because nothing ran).
+    static func builtElsewhere(course: Course) -> AssistSiteWorkResult {
+        return AssistSiteWorkResult(
+            succeeded: false,
+            message: AssistWording.courseIsBeingBuiltElsewhere(course: course.displayCode),
+            isAboutTheDestination: true,
+            wasBuiltElsewhere: true
+        )
     }
 }
 
@@ -106,6 +134,20 @@ final class AssistToolchainWork: AssistSiteWork {
             )
         }
 
+        // Taken, THEN checked (#156): the `build` lease is on disk from the
+        // line above, and only a lease another program took before it counts,
+        // so two that ask at once cannot both go ahead or both back off. The
+        // backstop on this path, whatever the caller checked first.
+        if let holding = WorkLeaseRegistry.whatBlocksABuild(
+            folderPath: workspaceURL.path, courseCode: course.code, afterTaking: true
+        ) {
+            WorkLeaseRegistry.noteDeclined(
+                act: WorkLeaseRegistry.assistantsAct("rebuild"), courseCode: course.code,
+                sectionNumber: sectionNumber, holding: holding
+            )
+            return AssistSiteWorkResult.builtElsewhere(course: course)
+        }
+
         runner = ScriptRunner()
         runner.milestones = TaskMilestones.preview
         runner.run(
@@ -183,6 +225,19 @@ final class AssistToolchainWork: AssistSiteWork {
             CourseActivity.endPublish(
                 folderPath: workspaceURL.path, courseCode: course.code, sectionNumber: sectionNumber
             )
+        }
+
+        // The same take-then-check as the rebuild above (#156). Synchronous
+        // from the busy check to here, so nothing of this process's own can
+        // have started in between.
+        if let holding = WorkLeaseRegistry.whatBlocksABuild(
+            folderPath: workspaceURL.path, courseCode: course.code, afterTaking: true
+        ) {
+            WorkLeaseRegistry.noteDeclined(
+                act: WorkLeaseRegistry.assistantsAct("deploy"), courseCode: course.code,
+                sectionNumber: sectionNumber, holding: holding
+            )
+            return AssistSiteWorkResult.builtElsewhere(course: course)
         }
 
         // The same sequencer the Deploy button uses. Built separately

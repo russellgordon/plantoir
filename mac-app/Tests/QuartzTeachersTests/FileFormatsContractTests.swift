@@ -95,7 +95,13 @@ final class FileFormatsContractTests: XCTestCase {
 
     func testVisibilityIsReadAsTheContractSays() throws {
         let section: [String: Any] = try FileFormatsContractTests.section("pageVisibility")
-        for testCase in try XCTUnwrap(section["readingCases"] as? [[String: Any]]) {
+        let readingCases: [[String: Any]] = try XCTUnwrap(section["readingCases"] as? [[String: Any]])
+        // A floor, for the reason the writing list gives below: a loop over a
+        // list an edit has emptied passes having read nothing.
+        XCTAssertGreaterThanOrEqual(
+            readingCases.count, 59, "contracts/file-formats.json → pageVisibility.readingCases has shrunk"
+        )
+        for testCase in readingCases {
             let frontmatter: String = try XCTUnwrap(testCase["page"] as? String)
             let page: String = """
             ---
@@ -152,22 +158,93 @@ final class FileFormatsContractTests: XCTestCase {
         // exactly the failure this whole file exists to prevent. Raise it when
         // cases are added; never lower it to make an edit go through.
         XCTAssertGreaterThanOrEqual(
-            cases.count, 13,
+            cases.count, 21,
             "contracts/file-formats.json → pageVisibility.writingCases has shrunk"
         )
 
         for testCase in cases {
             let before: String = try XCTUnwrap(testCase["before"] as? String)
             let why: String = (testCase["why"] as? String) ?? ""
-            let result: (text: String, changed: Bool) = AssistPageVisibility.setting(
+            let result: (text: String, outcome: FrontmatterWriteOutcome) = AssistPageVisibility.setting(
                 published: try XCTUnwrap(testCase["setVisible"] as? Bool),
                 in: before,
                 forSection: testCase["section"] as? Int ?? 1,
                 isSectionLocal: try XCTUnwrap(testCase["sectionLocal"] as? Bool)
             )
             XCTAssertEqual(result.text, try XCTUnwrap(testCase["after"] as? String), why)
-            XCTAssertEqual(result.changed, try XCTUnwrap(testCase["expectChanged"] as? Bool), why)
+            XCTAssertEqual(
+                result.outcome == .written, try XCTUnwrap(testCase["expectChanged"] as? Bool), why
+            )
+            // Since #186 a case may also say WHICH of the two unchanged
+            // outcomes it expects: "the page already said it" and "the writer
+            // declined" were both `changed: false`, and that is the lie #186
+            // is about.
+            if let expected = testCase["expectOutcome"] as? String {
+                XCTAssertEqual(FileFormatsContractTests.outcomeName(result.outcome), expected, why)
+            }
         }
+    }
+
+    /// The date and title writers take a key's continuation lines with it
+    /// (GitHub #199), run as data. Compared as bytes: a check that the new
+    /// value APPEARS passes the two-values-joined output this exists to stop,
+    /// and Swift's `==` reads "\r\n" as one character.
+    func testTheDateAndTitleWritersTakeAKeysWholeValue() throws {
+        let section: [String: Any] = try FileFormatsContractTests.section("datesAndTitles")
+        let group: [String: Any] = try XCTUnwrap(section["writingCases"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(group["cases"] as? [[String: Any]])
+        // A floor, for the reason the visibility list gives above.
+        XCTAssertGreaterThanOrEqual(
+            cases.count, 16, "contracts/file-formats.json → datesAndTitles.writingCases has shrunk"
+        )
+        for testCase in cases {
+            let before: String = try XCTUnwrap(testCase["before"] as? String)
+            let after: String = try XCTUnwrap(testCase["after"] as? String)
+            let why: String = (testCase["why"] as? String) ?? ""
+            let write: [String: Any] = try XCTUnwrap(testCase["write"] as? [String: Any])
+            var written: String
+            if let title = write["title"] as? String {
+                written = PageFrontmatter.settingTitle(in: before, to: title)
+            } else {
+                let day: CalendarDay = try XCTUnwrap(CalendarDay(text: try XCTUnwrap(write["day"] as? String)))
+                let key: String = try XCTUnwrap(write["key"] as? String)
+                let result: (text: String, outcome: FrontmatterWriteOutcome) =
+                    PageFrontmatter.settingCreated(in: before, key: key, to: day)
+                written = result.text
+                if let expected = testCase["expectOutcome"] as? String {
+                    XCTAssertEqual(FileFormatsContractTests.outcomeName(result.outcome), expected, why)
+                }
+            }
+            XCTAssertEqual(Data(written.utf8), Data(after.utf8), "\(why) — wrote \(written.debugDescription)")
+        }
+    }
+
+    /// Shapes of an open value the contract list does not carry, run straight
+    /// against the writer: an escaped `\"` and a doubled `''` do not close
+    /// their quote; a value closed on its own line takes nothing below it; a
+    /// quote that never closes inside the block takes nothing (that page does
+    /// not build either way, and guessing where it ends would be worse).
+    func testAnOpenValueRunsUntilItReallyCloses() {
+        let escaped: String = "---\ntitle: \"Unit \\\" 1,\nDay 1\"\npublish: true\n---\nBody.\n"
+        XCTAssertEqual(
+            PageFrontmatter.settingTitle(in: escaped, to: "Unit 1, Day 2"),
+            "---\ntitle: Unit 1, Day 2\npublish: true\n---\nBody.\n"
+        )
+        let doubled: String = "---\ntitle: 'Unit 1''s,\nDay 1'\npublish: true\n---\nBody.\n"
+        XCTAssertEqual(
+            PageFrontmatter.settingTitle(in: doubled, to: "Unit 1, Day 2"),
+            "---\ntitle: Unit 1, Day 2\npublish: true\n---\nBody.\n"
+        )
+        let closed: String = "---\ntitle: \"Unit 1, Day 1\"\npublish: true\n---\nBody.\n"
+        XCTAssertEqual(
+            PageFrontmatter.settingTitle(in: closed, to: "Unit 1, Day 2"),
+            "---\ntitle: Unit 1, Day 2\npublish: true\n---\nBody.\n"
+        )
+        let neverCloses: String = "---\ntitle: \"Unit 1,\npublish: true\n---\nBody.\n"
+        XCTAssertEqual(
+            PageFrontmatter.settingTitle(in: neverCloses, to: "Unit 1, Day 2"),
+            "---\ntitle: Unit 1, Day 2\npublish: true\n---\nBody.\n"
+        )
     }
 
     /// The two properties the case list cannot state as a before-and-after
@@ -180,7 +257,7 @@ final class FileFormatsContractTests: XCTestCase {
         let migrated = AssistPageVisibility.setting(
             published: true, in: windowsWritten, forSection: 1, isSectionLocal: false
         )
-        XCTAssertTrue(migrated.changed)
+        XCTAssertEqual(migrated.outcome, .written)
         XCTAssertEqual(
             migrated.text,
             "---\r\ntitle: Day one\r\npublishForSection1: true\r\n---\r\nBody.\r\n"
@@ -285,6 +362,18 @@ final class FileFormatsContractTests: XCTestCase {
         )
     }
 
+
+    /// The contract's spelling of a writer's outcome (#186).
+    static func outcomeName(_ outcome: FrontmatterWriteOutcome) -> String {
+        switch outcome {
+        case .written:
+            return "written"
+        case .alreadyRight:
+            return "alreadyRight"
+        case .noRoomForAKey:
+            return "noRoomForAKey"
+        }
+    }
     private static func section(_ name: String) throws -> [String: Any] {
         let url: URL = repositoryRoot().appendingPathComponent("contracts/file-formats.json")
         let all: [String: Any] = try XCTUnwrap(

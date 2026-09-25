@@ -663,11 +663,18 @@ each working folder's `.toolchain/`. The launchers:
   recreated container, with no update checks anywhere;
 - build with BuildKit (`docker buildx build --load`) — the legacy builder
   corrupts a layer, so don't remove that;
-- name containers `teaching-quartz-<hash of pwd -P>`, one per working folder.
-  The Swift side derives the identical name via POSIX `realpath` — Foundation's
-  `resolvingSymlinksInPath()` strips `/private` where `pwd -P` keeps it, so
-  don't swap one for the other;
-- probe a free host port block per container (8081/8091/8101…), mapping to
+- name containers `teaching-quartz-<hash of /bin/pwd -P>`, one per working
+  folder, after moving into `$(/bin/pwd -P)`. `/bin/pwd`, not bash's built-in
+  `pwd -P`, which keeps the TYPED case and Unicode form and gave one folder
+  two containers (#189). The Swift side derives the identical name through
+  `FolderIdentity.canonicalPath` (`fcntl(F_GETPATH)`) — not `realpath`, which
+  keeps a `/System/Volumes/Data` prefix `/bin/pwd` drops, and not Foundation's
+  `resolvingSymlinksInPath()`, which strips `/private` — and compares folders
+  with the same function, so don't swap one for the other;
+- probe a free host port block per container (8081/8091/8101…, walking up
+  through forty blocks and skipping any block another folder's container
+  holds, stopped ones included — `contracts/app-rules.json` → `previewPorts`,
+  one block of code shared by all three launchers), mapping to
   fixed container ports 8081–8084 for sites plus 9081–9084 for Quartz's
   live-reload websockets (`--wsPort` = port + 1000 — without it, concurrent
   previews collide on the websocket even with distinct site ports);
@@ -677,7 +684,9 @@ each working folder's `.toolchain/`. The launchers:
   websites live — `courses/<CODE>/.merged_output` is a symlink to it, so the
   link has to resolve to the same string on both sides. A container missing
   that mount is recreated, because a mount cannot be added to one that
-  already exists. Every launcher creates the same mount set; if one of them
+  already exists — and, since #94, only once nothing is running in it: every
+  recreation waits for a build or publish and refuses while a preview from
+  the folder is open (`documentation/03-launcher-scripts.md`). Every launcher creates the same mount set; if one of them
   stopped, two launchers would recreate the container away from each other
   on alternate runs. The rule, and what was rejected, is in
   [`contracts/shared-rules.json`](contracts/shared-rules.json) →
@@ -814,7 +823,7 @@ forget. Windows ships `plantoir-mcp.exe` instead.
 ## Example content and skeletons
 
 `support/example_content/<CODE>/` holds ready-made course content, one folder
-per Ontario course code (ADA1O is the template to copy; **38 codes** have
+per Ontario course code (ADA1O is the template to copy; **39 codes** have
 payloads today — count the folders rather than trusting a number). Each payload
 is `manifest.json` plus `shared/` and `per_section/` trees, and the manifest is
 the course's ENTIRE structure when a teacher pre-populates: the wizard asks no
@@ -840,8 +849,8 @@ mistake there is a mistake in nineteen hundred courses.
 
 | Change | Gate |
 |---|---|
-| Toolchain (launchers, `scripts/`, Dockerfile, patches, `contracts/`) | `./verify.sh` — builds a fresh `quartz-teacher:dev-test` image from the working tree, checks the baked files match, drives the real launchers. Needs a TTY; from a non-interactive shell: `script -q /dev/null ./verify.sh` |
-| macOS app | `cd mac-app && xcodebuild -project Plantoir.xcodeproj -scheme Plantoir -configuration Debug test -only-testing:QuartzTeachersTests` |
+| Toolchain (launchers, `scripts/`, Dockerfile, patches, `contracts/`) | `./verify.sh` — builds a fresh `quartz-teacher:dev-test` image from the working tree, checks the baked files match, drives the real launchers. Needs a TTY; from a non-interactive shell: `script -q /dev/null ./verify.sh`. **One run at a time per Mac**: a second run says which one holds `/tmp/plantoir-verify-<uid>.lock` and exits 1 — run it again when the first has finished. |
+| macOS app | `cd mac-app && xcodebuild -project Plantoir.xcodeproj -scheme Plantoir -configuration Debug test -only-testing:QuartzTeachersTests`. **3 skipped is the baseline; more than 3 skipped: read the reasons** — the tests that read the real window skip when it is on a desktop that is not showing, and say so (`documentation/09-mac-app.md`, #249). |
 | Windows app | `cd windows-app && dotnet test Plantoir.Tests/Plantoir.Tests.csproj` — which since 2026-09-07 also runs every shared `scripts/test_*.py` through `PythonToolchainTests`, so a change to the shared Python is gated on Windows too. Needs a `python` on PATH and FAILS rather than skips without one. **Judge it by the TOTALS line, never the exit code** — `dotnet test` exits 1 for a failing test, for a test host that DIED underneath the run, and for a project that did not compile, and only the output tells the three apart. `.\run-tests.ps1` (repo root) runs the same command and says which happened; a convenience, not a gate. What each looks like, measured, is in `documentation/12-windows-app.md` → "Reading a test run". **A green totals line may carry NAMED GAPS** — contract keys this app does not implement yet, held open by name rather than left red; `windows-app/Plantoir.Tests/NamedGapLedger.cs` lists them with the issue and milestone that own each, and `contracts/README.md` → "Named gaps" says when one is allowed (and `RELEASING.md` step 2 says to read the ledger before cutting). |
 | Windows app, **through the real interface** | `.\run-ui-tests.ps1`, **run from the repository root** (every other command in this table starts `cd windows-app`; this one does not), — launches the x64 Debug `Plantoir.exe` with `--state-dir` and drives it with UI Automation, for what a unit test cannot see: that a control can be REACHED, that clicking it opens something, that the RENDERED text is what the model said in the order the contract fixes, that a scrolling list is not cut off at the bottom, that a panel follows the course a teacher selected rather than going stale, and that a sentence the contract pins is actually RENDERED where a teacher can see it rather than merely held in a constant. **Opt-in and part of no gate**: every test carries `[UiFact]` and skips unless `PLANTOIR_UI_TESTS=1`, so a plain `dotnet test` builds them and runs none. It is in the solution, so a SOLUTION build compiles it — the per-project commands this table names do not, which is the honest limit of the compile-rot protection. Needs a desktop session and the foreground, takes minutes, and CLOSES a running Plantoir (saying so, and not reopening it). Nothing of the teacher's is touched: `--state-dir` moves the whole state folder for the run — but that redirects only what the APP resolves, and one test now presses the wizard's Create button and so runs `setup.ps1`, which computes the builds root from the real environment itself. That one is safe because `setup_course.py` never resolves `merged_output_root`; **a test that drove Preview or a scheduled deploy would NOT be**, and `documentation/12-windows-app.md` is where to read why before writing one. |
 | Assistant routing | **Nothing.** Measured by hand — see below. |
@@ -996,6 +1005,7 @@ implemented and passing on both platforms; see `GUI-IMPROVEMENTS.md` rows
 | [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md) | The dated log of every GUI change, with a required "Notes for Windows port" column. Append here for any GUI change — and read it as HISTORY: it used to be described as "the spec", and `contracts/` is what a test should be written against now. |
 | [`MAC-BOOTSTRAP.md`](MAC-BOOTSTRAP.md) | **The brief for a macOS session**: adding a feature responsibly here, and taking work that arrived from Windows. |
 | [`WINDOWS-BOOTSTRAP.md`](WINDOWS-BOOTSTRAP.md) | **The brief for a Windows session**: what to read, the order of work, the rules while working, and the plan-first rule. Point a Windows agent at this file. |
+| [`WINDOWS-PARITY.md`](WINDOWS-PARITY.md) | **Temporary.** The ordered strategy for the milestone "Windows: parity with mac v1.3.2": every issue in a phase, what the shared Python gives free, the traps. `WINDOWS-BOOTSTRAP.md` points at it. The issues stay the source of truth, and the file is deleted when that milestone closes. |
 | [GitHub issues](https://github.com/russellgordon/plantoir/issues) | **Everything still to do**, on either platform. Labelled `mac`, `windows`, `toolchain`, `assistant`, `decision`; milestones pin an issue to a release. |
 | [`documentation/13-windows-port-archive.md`](documentation/13-windows-port-archive.md) | Write-ups for Windows-port work verified shipped as of 2026-08-22, kept for the reasoning. **History, not a specification** — where it and a contract disagree, the contract is true. Closed to new entries. |
 | [`contracts/`](contracts/README.md) | **The Plantoir contract**: what the two apps must agree on, as data both test suites run — the assistant's sentences and behaviour, launcher arguments, validation wording, failure explanations, date reading, class naming, file names, progress markers, preview ports. Three of the ten files are generated from the macOS app by `Plantoir --write-contracts` and must never be hand-edited; the other seven — `shared-rules.json` among them — are AUTHORED, and can be proposed or corrected from either platform. `contracts/README.md` says which is which, and this line used to say "never hand-edited" of all ten, which sent a Windows session on 2026-09-08 to ask the mac for an edit it could make itself. Its coverage table says what is deliberately NOT shared, and why. |

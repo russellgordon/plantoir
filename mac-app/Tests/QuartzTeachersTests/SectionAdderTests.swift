@@ -648,6 +648,267 @@ final class SectionAdderTests: XCTestCase {
                         "\(stamp) should match the wizard's created: form")
     }
 
+    // MARK: - However the frontmatter is fenced (GitHub #175)
+
+    /// The whole road, through `addSection`: a course-level page HIDDEN in
+    /// section 1, saved with Windows line endings. It used to be skipped —
+    /// the old finder wanted exactly `---` on the first line — and a page with
+    /// no key for a section is SHOWN in it, so the new section published a
+    /// page the teacher had hidden. The rest of the file must not move.
+    @MainActor
+    func testAHiddenWindowsPageStaysHiddenInTheNewSection() throws {
+        let (root, course) = try makeWorkspace()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let before: String = "---\r\ntitle: Loops\r\ncreatedSection1: 2026-09-08T07:00:00.000-0400\r\n"
+            + "publishForSection1: false\r\n---\r\nBody line one.\r\n"
+        let pageURL: URL = course.directoryURL.appendingPathComponent("Loops.md")
+        try Data(before.utf8).write(to: pageURL)
+
+        try SectionAdder.addSection(2, to: course)
+
+        let written: String = String(decoding: try Data(contentsOf: pageURL), as: UTF8.self)
+        let created: String = try XCTUnwrap(
+            SectionAdderTests.value(ofKey: "createdSection2", in: written),
+            "the page got no key for the new section: \(written.debugDescription)"
+        )
+        let expected: String = "---\r\ntitle: Loops\r\ncreatedSection1: 2026-09-08T07:00:00.000-0400\r\n"
+            + "publishForSection1: false\r\ncreatedSection2: \(created)\r\n"
+            + "publishForSection2: false\r\n---\r\nBody line one.\r\n"
+        XCTAssertEqual(Data(written.utf8), Data(expected.utf8), written.debugDescription)
+    }
+
+    /// The same through `addSection` for a four-dash fence, also hidden.
+    @MainActor
+    func testAHiddenFourDashPageStaysHiddenInTheNewSection() throws {
+        let (root, course) = try makeWorkspace()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let before: String = "----\ntitle: Loops\ncreatedSection1: 2026-09-08T07:00:00.000-0400\n"
+            + "publishForSection1: false\n----\nBody line one.\n"
+        let pageURL: URL = course.directoryURL.appendingPathComponent("Shared/Loops.md")
+        try FileManager.default.createDirectory(
+            at: pageURL.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try Data(before.utf8).write(to: pageURL)
+
+        try SectionAdder.addSection(2, to: course)
+
+        let written: String = String(decoding: try Data(contentsOf: pageURL), as: UTF8.self)
+        let created: String = try XCTUnwrap(
+            SectionAdderTests.value(ofKey: "createdSection2", in: written),
+            "the page got no key for the new section: \(written.debugDescription)"
+        )
+        let expected: String = "----\ntitle: Loops\ncreatedSection1: 2026-09-08T07:00:00.000-0400\n"
+            + "publishForSection1: false\ncreatedSection2: \(created)\n"
+            + "publishForSection2: false\n----\nBody line one.\n"
+        XCTAssertEqual(written, expected)
+    }
+
+    /// A section's pages copied into the new one: on a landing page fenced
+    /// with four dashes, the title and date are replaced and NOTHING else —
+    /// not the fence, not the body. (The old copy rebuilt "---" plus the block
+    /// and cut the old text by a character count; with this fence it did not
+    /// find the block at all and copied the old title and date across.)
+    @MainActor
+    func testACopiedFourDashLandingPageKeepsItsFenceAndBody() throws {
+        let (root, course) = try makeWorkspace()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let source: String = "----\ntitle: Grade 11 Introduction to Computer Science, Section 1\n"
+            + "created: 2026-08-10T14:30:00.000-0400\npublish: true\n----\n# Most Recent Class\n![[Unit 1, Day 2]]\n"
+        let sourceURL: URL = course.sectionDirectoryURL(forSection: 1).appendingPathComponent("index.md")
+        try Data(source.utf8).write(to: sourceURL)
+        let destinationURL: URL = root.appendingPathComponent("copied-index.md")
+
+        try SectionAdder.replicateMarkdownFile(
+            from: sourceURL, to: destinationURL, relativePath: "index.md",
+            course: course, sectionNumber: 2, created: "2026-09-25T07:00:00.000-0400"
+        )
+
+        let expected: String = "----\ntitle: Grade 11 Introduction to Computer Science, Section 2\n"
+            + "created: 2026-09-25T07:00:00.000-0400\npublish: true\n----\n# Most Recent Class\n![[Unit 1, Day 2]]\n"
+        XCTAssertEqual(try String(contentsOf: destinationURL, encoding: .utf8), expected)
+    }
+
+    /// And a landing page saved with Windows line endings keeps them: the
+    /// replaced lines end the way the lines they replace ended, and the
+    /// title read from it carries no carriage return into the new one.
+    @MainActor
+    func testACopiedWindowsLandingPageKeepsItsLineEndings() throws {
+        let (root, course) = try makeWorkspace()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let source: String = "---\r\ntitle: Grade 11 Introduction to Computer Science, Section 1\r\n"
+            + "created: 2026-08-10T14:30:00.000-0400\r\npublish: true\r\n---\r\n# Most Recent Class\r\n"
+        let sourceURL: URL = course.sectionDirectoryURL(forSection: 1).appendingPathComponent("index.md")
+        try Data(source.utf8).write(to: sourceURL)
+        let destinationURL: URL = root.appendingPathComponent("copied-index.md")
+
+        try SectionAdder.replicateMarkdownFile(
+            from: sourceURL, to: destinationURL, relativePath: "index.md",
+            course: course, sectionNumber: 2, created: "2026-09-25T07:00:00.000-0400"
+        )
+
+        let expected: String = "---\r\ntitle: Grade 11 Introduction to Computer Science, Section 2\r\n"
+            + "created: 2026-09-25T07:00:00.000-0400\r\npublish: true\r\n---\r\n# Most Recent Class\r\n"
+        let written: Data = try Data(contentsOf: destinationURL)
+        XCTAssertEqual(written, Data(expected.utf8), String(decoding: written, as: UTF8.self).debugDescription)
+        XCTAssertEqual(
+            SectionAdder.sectionTitle(for: course, sectionNumber: 2),
+            "Grade 11 Introduction to Computer Science, Section 2"
+        )
+    }
+
+    /// Rule 5: adding a section writes into pages the teacher never opened,
+    /// so the trail says it happened and how many shared pages it touched —
+    /// and names none of them. Counted, not assumed: the plain page with no
+    /// per-section keys is left alone and is not counted.
+    @MainActor
+    func testAddingASectionLeavesALineOnTheTrail() throws {
+        let (root, course) = try makeWorkspace()
+        let scratchFolderURL: URL = root.appendingPathComponent("trail", isDirectory: true)
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: scratchFolderURL)
+        defer {
+            ActivityTrail.store = previousStore
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        let keyed: String = "----\ntitle: Loops\ncreatedSection1: 2026-09-08T07:00:00.000-0400\n"
+            + "publishForSection1: false\n----\nBody.\n"
+        try Data(keyed.utf8).write(to: course.directoryURL.appendingPathComponent("Loops.md"))
+        let plain: String = "---\ntitle: Plain\ncreated: 2026-09-08T07:00:00.000-0400\n---\nBody.\n"
+        try Data(plain.utf8).write(to: course.directoryURL.appendingPathComponent("Plain.md"))
+
+        try SectionAdder.addSection(2, to: course)
+
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(
+            trail.contains(SectionAdder.trailLine(sectionNumber: 2, pagesGivenKeys: 1)),
+            "the line says a section was added and counts the one page given keys: \(trail)"
+        )
+        XCTAssertTrue(trail.contains("ICS3U/2"), trail)
+        XCTAssertFalse(trail.contains("Loops"), "no page is named: \(trail)")
+    }
+
+    /// A refused add writes nothing: the trail would otherwise say a section
+    /// exists that does not.
+    @MainActor
+    func testARefusedAddLeavesNoLine() throws {
+        let (root, course) = try makeWorkspace()
+        let scratchFolderURL: URL = root.appendingPathComponent("trail", isDirectory: true)
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: scratchFolderURL)
+        defer {
+            ActivityTrail.store = previousStore
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        XCTAssertThrowsError(try SectionAdder.addSection(1, to: course))
+        XCTAssertFalse(
+            ActivityTrail.store.activityText(includingPrompts: true).contains("added section"),
+            "a section that already exists was refused, so nothing was added"
+        )
+    }
+
+    /// A page whose section-1 setting sits on the line BELOW its key, on a
+    /// four-dash fence, hidden. The pair must go after the whole value — put
+    /// between key and value it left section 1 with no setting (published)
+    /// and section 2 reading "false false" (also published) — and the new
+    /// section is held back, counted on the trail as a setting that could not
+    /// be read (review of #175).
+    @MainActor
+    func testASettingOnTheLineBelowItsKeyStaysWholeAndHidden() throws {
+        let (root, course) = try makeWorkspace()
+        let scratchFolderURL: URL = root.appendingPathComponent("trail", isDirectory: true)
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: scratchFolderURL)
+        defer {
+            ActivityTrail.store = previousStore
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        let before: String = "----\ntitle: Loops\ncreatedSection1: 2026-09-08T07:00:00.000-0400\n"
+            + "publishForSection1:\n  false\n----\nBody line one.\n"
+        let pageURL: URL = course.directoryURL.appendingPathComponent("Loops.md")
+        try Data(before.utf8).write(to: pageURL)
+
+        try SectionAdder.addSection(2, to: course)
+
+        let written: String = String(decoding: try Data(contentsOf: pageURL), as: UTF8.self)
+        let created: String = try XCTUnwrap(
+            SectionAdderTests.value(ofKey: "createdSection2", in: written), written.debugDescription
+        )
+        let expected: String = "----\ntitle: Loops\ncreatedSection1: 2026-09-08T07:00:00.000-0400\n"
+            + "publishForSection1:\n  false\ncreatedSection2: \(created)\n"
+            + "publishForSection2: false\n----\nBody line one.\n"
+        XCTAssertEqual(written, expected)
+
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(
+            trail.contains(
+                SectionAdder.trailLine(sectionNumber: 2, pagesGivenKeys: 1, pagesKeptHiddenUnreadable: 1)
+            ),
+            trail
+        )
+    }
+
+    /// A section's landing page copied into a new one, its date on the line
+    /// BELOW the key (GitHub #199): the new date replaces the old one whole.
+    /// Replacing the key's line alone left the old date underneath, and the
+    /// new section's page read the two dates joined.
+    @MainActor
+    func testACopiedLandingPageTakesADateBelowItsKeyAway() throws {
+        let (root, course) = try makeWorkspace()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let source: String = "---\ntitle:\n  Grade 11 Introduction to Computer Science, Section 1\n"
+            + "created:\n  2026-08-10T14:30:00.000-0400\npublish: true\n---\n# Most Recent Class\n"
+        let sourceURL: URL = course.sectionDirectoryURL(forSection: 1).appendingPathComponent("index.md")
+        try Data(source.utf8).write(to: sourceURL)
+        let destinationURL: URL = root.appendingPathComponent("copied-index.md")
+
+        try SectionAdder.replicateMarkdownFile(
+            from: sourceURL, to: destinationURL, relativePath: "index.md",
+            course: course, sectionNumber: 2, created: "2026-09-25T07:00:00.000-0400"
+        )
+
+        // The title below its key is not one `sectionTitle` can read, so the
+        // wizard's form stands in — and it too replaces the old title whole.
+        let expected: String = "---\ntitle: \(SectionAdder.sectionTitle(for: course, sectionNumber: 2))\n"
+            + "created: 2026-09-25T07:00:00.000-0400\npublish: true\n---\n# Most Recent Class\n"
+        XCTAssertEqual(try String(contentsOf: destinationURL, encoding: .utf8), expected)
+    }
+
+    /// The same for the frontmatter a missing file is scaffolded from.
+    @MainActor
+    func testAScaffoldTakesADateBelowItsKeyAway() throws {
+        let root: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("scaffold-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let siblingURL: URL = root.appendingPathComponent("Snippets.md")
+        try Data("---\ntitle: Snippets\ncreated: >-\n  2026-08-10T14:30:00.000-0400\npublish: true\n---\nBody.\n".utf8)
+            .write(to: siblingURL)
+
+        let frontmatter: String = SectionAdder.scaffoldFrontmatter(
+            sibling: siblingURL, replacingTitleWith: nil, created: "2026-09-25T07:00:00.000-0400"
+        )
+        XCTAssertEqual(frontmatter, "title: Snippets\ncreated: 2026-09-25T07:00:00.000-0400\npublish: true")
+    }
+
+    /// The value on a `key: value` line, whatever the line ends with.
+    static func value(ofKey key: String, in text: String) -> String? {
+        for line in text.components(separatedBy: "\n") {
+            let plainLine: String = line.hasSuffix("\r") ? String(line.dropLast()) : line
+            if plainLine.hasPrefix(key + ": ") {
+                return String(plainLine.dropFirst(key.count + 2))
+            }
+        }
+        return nil
+    }
+
     /// When a section is added to a course that already has a sibling section,
     /// all class pages in All Classes/, transclusions, notes, links, and body
     /// content are replicated into the new section.

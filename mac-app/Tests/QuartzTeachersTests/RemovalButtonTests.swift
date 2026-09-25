@@ -33,10 +33,20 @@ final class RemovalButtonTests: XCTestCase {
         workspace.selection = SidebarSelection.course(courseCode)
         await settle()
 
+        try AccessibilityInspector.skipUnlessTheWindowCanBeRead(workspace.window)
         XCTAssertTrue(AccessibilityInspector.press(identifier: "removeSelectedButton"),
                       "The − button should be present and enabled with a course selected")
         await settle()
 
+        // The desktop can change after the press. If it has, the alert may
+        // already be up, so close it before skipping — the next test must
+        // not find it covering the window.
+        do {
+            try AccessibilityInspector.skipUnlessTheWindowCanBeRead(workspace.window)
+        } catch {
+            await closeTheAlert(in: workspace)
+            throw error
+        }
         let labels: [String] = AccessibilityInspector.collectAllLabels()
         var alertAppeared: Bool = false
         for label in labels {
@@ -47,7 +57,12 @@ final class RemovalButtonTests: XCTestCase {
         XCTAssertTrue(alertAppeared,
                       "Pressing − must show the confirmation alert; labels seen: \(labels.suffix(25))")
 
-        // Close the alert so later tests find the window as they left it.
+        await closeTheAlert(in: workspace)
+    }
+
+    /// Closes the alert so later tests find the window as they left it.
+    @MainActor
+    func closeTheAlert(in workspace: WorkspaceModel) async {
         _ = AccessibilityInspector.press(identifier: "Cancel")
         for label in ["Cancel"] where AccessibilityInspector.press(identifier: label) {
             break

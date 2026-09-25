@@ -27,8 +27,9 @@ class WorkspaceModel {
 
     /// True when the hosted test suite is running. Tests drive the real
     /// window, and must not leave the teacher pointed at a fixture folder
-    /// that is deleted when the run ends.
-    static let isRunningTests: Bool = NSClassFromString("XCTestCase") != nil
+    /// that is deleted when the run ends. Asked of `RealHome`, which keeps
+    /// the one definition of "XCTest is in this process" (#264).
+    static let isRunningTests: Bool = RealHome.isInsideTestBundle
 
     /// The models belonging to open windows, in the order they appeared.
     /// Windows register themselves so the in-app tests can drive the real
@@ -90,6 +91,73 @@ class WorkspaceModel {
         windowModels.append(model)
     }
 
+    /// A course's settings file was just written by `writer`: bring every
+    /// other open window's copy of that course up to date (issue #265).
+    ///
+    /// Each window keeps its own copy of every course's settings, and "the
+    /// same folder in a second window" is supported, so without this a window
+    /// that had not seen a Save went on showing — and could save back — the
+    /// settings as they were before it. A copy with unsaved changes is left
+    /// alone rather than reloaded over them; when it saves, `write(to:)` keeps
+    /// the file's value for every setting it did not change.
+    ///
+    /// Returns how many copies were reloaded, for the tests.
+    @discardableResult
+    static func followWrite(
+        of writer: CourseConfiguration,
+        at url: URL,
+        in models: [WorkspaceModel] = windowModels
+    ) -> Int {
+        let writtenPath: String = FolderIdentity.canonicalPath(url.standardizedFileURL.path)
+        var reloadedCount: Int = 0
+        for model in models {
+            for course in model.courses {
+                if course.configuration === writer {
+                    continue
+                }
+                let coursePath: String = FolderIdentity.canonicalPath(course.configFileURL.standardizedFileURL.path)
+                if coursePath != writtenPath {
+                    continue
+                }
+                if course.configuration.hasUnsavedChanges {
+                    continue
+                }
+                do {
+                    try course.configuration.reloadFromDisk(url: course.configFileURL)
+                    reloadedCount += 1
+                } catch {
+                    // An unreadable file leaves this copy as it was; the next
+                    // folder reload reports the problem the usual way.
+                }
+            }
+        }
+        return reloadedCount
+    }
+
+    /// Whether ANY open window's copy of the course whose settings live at
+    /// `url` holds changes nobody saved — this window's included (issue #265,
+    /// the review's L1). A preview reads the saved file, and with two windows
+    /// on one folder the unsaved switches can be in the OTHER window's Course
+    /// Settings; asking only the previewing window's copy said nothing then.
+    static func anyCopyHasUnsavedChanges(
+        configFileURL url: URL,
+        in models: [WorkspaceModel] = windowModels
+    ) -> Bool {
+        let wantedPath: String = FolderIdentity.canonicalPath(url.standardizedFileURL.path)
+        for model in models {
+            for course in model.courses {
+                let coursePath: String = FolderIdentity.canonicalPath(course.configFileURL.standardizedFileURL.path)
+                if coursePath != wantedPath {
+                    continue
+                }
+                if course.configuration.hasUnsavedChanges {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
     /// True once the app has begun quitting. Windows closing as part of
     /// the quit must not rewrite the remembered list — that is the list
     /// the next launch restores from.
@@ -125,9 +193,21 @@ class WorkspaceModel {
     }
 
     /// True while some open window is working in this folder.
+    ///
+    /// **However either of them is spelled** (GitHub #189). This gates
+    /// stopping the folder's workspace, and the workspace is named by
+    /// `BuildOutputLocation.folderIdentifier`, which folds case, Unicode form,
+    /// links and the firmlink through `FolderIdentity.canonicalPath` — so a
+    /// plain `==` here would call the open folder, re-chosen in another
+    /// spelling, a DIFFERENT folder and stop the workspace it is using. The
+    /// hash and this comparison are the same function on purpose: change
+    /// one and you change the other.
     static func folderIsInUse(_ path: String) -> Bool {
         for model in windowModels {
-            if model.workspaceURL?.path == path {
+            guard let openPath = model.workspaceURL?.path else {
+                continue
+            }
+            if FolderIdentity.isSameFolder(openPath, path) {
                 return true
             }
         }
@@ -213,6 +293,27 @@ class WorkspaceModel {
 
     /// Saved copies of whole courses, newest first.
     var backupItems: [BackupItem] = []
+
+    /// What each backup takes, in bytes, keyed by `BackupItem.id` — its
+    /// LOGICAL size, measured off the main thread after every reload (#242).
+    /// A backup not measured yet is simply absent, and `backupSpace` then
+    /// says so rather than showing a total that is quietly too small.
+    var backupSizes: [String: Int64] = [:]
+
+    /// Every backup the last finished measurement LOOKED at, by id — so one it
+    /// could not size reads as unsized rather than as still being measured.
+    var backupsMeasured: Set<String> = []
+
+    /// How many measurements have been started, so one that finishes after a
+    /// newer one never overwrites it — a total that never shrinks after a
+    /// delete, or sizes for zips that are gone, is what that race looks like.
+    ///
+    /// Readable from outside so a test can see that opening a folder started
+    /// one — the reload's own measurement, not one the test asked for.
+    private(set) var backupSizeMeasurementsStarted: Int = 0
+
+    /// The backups a delete-several confirmation is being shown for, if any.
+    var backupsDeleteRequest: [BackupItem]?
 
     /// Whether the sidebar's Backups group is open.
     var isShowingBackups: Bool = false
@@ -515,6 +616,8 @@ class WorkspaceModel {
         case .backup:
             // A backup is a copy, not the live course itself.
             selectedCode = nil
+        case .allBackups:
+            selectedCode = nil
         case nil:
             selectedCode = nil
         }
@@ -611,8 +714,14 @@ class WorkspaceModel {
         // Choosing the folder this window already shows is not a new
         // choice — a teacher who does that with the notice showing would
         // otherwise find their courses hidden behind the picker.
-        noticeCloudSync(folderWasChosen: previousPath != url.path)
-        if let previousPath, previousPath != url.path {
+        // Compared as one folder however it is spelled (#189): a teacher
+        // re-choosing the open folder in another case is not choosing a new one.
+        var isTheSameFolder: Bool = false
+        if let previousPath {
+            isTheSameFolder = FolderIdentity.isSameFolder(previousPath, url.path)
+        }
+        noticeCloudSync(folderWasChosen: !isTheSameFolder)
+        if let previousPath, !isTheSameFolder {
             WorkspaceModel.releaseFolderIfUnused(previousPath)
         }
     }
@@ -627,14 +736,16 @@ class WorkspaceModel {
     /// restored, and moving them here would give a restored window a trail
     /// line saying the teacher had opened something.
     private func pointAtFolder(_ url: URL) {
-        // Plain `.path`, which is the same comparison `chooseWorkspace`
-        // already makes to decide whether the cloud-sync note is a question
-        // or a notice and whether the folder being left may rest. Two
-        // spellings of one folder would read as DIFFERENT and merely
-        // over-clear — a selection that could have stayed is dropped, and
-        // the teacher is looking at the sidebar either way. The reverse,
-        // two different folders reading as the same, cannot happen.
-        let isADifferentFolder: Bool = workspaceURL?.path != url.path
+        // The same comparison `chooseWorkspace` makes to decide whether the
+        // cloud-sync note is a question or a notice and whether the folder
+        // being left may rest: one folder however it is spelled (#189), so
+        // re-choosing the open folder in another case keeps its selection.
+        // Two different folders cannot read as the same — the disk is asked
+        // for each one's own name.
+        var isADifferentFolder: Bool = true
+        if let currentPath = workspaceURL?.path {
+            isADifferentFolder = !FolderIdentity.isSameFolder(currentPath, url.path)
+        }
         if isADifferentFolder {
             forgetWhatBelongedToTheOldFolder()
         }
@@ -710,6 +821,7 @@ class WorkspaceModel {
         archiveDeleteRequest = nil
         backupRestoreRequest = nil
         backupDeleteRequest = nil
+        backupsDeleteRequest = nil
         obsidianRenameRequest = nil
         // Alerts about what just happened in the folder being left. A
         // sentence naming a course this window no longer shows is worse
@@ -800,7 +912,8 @@ class WorkspaceModel {
         // or "Got It" here leaves it there until relaunch, against the
         // once-per-folder rule.
         for other in WorkspaceModel.windowModels {
-            if other !== self && other.workspaceURL?.path == workspaceURL.path {
+            if other !== self, let theirPath = other.workspaceURL?.path,
+               FolderIdentity.isSameFolder(theirPath, workspaceURL.path) {
                 other.needsCloudSyncDecision = false
                 other.isShowingCloudSyncNotice = false
             }
@@ -822,7 +935,7 @@ class WorkspaceModel {
         if !WorkspaceModel.folderExists(atPath: path) {
             return
         }
-        if workspaceURL?.path == path {
+        if let currentPath = workspaceURL?.path, FolderIdentity.isSameFolder(currentPath, path) {
             return
         }
         // The same funnel the picker goes through, so the letting-go cannot
@@ -1228,6 +1341,7 @@ class WorkspaceModel {
         placeBuiltSitesOutsideTheFolder(for: loadedCourses, everythingIn: entryURLs)
         archivedItems = WorkspaceModel.findArchivedItems(in: coursesDirectoryURL)
         backupItems = WorkspaceModel.findBackupItems(in: coursesDirectoryURL)
+        startMeasuringBackupSizes()
     }
 
     /// Points every course's `.merged_output` at this folder's builds folder,
@@ -1305,7 +1419,7 @@ class WorkspaceModel {
             return false
         }
         for lease in PreviewLeases.active {
-            if lease.folderPath == workspaceURL.path && lease.courseCode == code {
+            if lease.courseCode == code && FolderIdentity.isSameFolder(lease.folderPath, workspaceURL.path) {
                 return true
             }
         }
@@ -1469,6 +1583,39 @@ class WorkspaceModel {
         performRename(course, to: requestedCode)
     }
 
+    /// Why what has been typed into a course's rename field cannot be used,
+    /// or nil when it can — the same rule the New Course wizard asks, in the
+    /// short words a sidebar row has room for.
+    ///
+    /// ONE function for both halves of the field: the reason drawn under it,
+    /// and Return's refusal in `renameFromTheField`. Two copies of this
+    /// check could drift until the field showed no problem and still beeped,
+    /// or showed one and renamed anyway.
+    func renameFieldProblem(_ course: Course, typed text: String) -> String? {
+        var existingCodes: [String] = []
+        for existingCourse in courses {
+            existingCodes.append(existingCourse.code)
+        }
+        return CourseCodeRule.shortProblem(text, existingCodes: existingCodes, currentCode: course.code)
+    }
+
+    /// Return in the rename field. False — and nothing changes — when the
+    /// code cannot be used: its reason is already under the field, so it is
+    /// not raised again as an alert, and the field stays open for another
+    /// try. True when the rename was handed on to `rename(_:to:)`, which
+    /// still has its own reasons to stop (a preview, an open Obsidian).
+    ///
+    /// A model function rather than a line in the field so a test can press
+    /// Return without the window: #293 was a test that waited for the
+    /// window instead, and lost the field to a focus change on the way.
+    func renameFromTheField(_ course: Course, typed text: String) -> Bool {
+        if renameFieldProblem(course, typed: text) != nil {
+            return false
+        }
+        rename(course, to: text)
+        return true
+    }
+
     /// Closes Obsidian, renames, and opens the vaults again — the answer to
     /// the question `rename` asked.
     ///
@@ -1614,18 +1761,391 @@ class WorkspaceModel {
     }
 
     /// Deletes a backup for good — no archive behind it, which is why
-    /// its confirmation says so.
+    /// its confirmation says so. One backup is the one-item case of
+    /// `deleteBackups`, so the two cannot differ about what they refuse or
+    /// what they record.
     func deleteBackup(_ item: BackupItem) {
-        do {
-            try FileManager.default.removeItem(at: item.fileURL)
-        } catch {
-            backupProblem = error.localizedDescription
-            return
+        deleteBackups([item])
+    }
+
+    /// What deleting several backups did.
+    struct BackupDeletion {
+
+        // MARK: - Stored properties
+
+        /// The backups that are gone.
+        let deleted: [BackupItem]
+
+        /// The backups left alone because an open assistant conversation can
+        /// still restore from them.
+        let keptForTheAssistant: [BackupItem]
+
+        /// The backups that could not be deleted, with why.
+        let failed: [(item: BackupItem, reason: String)]
+    }
+
+    /// Deletes several backups for good, each permanently, as the single
+    /// delete always has (#242).
+    ///
+    /// **Never the backup an open assistant conversation restores from.**
+    /// Its "Restore Section N…" button is still on screen, and a restore from
+    /// a zip that is gone fails after the teacher has agreed to it — so that
+    /// backup is left alone and the teacher is told which window to close
+    /// (`AssistActivity.closeTheAssistantFirst`). Every other backup asked for
+    /// is deleted: one that cannot be (a locked file, say) is reported with
+    /// the others still deleted, never used as a reason to stop.
+    ///
+    /// ONE reload at the end, not one per file — the sidebar and its
+    /// selection would otherwise churn once for every backup. Then every OTHER
+    /// window on this folder refreshes its own list (`followBackupDeletion`),
+    /// or it goes on offering Restore for zips that are gone.
+    ///
+    /// `otherWindows` is every window's model — a parameter only so a test can
+    /// hand in its own, exactly as `followWrite` takes one.
+    @discardableResult
+    func deleteBackups(
+        _ items: [BackupItem],
+        following otherWindows: [WorkspaceModel] = WorkspaceModel.windowModels
+    ) -> BackupDeletion {
+        let heldPaths: Set<String> = WorkspaceModel.heldBackupPaths()
+
+        var deleted: [BackupItem] = []
+        var kept: [BackupItem] = []
+        var failed: [(item: BackupItem, reason: String)] = []
+        for item in items {
+            if heldPaths.contains(WorkspaceModel.comparablePath(of: item)) {
+                kept.append(item)
+                continue
+            }
+            do {
+                try FileManager.default.removeItem(at: item.fileURL)
+                deleted.append(item)
+            } catch {
+                failed.append((item: item, reason: error.localizedDescription))
+            }
         }
-        if selection == SidebarSelection.backup(item.id) {
+
+        let deletion: BackupDeletion = BackupDeletion(
+            deleted: deleted, keptForTheAssistant: kept, failed: failed
+        )
+        if !deleted.isEmpty {
+            ActivityTrail.note(
+                .backupsDeleted,
+                WorkspaceModel.trailLine(for: deletion, sizes: backupSizes)
+            )
+        }
+        backupProblem = WorkspaceModel.problem(with: deletion)
+
+        for item in deleted {
+            if selection == SidebarSelection.backup(item.id) {
+                selection = nil
+            }
+        }
+        if !deleted.isEmpty {
+            reloadCourses()
+            if let coursesDirectoryURL {
+                WorkspaceModel.followBackupDeletion(
+                    inCoursesDirectory: coursesDirectoryURL, besides: self, in: otherWindows
+                )
+            }
+        }
+        return deletion
+    }
+
+    /// Brings every OTHER window on the same folder up to date after backups
+    /// were deleted from this one (#242, the plan review's M2).
+    ///
+    /// The same shape as `followWrite`, #265's reload path for a settings
+    /// save: the same folder in two windows is supported, and Russell works
+    /// that way. Only the Backups list is re-read — never the courses, whose
+    /// settings copies may hold changes nobody has saved — and a selection or
+    /// a confirmation pointing at a zip that is gone is let go. Returns how
+    /// many windows were brought up to date, for the tests.
+    @discardableResult
+    static func followBackupDeletion(
+        inCoursesDirectory coursesDirectoryURL: URL,
+        besides origin: WorkspaceModel,
+        in models: [WorkspaceModel] = windowModels
+    ) -> Int {
+        let deletedFrom: String = FolderIdentity.canonicalPath(coursesDirectoryURL.standardizedFileURL.path)
+        var followed: Int = 0
+        for model in models {
+            if model === origin {
+                continue
+            }
+            guard let theirs = model.coursesDirectoryURL else {
+                continue
+            }
+            if FolderIdentity.canonicalPath(theirs.standardizedFileURL.path) != deletedFrom {
+                continue
+            }
+            model.backupItems = WorkspaceModel.findBackupItems(in: theirs)
+            model.letGoOfBackupsThatAreGone()
+            model.startMeasuringBackupSizes()
+            followed += 1
+        }
+        return followed
+    }
+
+    /// Clears a selection or a confirmation that names a backup no longer in
+    /// the list.
+    private func letGoOfBackupsThatAreGone() {
+        var listed: Set<String> = []
+        for item in backupItems {
+            listed.insert(item.id)
+        }
+        if case .backup(let identifier) = selection, !listed.contains(identifier) {
             selection = nil
         }
-        reloadCourses()
+        if let request = backupRestoreRequest, !listed.contains(request.id) {
+            backupRestoreRequest = nil
+        }
+        if let request = backupDeleteRequest, !listed.contains(request.id) {
+            backupDeleteRequest = nil
+        }
+        if let requested = backupsDeleteRequest {
+            for item in requested where !listed.contains(item.id) {
+                backupsDeleteRequest = nil
+            }
+        }
+    }
+
+    /// The backups an open assistant conversation holds, as comparable paths.
+    ///
+    /// Compared as RESOLVED paths: the runner names its backup from the
+    /// folder it was given, the list from what the folder enumerates, and
+    /// `/var` against `/private/var` is the same file spelt twice — as are
+    /// two cases or two Unicode forms of one name (`FolderIdentity`, #189).
+    static func heldBackupPaths() -> Set<String> {
+        var heldPaths: Set<String> = []
+        for heldURL in AssistActivity.backupsAnOpenConversationHolds() {
+            heldPaths.insert(FolderIdentity.canonicalPath(heldURL.standardizedFileURL.path))
+        }
+        return heldPaths
+    }
+
+    /// How many of `items` a delete would actually remove — every one but the
+    /// backups an open assistant conversation holds. Zero disables the
+    /// delete-several button: a confirmation that deletes nothing, while
+    /// saying "this deletes them for good", is a sentence that contradicts
+    /// itself.
+    static func deletableCount(of items: [BackupItem], heldPaths: Set<String>) -> Int {
+        var count: Int = 0
+        for item in items {
+            if !heldPaths.contains(WorkspaceModel.comparablePath(of: item)) {
+                count += 1
+            }
+        }
+        return count
+    }
+
+    /// "Delete Backup…" on one backup, from the sidebar or its pane.
+    ///
+    /// A backup the open assistant conversation holds is refused AT ONCE, with
+    /// the sentence the delete-several gives, and nothing is deleted — rather
+    /// than a confirmation promising "this deletes the backup for good" and an
+    /// alert afterwards saying it was kept. Any other backup gets the usual
+    /// confirmation.
+    func requestDeleteBackup(_ item: BackupItem) {
+        if WorkspaceModel.heldBackupPaths().contains(WorkspaceModel.comparablePath(of: item)) {
+            backupProblem = WorkspaceModel.problem(with: BackupDeletion(
+                deleted: [], keptForTheAssistant: [item], failed: []
+            ))
+            return
+        }
+        backupDeleteRequest = item
+    }
+
+    /// A backup's path in the form `heldBackupPaths` uses.
+    static func comparablePath(of item: BackupItem) -> String {
+        return FolderIdentity.canonicalPath(item.fileURL.standardizedFileURL.path)
+    }
+
+    /// The delete-several confirmation's message (the plan review's L3).
+    ///
+    /// Said BEFORE anything is deleted, so it tells the truth about what will
+    /// happen: a backup the open assistant conversation holds is named as
+    /// kept, and "Together they take" counts only what will actually go. The
+    /// same honesty as the single delete — for good, nothing kept, the courses
+    /// untouched — otherwise.
+    static func deleteConfirmation(
+        for items: [BackupItem],
+        sizes: [String: Int64],
+        heldPaths: Set<String>,
+        active: AssistActivity.Session?
+    ) -> String {
+        var going: [BackupItem] = []
+        var keptCount: Int = 0
+        for item in items {
+            if heldPaths.contains(WorkspaceModel.comparablePath(of: item)) {
+                keptCount += 1
+            } else {
+                going.append(item)
+            }
+        }
+
+        var message: String = going.count == 1
+            ? "This deletes the backup for good — unlike removing a course, nothing is kept."
+            : "This deletes them for good — unlike removing a course, nothing is kept."
+        var bytes: Int64 = 0
+        var everySizeKnown: Bool = true
+        for item in going {
+            if let size = sizes[item.id] {
+                bytes += size
+            } else {
+                everySizeKnown = false
+            }
+        }
+        if everySizeKnown && !going.isEmpty {
+            let together: String = going.count == 1 ? "It takes" : "Together they take"
+            message += " \(together) \(BackupSizes.description(ofBytes: bytes))."
+        }
+        if keptCount > 0, let active {
+            let which: String = keptCount == 1 ? "One of these is" : "\(keptCount) of these are"
+            message += "\n\n" + which + " kept: the assistant for \(active.courseCode) Section "
+                + "\(active.sectionNumber) is open and can still put the section back from "
+                + (keptCount == 1 ? "it." : "them.")
+        }
+        message += "\n\nThe courses themselves are not touched."
+        return message
+    }
+
+    /// What the teacher is told when a delete did not do everything asked,
+    /// or nil when it did.
+    static func problem(with deletion: BackupDeletion) -> String? {
+        var sentences: [String] = []
+        if !deletion.keptForTheAssistant.isEmpty, let active = AssistActivity.active {
+            var why: String = ". That conversation can still put Section \(active.sectionNumber) back from "
+            if deletion.keptForTheAssistant.count == 1 {
+                why += "this backup, so it was kept."
+            } else {
+                why += "these backups, so they were kept."
+            }
+            sentences.append(AssistActivity.closeTheAssistantFirst(active) + why)
+        }
+        if !deletion.failed.isEmpty {
+            let count: Int = deletion.failed.count
+            let noun: String = count == 1 ? "backup" : "backups"
+            sentences.append("\(count) \(noun) could not be deleted: \(deletion.failed[0].reason)")
+        }
+        if sentences.isEmpty {
+            return nil
+        }
+        return sentences.joined(separator: "\n\n")
+    }
+
+    /// The trail's line for a delete: which course or courses, how many, what
+    /// they took when every size is known, and each file's NAME — a course
+    /// code, a moment and who made it, never anything written on a page — so
+    /// "my backup is gone" is answered precisely (the plan review's L2).
+    static func trailLine(for deletion: BackupDeletion, sizes: [String: Int64]) -> String {
+        var courseCodes: [String] = []
+        var names: [String] = []
+        var bytes: Int64 = 0
+        var everySizeKnown: Bool = true
+        for item in deletion.deleted {
+            if !courseCodes.contains(item.courseCode) {
+                courseCodes.append(item.courseCode)
+            }
+            names.append(item.fileURL.lastPathComponent)
+            if let size = sizes[item.id] {
+                bytes += size
+            } else {
+                everySizeKnown = false
+            }
+        }
+        let count: Int = deletion.deleted.count
+        var line: String = "deleted \(count) " + (count == 1 ? "backup" : "backups")
+            + " of " + courseCodes.joined(separator: ", ")
+        if everySizeKnown {
+            line += ", " + BackupSizes.description(ofBytes: bytes)
+        }
+        line += ": " + names.joined(separator: ", ")
+        if !deletion.keptForTheAssistant.isEmpty {
+            var keptNames: [String] = []
+            for item in deletion.keptForTheAssistant {
+                keptNames.append(item.fileURL.lastPathComponent)
+            }
+            line += "; kept " + keptNames.joined(separator: ", ")
+                + ", which the open assistant conversation can restore from"
+        }
+        if !deletion.failed.isEmpty {
+            line += "; \(deletion.failed.count) could not be deleted"
+        }
+        return line
+    }
+
+    // MARK: - What the backups take
+
+    /// What the backups take, per course and in total.
+    var backupSpace: BackupSpace {
+        return BackupSpace.of(backupItems, sizes: backupSizes, measured: backupsMeasured)
+    }
+
+    /// "15.9 MB" for the Size column, `AssistWording.backupSizeCouldNotBeReadShort`
+    /// for a backup a finished measurement could not size, or nil until measured.
+    func shortSizeDescription(of item: BackupItem) -> String? {
+        if backupSizes[item.id] == nil && backupsMeasured.contains(item.id) {
+            return AssistWording.backupSizeCouldNotBeReadShort
+        }
+        return sizeDescription(of: item)
+    }
+
+    /// "15.9 MB" for one backup, `AssistWording.backupSizeCouldNotBeRead` for
+    /// one a finished measurement could not size, or nil until it has been
+    /// measured.
+    func sizeDescription(of item: BackupItem) -> String? {
+        guard let size = backupSizes[item.id] else {
+            if backupsMeasured.contains(item.id) {
+                return AssistWording.backupSizeCouldNotBeRead
+            }
+            return nil
+        }
+        return BackupSizes.description(ofBytes: size)
+    }
+
+    /// Starts measuring the backups now listed, off the main thread, and
+    /// stores the answer when it arrives — unless a newer measurement was
+    /// started meanwhile. Never a GCD hop and never a sleep: the measurement
+    /// is awaited, and the one that was started last is the one that counts.
+    func startMeasuringBackupSizes() {
+        let measurement: (number: Int, fileURLs: [URL]) = beginMeasuringBackupSizes()
+        Task { @MainActor [weak self] in
+            let sizes: [String: Int64] = await BackupSizes.measure(measurement.fileURLs)
+            self?.finishMeasuringBackupSizes(measurement.number, sizes: sizes, lookedAt: measurement.fileURLs)
+        }
+    }
+
+    /// The same, awaited — for a caller (a test) that needs the answer in
+    /// hand before it goes on.
+    func measureBackupSizes() async {
+        let measurement: (number: Int, fileURLs: [URL]) = beginMeasuringBackupSizes()
+        let sizes: [String: Int64] = await BackupSizes.measure(measurement.fileURLs)
+        finishMeasuringBackupSizes(measurement.number, sizes: sizes, lookedAt: measurement.fileURLs)
+    }
+
+    /// Numbers a new measurement and says which files it covers.
+    func beginMeasuringBackupSizes() -> (number: Int, fileURLs: [URL]) {
+        backupSizeMeasurementsStarted += 1
+        var fileURLs: [URL] = []
+        for item in backupItems {
+            fileURLs.append(item.fileURL)
+        }
+        return (number: backupSizeMeasurementsStarted, fileURLs: fileURLs)
+    }
+
+    /// Stores a measurement's answer, unless a newer one has been started.
+    /// `lookedAt` is every file it was asked about, sized or not.
+    func finishMeasuringBackupSizes(_ number: Int, sizes: [String: Int64], lookedAt fileURLs: [URL] = []) {
+        if number != backupSizeMeasurementsStarted {
+            return
+        }
+        var lookedAtPaths: Set<String> = []
+        for fileURL in fileURLs {
+            lookedAtPaths.insert(fileURL.path)
+        }
+        backupsMeasured = lookedAtPaths
+        backupSizes = sizes
     }
 
     /// What deleting an archive would leave behind, so the confirmation

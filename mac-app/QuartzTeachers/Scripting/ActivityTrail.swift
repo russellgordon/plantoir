@@ -38,6 +38,12 @@ nonisolated enum ActivityTrail {
         case workingFolderOpened = "working folder opened"
         case settingsSaved = "settings saved"
         case settingsCouldNotBeSaved = "settings could not be saved"
+        /// A preview started while Course Settings held changes nobody had
+        /// saved, and the teacher was told it uses the saved settings (#265).
+        case previewStartedWithUnsavedSettings = "preview started with unsaved settings"
+        /// Preview Again, pressed beside the sentence Course Settings shows
+        /// after a Save that an open preview could not see (#265).
+        case previewAgainAfterSettingsSaved = "preview again after settings saved"
         case taskStarted = "task started"
         case taskFinished = "task finished"
         case askedForACredential = "asked for a publishing credential"
@@ -59,6 +65,21 @@ nonisolated enum ActivityTrail {
         /// Windows recorded this first (`AssistWindow.xaml.cs`); the mac had
         /// the same button and wrote nothing.
         case sectionRestored = "section restored"
+        /// A teacher added a section to a course ("Add Section…"). Carries
+        /// the course, the new section, and how many pages shared by every
+        /// section were given a date and a published-or-hidden setting for
+        /// it, and how many of those were kept hidden because the setting
+        /// they would copy could not be read — never which pages.
+        ///
+        /// Adding a section writes into pages the teacher did not open: every
+        /// course-level page that carries per-section keys gains a pair for
+        /// the new section, copied from the lowest existing one. When that
+        /// went wrong it went wrong silently — a page hidden in section 1 but
+        /// fenced in a way the old finder missed was PUBLISHED in the new
+        /// section (GitHub #175) — and the trail had nothing at all about the
+        /// section being added, so "why is this page showing in section 2?"
+        /// had no line to start from.
+        case sectionAdded = "section added"
         case assistantAsked = "assistant asked"
         case assistantChoseATool = "assistant chose a tool"
         case assistantCouldNotAnswer = "assistant could not answer"
@@ -156,7 +177,11 @@ nonisolated enum ActivityTrail {
         /// that recorded only the release could not answer the question anyone
         /// actually reads it for.
         case sectionKeptItsWebsiteOnRollover = "section kept its website"
-        /// A folder a feature depends on was missing, renamed or emptied.
+        /// A folder a feature depends on was missing, renamed or emptied — or,
+        /// since #246, a PAGE whose settings the build could not read and so
+        /// hid (`pageSettingsUnreadable`). The name is kept because the event
+        /// is the site-health family; the line still names the check, never
+        /// the pages, which are the teacher's own names.
         /// Carries the check's NAME, never its wording: the sentence is
         /// product wording and will be reworded, while the name is what
         /// somebody reading the trail months later can match against the
@@ -164,6 +189,12 @@ nonisolated enum ActivityTrail {
         /// is long gone by the time it is reported, and the condition is
         /// invisible on disk — a renamed folder looks exactly like a folder
         /// that was always called that.
+        ///
+        /// Two writers, one sentence (`SiteHealthFinding.trailSentence`): a
+        /// build the app runs, as its output arrives; and a SCHEDULED publish,
+        /// from its own log at the end of the run
+        /// (`ScheduledDeploy.recordFolderProblems`, #153) — dated to the run,
+        /// not to whenever somebody next opens the section.
         case folderProblemFound = "folder problem found"
         /// A folder a feature depends on was put back, at the teacher's
         /// request. Separate from `folderProblemFound` because it is a
@@ -186,6 +217,19 @@ nonisolated enum ActivityTrail {
         /// deliberate rather than forgotten, and this event is the line it
         /// joins when it is closed, without a rename on either platform.
         case folderProblemNotRepaired = "folder problem not repaired"
+
+        /// A preview or a publish rewrote some of the teacher's own pages
+        /// with the date of their class: the front page takes the date of the
+        /// class it shows, and a page a class brings takes the date of the
+        /// earliest visible class that brings it (#275, #276). Carries the
+        /// course, the section, how many, and their NAMES — never anything
+        /// written on them. Read from the build's `PLANTOIR_DATED:` line
+        /// (`PagesDatedByTheBuild`), which is printed only when something was
+        /// rewritten, so a build whose dates were already right adds nothing.
+        /// Recorded because this is a change to the teacher's files nobody
+        /// asked for in so many words, and "why did this page's date change?"
+        /// is asked long after the console that said so has gone.
+        case pagesDatedByTheBuild = "pages dated by the build"
 
         /// A teacher asked for a class to be duplicated, the room for it was
         /// made, and then no copy appeared.
@@ -276,6 +320,12 @@ nonisolated enum ActivityTrail {
         /// token under it would make the trail say something untrue about the
         /// one run a teacher is trying to understand. Both are the same
         /// silence from the teacher's side; only one of them is a question.
+        ///
+        /// A BUILD that failed outright files here too
+        /// (`ScheduledPublishOutcome.Kind.buildDidNotFinish`, #137), with a
+        /// line that says the pages could not be built and names no
+        /// destination, because none was reached — the way
+        /// `buildNeededAnAnswer` files under the event above.
         case scheduledPublishDidNotFinish = "scheduled publish did not finish"
 
         /// A publish set to happen on its own went out.
@@ -320,7 +370,8 @@ nonisolated enum ActivityTrail {
         /// for.
         ///
         /// Scheduling a section again removes the deploy already set for it —
-        /// on purpose, one per section per Mac — and the old job leaves nothing
+        /// on purpose, one per section per working folder (per Mac until #237)
+        /// — and the old job leaves nothing
         /// behind once it is gone, so "it went on Saturday, I set it for
         /// Friday" had no answer anywhere. The card now says so beforehand;
         /// this is what says so afterwards. Written in
@@ -402,6 +453,12 @@ nonisolated enum ActivityTrail {
         /// uploading builds. Each of those arrives as a separate report
         /// ("where has my site gone?", "did something delete my files?"), and
         /// this line — dated, per course — is what answers all three at once.
+        /// The LAUNCHERS write it once more, in words the contract pins
+        /// (`launcherLineWhenASecondCopyIsClearedAway`, GitHub #189): when a
+        /// launcher handed another spelling of the folder clears away the
+        /// second workspace or builds folder that spelling made before #189,
+        /// filed under the course/section it ran for (or "setup"). The app
+        /// never writes that one; it sweeps nothing.
         case builtSiteMovedOutOfTheFolder = "built site moved out of the working folder"
         /// A section's leftover website-builder processes were reclaimed —
         /// after a preview was stopped, a window closed, or a publish was
@@ -420,7 +477,27 @@ nonisolated enum ActivityTrail {
         /// how long it had been saying nothing, and WHICH of the three things
         /// was true: the website builder was serving the site and this Mac
         /// could not reach it, nothing was serving it at all, or the builder
-        /// could not be asked and Plantoir does not know.
+        /// could not be asked and Plantoir does not know. Or — with no
+        /// silence waited out and nobody asked — that its website started and
+        /// no address for it was ever announced, so there was nothing to open
+        /// (issue #235; before it, a guessed address was tried instead).
+        /// The launcher writes this event too, in words the contract pins
+        /// (`launcherLine`): when `preview.sh` cannot find out the address at
+        /// all it stops before building and says so on the trail itself —
+        /// the ending a teacher will actually meet, since the app's own
+        /// no-address stop only fires if a launcher ever announced nothing.
+        /// Since issue #280 the launchers write it on one more ending, in
+        /// words pinned as `launcherLineWhenEveryAddressIsTaken`: every
+        /// address Plantoir can use for a preview was taken, so no workspace
+        /// could be made for the folder — from a preview, a publish, or
+        /// setup (which files it under the word "setup", having no course
+        /// yet). Deliberately not a new event: to a teacher it is the same
+        /// outcome, a preview that never appeared. Since issue #234
+        /// `preview.sh` writes it on a third ending, in words pinned as
+        /// `launcherLineWhenThisMacCannotReachTheBuilder`: before building,
+        /// a connection to the address it was about to announce was refused
+        /// on every try, so it stopped rather than build a preview this Mac
+        /// could not open — the fault #225 names after a build, found first.
         ///
         /// This is the line whose absence produced the report it exists for
         /// (issue #225). A teacher built three previews in four minutes, none
@@ -509,12 +586,32 @@ nonisolated enum ActivityTrail {
         /// GitHub issue #248 was reported against: a teacher declined the
         /// ready-made pages, got empty folders, and nothing on the trail
         /// said which of those two things had happened.
+        ///
+        /// A club (#267) says so, with its page word and class folder —
+        /// "created CODING as a club, with pages named “Week 1” in “All
+        /// Meetings”" — because those are what decide whether any of its
+        /// pages are seen at all.
         case courseCreated = "course created"
 
         /// A course was kept for reference: which folder it was given, the
         /// code and school year it shows, how many sections came across, and
-        /// which course it was copied from. Never the contents of a page.
+        /// which course it was copied from. Since #255 it also names the
+        /// Obsidian add-ons the copy was made without, by folder name — only
+        /// when there were any, so a course with none leaves the same line as
+        /// before (`ObsidianAddOns.trailClause`). Never the contents of a
+        /// page, and never anything read from inside an add-on.
         case courseKeptForReference = "course kept for reference"
+
+        /// "Keep a Copy for Reference…" was pressed and no copy was made
+        /// (#287): which course it was copied from, the folder it was to be
+        /// given, and why — being made in another window or copy of Plantoir,
+        /// a folder of that name already there, or the copy could not be
+        /// made (the system's reason, which may name a file; never a page's
+        /// contents). Its own event rather than the import's, because
+        /// nothing was imported. A disabled button writes nothing — the sheet
+        /// refuses a name or a school year by greying Keep a Copy out, and
+        /// that is not a press.
+        case courseCouldNotBeKeptForReference = "course could not be kept for reference"
 
         /// A reference course's pages were locked again, with the count —
         /// because a backup came back unlocked, or a folder that syncs
@@ -529,7 +626,10 @@ nonisolated enum ActivityTrail {
         /// here, the code and school year it shows, and how many sections
         /// came across. The folder it was READ from is the half a copy does
         /// not have, and it is the answer to "where did this ICS4U come
-        /// from". Never the contents of a page.
+        /// from". For a MODERN course it also names the Obsidian add-ons left
+        /// behind, by folder name and only when there were any (#255); the
+        /// older layouts say theirs on their own second line. Never the
+        /// contents of a page.
         case courseImportedForReference = "course imported for reference"
 
         /// A class kept in the OLDER layout (a folder per class, #254) came
@@ -569,9 +669,15 @@ nonisolated enum ActivityTrail {
         case courseImportedFromAClassWebsiteFolder = "course imported from a class website folder"
 
         /// One course of an import did not come across, and the rest did.
-        /// Carries which course and why — a course code already kept for
-        /// reference under that school year, a folder that could not be read,
-        /// a disk that filled. Written per COURSE, because "the import
+        /// Carries which course and why, as the sentence the summary showed —
+        /// already on the shelf under that school year (also a second course
+        /// of the same code in one run), a folder of that name already there
+        /// (both #287), already being imported in another window or another
+        /// copy of Plantoir, or something an earlier unfinished attempt left
+        /// behind could not be cleared (both #245), a folder that could not
+        /// be read, a disk that filled. Written for EVERY course the summary
+        /// lists as not imported; never for one the teacher stopped. Written
+        /// per COURSE, because "the import
         /// failed" is exactly the report that cannot be looked into: a run of
         /// four courses that imports three is the ordinary shape of this.
         case courseCouldNotBeImportedForReference = "course could not be imported for reference"
@@ -598,6 +704,83 @@ nonisolated enum ActivityTrail {
         /// one thing about a frozen course a teacher can still change.
         /// Carries the code they read, the folder, and both years.
         case referenceCourseSchoolYearChanged = "reference course school year changed"
+
+        /// Backups were deleted — one from the sidebar, or several from All
+        /// Backups (#242). Carries the course code or codes, how many, what
+        /// they took when every size is known, each file's NAME (a course code,
+        /// a moment and who made it — never anything on a page), and any the
+        /// open assistant conversation still needed and so kept.
+        ///
+        /// A teacher's own backups are never pruned, so a backup that is gone
+        /// was deleted by a person — and "my backup is gone" is answered by
+        /// this line and by nothing else. There was no line for it at all
+        /// before, for one delete or many.
+        case backupsDeleted = "backups deleted"
+
+        /// A build of a course was declined because ANOTHER program on this
+        /// Mac holds a build, publish or preview lease on it (#156) — Preview
+        /// or Deploy in the window, the in-app assistant's rebuild or deploy,
+        /// or an outside assistant's (`--mcp-stdio`). Carries the course, the
+        /// section asked about, what was asked for, what the other holds and
+        /// its process id. Never anything on a page.
+        ///
+        /// Recorded because the other program is invisible from here: a
+        /// teacher who reports "Preview said somebody else was using it"
+        /// can be answered only by the process id — carried on the lease
+        /// file and on this line. The app's own "app opened" line names it
+        /// too when the other program is a copy of the app; the
+        /// `--mcp-stdio` and scheduled processes write no opening line.
+        case buildDeclinedBusyElsewhere = "build declined, course busy elsewhere"
+
+        /// A publish set for later found the course being built or published
+        /// by another program and WAITED (#156): it polls every fifteen
+        /// seconds for up to ten minutes. Carries the course, the section, how
+        /// long it waited, the other's process id, and whether it then went
+        /// ahead or stood down (the stand-down also leaves the section's
+        /// `courseWasBusy` record). Recorded because a publish that ran ten
+        /// minutes late, or not at all, looks from outside exactly like one
+        /// that misfired.
+        case scheduledPublishWaitedForTheCourse = "scheduled publish waited for the course"
+        /// A launcher had to remake a working folder's workspace and found
+        /// something running in it (GitHub #94). Carries where the run was
+        /// for — course and section, or the word "setup" — and which of
+        /// three it was: it WAITED for a build or publish to finish, and for
+        /// how long; it stopped because a preview from the folder was still
+        /// open, and which one; or it stopped because something was still
+        /// being built or published after ten minutes.
+        ///
+        /// Written by the app, from the line the launcher prints
+        /// (`WorkspaceInUseReport`): `ScriptRunner` reads it from a run's
+        /// console, `ScheduledDeploy` from the log of a publish launchd ran.
+        /// On the trail because each of the three is a new way for a run to
+        /// be slow or not to happen — "my publish did not go out last night",
+        /// "it told me to close a preview" — and the app otherwise shows a
+        /// refusal only as a run that did not finish. A remake with nothing
+        /// running writes nothing. Mac only, permanently: Windows builds
+        /// natively and has no workspace.
+        case workspaceWasInUse = "workspace was in use"
+
+        /// Whether the teacher was told, with a macOS notification, how a
+        /// scheduled publish went (#212) — or why not: notifications turned
+        /// off for Plantoir, never allowed yet, or macOS would not take it.
+        /// Also the question, when a teacher first schedules from the window,
+        /// and their answer. Carries the course and the section, and NEVER the
+        /// notification's text.
+        ///
+        /// "I never got told" is answerable only if the trail says whether the
+        /// notice went out: a notification that was sent and one that was
+        /// blocked look identical from the teacher's side.
+        case scheduledPublishNotification = "scheduled publish notification"
+        /// Plantoir left some pages' settings exactly as they were, because
+        /// the settings at the top of those pages have no place a new line
+        /// can safely go (#186's shape — indented, or written as a list).
+        /// Carries the course and section, WHAT was being done, and HOW MANY
+        /// pages — never which, because a page's name is the teacher's own
+        /// words. Written by a section restore since #182, and by publishing,
+        /// hiding, re-dating and making room since #186; the teacher is told
+        /// in the same breath, and this is the line that is still there next
+        /// week, when "why is this page still showing?" arrives.
+        case pageSettingsLeftAsTheyWere = "page settings left as they were"
     }
 
     // MARK: - Stored properties
@@ -645,6 +828,13 @@ nonisolated enum ActivityTrail {
     /// section a line belongs to without every caller remembering to.
     static func note(_ event: Event, _ what: String, course: String, section: Int, at moment: Date = Date()) {
         ActivityTrail.note(event, "\(course)/\(section) · " + what, at: moment)
+    }
+
+    /// The words for `pageSettingsLeftAsTheyWere`: what was being done, and
+    /// how many pages — never which.
+    static func pageSettingsLeftAsTheyWereLine(act: String, pages: Int) -> String {
+        let counted: String = pages == 1 ? "1 page" : "\(pages) pages"
+        return "left the settings of \(counted) as they were while \(act): no room at the top for a new setting"
     }
 
     static func formatter(timeZone: TimeZone = TimeZone.current) -> DateFormatter {

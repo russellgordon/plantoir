@@ -207,6 +207,26 @@ nonisolated enum CopyPageWording {
         return "These links will not lead anywhere yet: \(quoted.joined(separator: ", "))."
     }
 
+    /// Pages copied whose SOURCE's settings could not be read (#188, #186's
+    /// review B6). Worded after the build's own `pageSettingsUnreadable`
+    /// finding (#246), so a teacher hears the same thing from both: the
+    /// settings could not be read, the page is hidden, and correcting the
+    /// lines at the top of it in Obsidian is the fix.
+    static func theSourcesSettingsCouldNotBeRead(names: [String]) -> String {
+        var quoted: [String] = []
+        for name in names {
+            quoted.append("“\(name)”")
+        }
+        if names.count == 1 {
+            return "Plantoir could not read the settings at the top of \(quoted[0]) in the course it "
+                 + "came from, so the copy is hidden and those lines are now the start of the page. "
+                 + "Correct them in Obsidian before you publish it."
+        }
+        return "Plantoir could not read the settings at the top of \(quoted.joined(separator: ", ")) "
+             + "in the course they came from, so the copies are hidden and those lines are now the "
+             + "start of each page. Correct them in Obsidian before you publish them."
+    }
+
     static func thatCourseIsDeployingRightNow(course: String) -> String {
         return "Available once \(course)’s deploy has finished"
     }
@@ -246,10 +266,11 @@ nonisolated enum CopyPageWording {
     /// website builder could read differently.
     ///
     /// Two shapes are known and each was reproduced: a block closed by an
-    /// INDENTED `---`, which this app reads as the end and the builder does
-    /// not (issue #188) — so the copy reads hidden here and is PUBLISHED
-    /// there — and a block carrying a YAML anchor or alias, which the builder
-    /// refuses to parse at all. Measured at 0 of 777 real pages; refused
+    /// INDENTED `---`, which this app read as the end and the builder does
+    /// not (issue #188, since fixed: neither reads it as an end now, so such
+    /// a source is copied HIDDEN with those lines as its body) — so the copy
+    /// read hidden here and was PUBLISHED there — and a block carrying a YAML
+    /// anchor or alias, which the builder refuses to parse at all. Measured at 0 of 777 real pages; refused
     /// anyway, because the promise this feature makes is certainty.
     static func thePageIsWrittenInAWayPlantoirCannotBeSureOf(page: String) -> String {
         return "“\(page)” was not copied: its settings are written in a way Plantoir cannot be sure of, and a copy must never turn up where students can read it."

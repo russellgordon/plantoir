@@ -6,6 +6,12 @@ import Observation
 /// Previews still being BUILT are recorded here too, for the one question
 /// that has to tell a build from a preview that is merely open — ⌘Q.
 ///
+/// Every change here ends by asking `WorkLeaseRegistry` to bring this
+/// process's lease FILES into line (#156), so another process — an assistant
+/// working from another app, a publish set for later, another copy of
+/// Plantoir — can see what this one is building. What is recorded here stays
+/// in-process; the files are derived from it.
+///
 /// Re-running the course setup rewrites a course's folders and files, so
 /// actions like "Add Section…" must decline while one of the course's
 /// sections is previewing or publishing — the setup run and the build
@@ -74,6 +80,7 @@ enum CourseActivity {
             sectionNumber: sectionNumber
         )
         store.activePublishes.append(record)
+        WorkLeaseRegistry.reconcile()
     }
 
     /// Records that a publish has finished, however it finished.
@@ -93,6 +100,7 @@ enum CourseActivity {
             remaining.append(existing)
         }
         store.activePublishes = remaining
+        WorkLeaseRegistry.reconcile()
     }
 
     /// Records that a preview of one section has started building.
@@ -114,6 +122,7 @@ enum CourseActivity {
             }
         }
         store.activePreviewBuilds.append(record)
+        WorkLeaseRegistry.reconcile()
     }
 
     /// Records that a section's preview is no longer being built, however it
@@ -139,6 +148,7 @@ enum CourseActivity {
             }
         }
         store.activePreviewBuilds = remaining
+        WorkLeaseRegistry.reconcile()
     }
 
     /// True while any section of the course is PUBLISHING — previews do not
@@ -151,7 +161,9 @@ enum CourseActivity {
     /// every time it is offered.
     static func coursePublishIsRunning(folderPath: String, courseCode: String) -> Bool {
         for publish in activePublishes {
-            if publish.folderPath == folderPath && publish.courseCode == courseCode {
+            // One folder however it is spelled (#189); the code is asked first
+            // because it is the cheaper question.
+            if publish.courseCode == courseCode && FolderIdentity.isSameFolder(publish.folderPath, folderPath) {
                 return true
             }
         }
@@ -169,7 +181,7 @@ enum CourseActivity {
     static func busyDescription(folderPath: String, courseCode: String) -> String? {
         var isPreviewing: Bool = false
         for lease in PreviewLeases.active {
-            if lease.folderPath == folderPath && lease.courseCode == courseCode {
+            if lease.courseCode == courseCode && FolderIdentity.isSameFolder(lease.folderPath, folderPath) {
                 isPreviewing = true
             }
         }
@@ -192,5 +204,6 @@ enum CourseActivity {
     static func reset() {
         store.activePublishes = []
         store.activePreviewBuilds = []
+        WorkLeaseRegistry.reconcile()
     }
 }

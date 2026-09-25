@@ -1752,6 +1752,17 @@ final class SharedRulesContractTests: XCTestCase {
             UnitWordRenameWording.rowCaption(word: "Module"),
             (rename["rowCaption"] as? String)?.replacingOccurrences(of: "{word}", with: "Module")
         )
+        // A numbered course (#267): its own caption, and the sentence beside
+        // its disabled Rename… button.
+        XCTAssertEqual(
+            UnitWordRenameWording.rowCaption(naming: ClassPageNaming(word: "Week", scheme: .numbered)),
+            (rename["rowCaptionNumbered"] as? String)?.replacingOccurrences(of: "{word}", with: "Week")
+        )
+        XCTAssertEqual(
+            UnitWordRenameWording.rowCaption(naming: ClassPageNaming(word: "Module", scheme: .unitDay)),
+            (rename["rowCaption"] as? String)?.replacingOccurrences(of: "{word}", with: "Module")
+        )
+        XCTAssertEqual(UnitWordRenameWording.renameLockedNumbered, rename["renameLockedNumbered"] as? String)
         XCTAssertEqual(UnitWordRenameWording.explanation, rename["explanation"] as? String)
         XCTAssertEqual(UnitWordRenameWording.proseIsLeftAlone, rename["proseIsLeftAlone"] as? String)
 
@@ -2159,14 +2170,24 @@ final class SharedRulesContractTests: XCTestCase {
             )
             let makesTheBuildsFolder: Range<String.Index>? =
                 functionBody.range(of: "\n  ensure_build_root\n")
+            // Since GitHub #280 the container is made by ONE function the
+            // three launchers share (the PREVIEW PORT BLOCK, which
+            // scripts/test_port_blocks.py pins byte-identical and runs), so
+            // the order asked here is "builds folder, then the call to it" —
+            // and the shared function is asked for its refusable form below.
             let makesTheWorkspace: Range<String.Index>? =
-                functionBody.range(of: "\n  if ! docker run -dit")
+                functionBody.range(of: "\n  create_the_workspace_on_free_ports\n")
             XCTAssertNotNil(
                 makesTheBuildsFolder,
                 "\(launcher) never makes the builds folder in run_container_with_mount()"
             )
             XCTAssertNotNil(
                 makesTheWorkspace,
+                "\(launcher) does not create the container through the shared create_the_workspace_on_free_ports"
+            )
+            XCTAssertTrue(
+                text.contains("\ncreate_the_workspace_on_free_ports() {\n")
+                    && text.contains("    if output=\"$(docker run -dit \\\n"),
                 "\(launcher) does not create the container in a form that can refuse"
             )
             if let buildsFolder = makesTheBuildsFolder, let workspace = makesTheWorkspace {
@@ -2450,13 +2471,15 @@ final class SharedRulesContractTests: XCTestCase {
         switch kind {
         case .neededAnAnswer: return "neededAnAnswer"
         case .buildNeededAnAnswer: return "buildNeededAnAnswer"
+        case .buildDidNotFinish: return "buildDidNotFinish"
         case .didNotFinish: return "didNotFinish"
         case .succeeded: return "succeeded"
         case .tooLateToRun: return "tooLateToRun"
+        case .courseWasBusy: return "courseWasBusy"
         }
     }
 
-    private static func section(_ name: String) throws -> [String: Any] {
+    static func section(_ name: String) throws -> [String: Any] {
         let url: URL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
@@ -2478,7 +2501,7 @@ final class SharedRulesContractTests: XCTestCase {
     ) {
         guard let adoptable = SkeletonCatalog.structureToAdopt(
             forCode: code,
-            takingExampleContent: takingExampleContent,
+            takingExampleContent: takingExampleContent, numbered: false,
             currentSharedFolders: lists.sharedFolders
         ) else {
             return

@@ -80,7 +80,7 @@ nonisolated enum ClaudeCodeLauncher {
             return onPath
         }
 
-        let homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
+        let homeDirectory: URL = RealHome.forFiles
         var candidates: [String] = [
             homeDirectory.appendingPathComponent(".local/bin/\(name)").path,
             "/opt/homebrew/bin/\(name)",
@@ -329,7 +329,7 @@ nonisolated enum ClaudeCodeLauncher {
         } else if BuildOutputLocation.isRunningTests {
             appSupportDirectory = supportDirectoryWhileTesting
         } else {
-            appSupportDirectory = FileManager.default.homeDirectoryForCurrentUser
+            appSupportDirectory = RealHome.forFiles
                 .appendingPathComponent("Library/Application Support/Plantoir/assist")
         }
         try FileManager.default.createDirectory(at: appSupportDirectory, withIntermediateDirectories: true)

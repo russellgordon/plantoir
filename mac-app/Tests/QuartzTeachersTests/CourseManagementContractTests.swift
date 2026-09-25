@@ -185,6 +185,72 @@ final class CourseManagementContractTests: XCTestCase {
         }
     }
 
+    /// A new section's keys, added to a page however its frontmatter is
+    /// fenced — and nothing else about the page changed (GitHub #175).
+    ///
+    /// Compared as BYTES, whole file: a test for the new key's presence
+    /// passes a splice that leaves a stray character on the new date, and
+    /// Swift's `==` reads "\r\n" as one character, which is exactly the
+    /// difference the Windows-line-ending case is about.
+    func testAddingASectionsKeysToAPageIsWhatTheContractSays() throws {
+        let section: [String: Any] = try CourseManagementContractTests.section("sectionNumbers")
+        let rule: [String: Any] = try XCTUnwrap(section["addingKeysToAPage"] as? [String: Any])
+        let created: String = try XCTUnwrap(rule["created"] as? String)
+        let newSection: Int = try XCTUnwrap(rule["section"] as? Int)
+        let folder: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("adding-keys-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 8)
+        for testCase in cases {
+            let shape: String = try XCTUnwrap(testCase["shape"] as? String)
+            let before: String = try XCTUnwrap(testCase["before"] as? String)
+            let after: String = try XCTUnwrap(testCase["after"] as? String)
+            let pageURL: URL = folder.appendingPathComponent("Loops.md")
+            try Data(before.utf8).write(to: pageURL)
+
+            SectionAdder.extendFrontmatter(ofPageAt: pageURL, toInclude: newSection, created: created)
+
+            let written: Data = try Data(contentsOf: pageURL)
+            XCTAssertEqual(
+                written, Data(after.utf8),
+                "\(shape): wrote \(String(decoding: written, as: UTF8.self).debugDescription)"
+            )
+        }
+    }
+
+    /// Putting one section's per-section keys back from a backup, carried and
+    /// dropped WITH the lines each key owns (GitHub #182), and a page with no
+    /// room for a new key left exactly as it is and counted (#186's shape).
+    ///
+    /// Compared as BYTES, whole file, for the reason the adding-keys cases
+    /// give above. Windows' restore does not read this list yet; it is owed
+    /// with #177.
+    func testRestoringOneSectionsKeysIsWhatTheContractSays() throws {
+        let backups: [String: Any] = try CourseManagementContractTests.section("backups")
+        let group: [String: Any] = try XCTUnwrap(backups["restoringOneSectionsKeys"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(group["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 6, "backups.restoringOneSectionsKeys has shrunk")
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let sectionNumber: Int = try XCTUnwrap(testCase["section"] as? Int)
+            let live: String = try XCTUnwrap(testCase["live"] as? String)
+            let backup: String = try XCTUnwrap(testCase["backup"] as? String)
+            let after: String = try XCTUnwrap(testCase["after"] as? String)
+            let notPutBack: Bool = try XCTUnwrap(testCase["expectCouldNotBePutBack"] as? Bool)
+            let restored: (text: String, couldNotBePutBack: Bool) = CourseRestorer.settingPerSectionKeys(
+                sectionNumber, in: live, asIn: backup
+            )
+            XCTAssertEqual(
+                Data(restored.text.utf8), Data(after.utf8),
+                "\(name): wrote \(restored.text.debugDescription)"
+            )
+            XCTAssertEqual(restored.couldNotBePutBack, notPutBack, name)
+        }
+    }
+
     // MARK: - What a course code says about the grade
 
     func testTheGradeLabelsAreWhatTheContractSays() throws {
@@ -212,6 +278,33 @@ final class CourseManagementContractTests: XCTestCase {
     }
 
     // MARK: - What a course code may be
+
+    /// `WORK` is kept for Plantoir's own use (GitHub issue #101): refused in
+    /// any case the teacher types it, by the rule BOTH the wizard and a
+    /// rename ask, and in words that never say what Plantoir uses it for.
+    /// The contract cases pin the sentence; this pins the reason is a kept
+    /// name rather than some other refusal that happens to match.
+    func testWorkIsKeptForPlantoirWhateverCaseItIsTypedIn() {
+        let typings: [String] = ["work", "Work", "WORK", "  wOrK  "]
+        for typed in typings {
+            XCTAssertEqual(
+                CourseCodeRule.trouble(typed, existingCodes: []),
+                CourseCodeRule.Trouble.keptForPlantoir("WORK"),
+                "typed “\(typed)”"
+            )
+        }
+        XCTAssertNil(CourseCodeRule.trouble("WORKS", existingCodes: []))
+        XCTAssertNil(CourseCodeRule.trouble("HOMEWORK", existingCodes: []))
+
+        // Rule 1: the refusal names no machinery, in either length.
+        let refusal: CourseCodeRule.Trouble = CourseCodeRule.Trouble.keptForPlantoir("WORK")
+        let machineryWords: [String] = ["workspace", "build", "folder", "toolchain", "script", "container", "docker"]
+        for word in machineryWords {
+            XCTAssertFalse(refusal.sentence.lowercased().contains(word), word)
+            XCTAssertFalse(refusal.short.lowercased().contains(word), word)
+        }
+        XCTAssertLessThanOrEqual(refusal.short.count, 25, "The sidebar row cuts off around twenty-five characters")
+    }
 
     /// The rule the New Course wizard and renaming BOTH ask. They used to
     /// ask separately, and a wizard that accepts a code renaming refuses is
@@ -284,7 +377,10 @@ final class CourseManagementContractTests: XCTestCase {
             .appendingPathComponent("_backups")
             .appendingPathComponent("ICS3U")
             .appendingPathComponent("ICS3U_backup_2026-01-01_120000.zip")
-        let scheduledURL: URL = ScheduledDeploy.plistURL(courseCode: "ICS3U", sectionNumber: 1)
+        let scheduledURL: URL = ScheduledDeploy.plistURL(
+            courseCode: "ICS3U", sectionNumber: 1,
+            inWorkingFolder: fixture.coursesURL.deletingLastPathComponent()
+        )
 
         let outcome: CourseRenamer.Outcome = try CourseRenamer.rename(
             fixture.course,
@@ -412,14 +508,14 @@ final class CourseManagementContractTests: XCTestCase {
         // A REAL agent rather than the `<plist></plist>` placeholder this used
         // to write. Since 2026-09-20 a rename asks each agent which working
         // folder it belongs to and leaves alone anything belonging to
-        // another — a label is the course code and section and nothing else,
-        // so without that a teacher holding two working folders with the same
+        // another — a label was the course code and section and nothing else
+        // until #237, so without that a teacher holding two working folders with the same
         // course code would have a rename in one cancel the other's live
         // deploy. Every release since v1.0.0 writes `WorkingDirectory`, so a
         // plist that does not name a folder is not something a teacher can
         // have; the placeholder was.
         let agentPlist: [String: Any] = [
-            "Label": ScheduledDeploy.agentLabel(courseCode: "ICS3U", sectionNumber: 1),
+            "Label": ScheduledDeploy.agentLabel(courseCode: "ICS3U", sectionNumber: 1, workingFolder: root),
             "WorkingDirectory": root.path,
             "ProgramArguments": [
                 "/Applications/Plantoir.app/Contents/MacOS/Plantoir",
@@ -433,7 +529,7 @@ final class CourseManagementContractTests: XCTestCase {
         ]
         try PropertyListSerialization.data(
             fromPropertyList: agentPlist, format: .xml, options: 0
-        ).write(to: ScheduledDeploy.plistURL(courseCode: "ICS3U", sectionNumber: 1))
+        ).write(to: ScheduledDeploy.plistURL(courseCode: "ICS3U", sectionNumber: 1, inWorkingFolder: root))
 
         let configuration: CourseConfiguration = try CourseConfiguration(contentsOf: configURL)
         return RenameFixture(
@@ -442,6 +538,180 @@ final class CourseManagementContractTests: XCTestCase {
         )
     }
 
+
+    // MARK: - Backups (#242)
+
+    /// The rules the pane and the pruning keep, as the contract states them.
+    func testTheBackupRulesAreTheOnesTheContractStates() throws {
+        let backups: [String: Any] = try CourseManagementContractTests.section("backups")
+        XCTAssertEqual(backups["assistantKept"] as? Int, CourseArchiver.mostBackupsKept)
+        XCTAssertEqual(backups["teacherBackupsPruned"] as? String, "never")
+        XCTAssertEqual(backups["mediaIsAlwaysIncluded"] as? Bool, true)
+        XCTAssertEqual(backups["sizeIsLogical"] as? Bool, true)
+        XCTAssertEqual(backups["neverDeletedWhileAConversationCanRestoreFromIt"] as? Bool, true)
+        XCTAssertFalse(
+            CourseArchiver.excludedFromArchives.contains("Media"),
+            "a backup without Media was REJECTED: restoring one would delete the course's Media"
+        )
+    }
+
+    /// What the pruning after a new backup deletes: the assistant's oldest
+    /// beyond five, and never a teacher's, an archive or a wizard zip.
+    func testThePruneCasesAreWhatTheContractSays() throws {
+        let backups: [String: Any] = try CourseManagementContractTests.section("backups")
+        for testCase in try XCTUnwrap(backups["pruneCases"] as? [[String: Any]]) {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let course: String = try XCTUnwrap(testCase["course"] as? String)
+            let existing: [String] = try XCTUnwrap(testCase["existing"] as? [String])
+            let expectDeleted: [String] = try XCTUnwrap(testCase["expectDeleted"] as? [String])
+
+            let coursesURL: URL = try CourseManagementContractTests.scratchCoursesFolder()
+            defer { try? FileManager.default.removeItem(at: coursesURL.deletingLastPathComponent()) }
+            let folder: URL = coursesURL.appendingPathComponent("_backups/\(course)", isDirectory: true)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            for fileName in existing {
+                FileManager.default.createFile(atPath: folder.appendingPathComponent(fileName).path, contents: Data())
+            }
+
+            CourseArchiver.pruneBackups(forCourseCode: course, coursesDirectoryURL: coursesURL)
+
+            for fileName in existing {
+                let stillThere: Bool = FileManager.default.fileExists(atPath: folder.appendingPathComponent(fileName).path)
+                XCTAssertEqual(stillThere, !expectDeleted.contains(fileName), "\(name): \(fileName)")
+            }
+        }
+    }
+
+    /// What the Backups header and All Backups count: backups only, per course
+    /// and in total, by their LOGICAL size.
+    func testTheSizeCasesAreCountedAsTheContractSays() async throws {
+        let backups: [String: Any] = try CourseManagementContractTests.section("backups")
+        for testCase in try XCTUnwrap(backups["sizeCases"] as? [[String: Any]]) {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let coursesURL: URL = try CourseManagementContractTests.scratchCoursesFolder()
+            defer { try? FileManager.default.removeItem(at: coursesURL.deletingLastPathComponent()) }
+
+            for file in try XCTUnwrap(testCase["files"] as? [[String: Any]]) {
+                let course: String = try XCTUnwrap(file["course"] as? String)
+                let fileName: String = try XCTUnwrap(file["name"] as? String)
+                let bytes: Int = try XCTUnwrap(file["bytes"] as? Int)
+                let folder: URL = coursesURL.appendingPathComponent("_backups/\(course)", isDirectory: true)
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                let url: URL = folder.appendingPathComponent(fileName)
+                // Sparse: the logical size is set, and no data is written.
+                FileManager.default.createFile(atPath: url.path, contents: nil)
+                let handle: FileHandle = try FileHandle(forWritingTo: url)
+                try handle.truncate(atOffset: UInt64(bytes))
+                try handle.close()
+                if file["sparse"] as? Bool == true {
+                    let onDisk: Int = try XCTUnwrap(
+                        url.resourceValues(forKeys: [.totalFileAllocatedSizeKey]).totalFileAllocatedSize
+                    )
+                    XCTAssertLessThan(onDisk, bytes / 100, "\(name): the file is not sparse, so the case proves nothing")
+                }
+            }
+
+            let items: [BackupItem] = WorkspaceModel.findBackupItems(in: coursesURL)
+            var fileURLs: [URL] = []
+            for item in items {
+                fileURLs.append(item.fileURL)
+            }
+            let sizes: [String: Int64] = await BackupSizes.measure(fileURLs)
+            let space: BackupSpace = BackupSpace.of(items, sizes: sizes)
+
+            XCTAssertTrue(space.isComplete, name)
+            XCTAssertEqual(space.totalCount, testCase["expectTotalCount"] as? Int, name)
+            XCTAssertEqual(space.totalBytes, Int64(try XCTUnwrap(testCase["expectTotalBytes"] as? Int)), name)
+            var expected: [BackupSpace.CourseShare] = []
+            for share in try XCTUnwrap(testCase["expectCourses"] as? [[String: Any]]) {
+                expected.append(BackupSpace.CourseShare(
+                    courseCode: try XCTUnwrap(share["courseCode"] as? String),
+                    count: try XCTUnwrap(share["count"] as? Int),
+                    bytes: Int64(try XCTUnwrap(share["bytes"] as? Int))
+                ))
+            }
+            XCTAssertEqual(space.courses, expected, name)
+        }
+    }
+
+    /// What a delete removes and what it keeps — never the backup an open
+    /// assistant conversation can restore from.
+    func testTheDeleteCasesAreWhatTheContractSays() throws {
+        let backups: [String: Any] = try CourseManagementContractTests.section("backups")
+        for testCase in try XCTUnwrap(backups["deleteCases"] as? [[String: Any]]) {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let coursesURL: URL = try CourseManagementContractTests.scratchCoursesFolder()
+            let rootURL: URL = coursesURL.deletingLastPathComponent()
+            defer {
+                AssistActivity.store.active = nil
+                AssistActivity.store.heldBackups = nil
+                try? FileManager.default.removeItem(at: rootURL)
+            }
+            let folder: URL = coursesURL.appendingPathComponent("_backups/ICS3U", isDirectory: true)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            for fileName in try XCTUnwrap(testCase["backups"] as? [String]) {
+                FileManager.default.createFile(atPath: folder.appendingPathComponent(fileName).path, contents: Data())
+            }
+            var held: [URL] = []
+            for fileName in try XCTUnwrap(testCase["heldByAnOpenConversation"] as? [String]) {
+                held.append(folder.appendingPathComponent(fileName))
+            }
+            // A constant for the closure to capture: `held` is built above and
+            // never changes again, and saying so keeps the compiler from
+            // warning that a captured variable might.
+            let heldURLs: [URL] = held
+            if !heldURLs.isEmpty {
+                AssistActivity.begin(folderPath: rootURL.path, courseCode: "ICS3U", sectionNumber: 2)
+                AssistActivity.holdBackups(folderPath: rootURL.path, courseCode: "ICS3U", sectionNumber: 2) {
+                    return heldURLs
+                }
+            }
+
+            let model: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
+            model.chooseWorkspace(at: rootURL)
+            let asked: [String] = try XCTUnwrap(testCase["delete"] as? [String])
+            var items: [BackupItem] = []
+            for item in model.backupItems where asked.contains(item.fileURL.lastPathComponent) {
+                items.append(item)
+            }
+            XCTAssertEqual(items.count, asked.count, "\(name): a backup to delete is not in the list")
+
+            let deletion: WorkspaceModel.BackupDeletion = model.deleteBackups(items, following: [])
+
+            var deletedNames: [String] = []
+            for item in deletion.deleted {
+                deletedNames.append(item.fileURL.lastPathComponent)
+            }
+            var keptNames: [String] = []
+            for item in deletion.keptForTheAssistant {
+                keptNames.append(item.fileURL.lastPathComponent)
+            }
+            XCTAssertEqual(Set(deletedNames), Set(try XCTUnwrap(testCase["expectDeleted"] as? [String])), name)
+            XCTAssertEqual(Set(keptNames), Set(try XCTUnwrap(testCase["expectKept"] as? [String])), name)
+            for fileName in deletedNames {
+                XCTAssertFalse(FileManager.default.fileExists(atPath: folder.appendingPathComponent(fileName).path), name)
+            }
+            for fileName in keptNames {
+                XCTAssertTrue(FileManager.default.fileExists(atPath: folder.appendingPathComponent(fileName).path), name)
+            }
+        }
+    }
+
+    /// A scratch working folder's `courses` folder, under the temporary
+    /// directory — never a real working folder (#240's lesson).
+    private static func scratchCoursesFolder() throws -> URL {
+        let coursesURL: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("backups-contract-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("courses", isDirectory: true)
+        try FileManager.default.createDirectory(at: coursesURL, withIntermediateDirectories: true)
+        // A working folder is recognised by its launcher; without one the
+        // folder is not read at all.
+        FileManager.default.createFile(
+            atPath: coursesURL.deletingLastPathComponent().appendingPathComponent("preview.sh").path,
+            contents: Data()
+        )
+        return coursesURL
+    }
 
     private static func section(_ name: String) throws -> [String: Any] {
         let url: URL = URL(fileURLWithPath: #filePath)

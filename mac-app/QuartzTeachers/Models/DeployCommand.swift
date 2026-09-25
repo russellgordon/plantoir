@@ -56,7 +56,13 @@ enum DeployCommand {
         }
         if destination.type == "local_folder" {
             arguments.append("--to-folder")
-            arguments.append(destination.path)
+            // Trimmed the same way `deployFolderProblem` trims before it
+            // checks, so the folder that was validated is the folder that is
+            // published into. The settings form saves what was typed, spaces
+            // and all; passed on verbatim, " /Users/x/Sites" is a RELATIVE
+            // path to the launcher and "/Users/x/Sites " is another folder
+            // (GitHub issue #227).
+            arguments.append(destination.path.trimmingCharacters(in: .whitespaces))
             return arguments
         }
         if destination.type == "cloudflare_pages" {

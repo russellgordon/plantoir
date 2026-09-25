@@ -10,6 +10,61 @@ enum WizardWording {
 
     // MARK: - Stored properties
 
+    /// The club choice (#267), beside the course code. Authored in
+    /// `contracts/shared-rules.json` → `wizard.clubToggle`.
+    nonisolated static let clubToggleLabel: String = "This is a club"
+
+    nonisolated static let clubToggleCaption: String =
+        "A club meets rather than holds classes: its pages are numbered one after "
+        + "another, it has no curriculum, and it starts with a page for its first "
+        + "meeting. The words below can be changed now, but not once the course is made."
+
+    /// Under Starting Content for a club, in place of every toggle there.
+    nonisolated static let clubStartingContentNote: String =
+        "A club starts with empty folders and one page for its first meeting — no "
+        + "ready-made pages, no subject skeleton and no curriculum coverage page. "
+        + "The coverage page can be turned on later in Course Settings."
+
+    /// The four rows a club's words are chosen in.
+    nonisolated static let clubClassFolderLabel: String = "Folder for meeting pages"
+    nonisolated static let clubFrontPageHeadingLabel: String = "Front page heading"
+    nonisolated static let clubPageWordLabel: String = "Pages are named"
+    nonisolated static let clubNounLabel: String = "The assistant calls a page a"
+
+    /// The caption under a club's page word: its own shape, never
+    /// "Week 1, Day 1".
+    nonisolated static func clubPageWordCaption(word: String) -> String {
+        return "Pages will be named “\(word) 1”, “\(word) 2” and so on."
+    }
+
+    /// Course Settings' three LOCKED rows (#267): the words a course was
+    /// made with, shown and not changeable (Russell, 2026-09-24: not
+    /// switchable after the wizard).
+    nonisolated static let settingsPageNamingLabel: String = "Class pages are named"
+    nonisolated static let settingsFrontPageHeadingLabel: String = "Front page heading"
+    nonisolated static let settingsNounLabel: String = "The assistant calls a page a"
+    nonisolated static let settingsLockedCaption: String =
+        "Chosen when the course was made. An existing course keeps these; they cannot be changed here."
+
+    /// The heading row when the course recorded none (every course made
+    /// before #267): its front page keeps whatever heading it has, and this
+    /// row does not guess which.
+    nonisolated static let settingsFrontPageHeadingNotSet: String =
+        "Not recorded — the front page keeps the heading it already has"
+
+    /// The heading row's value: the recorded heading, or the sentence above.
+    nonisolated static func settingsFrontPageHeadingValue(_ recorded: String?) -> String {
+        guard let recorded else {
+            return settingsFrontPageHeadingNotSet
+        }
+        return recorded
+    }
+
+    /// How a scheme is shown in its locked row: the course's own first page.
+    nonisolated static func settingsPageNamingValue(_ naming: ClassPageNaming) -> String {
+        return "“" + naming.title(unit: 1, day: 1) + "”"
+    }
+
     /// The affirmative button on the wizard's last step.
     nonisolated static let createCourseButton: String = "Create Course"
 

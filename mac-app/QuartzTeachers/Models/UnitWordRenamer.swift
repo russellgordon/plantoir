@@ -93,8 +93,11 @@ nonisolated enum UnitWordRenamer {
         var sectionsTouched: [Int] = []
 
         for page in classFolderPages(facts: facts) {
-            if let numbers = UnitDay(pageTitle: page.title, term: oldWord) {
-                let newTitle: String = UnitDay(unit: numbers.unit, day: numbers.day, term: newWord).title
+            if let numbers = UnitDay(pageTitle: page.title, naming: ClassPageNaming(word: oldWord, scheme: facts.scheme)) {
+                let newTitle: String = UnitDay(
+                    unit: numbers.unit, day: numbers.day,
+                    naming: ClassPageNaming(word: newWord, scheme: facts.scheme)
+                ).title
                 linkMap[page.title] = newTitle
                 if newTitle == page.title {
                     // Already exactly what it should be — a change of
@@ -122,10 +125,13 @@ nonisolated enum UnitWordRenamer {
                 if !sectionsTouched.contains(page.sectionNumber) {
                     sectionsTouched.append(page.sectionNumber)
                 }
-            } else if let numbers = UnitDay(pageTitle: page.title, term: newWord) {
+            } else if let numbers = UnitDay(pageTitle: page.title, naming: ClassPageNaming(word: newWord, scheme: facts.scheme)) {
                 // Already under the new word — a rename that stopped part
                 // way. Links to its OLD name still need following.
-                let oldTitle: String = UnitDay(unit: numbers.unit, day: numbers.day, term: oldWord).title
+                let oldTitle: String = UnitDay(
+                    unit: numbers.unit, day: numbers.day,
+                    naming: ClassPageNaming(word: oldWord, scheme: facts.scheme)
+                ).title
                 linkMap[oldTitle] = page.title
             }
         }
@@ -155,7 +161,7 @@ nonisolated enum UnitWordRenamer {
         var sections: [Int] = []
         var names: [String: String] = [:]
         for page in classFolderPages(facts: facts) {
-            if UnitDay(pageTitle: page.title, term: facts.currentWord) == nil {
+            if UnitDay(pageTitle: page.title, naming: ClassPageNaming(word: facts.currentWord, scheme: facts.scheme)) == nil {
                 continue
             }
             pages += 1
@@ -325,7 +331,8 @@ nonisolated enum UnitWordRenamer {
             directoryURL: course.directoryURL,
             sectionNumbers: course.sectionNumbers,
             classFolderNames: ClassFolder.names(for: course),
-            currentWord: course.configuration.unitWord
+            currentWord: course.configuration.unitWord,
+            scheme: course.configuration.classPageScheme
         )
     }
 
@@ -421,7 +428,7 @@ nonisolated enum UnitWordRenamer {
             // way, because "Units 1, Day 1" begins with "Unit". Right for all
             // four shapes: a different word, a change of capitalisation, an
             // old word that is a prefix of the new, and the reverse.
-            if UnitDay(pageTitle: page.title, term: to) != nil && page.title.hasPrefix(to) {
+            if UnitDay(pageTitle: page.title, naming: ClassPageNaming(word: to, scheme: facts.scheme)) != nil && page.title.hasPrefix(to) {
                 somethingMoved = true
                 break
             }
@@ -526,9 +533,18 @@ nonisolated struct UnitWordRenameCourseFacts: Sendable {
     let classFolderNames: [String]
     let currentWord: String
 
+    /// The shape the course's pages take, so a rename reads "Week 3" as a
+    /// page in a numbered course rather than passing it by (#267). No
+    /// default: see `ClassPageNaming`.
+    let scheme: ClassPageScheme
+
     // MARK: - Initializer
 
-    init(code: String, directoryURL: URL, sectionNumbers: [Int], classFolderNames: [String], currentWord: String) {
+    init(
+        code: String, directoryURL: URL, sectionNumbers: [Int], classFolderNames: [String],
+        currentWord: String, scheme: ClassPageScheme
+    ) {
+        self.scheme = scheme
         self.code = code
         self.directoryURL = directoryURL
         self.sectionNumbers = sectionNumbers

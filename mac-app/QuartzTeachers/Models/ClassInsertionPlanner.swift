@@ -30,7 +30,7 @@ enum ClassInsertionPlanner {
         case dayOutOfRange
         case countOutOfRange
         case noTimetable(String, Int)
-        case noNumberedClasses(String, Int)
+        case noNumberedClasses(String, Int, String)
         case wouldNotFit(String)
         case wrongCourse(String, String)
 
@@ -42,8 +42,8 @@ enum ClassInsertionPlanner {
                 return "Ask for at least one class."
             case .noTimetable(let code, let number):
                 return "I don’t know when \(code) Section \(number) meets, so I can’t move classes onto real days. Ask for the class dates, then record them first."
-            case .noNumberedClasses(let code, let number):
-                return "\(code) Section \(number) has no pages named “Unit N, Day N”, so there is nothing to make room in."
+            case .noNumberedClasses(let code, let number, let shape):
+                return "\(code) Section \(number) has no pages named “\(shape)”, so there is nothing to make room in."
             case .wouldNotFit(let reason):
                 return reason
             case .wrongCourse(let planned, let given):
@@ -76,16 +76,25 @@ enum ClassInsertionPlanner {
             throw Problem.noTimetable(course.code, sectionNumber)
         }
 
+        let naming: ClassPageNaming = course.configuration.classPageNaming
         let allPages: [ClassPageSummary] = ClassPages.list(forSection: sectionNumber, in: course)
         let numbered: [ClassPageSummary] = numberedClasses(among: allPages)
         if numbered.isEmpty {
-            throw Problem.noNumberedClasses(course.code, sectionNumber)
+            throw Problem.noNumberedClasses(course.code, sectionNumber, naming.shapeDescription)
         }
 
         var problems: [String] = []
         let unnumbered: Int = allPages.count - numbered.count
         if unnumbered > 0 {
-            problems.append("\(unnumbered) class page\(unnumbered == 1 ? " is" : "s are") not named “Unit N, Day N”, so \(unnumbered == 1 ? "it was" : "they were") left where \(unnumbered == 1 ? "it is" : "they are") — including \(unnumbered == 1 ? "its" : "their") date.")
+            problems.append("\(unnumbered) class page\(unnumbered == 1 ? " is" : "s are") not named “\(naming.shapeDescription)”, so \(unnumbered == 1 ? "it was" : "they were") left where \(unnumbered == 1 ? "it is" : "they are") — including \(unnumbered == 1 ? "its" : "their") date.")
+        }
+
+        if naming.isNumbered {
+            return try ClassInsertionPlanner.planNumbered(
+                atNumber: atDay, count: count, numbered: numbered,
+                timetable: remembered.dates, problems: problems,
+                forSection: sectionNumber, in: course
+            )
         }
 
         // Everything at or after the insertion point moves along: later days
@@ -149,6 +158,7 @@ enum ClassInsertionPlanner {
                 sectionNumber: sectionNumber,
                 unit: unit,
                 atDay: atDay,
+                naming: naming,
                 added: [],
                 renames: [],
                 moves: [],
@@ -163,7 +173,7 @@ enum ClassInsertionPlanner {
         for offset in 0..<count {
             let day: Int = atDay + offset
             let title: String = UnitDay(
-                unit: unit, day: day, term: course.configuration.unitWord
+                unit: unit, day: day, naming: course.configuration.classPageNaming
             ).title
             added.append(PlannedClass(
                 title: title,
@@ -190,7 +200,7 @@ enum ClassInsertionPlanner {
                 continue
             }
             let newTitle: String = UnitDay(
-                unit: unit, day: numbers.day + count, term: course.configuration.unitWord
+                unit: unit, day: numbers.day + count, naming: course.configuration.classPageNaming
             ).title
             renames.append(ClassRename(
                 from: page.title,
@@ -201,18 +211,23 @@ enum ClassInsertionPlanner {
         }
 
         // Dates: the new classes take the first slots, then everything shifted
-        // follows in the order it was already in.
+        // follows in the order it was already in. (A numbered course keeps its
+        // gaps instead, and never reaches here — see `planNumbered`.)
+        var destinations: [CalendarDay] = []
+        for index in 0..<shifted.count {
+            destinations.append(runway[count + index])
+        }
         var moves: [ClassDateMove] = []
         for index in 0..<shifted.count {
             let moving: ClassPageSummary = shifted[index]
-            let destination: CalendarDay = runway[count + index]
+            let destination: CalendarDay = destinations[index]
             if moving.date == destination {
                 continue
             }
             var name: String = moving.title
             if let numbers = moving.unitAndDay, numbers.unit == unit {
                 name = UnitDay(
-                    unit: unit, day: numbers.day + count, term: course.configuration.unitWord
+                    unit: unit, day: numbers.day + count, naming: course.configuration.classPageNaming
                 ).title
             }
             moves.append(ClassDateMove(
@@ -233,6 +248,7 @@ enum ClassInsertionPlanner {
             sectionNumber: sectionNumber,
             unit: unit,
             atDay: atDay,
+            naming: naming,
             added: added,
             renames: renames,
             moves: moves,
@@ -321,6 +337,11 @@ enum ClassInsertionPlanner {
         // 3. The dates.
         let createdKey: String = PageFrontmatter.createdKey(forSection: plan.sectionNumber, isSectionLocal: true)
         var moved: Int = 0
+        // Pages whose settings have no place a new date line can go (#186).
+        // Named and carried on past: such a page had no date this app could
+        // read before the rename either, so the class list is left exactly as
+        // it was about it.
+        var notDated: [String] = []
         for move in plan.moves {
             // A renamed page is found under its NEW name by now.
             var pageURL: URL = folderURL.appendingPathComponent(move.title + ".md")
@@ -331,13 +352,24 @@ enum ClassInsertionPlanner {
                   let text = try? String(contentsOf: pageURL, encoding: .utf8) else {
                 continue
             }
-            let result: (text: String, changed: Bool) = PageFrontmatter.settingCreated(
+            let result: (text: String, outcome: FrontmatterWriteOutcome) = PageFrontmatter.settingCreated(
                 in: text, key: createdKey, to: move.to, fallbackTail: tail
             )
-            if result.changed {
+            if result.outcome == .written {
                 try result.text.write(to: pageURL, atomically: true, encoding: .utf8)
                 moved += 1
             }
+            if result.outcome == .noRoomForAKey {
+                notDated.append(pageURL.deletingPathExtension().lastPathComponent)
+            }
+        }
+        if !notDated.isEmpty {
+            ActivityTrail.note(
+                .pageSettingsLeftAsTheyWere,
+                ActivityTrail.pageSettingsLeftAsTheyWereLine(act: "making room for a class", pages: notDated.count),
+                course: course.code,
+                section: plan.sectionNumber
+            )
         }
 
         // 4. The blank pages the room was made for. Checked a second time,
@@ -358,6 +390,8 @@ enum ClassInsertionPlanner {
             let body: String = ClassPages.skeleton(
                 title: planned.title,
                 unit: plan.unit,
+                naming: plan.naming,
+                folderName: folderURL.lastPathComponent,
                 date: planned.date,
                 howMany: plan.added.count,
                 tail: tail
@@ -366,8 +400,314 @@ enum ClassInsertionPlanner {
             created.append(planned.fileURL)
         }
 
-        let message: String = "Made room for \(created.count) class\(created.count == 1 ? "" : "es") at Unit \(plan.unit), Day \(plan.atDay). Renamed \(renamed.count), moved \(moved) onto later class days, and updated \(linksRewritten) link\(linksRewritten == 1 ? "" : "s"). The new pages are unpublished until you write them — look the section over before you deploy it."
+        var message: String = "Made room for \(created.count) class\(created.count == 1 ? "" : "es") at \(plan.positionTitle). Renamed \(renamed.count), moved \(moved) onto later class days, and updated \(linksRewritten) link\(linksRewritten == 1 ? "" : "s"). The new pages are unpublished until you write them — look the section over before you deploy it."
+        if !notDated.isEmpty {
+            message += " " + AssistPublishPlan.sayingPagesWhoseNewDateCouldNotBeSet(named: notDated)
+        }
         return ClassChangeOutcome(message: message, backupURL: backupURL, created: created)
+    }
+
+    /// Making room in a numbered course (#267) — a club's "Week 1", "Week 2".
+    ///
+    /// **Pages order by DATE here, and the numbers may have gaps.** Russell's
+    /// CODING club has Week 1, Week 2, Week 8 and Week 9 on weekly Thursdays,
+    /// the pages between never written. The ordinary rule — the new page takes
+    /// the day the page AT the insertion point sits on, and everything from
+    /// there along is renamed one up and packed onto the next class days —
+    /// was measured on that shape: "make room at Week 3" dated the new page
+    /// 2025-11-20 (Week 8's day, with 10-02 free) and renamed two published
+    /// meetings, Week 8 → 9 and Week 9 → 10, a week later each, to make room
+    /// in a slot that was empty.
+    ///
+    /// So, here:
+    /// * the new pages take the first free class days after the LATEST page
+    ///   numbered below the insertion point — "after Week 2";
+    /// * a page is renamed only when a new number would land on its name, and
+    ///   the run stops at the first page whose number is already clear;
+    /// * a later page keeps its date when it is already after the page before
+    ///   it, and only a page whose date COLLIDES moves — to the first class
+    ///   day after that page. Only then does the plan list a move.
+    ///
+    /// In a numbered course with no gaps (a club filled one page at a time)
+    /// this gives the same answer as the ordinary rule.
+    static func planNumbered(
+        atNumber: Int,
+        count: Int,
+        numbered: [ClassPageSummary],
+        timetable: [CalendarDay],
+        problems startingProblems: [String],
+        forSection sectionNumber: Int,
+        in course: Course
+    ) throws -> ClassInsertionPlan {
+        let naming: ClassPageNaming = course.configuration.classPageNaming
+        var problems: [String] = startingProblems
+
+        // Below the insertion point stays; at or after it may move.
+        var shifted: [ClassPageSummary] = []
+        var untouched: [ClassPageSummary] = []
+        for page in numbered {
+            guard let numbers = page.unitAndDay else {
+                continue
+            }
+            if numbers.day >= atNumber {
+                shifted.append(page)
+            } else {
+                untouched.append(page)
+            }
+        }
+
+        // The latest date among the pages that stay — "after Week 2", by
+        // date, which is also after every other page below the insertion.
+        var held: [CalendarDay] = []
+        var latestKept: CalendarDay? = nil
+        for page in untouched {
+            guard let date = page.date else {
+                continue
+            }
+            held.append(date)
+            if let current = latestKept, current >= date {
+                continue
+            }
+            latestKept = date
+        }
+        var runway: [CalendarDay] = []
+        for date in timetable {
+            if held.contains(date) {
+                continue
+            }
+            if let latestKept, date <= latestKept {
+                continue
+            }
+            runway.append(date)
+        }
+        runway.sort()
+
+        if runway.count < count {
+            let missing: Int = count - runway.count
+            let from: String = latestKept?.text ?? "the start of the course"
+            problems.append("This needs \(count) class day\(count == 1 ? "" : "s") after \(from) and the timetable only has \(runway.count). Add \(missing) more class date\(missing == 1 ? "" : "s") and ask again.")
+            return ClassInsertionPlan(
+                courseCode: course.code, sectionNumber: sectionNumber,
+                unit: 1, atDay: atNumber, naming: naming,
+                added: [], renames: [], moves: [], linksToRewrite: 0, problems: problems
+            )
+        }
+
+        let folderURL: URL = ClassPages.folderURL(forSection: sectionNumber, in: course)
+        var added: [PlannedClass] = []
+        for offset in 0..<count {
+            let number: Int = atNumber + offset
+            let title: String = naming.title(unit: 1, day: number)
+            added.append(PlannedClass(
+                title: title,
+                fileURL: folderURL.appendingPathComponent(title + ".md"),
+                day: number,
+                date: runway[offset]
+            ))
+        }
+
+        // Renames: only the run whose numbers the new pages would land on.
+        // `shifted` is in number order (see `numberedClasses`).
+        var newNames: [String: String] = [:]
+        var renamesUpward: [ClassRename] = []
+        var firstClearNumber: Int = atNumber + count
+        for page in shifted {
+            guard let numbers = page.unitAndDay else {
+                continue
+            }
+            if numbers.day >= firstClearNumber {
+                break
+            }
+            let newTitle: String = naming.title(unit: 1, day: firstClearNumber)
+            renamesUpward.append(ClassRename(
+                from: page.title,
+                to: newTitle,
+                fromURL: page.fileURL,
+                toURL: folderURL.appendingPathComponent(newTitle + ".md")
+            ))
+            newNames[page.title] = newTitle
+            firstClearNumber += 1
+        }
+        // Highest number first — see `apply` for why the order is part of the
+        // plan.
+        var renames: [ClassRename] = []
+        for rename in renamesUpward.reversed() {
+            renames.append(rename)
+        }
+
+        // Dates, in DATE order: a page already after the one before it stays.
+        let shiftedByDate: [ClassPageSummary] = ClassInsertionPlanner.inDateOrder(shifted)
+        guard let destinations = ClassInsertionPlanner.destinationsKeepingGaps(
+            for: shiftedByDate, after: runway, skippingFirst: count
+        ) else {
+            problems.append("There are not enough class days after the last page to move it onto. Add more class dates and ask again.")
+            return ClassInsertionPlan(
+                courseCode: course.code, sectionNumber: sectionNumber,
+                unit: 1, atDay: atNumber, naming: naming,
+                added: [], renames: [], moves: [], linksToRewrite: 0, problems: problems
+            )
+        }
+        var moves: [ClassDateMove] = []
+        for index in 0..<shiftedByDate.count {
+            let moving: ClassPageSummary = shiftedByDate[index]
+            // An undated page has no date to collide with, and is never
+            // given one (see `destinationsKeepingGaps`).
+            guard let destination = destinations[index] else {
+                continue
+            }
+            if moving.date == destination {
+                continue
+            }
+            moves.append(ClassDateMove(
+                title: newNames[moving.title] ?? moving.title,
+                fileURL: moving.fileURL,
+                from: moving.date,
+                to: destination
+            ))
+        }
+
+        var renamedFrom: [String] = []
+        for rename in renames {
+            renamedFrom.append(rename.from)
+        }
+
+        return ClassInsertionPlan(
+            courseCode: course.code,
+            sectionNumber: sectionNumber,
+            unit: 1,
+            atDay: atNumber,
+            naming: naming,
+            added: added,
+            renames: renames,
+            moves: moves,
+            linksToRewrite: countLinks(to: renamedFrom, forSection: sectionNumber, in: course),
+            problems: problems
+        )
+    }
+
+    /// Pages by date, earliest first, the number deciding a tie — and a page
+    /// with NO date placed by its NUMBER among its neighbours: just before the
+    /// first dated page numbered above it. How a numbered course orders (#267).
+    ///
+    /// Not "undated last", which the fix round first did: the fix review
+    /// measured Week 1 undated, Week 2 on 09-25, Week 8 on 11-20 and "make
+    /// room at 1" giving the old Week 1 (now Week 2) the date 11-27 — after
+    /// Week 8, so the front page, which follows the latest date, would have
+    /// jumped to it.
+    static func inDateOrder(_ pages: [ClassPageSummary]) -> [ClassPageSummary] {
+        var dated: [ClassPageSummary] = []
+        var undated: [ClassPageSummary] = []
+        for page in pages {
+            if page.date == nil {
+                undated.append(page)
+            } else {
+                dated.append(page)
+            }
+        }
+        dated.sort { first, second in
+            if let left = first.date, let right = second.date, left != right {
+                return left < right
+            }
+            return (first.unitAndDay?.day ?? 0) < (second.unitAndDay?.day ?? 0)
+        }
+        undated.sort { first, second in
+            return (first.unitAndDay?.day ?? 0) < (second.unitAndDay?.day ?? 0)
+        }
+        var ordered: [ClassPageSummary] = []
+        var nextUndated: Int = 0
+        for page in dated {
+            let number: Int = page.unitAndDay?.day ?? 0
+            while nextUndated < undated.count && (undated[nextUndated].unitAndDay?.day ?? 0) < number {
+                ordered.append(undated[nextUndated])
+                nextUndated += 1
+            }
+            ordered.append(page)
+        }
+        while nextUndated < undated.count {
+            ordered.append(undated[nextUndated])
+            nextUndated += 1
+        }
+        return ordered
+    }
+
+    /// The one number a make-room request names in a numbered course
+    /// (#267), read from the tool's two arguments.
+    ///
+    /// The schema still says `unit` and `atDay`, and is not changed (routing
+    /// was measured against it), so "make room at Week 5" may arrive as
+    /// `atDay: 5`, as `unit: 5`, as `unit: 1, atDay: 5`, or — the reading a
+    /// Unit/Day habit produces — as `unit: 5, atDay: 1`. Every one of those
+    /// names 5. Two DIFFERENT numbers neither of which is 1 cannot be read,
+    /// and nil is returned so the teacher is asked rather than having pages
+    /// renamed at a guess: making room renames pages the teacher's links
+    /// point at, which is the wrong thing to be wrong about.
+    static func numberedPosition(unit: Int?, atDay: Int?) -> Int? {
+        guard let unit else {
+            return atDay
+        }
+        guard let atDay else {
+            return unit
+        }
+        if unit == atDay {
+            return unit
+        }
+        if unit == 1 {
+            return atDay
+        }
+        if atDay == 1 {
+            return unit
+        }
+        return nil
+    }
+
+    /// Where each shifted page goes in a course that keeps its gaps. A page
+    /// already dated after the page before it stays where it is; otherwise
+    /// it takes the first runway day after that page (the new pages take the
+    /// first `skippingFirst`), which is always later than its own date. A page
+    /// with NO date stays undated (nil) and is passed over: it has no date to
+    /// collide with, and giving it one would be a move nothing forced. Nil
+    /// overall when a page has nowhere to go. Pure, so the rule can be tested
+    /// alone.
+    static func destinationsKeepingGaps(
+        for shifted: [ClassPageSummary], after runway: [CalendarDay], skippingFirst: Int
+    ) -> [CalendarDay?]? {
+        var destinations: [CalendarDay?] = []
+        var previous: CalendarDay? = nil
+        if skippingFirst > 0 && skippingFirst <= runway.count {
+            previous = runway[skippingFirst - 1]
+        }
+        for page in shifted {
+            if page.date == nil {
+                destinations.append(nil)
+                continue
+            }
+            var chosen: CalendarDay? = nil
+            // Already after the page before it: it does not move at all.
+            if let own = page.date {
+                if let previous {
+                    if own > previous {
+                        chosen = own
+                    }
+                } else {
+                    chosen = own
+                }
+            }
+            if chosen == nil {
+                for date in runway {
+                    if let previous, date <= previous {
+                        continue
+                    }
+                    chosen = date
+                    break
+                }
+            }
+            guard let chosen else {
+                return nil
+            }
+            destinations.append(chosen)
+            previous = chosen
+        }
+        return destinations
     }
 
     /// Only the pages named "Unit N, Day N", in unit then day order.
@@ -461,6 +801,12 @@ struct ClassInsertionPlan {
     let unit: Int
     let atDay: Int
 
+    /// How the course names its pages, so the position is said the way the
+    /// course writes it — "Unit 3, Day 4", "Module 3, Day 4", "Week 4" —
+    /// rather than rebuilt as "Unit … Day …" by hand, which is how a Module
+    /// course was told "at Unit 3, Day 4" (#268).
+    let naming: ClassPageNaming
+
     /// The blank classes that would be made room for.
     let added: [PlannedClass]
 
@@ -481,6 +827,11 @@ struct ClassInsertionPlan {
 
     var changesNothing: Bool {
         return added.isEmpty && renames.isEmpty && moves.isEmpty
+    }
+
+    /// Where the room is made, named as the course names a page.
+    var positionTitle: String {
+        return naming.title(unit: unit, day: atDay)
     }
 
     /// Whether anything OTHER than the new pages is disturbed.
@@ -524,8 +875,15 @@ struct ClassInsertionPlan {
         return names.count
     }
 
-    /// The proposal, as a teacher would hear it.
+    /// The proposal, as a teacher would hear it — and as the model reads it,
+    /// which is why this form always says "class".
     var description: String {
+        return describe(noun: .class)
+    }
+
+    /// The proposal in the course's own noun (#267): "meeting" on a club's
+    /// card. Only the card takes this; see `AssistToolOutcome.planned`.
+    func describe(noun: ClassNoun) -> String {
         var lines: [String] = []
 
         if changesNothing {
@@ -536,8 +894,10 @@ struct ClassInsertionPlan {
             return lines.joined(separator: "\n")
         }
 
-        let room: String = added.count == 1 ? "one new class" : "\(added.count) new classes"
-        lines.append("Make room for \(room) at Unit \(unit), Day \(atDay) in \(courseCode) Section \(sectionNumber).")
+        lines.append(AssistWording.wouldMakeRoom(
+            count: added.count, at: positionTitle,
+            course: courseCode, section: "\(sectionNumber)", noun: noun
+        ))
         lines.append("")
 
         lines.append("New, and unpublished until you write \(added.count == 1 ? "it" : "them"):")
@@ -572,7 +932,7 @@ struct ClassInsertionPlan {
 
         if !moves.isEmpty {
             lines.append("")
-            lines.append("Moved to later class days — \(moves.count):")
+            lines.append(AssistWording.movedToLaterDays(count: moves.count, noun: noun))
             var shown: Int = 0
             for move in moves {
                 if shown >= ClassInsertionPlan.mostShown {
@@ -600,6 +960,7 @@ struct ClassInsertionPlan {
         sectionNumber: Int,
         unit: Int,
         atDay: Int,
+        naming: ClassPageNaming,
         added: [PlannedClass],
         renames: [ClassRename],
         moves: [ClassDateMove],
@@ -610,6 +971,7 @@ struct ClassInsertionPlan {
         self.sectionNumber = sectionNumber
         self.unit = unit
         self.atDay = atDay
+        self.naming = naming
         self.added = added
         self.renames = renames
         self.moves = moves
