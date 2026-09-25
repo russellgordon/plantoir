@@ -138,7 +138,8 @@ nonisolated enum OlderCourseLayout {
     enum LeftOutReason: String, Sendable, Equatable {
         /// A symbolic link, anywhere. Never followed, never copied.
         case link
-        /// `.obsidian/plugins` and `.obsidian/community-plugins.json`.
+        /// `.obsidian/plugins`, `community-plugins.json` and `publish.json`
+        /// — `ObsidianAddOns`, the same three every route leaves (#255).
         case addOns
         /// A root `index.md` beside a `Home.md`: the front page is `Home.md`.
         case secondFrontPage
@@ -643,11 +644,24 @@ nonisolated enum OlderCourseLayout {
             destination: Array(OlderCourseLayout.sectionFolderName.utf8)
         ))
 
+        // The add-ons are SKIPPED by the walk rather than filtered after it
+        // (#255): an unreadable folder inside an add-on used to land in
+        // `unreadable` and refuse the whole class, for something that was
+        // never going to be copied. The same three entries every route
+        // leaves behind — `ObsidianAddOns`.
         let classSurvey: ReferenceTreeCopier.Survey = ReferenceTreeCopier.walk(
-            courseAt: classFolderURL, leavingBehind: leftBehindNames
+            courseAt: classFolderURL,
+            leavingBehind: leftBehindNames,
+            leavingBehindPaths: ObsidianAddOns.leftBehindFromTheCourse
         )
         for folder in classSurvey.unreadableFolders {
             unreadable.append(folder)
+        }
+        // Links and all: everything under `.obsidian/plugins/` is left
+        // behind by design, so a link in there is not a LOSS to be reported
+        // (#254 fix review, nit 3) — and now it is not even seen.
+        for path in classSurvey.pathsLeftBehind {
+            leftOut.append(LeftOut(path: path, inTheSharedFolder: false, reason: .addOns))
         }
 
         // Which top-level entries are real, and which are Thread folders.
@@ -672,19 +686,6 @@ nonisolated enum OlderCourseLayout {
         for item in classSurvey.items {
             let parts: [[UInt8]] = OlderCourseLayout.components(of: item.relativePath)
             let first: String = String(decoding: parts[0], as: UTF8.self)
-
-            // The add-ons first, links and all: everything under
-            // `.obsidian/plugins/` is left behind by design, so a link in
-            // there is not a LOSS to be reported (#254 fix review, nit 3).
-            if first == ".obsidian" && parts.count >= 2 {
-                let second: String = String(decoding: parts[1], as: UTF8.self)
-                if second == "plugins" || (parts.count == 2 && second == "community-plugins.json") {
-                    if parts.count == 2 {
-                        leftOut.append(LeftOut(path: item.text, inTheSharedFolder: false, reason: .addOns))
-                    }
-                    continue
-                }
-            }
 
             if item.isSymbolicLink {
                 leftOut.append(LeftOut(path: item.text, inTheSharedFolder: false, reason: .link))
@@ -730,9 +731,19 @@ nonisolated enum OlderCourseLayout {
             for name in shared.foundNames {
                 wanted.insert(OlderCourseLayout.composed(name))
             }
+            // The shared folder's own `.obsidian` comes only if a class link
+            // named it — and then without its add-ons, like every route's.
             let sharedSurvey: ReferenceTreeCopier.Survey = ReferenceTreeCopier.walk(
-                courseAt: sharedURL, leavingBehind: leftBehindNames
+                courseAt: sharedURL,
+                leavingBehind: leftBehindNames,
+                leavingBehindPaths: ObsidianAddOns.leftBehindFromTheCourse
             )
+            for path in sharedSurvey.pathsLeftBehind {
+                let top: [UInt8] = OlderCourseLayout.components(of: Array(path.utf8))[0]
+                if wanted.contains(OlderCourseLayout.composed(top)) {
+                    leftOut.append(LeftOut(path: path, inTheSharedFolder: true, reason: .addOns))
+                }
+            }
             for item in sharedSurvey.items {
                 let parts: [[UInt8]] = OlderCourseLayout.components(of: item.relativePath)
                 guard wanted.contains(OlderCourseLayout.composed(parts[0])) else {

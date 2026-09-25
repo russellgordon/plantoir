@@ -33,6 +33,11 @@ struct KeepACopyForReferenceSheet: View {
     @State var problem: String?
     @State var isCopying: Bool = false
 
+    /// What of the course's `.obsidian` the copy leaves behind (#255). Read
+    /// once when the sheet appears — one `lstat` or two and one listing —
+    /// rather than on every redraw of `body`.
+    @State var addOns: ObsidianAddOns.Found = ObsidianAddOns.Found()
+
     /// The day the year list is built from. A stored property rather than a
     /// call to the clock inside the body, so the list cannot change under
     /// the teacher mid-sheet — and so a test can move it.
@@ -114,6 +119,12 @@ struct KeepACopyForReferenceSheet: View {
             // whether the locking actually took, which is where a volume that
             // cannot carry the flag shows up.
             VStack(alignment: .leading, spacing: 4) {
+                if let addOnsNote = KeepACopyForReferenceSheet.addOnsNote(
+                    course: course.displayCode, found: addOns
+                ) {
+                    Text(addOnsNote)
+                        .accessibilityIdentifier("keepACopyAddOnsNote")
+                }
                 Text(ReferenceWording.pagesAreLocked)
             }
             .font(.callout)
@@ -139,6 +150,7 @@ struct KeepACopyForReferenceSheet: View {
             if folderName.isEmpty {
                 folderName = proposedFolderName()
             }
+            addOns = ObsidianAddOns.found(inCourseAt: course.directoryURL)
         }
     }
 
@@ -152,6 +164,16 @@ struct KeepACopyForReferenceSheet: View {
     }
 
     // MARK: - Functions
+
+    /// The sentence about add-ons, or nil when the course has none — an
+    /// empty add-ons folder says nothing, because telling a teacher their
+    /// add-ons stay behind when they have none would be false (#255).
+    static func addOnsNote(course: String, found: ObsidianAddOns.Found) -> String? {
+        if found.isEmpty {
+            return nil
+        }
+        return ReferenceWording.keepACopyLeavesAddOnsBehind(course: course)
+    }
 
     func proposedFolderName() -> String {
         return ReferenceCourseRule.proposedFolderName(

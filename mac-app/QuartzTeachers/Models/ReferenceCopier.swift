@@ -127,6 +127,11 @@ enum ReferenceCopier {
             ReferenceStaging.giveBack(folderName, inCoursesDirectory: coursesDirectoryURL)
         }
 
+        // What of `.obsidian` stays behind, read before the copy so the trail
+        // can name it (#255). A LIVE course keeps its add-ons; only the copy
+        // is made without them.
+        let addOnsLeftBehind: ObsidianAddOns.Found = ObsidianAddOns.found(inCourseAt: course.directoryURL)
+
         do {
             try ReferenceCopier.copyContents(of: course.directoryURL, into: stagingURL)
             // The lock TRAVELS through `FileManager.copyItem`, so a copy taken
@@ -183,7 +188,9 @@ enum ReferenceCopier {
         )
         ActivityTrail.note(
             .courseKeptForReference,
-            ReferenceCopier.trailLine(for: made, copiedFrom: course.displayCode)
+            ReferenceCopier.trailLine(
+                for: made, copiedFrom: course.displayCode, addOnsLeftBehind: addOnsLeftBehind
+            )
         )
         return made
     }
@@ -290,8 +297,14 @@ enum ReferenceCopier {
     }
 
     /// The trail line — what a teacher would recognise, and enough to explain
-    /// a report months later.
-    static func trailLine(for made: Made, copiedFrom source: String) -> String {
+    /// a report months later. It names the Obsidian add-ons the copy was made
+    /// without, by folder name, only when there were any (#255): the line for
+    /// a course without them is exactly what it was before.
+    static func trailLine(
+        for made: Made,
+        copiedFrom source: String,
+        addOnsLeftBehind: ObsidianAddOns.Found = ObsidianAddOns.Found()
+    ) -> String {
         var year: String = "no school year"
         if let startingYear = made.schoolYear {
             year = SchoolYear.label(forStartingYear: startingYear)
@@ -299,13 +312,20 @@ enum ReferenceCopier {
         let sections: String = made.sectionCount == 1 ? "1 section" : "\(made.sectionCount) sections"
         return "kept a copy of \(source) for reference as \(made.folderName) — "
              + "shown as \(made.displayCode), \(year), \(sections)"
+             + ObsidianAddOns.trailClause(for: addOnsLeftBehind)
     }
 
     // MARK: - Private helpers
 
-    /// Copies everything the teacher wrote, and nothing that is rebuilt.
     /// Copies everything the teacher wrote, and nothing that is rebuilt —
     /// through the SAME copier the import uses.
+    ///
+    /// **Without the course's Obsidian add-ons** (#255), the same three
+    /// entries every route leaves behind, and without `.obsidian` at all when
+    /// it is a link. A copy of a LIVE course follows the same rule as an
+    /// import: the copy is never published, so an add-on in it is only ever a
+    /// way to publish it outside Plantoir's refusals — and the course being
+    /// taught keeps its add-ons untouched. `ObsidianAddOns` says why.
     ///
     /// It used to have a loop of its own: `contentsOfDirectory`, then
     /// `copyItem` to `destination.appendingPathComponent(child.lastPathComponent)`.
@@ -325,7 +345,10 @@ enum ReferenceCopier {
             leftBehind.insert(name)
         }
         let survey: ReferenceTreeCopier.Survey = ReferenceTreeCopier.survey(
-            courseAt: sourceURL, leavingBehind: leftBehind
+            courseAt: sourceURL,
+            leavingBehind: leftBehind,
+            leavingBehindPaths: ObsidianAddOns.leftBehindFromTheCourse,
+            leavingBehindIfALink: ObsidianAddOns.leftBehindWhenALinkFromTheCourse
         )
         if let unreadable = survey.unreadableFolders.first {
             throw ReferenceTreeCopier.Trouble.couldNotRead(name: unreadable)

@@ -243,15 +243,6 @@ struct ImportCoursesForReferenceSheet: View {
         return result
     }
 
-    /// True when any row is an older-layout class, so the sheet says what
-    /// is left behind of those.
-    var hasOlderLayoutClasses: Bool {
-        for course in courses where course.olderLayout != nil {
-            return true
-        }
-        return false
-    }
-
     /// True when any row is a class kept a website folder per class, so the
     /// sheet says once what stays behind of those — and that it is not a
     /// loss.
@@ -375,8 +366,8 @@ struct ImportCoursesForReferenceSheet: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            if hasOlderLayoutClasses {
-                Text(ReferenceImportWording.olderLayoutAddOnsAreLeftBehind)
+            if let addOnsNote = ImportCoursesForReferenceSheet.addOnsNote(for: courses) {
+                Text(addOnsNote)
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -585,8 +576,8 @@ struct ImportCoursesForReferenceSheet: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            if hasOlderLayoutClasses {
-                Text(ReferenceImportWording.olderLayoutAddOnsAreLeftBehind)
+            if let addOnsNote = ImportCoursesForReferenceSheet.addOnsNote(for: courses) {
+                Text(addOnsNote)
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -615,6 +606,41 @@ struct ImportCoursesForReferenceSheet: View {
                 .accessibilityIdentifier("importDoneButton")
             }
         }
+    }
+
+    /// Which sentence about Obsidian add-ons the sheet says, if any (#255).
+    ///
+    /// * A MODERN course in the list that has add-ons →
+    ///   `addOnsAreLeftBehind`, which is true of every route. It wins over
+    ///   the older-layout sentence when both kinds are in the list: "…from
+    ///   older class folders…" beside a modern course with an add-on would
+    ///   read as if that course's add-ons DID come.
+    /// * Otherwise an older-layout class in the list →
+    ///   `olderLayoutAddOnsAreLeftBehind`, said for every such class as it
+    ///   was before #255 (every real one carries a publishing add-on).
+    /// * Otherwise nothing. A modern course with none — an empty `plugins/`
+    ///   and a `[]` list, as Russell's own ICS3U has — says nothing, because
+    ///   telling a teacher their add-ons were left behind would be false.
+    ///
+    /// A class kept a website folder per class says it through
+    /// `checkoutLayoutOnlyPagesComeAcross` instead, as it did before.
+    static func addOnsNote(for courses: [ReferenceImportSource.FoundCourse]) -> String? {
+        var aModernCourseHasAddOns: Bool = false
+        var hasOlderLayoutClasses: Bool = false
+        for course in courses {
+            if course.olderLayout != nil {
+                hasOlderLayoutClasses = true
+            } else if course.checkoutLayout == nil && !course.addOns.isEmpty {
+                aModernCourseHasAddOns = true
+            }
+        }
+        if aModernCourseHasAddOns {
+            return ReferenceImportWording.addOnsAreLeftBehind
+        }
+        if hasOlderLayoutClasses {
+            return ReferenceImportWording.olderLayoutAddOnsAreLeftBehind
+        }
+        return nil
     }
 
     /// One line of the summary, for one course.
