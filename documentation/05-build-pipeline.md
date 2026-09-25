@@ -666,10 +666,41 @@ reaches `main()`, so no node server is left behind. Pinned by
   other stop (`stopByUser`, which terminates the host shell) and
   `stop_preview.py` (SIGTERM by default) already end Python without a
   traceback, because SIGTERM does not raise `KeyboardInterrupt`.
-- **Not in this change:** `scripts/deploy.py` has no `KeyboardInterrupt`
-  handling either, so Cancel during a publish still prints its traceback —
-  measured by the review with a real `^C` through a pty: 20 lines during the
-  rebuild on this change, 53 before. Filed as #259.
+- **A publish, the same way (GitHub #259, 2026-09-25).** `scripts/deploy.py`
+  had no `KeyboardInterrupt` handling either, so Cancel during a publish still
+  printed its traceback. It now enters through `run_until_stopped()`, which
+  calls `main()` and turns `KeyboardInterrupt` into `sys.exit(130)`, printing
+  nothing. Measured with the real `deploy.py` under `pty.fork()` and a `^C`
+  written to the pty, the build swapped for a long `subprocess.run` (host
+  Python 3.14; the image's 3.11 prints fewer caret lines): during the
+  production rebuild, exit −2 and 26 lines with one traceback before, exit 130
+  and nothing after; at the surname question (`input()`), exit −2 and 10 lines
+  before, exit 130 and nothing after.
+  - **Around `main()`, not inside it.** Wrapping `main()`'s ~290-line body was
+    REJECTED (a re-indent diff over the whole publish path), and so was moving
+    the body into a new function: `test_deploy_netlify_headers.py` reads
+    `inspect.getsource(deploy.main)` to prove the Cloudflare branch returns
+    before the badge writer, so `main`'s body has to stay in `main`. One
+    handler covers every place a publish can be waiting — the rebuild's
+    `subprocess.run`, both questions, an upload, wrangler.
+  - **The Cancel that arrives through the build first.** The `^C` reaches the
+    rebuild child and `deploy.py` together. Usually `deploy.py` is still in
+    `waitpid` and hears its own interrupt first; if the child's exit is seen
+    first, `subprocess.run` raises `CalledProcessError` with 130 (the build's
+    own quiet exit) or −2 (killed outright), and `rebuild_for_production` used
+    to print "Production rebuild failed" and exit 1. It now exits 130 for
+    those two statuses (`build_was_stopped_by_the_teacher`), and 1 for any
+    other. Not reproduced by hand — the race is narrow — so it is pinned by a
+    test that raises the error directly.
+  - Nothing to tidy on the way out: the token file is removed by `deploy.sh`
+    before Python starts, a Netlify upload interrupted midway is never
+    published, and the publish registry belongs to the app.
+  - Pinned by the second class in `scripts/test_stop_quietly.py`: the
+    in-process 130, the program's entry going through `run_until_stopped()`
+    (the first case alone would pass with the entry put back to `main()`), the
+    rebuild that left first, and a real SIGINT sent to the whole process group
+    mid-rebuild (POSIX only). On `origin/dev` before the change: 3 failures and
+    1 error, three runs out of three.
 - **Which button.** Only the progress view's Cancel types a `^C`; the Stop
   Preview and console Stop buttons end the process without one and never
   showed the traceback (measured by the same review).
