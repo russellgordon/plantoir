@@ -78,7 +78,10 @@ and a terminal teacher should open. It asks the container for that mapping
 twice, and if both answers are empty it says it could not find out where the
 preview will be and stops before building (exit 1) — since #235 it never
 announces the container's own port in its place, which is right only for the
-first folder on a Mac. `--build-only` asks nothing and is never stopped there,
+first folder on a Mac. Since #234 it then connects to that address before
+building, and stops in about ten seconds if this Mac cannot reach it (see
+"Before building, preview.sh makes sure this Mac can reach the builder"
+below). `--build-only` asks neither question and is never stopped there,
 so a publish is unaffected. The old shared `teaching-quartz`
 container is retired automatically the first time a per-folder container is
 created. The macOS app stops a folder's container (a fast `docker stop`,
