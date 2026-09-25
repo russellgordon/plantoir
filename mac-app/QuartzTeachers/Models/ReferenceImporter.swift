@@ -140,6 +140,7 @@ enum ReferenceImporter {
             if let trouble = ReferenceCourseRule.trouble(
                 placing: displayCode, inYear: request.schoolYear, among: shelved
             ) {
+                ReferenceImporter.noteNotImported(displayCode, from: sourceFolderURL, because: trouble.sentence)
                 outcomes.append(.notImported(course: displayCode, reason: trouble.sentence))
                 continue
             }
@@ -152,9 +153,9 @@ enum ReferenceImporter {
             let destinationURL: URL = coursesDirectoryURL.appendingPathComponent(folderName)
             if fileManager.fileExists(atPath: destinationURL.path) {
                 let problem: ReferenceCopier.Problem = .folderAlreadyExists(folderName)
-                outcomes.append(.notImported(
-                    course: displayCode, reason: problem.errorDescription ?? folderName
-                ))
+                let reason: String = problem.errorDescription ?? folderName
+                ReferenceImporter.noteNotImported(displayCode, from: sourceFolderURL, because: reason)
+                outcomes.append(.notImported(course: displayCode, reason: reason))
                 continue
             }
 
@@ -318,9 +319,15 @@ enum ReferenceImporter {
         return outcomes
     }
 
-    /// The trail line for a course that did not come across, and why — the
-    /// same line whether the copy failed part way or never started because
-    /// the course is being imported somewhere else right now.
+    /// The trail line for a course that did not come across, and why —
+    /// written for EVERY course the summary lists as not imported (#287):
+    /// refused by the shelf rule, a folder of that name already there, being
+    /// imported somewhere else right now, a leftover that could not be
+    /// cleared, or a copy that failed part way. The reason is the sentence
+    /// the teacher read in the summary. Every early `continue` in
+    /// `importCourses` that appends `.notImported` must call this first; a
+    /// course the teacher STOPPED writes `courseImportForReferenceStopped`
+    /// instead.
     private static func noteNotImported(_ course: String, from sourceFolderURL: URL, because reason: String) {
         ActivityTrail.note(
             .courseCouldNotBeImportedForReference,
