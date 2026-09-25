@@ -42,6 +42,63 @@ enum FolderContainers {
         case theLastWindowOnTheFolderClosed
     }
 
+    /// Where the quit script reads what is running on this Mac (issue #243).
+    ///
+    /// The list is read INSIDE the generated script, by `sh`, after the app
+    /// has gone — so the seam is a choice of shell command made here, not a
+    /// Swift protocol to inject: by the time anything reads the list there is
+    /// no Swift left to ask.
+    ///
+    /// The app reads the real list. The unit suite reads a FILE in its
+    /// throwaway home, by default, because the real list is shared with
+    /// everything else on the Mac: a launcher run by another worktree, by a
+    /// `verify.sh`, or by the teacher's own preview made the "any launcher
+    /// running" check answer yes, which turned one quit test red and made
+    /// another skip itself. The default is keyed on the same fact as
+    /// `RealHome.forFiles`, so the NEXT test that runs a quit script is
+    /// hermetic without having to remember to be. A missing file lists
+    /// nothing, and nothing running is what a test that wrote no list means.
+    ///
+    /// One test reads the real list on purpose —
+    /// `QuitScriptRunsTests.testNothingIsStoppedWhileThatFoldersLauncherIsRunning`,
+    /// the proof that a real `ps` line carries a launcher's absolute path.
+    nonisolated enum ProcessListing: Equatable {
+        case thisMac
+        case readFrom(file: URL)
+
+        // MARK: - Computed properties
+
+        /// The command that prints one process per line, whole.
+        var shellCommand: String {
+            switch self {
+            case .thisMac:
+                return "ps -Ao args= 2>/dev/null"
+            case .readFrom(let file):
+                return "cat " + HelperPrograms.shellQuoted(file.path) + " 2>/dev/null"
+            }
+        }
+
+        /// What a script gets when nobody says: the real list in the app, a
+        /// file in the throwaway home under the unit suite.
+        static var forThisProcess: ProcessListing {
+            return forProcess(insideTestBundle: RealHome.isInsideTestBundle)
+        }
+
+        // MARK: - Functions
+
+        /// The choice `forThisProcess` makes, with the one fact it turns on
+        /// passed in — so the app's half can be pinned by a test that runs
+        /// inside the suite.
+        static func forProcess(insideTestBundle: Bool) -> ProcessListing {
+            if insideTestBundle {
+                let file: URL = RealHome.homeWhileTesting
+                    .appendingPathComponent("processes-running-on-this-mac.txt")
+                return .readFrom(file: file)
+            }
+            return .thisMac
+        }
+    }
+
     // MARK: - Stored properties
 
     /// How long the script waits for a folder's own work to finish before
@@ -182,12 +239,13 @@ enum FolderContainers {
         occasion: Occasion = .quitting,
         includingTheSharedSetup: Bool = true,
         secondsToWaitForWork: Int = secondsToWaitForWorkToFinish,
-        inHomeFolder homeFolder: URL = RealHome.forFiles
+        inHomeFolder homeFolder: URL = RealHome.forFiles,
+        processListing: ProcessListing = .forThisProcess
     ) -> String {
         var lines: [String] = []
         lines.append(HelperPrograms.exportLine(inHomeFolder: homeFolder))
         lines.append(trailFunction(inHomeFolder: homeFolder))
-        lines.append(launcherFunctions())
+        lines.append(launcherFunctions(processListing: processListing))
         lines.append(releaseFunction(secondsToWaitForWork: secondsToWaitForWork))
 
         var body: [String] = []
@@ -262,7 +320,8 @@ enum FolderContainers {
         occasion: Occasion = .quitting,
         includingTheSharedSetup: Bool = true,
         inheriting inherited: [String: String] = ProcessInfo.processInfo.environment,
-        inHomeFolder homeFolder: URL = RealHome.forFiles
+        inHomeFolder homeFolder: URL = RealHome.forFiles,
+        processListing: ProcessListing = .forThisProcess
     ) -> HelperPrograms.Command {
         return HelperPrograms.Command(
             executablePath: "/bin/sh",
@@ -270,7 +329,8 @@ enum FolderContainers {
                 folderPaths: folderPaths,
                 occasion: occasion,
                 includingTheSharedSetup: includingTheSharedSetup,
-                inHomeFolder: homeFolder
+                inHomeFolder: homeFolder,
+                processListing: processListing
             )],
             environment: HelperPrograms.environment(basedOn: inherited, inHomeFolder: homeFolder),
             currentDirectoryPath: nil
@@ -397,10 +457,18 @@ enum FolderContainers {
     /// own `preview.sh … --stop` for every live preview a moment before this
     /// script starts, and counting it would make every quit-with-a-preview
     /// decide that something was busy and free nothing at all.
-    private static func launcherFunctions() -> String {
+    ///
+    /// The list itself comes from `processListing`: the real `ps` in the app,
+    /// a file under the unit suite (issue #243). Both checks read it through
+    /// one function, so there is one line to swap and no second read that
+    /// could be forgotten.
+    private static func launcherFunctions(processListing: ProcessListing) -> String {
         var lines: [String] = []
+        lines.append("processesOnThisMac() {")
+        lines.append("  " + processListing.shellCommand)
+        lines.append("}")
         lines.append("launcherRunning() {")
-        lines.append("  seen=$(ps -Ao args= 2>/dev/null)")
+        lines.append("  seen=$(processesOnThisMac)")
         lines.append("  for launcher in preview.sh deploy.sh setup.sh; do")
         lines.append("    if printf '%s\\n' \"$seen\" | grep -F \"$1/$launcher\""
             + " | grep -Fv -- ' --stop' >/dev/null 2>&1; then")
@@ -410,7 +478,7 @@ enum FolderContainers {
         lines.append("  return 1")
         lines.append("}")
         lines.append("anyLauncherRunning() {")
-        lines.append("  seen=$(ps -Ao args= 2>/dev/null)")
+        lines.append("  seen=$(processesOnThisMac)")
         lines.append("  printf '%s\\n' \"$seen\" | grep -E '/(preview|deploy|setup)\\.sh( |$)'"
             + " | grep -Fv -- ' --stop' >/dev/null 2>&1")
         lines.append("}")
