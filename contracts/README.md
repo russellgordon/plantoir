@@ -419,7 +419,7 @@ recounted 2026-09-07.
 | Which assistant a teacher may choose, the caution, and when one may be removed | `shared-rules.json` → `assistantModelChoice` | SharedRulesContract (5), AssistantSettings (22) |
 | What a page is called when the assistant names it | `shared-rules.json` → `pageNaming` | SharedRulesContract (2), AssistPageNaming (7), AssistToolRunner (2) |
 | Dating the pages a class brings when it is published | `class-planning.json` → `datingPagesAClassBrings` | ClassPlanningContract (3), AssistToolRunner (10). Its `reachStopsAtAClassPage.cases` (2) arrived 2026-09-19 with [#173](https://github.com/russellgordon/plantoir/issues/173) and has **no Windows reader** — see the census table below |
-| Dating them on EVERY BUILD, in the teacher's own files, per section (#275, #276) | `class-planning.json` → `datingPagesAClassBrings.atBuildTime` (`cases`, `writingCases`) | `scripts/test_dates_follow_the_class.py` — in the image by `verify.sh`, and on Windows by `PythonToolchainTests`, which discovers it (it needs `python-frontmatter` on that interpreter, as `test_class_folder.py` already does). AUTHORED. Shared Python, so both platforms get the behaviour from one implementation; every case is built twice and the second build must rewrite nothing. The trail line it feeds is `shared-rules.json` → `pagesDatedByTheBuild` (PagesDatedByTheBuildTests on the mac; **owed on Windows**: reading the `PLANTOIR_DATED:` line, keeping it out of the console, and the trail event) |
+| Dating them on EVERY BUILD, in the teacher's own files, per section (#275, #276) | `class-planning.json` → `datingPagesAClassBrings.atBuildTime` (`cases`, `writingCases`) | `scripts/test_dates_follow_the_class.py` — in the image by `verify.sh`, and on Windows by `PythonToolchainTests`, which discovers it (it needs `python-frontmatter` on that interpreter, as `test_class_folder.py` already does). AUTHORED. DIRECT links only — a page reached only through another shared page keeps its own date (the hub case). Shared Python, so both platforms get the behaviour from one implementation; every case is built twice and the second build must rewrite nothing. The trail line it feeds is `shared-rules.json` → `pagesDatedByTheBuild` (PagesDatedByTheBuildTests on the mac; **owed on Windows**: reading the `PLANTOIR_DATED:` line, keeping it out of the console, and the trail event) |
 | What publishing and unpublishing do to linked pages, and what is never swept | `shared-rules.json` → `followingLinks` | SharedRulesContract (3), AssistToolRunner (9). Its `stopsAtAClassPage.cases` (3) arrived 2026-09-19 with [#173](https://github.com/russellgordon/plantoir/issues/173) and has **no Windows reader** — see the census table below. The three `publishing` booleans stay TRUE and both suites assert them: the walk is still transitive, it has one stop |
 | Whether the assistant asks before changing anything, and when it says so | `shared-rules.json` → `assistantConfirmation` | SharedRulesContract (1), AssistPlanMode (6), AssistantSettings (6) |
 | Phrasings matched in code, including the six PARSED families | `assist-cases.json` → `cardPhrasings` | AssistContract (1), AssistPromptShelf (2), AssistToolRunner (4), AssistScenario (1, walking `parsed`) |
@@ -650,8 +650,10 @@ ledger), and the wording block gained `scheduleReplaces` with a new
 (pages take their class's date). The walker read **171** at `origin/dev`
 (c02f5d3b — the 163 above was not re-taken by the pieces between) and reads
 **174** after: `sectionIndexPointer.dateCases.cases` (9),
-`datingPagesAClassBrings.atBuildTime.cases` (12) and
-`datingPagesAClassBrings.atBuildTime.writingCases.cases` (7); and
+`datingPagesAClassBrings.atBuildTime.cases` (14 — 12 when first written; the
+fix round the same day added the hub case and a plain YAML date) and
+`datingPagesAClassBrings.atBuildTime.writingCases.cases` (9 — 7, plus a note
+kept on the date line and a `#` inside quotes); and
 `activityTrail.mustRecord` grew from 70 to 71 (`pages dated by the build`),
 which is not a new list. The two `atBuildTime` lists DO have a Windows reader
 — the shared `scripts/test_dates_follow_the_class.py`, discovered by
