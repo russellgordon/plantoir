@@ -3049,12 +3049,12 @@ Copy before anything is read; the folder exists, empty, from the claim):
 
 A refused course is reported with `wording.alreadyBeingImported` and writes
 the "course could not be imported for reference" trail line, and the run
-carries on to the next course. Keep a Copy is refused with
+carries on to the next course. That import sentence says only that the course
+is being imported elsewhere; it does not promise the course will appear,
+because the other import may fail or be stopped. Keep a Copy is refused with
 `referenceCourses.wording.copyAlreadyBeingMade` and writes its OWN line,
 "course could not be kept for reference" (#287 — this paragraph said it wrote
-the import's line, which no failure of Keep a Copy did until then). The sentence says only that it is being imported elsewhere; it
-does not promise the course will appear, because the other import may fail or
-be stopped. The cases are `contracts/shared-rules.json` →
+the import's line, which no failure of Keep a Copy did until then). The cases are `contracts/shared-rules.json` →
 `referenceCourses.importing.oneImportPerCourseAtATime.cases`, run by
 `WorkLeaseLivenessTests.testTheClaimIsTheContracts` through the REAL claim. The sweep
 also skips any staging folder THIS app has claimed, whether or not its lease
