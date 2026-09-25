@@ -6175,7 +6175,10 @@ def build_section_site(
     # copy is dated the same way, but its files are never rewritten.
     frozen_course = reference_course.is_reference(course_dir) or reference_course.cannot_tell(course_dir)
     dating = _date_pages_from_their_classes(content_root, section_number, write_back=not frozen_course)
-    if dating["front_page"] is not None:
+    # Not said of a front page hidden because its settings could not be read
+    # (#246): only the build's hidden copy was dated, and the teacher's page
+    # cannot be, so the sentence would describe a page nobody will see.
+    if dating["front_page"] is not None and not health_facts["front_page_unreadable"]:
         print(f"📆 The front page now carries the date of the class it shows ({dating['front_page']}).")
     print(f"📆 Dated {dating['site_pages']} page(s) from the first class that links to them.")
     announce_dated_pages(dating, course_code, section_number)
