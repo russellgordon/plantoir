@@ -238,6 +238,13 @@ else
   cat /tmp/verify_starting_content_test.log
 fi
 
+if (cd scripts && python3 test_graded_folders_rerun.py) >/tmp/verify_graded_rerun_test.log 2>&1; then
+  pass "setup_course.py: a re-run writes a saved marks pool back as it was (scripts/test_graded_folders_rerun.py)"
+else
+  fail "setup_course.py: a re-run writes a saved marks pool back as it was (scripts/test_graded_folders_rerun.py)"
+  cat /tmp/verify_graded_rerun_test.log
+fi
+
 if (cd scripts && python3 test_contracts.py) >/tmp/verify_contracts_test.log 2>&1; then
   pass "contracts.py: the scripts can read the Plantoir contract (scripts/test_contracts.py)"
 else
