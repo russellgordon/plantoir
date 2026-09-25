@@ -1737,8 +1737,14 @@ class WorkspaceModel {
     /// selection would otherwise churn once for every backup. Then every OTHER
     /// window on this folder refreshes its own list (`followBackupDeletion`),
     /// or it goes on offering Restore for zips that are gone.
+    ///
+    /// `otherWindows` is every window's model — a parameter only so a test can
+    /// hand in its own, exactly as `followWrite` takes one.
     @discardableResult
-    func deleteBackups(_ items: [BackupItem]) -> BackupDeletion {
+    func deleteBackups(
+        _ items: [BackupItem],
+        following otherWindows: [WorkspaceModel] = WorkspaceModel.windowModels
+    ) -> BackupDeletion {
         var heldPaths: Set<String> = []
         for heldURL in AssistActivity.backupsAnOpenConversationHolds() {
             heldPaths.insert(heldURL.standardizedFileURL.path)
@@ -1780,7 +1786,7 @@ class WorkspaceModel {
             reloadCourses()
             if let coursesDirectoryURL {
                 WorkspaceModel.followBackupDeletion(
-                    inCoursesDirectory: coursesDirectoryURL, besides: self
+                    inCoursesDirectory: coursesDirectoryURL, besides: self, in: otherWindows
                 )
             }
         }
