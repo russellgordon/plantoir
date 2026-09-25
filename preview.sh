@@ -1107,14 +1107,50 @@ echo "📂 Output will be written to: $OUTPUT_PATH"
 MODE_FLAG="$BUILD_ONLY"
 
 # The container port maps to a host port block chosen for this folder, so
-# the address to open is resolved from the container rather than assumed.
-HOST_PREVIEW_PORT=$(docker port "$CONTAINER_NAME" "${PREVIEW_PORT}/tcp" 2>/dev/null | head -1 | sed 's/.*://')
-if [[ -z "$HOST_PREVIEW_PORT" ]]; then
-  HOST_PREVIEW_PORT="$PREVIEW_PORT"
-fi
-if [[ -z "$BUILD_ONLY" ]]; then
-  echo "🌐 Preview will be available at: http://localhost:${HOST_PREVIEW_PORT}/"
-fi
+# the address to open is resolved from the container rather than assumed —
+# and when it cannot be resolved, this says so and stops (GitHub #235).
+#
+# It used to fall back to the CONTAINER port and announce that as fact. That
+# port is right only for the first working folder on a Mac (8081 -> 8081); the
+# development Mac's own folder publishes 8091 -> 8081, so the guess sent the
+# app to the wrong address, or to ANOTHER section's preview. The app believes
+# this line — it is the only address it will open — so a guess here is a
+# wrong answer delivered as the truth.
+#
+# The question is put a second time before giving up: one empty answer is
+# not proof, and on the commonest Mac the old guess happened to be right, so
+# refusing on a single miss would stop previews that used to work. That is a
+# second asking of the question, not a wait for anything to settle.
+#
+# A build for publishing (--build-only) opens no preview, so it asks nothing
+# and can never be stopped here: a publish runs this first, and must not be
+# refused over a question publishing never asks.
+say_the_preview_address_is_unknown() {
+  echo "❌ Plantoir could not find out where this preview will be, so it stopped"
+  echo "   before building it. Nothing has been lost — try the preview again."
+}
+
+announce_the_preview_address() {
+  if [[ -n "$BUILD_ONLY" ]]; then
+    return 0
+  fi
+  local host_port=""
+  host_port=$(docker port "$CONTAINER_NAME" "${PREVIEW_PORT}/tcp" 2>/dev/null | head -1 | sed 's/.*://')
+  if [[ -z "$host_port" ]]; then
+    host_port=$(docker port "$CONTAINER_NAME" "${PREVIEW_PORT}/tcp" 2>/dev/null | head -1 | sed 's/.*://')
+  fi
+  if [[ -z "$host_port" ]]; then
+    say_the_preview_address_is_unknown
+    # Rule 5: without this the trail says only that preview.sh failed, and
+    # the reason is in a transcript nobody opens. The words are pinned —
+    # contracts/shared-rules.json -> activityTrail.mustRecord."preview did not appear".launcherLine
+    note_on_the_trail "${COURSE}/${SECTION} · the preview stopped before building — Plantoir could not find out where it would be"
+    return 1
+  fi
+  echo "🌐 Preview will be available at: http://localhost:${host_port}/"
+}
+
+announce_the_preview_address || exit 1
 
 # A terminal is what makes the container's prompts and live progress work, so
 # ask for one when there IS one. But `docker exec -t` refuses to start at all

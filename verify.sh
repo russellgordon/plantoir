@@ -216,6 +216,16 @@ else
   cat /tmp/verify_preview_sh_questions_test.log
 fi
 
+# preview.sh announces the address the app opens, or says it cannot and stops;
+# it never announces a port it guessed (GitHub #235). Runs the launcher's own
+# functions with docker answering as told, so it needs no Docker at all.
+if (cd scripts && python3 test_preview_address.py) >/tmp/verify_preview_address_test.log 2>&1; then
+  pass "preview.sh announces the preview's real address or stops, never a guessed one (scripts/test_preview_address.py)"
+else
+  fail "preview.sh announces the preview's real address or stops, never a guessed one (scripts/test_preview_address.py)"
+  cat /tmp/verify_preview_address_test.log
+fi
+
 if (cd scripts && python3 test_preflight_exclusions.py) >/tmp/verify_preflight_exclusions_test.log 2>&1; then
   pass "build_site.py: preflight excluded_items discovery skipping & index.md notes (scripts/test_preflight_exclusions.py)"
 else
