@@ -396,9 +396,12 @@ unambiguous and carries structure a sentence cannot.
 
 ### Three traps, all met here
 
-- **Do not read the findings from a tail.** Every other structured-line reader in
-  the mac's `ScriptRunner` works from `recentText(maximumCharacters: 8000)`, and
-  the health lines print in the MIDDLE of a build. On any real build they are
+- **Do not read the findings from a tail.** Most other structured-line readers in
+  the mac's `ScriptRunner` work from `recentText(maximumCharacters: 8000)`, and
+  the health lines print in the MIDDLE of a build. (The preview's announced
+  address is the other exception since #235: it is printed even EARLIER, lost
+  the same way, and now read from the same carried-over lines as they arrive —
+  `documentation/09-mac-app.md` → "Where the address comes from".) On any real build they are
   long past that window by the end. Collect them as output arrives. The mac test
   floods 400 lines after the finding to prove the point.
 - **Hide the marker line from the console a teacher reads.** A raw JSON blob is
@@ -666,10 +669,98 @@ reaches `main()`, so no node server is left behind. Pinned by
   other stop (`stopByUser`, which terminates the host shell) and
   `stop_preview.py` (SIGTERM by default) already end Python without a
   traceback, because SIGTERM does not raise `KeyboardInterrupt`.
-- **Not in this change:** `scripts/deploy.py` has no `KeyboardInterrupt`
-  handling either, so Cancel during a publish still prints its traceback —
-  measured by the review with a real `^C` through a pty: 20 lines during the
-  rebuild on this change, 53 before. Filed as #259.
+- **A publish, the same way (GitHub #259, 2026-09-25).** `scripts/deploy.py`
+  had no `KeyboardInterrupt` handling either, so Cancel during a publish still
+  printed its traceback. It now enters through `run_until_stopped()`, which
+  calls `main()` and turns `KeyboardInterrupt` into `sys.exit(130)`, printing
+  nothing. Measured with the real `deploy.py` under `pty.fork()` and a `^C`
+  written to the pty, the build swapped for a long `subprocess.run` (host
+  Python 3.14; the image's 3.11 prints fewer caret lines): during the
+  production rebuild, exit −2 and 26 lines with one traceback before, exit 130
+  and nothing after; at the surname question (`input()`), exit −2 and 10 lines
+  before, exit 130 and nothing after.
+  - **Around `main()`, not inside it.** Wrapping `main()`'s ~290-line body was
+    REJECTED (a re-indent diff over the whole publish path), and so was moving
+    the body into a new function: `test_deploy_netlify_headers.py` reads
+    `inspect.getsource(deploy.main)` to prove the Cloudflare branch returns
+    before the badge writer, so `main`'s body has to stay in `main`. One
+    handler covers every place a publish can be waiting — the rebuild's
+    `subprocess.run`, both questions, an upload, wrangler — and the two
+    guards below cover a child that is seen leaving first.
+  - **The Cancel that arrives through the build first.** The `^C` reaches the
+    rebuild child and `deploy.py` together. Usually `deploy.py` is still in
+    `waitpid` and hears its own interrupt first; if the child's exit is seen
+    first, `subprocess.run` raises `CalledProcessError` with 130 (the build's
+    own quiet exit) or −2 (killed outright), and `rebuild_for_production` used
+    to print "Production rebuild failed" and exit 1. It now exits 130 for
+    those two statuses (`build_was_stopped_by_the_teacher`), and 1 for any
+    other. Not reproduced by hand — the race is narrow — so it is pinned by a
+    test that raises the error directly.
+  - **The Cancel that arrives through wrangler first.** The same race on the
+    Cloudflare leg: `deploy_to_cloudflare` exits 130 when wrangler reports 130,
+    −2 or 0xC000013A (Ctrl-C on Windows) —
+    `STATUSES_OF_A_PROGRAM_STOPPED_BY_A_CANCEL`, which the rebuild's guard
+    reads too — instead of raising "Cloudflare's deploy tool exited with
+    code …" with a traceback. Measured inside the image with a stand-in API
+    that never answers: **wrangler 4.80.0 exits 0 on SIGINT** (its `pages`
+    commands install a handler that calls `process.exit()`), so the guard
+    cannot see that shape — `deploy.py`'s own interrupt is what covers it, and
+    with the whole group signalled, as the app's `^C` does, the real wrangler
+    run exits 130 with nothing on stderr and no wrangler left running. (A
+    harness that starts Python with SIGINT ignored — any `&` job in a
+    non-interactive shell — shows the danger: wrangler leaves with 0 and the
+    leg reads as published. Restore `default_int_handler` in such a harness.)
+  - **A Cancel during the upload stops the upload.** Until the #259 fix round
+    it did not: the uploads ran in a `with ThreadPoolExecutor` block, and
+    leaving that block on the `KeyboardInterrupt` waits for the executor to
+    RUN every upload still queued. Measured with the real `deploy.py` under a
+    pty, `netlify_api` stubbed (40 files, 0.4 s per PUT, 5 workers) and the
+    `^C` about a second in: **25 of 40 uploads started after the Cancel**, and
+    it took 2.3 s to leave. Now `_upload_required_files` drops the queue
+    (`shutdown(wait=False, cancel_futures=True)`) and sets `stop_uploading`,
+    so an upload waiting out a 429 gives up instead of retrying for up to a
+    minute: **0 of 40 after the Cancel**, 0.23 s, three runs of three. The
+    uploads already in flight — at most five — still finish.
+  - **What reaches the site, and what does not.** Neither host publishes a
+    half-finished upload, so a Cancel in the middle leaves the published site
+    exactly as it was:
+    - Netlify's file-digest deploy is created with `draft: false`, and Netlify
+      documents that it goes live when its state reaches `ready` — after every
+      required file has arrived. A deploy whose files never all arrive never
+      becomes the published one. (Netlify does document a cancel call, `POST /deploys/{id}/cancel`, but it is deliberately not used here: a deploy whose files have all arrived goes live regardless, and one still receiving files stays a draft anyway;
+      the unfinished one is simply left waiting, and nothing is sent after the
+      Cancel to tidy it up — a network call during a Cancel was REJECTED, since
+      the app ends the launcher two seconds after its `^C`.)
+    - wrangler uploads every asset first and creates the Pages deployment —
+      the step that changes the site — only after (`pages deploy` in
+      wrangler 4.80.0's `cli.js`: `upload(…)`, then `POST …/deployments`).
+      A Cancel before that step publishes nothing; `subprocess.run` kills
+      wrangler 0.25 s after the interrupt if it has not left on its own.
+
+    **The one window where a Cancel does not stop it:** a Cancel that lands
+    after the last files are already on their way — Netlify's final uploads
+    in flight, or wrangler past its deployment step — or after the upload has
+    finished. The publish then completes and the site changes, while the app
+    reports the task as cancelled (it decides by its own flags, and has no way
+    to know which side of that moment the `^C` landed). The window is the
+    last second or two of the upload; nothing in the app's wording claims the
+    site is unchanged, and whether a sentence should say so is a wording
+    decision left open, not taken here.
+  - Nothing else to tidy on the way out: the token file is removed by
+    `deploy.sh` before Python starts, and the publish registry belongs to the
+    app.
+  - Pinned by the second class in `scripts/test_stop_quietly.py`: the
+    in-process 130, the program's entry going through `run_until_stopped()`
+    (the first case alone would pass with the entry put back to `main()`), the
+    rebuild that left first, and a real SIGINT sent to the whole process group
+    mid-rebuild (POSIX only). On `origin/dev` before the change: 3 failures and
+    1 error, three runs out of three. The fix round added three more: wrangler
+    that left first; 40 stubbed uploads with a real SIGINT to the main thread
+    at the 15th (at most 25 may start in all — the old code started 40); and
+    five uploads turned away with 429 that must give up within 5 s of the
+    Cancel (the old code retried for 61 s; POSIX only, since nothing wakes a
+    main thread whose every upload is waiting without a real signal). On the
+    first round's `deploy.py`: 2 failures and 1 error.
 - **Which button.** Only the progress view's Cancel types a `^C`; the Stop
   Preview and console Stop buttons end the process without one and never
   showed the traceback (measured by the same review).
