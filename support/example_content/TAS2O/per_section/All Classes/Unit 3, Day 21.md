@@ -10,13 +10,16 @@ tags:
 ---
 ## Agenda
 
-1. Standup — crews 5 and 6 test their second versions; the printer is
-   free for reprints
-2. Use it: each crew shoots a [[Record a Standup|standup]] with its
-   rig on the tripod
+1. Standup — crews 5 and 6 test their second versions first, and add
+   the results to their process records; the printer is free for
+   reprints
+2. Use it: each crew shoots a [[Record a Standup|standup]] with its rig
+   doing the job it was made for — on the tripod, on the cable, in the
+   camera bag
 3. The printer's maintenance, from [[Safety in the Shop]]: bed cleaned,
    nozzle checked, supports and failed prints sorted
-4. Hand in [[The Rig]]: v1 and v2 files, test log, process record
+4. Last, once every crew has tested its second version, hand in
+   [[The Rig]]: v1 and v2 files, test log, process record
 
 ## Things to do before our next class
 

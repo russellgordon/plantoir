@@ -38,7 +38,12 @@ twice, in two very different materials, is the point.
 > - **¼″-20 nuts** (the thread every camera tripod uses), because a
 >   thread printed in plastic is rarely strong enough to trust with a
 >   phone;
-> - **safety glasses** for everyone on shop days;
+> - **safety glasses** for everyone on shop days, with **flush-cut
+>   pliers**, a **deburring tool** or **craft knife**, and a blade
+>   container for trimming prints;
+> - **materials**: corrugated cardboard for prototypes, 3 mm
+>   laser-grade plywood and a little 3 mm cast acrylic for the signs,
+>   and PLA filament for the printer;
 > - **accounts for a free browser-based 3D modelling program** such as
 >   Tinkercad, approved the way your school approves any online
 >   account, and a free vector drawing program such as Inkscape for the

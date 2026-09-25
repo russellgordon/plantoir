@@ -107,7 +107,7 @@ period with time to change over:
 Twelve prints, six hours of printing, and nearly two hours of slack for
 failures, all inside class time. Two things make the table work: the v2
 models are made on Day 17, so each print day starts printing within
-ten minutes; and the class's two or three tolerance coupons were
+ten minutes; and the class's three tolerance coupons were
 printed before the unit started. If your school allows supervised
 printing outside class, the spare slots become breathing room.
 
