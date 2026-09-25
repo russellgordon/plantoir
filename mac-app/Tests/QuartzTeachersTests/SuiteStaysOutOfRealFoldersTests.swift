@@ -20,9 +20,16 @@ final class SuiteStaysOutOfRealFoldersTests: XCTestCase {
     private var savedScriptsOverride: URL?
     private var savedSupportOverride: URL?
 
+    /// The teacher's own home, asked for once and only so that nothing
+    /// below may answer it.
+    private let realHomePath: String = FileManager.default.homeDirectoryForCurrentUser.path
+
+    // MARK: - Computed properties
+
     /// Where the teacher's own `Library` is, which nothing here may answer.
-    private let realLibraryPath: String = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("Library").path
+    private var realLibraryPath: String {
+        return realHomePath + "/Library"
+    }
 
     // MARK: - Set-up
 
@@ -84,6 +91,65 @@ final class SuiteStaysOutOfRealFoldersTests: XCTestCase {
         let result = LaunchControl.run(arguments: ["print", "gui/501"])
         XCTAssertEqual(result.exitCode, -1)
         XCTAssertEqual(result.output, LaunchControl.refusedUnderATestRun)
+    }
+
+    // MARK: - Every default home is the throwaway one (#264)
+
+    /// Every resolver that used to default to the real home now defaults to
+    /// `RealHome.forFiles`, so a test that calls one WITHOUT naming a home —
+    /// and then runs what it built, as `ScheduledPublishOutcomeTests` does
+    /// with the generated wrapper — is sent to the suite's throwaway home.
+    /// The source scan in `RealHomeTripwireTests` says nothing ELSE may ask
+    /// for a home; this says the one door that may answers the right one.
+    func testEveryDefaultHomeIsTheSuitesThrowawayOne() {
+        let throwaway: String = RealHome.homeWhileTesting.path
+        XCTAssertEqual(RealHome.forFiles.path, throwaway)
+
+        var answers: [String: String] = [:]
+        answers["HelperPrograms.binDirectory"] = HelperPrograms.binDirectory()
+        answers["HelperPrograms.exportLine"] = HelperPrograms.exportLine()
+        answers["HelperPrograms.pathValue"] = HelperPrograms.pathValue(inheriting: "/usr/bin:/bin")
+        answers["PreviewStopper.stopCommand PATH"] = PreviewStopper.stopCommand(
+            courseCode: "ICS3U", sectionNumber: 1, workspaceURL: URL(fileURLWithPath: "/tmp/w"),
+            inheriting: ["PATH": "/usr/bin:/bin"]
+        ).environment["PATH"] ?? ""
+        answers["PreviewReachability.askTheBuilderCommand PATH"] = PreviewReachability.askTheBuilderCommand(
+            containerName: "c", portInsideTheBuilder: 8081, inheriting: ["PATH": "/usr/bin:/bin"]
+        ).environment["PATH"] ?? ""
+        answers["FolderContainers.quitScript"] = FolderContainers.quitScript(folderPaths: ["/tmp/w"])
+        answers["ScheduledDeploy.oneShotCommand"] = ScheduledDeploy.oneShotCommand(
+            courseCode: "ICS3U", sectionNumber: 1, workspaceURL: URL(fileURLWithPath: "/tmp/w"),
+            deployArgumentsList: [["ICS3U", "1"]]
+        )
+        answers["AssistModelStore.directoryURL"] = AssistModelStore.directoryURL.path
+        answers["ProblemReportStore.defaultFolderURL"] = ProblemReportStore.defaultFolderURL().path
+        answers["FolderActions.obsidianRegistryFileURL"] = FolderActions.obsidianRegistryFileURL.path
+        answers["BuildOutputLocation.buildsRoot(inHomeFolder: forFiles)"] =
+            BuildOutputLocation.buildsRoot(inHomeFolder: RealHome.forFiles).path
+        answers["RealHome.expandingTilde"] = RealHome.expandingTilde(in: "~/Sites/ICS3U")
+        answers["QuartzCheckoutLayout.place"] = QuartzCheckoutLayout.place(
+            of: RealHome.forFiles.appendingPathComponent("Documents")
+        )
+
+        for (name, answer) in answers {
+            XCTAssertFalse(answer.contains(realHomePath + "/"), "\(name) named the real home: \(answer)")
+        }
+        XCTAssertTrue(answers["HelperPrograms.binDirectory"]?.hasPrefix(throwaway + "/") ?? false)
+        XCTAssertTrue(answers["ScheduledDeploy.oneShotCommand"]?.contains(throwaway + "/Library/") ?? false)
+        XCTAssertTrue(answers["AssistModelStore.directoryURL"]?.hasPrefix(throwaway + "/") ?? false)
+        XCTAssertEqual(answers["RealHome.expandingTilde"], throwaway + "/Sites/ICS3U")
+        XCTAssertEqual(answers["QuartzCheckoutLayout.place"], "~/Documents")
+    }
+
+    /// `~` means a home only at the very start, and `~name/` — another
+    /// account's home — is left exactly as typed rather than looked up.
+    func testATypedTildeIsExpandedOnlyAtTheStart() {
+        let throwaway: String = RealHome.homeWhileTesting.path
+        XCTAssertEqual(RealHome.expandingTilde(in: "~"), throwaway)
+        XCTAssertEqual(RealHome.expandingTilde(in: "~/"), throwaway)
+        XCTAssertEqual(RealHome.expandingTilde(in: "/Sites/~/x"), "/Sites/~/x")
+        XCTAssertEqual(RealHome.expandingTilde(in: "~colleague/Sites"), "~colleague/Sites")
+        XCTAssertEqual(RealHome.expandingTilde(in: ""), "")
     }
 
     // MARK: - The real rules, still pinned

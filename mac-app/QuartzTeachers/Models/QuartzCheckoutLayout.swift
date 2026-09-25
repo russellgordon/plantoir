@@ -821,7 +821,7 @@ nonisolated enum QuartzCheckoutLayout {
     /// home folder, the whole path otherwise.
     static func place(of url: URL) -> String {
         let path: String = url.standardizedFileURL.path
-        let home: String = NSHomeDirectory()
+        let home: String = RealHome.forFiles.path
         if path == home {
             return "~"
         }
@@ -1318,7 +1318,7 @@ nonisolated enum QuartzCheckoutLayout {
         while text.hasPrefix("./") {
             text = String(text.dropFirst(2))
         }
-        let home: String = NSHomeDirectory()
+        let home: String = RealHome.forFiles.path
         if text == home {
             return "~"
         }

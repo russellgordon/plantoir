@@ -256,7 +256,7 @@ nonisolated enum PreviewReachability {
         containerName: String,
         portInsideTheBuilder: Int,
         inheriting inherited: [String: String] = ProcessInfo.processInfo.environment,
-        inHomeFolder homeFolder: URL = FileManager.default.homeDirectoryForCurrentUser
+        inHomeFolder homeFolder: URL = RealHome.forFiles
     ) -> HelperPrograms.Command {
         return HelperPrograms.Command(
             executablePath: "/bin/sh",

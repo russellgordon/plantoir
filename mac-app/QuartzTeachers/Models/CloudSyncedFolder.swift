@@ -76,7 +76,7 @@ nonisolated enum CloudSyncDetector {
     /// a path arriving through it matches no rule while the folder behind it
     /// matches Dropbox's. Resolving also makes one folder one key for the
     /// acknowledgement, whichever spelling it arrived by.
-    static func syncedFolder(at folderURL: URL, homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser) -> CloudSyncedFolder? {
+    static func syncedFolder(at folderURL: URL, homeDirectory: URL = RealHome.forFiles) -> CloudSyncedFolder? {
         let resolvedURL: URL = folderURL.standardizedFileURL.resolvingSymlinksInPath()
         let folderPath: String = resolvedURL.path
         let homePath: String = homeDirectory.standardizedFileURL.resolvingSymlinksInPath().path

@@ -57,7 +57,7 @@ enum AssistMCPServer {
         if path.isEmpty || path.hasPrefix("-") {
             return nil
         }
-        return URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
+        return URL(fileURLWithPath: RealHome.expandingTilde(in: path))
     }
 
     /// Read requests from stdin, write replies to stdout, until stdin closes.
