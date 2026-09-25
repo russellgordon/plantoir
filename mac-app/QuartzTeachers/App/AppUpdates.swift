@@ -602,13 +602,23 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
         }
     }
 
-    /// Returns when the first of several streams yields — or when any of
-    /// them finishes, or the task is cancelled.
+    /// Returns when the first of several streams yields, or the task is
+    /// cancelled.
+    ///
+    /// A stream that FINISHES without yielding — a lease folder that could not
+    /// be opened — has nothing to say, and is not taken as a change: taking it
+    /// as one would ask the gate again at once, find the same work, arm the
+    /// same failing watch, and spin. The process being waited for is watched
+    /// as well, so the wait still ends when it does.
     nonisolated static func firstOf(_ streams: [AsyncStream<Void>]) async {
         await withTaskGroup(of: Void.self) { group in
             for stream in streams {
                 group.addTask {
                     for await _ in stream {
+                        return
+                    }
+                    let silence: AsyncStream<Void> = AsyncStream<Void> { _ in }
+                    for await _ in silence {
                         return
                     }
                 }
