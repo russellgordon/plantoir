@@ -647,7 +647,9 @@ know why"*, and it had no answer.
 
 **How the handover works.** The wrapper writes a small record, and the app reads
 it — the moment it lands if the teacher is looking at that section, and
-otherwise the next time they open it. (Reading it only on opening was all this
+otherwise the next time they open it. Since #212 the run also tells the teacher
+directly, with a macOS notification, so a teacher who has not opened the app at
+all is told too — see "When nobody is looking" below. (Reading it only on opening was all this
 did until 2026-09-19; the sub-section "The notice has to arrive while the
 teacher is looking" below is what changed, and why it needed a change to the
 wrapper as well.) The trail line is a
@@ -791,7 +793,9 @@ backup included.
 - **A distributed notification from the run.** `runScheduled` *is* Plantoir and
   could post one. It is a second channel that can disagree with the file, and it
   covers only writers that are Plantoir — not a record removed by hand, not a
-  restore, not another window.
+  restore, not another window. (Not to be confused with the macOS
+  notification the run now sends the TEACHER, #212, below: that one drives
+  nothing in the app, and is composed from the record after it is written.)
 - **`NSFilePresenter`/`NSFileCoordinator`.** It observes *coordinated* writes,
   and a `mv` from `/bin/bash` is not one. It would never fire at all.
 - **FSEvents** needs a dispatch queue too, plus a C callback and an `Unmanaged`
@@ -883,6 +887,164 @@ closed, and `ProgressViewSizeTests` measures both properties side by side. The
 console branch had always filled, by way of the `Spacer(minLength: 0)` at the
 bottom of `consoleArea`, which is why the notice sat correctly whenever anything
 was running and wrongly when nothing was.
+
+### When nobody is looking: a notification from the run (#212)
+
+Added 2026-09-25 for [issue
+#212](https://github.com/russellgordon/plantoir/issues/212). Everything above
+reaches a teacher who opens the app — and, for a success, opens THAT section.
+Russell's case: a publish set for 6:30, the laptop opened at 7:45, and nothing
+anywhere said whether it had gone out, *"especially when it did not"*. With the
+app closed the band waits unseen; with it open on another section a failure
+raises the sidebar's triangle but a success shows nowhere.
+
+**The change: when the run finishes, whatever happened, it sends ONE macOS
+notification**, which waits in Notification Center until the teacher reads it.
+Its text is the section's own sentence —
+`scheduledPublishStopped.sentences.<kind>`, through
+`ScheduledPublishOutcome.sentence(for:course:section:)`, the words the band
+shows — and nothing else. No title of our own: macOS heads it "Plantoir", and
+every sentence already begins with the course and the section, which is also
+what survives when a long one (`courseWasBusy` runs to ~300 characters) is cut
+short in a banner. No new wording, so nothing for the two apps to keep in step
+beyond what the contract already pins; `buildDidNotFinish` and every kind added
+later are covered automatically, because the notification reads the record
+exactly as the band does. `ScheduledPublishNotice` is the code;
+`ScheduledPublishNoticeTests` plays the contract's cases,
+`scheduledPublishStopped.notification`.
+
+- **A success is announced too, every time** (Russell's ruling, 2026-09-25).
+  `attention` gives a success no sidebar badge — a badge nobody reads by
+  Wednesday — and that is unchanged; the notification is how a success now
+  reaches a teacher who has not opened the section. A teacher who finds it noisy
+  turns Plantoir's notifications off in System Settings, and the band still
+  carries it.
+- **One per section, replaced by the next run** — the identifier is keyed like
+  the record file (`scheduled-publish.<CODE>.section<N>`), so section 1 and
+  section 11 never share one — and **withdrawn when the teacher dismisses the
+  band**, so the two never disagree about whether it is still news. A
+  successful run that clears an older record does not need to withdraw
+  anything: its own notification replaces the old one.
+- **The run never asks for permission.** A question at half six is a question
+  to nobody, in a process about to exit. It is asked the first time a teacher
+  schedules a publish from the scheduling sheet or the app's own assistant —
+  never at launch, since most teachers never schedule anything. A run that may
+  not post writes why on the trail instead (`scheduled publish notification`,
+  in both `ActivityTrail.Event` and `activityTrail.mustRecord`): turned off, not
+  allowed yet, or could not be sent. The question writes a line when it goes up
+  and another with the answer, because the answer may never come.
+- **The post happens BEFORE the job is booted out**, since booting it out ends
+  the process — the same ordering rule as the trail line above.
+  `ScheduledDeploy.announceThenLeave` does it for both the ordinary finish and a
+  stand-down (`tooLateToRun`, `courseWasBusy`). It keeps the process alive with
+  `dispatchMain()`, the deliberate exception `AssistMCPServer.serve` already
+  makes: the function is synchronous, never returns, runs inside `App.init`
+  before any run loop exists, and the notification centre only answers
+  asynchronously.
+- **The wait is bounded at ten seconds, and the bound is REAL.** The first plan
+  raced the post against a sleep in a task group. A task group does not return
+  until every child has finished, and cancelling a child only sets a flag that
+  `UNUserNotificationCenter.add` never looks at — so a notification service that
+  never answered would have held the finished run, and its launchd job, for
+  ever, while a test whose stand-in honoured cancellation passed. It is now an
+  unstructured race that resumes the caller exactly once and leaves the loser
+  behind for `exit` to take. `testAPostThatNeverAnswersIsLeftBehindAtTheCeiling`
+  uses a stand-in that ignores cancellation, and fails (times out) on the
+  task-group shape — proved by putting that shape back.
+- **The suite never reaches the real notification centre.** The test host IS
+  Plantoir.app, the bundle whose permission this reads, so a test that reached
+  it could put the permission question on the screen of the Mac running the
+  suite and make whatever was clicked Plantoir's real setting.
+  `ScheduledPublishNotice.poster` is `QuietNotifications` (does nothing) under
+  the suite, `SystemNotifications` refuses there as well, and
+  `AppDelegate` sets no notification delegate under the suite.
+
+**Measured first, on this Mac** (2026-09-25; Apple silicon, macOS 26; the Debug
+bundle built into a scratch DerivedData, never the Dock's copy), because none of
+the design is worth anything if a launchd-started Plantoir cannot post. A
+throwaway LaunchAgent under its own label ran
+`Plantoir.app/Contents/MacOS/Plantoir --run-scheduled-deploy <a no-op script>`
+through `launchctl bootstrap` and `kickstart`, with a temporary probe (never
+committed) posting from the run's own tail exactly where the announcement now
+sits; the last row is the finished code, run the same way:
+
+| what | result |
+|---|---|
+| permission before anything asked | `notDetermined` |
+| a post while `notDetermined` | `add` succeeded and it was listed as delivered, but **no banner appeared** — which is why "not asked yet" is its own trail line rather than a post |
+| asking FROM the launchd run | the question appeared as a notification ("“Plantoir” Notifications", with Allow / Don't Allow); the answer came back when it was pressed, 22 s later |
+| posting from the launchd run, allowed, 3 trials | a banner headed "Plantoir" each time, **3 of 3**; `add` returned in 3–9 ms; the whole exchange 0.04–0.13 s |
+| replace: three runs posting one section's identifier, each its own process | **one** entry left, carrying the third run's text |
+| withdraw from ANOTHER process — a launchd run, and a copy opened by LaunchServices the way the Dock opens it | removed, **0** left |
+| **the shipped code, end to end**: the real `--run-scheduled-deploy … --scheduled-section` path under a throwaway LaunchAgent, its script writing a `succeeded` record and then a `did not finish` one | the section's sentence as a banner each time, the second replacing the first; each run finished in about a second and exited 0 |
+
+The launchd run is a separate process from any open window and shares only the
+bundle identifier, which is what permission, replacement and withdrawal are all
+keyed by. Three banners appeared while another copy of Plantoir was running (not
+in front), so a running app does not swallow them. **Not measured**: the app IN
+FRONT when the run posts (the `willPresent` delegate in `AppDelegate` answers
+`[.banner, .list]` for that case, as Apple documents it is asked); the screen
+locked, and a Focus on. With the screen locked macOS's default "Show previews:
+When Unlocked" hides the text, so nothing here promises the lock screen — what
+matters is that the notification is waiting in Notification Center. **The
+permission this measurement granted is real**: Plantoir on this Mac is now
+allowed to send notifications (System Settings → Notifications → Plantoir turns
+it off).
+
+**What a teacher who says no, or never answers, gets.** Nothing new: the band
+and the triangle are unchanged, and every run writes "turned off" (or "not
+given permission yet") on the trail. Nothing in the app asks again — macOS would
+not show the question twice — so the fix is System Settings → Notifications →
+Plantoir. A question that is ignored, or arrives under a Focus, sits unanswered
+in Notification Center; permission stays not-yet-asked, the next schedule from
+the app puts the question again (whether macOS shows it a second time while the
+first is unanswered was not measured), and the first trail line says a question
+was put.
+
+**Rejected, and recorded so they are not proposed again:**
+
+- **Asking permission from the run.** A prompt at half six to nobody.
+- **`.provisional` authorisation** (no question; delivered quietly into
+  Notification Center only). It would spare the question and deliver exactly
+  where a teacher does not look before class: no banner at 7:45 is the silence
+  this closes. A teacher who chooses "Deliver Quietly" themselves gets that, and
+  the code reads their provisional answer as allowed.
+- **The app posting on its next activation.** Misses the app-closed case — the
+  case #212 is about — and needs an "announced" marker, which must not live in
+  the record (rewriting it re-dates the notice).
+- **Sound, a Dock badge, `.timeSensitive`.** A chime at half six in a quiet
+  house for news; a badge is the success badge `attention` decided against; and
+  breaking through a Focus for a publish needs an entitlement and is Russell's
+  call, not ours. The question asks for alerts only.
+- **A title of our own.** It would repeat the sentence's course and section.
+- **Click-to-open the section.** Clicking brings Plantoir forward (the system
+  default); selecting THAT section needs the window-finding
+  `revealSectionOnScreen` does and is deferred to a follow-up issue.
+
+**Known limits, stated rather than coded for:**
+
+- **A teacher who only ever schedules through an outside assistant** (Claude
+  Code, over `--mcp-stdio`) is never asked, so never notified, and every run's
+  line says permission was not given yet. That process has no window, so the
+  question would appear with nothing on screen to say why. It ends the first
+  time they schedule anything from the app itself.
+- **A run whose wrapper could not be started at all** (`runScheduled`'s `catch`)
+  writes no record, so nothing is announced — the silence that existed before,
+  not a new one.
+- **A job scheduled before v1.2.0** names no section, writes no record, and
+  announces nothing. A job scheduled by a build from BEFORE this change is
+  announced like any other: announcing is in the app binary, not in the
+  wrapper, so any record, whoever wrote it, is announced.
+- **The Debug copy and an installed copy share one bundle identifier**, so one
+  permission covers both; a click on a notification with the app quit opens
+  whichever copy Launch Services prefers.
+
+**Windows** matches the rule (the contract's `notification` cases), and the
+delivery is theirs: their run is PowerShell under Task Scheduler with no app
+process alive, so a toast must be attributed to Plantoir's own application
+identity, and toasts need no permission question — only the contract's
+`allowed` and `notAllowed` rows apply there. `platformDifferences.owed` carries
+it; GitHub #212 carries the ask.
 
 ### A build that stopped for a question is its own outcome
 
@@ -1001,8 +1163,12 @@ fails there.
   destination, because the exit code is all the wrapper has. Two such rebuilds
   exist. `deploy.py` rebuilds for production whenever the built site's
   `baseUrl` is not the destination's address (`ensure_base_url_and_rebuild`) —
-  on a first publish to an address, or after the address changes — so that one
-  stays reachable whatever happens to #136. And both `deploy.py` and `deploy.sh` rebuild a site they
+  on a first publish to an address, or after the address changes — and,
+  **unmeasured but very likely, on EVERY run of a course that publishes to two
+  destinations with different addresses** (Netlify AND Cloudflare Pages, say):
+  the site is built for one address, and the next destination finds the other
+  one baked in and rebuilds for its own. So that one stays reachable whatever
+  happens to #136, and for such a course it is not a first-publish corner. And both `deploy.py` and `deploy.sh` rebuild a site they
   find carrying the preview's live-reload client — reachable in a scheduled run
   only while the wrapper's is-the-site-stale check is narrower than the
   launchers' (the gap described under "How it is tested" below,
