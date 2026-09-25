@@ -111,8 +111,11 @@ struct BackupSpace: Equatable {
     /// How many backups there are.
     let totalCount: Int
 
-    /// Whether every backup has been measured. A total missing some is not
-    /// shown, because a number that is quietly too small is worse than none.
+    /// Whether a finished measurement has looked at every backup. Until then
+    /// no total is shown, because a number that is quietly too small is worse
+    /// than none. A backup the measurement looked at and could NOT size
+    /// counts as looked at: the total is then shown without it, and
+    /// `unsizedCount` says how many were left out.
     let isComplete: Bool
 
     /// How many backups a FINISHED measurement could not size — a zip deleted

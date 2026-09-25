@@ -298,7 +298,7 @@ struct SidebarView: View {
                                     }
                                     Divider()
                                     Button("Delete Backup…", systemImage: "trash", role: .destructive) {
-                                        workspace.backupDeleteRequest = item
+                                        workspace.requestDeleteBackup(item)
                                     }
                                 }
                         }

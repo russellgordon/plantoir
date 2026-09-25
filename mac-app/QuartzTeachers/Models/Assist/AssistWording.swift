@@ -735,6 +735,10 @@ nonisolated enum AssistWording {
     /// reaches the contract. A FIRST DRAFT for Russell's wording pass.
     static let backupSizeCouldNotBeRead: String = "Size could not be read, so it is not in the total"
 
+    /// The same, short enough for the Size column of All Backups; the whole
+    /// sentence is in the row's tooltip and the backup's own pane.
+    static let backupSizeCouldNotBeReadShort: String = "Unknown"
+
     // MARK: - Listing what is here
 
     /// A working folder with nothing in it yet.

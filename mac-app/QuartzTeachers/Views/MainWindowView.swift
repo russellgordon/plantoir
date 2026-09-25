@@ -161,7 +161,7 @@ struct MainWindowView: View {
                     .buttonStyle(.borderedProminent)
                     .accessibilityIdentifier("restoreBackupButton")
                     Button("Delete Backup…") {
-                        workspace.backupDeleteRequest = item
+                        workspace.requestDeleteBackup(item)
                     }
                     .accessibilityIdentifier("deleteBackupButton")
                 }

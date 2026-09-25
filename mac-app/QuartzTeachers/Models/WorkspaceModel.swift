@@ -1868,6 +1868,38 @@ class WorkspaceModel {
         return heldPaths
     }
 
+    /// How many of `items` a delete would actually remove — every one but the
+    /// backups an open assistant conversation holds. Zero disables the
+    /// delete-several button: a confirmation that deletes nothing, while
+    /// saying "this deletes them for good", is a sentence that contradicts
+    /// itself.
+    static func deletableCount(of items: [BackupItem], heldPaths: Set<String>) -> Int {
+        var count: Int = 0
+        for item in items {
+            if !heldPaths.contains(WorkspaceModel.comparablePath(of: item)) {
+                count += 1
+            }
+        }
+        return count
+    }
+
+    /// "Delete Backup…" on one backup, from the sidebar or its pane.
+    ///
+    /// A backup the open assistant conversation holds is refused AT ONCE, with
+    /// the sentence the delete-several gives, and nothing is deleted — rather
+    /// than a confirmation promising "this deletes the backup for good" and an
+    /// alert afterwards saying it was kept. Any other backup gets the usual
+    /// confirmation.
+    func requestDeleteBackup(_ item: BackupItem) {
+        if WorkspaceModel.heldBackupPaths().contains(WorkspaceModel.comparablePath(of: item)) {
+            backupProblem = WorkspaceModel.problem(with: BackupDeletion(
+                deleted: [], keptForTheAssistant: [item], failed: []
+            ))
+            return
+        }
+        backupDeleteRequest = item
+    }
+
     /// A backup's path in the form `heldBackupPaths` uses.
     static func comparablePath(of item: BackupItem) -> String {
         return item.fileURL.standardizedFileURL.resolvingSymlinksInPath().path
@@ -1992,6 +2024,15 @@ class WorkspaceModel {
     /// What the backups take, per course and in total.
     var backupSpace: BackupSpace {
         return BackupSpace.of(backupItems, sizes: backupSizes, measured: backupsMeasured)
+    }
+
+    /// "15.9 MB" for the Size column, `AssistWording.backupSizeCouldNotBeReadShort`
+    /// for a backup a finished measurement could not size, or nil until measured.
+    func shortSizeDescription(of item: BackupItem) -> String? {
+        if backupSizes[item.id] == nil && backupsMeasured.contains(item.id) {
+            return AssistWording.backupSizeCouldNotBeReadShort
+        }
+        return sizeDescription(of: item)
     }
 
     /// "15.9 MB" for one backup, `AssistWording.backupSizeCouldNotBeRead` for
