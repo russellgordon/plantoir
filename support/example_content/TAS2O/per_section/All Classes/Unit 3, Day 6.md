@@ -10,15 +10,17 @@ tags:
 ---
 ## Agenda
 
-1. Standup
-2. New warm-up: [[Spot the Edit]] — one of these images is not what
-   it claims
-3. Compare calls, then name it: [[Misinformation and Verification]]
-4. Drills: [[Verification Practice]] — then verify one claim in your
-   own story
-5. Discussion: [[When Is a Photo True]]
+1. Standup — the laser queue for Day 7 goes on the board
+2. Desk time: three thumbnails, one chosen for a reason from
+   [[Design Principles]]
+3. Choose your material and justify it in one sentence, using what
+   making costs in [[The Footprint of Media]]
+4. **Checkpoint conference**, at your desk: your criteria, your
+   thumbnails, your material — and how you will test the prototype
+5. Plan the next three days against the laser's time budget:
+   [[Planning a Production]], the machine-time row
 
 ## Things to do before our next class
 
-- [ ] Verify the remaining claims in your notes — every fact gets a source.
-- [ ] Journal: a claim you believed until you checked.
+- [ ] Cut file finished at real size, checked against the list at the
+      bottom of [[From Sketch to Cut File]].

@@ -38,6 +38,7 @@ defending a call out loud is the skill you are actually practising.
 | [[Copyright Scenarios Practice]] | [[Copyright and Fair Dealing]] |
 | [[Layout Practice]] | [[Design Principles]] |
 | [[Verification Practice]] | [[Misinformation and Verification]] |
+| [[Measurement Practice]] | [[Doing the Numbers]] |
 
 Stuck partway through a set? Good — that is the useful part. Start with
 [[Getting Unstuck]], lean on [[Finding Answers Online]] when a missing
