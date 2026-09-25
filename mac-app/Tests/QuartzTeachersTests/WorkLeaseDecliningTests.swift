@@ -343,6 +343,14 @@ final class WorkLeaseDecliningTests: XCTestCase {
         XCTAssertEqual(held.first?.kind, "build")
         XCTAssertEqual(held.first?.pid, pid)
 
+        // A lease with no name line is not one either app writes (Windows'
+        // reader calls it stale too): ignored, even with a live owner.
+        try Data("\(pid)\n".utf8).write(to: url)
+        XCTAssertTrue(
+            WorkLeaseFiles.heldElsewhere(courseCode: "ICS3U", coursesDirectory: coursesURL).isEmpty,
+            "A one-line build lease blocked a course."
+        )
+
         // The same pid under another name is a recycled id.
         try writeOthersLease(kind: "build", pid: pid, name: "Plantoir")
         held = WorkLeaseFiles.heldElsewhere(courseCode: "ICS3U", coursesDirectory: coursesURL)
