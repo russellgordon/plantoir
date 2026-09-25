@@ -20,6 +20,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Opens the trail for this launch.
     func applicationDidFinishLaunching(_ notification: Notification) {
         ActivityTrail.noteLaunch()
+        if !WorkspaceModel.isRunningTests {
+            // "It broke after the update" needs to know WHEN the update was
+            // (#204) — written by the first launch of a new version, however
+            // it got here.
+            AppUpdates.noteIfThisIsANewVersion()
+            // The updater, and ONLY here (#204): the assistant's server, a
+            // scheduled publish and writing the contracts never reach this
+            // method, `shouldStart` refuses their flags anyway, and a
+            // development build has no feed, so none of them ever checks for
+            // or installs anything. See `AppUpdates` for why it is not a
+            // stored property of the app.
+            if AppUpdates.shouldStart(
+                infoDictionary: Bundle.main.infoDictionary ?? [:],
+                arguments: CommandLine.arguments,
+                isRunningTests: WorkspaceModel.isRunningTests,
+                headlessFlags: AppUpdates.headlessFlags
+            ) {
+                AppUpdates.shared.start()
+            }
+        }
         // Built websites are kept outside the working folder, so a folder the
         // teacher has thrown away leaves its builds behind with nothing left
         // to name them. Once a launch, off the main thread — it is a few
@@ -79,55 +99,78 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
 
-            WorkspaceModel.isTerminating = true
-            WorkspaceModel.rememberOpenFolders()
+            // A new version ready to install (#204). The installer installs
+            // on ANY quit once it is prepared, and quitting is never refused
+            // — so with work still under way the update is SET ASIDE here,
+            // and the quit waits only for the installer to be told
+            // (`appUpdates.atQuit`). Asked after the question above, whose
+            // "keep working" must leave the update exactly as it was.
+            let updateAtQuit: UpdateGate.QuitAction = AppUpdates.shared.decideAtQuit()
 
-            // Deal with the work this app OWNS before asking anything to
-            // rest. A preview left running keeps its container busy, a busy
-            // container is left alone by the quit script, and a container of
-            // ours that is still up keeps the shared virtual machine up too —
-            // so a quit with a preview open would otherwise free nothing at
-            // all, which is the ordinary case rather than a corner of one.
-            //
-            // BOTH halves, in the Stop button's own order: the processes
-            // inside the container first, then the launcher on this Mac.
-            // Ending only the first would leave a `preview.sh` that the app
-            // no longer owns — measured, a child on a pseudo-terminal is
-            // reparented rather than killed when its parent goes — and the
-            // quit script's host-side check would then see it and refuse to
-            // stop anything, for the full length of its wait.
-            for lease in PreviewLeases.active {
-                PreviewStopper.stopSectionProcessesOnTheWayOut(
-                    courseCode: lease.courseCode,
-                    sectionNumber: lease.sectionNumber,
-                    workspaceURL: URL(fileURLWithPath: lease.folderPath)
-                )
-            }
-            ScriptRunner.stopEveryLivePreview()
+            AppDelegate.letEverythingGo()
 
-            // This app's work leases come down with it (#156) — tidiness
-            // rather than safety: a lease whose process has gone is ignored
-            // by every reader. A publish left running is not ended here (see
-            // `stopEveryLivePreview`), and its lease goes anyway, because
-            // the process that holds it is leaving; the quit script below
-            // still refuses to rest the machine while its launcher runs.
-            WorkLeaseRegistry.releaseEverything()
-
-            // Let every folder's container rest — and if that leaves the
-            // shared VM with nothing running at all, let the VM rest too.
-            // Sequenced in one script: the emptiness check must come after
-            // our own containers have stopped.
-            var folders: [String] = []
-            for model in WorkspaceModel.windowModels {
-                if let path = model.workspaceURL?.path {
-                    if !folders.contains(path) {
-                        folders.append(path)
-                    }
+            if updateAtQuit == .setAside {
+                AppUpdates.shared.setAsideForQuit {
+                    NSApp.reply(toApplicationShouldTerminate: true)
                 }
+                return .terminateLater
             }
-            FolderContainers.releaseEverythingAtQuit(folderPaths: folders)
             return .terminateNow
         }
+    }
+
+    /// Everything a quit does once it is going ahead: write down the open
+    /// folders, stop this app's previews, hand back its leases, and let the
+    /// builders rest.
+    @MainActor
+    static func letEverythingGo() {
+        WorkspaceModel.isTerminating = true
+        WorkspaceModel.rememberOpenFolders()
+
+        // Deal with the work this app OWNS before asking anything to
+        // rest. A preview left running keeps its container busy, a busy
+        // container is left alone by the quit script, and a container of
+        // ours that is still up keeps the shared virtual machine up too —
+        // so a quit with a preview open would otherwise free nothing at
+        // all, which is the ordinary case rather than a corner of one.
+        //
+        // BOTH halves, in the Stop button's own order: the processes
+        // inside the container first, then the launcher on this Mac.
+        // Ending only the first would leave a `preview.sh` that the app
+        // no longer owns — measured, a child on a pseudo-terminal is
+        // reparented rather than killed when its parent goes — and the
+        // quit script's host-side check would then see it and refuse to
+        // stop anything, for the full length of its wait.
+        for lease in PreviewLeases.active {
+            PreviewStopper.stopSectionProcessesOnTheWayOut(
+                courseCode: lease.courseCode,
+                sectionNumber: lease.sectionNumber,
+                workspaceURL: URL(fileURLWithPath: lease.folderPath)
+            )
+        }
+        ScriptRunner.stopEveryLivePreview()
+
+        // This app's work leases come down with it (#156) — tidiness
+        // rather than safety: a lease whose process has gone is ignored
+        // by every reader. A publish left running is not ended here (see
+        // `stopEveryLivePreview`), and its lease goes anyway, because
+        // the process that holds it is leaving; the quit script below
+        // still refuses to rest the machine while its launcher runs.
+        WorkLeaseRegistry.releaseEverything()
+
+        // Let every folder's container rest — and if that leaves the
+        // shared VM with nothing running at all, let the VM rest too.
+        // Sequenced in one script: the emptiness check must come after
+        // our own containers have stopped.
+        var folders: [String] = []
+        for model in WorkspaceModel.windowModels {
+            if let path = model.workspaceURL?.path {
+                if !folders.contains(path) {
+                    folders.append(path)
+                }
+            }
+        }
+        FolderContainers.releaseEverythingAtQuit(folderPaths: folders)
     }
 
     /// The reason macOS gave for this quit, when it gave one.
