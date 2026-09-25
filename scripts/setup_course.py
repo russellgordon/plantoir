@@ -2478,6 +2478,19 @@ class ClubStart:
         )
 
     def write_first_page(self, section_path: Path, now_str: str) -> None:
+        """
+        The first page, for a section being MADE — never on a re-run.
+
+        A section whose front page (`index.md`) already exists has been set
+        up before, so a missing "Week 1" there is one the teacher deleted.
+        Guarding on the page alone (the first version) recreated it on every
+        command-line re-run of setup, published and dated NOW — the newest
+        visible meeting, so the front page would follow it (#267
+        implementation review). Called BEFORE the front page is written, so
+        a new section still gets both.
+        """
+        if (section_path / "index.md").exists():
+            return
         folder = section_path / self.class_folder
         folder.mkdir(parents=True, exist_ok=True)
         page = folder / f"{self.first_page_title}.md"
@@ -3151,6 +3164,11 @@ def setup_course(no_backup: bool = False):
         section_name = f"section{sec}"
         section_path = toolchain_paths.COURSES_DIR / course_code / section_name
         section_path.mkdir(exist_ok=True)
+
+        # Before the front page, which is how it tells a section being made
+        # from one set up before — see `ClubStart.write_first_page`.
+        if club_start is not None:
+            club_start.write_first_page(section_path, now_str)
     
         index_md_path = section_path / "index.md"
         if not index_md_path.exists():
@@ -3188,9 +3206,6 @@ def setup_course(no_backup: bool = False):
                     f.write("publish: true\n")
                     f.write("---\n")
                     f.write(f"This is the **{folder}** folder. Add Markdown files to this folder to build out your site.\n")
-    
-        if club_start is not None:
-            club_start.write_first_page(section_path, now_str)
 
         for file in per_section_files:
             file_path = section_path / file

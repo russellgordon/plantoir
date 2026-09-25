@@ -95,6 +95,25 @@ class ClubStartTests(unittest.TestCase):
             self.start.write_first_page(section, NOW)
             self.assertEqual(page.read_text(encoding="utf-8"), "mine")
 
+    def test_a_rerun_never_recreates_a_deleted_first_page(self):
+        # A section set up before has its front page; the teacher then
+        # deleted Week 1. The first version wrote it again, published and
+        # dated now — the newest visible meeting (#267 implementation review).
+        with tempfile.TemporaryDirectory() as folder:
+            section = Path(folder) / "section1"
+            (section / "All Meetings").mkdir(parents=True)
+            (section / "index.md").write_text("---\ntitle: x\n---\n", encoding="utf-8")
+            self.start.write_first_page(section, NOW)
+            self.assertFalse((section / "All Meetings" / "Week 1.md").exists())
+
+    def test_a_new_section_of_an_existing_club_still_gets_its_first_page(self):
+        with tempfile.TemporaryDirectory() as folder:
+            (Path(folder) / "section1" / "index.md").parent.mkdir(parents=True)
+            (Path(folder) / "section1" / "index.md").write_text("made before", encoding="utf-8")
+            section = Path(folder) / "section2"
+            self.start.write_first_page(section, NOW)
+            self.assertTrue((section / "All Meetings" / "Week 1.md").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

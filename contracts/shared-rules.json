@@ -1880,6 +1880,9 @@
         "pageNaming": "Class pages are named",
         "pageNamingValue": "“{first page}” — the course's own first page name: “Unit 1, Day 1”, “Module 1, Day 1”, “Week 1”",
         "frontPageHeading": "Front page heading",
+        "frontPageHeadingValue": "the course's recorded front_page_heading, exactly as stored — never a default",
+        "frontPageHeadingNotSet": "Not recorded — the front page keeps the heading it already has",
+        "frontPageHeadingWhy": "Shown for a course WITHOUT front_page_heading — every course made before #267, CODING included. The first version showed “Most Recent Class” there, and CODING's front page reads “## Most Recent Meeting”: a locked row stating something the page does not say (#267 implementation review, LOW). Nothing rewrites a heading after creation, so the row does not guess.",
         "noun": "The assistant calls a page a",
         "lockedCaption": "Chosen when the course was made. An existing course keeps these; they cannot be changed here."
       },

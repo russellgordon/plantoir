@@ -226,6 +226,26 @@ struct NewCourseWizardView: View {
     /// nothing is. Written for the mistakes people actually make, and it
     /// matters beyond politeness: the parser silently DROPS pieces it
     /// cannot read, so "1,3 5" would quietly become just section 1.
+    /// Why a club's class-pages folder cannot have this name, in the
+    /// sentences a folder rename in Course Settings already uses
+    /// (`SpecialFolderRenamer.problem`): empty, a "/" or ":", hidden, Media,
+    /// a section folder's name, or the name of ANOTHER per-section folder.
+    /// `perSectionFolders` holds the class folder itself, once, since the
+    /// field renames its entry in place; that one entry is not a clash.
+    static func clubClassFolderProblem(_ name: String, perSectionFolders: [String]) -> String? {
+        let typed: String = name.trimmingCharacters(in: .whitespaces)
+        var others: [String] = []
+        var skippedItsOwnEntry: Bool = false
+        for folder in perSectionFolders {
+            if !skippedItsOwnEntry && folder == name {
+                skippedItsOwnEntry = true
+                continue
+            }
+            others.append(folder)
+        }
+        return SpecialFolderRenamer.problem(renaming: "", to: typed, existingNames: others)
+    }
+
     static func sectionNumbersProblem(_ text: String) -> String? {
         let trimmed: String = text.trimmingCharacters(in: .whitespaces)
         if trimmed.isEmpty {
@@ -1083,6 +1103,14 @@ struct NewCourseWizardView: View {
                         .textFieldStyle(.roundedBorder)
                         .accessibilityIdentifier("clubClassFolderField")
                     }
+                    if let problem = NewCourseWizardView.clubClassFolderProblem(
+                        classFolderName, perSectionFolders: perSectionFolders
+                    ) {
+                        Text(problem)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .accessibilityIdentifier("clubClassFolderProblem")
+                    }
                     LabeledContent(WizardWording.clubFrontPageHeadingLabel) {
                         TextField("", text: $frontPageHeading)
                             .textFieldStyle(.roundedBorder)
@@ -1553,6 +1581,16 @@ struct NewCourseWizardView: View {
         // well because the pages would otherwise be written with names nothing
         // can read back — built, and then recognised by nothing.
         if let problem = ClassPageTerm.problem(with: unitWord) {
+            validationProblem = problem
+            return
+        }
+        // The club's class-pages folder is typed into a field of its own
+        // rather than added through the list, so it gets the list's checks
+        // here (#267 review): empty, a "/", or another folder's name would
+        // otherwise go straight into `per_section_folders` and `class_folder`.
+        if isClubCourse, let problem = NewCourseWizardView.clubClassFolderProblem(
+            classFolderName, perSectionFolders: perSectionFolders
+        ) {
             validationProblem = problem
             return
         }

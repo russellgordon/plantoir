@@ -46,6 +46,20 @@ enum WizardWording {
     nonisolated static let settingsLockedCaption: String =
         "Chosen when the course was made. An existing course keeps these; they cannot be changed here."
 
+    /// The heading row when the course recorded none (every course made
+    /// before #267): its front page keeps whatever heading it has, and this
+    /// row does not guess which.
+    nonisolated static let settingsFrontPageHeadingNotSet: String =
+        "Not recorded — the front page keeps the heading it already has"
+
+    /// The heading row's value: the recorded heading, or the sentence above.
+    nonisolated static func settingsFrontPageHeadingValue(_ recorded: String?) -> String {
+        guard let recorded else {
+            return settingsFrontPageHeadingNotSet
+        }
+        return recorded
+    }
+
     /// How a scheme is shown in its locked row: the course's own first page.
     nonisolated static func settingsPageNamingValue(_ naming: ClassPageNaming) -> String {
         return "“" + naming.title(unit: 1, day: 1) + "”"
