@@ -49,6 +49,4 @@ arrive; [[Releases and Consent]] is how they arrive protected; and
 ![[A1.3]]
 
 ![[A1.7]]
-
-![[B3.2]]
 %%curriculum-end%%

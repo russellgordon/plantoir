@@ -47,6 +47,17 @@ The numbers in brackets are the trade codes Skilled Trades Ontario uses;
 its website lists every trade, what the work involves, and how long
 the apprenticeship runs.
 
+Technology changes these jobs as well as creating them. Pick one row
+from the table and look it up on the federal government's Job Bank,
+which reports the wages and the job outlook for that work in Ontario —
+whether openings are expected to be good, fair, or limited. Then ask
+the question the shop unit
+raised: does a tool like the 3D printer or the laser cutter remove
+work in this field, create new work, or change what the work is — and
+who gains and who loses, here and in the places where the parts used
+to be made? Write your answer in three sentences with the numbers
+you found.
+
 People from this country have been building these fields for a century.
 Reginald Fessenden, born in Quebec, was one of the first to send a
 human voice by radio. Elsie MacGill, the first woman in Canada to earn
@@ -136,6 +147,8 @@ these have application windows that close early.
 ## Curriculum connection
 
 ![[B3.1]]
+
+![[B2.2]]
 
 ![[B3.2]]
 

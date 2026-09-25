@@ -100,7 +100,7 @@ Machines add their own small numbers. A laser burns away a sliver of
 material along every line — the **kerf**, a fraction of a millimetre
 you measure on your own test card — and a 3D printer tends to print
 holes a little small. The allowance you design in for that is a
-**tolerance**, and finding it is what the class tolerance coupon in
+**tolerance**, and finding it is what the class tolerance coupons in
 [[The Tolerance Coupon]] is for.
 
 %%curriculum-start%%

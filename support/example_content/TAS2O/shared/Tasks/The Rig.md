@@ -50,14 +50,17 @@ The days are Unit 3's.
 1. **The problem (Day 10).** Pitch it with the shop version of
    [[One-Minute Pitch]]: what the problem is, who has it, and how you
    will know it is fixed.
-2. **The brief (Day 11).** Interview your crew as users, find what
-   others have already shared with [[Finding Answers Online]] — and
-   their licences — and write the brief in the shape
+2. **The brief (Day 11).** Interview your crew as users, then one
+   person outside it who uses the same gear differently — a left-handed
+   shooter, someone who films outdoors, someone who has never held a
+   tripod. Find what others have already shared with
+   [[Finding Answers Online]] — and their licences — and write the
+   brief in the shape
    [[Planning a Production]] shows: objective, criteria (at least three
    you can measure, including the time and grams limits), constraints,
    sketch.
 3. **Numbers first (Day 12).** Read [[3D Printing]], then measure the
-   class coupon in [[The Tolerance Coupon]]. The clearance goes into
+   class coupons in [[The Tolerance Coupon]]. The clearance goes into
    every fit you design.
 4. **Model (Days 13–14).** Build your candidate from a dimensioned
    drawing, the way [[Modelling in 3D]] shows. On Day 14 the crew
@@ -68,11 +71,12 @@ The days are Unit 3's.
    and a waste audit using [[The Footprint of Media]].
 6. **Test (Day 17).** Test the first version against every criterion
    and log the numbers, using [[Quality Control]]. Then the checkpoint
-   conference.
-7. **Change and reprint (Days 18–20).** Each member proposes a change
-   from their own test log; the crew prints the one the data supports
-   best. A print that fails is data too — [[Getting Unstuck]] has the
-   move.
+   conference, and straight after it each member models their own
+   change as v2, traced to a number in their test log.
+7. **Reprint (Days 18–20).** At the start of your crew's print day
+   the crew chooses the change the data supports best, and it goes
+   straight into the printer. A print that fails is data too —
+   [[Getting Unstuck]] has the move.
 8. **Credit and record (Days 19–21).** If you remixed a shared model,
    credit it as [[Copyright and Fair Dealing]] requires. Then write
    your process record and judge your work against the criteria with
@@ -99,10 +103,16 @@ period with time to change over:
 | 21 | Free for reprints of anything that failed | 60 spare |
 
 Twelve prints, six hours of printing, and nearly two hours of slack for
-failures, all inside class time. The class coupon was printed before
-the unit started. If your school allows supervised printing outside
-class, the spare slots become breathing room; if your printer is slower
-than the slicer promises, shrink the parts, not the testing.
+failures, all inside class time. Two things make the table work: the v2
+models are made on Day 17, so each print day starts printing within
+ten minutes; and the class's two or three tolerance coupons were
+printed before the unit started. If your school allows supervised
+printing outside class, the spare slots become breathing room.
+
+Thirty minutes and fifteen grams is a quick printer's pace. **Set the
+two limits from your own printer's slicer times** before the unit
+starts — slice a small clamp and see what it says — and if your printer
+is slower, shrink the parts, not the testing.
 
 ## Success criteria
 
@@ -173,21 +183,22 @@ your mind about your own design?
 %%
 Triangulation — the evidence you will not have unless you go and get it.
 
-OBSERVE — Unit 3, Day 18, when each member proposes a change for the
-second version
-  Watch what the student does before they open the model. Some go back
-  to their test log, point at a number, and change the dimension it
-  names; some open the model and start "improving" it — a rounded
-  corner, a thicker wall — with the log still closed. Both hand in a v2
-  file that differs from v1. The criteria row "A change with a reason"
-  asks for the first, and the file cannot tell you which happened; this
-  period can. That is A3.4, refining the design from data collected in
-  the development process.
-  Going well: the log is open beside the model, and the change is
-  written down before it is made.
+OBSERVE — Unit 3, Day 18, the first ten minutes, when crews 1 and 2
+choose which member's change to print (crews 3 to 5 do the same later
+in that period)
+  Listen to how the choice is argued. Some members put their test log
+  on the table and point at a number — "the clamp opened 2 mm too far,
+  my change closes it by 1.5" — and the crew weighs changes against the
+  criteria; some argue for the change that looks best on screen, a
+  rounded corner or a thicker wall, with the logs still closed. Both
+  crews print a v2 that differs from v1. The criteria row "A change
+  with a reason" asks for the first, and the file cannot tell you which
+  happened; this conversation can. That is A3.4, refining the design
+  from data collected in the development process.
+  Going well: the logs are open, and the chosen change names its number.
   Stuck: the change is to something no criterion mentioned.
-  Record: on the queue sheet, a tick beside each name — from the log /
-  not from the log.
+  Record: on the queue sheet, a tick beside each name — argued from the
+  log / not from the log.
 
 TALK — Unit 3, Day 17, the checkpoint conference already on that
 agenda

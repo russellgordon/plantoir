@@ -7,7 +7,7 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Individual, for a real user · six shop periods after the launch, with
+> Individual, for a real user · six shop periods, launch included, with
 > one laser cutter shared by the class · one laser-cut sign, its
 > cardboard prototype, and a settings log
 
@@ -74,17 +74,21 @@ laser, and it adds up like this:
 | Day | What runs on the laser | Laser minutes |
 | --- | --- | --- |
 | 5 | Three test cards, one per material, run by me as a demonstration | about 15 |
-| 7 | Cardboard prototypes, four to a sheet: six sheets at about 6 minutes | about 36 |
-| 8 | Final signs, two to a sheet: eight sheets at about 7 minutes, then 5 minutes of cleaning | about 60 |
-| 9 | The last four sheets of final signs | about 28 |
+| 7 | Cardboard prototypes, four to a sheet: six sheets at about 6 minutes (4 × 1 + 2) | about 36 |
+| 8 | Final signs, two to a sheet: eight sheets at about 7 minutes (2 × 2.5 + 2), then 5 minutes of cleaning | about 61 |
+| 9 | The last four sheets of final signs, at about 7 minutes | about 28 |
 
 About 140 laser minutes across four periods, and no period needs more
-than an hour of the machine — the rest of the period is for designing,
-testing, and conferences. The minutes assume each sign takes 4 to 5
-minutes to cut and score, plus a couple of minutes to load and focus a
-sheet. **Time your own laser on the Day 5 test cards and redo this table
-with your numbers.** If your signs run longer, hand-cut the prototypes
-and give the laser only the finals.
+than about an hour of the machine — the rest of the period is for designing,
+testing, and conferences. The minutes assume what scored lettering
+usually costs: about **2½ minutes** of laser time per final sign, about
+**1 minute** per cardboard prototype (an outline and a few scored
+lines), and about **2 minutes** to load and focus each sheet. **Time
+your own laser on the Day 5 test cards and redo this table with your
+numbers.** If your signs run longer — 4 or 5 minutes each would make
+Day 8 run past a 75-minute period — hand-cut the prototypes, give the
+laser only the finals, and split the final cuts across Days 8, 9, and
+the first half of Day 10, before the Rig launches.
 
 ## Success criteria
 

@@ -40,9 +40,3 @@ decides who gets seen. A newsroom that only covers championships
 misses [[Whose Story Is It|most of the school's actual life]] — which
 is why [[The Athletics Package|the athletics beat]] is never the only
 one this newsroom walks.
-
-%%curriculum-start%%
-## Curriculum connection
-
-![[A1.3]]
-%%curriculum-end%%

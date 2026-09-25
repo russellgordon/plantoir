@@ -94,8 +94,9 @@ in some form; yours starts now.
 
 ## Safety first, every period
 
-Newsrooms and shops both hurt people in the same way: slowly and
-quietly, on a day when everyone was in a hurry. So the order never
+Newsrooms hurt people slowly; shops can hurt them in a second. Either
+way it tends to happen on a day when everyone was in a hurry. So the
+order never
 changes — the safety check before the work, not after it, whether that
 means taping a cable across the studio floor or checking the laser's
 extraction is running before the lid closes. Nobody waits to be told.

@@ -158,9 +158,3 @@ Each task publishes its success criteria before you start, phrased as
 things a reader or an editor could see. If a mark ever surprises you,
 ask — those criteria are the whole story, and [[Getting Help]] lists
 the ways to reach me.
-
-%%curriculum-start%%
-## Curriculum connection
-
-![[B3.4]]
-%%curriculum-end%%

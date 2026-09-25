@@ -13,9 +13,8 @@ that matters: *what do you leave with that you did not arrive with?*
 
 ## Before you write
 
-Reread your journal front to back in one sitting — expect the
-your earliest entries to feel written by someone else. As you read,
-flag:
+Reread your journal front to back in one sitting — expect your
+earliest entries to feel written by someone else. As you read, flag:
 
 - one entry that embarrasses you a little — growth hides there
 - one "what I would chase next" you actually chased, and how it went

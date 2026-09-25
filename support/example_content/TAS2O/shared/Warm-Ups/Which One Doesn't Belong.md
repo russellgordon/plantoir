@@ -34,10 +34,10 @@ more design sense than solving ten — which is the point.
 Or put real objects in the grid: something laser-cut, something
 3D-printed, something moulded, something made by hand. Now a defence
 has to say how each was made and what that did to it — its function,
-its strength, its look, what it is made of, what it cost to make one
-versus a thousand. Technology teachers call those the fundamental
-technological concepts, and they are the same questions whichever
-technology area the object came from.
+its strength, its look, what it is made of. Those are among what
+technology teachers call the fundamental technological concepts, and
+they are the same questions whichever technology area the object came
+from.
 
 > [!tip] Swap corners on purpose
 > Once your corner is safe, defend the one across from it. Fluency

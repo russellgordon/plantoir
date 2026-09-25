@@ -10,14 +10,14 @@ tags:
 ---
 ## Agenda
 
-1. Standup — crew 6 tests first; crews 1 and 2 print their second
-   versions (60 printer minutes)
-2. Revision after feedback: each member models their change as v2 —
-   log open beside the model, change written down before it is made
-3. Crews choose which change the data supports best
+1. Standup — crews 1 and 2 choose, in the first ten minutes, which
+   member's change the data supports best; their second versions then
+   print (60 printer minutes)
+2. Crew 6 tests its first version; its members model their changes
+3. Crews 3 to 5 choose their change and slice it, ready for the queue
 4. If a print failed: [[Getting Unstuck]], move five — change one
    thing, and book the spare slot
 
 ## Things to do before our next class
 
-- [ ] v2 file saved beside v1, never over it.
+- [ ] Your crew's v2 sliced, with its time and grams written down.

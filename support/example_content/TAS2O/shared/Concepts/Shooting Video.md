@@ -49,7 +49,5 @@ is sound, which has its own honest rules in [[Clean Audio]].
 %%curriculum-start%%
 ## Curriculum connection
 
-![[A2.1]]
-
 ![[A2.4]]
 %%curriculum-end%%

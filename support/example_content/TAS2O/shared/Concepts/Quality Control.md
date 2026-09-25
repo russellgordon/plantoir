@@ -33,7 +33,7 @@ inspection**: before a factory makes a thousand of anything, it
 measures one, completely, against the drawing. A **go / no-go gauge**
 is the fast version — a test piece the part must fit (go) and must
 not fit (no-go), so a check takes seconds and needs no arithmetic. Our
-class tolerance coupon is a go / no-go gauge you made yourselves.
+class tolerance coupons are go / no-go gauges you made yourselves.
 
 ## Qualitative and quantitative
 
