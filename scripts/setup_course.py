@@ -54,6 +54,10 @@ def graded_folders_for(manifest: dict, shared_folders: list, per_section_folders
     what tells the build to keep applying the historical rule — see
     contracts/shared-rules.json -> gradedFolders.absentIsNotEmpty.
 
+    This reconciles a NEW course's pool only. A pool already saved in
+    course_config.json is never passed through here: a re-run writes it back
+    as it was (gradedFolders.rerunningSetup, #192).
+
     Whatever the source, the result is RECONCILED against the folder lists the
     course actually ends with: a declared name the teacher removed in the
     wizard is dropped, and a pool left with nothing is returned as `[]` — the
@@ -2972,12 +2976,24 @@ def setup_course(no_backup: bool = False):
     # a NEW course because there are no marks to lose; an EXISTING course
     # deliberately has no such key if never configured, which is what tells
     # the build to keep applying the historical rule.
+    #
+    # A SAVED pool is written back exactly as it was (#192). This run does not
+    # ask the marks question and offers no way to remove a folder, so it does
+    # not own the answer. It used to re-check the pool against the top-level
+    # folder lists only, which emptied every pool naming a folder the Marks
+    # checklist found INSIDE another one (Portfolios/Tasks, section1/Tasks) —
+    # with every prompt accepted. A name taken off a list at a prompt is not a
+    # removal either: the next build's preflight finds the folder on disk and
+    # publishes it again. A saved null is written as [] (as before); a key
+    # that was never there stays absent. See contracts/shared-rules.json ->
+    # gradedFolders.rerunningSetup, and documentation/04-course-setup.md.
     if saved_config:
         if "graded_folders" in saved_config:
-            config["graded_folders"] = graded_folders_for(
-                {"graded_folders": saved_config["graded_folders"]},
-                shared_folders, per_section_folders
-            )
+            saved_pool = saved_config["graded_folders"]
+            if isinstance(saved_pool, list):
+                config["graded_folders"] = list(saved_pool)
+            else:
+                config["graded_folders"] = []
     else:
         config["graded_folders"] = graded_folders_for(
             example_manifest if prepopulate_example else (skeleton_manifest or {}),
