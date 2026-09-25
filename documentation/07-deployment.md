@@ -836,9 +836,10 @@ does its own post-run work.
 
 - The launchd wrapper captures the BUILD's exit code and then each
   destination's. On a non-zero one it writes `~/Library/Application Support/
-  Plantoir/scheduled/stopped/<CODE>-section<N>.txt` — first line the kind,
+  Plantoir/scheduled/stopped/<CODE>-section<N>.<folder id>.txt` (the folder
+  id since #237 — see "One alarm per working folder") — first line the kind,
   second the destination. It assembles both lines in
-  `…/scheduled/<CODE>-section<N>.txt.partial` and **moves** the finished file
+  `…/scheduled/<CODE>-section<N>.<folder id>.txt.partial` and **moves** the finished file
   into place; the sub-section below is the whole reason, and it is not a
   tidiness preference.
 - **Exit 3 is tested before the general non-zero branch**, because it is also
@@ -1097,10 +1098,12 @@ exactly as the band does. `ScheduledPublishNotice` is the code;
   reaches a teacher who has not opened the section. A teacher who finds it noisy
   turns Plantoir's notifications off in System Settings, and the band still
   carries it.
-- **One per section, replaced by the next run** — the identifier is keyed like
-  the record file (`scheduled-publish.<CODE>.section<N>`), so section 1 and
-  section 11 never share one — and **withdrawn when the teacher dismisses the
-  band**, so the two never disagree about whether it is still news. A
+- **One per section per working folder, replaced by the next run** — the
+  identifier is keyed like the record file (`scheduled-publish.<CODE>.section<N>.<folder id>`
+  since #237, so two working folders holding the same section never replace or
+  withdraw each other's news; `ScheduledPublishNoticeTests.testTwoWorkingFoldersKeepTheirOwnNotification`),
+  so section 1 and section 11 never share one — and **withdrawn when the
+  teacher dismisses the band**, so the two never disagree about whether it is still news. A
   successful run that clears an older record does not need to withdraw
   anything: its own notification replaces the old one.
 - **The run never asks for permission.** A question at half six is a question
@@ -2056,7 +2059,10 @@ and whichever finishes last wears the badge in BOTH sidebars
 two generated wrappers and fails with the id taken out of `recordURL`). The
 readers — the sidebar badge, the section's notice and its Dismiss, the
 section's findings dialog — compute the id of the folder that is open with the
-same `folderIdentifier`.
+same `folderIdentifier`. **#212's notification is keyed the same way**
+(`scheduled-publish.<CODE>.section<N>.<folder id>`), and for the same race: a
+section-only key let one folder's run replace, and its Dismiss withdraw, the
+other folder's news.
 
 **The run takes its name from the script it was started with, never a rebuilt
 one.** After an update every pending job is still under the OLD label, with its
