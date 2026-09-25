@@ -408,6 +408,11 @@
         "carries": "the course, the section, how many seconds it waited, what the other program held and its process id, and whether it then went ahead or stood down",
         "event": "scheduled publish waited for the course",
         "why": "Added with #156. A publish set for later that finds another program building the course waits up to ten minutes (workLeases.declining.whyTheScheduledPublishWaits). A publish that went out ten minutes late, or not at all, looks from outside exactly like one that misfired; this line says it waited, for whom, and what it then did. A stand-down ALSO writes 'scheduled deploy turned off' (the job is cleared) and leaves the section's courseWasBusy record."
+      },
+      {
+        "carries": "the course and the section, and which of: told with a notification; not sent because notifications are turned off; not sent because permission was never given; could not be sent; and, when a teacher first schedules from the app, that the permission question was put and what the answer was. NEVER the notification's text.",
+        "event": "scheduled publish notification",
+        "why": "Added with #212. 'I never got told' is answerable only if the trail says whether the notification went out, or that notifications were off for the app — from the teacher's side a notification that was blocked and one that was never sent look identical. The question's own line is written BEFORE the answer, because a question that is ignored, or arrives under a Focus, may never be answered. See scheduledPublishStopped.notification."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty.",
@@ -1064,7 +1069,7 @@
   },
   "scheduledPublishStopped": {
     "note": "What a teacher is told when a publish that was set to happen on its own did not get through. It usually runs at half six with the app closed, so the LAUNCHER writes a record and the APP reads it \u2014 that handover is the feature. Without it the run is indistinguishable from one that was never scheduled, which is exactly the shape of \"my site did not update on Tuesday and I do not know why\". (This said the app reads the record \"the next time it opens\" until 2026-09-19; see whenItIsShown, which is what made that false.)",
-    "whenItIsShown": "On the section that is SHOWING, without the teacher navigating anywhere, as soon as the run writes its record \u2014 and the section's sentence and the sidebar's warning appear at the same moment, because both follow one counter. Waiting for the section to be reopened is the fault GitHub issue #216 closed on the mac on 2026-09-19: a teacher who stayed on the section while the run finished was told nothing until they clicked away and back. Two things make it work and both matter to whoever implements it elsewhere. The app watches the RECORD FOLDER, one watch for the whole app rather than one per view, since the folder is per user rather than per working folder. And the wrapper must land its record in ONE step: a folder watch sees an entry arrive but not a second line appended to a file already there, so a record written with two echoes arrived as one event carrying an empty file \u2014 measured on the mac, 0 of 40 \u2014 and the line that completed it produced no event at all. The mac assembles the record in a temporary file BESIDE the folder and moves it in (40 of 40), and separately watches any record that is there but cannot be read yet, which is what covers a job whose wrapper was written by an older build.",
+    "whenItIsShown": "On the section that is SHOWING, without the teacher navigating anywhere, as soon as the run writes its record \u2014 and the section's sentence and the sidebar's warning appear at the same moment, because both follow one counter. Waiting for the section to be reopened is the fault GitHub issue #216 closed on the mac on 2026-09-19: a teacher who stayed on the section while the run finished was told nothing until they clicked away and back. Two things make it work and both matter to whoever implements it elsewhere. The app watches the RECORD FOLDER, one watch for the whole app rather than one per view, since the folder is per user rather than per working folder. And the wrapper must land its record in ONE step: a folder watch sees an entry arrive but not a second line appended to a file already there, so a record written with two echoes arrived as one event carrying an empty file \u2014 measured on the mac, 0 of 40 \u2014 and the line that completed it produced no event at all. The mac assembles the record in a temporary file BESIDE the folder and moves it in (40 of 40), and separately watches any record that is there but cannot be read yet, which is what covers a job whose wrapper was written by an older build. And since #212 (2026-09-25), as a system notification sent by the run itself when it finishes, so a teacher who has not opened the app at all is told too — see `notification`.",
     "kinds": {
       "neededAnAnswer": "The launcher exited 3: a question was put to nobody. deploy.py's NEEDS_AN_ANSWER, distinct from 1 precisely so a caller can tell the two apart and say something useful.",
       "buildNeededAnAnswer": "The BUILD stopped for a question, before any destination was reached. PROPOSED FROM WINDOWS 2026-09-09 (GitHub issue #132) and adopted on the mac the same day; the mac's suite was red on this key until it was, which is the mechanism working rather than damage. A scheduled publish builds before it publishes, and the build launcher asks questions of its own \u2014 the 'Open' course-code guard on both platforms, plus a section-not-listed warning that only preview.ps1 has \u2014 so under --non-interactive it refuses with the same exit 3 having contacted nothing. It is a SEPARATE kind rather than neededAnAnswer with an empty destination because the sentence differs: there is no destination to name, and telling a teacher that publishing to Netlify needed an answer when Netlify was never reached sends them to look in the wrong place. REJECTED: filling the destination slot with the section's first configured destination, which reads correctly and is false.",
@@ -1140,11 +1145,265 @@
     "attention": "Every FAILURE asks for the teacher's attention and gets a warning beside their section in the list as well as the sentence inside it \u2014 a teacher who does not know WHICH section failed cannot open the right one. So does a run that STOOD DOWN (tooLateToRun), which is not a failure at all: nothing was attempted and nothing went wrong, and it still deserves the badge, because the site the teacher was expecting is not there either way and silence is what this whole key exists to break. The test is not \"did something break\" but \"is the site other than the teacher expects\". A SUCCESS is news rather than a problem: it gets the sentence and no badge, because a badge on every section that published fine overnight is a badge nobody reads by Wednesday.",
     "clearedBy": "A scheduled run that got ALL the way through \u2014 every destination, exit zero \u2014 OR the teacher dismissing it. Both, and the second is a decision rather than a convenience: clearing only on a successful run leaves the message standing after somebody has already fixed the problem by hand, and the next scheduled run that would clear it could be a week away.",
     "trail": "One line per RUN, dated to when the RUN wrote its record rather than to when the app read it — or an overnight problem is filed under the morning somebody noticed it. There are FOUR events, and not one per kind: the three outcomes of a run that HAPPENED share three of them (activityTrail.mustRecord: scheduled publish needed an answer, did not finish, finished), and a build that stopped for a question files under the first, because a question going unasked is what happened and an event of its own would put a distinction on the trail that means nothing to the person reading it. A build that failed outright (buildDidNotFinish) files under the second, `scheduled publish did not finish`, for the same reason, with a line that names no destination because none was reached (added 2026-09-25, #137). The fourth belongs to the kind where the run did not happen at all: tooLateToRun writes `scheduled deploy turned off`, the same event and the same words a REMOVAL writes, because the same thing happened to the teacher's alarm and the reason is what differs. (This said THREE events until 2026-09-20.) The line carries the course, the section, and which destination stopped — or, for a run that got through, where it WENT. NEVER the question's own text: that comes from a launcher's console, and a line naming a credential prompt would put a teacher's own words on the trail. An earlier draft had the app note the line when a teacher opened the section and mark the record as noted; rewriting the record changed its modification date, which is what the notice shows, so the teacher saw the morning they looked rather than the half six the run stopped at — and a teacher who never opened that section, who is exactly the one who reports that their site did not update, got no line at all. WHO writes it is platform-local and cannot be otherwise: see platformDifferences.",
+    "notification": {
+      "note": "Added 2026-09-25 with GitHub issue #212. A publish set for half six runs with nobody looking, and until this the only places it said how it went were the section's band and the sidebar's warning — both inside an app the teacher may not open before class. So when a run finishes, WHATEVER happened, the teacher is sent ONE system notification (a macOS notification; a toast on Windows) that waits for them in the system's own list. Its text is the section's own sentence (`sentences.<kind>`, filled in exactly as the band fills it) with nothing added — no title of the app's own, since the system heads it with the app's name and every sentence already begins with the course and the section, which is also what survives a banner cut short. A SUCCESS is announced too, every time: Russell's decision, 2026-09-25 — the band carries it and `attention` gives it no badge, so without the notification a success reaches nobody who has not opened that section. One notification per SECTION, keyed so that a later run of the same section REPLACES it (a teacher is not handed last week's news beside this week's), and dismissing the section's band WITHDRAWS it, so the two never disagree about whether it is still news. The RUN never asks for permission — a question at half six is a question to nobody — and a run that may not post writes why on the trail instead. The question is put the first time a teacher schedules a publish from the app's own window or its own assistant, never from an outside assistant (which has no window to explain it) and never at launch (most teachers never schedule anything). How a runner plays the cases: with a stand-in for the system's notifications that records what it was asked, keeps what is on show by identifier (a post replaces, a withdraw removes), and never reaches the real system. A platform whose notifications need no prompt (Windows toasts) plays only the rows whose `permission` is `allowed` or `notAllowed`; the `notAskedYet` rows carry `onlyWhereThereIsAPrompt` and exist only where there is a question to ask. `trailSays` is the line after the course/section prefix the trail already puts on every line of this kind.",
+      "announcing": {
+        "note": "Play each row once for EVERY key of `kinds` when `record` is `everyKind` (so a kind added later is covered without touching this list), and once with no record when it is `none`. Write the record, set the stand-in's permission, run the announcement, and check: whether a notification was posted, that its text is exactly the kind's sentence, whether permission was asked (never, from a run), and the trail line.",
+        "cases": [
+          {
+            "name": "allowed: every kind is announced",
+            "record": "everyKind",
+            "permission": "allowed",
+            "postFails": false,
+            "posts": true,
+            "asksForPermission": false,
+            "trailSays": "told the teacher how a scheduled publish went, with a notification",
+            "why": "A success as much as a failure: the silence is the complaint whatever the outcome."
+          },
+          {
+            "name": "turned off: nothing posted, and the trail says why",
+            "record": "everyKind",
+            "permission": "notAllowed",
+            "postFails": false,
+            "posts": false,
+            "asksForPermission": false,
+            "trailSays": "did not send a notification about a scheduled publish, because notifications are turned off for Plantoir",
+            "why": "From the teacher's side a blocked notification and one never sent look the same; the line is what tells them apart."
+          },
+          {
+            "name": "never asked: the run does not ask",
+            "record": "everyKind",
+            "permission": "notAskedYet",
+            "onlyWhereThereIsAPrompt": true,
+            "postFails": false,
+            "posts": false,
+            "asksForPermission": false,
+            "trailSays": "did not send a notification about a scheduled publish, because Plantoir has not been given permission to send them yet",
+            "why": "A question put by a run at half six is put to nobody, and the process is about to exit."
+          },
+          {
+            "name": "the system refused the post",
+            "record": "everyKind",
+            "permission": "allowed",
+            "postFails": true,
+            "posts": false,
+            "asksForPermission": false,
+            "trailSays": "a notification about a scheduled publish could not be sent",
+            "why": "The post was attempted and did not land — including a system that never answered before the run's ceiling. Never silent, and never a reason for the run itself to fail."
+          },
+          {
+            "name": "no record: nothing to say",
+            "record": "none",
+            "permission": "allowed",
+            "postFails": false,
+            "posts": false,
+            "asksForPermission": false,
+            "trailSays": null,
+            "why": "A run that wrote no record (a job scheduled before sections were named) has nothing the band would say, so nothing is announced and no line is written."
+          }
+        ]
+      },
+      "onShow": {
+        "note": "What stays on show after a sequence of posts and dismissals. Each step is `post` (a run of that section finished with that kind) or `dismiss` (the teacher dismissed that section's band). `stillShown` lists what the stand-in holds afterwards, in any order, with the kind whose sentence it carries.",
+        "cases": [
+          {
+            "name": "a later run of the same section replaces the earlier one",
+            "steps": [
+              {
+                "post": {
+                  "course": "ICS4U",
+                  "section": 1,
+                  "kind": "succeeded"
+                }
+              },
+              {
+                "post": {
+                  "course": "ICS4U",
+                  "section": 1,
+                  "kind": "didNotFinish"
+                }
+              }
+            ],
+            "stillShown": [
+              {
+                "course": "ICS4U",
+                "section": 1,
+                "kind": "didNotFinish"
+              }
+            ]
+          },
+          {
+            "name": "section 1 and section 11 are different sections",
+            "steps": [
+              {
+                "post": {
+                  "course": "ICS4U",
+                  "section": 1,
+                  "kind": "succeeded"
+                }
+              },
+              {
+                "post": {
+                  "course": "ICS4U",
+                  "section": 11,
+                  "kind": "succeeded"
+                }
+              }
+            ],
+            "stillShown": [
+              {
+                "course": "ICS4U",
+                "section": 1,
+                "kind": "succeeded"
+              },
+              {
+                "course": "ICS4U",
+                "section": 11,
+                "kind": "succeeded"
+              }
+            ],
+            "why": "Catches a key built so that one section's is the prefix of another's."
+          },
+          {
+            "name": "the same section number in two courses",
+            "steps": [
+              {
+                "post": {
+                  "course": "ICS4U",
+                  "section": 1,
+                  "kind": "succeeded"
+                }
+              },
+              {
+                "post": {
+                  "course": "ICS3U",
+                  "section": 1,
+                  "kind": "tooLateToRun"
+                }
+              }
+            ],
+            "stillShown": [
+              {
+                "course": "ICS4U",
+                "section": 1,
+                "kind": "succeeded"
+              },
+              {
+                "course": "ICS3U",
+                "section": 1,
+                "kind": "tooLateToRun"
+              }
+            ]
+          },
+          {
+            "name": "dismissing the band withdraws that section's notification and no other",
+            "steps": [
+              {
+                "post": {
+                  "course": "ICS4U",
+                  "section": 1,
+                  "kind": "didNotFinish"
+                }
+              },
+              {
+                "post": {
+                  "course": "ICS4U",
+                  "section": 11,
+                  "kind": "succeeded"
+                }
+              },
+              {
+                "dismiss": {
+                  "course": "ICS4U",
+                  "section": 1
+                }
+              }
+            ],
+            "stillShown": [
+              {
+                "course": "ICS4U",
+                "section": 11,
+                "kind": "succeeded"
+              }
+            ]
+          }
+        ]
+      },
+      "asking": {
+        "note": "Where the permission question may be put. `from` is what scheduled the publish: `window` (the scheduling sheet), `appAssistant` (the app's own assistant), `outsideAssistant` (an assistant in another program, over MCP) or `scheduledRun` (the run itself, finishing). The question is put only when `permission` is `notAskedYet` — a teacher who said no is not asked again, and the switch is in the system's own settings.",
+        "cases": [
+          {
+            "from": "window",
+            "permission": "notAskedYet",
+            "onlyWhereThereIsAPrompt": true,
+            "asks": true,
+            "trailSays": [
+              "asked whether Plantoir may send a notification when a scheduled publish finishes",
+              "the teacher allowed notifications about scheduled publishes"
+            ],
+            "answer": "allowed",
+            "why": "The first time a teacher schedules, from the one place they can see why they are being asked. The first line is written before the answer, because a question that is ignored, or arrives under a Focus, may never be answered."
+          },
+          {
+            "from": "window",
+            "permission": "notAskedYet",
+            "onlyWhereThereIsAPrompt": true,
+            "asks": true,
+            "trailSays": [
+              "asked whether Plantoir may send a notification when a scheduled publish finishes",
+              "the teacher did not allow notifications about scheduled publishes"
+            ],
+            "answer": "notAllowed"
+          },
+          {
+            "from": "window",
+            "permission": "allowed",
+            "asks": false,
+            "trailSays": []
+          },
+          {
+            "from": "window",
+            "permission": "notAllowed",
+            "asks": false,
+            "trailSays": [],
+            "why": "Said no once; the question is not put again."
+          },
+          {
+            "from": "appAssistant",
+            "permission": "notAskedYet",
+            "onlyWhereThereIsAPrompt": true,
+            "asks": true,
+            "answer": "allowed",
+            "trailSays": [
+              "asked whether Plantoir may send a notification when a scheduled publish finishes",
+              "the teacher allowed notifications about scheduled publishes"
+            ]
+          },
+          {
+            "from": "outsideAssistant",
+            "permission": "notAskedYet",
+            "onlyWhereThereIsAPrompt": true,
+            "asks": false,
+            "trailSays": [],
+            "why": "KNOWN LIMIT: a teacher who only ever schedules from an outside assistant is never asked, so never notified, and every run's line says permission was not given yet. The outside assistant's process has no window, so the question would appear with nothing on screen to explain it."
+          },
+          {
+            "from": "scheduledRun",
+            "permission": "notAskedYet",
+            "onlyWhereThereIsAPrompt": true,
+            "asks": false,
+            "trailSays": [
+              "did not send a notification about a scheduled publish, because Plantoir has not been given permission to send them yet"
+            ]
+          }
+        ]
+      }
+    },
     "platformDifferences": {
       "asOf": "2026-09-25",
       "windows": "Records every outcome of a run that HAPPENED \u2014 neededAnAnswer, buildNeededAnAnswer, didNotFinish and succeeded \u2014 and lets the teacher dismiss it, both since 2026-09-09 (GitHub issue #130); ScheduledPublishOutcome, plus the readout in SectionDetailView. It has NOT got the three kinds added on the mac since: tooLateToRun (2026-09-20, owed only if their task runs a missed start late \u2014 see that kind), courseWasBusy (2026-09-25, #156, owed once their scheduled publish reads leases) and buildDidNotFinish (2026-09-25, #137). A build that fails outright there is recorded as didNotFinish with every configured destination joined, which is the shape #137 replaced.",
       "mac": "Every kind above, and dismissible. Russell decided on 2026-09-09 that a teacher should learn their overnight publish did not happen whatever the reason, because the SILENCE is the complaint rather than the cause, and that landed on both platforms the same day. buildDidNotFinish landed here 2026-09-25 (#137). A section scheduled BEFORE that keeps the wrapper it was given, so its one remaining run still records a failed build as didNotFinish and shows the old sentence once; that was accepted, as it was for #132.",
-      "owed": "By Windows: buildDidNotFinish, and whichKind.cases run against its own wrapper (#137); tooLateToRun and courseWasBusy on the conditions their kinds give. Nothing is owed by the mac. ONE difference remains and it is deliberate, because it cannot be otherwise: WHO writes the trail line. The mac's launchd agent runs Plantoir, so the RUN writes it as the trail key describes, while Windows' Task Scheduler runs plain PowerShell with no app process alive \u2014 so that side sweeps every record when the app next opens, dating each line from the record rather than from the reading. Writing it from the wrapper's own shell was REJECTED there: it would put the trail's line format in a second home, in generated PowerShell, where nothing tests it and the redaction rules do not reach. The property the contract actually asks for is kept either way \u2014 a teacher who never opens the failed section still gets the line, and that teacher is precisely the one who writes in to say their site did not update."
+      "owed": "By Windows: buildDidNotFinish, and whichKind.cases run against its own wrapper (#137); tooLateToRun and courseWasBusy on the conditions their kinds give. Nothing is owed by the mac. ONE difference remains and it is deliberate, because it cannot be otherwise: WHO writes the trail line. The mac's launchd agent runs Plantoir, so the RUN writes it as the trail key describes, while Windows' Task Scheduler runs plain PowerShell with no app process alive \u2014 so that side sweeps every record when the app next opens, dating each line from the record rather than from the reading. Writing it from the wrapper's own shell was REJECTED there: it would put the trail's line format in a second home, in generated PowerShell, where nothing tests it and the redaction rules do not reach. The property the contract actually asks for is kept either way \u2014 a teacher who never opens the failed section still gets the line, and that teacher is precisely the one who writes in to say their site did not update. ALSO owed by Windows since #212 (2026-09-25): the `notification` rules — every kind announced with its own sentence, one per section replaced by the next, withdrawn on dismissal, the run never asking, and `scheduled publish notification` on the trail. The rule is theirs to MATCH; the delivery is theirs to design, because their run is PowerShell under Task Scheduler with no app process, so a toast has to be attributed to Plantoir's own application identity, and a toast needs no permission prompt (so only the `allowed` and `notAllowed` rows apply there). Their trail lines for it are written the way their other scheduled-publish lines are, by the sweep when the app next opens."
     },
     "whereTheRecordLives": "Platform-local and deliberately NOT shared: %LOCALAPPDATA%\\Plantoir\\scheduled\\unanswered on Windows, ~/Library/Application Support/Plantoir/scheduled/stopped on the mac. What is shared is the BEHAVIOUR above; a path is not a rule. The mac's folder says `stopped` rather than `unanswered` because that side records more than unanswered questions; Windows records more than that too and KEPT the old name deliberately, because a task scheduled before 2026-09-09 points at a wrapper script already on disk that writes the old path, and nothing rewrites that wrapper until the section is scheduled again — so renaming buys a better name and costs a second directory read for ever, on pain of the first overnight run after an update going silent. The record says what it is on its own first line."
   },
