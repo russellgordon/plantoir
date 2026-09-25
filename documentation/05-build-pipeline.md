@@ -50,6 +50,8 @@ support files ──────┘                        │                  
    rejected: [09 → "Two windows, one course"](09-mac-app.md#two-windows-one-course);
    the rule: `contracts/app-rules.json` → `buildFreshness.buildStartedMarker`.
 
+**One known extra rebuild, written down so it is not re-found.** Preflight rewrites `course_config.json` after the marker whenever it discovers a new item (a folder or file that arrived in Obsidian since the last build), so the config is then newer than the marker and the next Publish rebuilds once for nothing (measured 2026-09-24: `needsRebuild` true after a build that discovered `Extra Notes.md`). It errs toward rebuilding and settles after one build; not worth a special case.
+
    **That path is a link, and the built site is not inside the working
    folder.** Since 2026-09-05 `courses/<CODE>/.merged_output` is a symlink to
    `~/Library/Application Support/Plantoir/builds/<folder id>/<CODE>` on
