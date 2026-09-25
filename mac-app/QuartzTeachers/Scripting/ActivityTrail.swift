@@ -469,7 +469,12 @@ nonisolated enum ActivityTrail {
         /// could be made for the folder — from a preview, a publish, or
         /// setup (which files it under the word "setup", having no course
         /// yet). Deliberately not a new event: to a teacher it is the same
-        /// outcome, a preview that never appeared.
+        /// outcome, a preview that never appeared. Since issue #234
+        /// `preview.sh` writes it on a third ending, in words pinned as
+        /// `launcherLineWhenThisMacCannotReachTheBuilder`: before building,
+        /// a connection to the address it was about to announce was refused
+        /// on every try, so it stopped rather than build a preview this Mac
+        /// could not open — the fault #225 names after a build, found first.
         ///
         /// This is the line whose absence produced the report it exists for
         /// (issue #225). A teacher built three previews in four minutes, none
