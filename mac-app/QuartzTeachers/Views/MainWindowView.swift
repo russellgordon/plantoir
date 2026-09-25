@@ -153,7 +153,7 @@ struct MainWindowView: View {
                 ContentUnavailableView {
                     Label(item.title, systemImage: item.symbolName)
                 } description: {
-                    Text("\(item.subtitle). A saved copy of \(item.courseCode) — restore it to put the course back the way it was then. \(item.keptDescription) You can delete any of them yourself.")
+                    Text("\(item.subtitle)\(backupSizeClause(for: item)). A saved copy of \(item.courseCode) — restore it to put the course back the way it was then. \(item.keptDescription) You can delete any of them yourself.")
                 } actions: {
                     Button("Restore…") {
                         workspace.backupRestoreRequest = item
@@ -168,6 +168,8 @@ struct MainWindowView: View {
             } else {
                 missingSelectionView
             }
+        case .allBackups:
+            AllBackupsView()
         case nil:
             // Telling someone to choose from an empty list is a dead end.
             if workspace.courses.isEmpty {
@@ -190,6 +192,14 @@ struct MainWindowView: View {
                 )
             }
         }
+    }
+
+    /// " · 15.9 MB" once a backup has been measured, and nothing before.
+    func backupSizeClause(for item: BackupItem) -> String {
+        guard let size = workspace.sizeDescription(of: item) else {
+            return ""
+        }
+        return " · " + size
     }
 
     var missingSelectionView: some View {
