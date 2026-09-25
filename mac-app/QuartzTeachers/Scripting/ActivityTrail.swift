@@ -68,7 +68,8 @@ nonisolated enum ActivityTrail {
         /// A teacher added a section to a course ("Add Section…"). Carries
         /// the course, the new section, and how many pages shared by every
         /// section were given a date and a published-or-hidden setting for
-        /// it — never which pages.
+        /// it, and how many of those were kept hidden because the setting
+        /// they would copy could not be read — never which pages.
         ///
         /// Adding a section writes into pages the teacher did not open: every
         /// course-level page that carries per-section keys gains a pair for

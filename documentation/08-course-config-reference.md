@@ -670,15 +670,22 @@ separately from the reader:
   the splitter change: **11,891 pages, 0 whose split output moves.** Nothing
   the build does changes.
 
-  **Three of this app's own write paths still orphan a continuation**, and
-  they are named here rather than left to be discovered:
+  **Three of this app's own write paths orphaned a continuation** (the first
+  is fixed; the others stand), and they are named here rather than left to be
+  discovered:
 
-  * `SectionAdder.extendFrontmatter` inserts the new section's
+  * ~~`SectionAdder.extendFrontmatter` inserts the new section's
     `createdSection<N>` / `publishForSection<N>` pair after the last
-    per-section KEY LINE, so on a page whose value continues below it the pair
-    lands between the key and its value — measured, a page HIDDEN in section 1
-    becomes VISIBLE in both sections.
-    [Issue #181](https://github.com/russellgordon/plantoir/issues/181).
+    per-section KEY LINE~~ — **fixed 2026-09-25 by the review of #175**: the
+    pair now goes after the last key's continuation lines
+    (`continuationLineIndices`, asked on the whole file's lines, bounded by the
+    block), and a setting that runs onto the next line is carried as held back
+    and counted on the trail (`section added`). Measured before the fix, a page
+    HIDDEN in section 1 became VISIBLE in both sections (`None` and
+    `'false false'`); after it, hidden in both. Case seven of
+    `course-management.json` → `sectionNumbers.addingKeysToAPage`.
+    [Issue #181](https://github.com/russellgordon/plantoir/issues/181) — its
+    SectionAdder half; the rest of #181 is untouched.
   * `CourseRestorer.settingPerSectionKeys` swaps this section's key line for
     the backup's without either side's continuation lines — measured, a live
     `publishForSection1:` / `  a: 1` whose backup had no such key is left as
