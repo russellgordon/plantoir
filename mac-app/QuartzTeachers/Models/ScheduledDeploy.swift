@@ -1287,18 +1287,32 @@ enum ScheduledDeploy {
             // plist, because nothing is deleted until the new job is accepted.
             // Hand it back rather than lose it. A job under THIS label was
             // overwritten by the write above and is gone, as it always was.
-            var otherNames: [URL] = []
-            for agent in existing where agent.label != label {
-                otherNames.append(agent.plistURL)
+            //
+            // Each line names the job it is about (#237 review, L3): in the
+            // rare folder holding BOTH — an older copy of the app still
+            // running — the one that STANDS is the old-named job, and the one
+            // LOST is the one under this label, whichever is earlier.
+            var handedBack: [Agent] = []
+            var overwritten: [Agent] = []
+            for agent in existing {
+                if agent.label == label {
+                    overwritten.append(agent)
+                } else {
+                    handedBack.append(agent)
+                }
             }
-            if !otherNames.isEmpty && bootstrapEveryOne(of: otherNames, runner: runner),
-               let alreadySet {
-                ActivityTrail.note(
-                    .scheduledDeployCouldNotBeSet,
-                    "could not set a scheduled deploy for \(dayAndTimeText(when)); "
-                        + "the one set for \(dayAndTimeText(alreadySet)) still stands",
-                    course: course.code,
-                    section: sectionNumber
+            if !handedBack.isEmpty && bootstrapEveryOne(of: plistURLs(of: handedBack), runner: runner) {
+                if let standing = earliestUpcoming(of: handedBack) {
+                    ActivityTrail.note(
+                        .scheduledDeployCouldNotBeSet,
+                        "could not set a scheduled deploy for \(dayAndTimeText(when)); "
+                            + "the one set for \(dayAndTimeText(standing)) still stands",
+                        course: course.code,
+                        section: sectionNumber
+                    )
+                }
+                noteTheReplacedDeployWasLost(
+                    earliestUpcoming(of: overwritten), course: course, sectionNumber: sectionNumber
                 )
             } else {
                 noteTheReplacedDeployWasLost(alreadySet, course: course, sectionNumber: sectionNumber)
@@ -1325,6 +1339,22 @@ enum ScheduledDeploy {
             )
         }
         return nil
+    }
+
+    /// The earliest moment still ahead among some jobs, or nil — the same
+    /// reading `nextRun` makes, for a list already in hand.
+    private static func earliestUpcoming(of agents: [Agent], now: Date = Date()) -> Date? {
+        var earliest: Date?
+        for agent in agents {
+            guard let moment = agent.scheduledFor, moment > now else {
+                continue
+            }
+            if let soonestSoFar = earliest, soonestSoFar <= moment {
+                continue
+            }
+            earliest = moment
+        }
+        return earliest
     }
 
     /// The plist of every job in a list.

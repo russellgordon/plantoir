@@ -1487,6 +1487,60 @@ final class ScheduledDeployTests: XCTestCase {
         XCTAssertFalse(trail.contains("turned off"), trail)
     }
 
+    /// The rare folder holding BOTH an old-name and a new-name job for one
+    /// section (an older copy of the app still running), and macOS refuses
+    /// the new one: the new-name job was overwritten and is lost, the
+    /// old-name one is handed back. Each trail line names the job it is
+    /// about — "still stands" the one that STANDS, "turned off" the one lost —
+    /// even when the lost one is the earlier (#237 review, L3).
+    func testARefusalInAFolderHoldingBothNamesSaysWhichStands() throws {
+        try prepare()
+        let course: Course = try makeCourse()
+        let scratch: URL = agentsDirectory.deletingLastPathComponent().appendingPathComponent("trail")
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: scratch)
+        defer { ActivityTrail.store = previousStore }
+
+        let lostMoment: Date = sixThirtyTomorrow().addingTimeInterval(12 * 60 * 60)
+        let standingMoment: Date = sixThirtyTomorrow().addingTimeInterval(48 * 60 * 60)
+        try writeAgentSetBeforeTheUpdate(workingFolder: workspaceURL, when: standingMoment)
+        let newPlist: URL = ScheduledDeploy.plistURL(
+            courseCode: "ICS3U", sectionNumber: 1, inWorkingFolder: workspaceURL
+        )
+        let current: [String: Any] = ScheduledDeploy.propertyList(
+            courseCode: "ICS3U", sectionNumber: 1, when: lostMoment,
+            workspaceURL: workspaceURL, deployArguments: []
+        )
+        try PropertyListSerialization.data(fromPropertyList: current, format: .xml, options: 0)
+            .write(to: newPlist)
+
+        let runner: FakeLaunchControl = FakeLaunchControl()
+        runner.refusedPlists = [newPlist]
+        XCTAssertNotNil(ScheduledDeploy.scheduleDeploy(
+            course: course, sectionNumber: 1, when: sixThirtyTomorrow(),
+            workspaceURL: workspaceURL, cloudflareAccountID: "", runner: runner
+        ))
+
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(
+            trail.contains("the one set for \(ScheduledDeploy.dayAndTimeText(standingMoment)) still stands"),
+            "The line must name the job that stands: \(trail)"
+        )
+        XCTAssertFalse(
+            trail.contains("the one set for \(ScheduledDeploy.dayAndTimeText(lostMoment)) still stands"),
+            "It named the lost job as standing: \(trail)"
+        )
+        XCTAssertTrue(
+            trail.contains("turned off the scheduled deploy set for \(ScheduledDeploy.dayAndTimeText(lostMoment))"),
+            "The lost job must be recorded as turned off: \(trail)"
+        )
+        XCTAssertEqual(
+            ScheduledDeploy.nextRun(courseCode: "ICS3U", sectionNumber: 1, inWorkingFolder: workspaceURL)?
+                .timeIntervalSince1970 ?? 0,
+            standingMoment.timeIntervalSince1970, accuracy: 1
+        )
+    }
+
     /// The run keys its notes by the label of the script it was started with,
     /// never a rebuilt one: a job set before the update has the OLD label's
     /// log and success note baked in. Its findings are filed under this

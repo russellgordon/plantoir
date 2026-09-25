@@ -1938,7 +1938,7 @@ Until #237 an agent's label was the course code and the section number and
 nothing else, so `~/Library/LaunchAgents/<label>.plist` named **one file per
 code and section for the whole Mac**, and a teacher holding last year's working
 folder and this year's, both with ICS3U section 1, had one alarm between them.
-#237 gave each folder its own (next section) — and this scoping STAYS, because
+#237 gave each folder its own ("One alarm per working folder", below) — and this scoping STAYS, because
 it is how every reader FINDS a folder's jobs, including the ones set before
 #237 under the old label.
 
@@ -1993,7 +1993,77 @@ the job's own wrapper path moved too, so it cannot deploy anything, and the
 lateness check clears it away the next time it tries to fire.
 
 That two working folders shared one alarm at all was a separate fault, closed
-by #237 without orphaning the plists teachers already hold — next section.
+by #237 without orphaning the plists teachers already hold — see "One alarm
+per working folder (#237)" below.
+
+### What was rejected
+
+**A sweep for jobs whose COURSE no longer exists**, at folder-open and at course
+creation. It was in the plan and it is not here. It is the only code in this
+piece that DELETES something a teacher set on purpose, and every way it can be
+wrong is silent:
+
+- `FileManager.contentsOfDirectory` on an existing-but-EMPTY `courses/`
+  succeeds and returns `[]` — a volume that is not mounted, a synced folder
+  mid-materialisation — and every plist naming that folder then reads as an
+  orphan. That is CLAUDE.md rule 7's lesson verbatim: `docker ps -q` exits 1 and
+  prints nothing, and so does a daemon that did not answer.
+- A course code recovered from a LABEL is `sanitizedCode` and lossy, and the
+  failure direction of a mismatch is "this course does not exist" → cancel.
+- What it actually buys, once the lateness check exists, is ONE residue: a
+  still-future job whose course was removed BEFORE the teacher upgraded and
+  whose code is recreated before its date. That is not worth the family of ways
+  it can destroy a live deploy.
+
+The **overdue-only** sweep is kept, and it is provably harmless in a way the
+course-absence one is not: a job that far past its moment would stand itself
+down the next time it tried to fire, so removing it destroys nothing that could
+have run. It is one-sided on purpose — it asks only whether the moment has
+PASSED, so a deploy set three weeks ahead is never touched — and it leaves alone
+any job with no recorded moment, because the run fails open on one of those.
+
+**"The same calendar day" as the lateness rule** — measured above.
+
+**A fixed twenty-four hour window for everybody** — see "The window is the
+teacher's".
+
+**Cancelling inside `CourseArchiver`.** `CourseArchiverTests` and
+`CourseRestorerTests` build an **ICS3U** fixture — "a course a teacher plausibly
+has" — and set no `launchAgentsDirectoryOverride`, so a cancel inside the
+archiver with the real `LaunchControl` as its default would boot out and delete
+a real ICS3U schedule on the machine running the suite. The orchestration went
+into `ScheduledDeployCleanup` instead, which takes the runner explicitly.
+Putting it in `SidebarView.performRemoval` was rejected for the opposite reason:
+nothing in the suite constructs that view — every reference to it is to a static
+member — so the wiring could not be pinned, and a later edit that dropped the
+call would leave the suite green. `LaunchControl.run` now also refuses outright
+while the agents override is set, so the rule is structural rather than written
+down — and since the same day so does the SCRIPTS folder, which is the half that
+claim did not cover: `cancelScheduledDeploy` deletes the wrapper whatever runner
+it was handed, and `scriptURL` had no override at all, so the suite really was
+deleting `~/Library/Application Support/Plantoir/scheduled/<label>.sh` for the
+fixture code. See `documentation/09-mac-app.md`.
+
+**Cancelling on a restore.** Restoring a backup replaces a course's CONTENTS in
+place: the course and its sections are still there, its site marker comes back
+with it, and the schedule still means what it meant. Restoring an ARCHIVE adds,
+and a section restored after its deploy was cancelled comes back with nothing
+scheduled, which is the safe direction. Both are pinned as cases in the
+contract, by a scan of the file that must not have learned to cancel.
+
+### The one claim no unit test can reach, and how it was measured
+
+`launchAgentsDirectoryOverride` moves where the app WRITES; launchd only ever
+reads the real folder, so nothing in the suite can prove that launchd hands
+`PLANTOIR_SCHEDULED_FOR` to the process it starts — and the whole lateness check
+rests on it. It was measured by hand on 2026-09-20: three real launchd jobs, in
+a throwaway working folder inside `$HOME`, under course codes no teacher can
+have, with a stand-in wrapper in place of a real Quartz build. The numbers and
+what each job proved are in `GUI-IMPROVEMENTS.md`'s row for this change.
+
+---
+
+[◀ Previous: Quartz Customizations](06-quartz-customizations.md) · [Back to index](README.md) · [Next: course_config.json Reference ▶](08-course-config-reference.md)
 
 ### One alarm per working folder (#237)
 
@@ -2088,7 +2158,10 @@ out every job the scan finds for the section, writes the new one, and deletes
 the old plist and wrapper only once macOS has ACCEPTED the new job (review M1:
 the first plan deleted before the write and promised to re-bootstrap a file it
 had just removed). A refusal hands the old job straight back and the trail says
-it still stands (`testARefusedRescheduleHandsTheOldNamedDeployBack`, which fails
+it still stands — naming the job that STANDS; in the rare folder holding both
+an old-name and a new-name job (an older copy of the app still running), the
+new-name one was overwritten and gets its own "turned off" line
+(`testARefusalInAFolderHoldingBothNamesSaysWhichStands`, review L3) (`testARefusedRescheduleHandsTheOldNamedDeployBack`, which fails
 with the delete moved before the bootstrap). An old job in ANOTHER folder is
 not in the scan and is left standing — that is the fix.
 
@@ -2141,72 +2214,3 @@ February: `plutil -lint` OK, `launchctl bootstrap` exit 0, `launchctl print`
 listed it, `bootout` exit 0, plist deleted, `print` afterwards exit 113 (gone).
 No teacher's job was touched. Every test uses `FakeLaunchControl` and throwaway
 agents folders.
-
-### What was rejected
-
-**A sweep for jobs whose COURSE no longer exists**, at folder-open and at course
-creation. It was in the plan and it is not here. It is the only code in this
-piece that DELETES something a teacher set on purpose, and every way it can be
-wrong is silent:
-
-- `FileManager.contentsOfDirectory` on an existing-but-EMPTY `courses/`
-  succeeds and returns `[]` — a volume that is not mounted, a synced folder
-  mid-materialisation — and every plist naming that folder then reads as an
-  orphan. That is CLAUDE.md rule 7's lesson verbatim: `docker ps -q` exits 1 and
-  prints nothing, and so does a daemon that did not answer.
-- A course code recovered from a LABEL is `sanitizedCode` and lossy, and the
-  failure direction of a mismatch is "this course does not exist" → cancel.
-- What it actually buys, once the lateness check exists, is ONE residue: a
-  still-future job whose course was removed BEFORE the teacher upgraded and
-  whose code is recreated before its date. That is not worth the family of ways
-  it can destroy a live deploy.
-
-The **overdue-only** sweep is kept, and it is provably harmless in a way the
-course-absence one is not: a job that far past its moment would stand itself
-down the next time it tried to fire, so removing it destroys nothing that could
-have run. It is one-sided on purpose — it asks only whether the moment has
-PASSED, so a deploy set three weeks ahead is never touched — and it leaves alone
-any job with no recorded moment, because the run fails open on one of those.
-
-**"The same calendar day" as the lateness rule** — measured above.
-
-**A fixed twenty-four hour window for everybody** — see "The window is the
-teacher's".
-
-**Cancelling inside `CourseArchiver`.** `CourseArchiverTests` and
-`CourseRestorerTests` build an **ICS3U** fixture — "a course a teacher plausibly
-has" — and set no `launchAgentsDirectoryOverride`, so a cancel inside the
-archiver with the real `LaunchControl` as its default would boot out and delete
-a real ICS3U schedule on the machine running the suite. The orchestration went
-into `ScheduledDeployCleanup` instead, which takes the runner explicitly.
-Putting it in `SidebarView.performRemoval` was rejected for the opposite reason:
-nothing in the suite constructs that view — every reference to it is to a static
-member — so the wiring could not be pinned, and a later edit that dropped the
-call would leave the suite green. `LaunchControl.run` now also refuses outright
-while the agents override is set, so the rule is structural rather than written
-down — and since the same day so does the SCRIPTS folder, which is the half that
-claim did not cover: `cancelScheduledDeploy` deletes the wrapper whatever runner
-it was handed, and `scriptURL` had no override at all, so the suite really was
-deleting `~/Library/Application Support/Plantoir/scheduled/<label>.sh` for the
-fixture code. See `documentation/09-mac-app.md`.
-
-**Cancelling on a restore.** Restoring a backup replaces a course's CONTENTS in
-place: the course and its sections are still there, its site marker comes back
-with it, and the schedule still means what it meant. Restoring an ARCHIVE adds,
-and a section restored after its deploy was cancelled comes back with nothing
-scheduled, which is the safe direction. Both are pinned as cases in the
-contract, by a scan of the file that must not have learned to cancel.
-
-### The one claim no unit test can reach, and how it was measured
-
-`launchAgentsDirectoryOverride` moves where the app WRITES; launchd only ever
-reads the real folder, so nothing in the suite can prove that launchd hands
-`PLANTOIR_SCHEDULED_FOR` to the process it starts — and the whole lateness check
-rests on it. It was measured by hand on 2026-09-20: three real launchd jobs, in
-a throwaway working folder inside `$HOME`, under course codes no teacher can
-have, with a stand-in wrapper in place of a real Quartz build. The numbers and
-what each job proved are in `GUI-IMPROVEMENTS.md`'s row for this change.
-
----
-
-[◀ Previous: Quartz Customizations](06-quartz-customizations.md) · [Back to index](README.md) · [Next: course_config.json Reference ▶](08-course-config-reference.md)
