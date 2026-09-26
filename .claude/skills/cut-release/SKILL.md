@@ -201,7 +201,7 @@ python3 website/update_feed.py macos --version <version> \
    DMG leaves both alone. See `RELEASING.md` → "The update feed (macOS)".
 
    **Deltas (#312).** When the feed already holds earlier builds, the run
-   downloads their DMGs (up to three, ~430 MB each, from their own releases),
+   downloads their DMGs (up to three, ~410 MB each, from their own releases),
    makes a delta from each, puts every earlier item back as it was and signs
    the feed once more — so the Keychain asks a THIRD time (`sign_update`);
    answer **Allow** again. It prints each `.delta` it wrote beside the DMG.

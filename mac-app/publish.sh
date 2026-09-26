@@ -266,7 +266,8 @@ fi
 
 # LZMA (ULMO) rather than create-dmg's zlib (UDZO), since the app carries the
 # website builder's starting disk (#312): 432 MB rather than 466 MB, measured
-# with the same payload, for 72 s more here; macOS 15, the app's minimum,
+# with the same payload (410 MB at the rehearsal), for about 30-70 s more
+# here; macOS 15, the app's minimum,
 # reads it. Converted BEFORE the DMG is signed, because converting drops the
 # signature. The window layout create-dmg wrote is inside the volume and
 # survives the conversion (checked at the #312 rehearsal).

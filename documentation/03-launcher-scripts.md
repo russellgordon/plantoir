@@ -687,6 +687,26 @@ rebuild after an update keeps the older line, because most of those bytes are
 already cached (plan review M6). The words are pinned in
 `contracts/app-rules.json` → `helperBootstrap.printed`.
 
+**Rehearsed, 2026-09-26, on the signed and notarized rehearsal build** (M4
+Pro; the launchers' own code run with `HOME` pointed at a throwaway folder in
+Russell's home, so the tools folder, `~/.colima` and the virtual machine were
+new and his own were never touched; the DMG marked by a browser first):
+
+| Stage | Before #312 (v1.3.1's code, same Mac) | With the app's copy |
+|---|---|---|
+| Helper programs | 4 downloads, ~4 s here | copied, checked, stamped: **2 s** — no quarantine on the copies |
+| Virtual machine created | disk downloaded, ~25 s | from the app's disk: **22 s** (`PLANTOIR_BUILDER_CREATED: seeded 22`) |
+| Website builder's image | — | **63 s**, 440,803,331 bytes into the VM |
+| Colima's and Lima's download caches | filled | never created |
+
+The installed base, rehearsed the same way (R-G): a home set up by v1.3.1's
+own launcher code (tools downloaded, unstamped, the virtual machine made by
+upstream's ad-hoc limactl), then the #312 app's next start: "bundled
+unrecorded colima,limactl,docker" in **1 s**, and the EXISTING virtual machine
+started with the Developer ID, hardened-runtime limactl in 15 s. After an
+update to a second signed build (every program's bytes different, same pins),
+the next start installed nothing and left the stamp untouched.
+
 **What is still downloaded on a first run:** the website builder's image
 build, about 390 MB from Docker Hub, the Debian and nodesource mirrors, npm
 and GitHub (the Quartz clone). It is now the largest stage by far; trimming it
