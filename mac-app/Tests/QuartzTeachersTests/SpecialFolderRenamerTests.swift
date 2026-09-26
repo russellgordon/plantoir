@@ -157,7 +157,11 @@ final class SpecialFolderRenamerTests: XCTestCase {
                 "curriculum_folder": NSNull(),
             ]
         )
-        XCTAssertEqual(updated["curriculum_folder"] as? String, "Expectations")
+        // Since #128 the name is written down as the LIST `curriculum_folders`
+        // — the legacy one-name key is never created, only rewritten when it
+        // already named the folder (here it was null, so it stays null).
+        XCTAssertEqual(updated["curriculum_folders"] as? [String], ["Expectations"])
+        XCTAssertNil(updated["curriculum_folder"] as? String)
     }
 
     /// **The over-reach found by adversarial review.** `ClassFolder.name`
