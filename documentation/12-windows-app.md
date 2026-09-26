@@ -1779,10 +1779,15 @@ phrasing made a teacher the caller:
   against "writes the local model can reach". `make_room_for_classes` is
   MCP-only, so it was not in it — and it is the most far-reaching tool on the
   surface, renaming pages a teacher's links point at. Without the entry it
-  would have been the ONE card that ran with nothing shown first. The mac has
-  never had this hole because `AssistToolDefinition.planTwinName` DERIVES the
-  twin from the tool; a list has to be told. If you add a card phrasing, check
-  that map by hand.
+  would have been the ONE card that ran with nothing shown first. If you add a
+  card phrasing, check that map by hand. (This used to say the mac could not
+  have the hole because `planTwinName` DERIVES the twin. It had its own:
+  `add_curriculum_mentions` derived `plan_add_curriculum_mentions`, which does
+  not exist, so the mac's gate ran that write with no plan — reachable only by
+  a model naming a tool it was not offered, which the mac also did not refuse.
+  Both closed in #327: an explicit `irregularPlanTwins` map, and a refusal for
+  any tool the model was not offered — see doc 10, Part 6. `tools.planTwins`
+  now carries the pair.)
 - **A plan twin that returns a bare `string` cannot say it is a plan.** The
   mark is `_meta["plantoir.app/isPlan"]`, set only by `PlantoirTools.Proposing`,
   and `AssistAgent.ShowPlan` reads an unmarked answer as a REFUSAL: it prints
@@ -1793,7 +1798,12 @@ phrasing made a teacher the caller:
   read and never accept. `AssistSurfaceContractTests.EveryPlanTwinTheGateRunsCanSayItIsAPlan`
   now checks the RETURN TYPE of every twin the gate runs, which is the thing
   that makes the mark possible; it unwraps `Task<>`, since an async tool marks
-  just as well.
+  just as well. (The mac pins the same property by RUNNING every `plan_` tool
+  on a happy path, since its return type is always `AssistToolOutcome` — #150,
+  doc 10 → "A plan has to be able to SAY it is a plan". Since #150 the
+  contract also DECLARES "make room for a class at Unit 3, Day 4" in
+  `cardPhrasings.parsed`, so `InsertClassesTests`' local pin of the article
+  form can read the contract instead — optional, not owed.)
 - **A sentence written for a model becomes a sentence a teacher reads.**
   `explain_publishing`'s second answer said "Don't repeat it — carry on with
   what the teacher asked", which was harmless while a model was the only
