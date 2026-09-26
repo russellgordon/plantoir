@@ -23,7 +23,26 @@
       {
         "carries": "the folder path, redacted",
         "event": "working folder opened",
-        "why": "Almost every question about a course begins with which folder it is in - and a folder outside the home directory bind-mounts as an EMPTY folder inside the container, which is a whole class of report explained by this line alone."
+        "why": "Almost every question about a course begins with which folder it is in. On the mac, a folder outside the home folder used to bind-mount as an EMPTY folder inside the container, and a container made that old way still does until it is recreated; the launchers refuse such a folder since #221, and since #290 the app refuses it when a window chooses or reopens it, writing \"working folder refused\" or \"working folder not reopened\" instead of this line. This line is the teacher's CHOICE only: a folder the app reopened by itself writes \"working folder reopened\" (#311)."
+      },
+      {
+        "event": "working folder reopened",
+        "carries": "the working folder's path (redacted), which it was — the window's own folder or the last working folder — and, when a bookmark found it moved, the path it had been at",
+        "why": "\"Plantoir opened the wrong folder\" and \"my courses are gone\" are both answered by knowing the APP reopened a folder rather than the teacher choosing one. Until #311 (2026-09-26) a restore left nothing on the mac trail, and on Windows it wrote \"working folder opened\", indistinguishable from a choice. The moved clause answers \"it's opening my old copy\". Written only by a window's model, once per window that reopens. A window opened BESIDE another (⌘N) inherits the key window's folder and writes nothing on either platform — it is neither a choice nor a reopen."
+      },
+      {
+        "event": "working folder not reopened",
+        "carries": "the reason (gone, inTrash, driveNotConnected, unreadable, outsideHome, coursesOutsideHome — reopeningTheLastWorkingFolder.wording's keys), which folder it was (the window's own or the last working folder) and the remembered path (redacted)",
+        "why": "\"Plantoir forgot my folder\" is the report #311 exists to prevent; when it happens anyway, the reason and the path are what can no longer be looked for afterwards — the drive gets plugged back in, the Trash emptied, the permission granted."
+      },
+      {
+        "event": "working folder refused",
+        "carries": "the chosen folder's path (redacted), and whether the folder itself or its courses lead outside the home folder",
+        "why": "A refused folder leaves nothing else behind — not adopted, not remembered, no \"opened\" line — so without this the trail shows a teacher who never chose anything. Only the picker writes it; a remembered folder out of reach writes \"working folder not reopened\" with its reason instead, so one fact is one line (#290 folded into #311).",
+        "appliesOn": [
+          "mac"
+        ],
+        "appliesOnWhy": "PERMANENT: Windows builds natively, so no folder it can read is out of the builder's reach (shared-rules.json → workingFolderReach)."
       },
       {
         "carries": "the course code; which sidebar items this save hid or showed (names only, compared with the file as it was before the save); which settings it kept or replaced because another window or a build had changed the file since this window read it, and — when the sidebar list was one it replaced — that the teacher was told so (specialNames.settingsSaveReplacedSidebarChange); and whether a preview or a publish of the course was running, so it could not see the save",
@@ -10221,5 +10240,419 @@
       "expectNoLineStartingWith": ["PUBLISHED_FOLDER=", "✅ Published"],
       "why": "Before: the copy's own exit status (23, 'finished in part') went into a pipe whose status was thrown away, so the launcher said Published and named the folder. A partial copy is a failure deliberately: the page left behind may be one the teacher took down. Not measured: network shares and iCloud Drive, where a copy can fail to set a file's attributes and report the same 'finished in part' - see documentation/07-deployment.md."
     }
+  },
+  "reopeningTheLastWorkingFolder": {
+    "note": "Issue #311, found in the #204 rehearsal in a fresh account: \"You should NOT have to pick your working folder every time Plantoir opens.\" The folder is the teacher's library, not a document window — Photos and Music reopen their library whatever the window setting says. Merged with #290 into ONE restore route (director's ruling, 2026-09-26): a remembered folder the website builder cannot reach is one more reason on this list, not a second route.",
+    "rule": "When Plantoir opens, the first window opens on the last working folder the teacher worked in. That folder is not forgotten because windows are set not to come back, nor because the last window was closed first. A window opened with no other window open reopens it too. When it cannot be reopened, the window shows the folder picker with ONE sentence naming the folder and why, and the folder stays remembered until another is chosen or reopened. Whether every window comes back is a separate question, answered by the platform's own switch (mac: System Settings ▸ Desktop & Dock ▸ \"Close windows when quitting an application\"; Windows: RestoreWindowsOnLaunch).",
+    "why": "Measured 2026-09-26: the mac already restored each window's folder, but only when macOS keeps windows (NSQuitAlwaysKeepsWindows, GUI row 62). The system default is the opposite, so every fresh account — and every relaunch after an update — met the picker; and closing the last window before quitting emptied the list (row 84). Russell's own account keeps windows (NSQuitAlwaysKeepsWindows = 1), which is why it never showed there. Windows already had this shape: RestoreWindowsOnLaunch governs the window set, WorkspacePath always comes back.",
+    "whichFolderIsLast": "The folder of the window most recently in front — not the one most recently chosen. Written when a folder is chosen or reopened and whenever a window with a folder comes to the front. A window with no folder never writes it.",
+    "howItIsFound": "Mac: a plain bookmark first, then the path, so a folder renamed or moved on the same disk reopens where it now is. A bookmark that leads into a Trash is REFUSED (measured: it resolves to ~/.Trash/<name>, where the folder still exists) unless the original place holds a folder again. Windows: the path; a moved folder reads as gone, which is honest.",
+    "oneDecisionPerWindow": "Each window decides its folder ONCE — claimed, reopened, refused, inherited or left to the picker — and nothing later decides again. A second window that appears at launch without a remembered folder of its own (macOS brought back a window that was a picker, or a log-in restored windows the setting said not to keep) shows the picker; it never inherits the first window's folder.",
+    "neverTouchedBy": "The MCP server, a scheduled publish run, writing the contracts, the test suites (hosted and UI), and any model no window shows (the assistant's own). They neither read the memory nor write it, and never write the trail lines below.",
+    "wording": {
+      "gone": "“{folder}”, the working folder you had open last time, can’t be found — if you moved it, choose it again from its new place.",
+      "inTrash": "“{folder}”, the working folder you had open last time, is in the Trash — put it back and choose it again, or choose another folder.",
+      "driveNotConnected": "“{folder}”, the working folder you had open last time, is on a drive that isn’t connected — connect it and open Plantoir again, or choose another folder.",
+      "unreadable": "Plantoir isn’t allowed to open “{folder}”, the working folder you had open last time — turn Plantoir on in System Settings ▸ Privacy & Security ▸ Files and Folders, or choose the folder again.",
+      "outsideHome": "The working folder Plantoir had open last time, “{folder}”, is not inside your home folder, so Plantoir cannot build websites from it. Keep your working folder inside your home folder — on your Desktop or in Documents, for example — and not on an external drive or in a shared location, then choose it again.",
+      "coursesOutsideHome": "The working folder Plantoir had open last time, “{folder}”, keeps its courses outside your home folder, so Plantoir cannot build websites from it. Keep your working folder and the courses in it inside your home folder — on your Desktop or in Documents, for example — and not on an external drive or in a shared location, then choose it again.",
+      "unreadableWhy": "Points at System Settings because that is the fix that lasts for a folder macOS protects (Desktop, Documents, a removable drive) that Plantoir was not allowed into. Whether choosing it again in the picker lasts past the next launch was NOT measured (2026-09-26: the Mac's screen was locked, so the permission prompt could not be answered); it is on Russell's list. Windows reads an access denial as the folder not existing unless it probes differently — say unreadable only when that can be told apart."
+    },
+    "launchCases": [
+      {
+        "name": "one window left open, windows do not come back",
+        "windowsComeBack": false,
+        "windowsLeftOpen": [
+          "A"
+        ],
+        "lastWorkedIn": "A",
+        "windowsMacOSOpens": 1,
+        "expectWindows": [
+          "A"
+        ],
+        "why": "The rehearsal's report. The system default must still bring the folder back."
+      },
+      {
+        "name": "one window left open, windows come back",
+        "windowsComeBack": true,
+        "windowsLeftOpen": [
+          "A"
+        ],
+        "lastWorkedIn": "A",
+        "windowsMacOSOpens": 1,
+        "expectWindows": [
+          "A"
+        ],
+        "why": "What already worked, pinned."
+      },
+      {
+        "name": "two windows, windows do not come back",
+        "windowsComeBack": false,
+        "windowsLeftOpen": [
+          "A",
+          "B"
+        ],
+        "lastWorkedIn": "B",
+        "windowsMacOSOpens": 1,
+        "expectWindows": [
+          "B"
+        ],
+        "why": "ONE window, on the folder last in front (Russell's Q1, recommended and accepted): the setting governs the window set, the folder still comes back."
+      },
+      {
+        "name": "two windows, windows come back",
+        "windowsComeBack": true,
+        "windowsLeftOpen": [
+          "A",
+          "B"
+        ],
+        "lastWorkedIn": "B",
+        "windowsMacOSOpens": 2,
+        "expectWindows": [
+          "A",
+          "B"
+        ],
+        "why": "Each window on its own folder, as before."
+      },
+      {
+        "name": "the teacher closed the last window, then quit",
+        "windowsComeBack": true,
+        "windowsLeftOpen": [],
+        "lastWorkedIn": "A",
+        "windowsMacOSOpens": 1,
+        "expectWindows": [
+          "A"
+        ],
+        "why": "Closing the last window empties the window list, not the last folder (row 84 reversed)."
+      },
+      {
+        "name": "nothing ever chosen",
+        "windowsComeBack": false,
+        "windowsLeftOpen": [],
+        "lastWorkedIn": null,
+        "windowsMacOSOpens": 1,
+        "expectWindows": [
+          null
+        ],
+        "why": "A first launch: the picker, with no sentence."
+      },
+      {
+        "name": "windows do not come back, but a log-in brought two back",
+        "windowsComeBack": false,
+        "windowsLeftOpen": [
+          "A",
+          "B"
+        ],
+        "lastWorkedIn": "B",
+        "windowsMacOSOpens": 2,
+        "expectWindows": [
+          "B",
+          null
+        ],
+        "appliesOn": [
+          "mac"
+        ],
+        "why": "#311 review B2: \"Reopen windows when logging back in\" may restore windows whatever the Desktop & Dock setting says (unmeasured; on Russell's list). The first window takes the last folder; the second shows the picker rather than becoming a second window on B. Mac-only: Windows restores its own windows by its own switch."
+      }
+    ],
+    "folderCases": [
+      {
+        "name": "the folder is there",
+        "make": "there",
+        "expect": "reopen"
+      },
+      {
+        "name": "the folder was deleted",
+        "make": "deleted",
+        "expect": "gone"
+      },
+      {
+        "name": "the folder is in the Trash",
+        "make": "inTrash",
+        "expect": "inTrash",
+        "appliesOn": [
+          "mac"
+        ],
+        "why": "A path cannot reach a Windows Recycle Bin entry; there it reads as gone."
+      },
+      {
+        "name": "the folder was renamed on the same disk",
+        "make": "renamed",
+        "expect": "reopen",
+        "expectFoundAt": "renamed",
+        "appliesOn": [
+          "mac"
+        ],
+        "why": "The bookmark follows a rename. No bookmark on Windows: there it reads as gone, which is honest."
+      },
+      {
+        "name": "the bookmark leads into the Trash but the original place has a folder again",
+        "make": "trashedButOriginalBack",
+        "expect": "reopen",
+        "expectFoundAt": "original",
+        "appliesOn": [
+          "mac"
+        ],
+        "why": "Put back from a backup or a copy: that is the folder the teacher means (#311 review, minor)."
+      },
+      {
+        "name": "the folder is on a drive that is not connected",
+        "make": "driveNotConnected",
+        "expect": "driveNotConnected",
+        "why": "Asked from the drive's name alone, before anything under it is touched, so an absent network share never holds launch. Windows reads this as a missing drive root."
+      },
+      {
+        "name": "the folder cannot be read",
+        "make": "unreadable",
+        "expect": "unreadable"
+      },
+      {
+        "name": "the folder is outside the home folder",
+        "make": "outsideHome",
+        "expect": "outsideHome",
+        "appliesOn": [
+          "mac"
+        ],
+        "why": "#290 folded in: the website builder on a Mac sees only the home folder. A bookmark can carry a folder out of it (moved to /Users/Shared)."
+      },
+      {
+        "name": "the folder's courses are a link outside the home folder",
+        "make": "coursesLinkedOutside",
+        "expect": "coursesOutsideHome",
+        "appliesOn": [
+          "mac"
+        ]
+      },
+      {
+        "name": "the folder was emptied out",
+        "make": "emptied",
+        "expect": "reopen",
+        "why": "Reopens, and the window offers to set it up (workspaceCanBeInitialized), as for any empty folder."
+      },
+      {
+        "name": "the folder is no longer a working folder",
+        "make": "notAWorkingFolder",
+        "expect": "reopen",
+        "why": "Reopens, and the picker's existing guidance for a folder it does not recognise follows — chosen, not accidental (#311 review, minor). The trail says reopened, which is true."
+      }
+    ],
+    "memoryCases": [
+      {
+        "name": "a folder that could not be reopened stays remembered",
+        "expect": "stillRemembered",
+        "why": "Forgetting it would make a teacher who plugs the drive back in pick it again — the complaint itself."
+      },
+      {
+        "name": "choosing another folder replaces it and takes the sentence away",
+        "expect": "replacedAndSentenceGone"
+      },
+      {
+        "name": "a model no window shows never writes it",
+        "expect": "notWritten",
+        "why": "The assistant and the MCP server adopt folders on models of their own."
+      }
+    ],
+    "rejected": [
+      {
+        "instead": "A security-scoped bookmark, as the issue asked.",
+        "why": "The app is not sandboxed. Measured 2026-09-26 in a folder macOS does not protect: one is created, 'starts', and grants nothing a plain bookmark lacks. Whether it would carry a grant for a Desktop or Documents folder the teacher denied could not be measured that day (the screen was locked) — Russell's list; if it does, it is added beside the plain bookmark rather than instead of it."
+      },
+      {
+        "instead": "The path only.",
+        "why": "Loses a renamed folder, which is the case the issue names."
+      },
+      {
+        "instead": "Following the bookmark wherever it leads.",
+        "why": "Measured: it leads into ~/.Trash. Reopening, building and syncing out of a trashed folder is the success that is wrong."
+      },
+      {
+        "instead": "Honouring \"Close windows when quitting an application\" for the folder (row 62 as written).",
+        "why": "It is the cause of the report, and the default in every fresh account."
+      },
+      {
+        "instead": "Replaying EVERY remembered window even when macOS will not.",
+        "why": "Overrides the setting for the window set too, needs Plantoir to open windows itself at launch (duplicates when macOS is also restoring), and goes further than Windows."
+      },
+      {
+        "instead": "A Plantoir preference \"Reopen last folder\".",
+        "why": "Russell's words are unconditional, and File ▸ Open Working Folder… is one keystroke away."
+      },
+      {
+        "instead": "Letting a second launch-time window inherit the first one's folder.",
+        "why": "Two windows on one folder nobody asked for (#311 review B1/B2)."
+      },
+      {
+        "instead": "Forgetting a folder that could not be reopened.",
+        "why": "A reconnected drive would then need picking again."
+      },
+      {
+        "instead": "Writing \"working folder opened\" for a reopen, as Windows did.",
+        "why": "The trail could not then tell the teacher's choice from the app's."
+      },
+      {
+        "instead": "Showing the path bar under the sentence for every reason.",
+        "why": "For a gone, trashed or unplugged folder its crumbs would be wrong or dead. Shown only for a folder that is there (out of the builder's reach)."
+      }
+    ],
+    "howToRunACase": "launchCases: play through the launch rule window by window (mac: WindowStartRule.playLaunch) with the letters as folder names; expectWindows lists each window's folder in order, null for the picker. folderCases: build a real throwaway folder shaped by `make` and ask the platform's reopen decision; `expect` is 'reopen' or a wording key. The Trash is an INJECTED trash root, never the real Trash; 'driveNotConnected' is /Volumes/<a fresh uuid>/…; 'unreadable' is chmod 000 (restored afterwards); 'outsideHome' needs the home folder pointed at a throwaway 'home/' beside a throwaway 'outside/'."
+  },
+  "workingFolderReach": {
+    "note": "Issue #290, folded into #311's restore route. The website builder on a Mac runs in a virtual machine that is handed the home folder and nothing else, so a working folder outside it cannot produce a website. Since #221 the launchers refuse one at the first preview; since #290 the app refuses it when a window takes it on — chosen in the picker, or reopened (reopeningTheLastWorkingFolder, reasons outsideHome and coursesOutsideHome) — before anything is written into it.",
+    "appliesOn": [
+      "mac"
+    ],
+    "appliesOnWhy": "PERMANENT: Windows builds natively (no WSL2, no Docker since 2026-08-20), so any folder it can read it can build. Nothing to mirror. If Windows ever builds in a virtual machine or container again, drop this appliesOn rather than adding a windows twin — and copy the rule as 'inside what the VM mounts, by the disk's own spelling', not 'not on another drive letter'.",
+    "rule": "A folder is inside when its canonical path (FolderIdentity.canonicalPath, the disk's own spelling, which is what /bin/pwd -P gives the launchers) equals the canonical home or lies under it, compared name by name as bytes. Applied to the working folder, and to <folder>/courses when that is a LINK (read with the link's own attributes, so a link to an unplugged drive is caught). Refused when chosen in the picker and when reopened; never for the MCP server's or the assistant's own models, and never for the SOURCE of Import Courses for Reference, which is copied in. A hard refusal: there is no 'use it anyway'.",
+    "why": "Measured 2026-09-26: /Volumes/Macintosh HD is a link to /, so /Volumes/Macintosh HD/Users/<me>/Desktop is the teacher's own Desktop — a 'refuse anything under /Volumes' rule would refuse it. Case and the /System/Volumes/Data firmlink fold to /Users/… through F_GETPATH. iCloud Drive (~/Library/Mobile Documents) and ~/Library/CloudStorage/* are inside. External drives, /Users/Shared and /private/tmp are outside (the last two measured refused by the launcher in #221). String.hasPrefix is grapheme-based and answered false for a name beginning with a combining mark, which is why the comparison is by bytes. Unlike a cloud-synced folder, the verdict is exact and the folder is guaranteed not to build on the builder Plantoir installs, so a 'use it anyway' would lead to a certain refusal minutes later. Known false refusal, accepted: a Mac whose Docker engine could mount the drive (Docker Desktop, OrbStack, Colima with extra mounts).",
+    "whereItIsShown": "On the picker, when the window shows the picker — including the four picker screens that already have a folder half-chosen (empty folder to set up, unrecognised folder, a folder with a problem, a synced folder awaiting a decision), where the half-chosen folder and its own offer stay below the refusal. As an alert, when the window goes on showing its own folder (File ▸ Choose Working Folder…), whose folder stays exactly as it was; its buttons are cloudSyncedFolders' 'Choose a Different Folder…' (named, not repeated) and alertOKButton.",
+    "wording": {
+      "headline": "Plantoir cannot build websites from “{folderName}”, because it is not inside your home folder.",
+      "coursesHeadline": "Plantoir cannot build websites from “{folderName}”, because the courses in it are not inside your home folder.",
+      "whatToDo": "Keep your working folder inside your home folder — on your Desktop or in Documents, for example — and not on an external drive or in a shared location, then choose it again.",
+      "whatToDoForCourses": "Keep your working folder and the courses in it inside your home folder — on your Desktop or in Documents, for example — and not on an external drive or in a shared location, then choose it again.",
+      "alertOKButton": "OK",
+      "chooseDifferentFolderButtonIs": "CloudSyncWording.chooseDifferentFolderButton — named, not repeated",
+      "sharedClauseWithFailureExplanations": "inside your home folder — on your Desktop or in Documents, for example — and not on an external drive or in a shared location"
+    },
+    "pathCases": [
+      {
+        "name": "a folder on the Desktop",
+        "home": "/Users/ann",
+        "folder": "/Users/ann/Desktop/Notes",
+        "expect": "inside"
+      },
+      {
+        "name": "the home folder itself",
+        "home": "/Users/ann",
+        "folder": "/Users/ann",
+        "expect": "inside"
+      },
+      {
+        "name": "iCloud Drive",
+        "home": "/Users/ann",
+        "folder": "/Users/ann/Library/Mobile Documents/com~apple~CloudDocs/Notes",
+        "expect": "inside"
+      },
+      {
+        "name": "Dropbox",
+        "home": "/Users/ann",
+        "folder": "/Users/ann/Library/CloudStorage/Dropbox/Notes",
+        "expect": "inside"
+      },
+      {
+        "name": "an external drive",
+        "home": "/Users/ann",
+        "folder": "/Volumes/School Drive/Notes",
+        "expect": "refused"
+      },
+      {
+        "name": "the shared folder",
+        "home": "/Users/ann",
+        "folder": "/Users/Shared/Notes",
+        "expect": "refused"
+      },
+      {
+        "name": "a temporary folder",
+        "home": "/Users/ann",
+        "folder": "/private/tmp/Notes",
+        "expect": "refused"
+      },
+      {
+        "name": "a neighbour whose name starts the same",
+        "home": "/Users/ann",
+        "folder": "/Users/ann2/Notes",
+        "expect": "refused"
+      },
+      {
+        "name": "a home with a trailing slash",
+        "home": "/Users/ann/",
+        "folder": "/Users/ann/Notes",
+        "expect": "inside"
+      },
+      {
+        "name": "a folder whose name begins with a combining mark",
+        "home": "/Users/ann",
+        "folder": "/Users/ann/́Notes",
+        "expect": "inside",
+        "why": "String.hasPrefix answers false here (measured): the mark fuses with the slash. Compared as bytes it is inside."
+      }
+    ],
+    "diskCases": [
+      {
+        "name": "a folder that is simply inside",
+        "make": "plainInside",
+        "expect": "inside"
+      },
+      {
+        "name": "a folder that is simply outside",
+        "make": "plainOutside",
+        "expect": "refused"
+      },
+      {
+        "name": "a link outside that leads into home",
+        "make": "linkOutsideToInside",
+        "expect": "inside"
+      },
+      {
+        "name": "a link in home that leads outside",
+        "make": "linkInsideToOutside",
+        "expect": "refused"
+      },
+      {
+        "name": "home spelled in the wrong case",
+        "make": "wrongCaseSpelling",
+        "expect": "inside"
+      },
+      {
+        "name": "courses is a link to outside",
+        "make": "coursesLinkedOutside",
+        "expect": "refusedForCourses"
+      },
+      {
+        "name": "courses is a link to a drive that is not connected",
+        "make": "coursesLinkDangling",
+        "expect": "refusedForCourses",
+        "why": "fileExists follows links and would call this absent; the link's own attributes catch it."
+      }
+    ],
+    "notCaught": "A link INSIDE courses (courses/ICS3U → a drive) mounts, then shows an empty course to the builder; it is not caught here, and the launcher's refusal does not see it either. A home folder that is itself a link, or a network home, is not measured: the rule may call it inside and the launcher still refuse — a missed refusal, with #221 as the backstop, not a false one.",
+    "rejected": [
+      {
+        "instead": "\"Use This Folder Anyway\", as for synced folders.",
+        "why": "The cloud rule never refuses because detection is uncertain and the folder still works. Here the detection is exact and the folder is guaranteed not to build."
+      },
+      {
+        "instead": "Refuse any path under /Volumes.",
+        "why": "Measured wrong: /Volumes/Macintosh HD is a link to /. It would also miss /Users/Shared and /private/tmp."
+      },
+      {
+        "instead": "Compare raw paths, realpath or resolvingSymlinksInPath.",
+        "why": "#189's reasons: case, firmlink and /private spellings would disagree with what the launcher's /bin/pwd -P mounts."
+      },
+      {
+        "instead": "Check in adoptRestoredPath, every route.",
+        "why": "Shared by the MCP server and the assistant, which are not a teacher choosing; their building tools already get #221's explanation. A source-scan test (AdoptRestoredPathCallersTests) holds its callers to a named list instead, so a window route cannot slip back onto it."
+      },
+      {
+        "instead": "Check at course creation as well.",
+        "why": "It happens only inside a folder already adopted, so the check would find nothing."
+      },
+      {
+        "instead": "Refuse the SOURCE of Import Courses for Reference.",
+        "why": "It is copied into the working folder, so an external source is harmless."
+      },
+      {
+        "instead": "Ask the engine what it mounts at pick time.",
+        "why": "Spawns processes on the main actor, only meaningful once the virtual machine is up, and a second source of truth beside the launcher's."
+      },
+      {
+        "instead": "Reuse #221's sentence unchanged.",
+        "why": "Its first half describes an attempted build; nothing has been attempted at pick time. Its guidance clause IS reused word for word and pinned."
+      },
+      {
+        "instead": "Forget a remembered folder that is out of reach, so the reason is said once (#290's plan).",
+        "why": "Reversed when #290 was folded into #311: one remembering rule for every reason. The teacher cannot go on without choosing, so the repetition ends at one choice."
+      }
+    ]
   }
 }

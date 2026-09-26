@@ -86,7 +86,11 @@ nonisolated struct RememberedFolder: Equatable, Sendable {
                 relativeTo: nil,
                 bookmarkDataIsStale: &isStale
             ) {
-                resolvedPath = url.path
+                // The same folder however it is spelled (`/var` against
+                // `/private/var`, #189) is not a move.
+                if !FolderIdentity.isSameFolder(url.path, remembered.path) {
+                    resolvedPath = url.path
+                }
             }
         }
         var inTrash: Bool = RememberedFolder.isInTrash(resolvedPath, trashRoots: trashRoots)
@@ -166,8 +170,9 @@ nonisolated struct RememberedFolder: Equatable, Sendable {
     /// and the `/System/Volumes/Data` spelling do not matter.
     static func isInTrash(_ path: String, trashRoots: [String]?) -> Bool {
         if let trashRoots {
+            let canonicalPath: String = FolderIdentity.canonicalPath(path)
             for root in trashRoots {
-                if WorkingFolderReach.isInside(canonicalFolderPath: path, canonicalHomePath: root) {
+                if WorkingFolderReach.isInside(canonicalFolderPath: canonicalPath, canonicalHomePath: FolderIdentity.canonicalPath(root)) {
                     return true
                 }
             }
