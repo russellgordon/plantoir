@@ -1109,7 +1109,14 @@ as history, not as what Windows does today.
   way: resolve claims on the platform's restoration-complete signal
   rather than polling, and while a claim may still arrive show a quiet
   loading state, never the folder picker the claim is about to replace.
-  The scenario test suite in the macOS app is the porting spec. **The
+  The scenario test suite in the macOS app is the porting spec. **Since #311
+  the FOLDER comes back whatever happens to the window set** — the first
+  window reopens the last working folder (the one last in FRONT, not last
+  chosen), and a failed reopen says why in one sentence and is kept:
+  `contracts/shared-rules.json` → `reopeningTheLastWorkingFolder`, whose
+  `launchCases` and `folderCases` are the acceptance list; the reasoning is
+  in [`09-mac-app.md`](09-mac-app.md) → "Reopening on the last working
+  folder (#311)". **The
   other half of that — what a window lets GO of when it is pointed at a
   different folder** — is `contracts/shared-rules.json` →
   `workingFolderSelection`, and since 2026-09-19 all four of its cases run
