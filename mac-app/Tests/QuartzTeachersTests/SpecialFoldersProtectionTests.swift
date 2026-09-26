@@ -4,7 +4,45 @@ import XCTest
 @MainActor
 final class SpecialFoldersProtectionTests: XCTestCase {
 
+    // MARK: - Stored properties
+
+    /// Where this test's trail lines go, and the store that was there before.
+    /// A removal through the list editor runs `folderWasRemoved`, which writes
+    /// an `.itemExcluded` line — without the redirect it would land in the
+    /// real `~/Library/Logs/Plantoir`.
+    var trailFolderURL: URL?
+    var previousTrailStore: ProblemReportStore?
+
+    // MARK: - Set up
+
+    override func setUp() async throws {
+        let folderURL: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("special-folders-trail-\(UUID().uuidString)", isDirectory: true)
+        trailFolderURL = folderURL
+        previousTrailStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: folderURL)
+    }
+
+    override func tearDown() async throws {
+        if let previousTrailStore {
+            ActivityTrail.store = previousTrailStore
+        }
+        if let trailFolderURL {
+            try? FileManager.default.removeItem(at: trailFolderURL)
+        }
+    }
+
     // MARK: - Helper methods
+
+    /// Removes a shared folder the way the teacher does, through the list
+    /// editor Course Settings builds: `removeItem(named:)` takes the name out
+    /// of the list, then `onRemove` runs `folderWasRemoved` — the exclusion,
+    /// then the pool. Issue #183: a hand replay of those steps stays green
+    /// when the shipped order changes, so these tests call its owner.
+    private func removeSharedFolderThroughTheListEditor(_ name: String, in view: CourseSettingsView) {
+        let editor: StringListEditorView = CourseSettingsGestureScript.editor(for: .sharedFolders, of: view)
+        editor.removeItem(named: name)
+    }
 
     private func makeCourse(
         in root: URL,
@@ -373,19 +411,18 @@ final class SpecialFoldersProtectionTests: XCTestCase {
 
         // The confirmation promises the folder leaves the marks pool, and
         // the build must never be handed a pool naming an excluded folder.
-        // Played in the order Course Settings does it — the list editor drops
-        // the name, then `onRemove` excludes it — because since 2026-09-09 the
-        // drop asks what the checklist offers, and it offers what the lists
-        // and the disk still hold.
-        course.configuration.sharedFolders = ["Concepts", "Tests"]
-        course.configuration.exclude("Tasks", inScope: FolderScope.shared.exclusionKey)
-        view.dropFromMarksPool("Tasks")
+        // Run through the list editor, so it happens in the order Course
+        // Settings does it — the editor drops the name, then `onRemove`
+        // excludes it — because since 2026-09-09 the drop asks what the
+        // checklist offers, and it offers what the lists and the disk still
+        // hold.
+        removeSharedFolderThroughTheListEditor("Tasks", in: view)
+        XCTAssertEqual(course.configuration.sharedFolders, ["Concepts", "Tests"])
         XCTAssertEqual(course.configuration.gradedFolders, ["Tests"])
 
         // A name that was never in the pool changes nothing.
-        course.configuration.sharedFolders = ["Tests"]
-        course.configuration.exclude("Concepts", inScope: FolderScope.shared.exclusionKey)
-        view.dropFromMarksPool("Concepts")
+        removeSharedFolderThroughTheListEditor("Concepts", in: view)
+        XCTAssertEqual(course.configuration.sharedFolders, ["Tests"])
         XCTAssertEqual(course.configuration.gradedFolders, ["Tests"])
     }
 
@@ -430,11 +467,11 @@ final class SpecialFoldersProtectionTests: XCTestCase {
         )
         let view: CourseSettingsView = CourseSettingsView(course: course)
 
-        // In the order Course Settings really does it: the list editor drops
-        // the name, `onRemove` excludes it, and only then is the pool touched.
-        course.configuration.sharedFolders = ["Concepts", "Homework Tasks"]
-        course.configuration.exclude("Tasks", inScope: FolderScope.shared.exclusionKey)
-        view.dropFromMarksPool("Tasks")
+        // Through the list editor, so in the order Course Settings really
+        // does it: the editor drops the name, `onRemove` excludes it, and only
+        // then is the pool touched.
+        removeSharedFolderThroughTheListEditor("Tasks", in: view)
+        XCTAssertEqual(course.configuration.sharedFolders, ["Concepts", "Homework Tasks"])
 
         XCTAssertNil(course.configuration.gradedFolders)
     }

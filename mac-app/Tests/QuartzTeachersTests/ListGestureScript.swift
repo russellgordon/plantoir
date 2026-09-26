@@ -139,7 +139,16 @@ enum CourseSettingsGestureScript {
     /// The list editor exactly as `CourseSettingsView` builds it for that
     /// list — the same binding, closures and protection — so a gesture
     /// through it runs what the page runs. Shared by both adapters, since the
-    /// editor's initialiser did not change.
+    /// editor's initialiser did not change — and, since issue #183, by the
+    /// folder-removal tests in `GradedFolderChoicesTests` (the contract's
+    /// `gradedFolders.removingAFolder` runner among them) and
+    /// `SpecialFoldersProtectionTests`, which remove through
+    /// `removeItem(named:)` so the ORDER they check is the shipped one.
+    ///
+    /// It is still a hand copy of `body`'s wiring: if `body` ever called
+    /// something other than `folderWasRemoved` from a folder list, every test
+    /// using this would stay green. That seam is known and unpinned
+    /// (`documentation/04-course-setup.md`).
     static func editor(for list: GestureList, of view: CourseSettingsView) -> StringListEditorView {
         let configuration: CourseConfiguration = view.course.configuration
         switch list {

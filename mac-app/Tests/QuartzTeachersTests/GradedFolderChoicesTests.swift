@@ -25,16 +25,46 @@ final class GradedFolderChoicesTests: XCTestCase {
     /// `Tasks` folder cannot see each other's tree.
     var root: URL = URL(fileURLWithPath: "/")
 
+    /// The trail's store before this test pointed it at `root`. A removal
+    /// through the list editor runs `folderWasRemoved`, which writes an
+    /// `.itemExcluded` line — and without the redirect that line would land in
+    /// the real `~/Library/Logs/Plantoir`.
+    var previousTrailStore: ProblemReportStore?
+
     // MARK: - Functions
 
     override func setUpWithError() throws {
         root = FileManager.default.temporaryDirectory
             .appendingPathComponent("graded-choices-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        previousTrailStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: root.appendingPathComponent("trail"))
     }
 
     override func tearDownWithError() throws {
+        if let previousTrailStore {
+            ActivityTrail.store = previousTrailStore
+        }
         try? FileManager.default.removeItem(at: root)
+    }
+
+    /// Removes a folder the way the teacher does, through the list editor
+    /// Course Settings builds for that list: `removeItem(named:)` takes the
+    /// name out of the list, then calls `onRemove`, which is
+    /// `folderWasRemoved` — the exclusion, then the pool, then the trail line.
+    ///
+    /// Issue #183: these tests used to replay those steps by hand, in the
+    /// order they were believed to run. A replay stays green when the shipped
+    /// order changes, which is exactly the bug the contract's removal cases
+    /// exist to catch, so the tests call the owner of the order instead.
+    private func removeThroughTheListEditor(
+        _ name: String,
+        scope: FolderScope,
+        in view: CourseSettingsView
+    ) {
+        let list: GestureList = scope == .shared ? .sharedFolders : .perSectionFolders
+        let editor: StringListEditorView = CourseSettingsGestureScript.editor(for: list, of: view)
+        editor.removeItem(named: name)
     }
 
     /// A course folder holding the given directories, and a configuration to
@@ -147,7 +177,8 @@ final class GradedFolderChoicesTests: XCTestCase {
     /// tells the build to skip — a pool matching nothing the site publishes,
     /// while the settings claim something counts.
     ///
-    /// The removal is played in the order Course Settings really does it:
+    /// The removal runs through the list editor's own `removeItem(named:)`, so
+    /// it happens in the order Course Settings really does it (issue #183):
     /// `exclude` first, then `dropFromMarksPool`. That order matters for a
     /// course that has NEVER been asked — by the time the pool is touched the
     /// folder is no longer among the choices, so nothing is materialised and
@@ -168,13 +199,7 @@ final class GradedFolderChoicesTests: XCTestCase {
         // and its `onRemove` excludes it and drops it from the pool. The
         // folder itself stays on disk, which is the whole difficulty — before
         // this change the walk handed it straight back.
-        var remaining: [String] = []
-        for folder in course.configuration.sharedFolders where folder != "Tasks" {
-            remaining.append(folder)
-        }
-        course.configuration.sharedFolders = remaining
-        course.configuration.exclude("Tasks", inScope: FolderScope.shared.exclusionKey)
-        view.dropFromMarksPool("Tasks")
+        removeThroughTheListEditor("Tasks", scope: .shared, in: view)
 
         // Not offered back — and neither is anything inside it, because
         // nothing under a removed folder reaches the site either.
@@ -184,10 +209,17 @@ final class GradedFolderChoicesTests: XCTestCase {
 
     // MARK: - What a removal does to the pool
 
-    /// `contracts/shared-rules.json` → `gradedFolders.removingAFolder`, played
-    /// through the interface in the order Course Settings really does it: the
-    /// list editor's binding takes the name out of its list, `onRemove`
+    /// `contracts/shared-rules.json` → `gradedFolders.removingAFolder`, run
+    /// through the list editor Course Settings builds for that list, so the
+    /// order is the shipped one rather than a replay of it: the editor's
+    /// binding takes the name out of its list, `onRemove` (`folderWasRemoved`)
     /// records the exclusion, and only then is the pool touched.
+    ///
+    /// Until issue #183 this runner replayed those three steps by hand, and a
+    /// reorder or a dropped step inside `folderWasRemoved` left every case
+    /// green. Now moving the pool above the exclusion, leaving either out, or
+    /// calling `onRemove` before the list is written turns cases 3 and 4 red —
+    /// the same pair the same mutations turn red on Windows.
     ///
     /// The order is the whole subject. Ask what the checklist offers BEFORE
     /// the exclusion is written and the removed folder is still there, so the
@@ -223,14 +255,7 @@ final class GradedFolderChoicesTests: XCTestCase {
             let removed: String = try XCTUnwrap(removal["name"] as? String)
             let scope: FolderScope =
                 (try XCTUnwrap(removal["scope"] as? String)) == "per_section" ? .perSection : .shared
-            switch scope {
-            case .shared:
-                course.configuration.sharedFolders = GradedFolderChoicesTests.list(sharedFolders, without: removed)
-            case .perSection:
-                course.configuration.perSectionFolders = GradedFolderChoicesTests.list(perSectionFolders, without: removed)
-            }
-            course.configuration.exclude(removed, inScope: scope.exclusionKey)
-            view.dropFromMarksPool(removed)
+            removeThroughTheListEditor(removed, scope: scope, in: view)
 
             if let expected = testCase["expectGraded"] as? [String] {
                 XCTAssertEqual(course.configuration.gradedFolders, expected, name)
@@ -242,6 +267,33 @@ final class GradedFolderChoicesTests: XCTestCase {
                 )
             }
         }
+    }
+
+    /// A removal through the list editor leaves its line on the trail (rule 5):
+    /// one `.itemExcluded` line naming the folder, the list it left and the
+    /// course. Pinned here because the contract runner above now drives the
+    /// same path, and a line that went missing from it would otherwise be
+    /// noticed only when a teacher's report came back without it.
+    func testARemovalThroughTheListEditorLeavesItsLineOnTheTrail() throws {
+        let course: Course = try makeCourse(
+            named: "trail",
+            sharedFolders: ["Concepts"],
+            perSectionFolders: ["All Classes", "Labs"],
+            directories: ["Concepts", "Labs"]
+        )
+        let view: CourseSettingsView = CourseSettingsView(course: course)
+
+        removeThroughTheListEditor("Labs", scope: .perSection, in: view)
+
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        var matchingLines: [String] = []
+        for line in trail.components(separatedBy: "\n") {
+            if line.hasSuffix("excluded per-section folder Labs in ICS3U") {
+                matchingLines.append(line)
+            }
+        }
+        XCTAssertEqual(matchingLines.count, 1, trail)
+        XCTAssertEqual(course.configuration.perSectionFolders, ["All Classes"])
     }
 
     /// The still-offered question itself, asked the way the BUILD asks it.
@@ -267,14 +319,6 @@ final class GradedFolderChoicesTests: XCTestCase {
         // folder, and `_is_graded_path` compares whole segments too.
         XCTAssertFalse(GradedFolderChoices.stillOffers(["Homework Tasks"], aFolderNamed: "Tasks"))
         XCTAssertFalse(GradedFolderChoices.stillOffers([], aFolderNamed: "Tasks"))
-    }
-
-    private static func list(_ names: [String], without removed: String) -> [String] {
-        var remaining: [String] = []
-        for name in names where name != removed {
-            remaining.append(name)
-        }
-        return remaining
     }
 
     // MARK: - The walk itself
