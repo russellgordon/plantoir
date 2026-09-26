@@ -24,11 +24,27 @@ struct CourseSettingsView: View {
     /// stays until the next Save, Preview Again, or leaving this course.
     @State var saveNotice: SettingsSaveNotice? = nil
 
+    /// Counts the times this window has become key, so the page is drawn
+    /// again — and the course folder walked again for the marks questions —
+    /// when the teacher comes back from Finder or Obsidian (issue #152). The
+    /// floor now depends on what is on disk, and `onAppear` does not fire
+    /// when a window merely becomes key again.
+    @State var marksWalkGeneration: Int = 0
+
+    /// Whether this window is key, read only to notice it BECOMING key.
+    @Environment(\.controlActiveState) var controlActiveState: ControlActiveState
+
     // MARK: - Body
 
     var body: some View {
         @Bindable var configuration = course.configuration
         @Bindable var settings = AppSettings.shared
+        // ONE walk of the course folder per drawing, shared by the Marks
+        // checklist and by all three folder lists' protections (issue #152).
+        // A walk per row cost 53 ms each on a 400-folder course; the rows are
+        // drawn from this, and a click is decided afresh (`protectionWhenActedOn`).
+        let _ = marksWalkGeneration
+        let marks: MarksFloor.Snapshot = marksSnapshot()
 
         VStack(spacing: 0) {
             Form {
@@ -164,7 +180,10 @@ struct CourseSettingsView: View {
                         onAdd: { name in
                             folderWasAdded(name, scope: .shared)
                         },
-                        protection: sharedFolderProtection,
+                        protection: { folder in
+                            return sharedFolderProtection(for: folder, marks: marks)
+                        },
+                        protectionWhenActedOn: sharedFolderProtection,
                         renameProblem: { oldName, newName, finishing in
                             return folderRenameProblem(
                                 oldName, to: newName, scope: .shared, finishing: finishing
@@ -204,7 +223,10 @@ struct CourseSettingsView: View {
                         onAdd: { name in
                             folderWasAdded(name, scope: .perSection)
                         },
-                        protection: perSectionFolderProtection,
+                        protection: { folder in
+                            return perSectionFolderProtection(for: folder, marks: marks)
+                        },
+                        protectionWhenActedOn: perSectionFolderProtection,
                         renameProblem: { oldName, newName, finishing in
                             return folderRenameProblem(
                                 oldName, to: newName, scope: .perSection, finishing: finishing
@@ -246,9 +268,12 @@ struct CourseSettingsView: View {
                 Section {
                     MembershipToggleListView(
                         title: GradedFolderWording.listTitle,
-                        allItems: gradedFolderChoices,
-                        members: gradedFoldersBinding,
-                        protection: gradedFolderProtection
+                        allItems: marks.choices,
+                        members: gradedFoldersBinding(offered: marks.choices),
+                        protection: { folder in
+                            return gradedFolderProtection(for: folder, marks: marks)
+                        },
+                        protectionWhenActedOn: gradedFolderProtection
                     )
                     Text(GradedFolderWording.caption)
                         .font(.callout)
@@ -379,6 +404,11 @@ struct CourseSettingsView: View {
             // folder may have saved. Never over unsaved edits (issue #265).
             course.configuration.reloadIfNothingUnsaved(url: course.configFileURL)
         }
+        .onChange(of: controlActiveState) { oldState, newState in
+            if newState == .key {
+                marksWalkGeneration += 1
+            }
+        }
     }
 
     // MARK: - Computed properties
@@ -448,6 +478,13 @@ struct CourseSettingsView: View {
     /// be: the first tick freezes it, so anything the build counts today and
     /// this list omits loses its marks without a word.
     var gradedFoldersBinding: Binding<[String]> {
+        return gradedFoldersBinding(offered: nil)
+    }
+
+    /// The same, inferring a never-asked course's pool from `offered` — the
+    /// list the page was drawn with — rather than walking the course folder
+    /// again. Nil walks, as the property above does.
+    func gradedFoldersBinding(offered: [String]?) -> Binding<[String]> {
         return Binding(
             get: {
                 if let chosen = course.configuration.gradedFolders {
@@ -456,6 +493,9 @@ struct CourseSettingsView: View {
                 // The offered list is already de-duplicated by exact name, so
                 // asking the shared rule — which de-duplicates too — gives the
                 // answer the hand-written loop here gave.
+                if let offered {
+                    return GradedFolderRule.inferredPool(from: offered)
+                }
                 return GradedFolderRule.inferredPool(from: gradedFolderChoices)
             },
             set: { newValue in
@@ -583,73 +623,26 @@ struct CourseSettingsView: View {
         }
     }
 
-    /// A folder removed from the course leaves the marks pool as well, so the
-    /// confirmation's promise ("Removing it will take it out of your course's
-    /// marks pool") is kept and `graded_folders` never names a folder the
-    /// build has been told to exclude — with two conditions, both of which
-    /// exist to stop a removal quietly taking marks OFF the coverage map.
+    /// A folder removed from the course leaves the marks pool as well — with
+    /// the two exceptions `contracts/shared-rules.json` →
+    /// `gradedFolders.removingAFolder` pins, both of which exist to stop a
+    /// removal quietly taking marks OFF the coverage map. The rule is
+    /// `MarksPoolRemoval.poolAfterRemoving`, which the marks floor asks too,
+    /// so the removal and the floor cannot disagree about what a removal
+    /// leaves in the pool (issue #152).
     ///
-    /// The rule and its seven cases are `contracts/shared-rules.json` →
-    /// `gradedFolders.removingAFolder`. Called after the name has already left
-    /// its list and been written into `excluded_items`, which is what makes
-    /// `gradedFolderChoices` the right question to ask here.
+    /// Called after the name has already left its list and been written into
+    /// `excluded_items`, which is what makes `gradedFolderChoices` — walked
+    /// again HERE, not the drawing's snapshot — the right question to ask.
+    /// That order is `folderWasRemoved`'s, and issue #183's must-fails pin it.
     func dropFromMarksPool(_ name: String) {
-        // Still offered? Then a folder of that name is still in the course —
-        // `Portfolios/Tasks`, when the top-level `Tasks` was the one removed —
-        // and the pool entry still names work the build publishes. Dropping it
-        // would stop counting a folder nobody removed, and the checklist would
-        // go on showing an untickable row for it.
-        //
-        // Asked CASE-INSENSITIVELY, because the walk returns on-disk spellings:
-        // `Portfolios/tasks` is offered as `tasks`, and an exact test would
-        // read that as "no longer offered" while `build_site.py` goes on
-        // counting the folder. Seventh case of `gradedFolders.removingAFolder`,
-        // raised from Windows as issue #172; the comparison itself, and what
-        // was measured to choose it, are in `GradedFolderChoices.stillOffers`.
-        if GradedFolderChoices.stillOffers(gradedFolderChoices, aFolderNamed: name) {
-            return
+        let current: [String]? = course.configuration.gradedFolders
+        let remaining: [String]? = MarksPoolRemoval.poolAfterRemoving(
+            name, from: current, choicesAfter: gradedFolderChoices
+        )
+        if remaining != current {
+            course.configuration.gradedFolders = remaining
         }
-        // A course that has NEVER been asked is left unasked, rather than
-        // frozen to the historical rule's answer minus this folder. On the
-        // ordinary course whose only marked folder is `Tasks`, freezing writes
-        // `[]` — asked and answered, nothing counting for marks ever again,
-        // from a gesture the teacher was told would take one folder out of the
-        // pool. An absent key keeps the historical rule running instead.
-        //
-        // **This guard is not what makes the never-asked cases pass today, and
-        // it must not be "simplified" away.** The post-exclusion walk is: the
-        // historical rule only ever names folders drawn FROM the choices
-        // (`GradedFolderRule.inferredPool(from:)` reads that list), so a name
-        // the still-offered test has just rejected cannot be in a materialised
-        // pool either. That redundancy holds only while the DROP below is no
-        // more permissive than the still-offered test above — which is this
-        // file's shape (a case-insensitive test over an exact drop) and
-        // Windows' shape (one comparer for both). Reverse it — an exact test
-        // over a case-insensitive drop — and this guard is the only thing left
-        // standing.
-        //
-        // Measured ON WINDOWS 2026-09-18, on code whose drop is
-        // `OrdinalIgnoreCase`: with an exact still-offered test and this guard
-        // replaced by the materialised pool, a never-asked course that removes
-        // a top-level `Tasks` while `Portfolios/tasks` survives writes
-        // `graded_folders: []` — the #142 damage, back. The mac's own drop is
-        // exact, so that mutation stops one line lower instead, at
-        // `!currentGraded.contains(name)`: the materialised pool is `["tasks"]`
-        // and the name is `"Tasks"`. Do not read the `[]` as a mac number, and
-        // do not conclude from a green suite that the guard is dead.
-        guard let currentGraded = course.configuration.gradedFolders else {
-            return
-        }
-        if !currentGraded.contains(name) {
-            return
-        }
-        var remaining: [String] = []
-        for folder in currentGraded {
-            if folder != name {
-                remaining.append(folder)
-            }
-        }
-        course.configuration.gradedFolders = remaining
     }
 
     // MARK: - Adding and removing folders and files
@@ -661,40 +654,31 @@ struct CourseSettingsView: View {
     /// Named methods rather than closures written at the call site so that a
     /// test can run exactly what the list runs — the goldens for issue #266
     /// drive these, and a closure in `body` cannot be reached from a test.
+    ///
+    /// **No trail line here** (issue #152, from #85's third item). The line
+    /// used to be written on the click, so a Revert left the trail saying a
+    /// folder had been excluded when it never was. `item excluded` and
+    /// `item re-included` are written by `CourseConfiguration.write(to:)`,
+    /// from what actually reached the file — whichever writer saves it
+    /// (`excludedItems.recordedOnSave`).
     func folderWasRemoved(_ name: String, scope: FolderScope) {
         course.configuration.exclude(name, inScope: scope.exclusionKey)
         dropFromMarksPool(name)
-        ActivityTrail.note(.itemExcluded, "excluded " + trailWord(for: scope) + " folder " + name + " in " + course.code)
     }
 
     /// A folder name added back to a list is taken out of `excluded_items`.
     func folderWasAdded(_ name: String, scope: FolderScope) {
-        if course.configuration.reinclude(name, inScope: scope.exclusionKey) {
-            ActivityTrail.note(.itemReincluded, "re-included " + trailWord(for: scope) + " folder " + name + " in " + course.code)
-        }
+        course.configuration.reinclude(name, inScope: scope.exclusionKey)
     }
 
     /// The file twin of `folderWasRemoved`: a file is never in the marks pool.
     func fileWasRemoved(_ name: String, scope: FolderScope) {
         course.configuration.exclude(name, inScope: scope.exclusionKey)
-        ActivityTrail.note(.itemExcluded, "excluded " + trailWord(for: scope) + " file " + name + " in " + course.code)
     }
 
     /// The file twin of `folderWasAdded`.
     func fileWasAdded(_ name: String, scope: FolderScope) {
-        if course.configuration.reinclude(name, inScope: scope.exclusionKey) {
-            ActivityTrail.note(.itemReincluded, "re-included " + trailWord(for: scope) + " file " + name + " in " + course.code)
-        }
-    }
-
-    /// How the trail names a scope: "shared" or "per-section".
-    func trailWord(for scope: FolderScope) -> String {
-        switch scope {
-        case .shared:
-            return "shared"
-        case .perSection:
-            return "per-section"
-        }
+        course.configuration.reinclude(name, inScope: scope.exclusionKey)
     }
 
     // MARK: - Renaming a folder
@@ -859,7 +843,58 @@ struct CourseSettingsView: View {
         return created
     }
 
+    // MARK: - What a removal or an untick may do
+
+    /// One walk of the course folder, and what the Marks checklist offers
+    /// from it — what the page's marks questions are answered from
+    /// (`MarksFloor`, issue #152). The body takes one per drawing; every
+    /// one-argument protection below takes its own, which is the fresh walk
+    /// a teacher's click is decided with.
+    func marksSnapshot() -> MarksFloor.Snapshot {
+        return MarksFloor.snapshot(
+            sharedFolders: course.configuration.sharedFolders,
+            perSectionFolders: course.configuration.perSectionFolders,
+            courseDirectory: course.directoryURL,
+            excludedShared: course.configuration.excludedItems(forScope: FolderScope.shared.exclusionKey),
+            excludedPerSection: course.configuration.excludedItems(forScope: FolderScope.perSection.exclusionKey)
+        )
+    }
+
+    /// What the marks floor reads from this course's settings.
+    var marksSettings: MarksFloor.Settings {
+        return MarksFloor.Settings(
+            sharedFolders: course.configuration.sharedFolders,
+            perSectionFolders: course.configuration.perSectionFolders,
+            gradedFolders: course.configuration.gradedFolders,
+            includesCurriculumCoverage: course.configuration.includesCurriculumCoverage
+        )
+    }
+
+    /// How the floor's answer about removing `folder` is shown.
+    func removalProtection(for folder: String, outcome: MarksFloor.Outcome) -> ItemProtection {
+        switch outcome {
+        case .refused:
+            return .blocked(reason: SpecialNames.lastGradedFolderBlocked)
+        case .confirmed:
+            return .consequential(
+                title: SpecialNames.removeGradedFolderTitle(for: folder),
+                message: SpecialNames.removeGradedFolderMessage
+            )
+        case .ordinary:
+            return .ordinary
+        }
+    }
+
+    /// Asked with a FRESH walk: what a click is decided with, and what every
+    /// test through `CourseSettingsGestureScript` calls. Nothing but the
+    /// two-argument form with a new snapshot — if the two ever did different
+    /// things, every test through the script would stay green while the page
+    /// drew something else (the #183 seam; `testTheBodyDrawsTheMarksQuestionsFromOneWalk`).
     func sharedFolderProtection(for folder: String) -> ItemProtection {
+        return sharedFolderProtection(for: folder, marks: marksSnapshot())
+    }
+
+    func sharedFolderProtection(for folder: String, marks: MarksFloor.Snapshot) -> ItemProtection {
         let resolvedCurriculum: String? = CurriculumFolderRule.resolvedCurriculumFolder(for: course)
         if let resolvedCurriculum, folder == resolvedCurriculum {
             if course.configuration.includesCurriculumCoverage {
@@ -871,26 +906,25 @@ struct CourseSettingsView: View {
                 )
             }
         }
-        let currentGraded: [String] = gradedFoldersBinding.wrappedValue
-        if currentGraded.contains(folder) {
-            if course.configuration.includesCurriculumCoverage && currentGraded.count <= 1 {
-                return .blocked(reason: SpecialNames.lastGradedFolderBlocked)
-            } else {
-                return .consequential(
-                    title: SpecialNames.removeGradedFolderTitle(for: folder),
-                    message: SpecialNames.removeGradedFolderMessage
-                )
-            }
-        }
-        return .ordinary
+        let outcome: MarksFloor.Outcome = MarksFloor.outcome(
+            of: .remove(folder, .shared), settings: marksSettings, snapshot: marks
+        )
+        return removalProtection(for: folder, outcome: outcome)
     }
 
+    /// Asked with a fresh walk — see `sharedFolderProtection(for:)`.
     func perSectionFolderProtection(for folder: String) -> ItemProtection {
+        return perSectionFolderProtection(for: folder, marks: marksSnapshot())
+    }
+
+    func perSectionFolderProtection(for folder: String, marks: MarksFloor.Snapshot) -> ItemProtection {
         if course.configuration.perSectionFolders.count <= 1 {
             return .blocked(reason: SpecialNames.lastPerSectionFolderBlocked)
         }
-        let currentGraded: [String] = gradedFoldersBinding.wrappedValue
-        if currentGraded.contains(folder) && course.configuration.includesCurriculumCoverage && currentGraded.count <= 1 {
+        let outcome: MarksFloor.Outcome = MarksFloor.outcome(
+            of: .remove(folder, .perSection), settings: marksSettings, snapshot: marks
+        )
+        if outcome == .refused {
             return .blocked(reason: SpecialNames.lastGradedFolderBlocked)
         }
         // "All Classes" — exactly that folder — is never removable (Russell,
@@ -900,13 +934,7 @@ struct CourseSettingsView: View {
         if ClassFolder.isTheAllClassesFolder(folder, configured: course.configuration.classFolder) {
             return .blocked(reason: SpecialNames.classFolderBlocked)
         }
-        if currentGraded.contains(folder) {
-            return .consequential(
-                title: SpecialNames.removeGradedFolderTitle(for: folder),
-                message: SpecialNames.removeGradedFolderMessage
-            )
-        }
-        return .ordinary
+        return removalProtection(for: folder, outcome: outcome)
     }
 
     func perSectionFileProtection(for file: String) -> ItemProtection {
@@ -917,12 +945,17 @@ struct CourseSettingsView: View {
         return .ordinary
     }
 
+    /// The Marks checklist's untick, asked with a fresh walk — see
+    /// `sharedFolderProtection(for:)`.
     func gradedFolderProtection(for folder: String) -> ItemProtection {
-        guard course.configuration.includesCurriculumCoverage else {
-            return .ordinary
-        }
-        let currentGraded: [String] = gradedFoldersBinding.wrappedValue
-        if currentGraded.contains(folder) && currentGraded.count <= 1 {
+        return gradedFolderProtection(for: folder, marks: marksSnapshot())
+    }
+
+    func gradedFolderProtection(for folder: String, marks: MarksFloor.Snapshot) -> ItemProtection {
+        let outcome: MarksFloor.Outcome = MarksFloor.outcome(
+            of: .untick(folder), settings: marksSettings, snapshot: marks
+        )
+        if outcome == .refused {
             return .blocked(reason: SpecialNames.lastGradedFolderBlocked)
         }
         return .ordinary

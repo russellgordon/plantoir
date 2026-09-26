@@ -1207,9 +1207,39 @@ class CourseConfiguration {
                 attempts += 1
                 continue
             }
+            // What `excluded_items` was before THIS write, for the trail: the
+            // bytes the merge above used, or — when there was no readable file
+            // — what this copy last read or wrote. Taken before either is
+            // replaced below.
+            var baseline: [String: Any]? = nil
+            if let before {
+                baseline = CourseConfiguration.decodedDictionary(before)
+            }
+            if baseline == nil {
+                baseline = CourseConfiguration.decodedDictionary(lastSavedData)
+            }
+
             try data.write(to: url, options: [.atomic])
             lastSavedData = data
             values = toWrite
+
+            // `item excluded` / `item re-included`, from what reached the file
+            // — at EVERY writer, which is why it is here rather than in Course
+            // Settings' Save (issue #152, `excludedItems.recordedOnSave`). Only
+            // after the write returned: a write that throws records nothing.
+            // A file with no baseline at all (a new file from a copy that was
+            // never read from one) records nothing: its exclusions arrived with
+            // it, nobody removed anything.
+            if let baseline {
+                result.exclusionChanges = ExclusionTrail.changes(
+                    before: baseline, written: toWrite, courseDirectory: url.deletingLastPathComponent()
+                )
+                var courseCode: String = url.deletingLastPathComponent().lastPathComponent
+                if let written = toWrite["course_code"] as? String, !written.isEmpty {
+                    courseCode = written
+                }
+                ExclusionTrail.record(result.exclusionChanges, courseCode: courseCode)
+            }
             WorkspaceModel.followWrite(of: self, at: url)
             return result
         }
@@ -1227,6 +1257,11 @@ class CourseConfiguration {
         /// Settings changed BOTH in the file and in this copy. This copy's
         /// value was written, because it is the Save the teacher just made.
         var replacedChangesFromElsewhere: [String] = []
+
+        /// What this write did to `excluded_items`, compared with the file as
+        /// it was before it — each already written on the trail
+        /// (`ExclusionTrail`, issue #152).
+        var exclusionChanges: [ExclusionTrail.Change] = []
 
         // MARK: - Computed properties
 

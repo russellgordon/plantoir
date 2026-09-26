@@ -94,6 +94,14 @@ struct StringListEditorView: View {
     var onAdd: ((String) -> Void)? = nil
     var protection: ((String) -> ItemProtection)? = nil
 
+    /// The protection asked at the moment a teacher ACTS on a row — nil to
+    /// ask `protection` again. The rows are DRAWN from `protection`, which
+    /// Course Settings answers from one walk of the course folder per drawing;
+    /// a decision is taken afresh, because the marks floor depends on what is
+    /// on disk and a folder deleted in Finder since the list was drawn must
+    /// count as gone (issue #152, `gradedFolders.floor`).
+    var protectionWhenActedOn: ((String) -> ItemProtection)? = nil
+
     /// Why a proposed new name cannot be used, or nil when it can. Pure and
     /// asked on every keystroke, so the Rename button can be disabled with the
     /// reason showing rather than refusing after the fact.
@@ -555,7 +563,11 @@ struct StringListEditorView: View {
     /// line as the row's info button.
     @discardableResult
     func requestRemoval(of item: String) -> PendingRemoval? {
-        let state: ItemProtection = protection?(item) ?? .ordinary
+        var ask: ((String) -> ItemProtection)? = protection
+        if let protectionWhenActedOn {
+            ask = protectionWhenActedOn
+        }
+        let state: ItemProtection = ask?(item) ?? .ordinary
         switch state {
         case .blocked(let reason):
             removalExplanation = ActiveExplanation(item: item, reason: reason)

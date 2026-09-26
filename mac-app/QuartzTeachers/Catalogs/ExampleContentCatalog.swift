@@ -94,10 +94,10 @@ enum ExampleContentCatalog {
     /// list gives an empty pool. Only when the key is ABSENT is the
     /// historical rule applied to the folders.
     ///
-    /// Deliberately NOT `GradedFolderRule.reconciled`: that reconciles a
-    /// teacher's own ticks and matches exactly, while this reproduces what
-    /// the command line writes for the same payload, which matches
-    /// ignoring case.
+    /// The reconciling itself is `GradedFolderRule.reconciled`, the one copy
+    /// of the command line's rule the wizard shares (issue #152: until then
+    /// this held a second copy, because `reconciled` matched exactly). What
+    /// stays here is reading a manifest the way Python reads it.
     nonisolated static func marksPool(fromManifest manifest: [String: Any]) -> [String] {
         let sharedFolders: [String] = manifest["shared_folders"] as? [String] ?? []
         let perSectionFolders: [String] = manifest["per_section_folders"] as? [String] ?? []
@@ -122,38 +122,13 @@ enum ExampleContentCatalog {
         // follow Python into them: it reads them as empty or drops them.
         let declaredEntries: [Any] = declaredValue as? [Any] ?? []
 
-        // A later folder with the same name ignoring case wins the
-        // spelling, as it does in Python's dictionary built the same way.
-        var spellingIgnoringCase: [String: String] = [:]
-        for folder in courseFolders {
-            if folder.isEmpty {
-                continue
-            }
-            spellingIgnoringCase[folder.lowercased()] = folder
-        }
-
-        var pool: [String] = []
+        var declaredNames: [String] = []
         for entry in declaredEntries {
-            guard let declaredName = entry as? String else {
-                continue
-            }
-            if declaredName.isEmpty {
-                continue
-            }
-            var folderName: String? = nil
-            if courseFolders.contains(declaredName) {
-                folderName = declaredName
-            } else if let respelled = spellingIgnoringCase[declaredName.lowercased()] {
-                folderName = respelled
-            }
-            guard let matchedFolder = folderName else {
-                continue
-            }
-            if !pool.contains(matchedFolder) {
-                pool.append(matchedFolder)
+            if let declaredName = entry as? String {
+                declaredNames.append(declaredName)
             }
         }
-        return pool
+        return GradedFolderRule.reconciled(declaredNames, toFolders: courseFolders)
     }
 
     /// The jurisdiction name for the example content, e.g. "Ontario" or "British Columbia".

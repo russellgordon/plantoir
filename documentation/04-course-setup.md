@@ -852,7 +852,7 @@ nothing published reports that no folder counts for marks exactly as an empty
 pool would.
 
 **And a consequence of that filter, which is a rule in its own right** —
-`gradedFolders.removingAFolder`, seven cases. Removing a folder takes its name out
+`gradedFolders.removingAFolder`, eight cases. Removing a folder takes its name out
 of the marks pool, with two exceptions, and both exist to stop a removal quietly
 taking marks OFF the map:
 
@@ -872,17 +872,31 @@ taking marks OFF the map:
 Both fall out of one instruction: recompute what the checklist offers AFTER the
 removal is recorded, and drop the name only if it is no longer among them —
 asked the way the BUILD asks it, case ignored — AND the course had already been
-asked.
+asked. On the mac that instruction is one function,
+`MarksPoolRemoval.poolAfterRemoving`, which the marks floor below asks as well,
+so the removal and the floor cannot disagree about what a removal leaves.
 
-Two edges of that, recorded rather than left to be met. The second exception
+**Only the removed NAME is ever dropped — a nested name is not recomputed**
+(case 8, [#152](https://github.com/russellgordon/plantoir/issues/152), from
+#80's first item, settled with Russell away and the recommendation adopted).
+Removing `Portfolios` leaves a pooled `Tasks` that was found only inside it in
+the pool, matching nothing the site publishes. That is the cost the paragraph
+above already records, taken on purpose: putting `Portfolios` back restores the
+marks, where dropping `Tasks` would lose them silently on that same undo. The
+one real harm the kept name could do — holding up the "at least one folder
+counts for marks" floor while nothing counts — is closed by the floor counting
+only names found on disk (the next section). REJECTED: dropping every pooled
+name the removal took off the checklist; a must-fail of exactly that (offered
+before against offered after) turns case 8 red and leaves 1–7 green.
+
+One edge of that, recorded rather than left to be met. The second exception
 says "still OFFERED", not "still counts": the checklist sees four levels and the
 build counts at any depth, so a `Tasks` five levels down is dropped from the
-pool and goes on counting. And the "at least one folder must count for marks"
-floor — the one that refuses to unpick the last pooled folder while the coverage
-map is on — asks whether this is the last NAME in the pool, not whether the pool
-would survive the removal. So it still blocks removing a top-level `Tasks` on a
-course where `Portfolios/Tasks` would have kept the name. Conservative, rare,
-and the same on both platforms; sharpening it would be a shared change.
+pool and goes on counting. (This paragraph also recorded a second edge until
+#152: the floor asked whether a folder was the last NAME in the pool, so it
+refused removing a top-level `Tasks` that `Portfolios/Tasks` would have kept.
+The floor now asks whether the pool would SURVIVE — the next section — and that
+removal is allowed.)
 
 **Order is the whole subject.** Ask before
 the exclusion is written and the removed folder is still on the list, so the
@@ -904,7 +918,8 @@ or leaving the exclusion out — turns 3 and 4 red.
 [#183](https://github.com/russellgordon/plantoir/issues/183) (2026-09-26) the
 contract drives it.** Since #266 both folder lists' removal is one method,
 `CourseSettingsView.folderWasRemoved(_:scope:)` — `excluded_items`, then the
-pool, then the trail line — called from the list editor's
+pool (and, until #152, the trail line, which is now written when the file is:
+`excludedItems.recordedOnSave`) — called from the list editor's
 `StringListEditorView.removeItem(named:)` after the editor has written the copy
 list. Until #183 the mac's contract runner (and three other tests) REPLAYED
 those steps by hand in the order they were believed to run, so a reorder inside
@@ -919,7 +934,7 @@ in one scope. Now the runner removes through the editor
 (`CourseSettingsGestureScript.editor(for:of:).removeItem(named:)`), and each of
 four mutations — pool above exclusion, exclusion left out, pool left out, or
 `onRemove` called before the editor writes the list — turns cases 3 and 4 red:
-the same pair as on Windows. Cases 1, 2, 5, 6 and 7 stay green under a reorder,
+the same pair as on Windows. Cases 1, 2, 5, 6 and 7 (and 8, added by #152) stay green under a reorder,
 correctly: there the name is still offered or the course was never asked, so
 the pool is left alone whatever the order.
 
@@ -1048,7 +1063,9 @@ unasked. A mac reader who tries the stated mutation and sees the suite stay
 green must not conclude the guard is dead.
 
 Nothing new is written to the activity trail for any of this. The removal
-already leaves its own line (`item excluded`), and what changed is only which
+already leaves its own line (`item excluded` — written since #152 when the
+removal reaches `course_config.json`, whichever writer saves it, never on the
+click; `excludedItems.recordedOnSave`), and what changed is only which
 folders are OFFERED — which is not something a teacher DOES, and a trail line
 for it would record a redraw.
 
@@ -1078,6 +1095,98 @@ other's files.
 Finder order is arguably nicer for a person reading a list. If anyone wants it,
 it is a shared change to the contract and both apps — not something to reach for
 on one side because it looked more natural there.
+
+### The marks floor counts only folders on disk (#152)
+
+While the coverage map is on, Course Settings refuses to remove or untick the
+folder that would leave nothing counting for marks
+(`specialNames.lastGradedFolderBlocked`). Until
+[#152](https://github.com/russellgordon/plantoir/issues/152) (from #80's second
+item) it asked whether the folder was the LAST NAME in the pool, with no look at
+the disk, and that cut both ways: a pooled name whose folder had been deleted in
+Finder REFUSED its own removal on the strength of a folder that was not there,
+and it ALLOWED the last real folder to go while it sat in the pool beside it —
+leaving every expectation reading as never evaluated. The kept nested name
+above is the same phantom, reached by removing its parent.
+
+**The rule** (`contracts/shared-rules.json` → `gradedFolders.floor`, seventeen
+cases, three outcomes): refuse a removal or an untick when, BEFORE it, some
+pooled name names a folder found by the checklist's own walk (case ignored, as
+the build compares), and AFTER it none does. "After" is the removal rule's own
+answer — the walk without everything found under the removed folder, the lists
+without the name, and the pool as `MarksPoolRemoval` leaves it; for an untick,
+the pool without that name. A never-asked course's pool is the historical rule
+over what is offered. If the walk finds no folder at all, every pooled name
+counts as found — the old rule, kept so an unreadable or empty course folder
+cannot switch the floor off (F11; it is also what keeps
+`SpecialFoldersProtectionTests`, whose courses hold only `section1/`, green
+unchanged, and Windows' `ItemProtectionTests`, which build contexts with no
+disk at all — the fallback must not be "simplified" away on either side).
+
+**The confirmation follows the same comparison**, so its sentence stays true.
+A removal is ASKED about when it changes the pool or takes a pooled name from
+found to not found, and not otherwise. So removing `Portfolios` while a pooled
+top-level `Tests` holds the floor up now asks (F9 — it takes
+`Portfolios/Tasks` out of the marks, and "This folder holds work that counts for
+marks" is true of `Portfolios`); and removing a top-level `Tasks` that
+`Portfolios/Tasks` keeps no longer asks (F7, F16), because "Removing it will take
+it out of your course's marks pool" would be untrue of a name that stays. The
+contract pins `refused` with its SENTENCE, so a per-section case cannot pass on
+`lastPerSectionFolderBlocked`; every per-section fixture has two per-section
+folders, none of them the class folder, and no case has a curriculum folder.
+
+**Every occurrence, with where it was found.** `GradedFolderChoices.walkedFolders`
+records each folder the walk finds — every occurrence, not the first — with the
+folder directly inside the course it was found under and the folders on its path
+that sit directly inside a section folder. The walk after a removal is then
+worked out in memory by dropping entries under the removed name, compared
+EXACTLY (`excluded_items` is exact, `excludedItems.matching`): removing a list
+entry `tasks` whose folder on disk is `Tasks` takes nothing off the site, and the
+floor must agree (F17). A walk that kept only first occurrences passes fifteen
+of the cases and fails F16 — `Tasks` is first found inside `Portfolios`, and the
+top-level `Tasks` that survives removing `Portfolios` must still be seen.
+
+**When the walk is taken, measured.** One walk per drawing of the page (per
+BODY evaluation, which includes every keystroke in the course name or the
+footer — the same count as before, since the checklist already walked in the
+body), shared by the checklist and all three lists' protections; again when the
+window becomes key (`controlActiveState`, because `onAppear` does not fire when a
+window merely becomes key again); and AFRESH for the row a teacher acts on
+(`protectionWhenActedOn` on `StringListEditorView` and
+`MembershipToggleListView`). The last is the one that matters: the floor now
+depends on the disk, and a teacher who deletes a folder in Finder with Settings
+open — #80's own scenario — would otherwise be answered from a walk taken before
+the deletion. Asking at the click happens in the list's own handler (the
+editor's `requestRemoval`, the checkbox binding's setter), never while a table
+cell is drawn, so #266's rule that a cell never asks the course a question
+(09 → "A cell never asks the course a question") still holds. Measured on an
+Apple M4 Pro, `swiftc -O`, a synthetic 413-folder, 2,500-page course, best of
+20: the walk before this change 35.6 ms, the new walk with ancestry 32.7 ms —
+the same cost. What changed is how many: a never-asked course used to walk
+once per ROW in every protection (through the inferred pool), and now walks
+once per drawing plus once per click. The planner's 53 ms on a 400-folder,
+3,264-page course was the same walk on another fixture.
+
+**REJECTED**, so they are not proposed again: counting only names found on disk
+but keeping "is this the last pooled name" (F8 still passes and F7 is still
+refused, and liveness needs the same walk anyway); taking names without a folder
+OUT of the pool (a preserved answer, `choices` case 11 and #142's no-repair
+ruling); a new sentence naming the nested folder for F8 (offered to the wording
+pass — the existing instruction, "choose another graded folder under Marks
+first", is already right); a walk per row (above); and deciding a click from the
+walk the list was drawn with (above).
+
+**Recorded, not fixed.** A course folder that is readable but whose every folder
+is hidden, skipped or excluded walks as EMPTY, so the floor falls back to
+counting the declared pool, phantoms included — the old behaviour, not a new
+fault. Between a Finder deletion and the next drawing, a row can LOOK ordinary
+and then refuse when clicked; the refusal explains itself. And a removal of a
+list entry whose case differs from a pooled name (`tasks` against a pooled
+`Tasks`) is asked about when it takes the folder off the site, while the mac's
+DROP compares exactly and keeps `Tasks` in the pool (Windows drops with
+`OrdinalIgnoreCase`) — the drop's own comparison is still unpinned
+(`removingAFolder` case 7's `why`), and a teacher needs a list entry spelled
+differently from its own pooled name to meet it.
 
 ### A command-line re-run leaves the marks pool alone (#192)
 
@@ -1143,9 +1252,11 @@ dropping the reconciliation:
 
 **A name that names no folder is kept, and it is not invisible.** It counts no
 page, but the published Curriculum Coverage page names every pooled folder in
-its sentence about what counts (`build_site._graded_folders_in_words`), and
-Course Settings' last-folder guard counts it, so the last LIVE folder can be
-unticked without the block. `site_health` raises `noGradedFolders` only when the
+its sentence about what counts (`build_site._graded_folders_in_words`). Course
+Settings' last-folder guard used to count it too, so the last LIVE folder could
+be unticked without the block; since #152 the guard counts only names found on
+disk (`gradedFolders.floor`, "The marks floor counts only folders on disk"
+above), so that half is closed. `site_health` raises `noGradedFolders` only when the
 coverage map is on, curriculum pages are found and nothing in the pool matches a
 published folder — so a dead name beside a live one raises nothing. Both effects
 could already happen through the apps' own exact-match removal
@@ -1158,7 +1269,9 @@ key again when it reads it" behind the apps' own narrowing on a new course.
 Both apps write `course_config.json` BEFORE they drive the setup script, so an
 app-created course always takes the re-run path; there the reconciliation was a
 no-op, since each wizard narrows its pool before writing (mac
-`GradedFolderRule.reconciled`, Windows `CurrentGradedFolders`). What the net
+`GradedFolderRule.reconciled`, Windows `CurrentGradedFolders` — both, since
+#152, the command line's own rule: exact first, then respelled with case
+ignored, repeats dropped, `gradedFolders.reconcilingAChosenPool`). What the net
 could still catch was a name that counts nothing. Now each wizard's narrowing
 is the only one.
 
@@ -1279,9 +1392,14 @@ the key absent — which is what a command-line course has always done.
   would pass every literal test while being wrong — the contract's MCV4U case
   with a hidden `["Tests"]` exists to catch it.
 - *Reusing `GradedFolderRule.reconciled`* (exact match) on the manifest's
-  pool. That reconciles a teacher's own ticks; this reproduces what the command
-  line writes, which matches ignoring case and infers when the key is absent.
-  The contract's respelling case is red for it on the mac and green in Python.
+  pool. That reconciled a teacher's own ticks exactly, while this reproduces
+  what the command line writes, which matches ignoring case and infers when the
+  key is absent; the contract's respelling case was red for it on the mac and
+  green in Python. **Superseded by #152**: `reconciled` now IS the command
+  line's rule (`gradedFolders.reconcilingAChosenPool`), so `marksPool` hands its
+  string entries to it and there is one copy. The manifest reading — the
+  `Media` filter, the absent-key inference, non-strings dropped — stays in
+  `marksPool`.
 - *Reading `SkeletonCatalog.adoptedGradedFolders`* — the wrong source, and it
   reads a declared `[]` as "infer".
 

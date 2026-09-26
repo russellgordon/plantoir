@@ -1,4 +1,5 @@
 import XCTest
+import SwiftUI
 @testable import QuartzTeachers
 
 /// Which folders the Marks checklist may OFFER — run from
@@ -360,6 +361,98 @@ final class GradedFolderChoicesTests: XCTestCase {
             }
         }
         XCTAssertEqual(failures, [], "\n" + failures.joined(separator: "\n"))
+    }
+
+    /// The floor is decided at the CLICK from the disk as it is then, not
+    /// from the walk the page was drawn with (#152's plan review, finding
+    /// 4). #80's own scenario: Settings is open, the teacher deletes `Tests`
+    /// in Finder and comes back — nothing the page observes has changed, so
+    /// nothing is redrawn, and a decision taken from the drawing's walk would
+    /// still count `Tests` and let the last real folder go.
+    ///
+    /// The lists here are built the way the body builds them: drawn from one
+    /// snapshot, acted on through `protectionWhenActedOn`.
+    func testAClickIsDecidedFromTheDiskAsItIsNotAsTheListWasDrawn() throws {
+        let course: Course = try makeCourse(
+            named: "stale",
+            sharedFolders: ["Concepts", "Tasks", "Tests"],
+            gradedFolders: ["Tasks", "Tests"],
+            directories: ["Concepts", "Tasks", "Tests", "section1"]
+        )
+        let view: CourseSettingsView = CourseSettingsView(course: course)
+        let drawn: MarksFloor.Snapshot = view.marksSnapshot()
+        XCTAssertEqual(view.gradedFolderProtection(for: "Tasks", marks: drawn), .ordinary)
+
+        try FileManager.default.removeItem(at: course.directoryURL.appendingPathComponent("Tests"))
+        XCTAssertEqual(
+            view.gradedFolderProtection(for: "Tasks", marks: drawn), .ordinary,
+            "the drawing's walk still counts Tests — which is why the click must not be decided from it"
+        )
+
+        let checklist: MembershipToggleListView = MembershipToggleListView(
+            title: GradedFolderWording.listTitle,
+            allItems: drawn.choices,
+            members: view.gradedFoldersBinding(offered: drawn.choices),
+            protection: { folder in
+                return view.gradedFolderProtection(for: folder, marks: drawn)
+            },
+            protectionWhenActedOn: view.gradedFolderProtection
+        )
+        checklist.toggleMembership(of: "Tasks")
+        XCTAssertEqual(course.configuration.gradedFolders, ["Tasks", "Tests"], "the untick is refused")
+
+        let configuration: CourseConfiguration = course.configuration
+        let sharedList: StringListEditorView = StringListEditorView(
+            title: "Shared folders (all sections)",
+            items: Binding(
+                get: { return configuration.sharedFolders },
+                set: { newValue in configuration.sharedFolders = newValue }
+            ),
+            onRemove: { name in view.folderWasRemoved(name, scope: .shared) },
+            protection: { folder in
+                return view.sharedFolderProtection(for: folder, marks: drawn)
+            },
+            protectionWhenActedOn: view.sharedFolderProtection
+        )
+        XCTAssertNil(sharedList.requestRemoval(of: "Tasks"), "refused, not asked about")
+        XCTAssertEqual(course.configuration.sharedFolders, ["Concepts", "Tasks", "Tests"])
+    }
+
+    /// The body draws every marks question from ONE walk and decides every
+    /// click with a fresh one, and each one-argument protection — what the
+    /// click and `CourseSettingsGestureScript` call — is nothing but the
+    /// two-argument form with a fresh snapshot. `CourseSettingsGestureScript`
+    /// hand-copies the body's wiring (the #183 seam), so if the body and the
+    /// one-argument forms ever diverged, every test through the script would
+    /// stay green while the page did something else. A source scan, because
+    /// the body's closures cannot be reached from a test.
+    func testTheBodyDrawsTheMarksQuestionsFromOneWalk() throws {
+        let sourceURL: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("QuartzTeachers/Views/CourseSettings/CourseSettingsView.swift")
+        let source: String = try String(contentsOf: sourceURL, encoding: .utf8)
+
+        let mustAppear: [String] = [
+            "let marks: MarksFloor.Snapshot = marksSnapshot()",
+            "return sharedFolderProtection(for: folder, marks: marks)",
+            "protectionWhenActedOn: sharedFolderProtection,",
+            "return perSectionFolderProtection(for: folder, marks: marks)",
+            "protectionWhenActedOn: perSectionFolderProtection,",
+            "allItems: marks.choices,",
+            "members: gradedFoldersBinding(offered: marks.choices),",
+            "return gradedFolderProtection(for: folder, marks: marks)",
+            "protectionWhenActedOn: gradedFolderProtection",
+            "return sharedFolderProtection(for: folder, marks: marksSnapshot())",
+            "return perSectionFolderProtection(for: folder, marks: marksSnapshot())",
+            "return gradedFolderProtection(for: folder, marks: marksSnapshot())",
+        ]
+        for expected in mustAppear {
+            XCTAssertTrue(source.contains(expected), "CourseSettingsView no longer says: " + expected)
+        }
+        XCTAssertFalse(
+            source.contains("protection: sharedFolderProtection,"),
+            "the shared list would be drawn with a walk per row again"
+        )
     }
 
     // MARK: - The trail, written when the file is

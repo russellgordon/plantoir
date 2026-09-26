@@ -1445,9 +1445,10 @@ struct NewCourseWizardView: View {
     }
 
     /// The marks pool narrowed to the folders this course will actually have.
-    /// The rule itself is `GradedFolderRule.reconciled(_:toFolders:)`, which
-    /// says how it differs from Windows' and why; this stays as the name the
-    /// call sites and their tests already use.
+    /// The rule itself is `GradedFolderRule.reconciled(_:toFolders:)` — the
+    /// command line's rule, pinned by `gradedFolders.reconcilingAChosenPool`
+    /// (#152); this stays as the name the call sites and their tests already
+    /// use.
     static func reconciledGradedFolders(from gradedFolders: [String], validChoices: [String]) -> [String] {
         return GradedFolderRule.reconciled(gradedFolders, toFolders: validChoices)
     }
