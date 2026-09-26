@@ -36,6 +36,30 @@ scanning logic lives once, in `scripts/netlify_badge.py`, and
 `website/netlify_deploy.py` imports it rather than carrying its own copy;
 `website/test_netlify_deploy_headers.py` covers the wiring.
 
+## The update feeds (`updates/`, #204)
+
+`website/updates/macos.xml` is the feed a released Plantoir on a Mac asks once a
+day for a new version; `updates/windows.xml` will join it with Windows' v1.4.0.
+Each is **signed**, so the site must serve the exact bytes that were signed:
+`build.py` copies `updates/*.xml` (and any `*.xml.signature`, NetSparkle's
+detached form) into `site/updates/` byte for byte, never parsing and rewriting
+them, and checks each one in both modes (`update_feeds.problems_with`: well
+formed, signed, every download the platform's own asset under its own
+version's release, never the other platform's). `--deploy` refuses when the mac
+feed's newest version is not `MARKETING_VERSION`, and afterwards — like
+`--verify-deploy` — fetches each live feed, compares its SHA-256 with `site/`,
+and follows its newest download to a 200 of the right length: the check for a
+feed deployed before its release was published.
+
+`updates/macos-notes.html` is the cumulative release notes the feed is built
+from, and is NOT served. Both files are written only by
+`website/update_feed.py` at a release cut — never by hand
+(RELEASING.md → "The update feed (macOS)"). `website/test_update_feed.py`
+covers the generator and the checks with a throwaway key; it is macOS-only
+(hdiutil, Sparkle's tools), which is why it is here and not in `scripts/`.
+`updates/rehearsal-*/` holds a dress-rehearsal feed, is ignored by git and is
+never copied by `build.py`.
+
 ## What is where
 
 | File | What it is |

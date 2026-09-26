@@ -4947,11 +4947,12 @@ From v1.3.2 a released Plantoir finds and installs its own new versions, with
 day, never install while work is under way, never refuse a quit — are
 `contracts/shared-rules.json` → `appUpdates`, which Windows adopts with
 NetSparkleUpdater (the `windows` issue drafted from #204, milestone v1.4.0).
-This section is the mac's mechanism and the reasons for it. **Slice 1** (the
-app) is described here; the release half — signing the updater's helpers in
+This section is the mac's mechanism and the reasons for it: the app (#204's
+slice 1). The release half (slice 2) — signing the updater's helpers in
 `publish.sh`, building and signing the feed at cut time, `website/build.py`
 copying it byte-for-byte, and the dress rehearsal in a throwaway standard
-account — is slice 2, and `RELEASING.md` says nothing about it until then.
+account — is in `RELEASING.md` → "The update feed (macOS)" and "The dress
+rehearsal", with its reasons under "Signing the updater into a release" below.
 
 ### The settled decisions, and where they live in the build
 
@@ -5148,7 +5149,7 @@ says the installer may not have heard. A skip in THIS reply does not mark the
 version skipped (only the update window's own Skip does), so it is offered
 again at the next check. Whether the cancel message always reaches the
 installer before the app is gone is a runtime fact about Sparkle's own
-connection, and the dress rehearsal (slice 2, V4b) measures it.
+connection, and the dress rehearsal (`RELEASING.md`, V4b) measures it.
 
 **What the installer watches, for the record** (the plan review's correction):
 `Autoupdate/TerminationListener.m` is dead code, absent from the project.
@@ -5160,7 +5161,7 @@ publish, an assistant's server — is not an `NSRunningApplication` (measured by
 the review), so it is never sent that event. **If the scheduled run ever
 becomes an application**, it would start receiving Quit events on Install and
 Relaunch. Since #212 the run posts a notification; whether that registers it as
-an application was NOT measured in slice 1 — the rehearsal (slice 2, V3) checks
+an application was NOT measured — the dress rehearsal (`RELEASING.md`, V3) checks
 `NSWorkspace.shared.runningApplications` while a scheduled run is posting.
 
 ### What the gate reads: leases first, then a scan for what they cannot show
@@ -5251,6 +5252,52 @@ by its own updater — a note the old version leaves at `willInstallUpdate` — 
 by hand). All eight are in `ActivityTrail.Event` and `activityTrail.mustRecord`
 with no `appliesOn`: Windows owes every one, and `app updated` from the day it
 is read, updater or not.
+
+### Signing the updater into a release (slice 2)
+
+`publish.sh -Sign` runs `mac-app/release/sign-updater.sh` BEFORE the dylibs
+and the app: Autoupdate, Updater.app, then the framework LAST, never `--deep`,
+never the app's entitlements. Xcode's Code Sign On Copy re-signs only the
+framework's top level; the helpers arrive signed ad-hoc by the Sparkle project
+(measured: `Signature=adhoc`, `TeamIdentifier=not set`), notarization refuses
+nested code that is not Developer ID signed with a timestamp, and — worse, if it
+ever got through — Sparkle finds its installer on a different team from the
+update and silently skips its atomic swap and Gatekeeper scan
+(`Autoupdate/SUPlainInstaller.m` ~:350-376).
+
+**Why a separate check, and why the team.** `codesign --verify --deep --strict`
+passes a Developer-ID app whose updater helpers were left ad-hoc (measured for
+the plan with `C.app`, and pinned again by
+`test_the_updaters_helpers_left_as_fetched_are_caught_by_the_team_and_not_by_verify`).
+`release/check-signatures.sh` asks what matters of every updater item and the
+app — the app's own team (read from its signature, not typed), the hardened
+runtime, and no helper carrying `disable-library-validation` or
+`network.server` — and refuses an ad-hoc app outright. It runs after the app is
+signed and before the DMG, so a missing step costs seconds rather than a
+five-minute notarization round trip — and it is the slice-1 review's M1 belt: a
+`-Sign` build of a tree whose helpers the script did not sign is refused.
+`release/check-update-keys.sh` reads the BUILT bundle's feed, public key and
+ask-first key in every mode.
+
+**What was proven, and how far.** `mac-app/release/test_release_signing.py`
+(8 tests) signs only AD-HOC: the release order verifies; an ad-hoc app is
+refused; against a real team every item is named; helpers left as fetched are
+caught; `--deep --entitlements` and a helper without the runtime are refused;
+`publish.sh` calls each step in its place. Four must-fails by copy-and-restore
+(framework signed first, no entitlement check, ad-hoc accepted, `publish.sh`
+skipping the updater) each go red. **Not provable ad-hoc:** that a correctly
+signed Developer ID bundle PASSES the team check — every ad-hoc item reports
+"not set". The dress rehearsal's R1 measures it, and its must-fail (b)
+(re-sign only Autoupdate ad-hoc; the check must name it alone).
+
+**The feed** is built by `website/update_feed.py` at the cut, checked and
+copied by `website/update_feeds.py` — `website/README.md` → "The update feeds"
+and `RELEASING.md` → "The update feed (macOS)". *Rejected:* deltas (each is
+another asset on the GitHub release under a name that would have to stay
+stable, to save part of a ~59 MB download once a release); generating the feed
+in `publish.sh` (the feed needs the APPROVED notes, which do not exist until the
+cut, and must follow the release being published); a feed parsed and rewritten
+by `build.py` (breaks its signature).
 
 ### What was rejected, besides the above
 

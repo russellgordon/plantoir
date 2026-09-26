@@ -32,8 +32,13 @@ What it does, in order — and what it refuses:
    byte; `--deploy` checks it live.
 
 `--rehearsal <path>` writes the feed to that path instead (it must be under
-`website/updates/`), takes `--download-prefix`, and never touches `macos.xml`
-or `macos-notes.html`. `--ed-key-file` replaces the Keychain key — for the
+`website/updates/` and is never committed), takes `--download-prefix`, keeps
+its own cumulative notes beside it, names the download
+`Plantoir-macOS-REHEARSAL.dmg` (the name `publish.sh --rehearsal-feed` gives
+it, which `cut-release` refuses to attach), and never touches `macos.xml` or
+`macos-notes.html`. Run it once per rehearsal build, oldest first, so the
+second run sees the first's notes — which is how the rehearsal checks that
+the notes of the installed version are hidden. `--ed-key-file` replaces the Keychain key — for the
 tests, which use a throwaway key they make themselves.
 """
 
@@ -54,6 +59,7 @@ SPARKLE_BIN = REPO / "mac-app" / "Vendor" / "Sparkle" / "bin"
 KEYCHAIN_ACCOUNT = "plantoir-macos"
 DOWNLOADS = "https://github.com/russellgordon/plantoir/releases/download/"
 ASSET = "Plantoir-macOS.dmg"
+REHEARSAL_ASSET = "Plantoir-macOS-REHEARSAL.dmg"
 STYLE_LINE = ("<style>div.sparkle-installed-version, div.sparkle-installed-version ~ div "
               "{ display: none; }</style>")
 
@@ -178,10 +184,14 @@ def build_feed(version: str, dmg: Path, notes_markdown: str, required_warning: b
         if not download_prefix:
             raise Refusal("A rehearsal needs --download-prefix (the pre-release's download address).")
     prefix = download_prefix or f"{DOWNLOADS}v{version}/"
+    asset = ASSET
+    existing_feed = feed_path
+    if rehearsal is not None:
+        asset = REHEARSAL_ASSET
+        existing_feed = rehearsal
+        notes_path = rehearsal.with_name(rehearsal.stem + "-notes.html")
 
     existing_notes = notes_path.read_text(encoding="utf-8") if notes_path.is_file() else ""
-    if rehearsal is not None:
-        existing_notes = ""
     section = notes_section(version, build, notes_markdown, required_warning)
     notes = cumulative_notes(existing_notes, section)
     critical = critical_version(notes, required_warning)
@@ -189,11 +199,11 @@ def build_feed(version: str, dmg: Path, notes_markdown: str, required_warning: b
     with tempfile.TemporaryDirectory(prefix="plantoir-feed-") as work:
         folder = Path(work) / "archives"
         folder.mkdir()
-        shutil.copyfile(dmg, folder / ASSET)
-        (folder / "Plantoir-macOS.html").write_text(notes, encoding="utf-8")
+        shutil.copyfile(dmg, folder / asset)
+        (folder / (Path(asset).stem + ".html")).write_text(notes, encoding="utf-8")
         output = Path(work) / "macos.xml"
-        if rehearsal is None and feed_path.is_file():
-            shutil.copyfile(feed_path, output)
+        if existing_feed.is_file():
+            shutil.copyfile(existing_feed, output)
         command = [str(generate)] + key_arguments(ed_key_file) + [
             "--download-url-prefix", prefix,
             "--link", "https://plantoir.app/",
@@ -218,8 +228,8 @@ def build_feed(version: str, dmg: Path, notes_markdown: str, required_warning: b
         newest = update_feeds.newest_item(output)
         if newest is None or newest["build"] != build:
             raise Refusal("The new release is not the newest item in the feed.")
-        if newest["url"] != prefix + ASSET:
-            raise Refusal(f"The new item downloads {newest['url']}, not {prefix + ASSET}.")
+        if newest["url"] != prefix + asset:
+            raise Refusal(f"The new item downloads {newest['url']}, not {prefix + asset}.")
         if newest["length"] != str(dmg.stat().st_size):
             raise Refusal(f"The new item says {newest['length']} bytes; the DMG is {dmg.stat().st_size}.")
 
@@ -227,6 +237,7 @@ def build_feed(version: str, dmg: Path, notes_markdown: str, required_warning: b
         if rehearsal is not None:
             rehearsal.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(output, rehearsal)
+            notes_path.write_text(notes, encoding="utf-8")
             return rehearsal
         shutil.copyfile(output, feed_path)
         notes_path.write_text(notes, encoding="utf-8")
