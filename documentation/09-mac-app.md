@@ -710,12 +710,20 @@ removed. It is on Russell's list (`~/Downloads/plantoir-v1.3.2-run/ready/311-290
 Meanwhile "can't be read" is two reasons, told apart by the error the disk
 gives (`RememberedFolder.presence`, `stat`'s errno — never `fileExists`, which
 answers false for "nothing there" and "you may not look" alike, and would
-have called a denied Desktop folder GONE): EPERM is macOS's privacy settings
+have called a denied Desktop folder GONE): EPERM is taken to be macOS's
+privacy settings — **assumed** from Apple's documented behaviour ("Operation
+not permitted"), not measured here, since the permission probe could not run;
+Russell's list checks that a denied Desktop folder says `privacyDenied`
 (`privacyDenied`, pointing at System Settings ▸ Privacy & Security ▸ Files &
 Folders — the spelling read from System Settings' own strings on macOS 26.6,
 `FILE_ACCESS_COMBINED`, not from memory), and EACCES is the folder's own
-permissions (`unreadable`, pointing at Finder's Get Info, since no setting
-would help).
+permissions (`unreadable`, measured with chmod 000 on the folder and on a
+parent; its sentence names no pane and no Finder, because no setting would
+help and Windows shares it). **Anything but EPERM or EACCES reads as gone** —
+not only "no such file", but also a mounted network share that has hung
+(a time-out or an input/output error), which is then told "can't be found".
+And `stat` on such a share can itself block: `.withoutMounting` covers a
+share that is not mounted, not one that is mounted and hung.
 One thing the probe DID show: reading a protected folder for the first time
 blocks the calling thread until the question is answered — at launch that is
 the main thread, behind the permission sheet. Whether that reads as a hang
@@ -726,7 +734,7 @@ in a fresh account is on the same list.
 `RememberedFolder.decide`, in this order: in a Trash (a trashed folder
 EXISTS, so it goes first) → on a `/Volumes/<name>` that is not there (asked
 from the name alone, before touching anything under it) → gone (the disk said
-ENOENT/ENOTDIR) → out of the website builder's reach (`outsideHome`,
+anything but EPERM or EACCES) → out of the website builder's reach (`outsideHome`,
 `coursesOutsideHome`, #290 below) → not allowed in (`privacyDenied`,
 `unreadable`) → reopen. Out of reach comes before a denial because it needs
 only the folder's name from the disk, and fixing a permission only to be

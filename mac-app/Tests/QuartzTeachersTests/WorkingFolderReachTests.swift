@@ -148,6 +148,21 @@ final class WorkingFolderReachTests: XCTestCase {
         }
     }
 
+    /// The text collapse on its own. The disk case above cannot prove it,
+    /// because the kernel resolves `..` wherever the names exist; the
+    /// collapse is what answers when a `..` climbs through names that do
+    /// not (a drive that is not plugged in).
+    @MainActor
+    func testDotsAreCollapsedByTextAlone() {
+        XCTAssertEqual(WorkingFolderReach.collapsingDots("/Users/ann/Notes/../../../Volumes/Gone/courses"), "/Volumes/Gone/courses")
+        XCTAssertEqual(WorkingFolderReach.collapsingDots("/Volumes/Gone/a/b/../../c/./d"), "/Volumes/Gone/c/d")
+        XCTAssertEqual(WorkingFolderReach.collapsingDots("/a/../../../x"), "/x")
+        XCTAssertFalse(WorkingFolderReach.isInside(
+            canonicalFolderPath: WorkingFolderReach.collapsingDots("/Users/ann/Notes/../../../Volumes/Gone/courses"),
+            canonicalHomePath: "/Users/ann"
+        ), "a link climbing out of the home folder by names that do not exist is outside")
+    }
+
     /// The Swift sentences are the contract's, and the guidance clause is the
     /// one `app-rules.json` → `failureExplanations` and the launchers say.
     @MainActor

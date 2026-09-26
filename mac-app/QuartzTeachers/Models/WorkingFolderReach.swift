@@ -139,9 +139,12 @@ nonisolated enum WorkingFolderReach {
         // The link's target, made absolute against the folder it sits in,
         // then asked of the disk. A target that cannot be opened (a drive not
         // plugged in) comes back as its text, and its text is outside too.
+        // Joined to the folder's DISK spelling, so a `..` in the link is
+        // taken from the folder the kernel would take it from, not from a
+        // typed spelling that passes through a link of its own.
         var target: String = destination
         if !destination.hasPrefix("/") {
-            target = url.appendingPathComponent(destination).path
+            target = (canonicalFolder as NSString).appendingPathComponent(destination)
         }
         // `..` taken away by its text: a link that climbs out of the home
         // folder to a drive that is not plugged in cannot be asked of the

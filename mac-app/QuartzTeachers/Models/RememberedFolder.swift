@@ -316,10 +316,10 @@ nonisolated enum ReopenWording {
     }
 
     /// The folder's own permissions: no System Settings in it, because no
-    /// setting there changes them. "Sharing & Permissions" is the section of
-    /// Finder's Get Info window where they are.
+    /// setting there changes them — and no Finder either, because the
+    /// sentence is shared with Windows, where the same case is an ACL.
     static func unreadable(folderName: String) -> String {
-        return "“\(folderName)”, the working folder you had open last time, can’t be opened because its permissions don’t let you read it — check Sharing & Permissions in Finder’s Get Info, or choose another folder."
+        return "“\(folderName)”, the working folder you had open last time, can’t be opened because you don’t have permission to read it — check who is allowed to open it, then choose it again."
     }
 
     /// macOS's privacy settings. The pane's name is Apple's own, read from
