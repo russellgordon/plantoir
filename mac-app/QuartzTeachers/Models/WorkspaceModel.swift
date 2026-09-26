@@ -42,9 +42,10 @@ class WorkspaceModel {
 
     /// A folder the NEXT new window must open on, set just before something
     /// opens one for a reason of its own — the assistant revealing a
-    /// section, or a click on a scheduled publish's notification (#306). Taken by exactly one window; without it, a window opened
-    /// with none other on screen would reopen the last working folder, write
-    /// a reopen the teacher never saw, and then be moved (#311 review M1).
+    /// section, or a click on a scheduled publish's notification (#306).
+    /// Taken by exactly one window; without it, a window opened with none
+    /// other on screen would reopen the last working folder, write a reopen
+    /// the teacher never saw, and then be moved (#311 review M1).
     static var folderForNextNewWindow: String?
 
     /// Decides the folder a window starts on, once, before its first frame
