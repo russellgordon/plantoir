@@ -99,8 +99,8 @@ enum BuildFreshness {
     ///
     /// The bare address `ws://localhost:` was the rule until 2026-09-26, and
     /// any page whose note MENTIONS the address carries that too — one
-    /// networking lesson, measured in a production build, carried it 8 times
-    /// — so its site read as a preview's on every Publish and was rebuilt.
+    /// networking lesson, measured in a production build, carried it 20 times
+    /// on 7 lines — so its site read as a preview's on every Publish and was rebuilt.
     /// A page's own words cannot produce the raw tag, because Quartz writes
     /// `<` as `&lt;` in text and in attributes alike.
     ///

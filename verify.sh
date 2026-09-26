@@ -1042,10 +1042,18 @@ check_baked support/favicon/icon.png      /opt/support/favicon/icon.png
 # buildFreshness.previewBuild.signature, #291). Those bytes are Quartz's, not
 # ours: if a Quartz raise or a patch changes them, the rule matches NOTHING,
 # every preview reads as a production build, and a preview is published — the
-# one catastrophic direction. So the three source lines that produce them are
-# asked for here, in the image, which takes seconds rather than a serve cycle
-# and fails the day Quartz is raised. verify-deploy.sh checks a real
-# serve-mode page against the rule as well.
+# one catastrophic direction. So the source that produces them is asked for
+# here, in the image, which takes seconds rather than a serve cycle and fails
+# the day Quartz is raised. verify-deploy.sh checks a real serve-mode page
+# against the rule as well.
+#
+# The client's template is checked for ADJACENCY, not for its words: the
+# inline script's template literal must open with nothing but whitespace
+# before `const socket = new WebSocket(`, read as one record in the C locale
+# as deploy.sh reads a page. Three separate `grep -F`s (the first version)
+# would all still pass if a Quartz raise put a comment or "use strict" first,
+# and the rule would then match nothing (found by review, #291). The other two
+# lines — the address and the tag's type — are words, so a fixed string does.
 echo ""
 echo "🔎 Checking the image's Quartz still writes the live-reload client the preview rule looks for…"
 CLIENT_OK="true"
@@ -1056,7 +1064,11 @@ check_client_source() {
     fail "$image_path no longer holds: $expected — re-measure the preview rule in contracts/app-rules.json (#291)"
   fi
 }
-check_client_source /opt/quartz/quartz/plugins/index.ts "const socket = new WebSocket('\${wsUrl}')"
+QUARTZ_CLIENT_TEMPLATE='script: `[[:space:]]*const socket = new WebSocket('"'"'${wsUrl}'"'"')'
+if ! docker run --rm -e LC_ALL=C "$DEV_TEST_IMAGE" grep -zq -- "$QUARTZ_CLIENT_TEMPLATE" /opt/quartz/quartz/plugins/index.ts 2>/dev/null; then
+  CLIENT_OK="false"
+  fail "/opt/quartz/quartz/plugins/index.ts no longer opens the live-reload script with const socket = new WebSocket(…) — re-measure the preview rule in contracts/app-rules.json (#291)"
+fi
 check_client_source /opt/quartz/quartz/plugins/index.ts 'ws://localhost:${ctx.argv.wsPort}'
 check_client_source /opt/quartz/quartz/util/resources.tsx 'moduleType ?? "application/javascript"'
 [[ "$CLIENT_OK" == "true" ]] && pass "The image's Quartz writes the live-reload client the preview rule looks for (#291)"
