@@ -2320,6 +2320,21 @@ unsaved settings` and `preview again after settings saved`.
 `PreviewLeases.active` and `CourseActivity.activePublishes`; no cell of the
 sidebar table asks the course anything while drawn (the #266 rule above).
 
+
+**A Save that affects a scheduled deploy says so** (#323). Since #323 a
+scheduled run reads the course's settings when it fires, so a Save can move or
+break a deploy already set. After a Save, for each section with a deploy set to
+happen on its own in THIS working folder and still to come,
+`SettingsSaveNotice.scheduledDeploysAtSave` decides one sentence:
+`SpecialNames.settingsSaveScheduledDeployCannotGoAheadAsSetNow` when it could
+not go ahead as the course is set now (changed or not), else
+`settingsSaveScheduledDeployGoesWhereTheCourseDeploysNow` when this Save changed
+where the course deploys (the file BEFORE the Save against what it wrote).
+They come before the "saved while publishing" early return, so a Save during a
+publish still says them; nothing is refused or undone. The trail's `settings
+saved` line carries the same facts from `SettingsSaveNotice.scheduledDeploys`.
+Contract: `savingSettings.scheduledDeploys`; the whole story is docs 07, "Where
+it deploys is read when it runs (#323)".
 ## Two programs, one course: the build, preview and publish leases (#156)
 
 Written 2026-09-25 for [issue #156](https://github.com/russellgordon/plantoir/issues/156).

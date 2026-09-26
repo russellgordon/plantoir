@@ -4463,12 +4463,13 @@ and two worse things the report did not name:
   a course from Netlify to Cloudflare published to the old Netlify site and
   said "deployed". Fail-open, which is why this is more than a wrong refusal.
 
-It also matters because **a scheduled deploy's destination is written into the
-job when it is SET** (`ScheduledDeploy.scheduleDeploy` writes each
-destination's `deploy.sh` arguments into the one-shot command); only the
-lateness window is read when it fires (docs 07). So "read at scheduling" has
-to mean "read from disk", or the stale destination is baked into a job that
-runs at 06:30 with nobody watching.
+It also mattered because **a scheduled deploy's destination was written into
+the job when it was SET** (`ScheduledDeploy.scheduleDeploy` wrote each
+destination's `deploy.sh` arguments into the one-shot command, and only the
+lateness window was read when it fired). So "read at scheduling" had to mean
+"read from disk", or the stale destination was baked into a job that ran at
+06:30 with nobody watching. Since #323 the run reads the settings again itself
+(docs 07); what is read at scheduling still decides the refusal and the card.
 
 **What landed.**
 
@@ -4545,9 +4546,12 @@ additional destination's refusal.
 
 **Known limits, left as they are.**
 
-- **A destination changed AFTER a deploy is scheduled** still goes to the old
-  one — the destination is in the job. Pre-existing, outside the assistant, and
-  the same fail-open shape: [issue #323](https://github.com/russellgordon/plantoir/issues/323).
+- **A destination changed AFTER a deploy is scheduled** used to go to the old
+  one — the destination was written into the job. Fixed by
+  [issue #323](https://github.com/russellgordon/plantoir/issues/323): the run
+  now reads the course's settings when it fires (docs 07, "Where it deploys is
+  read when it runs"). What the assistant reads at scheduling still decides its
+  refusal and card, and what the job records it was told.
 - **Settings saved between the card and the Approve press**: the act reads
   fresh, so it may differ from what the card said. The `schedule_deploy` result
   names the destination it used, so the teacher sees it.
