@@ -813,8 +813,10 @@ Four things that cost a day each if you do not know them:
   tool as a recommendation, not a boundary. The rule went into Swift instead.
 - **Adding a tool is a routing change.** On the mac the local model is shown
   13 of the 22 tools that exist (`AssistToolRunner.localTools`); an MCP client
-  is shown 32 (`.mcpTools`, the 22 plus ten: three that ask for judgement about
-  meaning). More choices is the classic way a router degrades. **Windows'
+  is shown 35 (`.mcpTools`, the 22 plus thirteen: six that ask for judgement
+  about meaning — the three curriculum tools, and #209's three for the How I
+  Teach page). The local 13's full digest is pinned
+  (`scripts/test_tool_surface_digest.py`, made by `research/ai-assist/toolhash.py`). More choices is the classic way a router degrades. **Windows'
   `plantoir-mcp.exe` serves 37**, so the two MCP surfaces are no longer the
   same product — see [issue #66](https://github.com/russellgordon/plantoir/issues/66).
 

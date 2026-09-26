@@ -2029,12 +2029,13 @@ configuration is updated in memory as it is written to disk. Windows'
 deliberately: a server that silently swapped its courses under a conversation
 would be worse than one that has to be restarted.
 
-Claude Code is offered a **longer** list than the local model: 32 tools
-against 13 — the twenty-two that exist, plus ten served only over MCP.
+Claude Code is offered a **longer** list than the local model: 35 tools
+against 13 — the twenty-two that exist, plus thirteen served only over MCP.
 (Windows' separate `plantoir-mcp.exe` serves 37; the gap is recorded in
-[issue #66](https://github.com/russellgordon/plantoir/issues/66).) Three of the extra ones ask for judgement about meaning — reading the
-curriculum and deciding which expectations a page addresses — which a large
-model does well and a 4B model does not. Anything shown to the local model has
+[issue #66](https://github.com/russellgordon/plantoir/issues/66).) Six of the extra ones ask for judgement about meaning — reading the
+curriculum and deciding which expectations a page addresses, and reading or
+drafting the teacher's How I Teach page (#209, "Telling an outside assistant how
+the course is taught") — which a large model does well and a 4B model does not. Anything shown to the local model has
 been measured against it, and a unit test pins the count so the list cannot
 grow by accident.
 
@@ -2984,8 +2985,8 @@ half-built mac version of any of them:
 `plan_make_room_for_classes`, `plan_sync_page_dates`, `read_timetable`,
 `roll_over_section`, `sync_page_dates`.
 
-**Seven of those twelve are the mac's now**, and the surface is **32** (22 plus
-ten MCP-only). All six tools this sorting judged the mac should have were built
+**Seven of those twelve are the mac's now**, and the surface was **32** (22 plus
+ten MCP-only) — 35 since #209 added the three How I Teach tools. All six tools this sorting judged the mac should have were built
 on 2026-09-08 — `list_courses`, the `add_classes` pair, the
 `make_room_for_classes` pair, `explain_publishing` and `back_up_course`
 (`GUI-IMPROVEMENTS.md` rows 452–456, and item 46 below). So the set difference
@@ -4565,7 +4566,8 @@ not a git repository.
    make the two greetings diverge. Also seen: asked about the teacher's
    teaching style, both honestly said they did not know yet — neither had read
    a page, and nothing Plantoir hands them says how the course is taught.
-   That is issue #209.
+   That is issue #209, answered by "Telling an outside assistant how the
+   course is taught (#209)" below.
 
 Whole `exec` session including the model call: 15 s. MCP cold-start was not
 timed separately, and a signed-out launch was not measured (expected: Codex
@@ -4676,6 +4678,177 @@ will eventually ask why the two are not the same.
   that pin the Claude door's greeting, script and configuration **to the byte**
   were added FIRST, before anything was touched, precisely so the extraction can
   be done later and proved not to have moved anything.
+
+## Telling an outside assistant how the course is taught (#209)
+
+Asked "How about my teaching style?", both doors' sessions said they did not
+know (item 6 above). Russell decided on 2026-09-26: **a "How I Teach" page per
+course, plain Markdown in the course folder, never published, that the teacher
+writes or the assistant drafts from the course's pages; both outside doors read
+it as part of the briefing.** Rejected by him: a Course Settings field. The rule,
+its cases and everything rejected are `contracts/shared-rules.json` →
+`howITeachPage`; this section is the why.
+
+### The page, and why its LOCATION is the guarantee
+
+`How I Teach.md` at the top of the course folder — the top of the Obsidian
+vault, beside `course_config.json` — matched on the whole name after NFC with
+only A–Z folded (so `how i teach.md` is it and `How I Teach 1.md` is not; ASCII
+folding because Python's `casefold` and Swift's `lowercased` disagree on a few
+letters, and two implementations of one rule must not). Measured before this
+existed: a page with that name at the top of a course, and at the top of
+`section1/`, was DISCOVERED, copied to the top of the site's content and
+PUBLISHED — a page typed in Obsidian has no frontmatter, and `publish: false`
+would not have saved it anyway, because `publishForSection<N>: true` beats it
+and that is exactly what `publish_pages` writes on a course-level page. So the
+build keeps it off by location, in shared Python (`scripts/how_i_teach.py`;
+docs 05 has the four points), and the `publish: false` a NEW page is given is
+only for a page later moved into a folder. The same name at the top of a
+section folder is kept off too, because the build copies it to the same place.
+
+A name that LOOKS like the page and is not ("How I Teach 1", "How I teach
+ICS4U") is published like any page, silently — the privacy risk runs that way,
+not the other — so the build names it in the console, and the missing-page
+answer states the exact name and place for an agent to relay.
+
+### Three channels, and which one is relied on
+
+1. **The greeting** (both doors, one string both platforms pin:
+   `app-rules.json` → `outsideAgents.greetingHowITeachSentence`), straight after
+   "Start by listing its sections…". The same sentence whether or not a page
+   exists: the tool's answer handles absence. It is the LOAD-BEARING channel,
+   because item 6 measured Codex deferring a tool whose description says "call
+   first" while acting on the greeting at once.
+2. **`read_how_i_teach`**, what the greeting sentence resolves to.
+3. **MCP `initialize.instructions`** (mac only; Windows' server sends none):
+   one paragraph naming each LIVE course whose page exists — the case the
+   greeting cannot cover, since it names one course. A folder with no page and
+   no reference course still sends nothing at all. Third, not first: whether
+   clients read `instructions` has never been measured.
+
+`list_courses` also says, per course, "How I Teach page: yes / not written
+yet" — to an MCP client ONLY. The local window reaches `list_courses` by a
+phrase matched in code and SHOWS the answer to the teacher, and the local
+assistant neither reads nor drafts the page, so the line would be a suggestion
+that window cannot act on (plan review, item 1).
+
+**Both doors start in the working folder, where the agent's own file tools can
+open the page.** A read that way leaves no trail line, so the
+`How I Teach page read` line means "read THROUGH PLANTOIR" and its absence
+proves nothing. Russell's acceptance (below) records which way each read went;
+if file reads turn out common, the lever is the greeting's wording, which is his
+decision.
+
+### Three tools, MCP only; the local thirteen do not move
+
+`read_how_i_teach` (course only; works on a reference course, whose page is
+evidence), `plan_write_how_i_teach`, `write_how_i_teach`. MCP-only for the
+curriculum tools' reason — drafting a teacher's account of their own teaching is
+judgement about meaning — and because anything on the local surface owes a
+routing re-measurement. The surface is 22 / 13 local / 35 MCP (was 32).
+`toolhash.py` (now committed in `research/ai-assist/`; the recipe is in its
+docstring) gives, after regeneration:
+
+- `local 13 tools 46b965622213567d49aae523c70f9bcd2c9fd3d1c21279e167d0da2b2cd96cb6` — unchanged, and now PINNED in full by `scripts/test_tool_surface_digest.py`;
+- `mcp 35 tools 777bf545185efd47333e13877c263884c9a3e3d19d6deb82388f6eb5c2fdcc54` — moved, as it must with three new tools; recorded here, not pinned.
+
+What the write keeps, and why:
+
+- **`replacing` is a MARK, not a boolean.** The plan's first form was
+  `replacing: true`; this surface carries no boolean anywhere
+  (`toolSchemas.departures`, `testNothingOnThisSurfaceIsAPreviewFlagOrAnyBoolean`),
+  because a boolean is an argument the model decides under pressure. The mark
+  is the first eight hex digits of the SHA-256 of the page's bytes, which
+  `plan_write_how_i_teach` reports and the model can only COPY. It also refuses
+  a replace when the teacher edited the page after the plan — which a boolean
+  could not. With no mark, an existing page is never replaced.
+- **Refused, by the plan and the write alike:** empty text, more than 8,000
+  characters, text whose first non-blank line (after a byte-order mark) is a
+  `---` fence (so an agent cannot write `publish: true` into it), a wrong mark,
+  and a reference course — the plan is read-only and would otherwise pass the
+  shared write gate, promising what the write refuses.
+- **A new page** is `---\npublish: false\n---\n\n<text>\n`. **A replaced page**
+  keeps its settings block byte for byte (LF or CRLF, a leading byte-order mark
+  included) and only the body changes; a page that opens a fence and never
+  closes it is replaced whole, so the old text cannot survive under a
+  "block" that swallowed it. Foundation's UTF-8 reading drops a byte-order
+  mark, so the page is decoded from its bytes (`HowITeachPage.text(of:)`) and
+  the undo entry's `after` is the file as it reads back.
+- **The teacher's own spelling** is found by listing the folder, so
+  `how i teach.md` is what is read, planned and replaced, and a case-sensitive
+  volume cannot end up with two.
+- **Backed up once per conversation, one undo entry, no preview touched.**
+  The backup and the entry need a section, so the lowest stands in; the
+  change's description names the course alone (`AssistChange.appliesToTheWholeCourse`),
+  and the Backups list says "before an assistant chat about Section 1" —
+  accepted rather than teaching the backup-name parser a new maker on both
+  platforms (plan review, item 6).
+
+The drafting brief (`AssistWording.howITeachDraftingBrief`, handed over with a
+missing page) says: offer, do not draft unasked; read the landing page, class
+pages from at least two units, some warm-ups/tasks/discussions, and a reference
+course of the same code; write in the teacher's first person; say what the
+pages SHOW and never invent; 200–500 words; show the whole draft and change it
+until they agree; save it only through the tools. It names no teaching
+approach on purpose: a lean should be FOUND in the pages, not asserted by
+Plantoir about a teacher who may have rewritten them.
+
+### Never listed, never published, and link rewriting still sees it
+
+The assistant's LISTINGS leave the page out — `list_pages`, the section graph
+(so `publish_pages` and `unpublish_pages` cannot find it by title) and
+curriculum mentions — through `ClassPages.pagesTheAssistantLists`. Asked for by
+title, publishing and hiding answer `wording.howITeachIsNeverPublished`, on the
+local window too, with no routing change: the model still picks
+`publish_pages`, the refusal is in code. An ordinary page of the same name
+inside a folder publishes like any other. **`ClassPages.pagesOfSection` is NOT
+narrowed** (plan review, item 2): it is also the walk that rewrites
+`[[links]]` when classes are renamed, and a How I Teach page that links to
+[[Unit 2, Day 3]] must follow that class — Obsidian only rewrites links when
+Obsidian does the rename. `HowITeachTests.testMakingRoomRewritesALinkOnTheHowITeachPage`
+pins it.
+
+### The trail
+
+Three events (`activityTrail.mustRecord`): `How I Teach page read` (course,
+word count, cut short or not — never the words), `How I Teach page written`
+(created or replaced, word counts, the backup's name — "did I write this, or
+did an assistant?"), and `How I Teach page kept off the website`, read from
+the build's `PLANTOIR_KEPT_OFF:` line — printed ONLY when a page the course's
+settings had LISTED is dropped, so the one transition a teacher will ask about
+("my How I Teach page vanished from the site") is recorded and a course whose
+page was never on the site leaves no line on every build. Read by the app from
+a run's console and from a scheduled publish's log, as `PLANTOIR_DATED:` is.
+
+### What is deliberately not in this piece
+
+- The section's "— Edited" fingerprint still counts the page, so editing it
+  makes the next Publish rebuild although the site would not change — a wire
+  format held byte for byte in three implementations; follow-up
+  [#330](https://github.com/russellgordon/plantoir/issues/330).
+- A button to open or create the page — a GUI surface on both platforms;
+  follow-up [#329](https://github.com/russellgordon/plantoir/issues/329).
+- No starter page from the wizard, `setup_course.py` or a payload: a template is
+  text an agent would read as the teacher's approach.
+- The local assistant neither reads nor drafts it.
+
+### Acceptance: through the real doors, by Russell
+
+Not automatable, and not headless: under `claude -p` an MCP write outside
+`--allowedTools` is denied, and `codex exec` ran with approvals at `never` and a
+read-only sandbox (item 2) — so write probes fail for reasons that are not the
+product's. In a SCRATCH working folder, ICS4U from its payload, the Debug build,
+each door three times: (A) greeting with no page — was `read_how_i_teach`
+called, did it offer to draft; (B) a 150-word page with a distinctive claim, then
+"How about my teaching style?" — PASS BAR: the answer reflects the page, 3/3 on
+both doors; "read at the greeting" is recorded as information, not a bar;
+(C) "Draft my How I Teach page" — pages read, plan before write, waited; (D)
+"Replace it with …" — refused without the mark, asked, then saved; (E) preview
+— no page on the site, the console line shown. For every probe, record whether
+the page was read THROUGH THE TOOL or with the agent's own file tools. A
+shortfall on B is recorded on #209 and flagged, not tuned away (steer with
+code, not descriptions), and does not block the merge. Results: not yet run
+(Russell's list, `ready/209.md`).
 
 ## A course kept for reference: the write gate, and the seam it is NOT gated on
 

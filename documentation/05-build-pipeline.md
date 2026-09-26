@@ -141,6 +141,57 @@ with it, the folder just shows up on the next preview. Reserved names
 (`Media`, `.obsidian`, `.merged_output`, `node_modules`, `course_config.json`,
 OS junk files) are excluded from discovery.
 
+<a name="how-i-teach"></a>
+
+### The teacher's How I Teach page never reaches a site (#209)
+
+`How I Teach.md` at the top of a course folder is the teacher's own account of
+how the course is taught, read by the outside doors
+([10 → "Telling an outside assistant how the course is taught"](10-local-ai-assistant.md#telling-an-outside-assistant-how-the-course-is-taught-209)).
+Before #209, discovery listed it like any top-level file and the site
+published it — measured on a scratch course, at the course's top level and at
+`section1/`'s, both. `publish: false` cannot be the guarantee (a later
+`publishForSection<N>: true` beats it, and a page typed in Obsidian has no
+flag at all), so the build keeps it off by LOCATION, asking
+`scripts/how_i_teach.py` at four points, all in the ALWAYS section so no
+course needs `--full-rebuild`:
+
+1. **Discovery** — `discover_shared_items` / `discover_section_items` never
+   list it.
+2. **Preflight** — a name ALREADY listed in `shared_files` /
+   `per_section_files` (a course whose page predates the rule) is dropped and
+   the configuration written back, the way an excluded name is; the in-memory
+   config a build is handed without a write (`_dropping_excluded_items`) drops
+   it too.
+3. **The copy lists** are filtered where they are READ, not in each loop, so a
+   copy loop added later inherits the rule.
+4. **A final sweep** (`remove_from_content_root`) deletes any match from the
+   top of the merged `content/` before the health checks and Quartz — the
+   backstop that makes the guarantee a property of the output. Top level only:
+   inside a folder the name is an ordinary page, and the sweep only ever
+   touches the build's own copy, never the teacher's folder.
+
+The name is matched whole, after NFC, with only A–Z folded; at the top of a
+section folder too, because a section's top-level files land in the same place.
+The console says `howITeachPage.keptOffTheWebsiteLine` when a page is found,
+and names a LOOK-ALIKE ("How I Teach 1") that WILL be published
+(`lookAlikeLine`) — that silent publication is the failure the exact name risks.
+When a page the settings had listed is dropped, the build prints
+`PLANTOIR_KEPT_OFF: {json}`, which the app writes on the trail
+(`How I Teach page kept off the website`) — once, at the transition, not on every
+build. Gates: `scripts/test_how_i_teach.py` (Windows runs it too), and
+`verify.sh`'s real build, which plants pages with sentinel phrases and greps the
+whole of `public/` (pages, `contentIndex.json`, sitemap, RSS) — the reserved
+two absent, the look-alike present so the check cannot pass by building nothing.
+
+**One residual, needing no code** (plan review): a site built for PUBLISHING
+before the update, while such a page existed, and not rebuilt since, still holds
+the page, and a publish that uploads that existing build sends it. A new image
+tag does not by itself rebuild a site. It applies only to a teacher whose page
+was already public before the update; the first build after the update removes
+it (`public/` is cleaned and mirrored with `rsync --delete`), and every preview
+build is rebuilt before it is published.
+
 ## Stage 2: Scaffold management
 
 The container build workspace `/tmp/quartz-builds/<CODE>/section<N>/` is
@@ -1537,6 +1588,12 @@ the course folder, minus
 - `node_modules` and the legacy non-hidden `merged_output`,
 - `.DS_Store` / `Thumbs.db`,
 - `course_config.backup.json` and any `*.tmp`.
+
+The How I Teach page (#209) COUNTS, although it never reaches a site: editing it
+marks the section "— Edited" and makes the next Publish rebuild for nothing.
+Deliberately not excluded yet — this list is a wire format held byte for byte in
+three implementations, and changing one first would give the others a permanent
+false "Edited"; follow-up [#330](https://github.com/russellgordon/plantoir/issues/330).
 
 `course_config.json` itself COUNTS — fonts, the sidebar and the coverage map
 are inputs to the built site as surely as a page is. `Media/` counts, because
