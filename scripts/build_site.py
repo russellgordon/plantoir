@@ -4743,10 +4743,22 @@ def _dropping_excluded_items(cfg: dict) -> dict:
     it is NOT going to write. Exists for the give-up path of preflight's
     compare-and-swap: nothing downstream reads `excluded_items`, so a build
     handed an unreconciled config publishes folders the teacher excluded.
+
+    Matched EXACTLY, case included — the same way the drop pass and the
+    discovery filters in `preflight_update_course_config` match, and the way
+    both apps' `isExcluded` does (contracts/shared-rules.json ->
+    excludedItems.matching, GitHub issue #152). Until #152 this path
+    lower-cased both sides, so one file gave two answers: with `Old Tests`
+    excluded and `old tests` listed, preflight kept `old tests` and this
+    dropped it. Exact is the rule, not the defect (GUI-IMPROVEMENTS row 412:
+    an app must never believe a folder is excluded while the build publishes
+    it). Names are compared as text (`str`), so an entry that is not a string
+    — a hand edit neither app writes — cannot make this path throw the way a
+    set of unhashable entries would.
     """
     excluded = cfg.get("excluded_items") or {}
-    shared_excluded = {str(n).lower() for n in (excluded.get("shared") or [])}
-    section_excluded = {str(n).lower() for n in (excluded.get("per_section") or [])}
+    shared_excluded = {str(n) for n in (excluded.get("shared") or [])}
+    section_excluded = {str(n) for n in (excluded.get("per_section") or [])}
     corrected = dict(cfg)
     for key, names in (("shared_folders", shared_excluded), ("shared_files", shared_excluded),
                        ("per_section_folders", section_excluded),
@@ -4755,7 +4767,7 @@ def _dropping_excluded_items(cfg: dict) -> dict:
         if isinstance(current, list) and names:
             kept = []
             for entry in current:
-                if str(entry).lower() not in names:
+                if str(entry) not in names:
                     kept.append(entry)
             corrected[key] = kept
     return corrected
