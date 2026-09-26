@@ -13,9 +13,12 @@ This file runs that data against the REAL code.
 the CONTAINER MOUNT BLOCK are cut out of each launcher by their markers, and
 each launcher's own `run_container_with_mount` by name — not retyped — and run
 under `/bin/bash` (3.2 on a Mac, the one a teacher's launchers run under) with
-`set -euo pipefail`. `lsof` and `docker` are small pretend programs put first
-on PATH, answering from files in a scratch folder and writing down every
-question they were asked. Nothing is started, nothing is published, and the
+`set -euo pipefail`. `lsof`, `netstat` and `docker` are small pretend programs
+put first on PATH, answering from files in a scratch folder and writing down
+every question they were asked. One test (`TheRealListings`) runs the two
+listing functions against THIS Mac's real `netstat` and `lsof`, because every
+other test here would pass against a parse that the real kernel's output
+defeats (GitHub #310). Nothing is started, nothing is published, and the
 trail written is a scratch folder's.
 
 **Windows.** The parts that need bash are skipped where there is no bash that
@@ -106,9 +109,30 @@ cat "$FAKE/listening" 2>/dev/null
 exit 0
 """
 
+# The kernel's list, as `netstat -an -p tcp` prints it: a heading, then one
+# row per socket. $FAKE/kernel holds the rows; the heading's last word is
+# "(state)", so it never reads as LISTEN.
+FAKE_NETSTAT = r"""#!/bin/bash
+echo "netstat $*" >> "$FAKE/calls"
+if [ -f "$FAKE/netstat_fails" ]; then
+  echo "netstat: sysctl: net.inet.tcp.pcblist_n: Operation not permitted" >&2
+  exit 1
+fi
+echo "Active Internet connections (including servers)"
+echo "Proto Recv-Q Send-Q  Local Address          Foreign Address        (state)"
+cat "$FAKE/kernel" 2>/dev/null
+exit 0
+"""
+
 FAKE_DOCKER = r"""#!/bin/bash
 echo "docker $*" >> "$FAKE/calls"
 case "$1" in
+  context)
+    cat "$FAKE/context" 2>/dev/null || echo "colima"
+    exit 0 ;;
+  port)
+    if [ -f "$FAKE/remade" ]; then echo "0.0.0.0:$(cat "$FAKE/port_after")"; else echo "0.0.0.0:$(cat "$FAKE/port" 2>/dev/null || echo 8081)"; fi
+    exit 0 ;;
   ps)
     if [ "${2:-}" = "-a" ]; then cat "$FAKE/workspaces" 2>/dev/null; else cat "$FAKE/running" 2>/dev/null; fi
     exit 0 ;;
@@ -142,6 +166,7 @@ case "$1" in
   stop)
     exit 0 ;;
   run)
+    touch "$FAKE/remade"
     n=$(cat "$FAKE/runs" 2>/dev/null || echo 0); n=$((n + 1)); echo "$n" > "$FAKE/runs"
     answer=$(sed -n "${n}p" "$FAKE/run_answers" 2>/dev/null)
     if [ -z "$answer" ] || [ "$answer" = "ok" ]; then echo "0123456789abcdef"; exit 0; fi
@@ -189,11 +214,18 @@ echo "sleep $*" >> "$FAKE/calls"
 exit 0
 """
 
+# A connection to a forwarded port with nothing served inside yet: an empty
+# reply, curl's exit 52 (#234's healthy answer).
+FAKE_CURL = r"""#!/bin/bash
+echo "curl $*" >> "$FAKE/calls"
+exit 52
+"""
+
 
 class PretendMac:
     """A scratch folder holding the pretend programs and what they answer."""
 
-    def __init__(self, scratch: Path, with_lsof: bool = True):
+    def __init__(self, scratch: Path, with_lsof: bool = True, with_netstat: bool = True):
         self.scratch = scratch
         self.fake = scratch / "fake"
         self.bin = scratch / "bin"
@@ -201,15 +233,22 @@ class PretendMac:
         self.courses = scratch / "work" / "courses"
         for folder in (self.fake, self.bin, self.home, self.courses):
             folder.mkdir(parents=True, exist_ok=True)
-        programs = {"docker": FAKE_DOCKER, "ps": FAKE_PS, "sleep": FAKE_SLEEP}
+        programs = {"docker": FAKE_DOCKER, "ps": FAKE_PS, "sleep": FAKE_SLEEP, "curl": FAKE_CURL}
         if with_lsof:
             programs["lsof"] = FAKE_LSOF
+        if with_netstat:
+            programs["netstat"] = FAKE_NETSTAT
         for name, body in programs.items():
             path = self.bin / name
             path.write_text(body, encoding="utf-8")
             path.chmod(path.stat().st_mode | stat.S_IEXEC)
+        self.own_ports = []
+        self.others_ports = []
+        self.other_rows = []
 
     def listening(self, ports: list) -> None:
+        """Listening in THIS account: both lists show them."""
+        self.own_ports = list(ports)
         # The three shapes lsof really writes, plus the process and file lines
         # that come between them.
         lines = ["p1105", "f15"]
@@ -219,6 +258,40 @@ class PretendMac:
             lines.append(shapes[index % 3].format(port))
             index += 1
         (self.fake / "listening").write_text("\n".join(lines) + "\n", encoding="utf-8")
+        self.write_the_kernels_list()
+
+    def listening_in_another_account(self, ports: list) -> None:
+        """Listening in another account, or as root: only the kernel's list."""
+        self.others_ports = list(ports)
+        self.write_the_kernels_list()
+
+    def not_listening(self, rows: list) -> None:
+        """Sockets on these ports in a state other than LISTEN."""
+        self.other_rows = list(rows)
+        self.write_the_kernels_list()
+
+    def write_the_kernels_list(self) -> None:
+        # The shapes netstat really writes: tcp4 and tcp6 and tcp46, a
+        # wildcard, a specific IPv4 address, ::1, and a long IPv6 address cut
+        # short with its port kept (measured on macOS 26).
+        shapes = [
+            "tcp4       0      0  *.{}                 *.*                    LISTEN",
+            "tcp4       0      0  127.0.0.1.{}         *.*                    LISTEN",
+            "tcp6       0      0  ::1.{}               *.*                    LISTEN",
+            "tcp46      0      0  *.{}                 *.*                    LISTEN",
+            "tcp6       0      0  fd35:5143:77cb:4.{}  *.*                    LISTEN",
+        ]
+        lines = ["tcp4       0      0  192.168.1.20.51234     17.253.144.10.443      ESTABLISHED"]
+        index = 0
+        for port in self.own_ports + self.others_ports:
+            lines.append(shapes[index % len(shapes)].format(port))
+            index += 1
+        for row in self.other_rows:
+            lines.append(f"tcp4       0      0  127.0.0.1.{row['port']}         127.0.0.1.52011        {row['state']}")
+        (self.fake / "kernel").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    def flag(self, name: str, text: str = "") -> None:
+        (self.fake / name).write_text(text, encoding="utf-8")
 
     def workspaces(self, holding: dict, running: list = None) -> None:
         """holding: {name: [ports]} — every workspace, stopped ones included."""
@@ -238,7 +311,10 @@ class PretendMac:
         path = self.home / "Library" / "Logs" / "Plantoir" / "activity.txt"
         return path.read_text(encoding="utf-8").splitlines() if path.exists() else []
 
-    def run(self, launcher: str, action: str) -> subprocess.CompletedProcess:
+    def run(self, launcher: str, action: str, serving: bool = False,
+            docker_host: str = None) -> subprocess.CompletedProcess:
+        """`serving` sets WORKSPACE_WILL_SERVE the way preview.sh does for a
+        preview (never for setup.sh, deploy.sh or a build for publishing)."""
         text = launcher_text(launcher)
         place = ""
         for line in text.splitlines():
@@ -246,6 +322,7 @@ class PretendMac:
                 place = line
         program = "\n".join([
             "set -euo pipefail",
+            'WORKSPACE_WILL_SERVE="' + ("yes" if serving else "") + '"',
             'COURSE="ICS4U"; SECTION="2"; COURSE_CODE="ICS4U"; SECTION_NUM="2"',
             'CONTAINER_NAME="' + CONTAINER + '"',
             'HOST_COURSES="' + str(self.courses) + '"',
@@ -263,9 +340,12 @@ class PretendMac:
         environment = {
             "HOME": str(self.home),
             "FAKE": str(self.fake),
-            # /usr/sbin (where the real lsof lives) is deliberately absent.
+            # /usr/sbin (where the real lsof and netstat live) is deliberately
+            # absent, so neither real program can leak in.
             "PATH": str(self.bin) + ":/usr/bin:/bin",
         }
+        if docker_host is not None:
+            environment["DOCKER_HOST"] = docker_host
         return subprocess.run([BASH, "-c", program], capture_output=True, timeout=60, env=environment)
 
 
@@ -292,12 +372,39 @@ def stopped_workspaces_of(case: dict) -> dict:
     return holding
 
 
-def busy_ports_of(case: dict) -> list:
+def this_accounts_ports_of(case: dict) -> list:
+    """busyBlocks and busyPorts: listening in THIS account."""
     ports = []
     for base in case.get("busyBlocks", []):
         ports.extend(block_ports(base))
     ports.extend(case.get("busyPorts", []))
     return ports
+
+
+def another_accounts_ports_of(case: dict) -> list:
+    """anotherAccountBlocks and anotherAccountPorts: only the kernel's list."""
+    ports = []
+    for base in case.get("anotherAccountBlocks", []):
+        ports.extend(block_ports(base))
+    ports.extend(case.get("anotherAccountPorts", []))
+    return ports
+
+
+def busy_ports_of(case: dict) -> list:
+    """Every port the case says something is LISTENING on, in any account:
+    a port is busy whoever holds it (the native walk's reading)."""
+    return this_accounts_ports_of(case) + another_accounts_ports_of(case)
+
+
+def lay_out_the_listings(mac: "PretendMac", case: dict, own_ports: list) -> None:
+    """The case's listening fields, onto a pretend Mac's two lists."""
+    mac.listening(own_ports)
+    mac.listening_in_another_account(another_accounts_ports_of(case))
+    mac.not_listening(case.get("notListening", []))
+    if case.get("kernelListFails"):
+        mac.flag("netstat_fails")
+    if case.get("accountListFails"):
+        mac.flag("lsof_fails")
 
 
 # ======================================================================
@@ -363,6 +470,29 @@ class TheThreeLaunchersCarryOneWalk(unittest.TestCase):
         for line in lines:
             self.assertIn(f'echo "{line}"', block)
 
+    def test_each_listing_fails_open_on_its_own(self):
+        """Each half carries its own `|| true`, so one list failing never
+        takes the other's answer with it. (Behaviourally the lsof half's is
+        what a failing netstat hides behind too, so the text is pinned.)"""
+        block = between(launcher_text("setup.sh"), BLOCK_START, BLOCK_END)
+        every = function_named(block, "ports_listening_in_every_account")
+        this = function_named(block, "ports_listening_in_this_account")
+        self.assertIn("{ netstat -an -p tcp 2>/dev/null || true; }", every)
+        self.assertIn("{ lsof -nP -iTCP -sTCP:LISTEN -Fn 2>/dev/null || true; }", this)
+        both = function_named(block, "listening_ports_on_this_mac")
+        self.assertIn("\n  ports_listening_in_every_account\n  ports_listening_in_this_account\n", both)
+
+    def test_only_a_serving_run_looks_before_a_start(self):
+        """(B) is switched on by a variable only preview.sh sets, so the block
+        stays the same text in all three launchers (#280) while setup.sh and
+        deploy.sh keep their warm builder."""
+        self.assertIn('\nWORKSPACE_WILL_SERVE=""\nif [[ -z "$BUILD_ONLY" ]]; then\n  WORKSPACE_WILL_SERVE="yes"\nfi\n',
+                      launcher_text("preview.sh"))
+        for launcher in ["setup.sh", "deploy.sh"]:
+            text = launcher_text(launcher)
+            outside = text.replace(between(text, BLOCK_START, BLOCK_END), "")
+            self.assertNotIn("WORKSPACE_WILL_SERVE", outside, launcher)
+
     def test_the_sentence_names_no_machinery(self):
         """Rule 1, and the old sentence's fault: it said "ports"."""
         for line in the_rules()["whenNoBlockIsFree"]["sentence"]:
@@ -378,13 +508,18 @@ class TheThreeLaunchersCarryOneWalk(unittest.TestCase):
 class TheWalk(unittest.TestCase):
 
     def walk(self, launcher: str, listening: list = None, holding: dict = None, with_lsof: bool = True,
-             lsof_fails: bool = False) -> tuple:
+             lsof_fails: bool = False, case: dict = None, with_netstat: bool = True,
+             netstat_fails: bool = False, elsewhere: list = None) -> tuple:
         with tempfile.TemporaryDirectory() as scratch:
-            mac = PretendMac(Path(scratch), with_lsof=with_lsof)
-            mac.listening(listening or [])
+            mac = PretendMac(Path(scratch), with_lsof=with_lsof, with_netstat=with_netstat)
+            lay_out_the_listings(mac, case or {}, listening or [])
+            if elsewhere:
+                mac.listening_in_another_account(elsewhere)
             mac.workspaces(holding or {})
             if lsof_fails:
-                (mac.fake / "lsof_fails").write_text("", encoding="utf-8")
+                mac.flag("lsof_fails")
+            if netstat_fails:
+                mac.flag("netstat_fails")
             result = mac.run(launcher, "run_container_with_mount")
             return result, published_bases(mac.calls()), mac.trail(), mac.calls()
 
@@ -392,8 +527,8 @@ class TheWalk(unittest.TestCase):
         for case in the_rules()["hostBlockCases"]:
             for launcher in LAUNCHERS:
                 with self.subTest(case=case["name"], launcher=launcher):
-                    result, bases, _, _ = self.walk(launcher, listening=busy_ports_of(case),
-                                                    holding=stopped_workspaces_of(case))
+                    result, bases, _, _ = self.walk(launcher, listening=this_accounts_ports_of(case),
+                                                    holding=stopped_workspaces_of(case), case=case)
                     if case["expect"] is None:
                         self.assertEqual(result.returncode, 1, output_of(result))
                         self.assertEqual(bases, [], "a workspace was made with nowhere free")
@@ -418,7 +553,7 @@ class TheWalk(unittest.TestCase):
                 with self.subTest(case=case["name"], launcher=launcher):
                     with tempfile.TemporaryDirectory() as scratch:
                         mac = PretendMac(Path(scratch))
-                        mac.listening(case.get("busyPorts", []))
+                        lay_out_the_listings(mac, case, case.get("busyPorts", []))
                         mac.workspaces(holding, running)
                         result = mac.run(launcher, "run_container_with_mount")
                         bases = published_bases(mac.calls())
@@ -445,33 +580,59 @@ class TheWalk(unittest.TestCase):
                 self.assertEqual(bases, [8081])
 
     def test_one_listing_is_asked_for_not_one_per_port(self):
-        """0.12 s against 9.8 s for forty blocks, measured."""
+        """ONE of each list, for all forty blocks: 0.01 s and 0.12 s, against
+        9.8 s for the old one-question-per-port probe (measured)."""
         for launcher in LAUNCHERS:
             with self.subTest(launcher=launcher):
-                _, bases, _, calls = self.walk(launcher, listening=busy_ports_of({"busyBlocks": [8081, 8091, 8101]}))
+                _, bases, _, calls = self.walk(launcher, listening=busy_ports_of({"busyBlocks": [8081, 8091]}),
+                                               elsewhere=block_ports(8101))
                 self.assertEqual(bases, [8111])
-                asked = [call for call in calls if call.startswith("lsof ")]
-                self.assertEqual(asked, ["lsof -nP -iTCP -sTCP:LISTEN -Fn"])
+                asked = [call for call in calls if call.startswith("lsof ") or call.startswith("netstat ")]
+                self.assertEqual(sorted(asked), ["lsof -nP -iTCP -sTCP:LISTEN -Fn", "netstat -an -p tcp"])
                 inspected = [call for call in calls if call.startswith("docker inspect")]
                 self.assertLessEqual(len(inspected), 1)
 
-    def test_no_lsof_at_all_takes_the_first_block(self):
+    def test_no_listing_at_all_takes_the_first_block(self):
         """Unchanged from the old probe, and pinned so nobody changes it
-        quietly: a listing that cannot be read counts as nothing listening."""
+        quietly: when NEITHER list can be read, nothing counts as listening."""
         for launcher in LAUNCHERS:
             with self.subTest(launcher=launcher):
-                result, bases, _, _ = self.walk(launcher, with_lsof=False)
+                result, bases, _, _ = self.walk(launcher, with_lsof=False, with_netstat=False)
                 self.assertEqual(result.returncode, 0, output_of(result))
                 self.assertEqual(bases, [8081])
-                result, bases, _, _ = self.walk(launcher, lsof_fails=True)
+                result, bases, _, _ = self.walk(launcher, lsof_fails=True, netstat_fails=True)
                 self.assertEqual(result.returncode, 0, output_of(result))
                 self.assertEqual(bases, [8081])
+
+    def test_each_list_still_counts_when_the_other_is_missing(self):
+        """No netstat: this account's list alone, as before #310. No lsof: the
+        kernel's list, which holds this account's listeners too."""
+        for launcher in LAUNCHERS:
+            with self.subTest(launcher=launcher):
+                result, bases, _, _ = self.walk(launcher, listening=block_ports(8081), with_netstat=False)
+                self.assertEqual((result.returncode, bases), (0, [8091]), output_of(result))
+                result, bases, _, _ = self.walk(launcher, listening=block_ports(8081), with_lsof=False)
+                self.assertEqual((result.returncode, bases), (0, [8091]), output_of(result))
+
+    def test_another_accounts_listener_is_stepped_past(self):
+        """#310: seen only in the kernel's list, and the only thing that moves
+        the walk here. Every shape netstat writes: the port after the LAST
+        dot, whatever the address (a long IPv6 one cut short included)."""
+        for launcher in LAUNCHERS:
+            for port in [8081, 9084]:
+                # Rows in front of it (screen sharing's 5900) put the port in
+                # each of the five shapes the pretend kernel writes in turn.
+                for shape in range(5):
+                    with self.subTest(launcher=launcher, port=port, shape=shape):
+                        result, bases, _, _ = self.walk(launcher, elsewhere=[5900] * shape + [port])
+                        self.assertEqual((result.returncode, bases), (0, [8091]), output_of(result))
 
     def test_with_no_lsof_the_other_workspaces_are_still_skipped(self):
         for launcher in LAUNCHERS:
             with self.subTest(launcher=launcher):
                 result, bases, _, _ = self.walk(
-                    launcher, with_lsof=False, holding={"teaching-quartz-deadbeef": block_ports(8081)})
+                    launcher, with_lsof=False, with_netstat=False,
+                    holding={"teaching-quartz-deadbeef": block_ports(8081)})
                 self.assertEqual(result.returncode, 0, output_of(result))
                 self.assertEqual(bases, [8091])
 
@@ -558,46 +719,65 @@ class AClashAtTheMomentOfMaking(unittest.TestCase):
                 self.assertIn(the_rules()["whenNoBlockIsFree"]["sentence"][0], output_of(result))
 
 
+# Another working folder's RUNNING workspace, holding the first block — the
+# shape a Docker port refusal comes from. Its ports are NOT in the listening
+# lists: nothing here is meant to be "another account holds them", so the
+# look before a start (#310) finds nothing and the refusal path is what is
+# tested. (Until #310 this fixture listed the block as listening, which
+# could not matter while nothing looked before starting.)
+OTHER_FOLDER = "teaching-quartz-deadbeef"
+
+
+def the_launchers_serving_or_not() -> list:
+    """Every launcher as it runs for real, plus preview.sh serving: the look
+    before a start must leave these paths exactly as they were."""
+    return [(launcher, False) for launcher in LAUNCHERS] + [("preview.sh", True)]
+
+
 @unittest.skipUnless(HAS_BASH, "no bash here that can run a program")
 class AStoppedWorkspaceThatCannotStart(unittest.TestCase):
 
-    def start(self, launcher: str, answer: str, rm_refuses: bool = False, running: list = None) -> tuple:
+    def start(self, launcher: str, answer: str, rm_refuses: bool = False, running: list = None,
+              serving: bool = False) -> tuple:
         with tempfile.TemporaryDirectory() as scratch:
             mac = PretendMac(Path(scratch))
-            mac.listening(block_ports(8081))
-            mac.workspaces({CONTAINER: block_ports(8081)}, running)
+            mac.listening([])
+            mac.workspaces({CONTAINER: block_ports(8081), OTHER_FOLDER: block_ports(8081)},
+                           [OTHER_FOLDER] + (running or []))
             (mac.fake / "start_answer").write_text(answer, encoding="utf-8")
             if rm_refuses:
                 (mac.fake / "rm_refuses").write_text("", encoding="utf-8")
-            result = mac.run(launcher, 'start_the_existing_workspace; echo "CARRIED ON"')
+            result = mac.run(launcher, 'start_the_existing_workspace; echo "CARRIED ON"', serving=serving)
             return result, mac.calls()
 
     def test_a_start_that_works_changes_nothing(self):
-        for launcher in LAUNCHERS:
-            with self.subTest(launcher=launcher):
-                result, calls = self.start(launcher, "ok")
+        for launcher, serving in the_launchers_serving_or_not():
+            with self.subTest(launcher=launcher, serving=serving):
+                result, calls = self.start(launcher, "ok", serving=serving)
                 self.assertEqual(result.returncode, 0, output_of(result))
                 self.assertIn("CARRIED ON", output_of(result))
                 self.assertEqual([c for c in calls if c.startswith("docker rm") or c.startswith("docker run")], [])
 
     def test_a_block_taken_while_it_was_stopped_is_made_again_on_free_ports(self):
         refusal = "Error response from daemon: driver failed programming external connectivity on endpoint teaching-quartz-0000abcd: Bind for 0.0.0.0:8081 failed: port is already allocated"
-        for launcher in LAUNCHERS:
-            with self.subTest(launcher=launcher):
-                result, calls = self.start(launcher, refusal)
+        for launcher, serving in the_launchers_serving_or_not():
+            with self.subTest(launcher=launcher, serving=serving):
+                result, calls = self.start(launcher, refusal, serving=serving)
                 self.assertEqual(result.returncode, 0, output_of(result))
                 self.assertIn("CARRIED ON", output_of(result))
                 self.assertIn("slower", output_of(result), "the console must say what it costs")
                 self.assertEqual([c for c in calls if c.startswith("docker rm")], ["docker rm " + CONTAINER])
                 self.assertEqual(published_bases(calls), [8091])
+                self.assertNotIn(address_held_prefix(), output_of(result),
+                                 "a Docker refusal is not another account's address")
 
     def test_any_other_refusal_stops_with_the_engines_words(self):
         """setup.sh and deploy.sh used to end here under `set -e` with only
         the engine's words; preview.sh carried on past it."""
         refusal = "Error response from daemon: something else entirely"
-        for launcher in LAUNCHERS:
-            with self.subTest(launcher=launcher):
-                result, calls = self.start(launcher, refusal)
+        for launcher, serving in the_launchers_serving_or_not():
+            with self.subTest(launcher=launcher, serving=serving):
+                result, calls = self.start(launcher, refusal, serving=serving)
                 self.assertEqual(result.returncode, 1, output_of(result))
                 self.assertNotIn("CARRIED ON", output_of(result))
                 self.assertIn("something else entirely", output_of(result))
@@ -605,12 +785,135 @@ class AStoppedWorkspaceThatCannotStart(unittest.TestCase):
 
     def test_a_workspace_another_launcher_already_started_is_used_as_it_is(self):
         refusal = "Bind for 0.0.0.0:8081 failed: port is already allocated"
-        for launcher in LAUNCHERS:
-            with self.subTest(launcher=launcher):
-                result, calls = self.start(launcher, refusal, rm_refuses=True, running=[CONTAINER])
+        for launcher, serving in the_launchers_serving_or_not():
+            with self.subTest(launcher=launcher, serving=serving):
+                result, calls = self.start(launcher, refusal, rm_refuses=True, running=[CONTAINER],
+                                           serving=serving)
                 self.assertEqual(result.returncode, 0, output_of(result))
                 self.assertIn("CARRIED ON", output_of(result))
                 self.assertEqual(published_bases(calls), [])
+
+
+# ======================================================================
+# GitHub #310 (B): before a PREVIEW starts a stopped workspace under Colima,
+# its own ports are looked at. Colima does not refuse a start onto a port
+# another account holds — it exits 0 and the forward silently fails.
+# ======================================================================
+def address_held_entry() -> dict:
+    rules = json.loads((REPOSITORY_ROOT / "contracts" / "shared-rules.json").read_text(encoding="utf-8"))
+    for entry in rules["activityTrail"]["mustRecord"]:
+        if entry["event"] == "preview address held by another account":
+            return entry
+    raise AssertionError("the contract no longer has a 'preview address held by another account' event")
+
+
+def address_held_prefix() -> str:
+    return address_held_entry()["marker"]["prefix"]
+
+
+@unittest.skipUnless(HAS_BASH, "no bash here that can run a program")
+class TheLookBeforeAStart(unittest.TestCase):
+
+    def start(self, launcher: str = "preview.sh", serving: bool = True, elsewhere: list = None,
+              own: list = None, context: str = "colima", running: list = None, docker_host: str = None,
+              rm_refuses: bool = False) -> tuple:
+        with tempfile.TemporaryDirectory() as scratch:
+            mac = PretendMac(Path(scratch))
+            mac.listening(own or [])
+            mac.listening_in_another_account(elsewhere if elsewhere is not None else [8081])
+            mac.workspaces({CONTAINER: block_ports(8081)}, running)
+            mac.flag("context", context + "\n")
+            if rm_refuses:
+                mac.flag("rm_refuses")
+            result = mac.run(launcher, 'start_the_existing_workspace; echo "CARRIED ON"',
+                             serving=serving, docker_host=docker_host)
+            return result, mac.calls()
+
+    def said(self, result) -> list:
+        return result.stdout.decode("utf-8").splitlines()
+
+    def assert_remade_before_starting(self, result, calls, port: int = 8081) -> None:
+        self.assertEqual(result.returncode, 0, output_of(result))
+        self.assertIn("CARRIED ON", output_of(result))
+        self.assertEqual(engine_calls(calls, "start"), [], "started onto somebody else's address: " + output_of(result))
+        self.assertEqual(engine_calls(calls, "rm"), ["docker rm " + CONTAINER])
+        self.assertEqual(published_bases(calls), [8091])
+        said = self.said(result)
+        for line in the_rules()["hostBlockClash"]["saysWhenAStoppedWorkspaceIsRemade"]:
+            self.assertIn(line, said)
+        self.assertIn(f"{address_held_prefix()} before-start {port} ICS4U/2", said)
+
+    def test_another_accounts_listener_on_its_address_remakes_it_before_it_starts(self):
+        """The #204 rehearsal's second half: the start would have 'worked'."""
+        result, calls = self.start()
+        self.assert_remade_before_starting(result, calls)
+
+    def test_any_of_its_eight_ports_counts(self):
+        result, calls = self.start(elsewhere=[9084])
+        self.assert_remade_before_starting(result, calls, port=9084)
+
+    def test_this_accounts_own_program_counts_too(self):
+        """A stopped workspace listens on nothing itself, so any listener is
+        somebody else's — including a program of this account's."""
+        result, calls = self.start(elsewhere=[], own=[8082])
+        self.assert_remade_before_starting(result, calls, port=8082)
+
+    def test_a_colima_profile_counts_as_colima(self):
+        result, calls = self.start(context="colima-work")
+        self.assert_remade_before_starting(result, calls)
+
+    def test_docker_host_into_colima_counts_as_colima(self):
+        result, calls = self.start(context="default", docker_host="unix:///Users/t/.colima/default/docker.sock")
+        self.assert_remade_before_starting(result, calls)
+
+    def test_nothing_on_its_addresses_starts_it_as_before(self):
+        result, calls = self.start(elsewhere=[8085, 9085])
+        self.assertEqual(result.returncode, 0, output_of(result))
+        self.assertEqual(engine_calls(calls, "start"), ["docker start " + CONTAINER])
+        self.assertEqual(engine_calls(calls, "rm") + engine_calls(calls, "run"), [])
+        self.assertNotIn(address_held_prefix(), output_of(result))
+
+    def test_one_another_launcher_started_a_moment_ago_is_used_as_it_is(self):
+        """The listener is then its own forward: no remake, nothing said."""
+        result, calls = self.start(running=[CONTAINER])
+        self.assertEqual(result.returncode, 0, output_of(result))
+        self.assertEqual(engine_calls(calls, "start") + engine_calls(calls, "rm") + engine_calls(calls, "run"), [])
+        self.assertNotIn("♻️", output_of(result))
+        self.assertNotIn(address_held_prefix(), output_of(result))
+
+    def test_another_engine_is_not_looked_at(self):
+        """Docker Desktop refuses a start onto a held port itself, and an
+        engine nobody measured must not pay a remake on a guess."""
+        for context, docker_host in [("desktop-linux", None), ("default", "tcp://192.168.64.2:2375")]:
+            with self.subTest(context=context, docker_host=docker_host):
+                result, calls = self.start(context=context, docker_host=docker_host)
+                self.assertEqual(engine_calls(calls, "start"), ["docker start " + CONTAINER], output_of(result))
+                self.assertEqual([c for c in calls if c.startswith("netstat") or c.startswith("lsof")], [])
+                self.assertNotIn(address_held_prefix(), output_of(result))
+
+    def test_a_run_that_does_not_serve_never_looks(self):
+        """setup.sh, deploy.sh and a build for publishing keep their warm
+        builder: a squatted forward costs them nothing."""
+        for launcher in LAUNCHERS:
+            with self.subTest(launcher=launcher):
+                result, calls = self.start(launcher=launcher, serving=False)
+                self.assertEqual(result.returncode, 0, output_of(result))
+                self.assertEqual(engine_calls(calls, "start"), ["docker start " + CONTAINER])
+                self.assertEqual([c for c in calls if c.startswith("netstat") or c.startswith("lsof")
+                                  or c.startswith("docker context")], [])
+
+    def test_a_remove_that_is_refused_stops_with_the_sentence_and_no_engine_words(self):
+        """There was no start, so there are no engine's words to print."""
+        result, calls = self.start(rm_refuses=True)
+        self.assertEqual(result.returncode, 1, output_of(result))
+        self.assertNotIn("CARRIED ON", output_of(result))
+        self.assertEqual(engine_calls(calls, "start") + engine_calls(calls, "run"), [])
+        self.assertEqual(self.said(result)[-1], the_rules()["hostBlockClash"]["saysWhenAStartIsRefused"])
+
+    def test_the_marker_is_the_contracts(self):
+        block = between(launcher_text("setup.sh"), BLOCK_START, BLOCK_END)
+        self.assertIn(f'echo "{address_held_prefix()} $1 $2 ${{WORKSPACE_TRAIL_PLACE:-setup}}"', block)
+        self.assertIn("tell_the_app_the_address_was_held before-start", block)
 
 
 # ======================================================================
@@ -723,7 +1026,9 @@ class TheLookBeforeARemakeIsWritten(unittest.TestCase):
                                  "the old shared workspace is retired by the block's look, not a copy of its own")
 
     def test_every_remake_reason_calls_the_block(self):
-        expected = {"setup.sh": 8, "preview.sh": 5, "deploy.sh": 7}
+        # preview.sh's sixth is #310's: an announced address that turned
+        # out to be another account's.
+        expected = {"setup.sh": 8, "preview.sh": 6, "deploy.sh": 7}
         for launcher, count in expected.items():
             text = launcher_text(launcher)
             outside = text.replace(between(text, BLOCK_START, BLOCK_END), "")
@@ -1000,6 +1305,109 @@ class TheOldSharedWorkspace(unittest.TestCase):
 
 
 # ======================================================================
+# GitHub #310 (C) through the REAL remake: preview.sh's announcement, with
+# the real block behind it, when the address is another account's. The
+# contract's own cases (whenAnotherAccountHasTheAddress.cases) run in
+# test_preview_reach.py with the remake stubbed; these two need it real.
+# ======================================================================
+def preview_announcement_functions() -> str:
+    text = launcher_text("preview.sh")
+    parts = re.findall(r"^PREVIEW_REACH_[A-Z_]+=.*$", text, flags=re.MULTILINE)
+    for name in ["this_mac_can_reach_the_builder", "say_this_mac_cannot_reach_the_builder",
+                 "say_the_preview_address_is_unknown", "held_by_someone_else",
+                 "say_another_account_has_this_preview_s_address", "the_preview_s_host_port",
+                 "announce_the_preview_address"]:
+        parts.append(function_named(text, name))
+    return "\n".join(parts)
+
+
+@unittest.skipUnless(HAS_BASH, "no bash here that can run a program")
+class TheLookBeforeTheAnnouncement(unittest.TestCase):
+
+    def announce(self, looks: list, launchers: list) -> tuple:
+        with tempfile.TemporaryDirectory() as scratch:
+            pretend = AWorkspaceInUse(Path(scratch))
+            pretend.exists({CONTAINER: OLD_ID})
+            answers = []
+            for word in looks:
+                answers.append(LOOKS[word])
+            pretend.looks(answers)
+            pretend.launchers(launchers)
+            # This account's own list holds limactl's listener only; the
+            # kernel's has another account's on 8081, the announced address.
+            pretend.mac.listening([53])
+            pretend.mac.listening_in_another_account([8081])
+            pretend.flag("port", "8081")
+            pretend.flag("port_after", "8091")
+            action = "\n".join([
+                preview_announcement_functions(),
+                'PREVIEW_PORT=8081; BUILD_ONLY=""; THIS_RUN_STARTED_THE_BUILDER=""',
+                'announce_the_preview_address || { echo "STOPPED"; exit 1; }',
+                'echo "CARRIED ON"',
+            ])
+            return pretend.run("preview.sh", action)
+
+    def test_an_open_preview_from_the_folder_refuses_the_remake_with_94s_words(self):
+        """The plan's tenth case, moved here from the contract: the remake
+        is #94's, so an open preview of another section is not ended for it."""
+        result, calls = self.announce(["a preview"], [ITS_LAUNCHER])
+        said = result.stdout.decode("utf-8").splitlines()
+        self.assertEqual(result.returncode, in_use_rules()["sentences"]["exitCode"], output_of(result))
+        for line in in_use_rules()["sentences"]["whenAPreviewIsOpen"]:
+            self.assertIn(line.replace("{course}", "ICS4U").replace("{section}", "1"), said)
+        prefix = in_use_trail_entry()["marker"]["prefix"]
+        self.assertIn(f"{prefix} preview 20 ICS4U/2 ICS4U/1", said)
+        self.assertIn(f"{address_held_prefix()} remade 8081 ICS4U/2", said)
+        self.assertEqual(engine_calls(calls, "rm") + engine_calls(calls, "run"), [])
+        self.assertNotIn("Preview will be available at", output_of(result))
+
+    def test_an_idle_workspace_is_remade_and_the_new_address_announced(self):
+        result, calls = self.announce(["nothing"], [])
+        said = result.stdout.decode("utf-8").splitlines()
+        self.assertEqual(result.returncode, 0, output_of(result))
+        self.assertIn("CARRIED ON", said)
+        self.assertEqual(engine_calls(calls, "rm"), ["docker rm " + OLD_ID])
+        self.assertEqual(published_bases(calls), [8091], "the walk steps past the kernel's 8081")
+        self.assertIn("🌐 Preview will be available at: http://localhost:8091/", said)
+        self.assertEqual([line for line in said if line.startswith(address_held_prefix())],
+                         [f"{address_held_prefix()} remade 8081 ICS4U/2"])
+
+
+# ======================================================================
+# The REAL listings on this Mac. Every other test here fakes both programs,
+# so all of them would pass against an awk the real kernel's output
+# defeats — and that failure falls back to lsof alone, silently
+# reproducing #310. So the netstat half is checked ON ITS OWN.
+# ======================================================================
+@unittest.skipUnless(sys.platform == "darwin" and Path("/usr/sbin/netstat").exists()
+                     and Path("/usr/sbin/lsof").exists(), "needs a Mac's netstat and lsof")
+class TheRealListings(unittest.TestCase):
+
+    def ports_from(self, function: str) -> set:
+        block = between(launcher_text("setup.sh"), BLOCK_START, BLOCK_END)
+        program = "set -euo pipefail\n" + function_named(block, function) + function + "\n"
+        result = subprocess.run([BASH, "-c", program], capture_output=True, timeout=60,
+                                env={"PATH": "/usr/sbin:/usr/bin:/bin", "HOME": os.environ.get("HOME", "/tmp")})
+        self.assertEqual(result.returncode, 0, output_of(result))
+        found = set()
+        for line in result.stdout.decode("utf-8").splitlines():
+            self.assertRegex(line, r"^[0-9]+$")
+            found.add(int(line))
+        return found
+
+    def test_the_kernels_list_holds_every_port_this_accounts_list_holds(self):
+        """Non-empty whenever lsof's is, and a superset of it: netstat sees
+        this account too. Under Colima this account always owns listeners
+        (limactl's), so on the development Mac this is never vacuous."""
+        everyone = self.ports_from("ports_listening_in_every_account")
+        this_account = self.ports_from("ports_listening_in_this_account")
+        if this_account:
+            self.assertTrue(everyone, "netstat's half read NOTHING on this macOS: the walk is back to lsof alone")
+        self.assertEqual(this_account - everyone, set(),
+                         f"netstat's half missed ports lsof lists (macOS {os.uname().release})")
+
+
+# ======================================================================
 # build_site.py's own walk, which Windows' native preview runs moments
 # before it binds. No bash needed: this half runs everywhere.
 # ======================================================================
@@ -1019,7 +1427,8 @@ class TheBuildersOwnWalk(unittest.TestCase):
         site port and its websocket, not a block of four, so a single busy
         port elsewhere in a block does not move it (next test)."""
         for case in the_rules()["hostBlockCases"]:
-            if case.get("busyPorts") or case.get("stoppedBlocks"):
+            if (case.get("busyPorts") or case.get("anotherAccountPorts") or case.get("stoppedBlocks")
+                    or case.get("notListening")):
                 continue
             busy = set(busy_ports_of(case))
 

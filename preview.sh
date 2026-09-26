@@ -1020,12 +1020,23 @@ build_image_if_missing
 # refusal below reachable, so it can be tested and its sentence stays true.
 #
 # A block is taken if ANY of its eight ports is
-#   - listening on this Mac, by anybody — one `lsof` listing, parsed once
-#     (0.12 s measured, against 0.123 s PER PORT for the old one-call-per-port
-#     probe: 9.8 s for forty blocks). Docker cannot see a program on the Mac
-#     holding a port and publishes over it anyway (measured: exit 0), so this
-#     is the only guard against another app. A listing that cannot be read
-#     counts as nothing listening, which is what the old probe did too.
+#   - listening on this Mac, in ANY account — the kernel's own list
+#     (`netstat -an -p tcp`, every owner: 0.01 s) joined to this account's
+#     (`lsof`, 0.06-0.12 s), each read once for all 320 ports rather than
+#     per port (0.123 s PER PORT for the old probe: 9.8 s for forty blocks).
+#     Until #310 it was `lsof` alone, which run as the teacher lists only the
+#     teacher's own programs: a second account on the same Mac was handed
+#     8081 while the first account's preview held it, its forward quietly
+#     failed to bind, and its Preview opened the other person's site
+#     (measured in the #204 rehearsal). Root's listeners (`kdc` on 88,
+#     screen sharing on 5900) are invisible to `lsof` for the same reason.
+#     Docker cannot see a program on the Mac holding a port and publishes
+#     over it anyway (measured: exit 0, and under Colima `docker port` still
+#     claims the port), so this is the only guard against another app. Only
+#     LISTEN rows count: a port in TIME_WAIT, a preview closed a minute ago,
+#     is free. Each listing fails open on its own, so a `netstat` whose
+#     columns change in some future macOS falls back to exactly the old
+#     `lsof` answer rather than to "nothing listening".
 #   - published by ANOTHER working folder's workspace, stopped ones included
 #     — one `docker inspect` over every teaching-quartz-* workspace. A stopped
 #     workspace listens on nothing, so without this a new folder would take
@@ -1046,13 +1057,120 @@ FIRST_HOST_BLOCK=8081
 HOST_BLOCK_STEP=10
 HOST_BLOCK_COUNT=40
 
-# Every TCP port something on this Mac is listening on, one per line. lsof
-# writes `n*:8081`, `n127.0.0.1:8443` and `n[::1]:8443`; the port is what
-# follows the LAST colon, whichever of the three it is. Prints nothing, and
-# still succeeds, when lsof is missing or fails.
-listening_ports_on_this_mac() {
+# Every TCP port something in ANY account on this Mac is listening on, one
+# line per listening socket, from the kernel's own list. netstat writes the
+# local address as `*.8081`, `127.0.0.1.8443`, `::1.8443` (a long IPv6
+# address is cut short, but its port is kept: measured), so the port is what
+# follows the LAST dot. Only LISTEN rows: TIME_WAIT and ESTABLISHED are not
+# a listener. Prints nothing, and still succeeds, when netstat is missing or
+# fails.
+ports_listening_in_every_account() {
+  { netstat -an -p tcp 2>/dev/null || true; } \
+    | awk '$NF == "LISTEN" { n = split($4, part, "."); if (part[n] ~ /^[0-9]+$/) print part[n] }'
+}
+
+# Every TCP port a program of THIS account is listening on, one line per
+# listening socket (per program holding it). lsof writes `n*:8081`,
+# `n127.0.0.1:8443` and `n[::1]:8443`; the port is what follows the LAST
+# colon, whichever of the three it is. Prints nothing, and still succeeds,
+# when lsof is missing or fails.
+ports_listening_in_this_account() {
   { lsof -nP -iTCP -sTCP:LISTEN -Fn 2>/dev/null || true; } \
     | sed -n 's/^n.*:\([0-9][0-9]*\)$/\1/p'
+}
+
+# Every TCP port something on this Mac is listening on: both lists, so that
+# either one failing leaves the other's answer (GitHub #310).
+listening_ports_on_this_mac() {
+  ports_listening_in_every_account
+  ports_listening_in_this_account
+}
+
+# ---- Whose address is it? (GitHub #310) ---------------------------------
+# Under Colima, a workspace's published port is forwarded by THIS account's
+# own `ssh` (measured: `ssh … russellgordon *:<port>`, and limactl's own
+# listeners beside it). When another account already holds the port, the
+# forward fails to bind and NOTHING a launcher reads says so: `docker run`
+# and `docker start` exit 0 and `docker port` names the port anyway
+# (measured, with root's screen sharing on 5900 standing in for another
+# account: XNU refuses a port shared across uids). So two checks look for
+# it themselves — before a stopped workspace is started, and before
+# preview.sh announces an address — and both are switched on only for the
+# engine whose forwarder was measured. Under Docker Desktop a start onto a
+# held port is already REFUSED ("Ports are not available", which
+# start_the_existing_workspace handles), and an engine nobody measured
+# must not pay a two-minute rebuild on a guess.
+#
+# DOCKER_HOST switches the checks off unless it points into ~/.colima/:
+# with it set, `docker context show` says "default" whatever the engine is,
+# so the only honest reading of an unfamiliar DOCKER_HOST is "not the engine
+# that was measured". The app never sets it; a developer who does gets a
+# line saying the check was not made (see preview.sh), rather than a check
+# that silently stopped happening.
+the_engine_forwards_from_this_account() {
+  local context
+  if [ -n "${DOCKER_HOST:-}" ]; then
+    case "$DOCKER_HOST" in
+      */.colima/*) return 0 ;;
+    esac
+    return 1
+  fi
+  context="$(docker context show 2>/dev/null)" || return 1
+  case "$context" in
+    colima|colima-*) return 0 ;;
+  esac
+  return 1
+}
+
+# Whether DOCKER_HOST names an engine other than Colima, so the checks
+# above are off for that reason and not because the engine is Docker
+# Desktop.
+a_different_engine_was_named_by_hand() {
+  case "${DOCKER_HOST:-}" in
+    ""|*/.colima/*) return 1 ;;
+  esac
+  return 0
+}
+
+# The line the app reads onto the activity trail: contracts/shared-rules.json
+# -> activityTrail.mustRecord."preview address held by another account" ->
+# marker. Machinery, so the console a teacher reads leaves it out; the app
+# writes the trail line from it, as it does for PLANTOIR_WORKSPACE_IN_USE.
+# "<before-start|remade|refused|unchecked> <port> <where this run was for>".
+tell_the_app_the_address_was_held() {
+  echo "PLANTOIR_PREVIEW_ADDRESS_HELD: $1 $2 ${WORKSPACE_TRAIL_PLACE:-setup}"
+}
+
+# What the console says when this folder's workspace is made again on free
+# addresses because something else has its own: a Docker refusal at start,
+# a listener on a stopped workspace's port, or (preview.sh) a forward that
+# did not bind. Pinned in contracts/app-rules.json -> previewPorts
+# .hostBlockClash.saysWhenAStoppedWorkspaceIsRemade.
+say_this_folder_is_set_up_again_on_free_addresses() {
+  echo "♻️  Something else is now using this folder's preview addresses, so Plantoir is setting this folder up again on free ones."
+  echo "   The next preview will be slower than usual — about two minutes — while it gets ready."
+}
+
+# The first of this folder's own published ports that something on this Mac
+# is listening on, printed; fails when there is none. Asked only of a STOPPED
+# workspace, which listens on nothing itself: under Colima its forward is
+# gone 0.011 s after the stop returns and back 0.011 s after a start (5 of 5
+# each way, measured), so a listener on one of its ports is somebody else's.
+a_port_of_this_stopped_workspace_that_is_taken() {
+  local own busy port
+  own="$(docker inspect -f '{{range $p, $b := .HostConfig.PortBindings}}{{range $b}}{{.HostPort}} {{end}}{{end}}' "$CONTAINER_NAME" 2>/dev/null)" || return 1
+  busy=" $(listening_ports_on_this_mac | tr '\n' ' ') "
+  for port in $own; do
+    case "$port" in
+      ""|*[!0-9]*) continue ;;
+    esac
+    case "$busy" in
+      *" $port "*)
+        echo "$port"
+        return 0 ;;
+    esac
+  done
+  return 1
 }
 
 # Every host port published by another working folder's workspace, one per
@@ -1212,8 +1330,40 @@ create_the_workspace_on_free_ports() {
 # own words: setup.sh and deploy.sh used to end on the bare `docker start`
 # under `set -e` with only those words, and preview.sh carried on past it and
 # failed later at a step that could not say why.
+#
+# Before the start, a run that will SERVE a preview (WORKSPACE_WILL_SERVE,
+# set by preview.sh alone) under Colima looks at the workspace's own ports
+# first (GitHub #310): Colima does NOT refuse a start onto a port another
+# account holds — it exits 0 and the forward silently fails — so a listener
+# on one of them means the same remake, done before the start rather than
+# after a refusal that never comes. setup.sh and deploy.sh never serve, so
+# a squatted forward costs them nothing and they do not pay a two-minute
+# remake for it (a publish at six in the morning keeps its warm builder).
+# The workspace is asked once more whether it is RUNNING before anything is
+# removed: another launcher for this folder may have started it a moment
+# ago, and the listener is then its own forward.
 start_the_existing_workspace() {
-  local output
+  local output taken
+  if [ "${WORKSPACE_WILL_SERVE:-}" = "yes" ] \
+    && the_engine_forwards_from_this_account \
+    && taken="$(a_port_of_this_stopped_workspace_that_is_taken)"; then
+    if docker ps --format '{{.Names}}' 2>/dev/null | grep -Fxq -- "$CONTAINER_NAME"; then
+      return 0
+    fi
+    say_this_folder_is_set_up_again_on_free_addresses
+    tell_the_app_the_address_was_held before-start "$taken"
+    if docker rm "$CONTAINER_NAME" >/dev/null 2>&1; then
+      run_container_with_mount
+      return 0
+    fi
+    # Refused: another launcher got here first and it is running again. Use it.
+    if docker ps --format '{{.Names}}' 2>/dev/null | grep -Fxq -- "$CONTAINER_NAME"; then
+      return 0
+    fi
+    # There was no start, so there are no engine's words to show.
+    echo "❌ Plantoir could not start this folder's workspace. Try again, or restart this Mac if it happens again."
+    exit 1
+  fi
   if output="$(docker start "$CONTAINER_NAME" 2>&1)"; then
     return 0
   fi
@@ -1222,8 +1372,7 @@ start_the_existing_workspace() {
     echo "❌ Plantoir could not start this folder's workspace. Try again, or restart this Mac if it happens again."
     exit 1
   fi
-  echo "♻️  Something else is now using this folder's preview addresses, so Plantoir is setting this folder up again on free ones."
-  echo "   The next preview will be slower than usual — about two minutes — while it gets ready."
+  say_this_folder_is_set_up_again_on_free_addresses
   if docker rm "$CONTAINER_NAME" >/dev/null 2>&1; then
     run_container_with_mount
     return 0
@@ -1618,6 +1767,13 @@ retire_legacy_container() {
 # <<< PREVIEW PORT BLOCK <<<
 # Where the refusal above is filed on the trail: this run's course and section.
 WORKSPACE_TRAIL_PLACE="${COURSE}/${SECTION}"
+# A preview SERVES, so a stopped workspace whose addresses somebody else has
+# taken is remade before it starts (start_the_existing_workspace, #310). A
+# build for publishing serves nothing and keeps its warm builder.
+WORKSPACE_WILL_SERVE=""
+if [[ -z "$BUILD_ONLY" ]]; then
+  WORKSPACE_WILL_SERVE="yes"
+fi
 
 
 run_container_with_mount() {
@@ -1771,8 +1927,9 @@ say_the_preview_address_is_unknown() {
 # connection (exit 7). ONLY a refusal counts as absent — every other answer,
 # including no curl at all, goes ahead exactly as before, and #225's check
 # after the build stays the backstop. A listener that is NOT the forwarder
-# (another program took the port) also goes ahead; do not tighten this to
-# require a real page, since nothing is being served yet.
+# answers too, so it is not this check's to find: the ownership look below
+# (#310) asks whose it is. Do not tighten this to require a real page, since
+# nothing is being served yet.
 #
 # The retry is a bounded, deliberately paced re-asking of the real question,
 # not a wait for something to settle: a healthy Mac answers on the first try,
@@ -1816,30 +1973,123 @@ say_this_mac_cannot_reach_the_builder() {
   echo "   Nothing is wrong with your pages. Restarting your Mac puts it right."
 }
 
-announce_the_preview_address() {
-  if [[ -n "$BUILD_ONLY" ]]; then
-    return 0
+# Whether the address about to be announced is held by ANOTHER account on
+# this Mac, or by macOS itself, rather than by this account's own forward
+# (GitHub #310). Succeeds only when that is PROVEN; every doubt goes ahead.
+#
+# Found in the #204 rehearsal: a second account's workspace was handed 8081
+# while the first account's preview held it. Its forward failed to bind with
+# nothing said anywhere a launcher reads (`docker run` exit 0, `docker port`
+# naming the port anyway), the reach check above was answered by the OTHER
+# account's forwarder, and the teacher's Preview opened somebody else's site.
+#
+# The question, from one listing each: does the kernel show MORE listening
+# sockets on this port than this account owns? Under Colima the forward is
+# this account's own `ssh` (measured), so on a healthy Mac the two counts
+# are equal. Counts rather than presence, because a listener in another
+# account on `::1` alone sits BESIDE our IPv4 forward (the bind does not
+# collide, measured with a same-account stand-in), and `localhost` — the
+# address the app opens — tries `::1` first and reaches the other one.
+#   - not Colima (the_engine_forwards_from_this_account): not asked;
+#   - the kernel's list shows no listener on the port: not proven;
+#   - this account's list is EMPTY: `lsof` failed or is missing, since under
+#     Colima this account always owns limactl's listeners (measured) — not
+#     proven, goes ahead.
+held_by_someone_else() {
+  local port="$1" everyone own ours
+  the_engine_forwards_from_this_account || return 1
+  everyone="$(ports_listening_in_every_account | grep -cx -- "$port" || true)"
+  if [ "${everyone:-0}" -eq 0 ]; then
+    return 1
   fi
+  own="$(ports_listening_in_this_account)"
+  if [ -z "$own" ]; then
+    return 1
+  fi
+  ours="$(printf '%s\n' "$own" | grep -cx -- "$port" || true)"
+  [ "$everyone" -gt "${ours:-0}" ]
+}
+
+# The sentence when the address is still somebody else's after this folder's
+# workspace was set up again on free ones. Pinned in contracts/app-rules.json
+# -> previewPorts.whenAnotherAccountHasTheAddress.sentence.
+say_another_account_has_this_preview_s_address() {
+  echo "❌ Another account on this Mac — or macOS itself — is using the address this preview needs, so Plantoir stopped before building it."
+  echo "   Nothing is wrong with your pages. Press Preview to try again; if it happens again, restarting this Mac puts it right."
+}
+
+# The published host port of this preview, asked twice before giving up
+# (GitHub #235: one empty answer is not proof).
+the_preview_s_host_port() {
   local host_port=""
   host_port=$(docker port "$CONTAINER_NAME" "${PREVIEW_PORT}/tcp" 2>/dev/null | head -1 | sed 's/.*://')
   if [[ -z "$host_port" ]]; then
     host_port=$(docker port "$CONTAINER_NAME" "${PREVIEW_PORT}/tcp" 2>/dev/null | head -1 | sed 's/.*://')
   fi
-  if [[ -z "$host_port" ]]; then
-    say_the_preview_address_is_unknown
-    # Rule 5: without this the trail says only that preview.sh failed, and
-    # the reason is in a transcript nobody opens. The words are pinned —
-    # contracts/shared-rules.json -> activityTrail.mustRecord."preview did not appear".launcherLine
-    note_on_the_trail "${COURSE}/${SECTION} · the preview stopped before building — Plantoir could not find out where it would be"
-    return 1
+  printf '%s' "$host_port"
+}
+
+# Finds the address, makes sure this Mac reaches it (#234) and that it is
+# this account's own (#310), and only then announces it.
+#
+# The ownership look comes AFTER the reach check, so a refused connection
+# (curl exit 7) is still #234's case, and is said as #234 says it. When the
+# address is somebody else's the workspace is remade ONCE, through
+# remake_the_workspace (so #94's look at what runs in it applies, and an open
+# preview of another section refuses with #94's sentence); the walk that
+# remakes it reads the kernel's list too, so the new block is free when it
+# is picked. If the address is STILL not ours the run stops before building,
+# with the sentence above: exit 1 with no address announced, the shape the
+# app already treats as a preview that never appeared (#235). A second
+# remake is never tried — rebuilding in a loop against a listener that
+# moves with us would cost two minutes a turn and fix nothing.
+#
+# The remade workspace skips the "Preflight: checking Quartz sidebar
+# anchor" look above: it only warns, and it was made from the same image
+# the look was just run against. Do not "fix" that by looking again.
+announce_the_preview_address() {
+  if [[ -n "$BUILD_ONLY" ]]; then
+    return 0
   fi
-  if ! this_mac_can_reach_the_builder "$host_port"; then
-    say_this_mac_cannot_reach_the_builder
-    # Rule 5, words pinned in contracts/shared-rules.json ->
-    # activityTrail.mustRecord."preview did not appear".launcherLineWhenThisMacCannotReachTheBuilder
-    note_on_the_trail "${COURSE}/${SECTION} · the preview stopped before building — this Mac could not reach the website builder"
-    return 1
-  fi
+  local host_port=""
+  local looked=0
+  while true; do
+    host_port="$(the_preview_s_host_port)"
+    if [[ -z "$host_port" ]]; then
+      say_the_preview_address_is_unknown
+      # Rule 5: without this the trail says only that preview.sh failed, and
+      # the reason is in a transcript nobody opens. The words are pinned —
+      # contracts/shared-rules.json -> activityTrail.mustRecord."preview did not appear".launcherLine
+      note_on_the_trail "${COURSE}/${SECTION} · the preview stopped before building — Plantoir could not find out where it would be"
+      return 1
+    fi
+    if ! this_mac_can_reach_the_builder "$host_port"; then
+      say_this_mac_cannot_reach_the_builder
+      # Rule 5, words pinned in contracts/shared-rules.json ->
+      # activityTrail.mustRecord."preview did not appear".launcherLineWhenThisMacCannotReachTheBuilder
+      note_on_the_trail "${COURSE}/${SECTION} · the preview stopped before building — this Mac could not reach the website builder"
+      return 1
+    fi
+    looked=$((looked + 1))
+    if [ "$looked" -eq 1 ] && a_different_engine_was_named_by_hand; then
+      # Rule 5: a check that was not made says so, rather than silently
+      # stopping (contracts/shared-rules.json -> activityTrail.mustRecord.
+      # "preview address held by another account", outcome unchecked).
+      tell_the_app_the_address_was_held unchecked "$host_port"
+      break
+    fi
+    if ! held_by_someone_else "$host_port"; then
+      break
+    fi
+    if [ "$looked" -ge 2 ]; then
+      say_another_account_has_this_preview_s_address
+      tell_the_app_the_address_was_held refused "$host_port"
+      return 1
+    fi
+    say_this_folder_is_set_up_again_on_free_addresses
+    tell_the_app_the_address_was_held remade "$host_port"
+    remake_the_workspace
+  done
   echo "🌐 Preview will be available at: http://localhost:${host_port}/"
 }
 
