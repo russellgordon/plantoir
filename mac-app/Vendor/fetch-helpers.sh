@@ -73,7 +73,8 @@ write_manifest() {
     echo "arch arm64"
     echo "${PINS_LINE}"
     echo "image vm/${IMAGE_NAME}"
-    (cd "${folder}" && find bin cli-plugins share -type f | LC_ALL=C sort | while IFS= read -r file; do
+    (cd "${folder}" && find . -type f ! -path './vm/*' ! -name 'MANIFEST' ! -name 'MANIFEST.next' \
+        | sed 's#^\./##' | LC_ALL=C sort | while IFS= read -r file; do
       shasum -a 256 "${file}"
     done)
   } > "${next}"

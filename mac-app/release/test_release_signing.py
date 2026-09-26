@@ -27,6 +27,8 @@ RELEASE = Path(__file__).resolve().parent
 MAC_APP = RELEASE.parent
 FRAMEWORK = MAC_APP / "Vendor" / "Sparkle" / "Sparkle.framework"
 ENTITLEMENTS = MAC_APP / "QuartzTeachers" / "QuartzTeachers.entitlements"
+FETCH_HELPERS = MAC_APP / "Vendor" / "fetch-helpers.sh"
+HELPER_PROGRAMS = ["bin/colima", "bin/limactl", "bin/docker", "cli-plugins/docker-buildx"]
 REAL_TEAM = "U2ZN2W2UQJ"
 
 
@@ -69,10 +71,27 @@ class ReleaseSigningTests(unittest.TestCase):
         # ditto keeps the framework's version symlinks as symlinks.
         subprocess.run(["ditto", str(FRAMEWORK), str(app / "Contents" / "Frameworks" / "Sparkle.framework")],
                        check=True)
+        # The website builder's helper programs (#312): real Mach-O files standing in for
+        # Colima, limactl, the Docker CLI and buildx, signed ad-hoc as upstream ships them,
+        # the `lima` wrapper (a script) and a MANIFEST.
+        helpers = app / "Contents" / "Resources" / "helpers"
+        for relative in HELPER_PROGRAMS:
+            (helpers / relative).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile("/usr/bin/true", helpers / relative)
+            (helpers / relative).chmod(0o755)
+            run("codesign", "--force", "--timestamp=none", "--sign", "-", str(helpers / relative))
+        (helpers / "bin" / "lima").write_text("#!/bin/sh\nexec limactl shell \"$@\"\n", encoding="utf-8")
+        (helpers / "bin" / "lima").chmod(0o755)
+        (helpers / "vm").mkdir()
+        (helpers / "vm" / "disk.raw.gz").write_bytes(b"not a program")
+        manifest = run(str(FETCH_HELPERS), "--manifest-only", str(helpers))
+        self.assertEqual(manifest.returncode, 0, manifest.stdout + manifest.stderr)
         return app
 
     def sign_the_release_way(self, app: Path) -> None:
         result = run(str(RELEASE / "sign-updater.sh"), str(app), "-", "--no-timestamp")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        result = run(str(RELEASE / "sign-helpers.sh"), str(app), "-", "--no-timestamp")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         result = run("codesign", "--force", "--timestamp=none", "--options", "runtime",
                      "--entitlements", str(ENTITLEMENTS), "--sign", "-", str(app))
@@ -111,11 +130,13 @@ class ReleaseSigningTests(unittest.TestCase):
         self.sign_the_release_way(app)
         refused = self.check(app, "--expect-team", REAL_TEAM)
         self.assertEqual(refused.returncode, 1)
-        for item in ("Autoupdate", "Updater.app", "Sparkle.framework", "Plantoir.app"):
+        for item in ("Autoupdate", "Updater.app", "Sparkle.framework", "Plantoir.app",
+                     "helpers/bin/colima", "helpers/bin/limactl", "helpers/bin/docker",
+                     "helpers/cli-plugins/docker-buildx"):
             self.assertIn(item, refused.stdout, f"{item} was not named")
-        self.assertEqual(refused.stdout.count("WRONG TEAM"), 4)
+        self.assertEqual(refused.stdout.count("WRONG TEAM"), 8)
         # Signed --timestamp=none, as every item here is: refused outside the tests.
-        self.assertEqual(refused.stdout.count("NO SECURE TIMESTAMP"), 4)
+        self.assertEqual(refused.stdout.count("NO SECURE TIMESTAMP"), 8)
 
     def test_the_updaters_helpers_left_as_fetched_are_caught_by_the_team_and_not_by_verify(self) -> None:
         """The failure the check exists for: the app re-signed, the helpers left as Sparkle ships them."""
@@ -163,6 +184,82 @@ class ReleaseSigningTests(unittest.TestCase):
         self.assertIn("NO HARDENED RUNTIME: Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate",
                       refused.stdout)
 
+    # MARK: the website builder's helper programs (#312)
+
+    def resign_app(self, app: Path) -> None:
+        run("codesign", "--force", "--timestamp=none", "--options", "runtime",
+            "--entitlements", str(ENTITLEMENTS), "--sign", "-", str(app))
+
+    def test_the_helpers_are_signed_limactl_with_its_own_entitlements(self) -> None:
+        app = self.fake_app("helpers-right")
+        self.sign_the_release_way(app)
+        helpers = app / "Contents" / "Resources" / "helpers"
+        limactl = run("codesign", "-d", "--entitlements", "-", "--xml", str(helpers / "bin" / "limactl")).stdout
+        self.assertIn("com.apple.security.virtualization", limactl)
+        self.assertNotIn("disable-library-validation", limactl)
+        for relative in HELPER_PROGRAMS:
+            info = run("codesign", "-dvv", str(helpers / relative)).stderr
+            self.assertIn("runtime", info, relative)
+        checked = subprocess.run("grep '^[0-9a-f]\\{64\\}  ' MANIFEST | shasum -a 256 -c --status",
+                                 shell=True, cwd=helpers)
+        self.assertEqual(checked.returncode, 0, "the MANIFEST does not describe the signed helpers")
+
+    def test_a_helper_left_as_upstream_ships_it_is_refused(self) -> None:
+        app = self.fake_app("helpers-untouched")
+        run(str(RELEASE / "sign-updater.sh"), str(app), "-", "--no-timestamp")
+        self.resign_app(app)
+        verify = run("codesign", "--verify", "--deep", "--strict", str(app))
+        self.assertEqual(verify.returncode, 0, "verify --deep --strict does not look inside Resources")
+        refused = self.check(app, "--ad-hoc-for-tests")
+        self.assertEqual(refused.returncode, 1, refused.stdout)
+        self.assertIn("NO HARDENED RUNTIME: Contents/Resources/helpers/bin/limactl", refused.stdout)
+        self.assertIn("CANNOT START THE WEBSITE BUILDER", refused.stdout)
+
+    def test_a_limactl_without_the_virtualization_entitlement_is_refused(self) -> None:
+        app = self.fake_app("helpers-no-vz")
+        self.sign_the_release_way(app)
+        helpers = app / "Contents" / "Resources" / "helpers"
+        run("codesign", "--force", "--timestamp=none", "--options", "runtime", "--sign", "-",
+            str(helpers / "bin" / "limactl"))
+        run(str(FETCH_HELPERS), "--manifest-only", str(helpers))
+        self.resign_app(app)
+        refused = self.check(app, "--ad-hoc-for-tests")
+        self.assertEqual(refused.returncode, 1, refused.stdout)
+        self.assertIn("CANNOT START THE WEBSITE BUILDER (no com.apple.security.virtualization): "
+                      "Contents/Resources/helpers/bin/limactl", refused.stdout)
+
+    def test_a_helper_carrying_the_apps_entitlements_is_refused(self) -> None:
+        app = self.fake_app("helpers-app-entitlements")
+        self.sign_the_release_way(app)
+        helpers = app / "Contents" / "Resources" / "helpers"
+        run("codesign", "--force", "--timestamp=none", "--options", "runtime", "--entitlements", str(ENTITLEMENTS),
+            "--sign", "-", str(helpers / "bin" / "docker"))
+        run(str(FETCH_HELPERS), "--manifest-only", str(helpers))
+        self.resign_app(app)
+        refused = self.check(app, "--ad-hoc-for-tests")
+        self.assertEqual(refused.returncode, 1, refused.stdout)
+        self.assertIn("CARRIES THE APP'S ENTITLEMENTS: Contents/Resources/helpers/bin/docker", refused.stdout)
+
+    def test_a_manifest_older_than_the_signatures_is_refused(self) -> None:
+        app = self.fake_app("helpers-stale-manifest")
+        self.sign_the_release_way(app)
+        helpers = app / "Contents" / "Resources" / "helpers"
+        run("codesign", "--force", "--timestamp=none", "--options", "runtime",
+            "--identifier", "something.else", "--sign", "-", str(helpers / "bin" / "colima"))
+        self.resign_app(app)
+        refused = self.check(app, "--ad-hoc-for-tests")
+        self.assertEqual(refused.returncode, 1, refused.stdout)
+        self.assertIn("MANIFEST DOES NOT MATCH THE SIGNED HELPERS", refused.stdout)
+
+    def test_an_app_without_helpers_is_refused(self) -> None:
+        app = self.fake_app("helpers-none")
+        shutil.rmtree(app / "Contents" / "Resources" / "helpers")
+        run(str(RELEASE / "sign-updater.sh"), str(app), "-", "--no-timestamp")
+        self.resign_app(app)
+        refused = self.check(app, "--ad-hoc-for-tests")
+        self.assertEqual(refused.returncode, 1, refused.stdout)
+        self.assertIn("NO HELPER PROGRAMS", refused.stdout)
+
     # MARK: the update keys in the built bundle
 
     def test_the_update_keys_are_checked_in_the_built_bundle(self) -> None:
@@ -185,6 +282,12 @@ class ReleaseSigningTests(unittest.TestCase):
             return index
 
         self.assertLess(at("./Vendor/fetch-sparkle.sh"), at("xcodegen generate"))
+        self.assertLess(at("./Vendor/fetch-helpers.sh"), at("xcodegen generate"))
+        sign_helpers = at('./release/sign-helpers.sh "${STAGE_APP}" "${IDENTITY}"')
+        self.assertLess(at('"${LLAMA_SERVER}"'), sign_helpers)
+        self.assertLess(sign_helpers, at("Signing Plantoir.app with entitlements"))
+        # ULMO before the DMG is signed: converting drops the signature.
+        self.assertLess(at("-format ULMO"), at('codesign --force --timestamp --sign "${IDENTITY}" "${DMG_PATH}"'))
         # The CALLS, not a mention in a comment.
         sign_updater = at('./release/sign-updater.sh "${STAGE_APP}" "${IDENTITY}"')
         check_signatures = at('./release/check-signatures.sh "${STAGE_APP}"')

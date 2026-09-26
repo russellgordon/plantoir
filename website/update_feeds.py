@@ -65,8 +65,22 @@ def copy_feeds(source: Path, destination: Path) -> list[Path]:
     return copied
 
 
+def deltas_in(item) -> list[dict]:
+    """The delta enclosures of one parsed item (#312): from which build, where, how long."""
+    found: list[dict] = []
+    for deltas in item.findall(f"{{{SPARKLE_NAMESPACE}}}deltas"):
+        for enclosure in deltas.findall("enclosure"):
+            found.append({
+                "from": enclosure.get(f"{{{SPARKLE_NAMESPACE}}}deltaFrom", ""),
+                "url": enclosure.get("url", ""),
+                "length": enclosure.get("length", ""),
+            })
+    return found
+
+
 def items_of(feed: Path) -> list[dict]:
-    """Every item in a feed: its version, build, download address and length."""
+    """Every item in a feed: its version, build, download address and length,
+    and its deltas (#312)."""
     root = ElementTree.fromstring(feed.read_bytes())
     items: list[dict] = []
     for item in root.iter("item"):
@@ -78,7 +92,8 @@ def items_of(feed: Path) -> list[dict]:
         if enclosure is not None:
             url = enclosure.get("url", "")
             length = enclosure.get("length", "")
-        items.append({"short": short.strip(), "build": build.strip(), "url": url, "length": length})
+        items.append({"short": short.strip(), "build": build.strip(), "url": url, "length": length,
+                      "deltas": deltas_in(item)})
     return items
 
 
@@ -144,6 +159,14 @@ def problems_with(feed: Path) -> list[str]:
                 f"updates/{name}: {item['short']} ({item['build']}) downloads {item['url'] or 'nothing'}, "
                 f"expected {expected}"
             )
+        # A delta is uploaded to its item's own release (#312), and is a .delta.
+        release = f"{RELEASE_DOWNLOADS}v{item['short']}/"
+        for delta in item.get("deltas", []):
+            if not delta["url"].startswith(release) or not delta["url"].endswith(".delta"):
+                problems.append(
+                    f"updates/{name}: {item['short']} ({item['build']}) has a delta from {delta['from']} at "
+                    f"{delta['url'] or 'nowhere'}, expected a .delta under {release}"
+                )
     for other_name, other_asset in PLATFORM_ASSETS.items():
         if other_name != name and other_asset.encode() in data:
             problems.append(f"updates/{name}: names {other_asset}, the other platform's download")
@@ -192,7 +215,20 @@ def verify_live(base_url: str, local_feed: Path, fetch=None) -> str:
     if length and newest["length"] and length != newest["length"]:
         print(f"❌ {newest['url']} is {length} bytes; the feed says {newest['length']}.")
         return "mismatch"
-    print(f"✅ {feed_url} is live, signed as committed, and its newest download ({newest['short']}) is there.")
+    # Each delta the newest item offers must be there too (#312): a missing
+    # one makes Sparkle fall back to the full download, silently.
+    for delta in newest.get("deltas", []):
+        try:
+            status, headers, _ = fetch(delta["url"], "HEAD")
+        except (urllib.error.URLError, TimeoutError, OSError) as error:
+            print(f"⚠️ Could not reach {delta['url']} ({error}); check it by hand.")
+            return "unknown"
+        if status != 200:
+            print(f"❌ The delta from build {delta['from']} points at {delta['url']}, which answered {status}. "
+                  f"Was it uploaded to the release beside the DMG?")
+            return "mismatch"
+    print(f"✅ {feed_url} is live, signed as committed, and its newest download ({newest['short']}) is there"
+          f"{', with its ' + str(len(newest.get('deltas', []))) + ' deltas' if newest.get('deltas') else ''}.")
     return "match"
 
 

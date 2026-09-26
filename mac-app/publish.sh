@@ -121,6 +121,12 @@ echo "📦 Step 1: Checking llama.cpp engine..."
 # signed item by item in step 4 (release/sign-updater.sh).
 echo "📦 Checking Sparkle (the updater)..."
 ./Vendor/fetch-sparkle.sh
+# The website builder's helper programs and starting disk (#312): project.yml
+# carries Vendor/helpers as a resource folder, so it must be in place before
+# step 2 generates the project. The programs are signed in step 4
+# (release/sign-helpers.sh), which writes their MANIFEST again.
+echo "📦 Checking the website builder's helper programs..."
+./Vendor/fetch-helpers.sh
 
 # ---- 2. Generate Xcode Project -----------------------------------------------
 echo ""
@@ -196,6 +202,12 @@ if [[ "${SIGN}" == true ]]; then
     codesign --force --timestamp --options runtime --sign "${IDENTITY}" "${LLAMA_SERVER}"
   fi
 
+  # The website builder's helper programs (#312), one by one — limactl with
+  # its own entitlements, never the app's — and their MANIFEST written again
+  # from the signed bytes, BEFORE the app, so the app's signature seals it.
+  echo "   - Signing the website builder's helper programs..."
+  ./release/sign-helpers.sh "${STAGE_APP}" "${IDENTITY}"
+
   # Sign main application bundle
   echo "   - Signing Plantoir.app with entitlements..."
   codesign --force --timestamp --options runtime --entitlements "${ENTITLEMENTS}" --sign "${IDENTITY}" "${STAGE_APP}"
@@ -251,6 +263,18 @@ else
   echo "   Using native hdiutil to create APFS disk image..."
   hdiutil create -fs APFS -volname "Plantoir" -srcfolder "${DMG_STAGE}" -ov -format UDZO "${DMG_PATH}"
 fi
+
+# LZMA (ULMO) rather than create-dmg's zlib (UDZO), since the app carries the
+# website builder's starting disk (#312): 432 MB rather than 466 MB, measured
+# with the same payload, for 72 s more here; macOS 15, the app's minimum,
+# reads it. Converted BEFORE the DMG is signed, because converting drops the
+# signature. The window layout create-dmg wrote is inside the volume and
+# survives the conversion (checked at the #312 rehearsal).
+echo "   Recompressing the disk image with LZMA (ULMO)..."
+ULMO_PATH="${DIST_DIR}/.Plantoir-ULMO.dmg"
+rm -f "${ULMO_PATH}"
+hdiutil convert "${DMG_PATH}" -format ULMO -o "${ULMO_PATH}" -quiet
+mv -f "${ULMO_PATH}" "${DMG_PATH}"
 
 # ---- 6. Sign DMG, Notarize & Staple ------------------------------------------
 if [[ "${SIGN}" == true ]]; then
