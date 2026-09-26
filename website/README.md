@@ -45,7 +45,7 @@ scanning logic lives once, in `scripts/netlify_badge.py`, and
 | `layout/base.html` | The page skeleton every page is poured into — head tags, top bar, footer. |
 | `assets/style.css` | The whole stylesheet, copied to `site/assets/`. |
 | `pages/*.html` | One file per page: a front matter block, then the body. The file name is the URL (`features.html` → `/features`), except `index.html`, which is the front page. |
-| `shots/` | The screenshot harness. See below. |
+| `shots/` | The screenshot harness. See below. `shots/scenes.py` lists the v1.4.0 scenes; `shots/marketing_folder.py` sets up the kept marketing folder; `shots/csp-correlation.json` says which ICS3U activities reach which AP CSP learning objectives; `shots/marketing/` holds the College Board source's address and hash (never its text) and the How I Teach page. |
 
 ## Writing a page
 
@@ -72,6 +72,10 @@ Inside the body you can use:
 - `{{version}}`, `{{released}}`, `{{repo_url}}`, `{{support_email}}`,
   `{{tagline}}`, `{{site_name}}`, `{{base_url}}` — from `site.json`.
 - `{{demo_links}}` — the list of live example class sites.
+- `{{ready_made_ontario}}`, `{{ready_made_other_sentence}}`, `{{skeleton_codes}}`
+  — counted from `support/` at every build; `{{availability:<key>}}`,
+  `{{download_cards}}`, `{{new_in}}` — drawn from `site.json`. See "What the
+  pages read from data" below. A count typed into a page is refused.
 
 A page that leaves a `{{placeholder}}` unfilled, or names a screenshot that
 does not exist, is reported. `--check` turns that into a non-zero exit, which
@@ -90,18 +94,31 @@ Full architecture and pipeline documentation is in [`SCREENSHOTS.md`](SCREENSHOT
 
 ### Capturing on macOS
 
+There are two working folders, and each picture is taken in one of them:
+
+- **`~/Plantoir Marketing`** — the KEPT marketing folder, for every app scene
+  new in v1.4.0: ICS3U (sections 1 and 2) and ICS4U (section 1) from their
+  ready-made content, a reference copy of ICS3U, and ICS3U revised to answer
+  to AP Computer Science Principles as well. See "Regenerating every image".
+- **`~/Desktop/Teaching`** — the demo folder: ENG2D, MCV4U and SCH3U, whose
+  sections are published as the live example sites. The hero, the class-site
+  shots, search, the phone and the colour figures come from here, because a
+  visitor can follow those to a real site. ICS3U is never published to a
+  public site: an embedded curriculum page puts its text on the page, and
+  the College Board's words were cleared for Russell's own folder, not for
+  the web (ruling Q2).
+
 ```bash
-python3 website/shots/capture.py            # everything
-python3 website/shots/capture.py --app      # just the app windows
-python3 website/shots/capture.py --sites    # just the class websites
+python3 website/shots/capture.py --app      # hero and the older window shots, demo folder
+python3 website/shots/capture.py --sites    # the class websites and the phone
+python3 website/shots/capture.py --provision-demo   # first time only: the three demo courses
 ```
 
-It provisions a demo working folder (`~/Teaching` by default) with three
-courses — ENG2D, MCV4U and SCH3U — by driving the app's own new-course panel.
-It then builds and publishes those sections, photographs the app through the
-marketing UI tests (`mac-app/Tests/QuartzTeachersUITests/MarketingScreenshotTests.swift`),
-photographs the published sites in Safari and on an iPhone in the Simulator, and
-rebuilds the pages.
+`--provision-demo` makes ENG2D, MCV4U and SCH3U through the app's own
+new-course panel (the `DemoWorkspaceProvisioning` UI test) and writes the live
+sites' markers. Before v1.4.0 the same step, then called `--provision`, only
+wrote launchers and markers and never ran that test, although its docstring
+said it did — so the demo folder could not actually be made from nothing.
 
 ### Capturing on Windows
 
@@ -146,6 +163,16 @@ Written down because each cost an afternoon:
 - **Quartz serves the previous build immediately.** A section that has been
   previewed before comes back too fast to photograph its progress, so the
   harness deletes that section's built pages first.
+- **A UI-tested app cannot see a real scheduled run.** Under
+  `UITEST_WORKSPACE` the app reads scheduled records from a temporary folder,
+  so the notification scene schedules through `--mcp-stdio` instead, outside
+  the isolation. A record written into the temporary folder would photograph a
+  publish that never happened.
+- **An embedded curriculum page publishes its text.** A class site shows the
+  full wording of every expectation a lesson embeds, even with the curriculum
+  folder hidden from the sidebar — which is why ICS3U, whose College Board
+  pages are the College Board's words, is photographed in the in-app preview
+  and never published to a public site.
 - **The class site inside the app's preview renders dark even in a light
   capture.** Quartz reads `(prefers-color-scheme: light)` and treats anything
   else as dark, and the embedded web view does not report a light preference.
@@ -160,6 +187,117 @@ what the type rendering, the scrollbars and the window chrome actually look
 like on a Mac. A headless renderer approximates all three. The phone shot uses
 the Simulator with RocketSim drawing the device around it, for the same
 reason.
+## Regenerating every image
+
+Every picture on plantoir.app is made by `website/shots/capture.py` from the
+real app and real class sites. Nothing is edited by hand, and nothing on a page
+is typed that a folder can count.
+
+```bash
+python3 website/shots/capture.py --dry-run     # proves every scene can be set up; launches nothing
+python3 website/shots/capture.py --provision   # makes ~/Plantoir Marketing if missing, reuses it if not
+python3 website/shots/capture.py --scenes      # the eleven v1.4.0 scenes, light and dark
+python3 website/shots/capture.py --only reference,two-maps   # re-take some
+python3 website/shots/capture.py --publish     # republish the three demo class sites
+python3 website/shots/capture.py --app         # hero and the ENG2D window shots, in ~/Desktop/Teaching
+python3 website/shots/capture.py --sites       # the class sites, search, phone and the figures
+python3 website/build.py && python3 website/build.py --check
+```
+
+**Before starting:** the screen unlocked and left alone for about an hour,
+Focus off, Plantoir's notifications allowed, the Safari profile `⎚` present,
+nothing else using Xcode, and the app built from the tree you are releasing
+(the Dock rebuild — `capture.py` photographs the newest Debug build in
+DerivedData). The run asks for Safari and UI-automation permission in its first
+minute; answer both and walk away.
+
+**The marketing folder** (`website/shots/marketing_folder.py`) is made once and
+kept. `--provision` makes ICS3U and ICS4U through the app when they are
+missing, then, in the folder only — never the shipped payload:
+
+- a **College Board Curriculum** folder with one page per AP CSP *learning
+  objective* (`CRD-1.A` …), the objective's exact text with its essential
+  knowledge statements verbatim beneath (`college_board.py`). The words are
+  read from the College Board's public Course and Exam Description, fetched
+  into the folder's `.sources/` and checked against the SHA-256 in
+  `shots/marketing/csp-codes.json`; **none of that text is in this
+  repository**. Ten objectives quote exam-reference code drawn as blocks, which
+  no reading of the columns can set out faithfully: `--provision` writes a draft
+  of each into `.sources/College Board Curriculum drafts/`, and a person sets it
+  out from the document into `.sources/College Board Curriculum/`, which is
+  then used as it is;
+- an embed per objective in each activity `shots/csp-correlation.json` names,
+  inside its existing `## Curriculum connection` block after the Ontario ones
+  (the map counts transclusions, never plain links);
+- `How I Teach.md` (our own words, `shots/marketing/`), and a folder
+  destination (`School Web Space`) so the scheduled publish makes nothing
+  public;
+- a reference copy of ICS3U for 2025–26, through the app.
+
+Every step says "made" or "already there", a second run changes nothing, a file
+you changed is "left as you changed it", and a folder holding any course but
+ICS3U, ICS4U and their reference copies is refused before anything is written.
+Declaring the second curriculum is not a set-up step: the `curriculum-settings`
+scene does it in Course Settings, because that is the picture.
+
+**The scenes** are listed in `website/shots/scenes.py` with what each sets up.
+Most are `MarketingScenes` UI tests; the notification banner is a REAL
+scheduled publish asked for through `Plantoir --mcp-stdio` (a UI-tested app
+reads scheduled records from a temporary folder, so it could never see a real
+run's), photographed the moment the banner appears after the run's record says
+it succeeded.
+
+**A green run means every image was made and checked.** A scene FAILS, and is
+named, when a picture it owes is missing, when the text Vision reads on it
+(`ocr.swift`) lacks a word in `shots.json → expectText`, or when the state
+behind it was wrong (an empty plan, a refused copy, an empty second map). The
+count is the exit code now.
+
+It puts back the Mac's appearance, window sizes, Obsidian's list of vaults and
+the frontmost app, and cancels any schedule it set that has not run. **It
+leaves** one notification in Notification Center (a script cannot withdraw
+another app's), ordinary lines in the activity trail
+(`~/Library/Logs/Plantoir/activity.txt` — "previewed ICS3U 1", and so on; the
+UI-tested app has no switch to send them elsewhere, and adding one would be a
+product change for a marketing script), and the kept folder.
+
+**Until the release it photographs exists**, a new shot is marked
+`awaiting_capture` in `shots.json`: `build.py` renders nothing where it goes
+(the page still reads well) and lists it on every build, so the site stays
+publishable. The capture that takes it removes the flag. Retaken shots carry
+their new alt text and caption under `retake` until then, so the words never
+describe a picture that is not there yet.
+
+## What the pages read from data
+
+- **Counts.** `build.py`'s `site_counts()` counts `support/` at every build:
+  `{{ready_made_ontario}}` (payloads whose manifest names no other
+  `jurisdiction`), `{{ready_made_other_sentence}}` (", and one British Columbia
+  course"), and `{{skeleton_codes}}` (Ontario's catalogue less the Ontario
+  payloads, to the nearest hundred, because the page says "about"). `--check`
+  REFUSES a digit written within four words of "course" or "code" in the same
+  sentence: "39 Ontario codes" was typed once, and one of the 39 was British
+  Columbia's.
+- **Machinery words.** `--check` also refuses `toolchain`, `script`, `docker`,
+  `container`, `model`, `feed` and the rest (`build.py → MACHINERY`) in what a
+  visitor reads — rule 1 of the repository, which the app enforces for its own
+  sentences. "API token" is allowed: Cloudflare's dashboard calls it that.
+- **Availability.** `{{availability:<key>}}` prints "On the Mac. The Windows
+  version gets this in a later release." under a section while `site.json →
+  availability → features → <key> → windows` is false, and nothing once it is
+  true. An unknown key is a `--check` problem.
+- **Download cards.** `{{download_cards}}` draws both cards from `site.json →
+  downloads`. A card with no `pinned` version links GitHub's evergreen
+  `releases/latest/download/<asset>`; that URL 404s for a platform whose
+  installer is missing from the newest release, so such a card is PINNED to the
+  last release that has it and says "version <pinned>". Windows is pinned to
+  1.1.0 (v1.2.0 onward carried the DMG only); unpin it in the release that ships
+  the Windows installer again. The asset names are frozen (RELEASING.md).
+- **New this year.** `{{new_in}}` is `site.json → new_in`, each item a sentence
+  and a link to the section that explains it. `new_in.version` names the
+  release it was written for; `--deploy` warns when that is not the major.minor
+  of `version`.
+
 ## plantoir.app is generated, and its screenshots are taken by a robot
 
 The marketing site used to be one hand-written `site/index.html`. It is now

@@ -170,20 +170,30 @@ gh release edit v<version> --draft=false -R <owner/repo>
    Set `version` and `released` in `website/site.json`, redraw brand images,
    rebuild, and push.
 
-   **If this cut carries one platform only, fix that platform's download card
-   in `website/pages/index.html` in the same commit.** The cards use GitHub's
+   **If this cut carries one platform only, pin that platform's download card
+   in `website/site.json` → `downloads` in the same commit** — set its
+   `pinned` to the last version that has the asset (since v1.4.0 the cards are
+   drawn from that list; `index.html` holds only `{{download_cards}}`). The cards use GitHub's
    evergreen `releases/latest/download/<asset-name>` URL, which starts
    resolving to the NEW release the moment it publishes — and the release has
    no asset for the lagging platform, so that button 404s for every visitor on
    that OS. Pin it to the last release that HAS the asset
-   (`releases/download/v<older>/<asset-name>`), and add one short note saying
-   that platform is still on the older version.
+   (`releases/download/v<older>/<asset-name>`) — the card then says
+   "version <older>" by itself.
 
-   **Then un-pin it in the release that catches the platform up**, and delete
-   the note. A pinned card keeps working forever, which is exactly why it is
+   **Then un-pin it in the release that catches the platform up** (`pinned`
+   back to `null`). A pinned card keeps working forever, which is exactly why it is
    easy to forget: it serves an old version from a button that looks healthy.
-   The comment beside the card in `index.html` says all of this too — first
-   done for v1.1.0 (Windows only), 2026-08-20.
+   `site.json → downloads_note` says all of this too — first done for v1.1.0
+   (Windows only), 2026-08-20.
+
+   **And while the Windows card is pinned behind the mac, check
+   `site.json → availability`**: each v1.4.0-and-later feature section says
+   "On the Mac. The Windows version gets this in a later release." while its
+   `windows` flag is false. Flip the flags for what the Windows installer being
+   released actually has. **`new_in.version`** names the release the home
+   page's "New this year" list was written for; `--deploy` warns when it is not
+   this version's major.minor — rewrite the list for a new minor version.
 
 ```bash
 # Redraw brand images if needed

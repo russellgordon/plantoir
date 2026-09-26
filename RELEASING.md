@@ -41,6 +41,8 @@ sentences and rules regardless of their OS. Three consequences:
   old version from a button that looks perfectly healthy, which is why the
   un-pinning is the half that gets forgotten. Done first for v1.1.0
   (Windows only), 2026-08-20; the procedure is in the `cut-release` skill.
+  Since v1.4.0 the pin is DATA — `website/site.json` → `downloads[].pinned`
+  — not an edited link in `index.html`.
 - **"No code changes" does not exempt a platform from the gate.** A mac DMG
   gets the 1.1.0 label only when a mac session has made its suite green
   against the 1.1.0 contracts. An unchanged binary re-badged with a new

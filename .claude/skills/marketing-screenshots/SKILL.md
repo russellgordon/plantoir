@@ -38,10 +38,16 @@ Then check, in this order:
 3. **The demo folder exists** — `~/Desktop/Teaching` (NOT `~/Teaching`,
    which holds real courses now), with ENG2D, MCV4U and SCH3U in
    `courses/`. If it does not, that is a provisioning run
-   (`capture.py --provision`), which is slow and separate. See below.
+   (`capture.py --provision-demo`), which is slow and separate. See below.
 4. **For `--sites`, the three class sites answer.** They are at
    `<code>-s1-2026-gordon.netlify.app`. A 404 means the demo sites need
    publishing again (`capture.py --publish`), not that the capture is broken.
+5. **For the v1.4.0 scenes, the marketing folder is set up** —
+   `~/Plantoir Marketing`, made by `capture.py --provision` (see
+   "Provisioning" below) — and `capture.py --dry-run` says every scene is
+   ready. **Focus is off and Plantoir's notifications are allowed**: the
+   notification-banner scene photographs a real notification, and neither
+   setting can be read reliably from a script, so ask.
 
 ## Two rules about HOW a picture is taken
 
@@ -160,9 +166,17 @@ cheap and re-runs on every invocation.
 ## Running it
 
 ```bash
-python3 website/shots/capture.py --app      # the six app windows
+python3 website/shots/capture.py --scenes   # the eleven v1.4.0 scenes (marketing folder)
+python3 website/shots/capture.py --app      # the hero and the older app windows (demo folder)
 python3 website/shots/capture.py --sites    # the class sites and the phone
 ```
+
+The scenes re-take one at a time too: `capture.py --only reference,two-maps`
+(names in `website/shots/scenes.py`). **Unlike `--app`, a scenes run judges
+itself**: it exits non-zero, naming the scene, when a picture it owes is
+missing or when Vision does not find the words `shots.json → expectText` says
+it must show. Still look at every image — a picture can say the right words
+and be ugly.
 
 Run **only the half that changed**. Interface work needs `--app`; changes to
 the example content, to Quartz, or to a course's colours need `--sites`.
@@ -271,11 +285,25 @@ first and fall back to the PNG.
 
 ## Provisioning, and when you need it
 
-Only on a machine that has never done this, or after `~/Desktop/Teaching` is deleted:
+**The marketing folder** (`~/Plantoir Marketing`), for the v1.4.0 scenes:
 
 ```bash
-python3 website/shots/capture.py --provision   # creates the three courses
-python3 website/shots/capture.py --publish     # builds and publishes them
+python3 website/shots/capture.py --provision   # makes it when absent, reuses it when present
+```
+
+It makes ICS3U and ICS4U through the app, adds the College Board pages from
+the public document (kept in `.sources/`, never committed), links the
+activities, writes How I Teach, and keeps a copy of ICS3U for reference. It
+never overwrites a file you changed and refuses a folder holding any other
+course. Ten learning objectives quote drawn code and are set out by a person
+from drafts it writes — it says which, and exits non-zero until they are there.
+`website/README.md`, "Regenerating every image", has the whole of it.
+
+**The demo folder**, only on a machine that has never done this, or after `~/Desktop/Teaching` is deleted:
+
+```bash
+python3 website/shots/capture.py --provision-demo   # creates the three courses
+python3 website/shots/capture.py --publish          # builds and publishes them
 ```
 
 Provisioning drives the app's own new-course panel three times and runs the
