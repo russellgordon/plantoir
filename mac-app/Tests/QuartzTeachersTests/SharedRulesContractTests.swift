@@ -242,7 +242,8 @@ final class SharedRulesContractTests: XCTestCase {
     /// links answer uses (names as written) and the one publishing, dating,
     /// the site check and copying use (lowercased, last path component) —
     /// because both read `WikiLinkRewriter.pattern`, and the second is the one
-    /// the issue was about.
+    /// the issue was about. Since #313 the cases also say where CODE is, and
+    /// both readers go through `WikiLinkRewriter.linkMatches`.
     @MainActor
     func testEveryLinkShapeReadsAsTheContractSays() throws {
         let section: [String: Any] = try SharedRulesContractTests.section("readingALink")
@@ -250,7 +251,11 @@ final class SharedRulesContractTests: XCTestCase {
         XCTAssertNotNil(section["whenRewritten"] as? String)
         XCTAssertNotNil(section["why"] as? String)
         let cases: [[String: Any]] = try XCTUnwrap(section["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 10, "readingALink lost cases")
+        XCTAssertGreaterThanOrEqual(cases.count, 32, "readingALink lost cases")
+        // #313: what code is, written to be implemented from.
+        XCTAssertNotNil(section["codeIsNeverALink"] as? String)
+        XCTAssertNotNil(section["whatIsCode"] as? [String])
+        XCTAssertNotNil(section["whatIsCodeLimits"] as? [String])
 
         for oneCase in cases {
             let name: String = try XCTUnwrap(oneCase["name"] as? String)

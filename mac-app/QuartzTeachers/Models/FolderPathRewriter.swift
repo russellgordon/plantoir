@@ -33,6 +33,10 @@ import Foundation
 ///
 /// ## What is NOT handled, on purpose
 ///
+/// **A link written inside code** — a fenced block or an inline span — is an
+/// example of a link, not one, and is neither counted nor rewritten (#313).
+/// Both styles skip it, by `MarkdownCode`, the one definition the mac shares.
+///
 /// A segment is replaced only when it matches the whole folder name. A folder
 /// called `Tasks` does not rewrite `Extra Tasks/`, and a page whose own NAME is
 /// `Tasks.md` is left alone — the match stops at the last `/`, so a file name
@@ -189,14 +193,19 @@ enum FolderPathRewriter {
 
     // MARK: - Private helpers
 
-    /// Every link target in the text, for one of the two link styles.
+    /// Every link target in the text, for one of the two link styles — less
+    /// the ones that start inside code, which are examples of a link and not
+    /// links (#313, `readingALink.whatIsCode`): a rename leaves a teacher's
+    /// `` `[[Tasks/Quiz 1]]` `` or `` `[q](Tasks/Quiz%201.md)` `` exactly as
+    /// written, and does not count it. The same mask `rewritingTargets`
+    /// applies, so the count is what the rewrite moves.
     nonisolated private static func targets(in text: String, written style: LinkStyle) -> [String] {
         guard let expression = style.expression else {
             return []
         }
-        let whole: NSRange = NSRange(text.startIndex..<text.endIndex, in: text)
         var found: [String] = []
-        for match in expression.matches(in: text, range: whole) {
+        let code: [NSRange] = MarkdownCode.ranges(in: text)
+        for match in MarkdownCode.matches(of: expression, in: text, outside: code) {
             if let targetRange = Range(match.range(at: 2), in: text) {
                 found.append(String(text[targetRange]))
             }
@@ -215,8 +224,8 @@ enum FolderPathRewriter {
         guard let expression = style.expression else {
             return text
         }
-        let whole: NSRange = NSRange(text.startIndex..<text.endIndex, in: text)
-        let matches: [NSTextCheckingResult] = expression.matches(in: text, range: whole)
+        let code: [NSRange] = MarkdownCode.ranges(in: text)
+        let matches: [NSTextCheckingResult] = MarkdownCode.matches(of: expression, in: text, outside: code)
         if matches.isEmpty {
             return text
         }

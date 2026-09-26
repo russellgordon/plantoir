@@ -1268,33 +1268,25 @@ nonisolated struct CoursePageCopySource: Sendable {
     ///
     /// A page shown INSIDE another comes along whether or not it is ticked:
     /// leaving it behind would put a hole in the page that shows it.
+    ///
+    /// Read with `WikiLinkRewriter.linkMatches`, the one reader every other
+    /// link on the mac goes through (#313), keeping the matches that are
+    /// embeds. So an embed shown inside code, `` `![[Note]]` ``, is an example
+    /// and brings nothing; and the name stops before the backslash of an
+    /// escaped pipe exactly as it does everywhere else (#294). This used to
+    /// be a hand-rolled line scanner that stripped EVERY trailing backslash
+    /// and saw no code at all.
     static func pagesEmbeddedIn(_ text: String) -> [String] {
         var found: [String] = []
-        for line in text.components(separatedBy: "\n") {
-            var rest: Substring = Substring(line)
-            while let start = rest.range(of: "![[") {
-                rest = rest[start.upperBound...]
-                guard let end = rest.firstIndex(where: { character in
-                    return character == "]" || character == "|" || character == "#"
-                }) else {
-                    break
-                }
-                var target: String = String(rest[rest.startIndex..<end])
-                // The backslash of an alias pipe escaped inside a table,
-                // `![[Note\|x]]`, is not part of the name — the rule
-                // `WikiLinkRewriter.pattern` follows for every other reader
-                // (#294). This scanner stays line-based and hand-rolled on
-                // purpose, so it strips by hand — EVERY trailing backslash,
-                // where the pattern drops only the one before the pipe: for
-                // the pathological `![[a\\|x]]` this reads `a` and the
-                // pattern `a\`. Nothing ships in that shape; parity was not
-                // worth a second rule.
-                while target.hasSuffix("\\") {
-                    target = String(target.dropLast())
-                }
-                found.append(AssistSectionGraph.normalized(target))
-                rest = rest[end...]
+        for match in WikiLinkRewriter.linkMatches(in: text) {
+            guard let bracketsRange = Range(match.range(at: 1), in: text),
+                  let targetRange = Range(match.range(at: 2), in: text) else {
+                continue
             }
+            if text[bracketsRange] != "![[" {
+                continue
+            }
+            found.append(AssistSectionGraph.normalized(String(text[targetRange])))
         }
         return found
     }
