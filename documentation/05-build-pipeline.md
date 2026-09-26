@@ -542,10 +542,36 @@ undated.
   (payloads, skeletons and the example course, code stripped — the old and new
   readers give identical targets on all 12,490 files), so no shipped page
   moves; teacher-written ones will. No log line's wording changes and none
-  becomes untrue. The install-time readers in `setup_course.py`, and the
-  curriculum-coverage patterns (which already read `\|` but share the old
-  group order), are
-  [#314](https://github.com/russellgordon/plantoir/issues/314).
+  becomes untrue.
+
+  **A stray `[[` cannot swallow the link after it** (since
+  [#314](https://github.com/russellgordon/plantoir/issues/314)): the heading
+  group stops at `[`, as Quartz's own `wikilinkRegex` does. This reader strips
+  inline code, but a `[[` typed in a sentence, followed later by a `#` and a
+  real `[[Page|words]]`, otherwise read as one link with a garbage name and
+  the real one was lost. Measured: 0 change on all 12,490 files in `support/`.
+
+  **The other readers of the same shapes, since #314.** The installer's three
+  (`setup_course.py`: `first_use_dates`, `WIKI_LINK_TARGET` for retargeting a
+  template's expectation, `unlink_curriculum_references`) now stop the name
+  before a backslash right in front of `]`, `|` or `#`, as `readingALink.rule`
+  says — all three had read `[[P\|a]]` as a page called `P\`. The coverage
+  map's two (`BLOCK_LINK`, behind "pages the course teaches", and
+  `TRANSCLUSION`, what it counts as covered) already read `\|` but had the old
+  alias-before-heading order, so `[[P#h|a]]` and `![[A1.1#h\|a]]` matched
+  nothing. They were NOT given #294's plain reorder: those two strip fenced
+  code but not inline code, and on `Tutorials/Scavenger Hunt.md` (the example
+  course and every skeleton family, 90 files) the reordered pattern ran from
+  "type `` `[[` ``" through a `### Custom Display Words` heading and swallowed
+  the real `[[Help Sessions|…]]` after it. With the heading stopping at `[`:
+  0 differences over all 12,490 files, fences-only or inline-stripped. Every
+  `readingALink` case runs through every one of these readers in
+  `scripts/test_install_link_readers.py`, which `verify.sh` lists and Windows'
+  `PythonToolchainTests` discovers. Rejected: one shared `wiki_links.py` for
+  all six readers — each needs different groups, and a new sibling module is a
+  Dockerfile change (`test_baked_modules.py` exists because one was once
+  missed); and stripping inline code in `_pages_the_course_teaches`, which
+  changes what counts as taught by a different rule (#313's question).
 - **A class dated with a plain YAML date** (`created: 2026-09-24`, unquoted —
   what Obsidian's Date property writes) counts, as midnight in Toronto. Until
   the fix round `_parse_created_value` read it as no date at all, so such a
