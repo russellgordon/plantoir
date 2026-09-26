@@ -90,11 +90,20 @@ The automated PowerShell script executes:
 
 ## 4. Marketing Website & Evergreen Download URLs
 
-The website (`website/pages/index.html`) references evergreen download URLs:
+The website's download cards are drawn from `website/site.json` →
+`downloads` (since v1.4.0; they used to be typed into
+`website/pages/index.html`). A card with no `pinned` version uses the
+evergreen download URL:
 - **macOS**: `https://github.com/russellgordon/plantoir/releases/latest/download/Plantoir-macOS.dmg`
 - **Windows**: `https://github.com/russellgordon/plantoir/releases/latest/download/PlantoirSetup.exe`
 
-GitHub automatically resolves `releases/latest/download/<filename>` to the newest published release carrying that asset name.
+GitHub resolves `releases/latest/download/<filename>` to that asset on the
+newest published release — and 404s when the newest release does not carry it.
+(This paragraph used to say it found "the newest release carrying that asset
+name"; it does not, which is why a platform that lags a release has its card
+PINNED to `releases/download/v<version>/<filename>` by setting `pinned` in
+`site.json`, and un-pinned when it catches up. Windows is pinned to 1.1.0 as
+of v1.2.0.)
 
 **The names are frozen, and renaming one breaks the site's download button
 silently** — the evergreen URL keeps resolving, to nothing. `Plantoir-macOS.dmg`

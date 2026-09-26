@@ -64,11 +64,24 @@ The macOS capture harness is driven by Python and Xcode UI tests:
 python3 website/shots/capture.py            # captures app + published sites
 python3 website/shots/capture.py --app      # app windows only
 python3 website/shots/capture.py --sites    # class websites only
+python3 website/shots/capture.py --scenes   # the v1.4.0 scenes, in ~/Plantoir Marketing
 ```
 
-- **App Windows**: Photographed via `MarketingScreenshotTests.swift` in
-  `mac-app/Tests/QuartzTeachersUITests/`. Uses XCUITest's native window
-  screenshotting to preserve window geometry and transparent rounded corners.
+- **App Windows**: Driven by `MarketingScreenshotTests.swift` in
+  `mac-app/Tests/QuartzTeachersUITests/`, and photographed with macOS's own
+  window capture (`screencapture -o -l <window number>`), which returns the
+  real rounded corners already transparent. (XCUITest's `window.screenshot()`
+  was used once and baked the corners black; it is gone, with no fallback.)
+- **The v1.4.0 scenes** are taken in a kept working folder of their own
+  (`~/Plantoir Marketing`, ICS3U and ICS4U). `website/shots/scenes.py` lists
+  the eleven — courses, new-course, schedule-sheet, notification-banner,
+  reference, start-of-year, curriculum-settings, two-maps, both-curricula,
+  how-i-teach, club — with the state each sets up, and every picture is read
+  back with Vision (`ocr.swift`) against `shots.json → expectText`. Two figures
+  are assembled per appearance from parts (`schedule` = the sheet with the
+  notification banner over it; `two-maps` = the two coverage maps side by side).
+  How to run it and what it leaves behind: `website/README.md`, "Regenerating
+  every image".
 - **Class Sites**: Photographed in Safari on a real macOS display so native font
   rasterization, scrollbars, and window chrome are preserved.
 - **Mobile View**: Photographed in the iOS Simulator using RocketSim to render
@@ -197,3 +210,18 @@ Every screenshot on plantoir.app has both a macOS version (Safari / SwiftUI) and
 | `search` | Quartz live search popover | `search-light.png/.webp`<br>`search-dark.png/.webp` | `search-windows-light.png/.webp`<br>`search-windows-dark.png/.webp` |
 | `colour-schemes`| 3 Quartz built-in colour palettes | `colour-schemes.png/.webp` | `colour-schemes-windows.png/.webp` |
 | `light-and-dark`| Split light/dark class page composite | `light-and-dark.png/.webp` | `light-and-dark-windows.png/.webp` |
+
+Added for v1.4.0, macOS only (a Windows visitor sees the mac picture until
+`capture_windows.py` takes an id marked `windows: true`, and the section says
+"On the Mac" while `site.json → availability` says so):
+
+| ID | Subject | Scene(s) |
+|---|---|---|
+| `schedule` | Schedule Deploy sheet with the "published on its own" notification over it | `schedule-sheet`, `notification-banner` |
+| `reference` | Reference Courses in the sidebar, and Copy a Page into ICS4U | `reference` |
+| `start-of-year` | Get Ready for the Start of the Year's plan | `start-of-year` |
+| `two-maps` | The Ontario and College Board coverage maps side by side | `two-maps` |
+| `curriculum-settings` | Course Settings with two curriculum folders ticked | `curriculum-settings` |
+| `both-curricula` | A lesson's curriculum connection quoting both | `both-curricula` |
+| `how-i-teach` | Obsidian on ICS3U's How I Teach page | `how-i-teach` |
+| `club` | The New Course panel making a club | `club` |
