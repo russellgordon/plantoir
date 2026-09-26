@@ -796,6 +796,30 @@ nonisolated enum ActivityTrail {
         /// Mac only, permanently: Windows serves a preview on the PC itself,
         /// with no forward to lose.
         case previewAddressHeldByAnotherAccount = "preview address held by another account"
+        /// Plantoir installed one or more of the website builder's helper
+        /// programs into its tools folder (GitHub #312): which ones, at which
+        /// pinned versions, whether from inside Plantoir or downloaded, why
+        /// (not yet on this Mac, other versions, a damaged copy, or copies
+        /// from before Plantoir kept a record of them), and for a download
+        /// why Plantoir's own copy was not used.
+        ///
+        /// Written by the app, from the line the launchers print
+        /// (`HelperBootstrapReport`), which `ScriptRunner` reads from a run's
+        /// console and `ScheduledDeploy` from the log of a publish launchd
+        /// ran. On the trail because a silent fallback to downloading is the
+        /// failure that reports success: the first run works, only slower.
+        /// Mac only, permanently: Windows carries its runtime and installs no
+        /// helper programs.
+        case helperProgramsInstalled = "helper programs installed"
+        /// The website builder was created on this Mac for the first time
+        /// (GitHub #312): how many seconds it took, and where its starting
+        /// disk came from — inside Plantoir, downloaded, or downloaded
+        /// because starting from Plantoir's copy was refused or failed. Read
+        /// from the launchers' line by `HelperBootstrapReport`, as above. On
+        /// the trail because "the first run took forever" is the report #312
+        /// exists for, and the seconds from the teacher's own Mac are what
+        /// the next decision needs. Mac only, permanently.
+        case websiteBuilderCreated = "website builder created"
 
         /// Whether the teacher was told, with a macOS notification, how a
         /// scheduled publish went (#212) — or why not: notifications turned

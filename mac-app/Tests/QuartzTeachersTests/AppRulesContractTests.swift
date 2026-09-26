@@ -251,7 +251,7 @@ final class AppRulesContractTests: XCTestCase {
     }
 
     /// The test above pins two phrases; this one pins the whole first-run
-    /// block. Everything from `_download() {` to the bare
+    /// block. Everything from the `# >>> FIRST-RUN BLOCK >>>` line to the bare
     /// `ensure_container_runtime` call is what a teacher on a new Mac (or with
     /// a wedged builder) reads in the details: downloading, first start,
     /// waiting, restarting, failing. Until GitHub #263 it named Colima,
@@ -301,13 +301,22 @@ final class AppRulesContractTests: XCTestCase {
         }
     }
 
-    /// The lines from `_download() {` up to and including the line that is
-    /// exactly `ensure_container_runtime`. Empty when either end is missing.
+    /// The lines from `# >>> FIRST-RUN BLOCK >>>` up to and including the line
+    /// that is exactly `ensure_container_runtime`. Empty when either end is
+    /// missing.
+    ///
+    /// It started at `_download() {` until GitHub #312, which left the pinned
+    /// versions — and, since #312, the SHA-256 each download must match —
+    /// above it, where a pin changed in one launcher and not the others was
+    /// caught by nothing. `scripts/test_helper_bootstrap.py` cuts the block
+    /// out from the same line, so there is one extraction, not two.
+    static let firstRunBlockStart: String = "# >>> FIRST-RUN BLOCK >>>"
+
     static func firstRunBlock(in text: String) -> [String] {
         var block: [String] = []
         var inside: Bool = false
         for line in text.components(separatedBy: "\n") {
-            if line.hasPrefix("_download() {") {
+            if line.hasPrefix(firstRunBlockStart) {
                 inside = true
             }
             if inside {
@@ -324,11 +333,20 @@ final class AppRulesContractTests: XCTestCase {
     /// each `_download` call passes (its last quoted argument), which
     /// `_download` prints. `$( … )` substitutions are removed first, because
     /// `$(_colima_cpus)` prints a number, not the word Colima.
+    ///
+    /// One exemption, by name: an `echo` of a `PLANTOIR_` line. Those are the
+    /// machine-readable lines the app reads and keeps out of the console
+    /// (`HelperBootstrapReport.isMarkerLine`, and its siblings for the other
+    /// markers), so a teacher never reads them — and their fields name the
+    /// programs, on purpose, because the trail is support's record (#312).
     static func printedText(of block: [String]) -> [String] {
         var printed: [String] = []
         for line in block {
             let trimmed: String = line.trimmingCharacters(in: .whitespaces)
             var shown: String? = nil
+            if trimmed.hasPrefix("echo \"PLANTOIR_") {
+                continue
+            }
             if trimmed.hasPrefix("echo ") {
                 shown = trimmed
             } else if trimmed.hasPrefix("_download ") {

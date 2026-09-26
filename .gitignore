@@ -40,3 +40,8 @@ windows-app/Vendor/runtime/
 # would be a poor trade.
 TestResults/
 *.dmp
+
+# The website builder's helper programs and starting disk (~470 MB), fetched by
+# mac-app/Vendor/fetch-helpers.sh (GitHub #312), and its staging folders.
+mac-app/Vendor/helpers/
+mac-app/Vendor/.helpers.*/

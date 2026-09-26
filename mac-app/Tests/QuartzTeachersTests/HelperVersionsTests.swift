@@ -305,6 +305,77 @@ final class HelperVersionsTests: XCTestCase {
 
     // MARK: - Functions
 
+    /// Every download is checked against a pinned SHA-256 since GitHub #312,
+    /// and the pins have to exist for BOTH kinds of Mac: with only the
+    /// Apple-silicon ones, every Intel first run would be refused as a
+    /// failed download.
+    func testEveryDownloadHasAChecksumForBothKindsOfMac() throws {
+        let setup: String = try String(contentsOf: HelperVersionsTests.repositoryFile("setup.sh"), encoding: .utf8)
+        for name in ["LIMA", "COLIMA", "DOCKER_CLI", "BUILDX"] {
+            for kind in ["ARM64", "X86_64"] {
+                let pattern: String = "(?m)^" + name + "_SHA256_" + kind + "=\"[0-9a-f]{64}\"$"
+                XCTAssertNotNil(
+                    setup.range(of: pattern, options: .regularExpression),
+                    "setup.sh has no \(name)_SHA256_\(kind): that download could not be checked."
+                )
+            }
+        }
+        XCTAssertNotNil(setup.range(of: "(?m)^VM_IMAGE_SHA512=\"[0-9a-f]{128}\"$", options: .regularExpression))
+    }
+
+    /// `fetch-helpers.sh` reads the pins out of setup.sh rather than keeping
+    /// its own, so the app's copies and the launchers' downloads cannot be
+    /// two different versions.
+    func testFetchingTheAppsCopiesReadsThePinsFromSetup() throws {
+        let fetch: String = try String(
+            contentsOf: HelperVersionsTests.repositoryFile("mac-app/Vendor/fetch-helpers.sh"), encoding: .utf8
+        )
+        for helper in ProblemReportEnvironment.pinnedHelpers {
+            XCTAssertFalse(fetch.contains(helper.pinnedVersion), "fetch-helpers.sh carries its own \(helper.displayName) version")
+            XCTAssertTrue(fetch.contains(helper.setupVariable), "fetch-helpers.sh does not read \(helper.setupVariable)")
+        }
+        XCTAssertNil(fetch.range(of: "[0-9a-f]{64}", options: .regularExpression), "fetch-helpers.sh carries its own checksum")
+    }
+
+    /// An app built after a pin bump but before a re-fetch carries the old
+    /// programs, with a MANIFEST that agrees with them (Trap 1 can do the
+    /// same). The launcher refuses such a copy; this says so at build time,
+    /// for the fetched folder and for the app this suite is running in.
+    func testTheAppsCopiesCarryTheLaunchersPins() throws {
+        let setup: String = try String(contentsOf: HelperVersionsTests.repositoryFile("setup.sh"), encoding: .utf8)
+        var values: [String: String] = [:]
+        for line in setup.components(separatedBy: "\n") {
+            for name in ["COLIMA_VERSION", "LIMA_VERSION", "DOCKER_CLI_VERSION", "BUILDX_VERSION", "VM_IMAGE_SHA512"] {
+                if line.hasPrefix(name + "=\"") && values[name] == nil {
+                    values[name] = line.components(separatedBy: "\"")[1]
+                }
+            }
+        }
+        let pins: String = "pins " + (values["COLIMA_VERSION"] ?? "?") + " " + (values["LIMA_VERSION"] ?? "?")
+            + " " + (values["DOCKER_CLI_VERSION"] ?? "?") + " " + (values["BUILDX_VERSION"] ?? "?")
+            + " " + (values["VM_IMAGE_SHA512"] ?? "?")
+        var manifests: [URL] = [HelperVersionsTests.repositoryFile("mac-app/Vendor/helpers/MANIFEST")]
+        if let carried = HelperPrograms.bundledHelpersDirectory() {
+            manifests.append(carried.appendingPathComponent("MANIFEST"))
+        }
+        for manifest in manifests {
+            guard let text = try? String(contentsOf: manifest, encoding: .utf8) else {
+                continue
+            }
+            XCTAssertTrue(
+                text.components(separatedBy: "\n").contains(pins),
+                "\(manifest.path) carries other versions than setup.sh pins: run ./Vendor/fetch-helpers.sh, then xcodegen generate, then build."
+            )
+        }
+    }
+
+    private static func repositoryFile(_ relative: String) -> URL {
+        return URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent(relative)
+    }
+
     private func stubEnvironment() -> [String: String] {
         return ["PATH": stubFolderURL.path + ":/usr/bin:/bin", "HOME": stubFolderURL.path]
     }

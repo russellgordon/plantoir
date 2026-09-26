@@ -735,6 +735,9 @@ class ScriptRunner {
         // A preview whose address was held by something else on this Mac,
         // or whose look could not be made (#310).
         PreviewAddressHeldReport.noteOnTheTrail(from: text)
+        // The helper programs installed and the website builder created on
+        // a first run, and where each came from (#312).
+        HelperBootstrapReport.noteOnTheTrail(from: text)
         for finding in SiteHealthFinding.findings(in: text) {
             if healthFindings.contains(finding) {
                 continue
@@ -899,6 +902,9 @@ class ScriptRunner {
             return false
         }
         if PreviewAddressHeldReport.isMarkerLine(line) {
+            return false
+        }
+        if HelperBootstrapReport.isMarkerLine(line) {
             return false
         }
         if line.hasSuffix(":") || line.hasSuffix("?") || line.hasSuffix(">") {
