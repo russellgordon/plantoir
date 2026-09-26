@@ -1198,9 +1198,8 @@ was put.
   breaking through a Focus for a publish needs an entitlement and is Russell's
   call, not ours. The question asks for alerts only.
 - **A title of our own.** It would repeat the sentence's course and section.
-- **Click-to-open the section.** Clicking brings Plantoir forward (the system
-  default); selecting THAT section needs the window-finding
-  `revealSectionOnScreen` does and is deferred to a follow-up issue.
+- ~~**Click-to-open the section.**~~ Deferred here, and done by #306 — see
+  "Clicking the notification opens the section (#306)" below.
 
 **Known limits, stated rather than coded for:**
 
@@ -1218,7 +1217,10 @@ was put.
   wrapper, so any record, whoever wrote it, is announced.
 - **The Debug copy and an installed copy share one bundle identifier**, so one
   permission covers both; a click on a notification with the app quit opens
-  whichever copy Launch Services prefers.
+  whichever copy Launch Services prefers. Since #306 that matters more: an
+  installed copy from before #306 has no click handling, so the click only
+  brings it forward. The trail's launch line records the bundle path, which
+  says which copy a click started.
 
 **Windows** matches the rule (the contract's `notification` cases), and the
 delivery is theirs: their run is PowerShell under Task Scheduler with no app
@@ -1226,6 +1228,155 @@ process alive, so a toast must be attributed to Plantoir's own application
 identity, and toasts need no permission question — only the contract's
 `allowed` and `notAllowed` rows apply there. `platformDifferences.owed` carries
 it; GitHub #212 carries the ask.
+
+### Clicking the notification opens the section (#306)
+
+Until #306 a click on the notification from "When nobody is looking" only
+brought Plantoir forward, on whatever it had last shown. A teacher who read
+"ICS3U Section 2 was not published" then had to find the section by hand. Now
+the click shows **that section**. The rule is data, in
+`contracts/shared-rules.json` → `scheduledPublishStopped.notification.onClick`
+(its `rule`, sixteen `cases` and ten `rejected`). What follows is the reasoning
+and the mechanics.
+
+**What the notification carries.** The working folder's path, the course and
+the section, in its `userInfo` (`NotificationClickTarget`, keys `v`,
+`workingFolder`, `course`, `section`; plist strings and an integer only,
+because a value that is not a property-list type makes macOS refuse the whole
+notification). The identifier alone is not enough: its last segment is the
+folder's id since #237, and that id is a hash, so it names no path. The run knows
+the path because its course directory is `<folder>/courses/<CODE>`
+(`ScheduledDeploy.workingFolderURL(forCourseDirectory:)`, the same step
+`folderIDForRun` takes, so the id and the path cannot disagree; a test pins
+it). The path is never shown and never written on the trail. It lives in the
+teacher's own notification database with the notification. A notification
+with no target, or of another `v`, names nothing, and its click only brings
+Plantoir forward.
+
+**Who answers the click.** Only a GUI copy of Plantoir. The run itself is
+Plantoir under `--run-scheduled-deploy`, with no `NSApplication` and no
+notification delegate. `AppDelegate` sets the delegate in
+`applicationWillFinishLaunching`, which is early enough for a click that
+launches the app, and `userNotificationCenter(_:didReceive:)` does one thing:
+it asks `NotificationClickTarget.requested` whether this is a plain click
+(`UNNotificationDefaultActionIdentifier`) on a `scheduled-publish.` identifier,
+and hands the target to `SectionFromNotification.receive`. Both filters live
+in the tested type, not in the delegate.
+
+**The rule, in the order `SectionFromNotification.decide` applies it** (pure,
+and the contract's cases are played against it, then again through the router
+with real folders):
+
+1. The notification names nothing → Plantoir comes forward. One trail line,
+   with no course.
+2. Its working folder is not there any more → Plantoir comes forward. No
+   window is opened and none is pointed anywhere. Nothing is said on screen:
+   the notification already said how the publish went, and a folder gone at
+   launch is #311's sentence.
+3. The app is still opening its first window, or any window is still finding
+   its folder → **wait** (below).
+4. A window is already on that folder → the one nearest the FRONT (not "the
+   key window": when a notification is clicked Plantoir is not the active app,
+   so none of its windows is key; `NSApp.orderedWindows`, then any window not on
+   screen in the order the windows appeared). It is brought forward
+   (deminiaturised if needed) and the section is selected with its course
+   unfolded. A window that is **busy** is skipped: a sheet is attached, or a
+   course is being renamed in place. If every window on the folder is busy, the
+   front one is brought forward with its selection left alone. A selection change
+   moves the keyboard, and a rename field commits whatever was typed when it
+   loses focus (#293).
+5. Else a window with **no folder** (the picker, and not busy) takes the folder,
+   through `reopen(_:occasion:)` with the occasion
+   `.scheduledPublishNotification`. That is #311's one route for a window taking
+   a folder it did not choose, so a folder in the Trash or out of the builder's
+   reach is said on the picker the way a remembered one is. Its trail line is
+   `working folder reopened`, whose `carries` names the occasion.
+6. Else **a new window** opens on the folder. A window on ANOTHER working folder
+   is never pointed elsewhere.
+7. The section is not in the folder (course renamed, section archived) → the
+   window from 4, 5 or 6 is shown with its selection left as it was. It is not
+   guessed at.
+8. Clicking changes nothing else. The record, the band and the sidebar's
+   triangle stay until Dismiss. macOS removing the clicked notification from
+   Notification Center is macOS's own doing.
+
+**Waiting is an event, never a timer.** A click that launches Plantoir can
+arrive before its first window exists, and a restored window takes its folder a
+moment after it appears. Deciding early would either open a second window
+beside the one launch is about to show, or put the section's folder into a
+window about to be given its remembered one. So the router PARKS the click
+while it has seen no window settle (`hasSeenAWindowSettle`) or while any window
+has `hasSettledItsFolder == false`. It decides again inside
+`WindowSettling.windowSettled`, which #311's `WorkspaceModel.settleItsFolder()`
+calls exactly once per window, whichever way the window got its folder. That is
+the invariant any future way of giving a window its folder must keep: end in
+`settleItsFolder()`, or a parked click waits for nothing. A click still parked
+when the app resigns active is dropped (`forgetPendingRequest`), together with
+the folder it set aside for a new window. A newer click replaces an older one
+still waiting.
+
+**The new window never shows the wrong folder first.** Before opening it, the
+router sets `WorkspaceModel.folderForNextNewWindow`, the field #311 added for
+the assistant. `adoptFolderForNewWindow` takes it FIRST, before the launch-time
+claims wait (`WindowStartRule.start` → `.requested`). The window settles on it
+before its first frame, and a settled window never claims a remembered entry
+(#311's one decision per window). So a click's window at launch, with claims
+still open and a remembered window left unclaimed, ends on the section's folder
+and leaves the entry alone (`testTheClicksWindowTakesItsFolderWhileClaimsAreOpen`).
+The field is cleared whenever the click is finished or dropped, so it cannot
+leak into the next ⌘N. The opener is `openWindow(id: "main")`, installed by
+every `WindowRootView` in `onAppear`.
+
+**Per app state:**
+
+| At the click | What happens |
+|---|---|
+| Running, a window on that folder | That window (the front one of several) shows the section. |
+| Running, windows only on other folders | A second window opens on the section's folder; the teacher's window is untouched. |
+| Running, no windows open | A window opens on the folder. |
+| Quit, nothing to reopen (fresh account) | Launch shows one window; it settles on the picker; the click is decided then and the picker takes the folder. |
+| Quit, #311 reopens the SAME folder | The reopened window settles, then shows the section. |
+| Quit, #311 reopens a DIFFERENT folder | That window is left exactly as #311 put it, and a second window opens on the section's folder, in front. Nothing restored is thrown away, and the next launch remembers both. |
+| Folder gone, any state | Only comes forward. With the app quit, launch proceeds as it would from the Dock. |
+
+**The trail.** One line per click on the existing event `scheduled publish
+notification`, with the `COURSE/N · ` prefix whenever the notification named a
+section. The words are the contract's `trailSays`, one per outcome
+(`SectionFromNotification.Outcome`). No new event (rejected: the same
+notification, the same story). **No line at all** after a click means the click
+never reached a copy of Plantoir that handles clicks. The launch line's bundle
+path says which copy was started (see the Debug/installed limit above).
+
+**Measured, and not.** Unit tests play every case through the real settle
+hook, with real working folders on disk, real window models and the real
+`reopen`. One test covers a window path spelled `/var` against the run's
+`/private/var`, compared through `FolderIdentity.isSameFolder`. Another covers
+the content handed to macOS round-tripped through a binary property list. What a
+real click does in each app state was **not** measured here: it needs a real
+notification and a person to click it, and posting one to Russell's account was
+ruled out. These are on Russell's list in the piece's hand-over:
+
+- a click with the app running on the same folder, on another folder, and quit;
+- a click on section 1's notification while section 2's run is still going
+  and the GUI is quit. Launch Services may hand the click to the running run
+  process, which has no delegate and would lose it silently. If it does, the
+  mitigation is a minimal delegate in the run that opens the GUI copy
+  (`NSWorkspace.openApplication`), decided after measuring, not built blind;
+- the #311 restore ordering (a click that launches the app with two windows
+  remembered);
+- that `openWindow` captured from a window that has since closed still opens
+  one (the "no windows open" row). The fallback, if not, is the App-level
+  `@Environment(\.openWindow)`.
+
+**Windows** owes the same rule (every case but the three `appliesOn: ["mac"]`
+waits, which exist because the mac's windows find their folders a moment after
+they appear, while Windows builds its remembered windows synchronously in
+`OnLaunched`). The toast itself (#212's Windows half) comes first. The toast's
+launch arguments carry the path, course and section. A cold start routes in
+`OnLaunched` after the remembered windows exist. An unpackaged app's toast
+activation can start a SECOND process, which must hand its arguments to the
+first. Nothing on that side reads `notification` yet, so `onClick` is unrun
+there, not red.
 
 ### A build that stopped for a question is its own outcome
 
