@@ -134,10 +134,17 @@ enum ScheduledDeploy {
         if let label, let baked = folderID(fromLabel: label) {
             return baked
         }
-        let workingFolderURL: URL = section.courseDirectory
+        let workingFolder: URL = workingFolderURL(forCourseDirectory: section.courseDirectory)
+        return BuildOutputLocation.folderIdentifier(forWorkingFolder: workingFolder.path)
+    }
+
+    /// The working folder a course directory sits in: `<folder>/courses/<CODE>`.
+    /// One step, used by the id above and by the notification a run posts,
+    /// which carries the folder's path so a click can open it (#306).
+    nonisolated static func workingFolderURL(forCourseDirectory courseDirectory: URL) -> URL {
+        return courseDirectory
             .deletingLastPathComponent()   // courses
             .deletingLastPathComponent()   // the working folder
-        return BuildOutputLocation.folderIdentifier(forWorkingFolder: workingFolderURL.path)
     }
 
     /// A course code reduced to what a launchd label may carry. Codes are
@@ -1666,11 +1673,14 @@ enum ScheduledDeploy {
             let courseCode: String? = section?.courseCode
             let sectionNumber: Int? = section?.sectionNumber
             var noticeFolderID: String?
+            var noticeFolderPath: String?
             if let section {
                 noticeFolderID = folderIDForRun(label: label, section: section)
+                noticeFolderPath = workingFolderURL(forCourseDirectory: section.courseDirectory).path
             }
             announceThenLeave(
-                courseCode: courseCode, sectionNumber: sectionNumber, folderID: noticeFolderID
+                courseCode: courseCode, sectionNumber: sectionNumber, folderID: noticeFolderID,
+                workingFolderPath: noticeFolderPath
             ) {
                 if let label {
                     bootOutAgent(label: label)
@@ -1929,11 +1939,14 @@ enum ScheduledDeploy {
 
         let jobLabel: String? = label(fromScriptPath: script)
         var noticeFolderID: String?
+        var noticeFolderPath: String?
         if let section {
             noticeFolderID = folderIDForRun(label: jobLabel, section: section)
+            noticeFolderPath = workingFolderURL(forCourseDirectory: section.courseDirectory).path
         }
         announceThenLeave(
-            courseCode: section?.courseCode, sectionNumber: section?.sectionNumber, folderID: noticeFolderID
+            courseCode: section?.courseCode, sectionNumber: section?.sectionNumber, folderID: noticeFolderID,
+            workingFolderPath: noticeFolderPath
         ) {
             if let jobLabel {
                 bootOutAgent(label: jobLabel)
@@ -1970,19 +1983,22 @@ enum ScheduledDeploy {
     ///
     /// `folderID` is the working folder's id the run's record is filed under
     /// (`folderIDForRun`, #237) — the notification is keyed by it too.
+    /// `workingFolderPath` is that folder's path, which the notification
+    /// carries so a click on it opens the section (#306).
     nonisolated static func announceThenLeave(
         courseCode: String?,
         sectionNumber: Int?,
         folderID: String?,
+        workingFolderPath: String?,
         leave: @escaping @Sendable () -> Never
     ) -> Never {
-        guard let courseCode, let sectionNumber, let folderID else {
+        guard let courseCode, let sectionNumber, let folderID, let workingFolderPath else {
             leave()
         }
         Task { @MainActor in
             await ScheduledPublishNotice.announce(
                 inHomeFolder: RealHome.forFiles, course: courseCode, section: sectionNumber,
-                folderID: folderID
+                folderID: folderID, workingFolderPath: workingFolderPath
             )
             leave()
         }
