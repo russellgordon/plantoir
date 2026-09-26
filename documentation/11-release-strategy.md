@@ -22,7 +22,7 @@ An adversarial architecture review uncovered five potential failure points that 
 5. **Windows ZIP vs. Inno Setup**:
    When teachers download a `.zip`, double-clicking `Plantoir.exe` from inside Windows Explorer's archive view launches the executable from `%TEMP%` without extracting DLLs, causing immediate crashes. A per-user Inno Setup installer (`PrivilegesRequired=lowest`) installs cleanly to `%LOCALAPPDATA%\Programs\Plantoir` with **zero UAC/admin prompts**, adds Start Menu/Desktop shortcuts, and manages clean uninstalls and updates.
 6. **The Netlify / GitHub 404 Race Condition**:
-   Pushing to `main` triggers Netlify to deploy the website in ~20 seconds. If GitHub is still uploading the ~430 MB DMG (80 MB before #312 put the website builder's helpers in it) or 60 MB Windows installer, teachers clicking "Download" will get a 404 error. The workflow must upload assets to a **GitHub Draft Release first**, publish the draft, and only *then* update and deploy the website.
+   Pushing to `main` triggers Netlify to deploy the website in ~20 seconds. If GitHub is still uploading the ~410 MB DMG (80 MB before #312 put the website builder's helpers in it) or 60 MB Windows installer, teachers clicking "Download" will get a 404 error. The workflow must upload assets to a **GitHub Draft Release first**, publish the draft, and only *then* update and deploy the website.
 
 ---
 
@@ -59,7 +59,7 @@ The automated script executes the following sequence:
    - Signs each helper program in `Contents/Resources/helpers` the same way, limactl with its own entitlements (`release/limactl.entitlements`: virtualization, network client and server), then writes the helpers' `MANIFEST` again from the signed bytes (`mac-app/release/sign-helpers.sh`, #312).
    - Signs `Plantoir.app` with Developer ID + `--timestamp` + `--options runtime` + entitlements.
    - Refuses unless every updater item, every helper program and the app are on the app's own team with the hardened runtime, limactl carries the virtualization entitlement and the helpers' `MANIFEST` matches (`mac-app/release/check-signatures.sh`) — `codesign --verify --deep --strict` cannot see a helper left ad-hoc.
-5. Creates APFS-formatted `dist/Plantoir-macOS.dmg` with `/Applications` symlink, then recompresses it with LZMA (`hdiutil convert -format ULMO`, #312: ~432 MB rather than ~466 MB) BEFORE signing it, because converting drops a signature.
+5. Creates APFS-formatted `dist/Plantoir-macOS.dmg` with `/Applications` symlink, then recompresses it with LZMA (`hdiutil convert -format ULMO`, #312: 410 MB at the rehearsal; zlib was ~466 MB on an earlier app) BEFORE signing it, because converting drops a signature.
 6. Signs `dist/Plantoir-macOS.dmg` with Developer ID.
 7. Submits DMG to Apple Notarization (`xcrun notarytool submit ... --wait`).
 8. Staples the notarization ticket (`xcrun stapler staple dist/Plantoir-macOS.dmg`).

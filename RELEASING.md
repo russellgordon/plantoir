@@ -143,7 +143,7 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    a bundle whose updater is not on the app's own team, before notarization.
    Since #312 it also fetches and signs the website builder's helper programs
    (Vendor/fetch-helpers.sh, release/sign-helpers.sh), and the DMG is about
-   **430 MB** (ULMO) rather than 59 MB — the notarization upload takes
+   **410 MB** (ULMO; 410,488,446 bytes at the #312 rehearsal) rather than 59 MB — the notarization upload takes
    correspondingly longer ("The update feed (macOS)" → "Deltas" for why
    updates stay small).
 5. **Tell Claude "cut the release."** It drafts teacher-friendly notes, adds the
@@ -335,11 +335,13 @@ the release side.
 - **Deltas, since #312 — which REVERSED #204's decision.** #204 rejected
   deltas (`--maximum-deltas 0`) "to save part of a ~59 MB download once a
   release"; since #312 the DMG carries the website builder's helper programs
-  and starting disk and is ~430 MB, so without deltas every update would be a
-  430 MB download, which defeats the reason the payload was allowed into the
+  and starting disk and is ~410 MB, so without deltas every update would be a
+  410 MB download, which defeats the reason the payload was allowed into the
   app at all (Russell's decision on #312 relies on it). Measured with Sparkle
-  2.9.6's `BinaryDelta`: a Swift-only change is a **~3.7 MB** delta with or
-  without the 467 MB payload inside both apps (3,658,602 B without, 3,658,626
+  2.9.6's `BinaryDelta`: between the two signed #312 rehearsal builds (one
+  Swift string apart, every helper re-signed) the delta was **106,054 bytes**,
+  and applied, gave build 2 byte for byte; between v1.3.1 and #204's
+  rehearsal build it was ~3.7 MB with or without the 467 MB payload inside both apps (3,658,602 B without, 3,658,626
   B with; 3,733,870 B with the four programs' signatures changed). So
   `update_feed.py` now asks for deltas from the **three newest builds in the
   feed** — not the newest three tags: releases before Sparkle and Windows-only
@@ -347,7 +349,7 @@ the release side.
   delta. What that costs at the cut:
   - **Each earlier DMG is downloaded** from the address its own feed item
     gives — the exact bytes teachers installed, so no copy needs keeping — and
-    checked for length and build: up to 3 × ~430 MB, plus
+    checked for length and build: up to 3 × ~410 MB, plus
     `~/Library/Caches/Sparkle_generate_appcast`, which can grow to a few GB and
     may be emptied afterwards.
   - **Each `.delta` lands beside the DMG** (`mac-app/dist/Plantoir<new>-<old>.delta`)

@@ -26,7 +26,7 @@ What it does, in order — and what it refuses:
    warning is marked critical from every version (no Skip, no Remind Me
    Later); otherwise the newest earlier release that had one stays critical
    for teachers below it.
-   Since #312 the app carries the website builder's helpers and a ~450 MB
+   Since #312 the app carries the website builder's helpers and a ~410 MB
    DMG, so the new item carries DELTAS from the three newest builds already
    in the feed (`--maximum-deltas 3`): their DMGs are fetched from the
    addresses the feed itself gives — the exact bytes teachers installed, so
@@ -39,7 +39,7 @@ What it does, in order — and what it refuses:
    to the one that was there, or the cut is refused. The
    `.delta` files are written beside the DMG, to be uploaded to the same
    release (their addresses use the same prefix). A Swift-only release's
-   delta measured 3.7 MB against a 466 MB DMG.
+   delta measured 106 KB between two signed builds of a 410 MB DMG.
 4. Verifies the result with `sign_update --verify` and checks the new item's
    download address and length, then copies feed and notes into
    `website/updates/`. `website/build.py` copies the feed into `site/` byte for
@@ -78,7 +78,7 @@ DOWNLOADS = "https://github.com/russellgordon/plantoir/releases/download/"
 ASSET = "Plantoir-macOS.dmg"
 REHEARSAL_ASSET = "Plantoir-macOS-REHEARSAL.dmg"
 # How many earlier builds the new item carries a delta from (#312). Each costs
-# one earlier DMG downloaded at the cut (~450 MB) and a few MB uploaded.
+# one earlier DMG downloaded at the cut (~410 MB) and a few MB uploaded.
 MAXIMUM_DELTAS = 3
 SPARKLE_NS = "http://www.andymatuschak.org/xml-namespaces/sparkle"
 STYLE_LINE = ("<style>div.sparkle-installed-version, div.sparkle-installed-version ~ div "

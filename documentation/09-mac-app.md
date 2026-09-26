@@ -5279,9 +5279,14 @@ launcher said 600): 135 MB of programs, the 332 MB disk, ~390 MB building the
 website builder. Now only the build is downloaded. The disk-seeded start of
 the virtual machine takes 22–27 s. Estimated for an 8 GB M1 at 25 Mbit/s:
 about 4.5 minutes rather than 7; at 10 Mbit/s about 7.5 rather than 14. The
-app bundle grows from ~125 MB to ~600 MB; the DMG from 58.8 MB to 466 MB with
-create-dmg's zlib, **432 MB with LZMA (ULMO)**, which publish.sh now uses
-(101 s to make rather than 29; macOS 15 reads it).
+app bundle grows from ~125 MB to ~600 MB (599 MB signed); the DMG from 58.8 MB
+to **410,488,446 bytes** with LZMA (ULMO), which publish.sh now uses — the
+planner measured 466 MB with zlib and 432 MB with LZMA on an earlier app, and
+converting took 29 s at the rehearsal; macOS 15, the minimum, reads it. At the
+#312 rehearsal (two `-Sign` builds, 2026-09-26): upload to the notary about
+35 s each, **accepted after 625 s and 203 s** from submission, no issues in the
+notary log (nothing about `vm/*.raw.gz` or the Linux guest agent), stapled,
+and `spctl` accepted it; the whole `publish.sh -Sign` run took 783 s and 359 s.
 
 **Why Apple silicon only.** A universal payload would add ~135 MB of Intel
 programs and the 358 MB Intel disk to every Apple-silicon teacher's download.
@@ -5329,8 +5334,13 @@ launchers copy OUT and strip quarantine from the copies only, and
 `scripts/test_helper_bootstrap.py` checks the app's copy is unchanged after
 every case.
 
-**Updates stay small.** Measured with Sparkle 2.9.6's `BinaryDelta` between
-two real signed apps: 3,658,602 bytes without the payload, 3,658,626 with an
+**Updates stay small.** At the #312 rehearsal, Sparkle 2.9.6's `BinaryDelta`
+between the two signed, notarized rehearsal builds (one Swift string apart,
+every helper program signed again, so all four differ in bytes) made a
+**106,054-byte** delta in 6 s; applied to a copy of build 1 in 4 s, the result
+was byte-identical to build 2, verified `--deep --strict` and was accepted by
+`spctl` as Notarized Developer ID. The planner's earlier measurement between
+two real signed apps further apart: 3,658,602 bytes without the payload, 3,658,626 with an
 identical payload in both, 3,733,870 with the four programs' signatures
 changed. A version bump of one program costs roughly that file's binary
 difference; a new disk (rare: colima-core ships one with Colima releases)
@@ -5339,7 +5349,7 @@ from the three newest builds in the feed — reversing #204's decision, see
 "Updating itself" below.
 
 **What a teacher who already has Plantoir gains: nothing on the first run,**
-which they have had. They pay ~430 MB once, for v1.4.0, by hand (it is the
+which they have had. They pay ~410 MB once, for v1.4.0, by hand (it is the
 first release with the updater); at their next start of the website builder
 the app's signed copies replace the downloaded ones ("replacing copies set up
 before Plantoir kept a record of them" on the trail) and the existing virtual
@@ -5727,9 +5737,9 @@ by #204 and turned on by #312**, and the reversal is the point of the note: the
 rejection (each is another asset on the GitHub release under a name that would
 have to stay stable, to save part of a ~59 MB download once a release) was
 sound for a 59 MB DMG. Since #312 the DMG carries the website builder's helper
-programs and starting disk and is ~430 MB, and a Swift-only update measured
-~3.7 MB as a delta with or without that payload — so every update without
-deltas would be a 430 MB download. How they are made, and the rewrite of
+programs and starting disk and is ~410 MB, and a Swift-only update measured
+106 KB as a delta between the two signed rehearsal builds with or without that payload — so every update without
+deltas would be a 410 MB download. How they are made, and the rewrite of
 earlier items `generate_appcast` does that `update_feed.py` has to undo, is in
 "What the app carries for the website builder (#312)" below and in
 `RELEASING.md` → "The update feed (macOS)". Still rejected: generating the feed

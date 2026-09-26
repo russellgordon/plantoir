@@ -1097,10 +1097,10 @@ Windows figures are the v1.1.0 release assets.
 
 | | macOS v1.3.1 | macOS after #312 | Windows (v1.1.0, latest with an installer) |
 |---|---|---|---|
-| Installer | DMG 58.8 MB | DMG ~432 MB (LZMA; 466 MB zlib) | PlantoirSetup.exe 235 MB; zip 398 MB |
+| Installer | DMG 58.8 MB | DMG ~410 MB (LZMA; 410,488,446 B at the rehearsal) | PlantoirSetup.exe 235 MB; zip 398 MB |
 | Carried inside | app, llama.cpp (25 MB), the build recipe | + Colima, Lima, Docker CLI, buildx, the Ubuntu disk (Apple silicon) | app, llama.cpp, `plantoir-mcp.exe`, the native runtime (Node 20, Python 3.11 and packages, patched Quartz and its node_modules, wrangler, the emoji font) |
 | Downloaded on a first run, for building | ~857 MB | ~390 MB (the website builder's image build) | none |
-| Update delivery | download the DMG by hand | Sparkle, a ~3.7 MB delta for a Swift-only release from the release after v1.4.0 | installer by hand |
+| Update delivery | download the DMG by hand | Sparkle, a delta of 0.1–3.7 MB for a Swift-only release (measured) from the release after v1.4.0 | installer by hand |
 | Downloads checked against a pinned SHA-256 | none | every helper, both kinds of Mac, and the disk | none in `fetch-runtime.ps1` (a build-time fetch, not on a teacher's machine) |
 
 1. **The mac installer is now almost twice Windows'**, because the mac still
