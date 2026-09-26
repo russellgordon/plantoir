@@ -52,7 +52,7 @@
     "why": "The home page's 'New this year' list. --deploy warns when this version is not the major.minor of 'version', so a 1.5 release is reminded to rewrite it; a 1.4.x is not.",
     "items": [
       {
-        "text": "A ready-made course for {{ready_made_ontario}} Ontario courses, and a starting outline for about {{skeleton_codes}} more.",
+        "text": "Ready-made courses for {{ready_made_ontario}} Ontario courses now, and a starting outline for about {{skeleton_codes}} more.",
         "href": "features/#ready-made"
       },
       {

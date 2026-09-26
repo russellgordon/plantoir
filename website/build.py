@@ -443,6 +443,8 @@ def readable_text(body: str) -> str:
     text = blank_out(text, r"<code>.*?</code>", re.DOTALL)
     text = blank_out(text, r"\{\{[^}]*\}\}")
     text = blank_out(text, r"<[^>]+>")
+    # A year or a school year ("2025–26") is a date, not a count.
+    text = blank_out(text, r"\b(?:19|20)\d\d(?:[–-]\d\d)?\b")
     return text
 
 
@@ -574,6 +576,27 @@ def new_in_html(site: dict, counts: dict) -> str:
     return f'<ul class="plain new-in">\n{joined}\n  </ul>'
 
 
+def broken_fragment_problems(rendered: dict[str, str]) -> list[str]:
+    """A link to `page/#section` whose page has no `id="section"`.
+
+    A new-in item or a cross-reference pointing at a section that was renamed
+    or never landed goes to the top of the page with nothing said.
+    """
+    ids: dict[str, set] = {}
+    for slug, html in rendered.items():
+        ids[slug] = set(re.findall(r'\sid="([^"]+)"', html))
+    problems: list[str] = []
+    link = re.compile(r'href="(?:\./|\.\./)?(?:([a-z0-9-]+)/)?#([^"]+)"')
+    for slug, html in rendered.items():
+        for match in link.finditer(html):
+            target = match.group(1) or slug
+            if target == "" or target not in ids:
+                continue
+            if match.group(2) not in ids[target]:
+                problems.append(f"{slug}.html links to {target}/#{match.group(2)}, which is not on that page")
+    return problems
+
+
 def version_tuple(text: str) -> tuple:
     parts: list[int] = []
     for piece in str(text).split("."):
@@ -661,11 +684,20 @@ def build(check_only: bool) -> int:
     }
     site_values.update(counts)
 
+    # Alt text and captions are read too (a screen reader reads alt aloud).
+    for shot in shot_list:
+        for key in ("alt", "caption"):
+            words = [shot.get(key, ""), shot.get("retake", {}).get(key, "")]
+            for text in words:
+                if text:
+                    problems.extend(typed_count_problems(f"shots.json {shot['id']} {key}", text))
+                    problems.extend(machinery_problems(f"shots.json {shot['id']} {key}", text))
     for index, item in enumerate(site.get("new_in", {}).get("items", [])):
         problems.extend(typed_count_problems(f"site.json new_in item {index + 1}", item["text"]))
         problems.extend(machinery_problems(f"site.json new_in item {index + 1}", item["text"]))
 
     written: list[Path] = []
+    rendered: dict[str, str] = {}
     for page in pages:
         # How far this page sits below the site root. Every reference is
         # written relative to it — stylesheet, images, icon, navigation — so
@@ -706,6 +738,7 @@ def build(check_only: bool) -> int:
         if leftover:
             problems.append(f"{page['slug']}.html left placeholders unfilled: {', '.join(sorted(set(leftover)))}")
 
+        rendered[page["slug"]] = html
         destination = output_path(page["slug"])
         if not check_only:
             destination.parent.mkdir(parents=True, exist_ok=True)
@@ -724,6 +757,8 @@ def build(check_only: bool) -> int:
             problems.append(problem)
     if not check_only:
         update_feeds.copy_feeds(feed_source, OUTPUT / "updates")
+
+    problems.extend(broken_fragment_problems(rendered))
 
     if not check_only:
         assets = OUTPUT / "assets"

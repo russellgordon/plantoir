@@ -289,10 +289,16 @@ product change for a marketing script), and the kept folder.
 
 **Until the release it photographs exists**, a new shot is marked
 `awaiting_capture` in `shots.json`: `build.py` renders nothing where it goes
-(the page still reads well) and lists it on every build, so the site stays
-publishable. The capture that takes it removes the flag. Retaken shots carry
-their new alt text and caption under `retake` until then, so the words never
-describe a picture that is not there yet.
+and lists it on every build, so `--check` passes and the pages can be
+reviewed. **`--deploy` refuses** while any such shot has no image, and while
+`site.json → new_in.version` is ahead of `version` (pages describing a release
+nobody can download yet). Retaken shots carry their new alt text and caption
+under `retake`. Pictures are checked in a staging folder and only those that
+pass are promoted; a shot taken in both appearances then loses
+`awaiting_capture`, and a retake's words are promoted with its picture
+(`capture.py → promote_captured_shots`), so the words never describe a
+picture that is not there. `--check` also reports a link to `page/#section`
+whose section does not exist.
 
 ## What the pages read from data
 
