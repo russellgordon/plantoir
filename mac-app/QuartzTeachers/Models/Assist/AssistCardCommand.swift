@@ -1713,6 +1713,8 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     /// time of day. A contract that carried only the literals would say the
     /// assistant understands eleven sentences when it understands those plus
     /// nine families (#167 made it nine), and Windows would build eleven.
+    /// The nine are declared in ten entries since #150, the make-room family
+    /// twice (its count form and its article form).
     ///
     /// One example and one near-miss is not enough to describe a family whose
     /// variable part is a TIME, because the spellings a teacher uses are the
@@ -1765,6 +1767,29 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
                               + "carelessly rather than one of these shapes — and this tool renames "
                               + "pages the teacher's links point at. Guessing which half they meant is "
                               + "exactly what a fixed shape exists to avoid."
+            ),
+            // The same family as the entry above, declared a second time for
+            // its ARTICLE form (#150). The matcher has always taken "a" as a
+            // count of one; the contract never said so, so Windows could not
+            // know it was expected and shipped without it — on the sentence
+            // #70 and the tool's own TEACHERS SAY clause both use as their
+            // example. A form this app accepts and does not DECLARE is
+            // invisible to the other one. Listed as its own entry rather than
+            // by changing the example above, so the entry Windows already
+            // implements stays byte-for-byte what it was.
+            ParsedShape(
+                shape: "make room for a class at unit <unit>, day <day>",
+                tool: "make_room_for_classes",
+                fills: [
+                    "unit": "<unit>", "atDay": "<day>",
+                    "howMany": "1 — the article is a count of one",
+                ],
+                example: "make room for a class at Unit 3, Day 4",
+                notThis: "make room for a classes at Unit 3, Day 4",
+                becauseNotThis: "The article is singular and the noun is plural, which is the same "
+                              + "disagreement as “two class” — and this tool renames pages the teacher's "
+                              + "links point at, so guessing which half they meant is what a fixed "
+                              + "shape exists to avoid."
             ),
             ParsedShape(
                 shape: "publish unit <number>",
