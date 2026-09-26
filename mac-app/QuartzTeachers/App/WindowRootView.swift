@@ -50,11 +50,11 @@ struct WindowRootView: View {
                 // Success only: on a mismatch the polling keeps running,
                 // so this window cannot give up early and order-claim an
                 // entry that rightly belongs to a sibling's frame.
-                if workspace.hasSettledItsFolder {
-                    return
-                }
                 if let window = workspace.window,
-                   let entry = claimant.frameDidSettle(NSStringFromRect(window.frame)) {
+                   let entry = claimant.frameDidSettle(
+                       NSStringFromRect(window.frame),
+                       windowHasSettled: workspace.hasSettledItsFolder
+                   ) {
                     adopt(entry, how: "matched at restoration-complete")
                 }
             }
@@ -114,10 +114,16 @@ struct WindowRootView: View {
     /// second decision, putting a window whose folder had gone onto a
     /// sibling's folder and wiping the sentence that said why.
     func attemptClaim(for window: NSWindow, attemptsLeft: Int) {
+        // The claimant refuses for a settled window and marks itself done,
+        // so the give-up below is never reached for one either.
         if workspace.hasSettledItsFolder {
+            _ = claimant.giveUp(windowHasSettled: true)
             return
         }
-        if let entry = claimant.frameDidSettle(NSStringFromRect(window.frame)) {
+        if let entry = claimant.frameDidSettle(
+            NSStringFromRect(window.frame),
+            windowHasSettled: workspace.hasSettledItsFolder
+        ) {
             adopt(entry, how: "matched by frame")
             return
         }
@@ -126,7 +132,7 @@ struct WindowRootView: View {
         // (or its picker) right away rather than a second later.
         let claimsHaveClosed: Bool = Date() > WindowFolderMemory.claimsOpenUntil
         if attemptsLeft <= 0 || claimsHaveClosed {
-            if let entry = claimant.giveUp() {
+            if let entry = claimant.giveUp(windowHasSettled: workspace.hasSettledItsFolder) {
                 adopt(entry, how: "fell back to order")
             } else {
                 // No remembered window for this one: macOS brought back a

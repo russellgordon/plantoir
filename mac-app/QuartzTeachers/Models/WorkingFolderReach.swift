@@ -124,11 +124,11 @@ nonisolated enum WorkingFolderReach {
         // cannot be asked its spelling, so the answer would be about the
         // TEXT (`/var/…` rather than `/private/var/…`), and a missing folder
         // has its own sentence on the reopening route.
-        if !FileManager.default.fileExists(atPath: url.path) {
+        if RememberedFolder.presence(atPath: url.path) == .missing {
             return nil
         }
-        let canonicalHome: String = FolderIdentity.canonicalPath(homeFolder.path)
-        let canonicalFolder: String = FolderIdentity.canonicalPath(url.path)
+        let canonicalHome: String = WorkingFolderReach.diskSpelling(homeFolder.path)
+        let canonicalFolder: String = WorkingFolderReach.diskSpelling(url.path)
         if !isInside(canonicalFolderPath: canonicalFolder, canonicalHomePath: canonicalHome) {
             return Refusal(folderPath: url.path, folderName: url.lastPathComponent, whichPath: .workingFolder)
         }
@@ -143,11 +143,37 @@ nonisolated enum WorkingFolderReach {
         if !destination.hasPrefix("/") {
             target = url.appendingPathComponent(destination).path
         }
-        let canonicalCourses: String = FolderIdentity.canonicalPath(target)
+        // `..` taken away by its text: a link that climbs out of the home
+        // folder to a drive that is not plugged in cannot be asked of the
+        // disk, and its raw text keeps the `..` names that would otherwise
+        // compare as inside.
+        target = (target as NSString).standardizingPath
+        let canonicalCourses: String = WorkingFolderReach.diskSpelling(target)
         if !isInside(canonicalFolderPath: canonicalCourses, canonicalHomePath: canonicalHome) {
             return Refusal(folderPath: url.path, folderName: url.lastPathComponent, whichPath: .coursesFolder)
         }
         return nil
+    }
+
+    /// The disk's spelling of a path, even when the path itself cannot be
+    /// opened (gone, dangling, or behind a denied permission): the nearest
+    /// folder above it that CAN be opened is asked, and the rest of the
+    /// names are put back on. `FolderIdentity.canonicalPath` alone falls back
+    /// to the TEXT, and `/var/…` as text is outside a home of
+    /// `/private/var/…` — a false verdict made of spelling, not of place.
+    static func diskSpelling(_ path: String) -> String {
+        let standardized: String = (path as NSString).standardizingPath
+        let descriptor: Int32 = open(standardized, O_EVTONLY | O_NONBLOCK)
+        if descriptor >= 0 {
+            close(descriptor)
+            return FolderIdentity.canonicalPath(standardized)
+        }
+        let parent: String = (standardized as NSString).deletingLastPathComponent
+        if parent == standardized || parent.isEmpty {
+            return standardized
+        }
+        let name: String = (standardized as NSString).lastPathComponent
+        return (WorkingFolderReach.diskSpelling(parent) as NSString).appendingPathComponent(name)
     }
 
     /// Where a link points, or nil when the path is not a link.

@@ -25,7 +25,11 @@ nonisolated struct RememberedFolder: Equatable, Sendable {
         case gone
         case inTrash
         case driveNotConnected
+        /// The folder's own permissions do not let this account read it.
         case unreadable
+        /// macOS's privacy settings do not let Plantoir into it (a folder
+        /// macOS protects — Desktop, Documents, a removable drive).
+        case privacyDenied
         case outsideHome
         case coursesOutsideHome
     }
@@ -37,11 +41,32 @@ nonisolated struct RememberedFolder: Equatable, Sendable {
         var resolvedPath: String
         /// The remembered path, as it was written down.
         var rememberedPath: String
+        /// False only when the disk says there is nothing there (or not a
+        /// folder) — NOT when it refused to say. A folder behind a denied
+        /// permission exists, and calling it gone would send the teacher
+        /// looking for a folder that never moved.
         var existsAsDirectory: Bool
         var isInsideTrash: Bool
         var volumeIsMissing: Bool
-        var isReadable: Bool
+        /// Why the folder could not be looked at or read, if it could not.
+        var denial: Denial?
         var reachRefusal: WorkingFolderReach.WhichPath?
+    }
+
+    /// The two kinds of "not allowed", told apart by the error the disk
+    /// gives, because they have different fixes.
+    enum Denial: Equatable, Sendable {
+        /// EACCES: the folder's (or a parent's) permissions.
+        case permissions
+        /// EPERM: macOS's privacy settings (Files & Folders).
+        case privacy
+    }
+
+    /// What the disk said when asked about a path.
+    enum Presence: Equatable, Sendable {
+        case folder
+        case missing
+        case denied(Denial)
     }
 
     /// What to do with it.
@@ -108,12 +133,25 @@ nonisolated struct RememberedFolder: Equatable, Sendable {
         // alone, without touching anything under it.
         let volumeIsMissing: Bool = RememberedFolder.volumeIsMissing(for: resolvedPath)
         var exists: Bool = false
-        var readable: Bool = false
+        var denial: Denial?
         var reach: WorkingFolderReach.WhichPath?
         if !volumeIsMissing {
-            exists = RememberedFolder.isDirectory(atPath: resolvedPath)
+            switch RememberedFolder.presence(atPath: resolvedPath) {
+            case .missing:
+                exists = false
+            case .denied(let kind):
+                exists = true
+                denial = kind
+            case .folder:
+                exists = true
+                denial = RememberedFolder.readDenial(atPath: resolvedPath)
+            }
             if exists {
-                readable = (try? FileManager.default.contentsOfDirectory(atPath: resolvedPath)) != nil
+                // Asked whether or not the folder can be read: the reach
+                // needs only the folder's name from the disk (O_EVTONLY, or
+                // the nearest folder above it), and a folder out of reach
+                // should say so FIRST — fixing a permission only to be
+                // refused next launch is going round twice.
                 if let refusal = WorkingFolderReach.refusal(forFolder: URL(fileURLWithPath: resolvedPath)) {
                     reach = refusal.whichPath
                 }
@@ -125,15 +163,16 @@ nonisolated struct RememberedFolder: Equatable, Sendable {
             existsAsDirectory: exists,
             isInsideTrash: inTrash,
             volumeIsMissing: volumeIsMissing,
-            isReadable: readable,
+            denial: denial,
             reachRefusal: reach
         )
     }
 
     /// The decision, in this order: the Trash first (a trashed folder
     /// EXISTS, so asking existence first would reopen it), then a drive that
-    /// is not connected, then gone, then unreadable, then out of the
-    /// builder's reach — and otherwise, reopen.
+    /// is not connected, then gone, then out of the builder's reach, then
+    /// not allowed in (privacy settings, or the folder's own permissions) —
+    /// and otherwise, reopen.
     static func decide(_ facts: Facts) -> Outcome {
         let folderName: String = URL(fileURLWithPath: facts.rememberedPath).lastPathComponent
         if facts.isInsideTrash {
@@ -145,15 +184,20 @@ nonisolated struct RememberedFolder: Equatable, Sendable {
         if !facts.existsAsDirectory {
             return .cannotReopen(.gone, folderName: folderName, path: facts.resolvedPath)
         }
-        if !facts.isReadable {
-            return .cannotReopen(.unreadable, folderName: folderName, path: facts.resolvedPath)
-        }
         if let which = facts.reachRefusal {
             switch which {
             case .workingFolder:
                 return .cannotReopen(.outsideHome, folderName: folderName, path: facts.resolvedPath)
             case .coursesFolder:
                 return .cannotReopen(.coursesOutsideHome, folderName: folderName, path: facts.resolvedPath)
+            }
+        }
+        if let denial = facts.denial {
+            switch denial {
+            case .privacy:
+                return .cannotReopen(.privacyDenied, folderName: folderName, path: facts.resolvedPath)
+            case .permissions:
+                return .cannotReopen(.unreadable, folderName: folderName, path: facts.resolvedPath)
             }
         }
         var movedFrom: String?
@@ -170,9 +214,9 @@ nonisolated struct RememberedFolder: Equatable, Sendable {
     /// and the `/System/Volumes/Data` spelling do not matter.
     static func isInTrash(_ path: String, trashRoots: [String]?) -> Bool {
         if let trashRoots {
-            let canonicalPath: String = FolderIdentity.canonicalPath(path)
+            let canonicalPath: String = WorkingFolderReach.diskSpelling(path)
             for root in trashRoots {
-                if WorkingFolderReach.isInside(canonicalFolderPath: canonicalPath, canonicalHomePath: FolderIdentity.canonicalPath(root)) {
+                if WorkingFolderReach.isInside(canonicalFolderPath: canonicalPath, canonicalHomePath: WorkingFolderReach.diskSpelling(root)) {
                     return true
                 }
             }
@@ -184,6 +228,50 @@ nonisolated struct RememberedFolder: Equatable, Sendable {
             }
         }
         return false
+    }
+
+    /// What `stat` says about a path, by its error rather than a yes/no:
+    /// `fileExists` answers false for "there is nothing" and for "you may
+    /// not look" alike.
+    static func presence(atPath path: String) -> Presence {
+        var information: stat = stat()
+        if stat(path, &information) == 0 {
+            if (information.st_mode & S_IFMT) == S_IFDIR {
+                return .folder
+            }
+            return .missing
+        }
+        return RememberedFolder.presence(forErrno: errno)
+    }
+
+    /// The pure half: which error means what.
+    static func presence(forErrno code: Int32) -> Presence {
+        if code == EPERM {
+            return .denied(.privacy)
+        }
+        if code == EACCES {
+            return .denied(.permissions)
+        }
+        return .missing
+    }
+
+    /// Whether a folder that is there can be listed, and if not, which kind
+    /// of refusal it was.
+    static func readDenial(atPath path: String) -> Denial? {
+        do {
+            _ = try FileManager.default.contentsOfDirectory(atPath: path)
+            return nil
+        } catch {
+            let cocoa: NSError = error as NSError
+            var code: Int32 = EACCES
+            if let underlying = cocoa.userInfo[NSUnderlyingErrorKey] as? NSError, underlying.domain == NSPOSIXErrorDomain {
+                code = Int32(underlying.code)
+            }
+            if code == EPERM {
+                return .privacy
+            }
+            return .permissions
+        }
     }
 
     /// True when a folder is there (not a file).
@@ -227,11 +315,19 @@ nonisolated enum ReopenWording {
         return "“\(folderName)”, the working folder you had open last time, is on a drive that isn’t connected — connect it and open Plantoir again, or choose another folder."
     }
 
-    /// Points at the setting, because that is the fix that lasts: a folder
-    /// macOS protects (Desktop, Documents, a removable drive) that Plantoir
-    /// was not allowed into. Choosing it again in the picker is offered too.
+    /// The folder's own permissions: no System Settings in it, because no
+    /// setting there changes them. "Sharing & Permissions" is the section of
+    /// Finder's Get Info window where they are.
     static func unreadable(folderName: String) -> String {
-        return "Plantoir isn’t allowed to open “\(folderName)”, the working folder you had open last time — turn Plantoir on in System Settings ▸ Privacy & Security ▸ Files and Folders, or choose the folder again."
+        return "“\(folderName)”, the working folder you had open last time, can’t be opened because its permissions don’t let you read it — check Sharing & Permissions in Finder’s Get Info, or choose another folder."
+    }
+
+    /// macOS's privacy settings. The pane's name is Apple's own, read from
+    /// System Settings' strings on macOS 26.6 (`FILE_ACCESS_COMBINED` =
+    /// "Files & Folders", the extension's display name "Privacy & Security"),
+    /// not written from memory — a teacher searches for the words given.
+    static func privacyDenied(folderName: String) -> String {
+        return "Plantoir isn’t allowed to open “\(folderName)”, the working folder you had open last time — turn Plantoir on in System Settings ▸ Privacy & Security ▸ Files & Folders, or choose the folder again."
     }
 
     static func outsideHome(folderName: String) -> String {
@@ -252,6 +348,8 @@ nonisolated enum ReopenWording {
             return driveNotConnected(folderName: folderName)
         case .unreadable:
             return unreadable(folderName: folderName)
+        case .privacyDenied:
+            return privacyDenied(folderName: folderName)
         case .outsideHome:
             return outsideHome(folderName: folderName)
         case .coursesOutsideHome:

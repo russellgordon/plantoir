@@ -112,15 +112,17 @@ final class ReopeningTheLastWorkingFolderTests: XCTestCase {
     // MARK: - The contract: folders
 
     /// Every folder case, on a real throwaway folder, through the reopen
-    /// decision the windows use. The Trash is an injected root, never the
-    /// real one; the home folder is a throwaway `home/`.
+    /// decision the windows use. The Trash is a real folder named `.Trash`
+    /// inside a throwaway `home/` — the rule that SHIPS (a `.Trash` along the
+    /// path), never the account's own Trash and never an injected location,
+    /// so renaming the literal in `isInTrash` fails here.
     @MainActor
     func testEveryFolderCaseIsDecidedAsTheContractSays() throws {
         let cases: [[String: Any]] = try XCTUnwrap(ReopeningTheLastWorkingFolderTests.section()["folderCases"] as? [[String: Any]])
         XCTAssertGreaterThanOrEqual(cases.count, 11)
         let home: URL = try makeFolder("home")
         let outside: URL = try makeFolder("outside")
-        let trash: URL = try makeFolder("home/.FakeTrash")
+        let trash: URL = try makeFolder("home/.Trash")
         WorkingFolderReach.homeFolderOverride = home
         var played: Int = 0
         for folderCase in cases {
@@ -164,6 +166,27 @@ final class ReopeningTheLastWorkingFolderTests: XCTestCase {
                 let url: URL = try makeWorkingFolder("home/\(slug)")
                 remembered = RememberedFolder.make(for: url)
                 try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: url.path)
+            case "privacyDenied":
+                // macOS cannot be made to deny in a test: the decision is
+                // played with the denial the disk would report (EPERM).
+                let outcome: RememberedFolder.Outcome = RememberedFolder.decide(RememberedFolder.Facts(
+                    resolvedPath: home.appendingPathComponent(slug).path,
+                    rememberedPath: home.appendingPathComponent(slug).path,
+                    existsAsDirectory: true, isInsideTrash: false, volumeIsMissing: false,
+                    denial: RememberedFolder.presence(forErrno: EPERM) == .denied(.privacy) ? .privacy : nil,
+                    reachRefusal: nil
+                ))
+                if case .cannotReopen(let reason, _, _) = outcome {
+                    XCTAssertEqual(reason.rawValue, expect, "folder case “\(name)”")
+                } else {
+                    XCTFail("folder case “\(name)” reopened")
+                }
+                played += 1
+                continue
+            case "outsideHomeAndUnreadable":
+                let url: URL = try makeWorkingFolder("outside/\(slug)")
+                remembered = RememberedFolder.make(for: url)
+                try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: url.path)
             case "outsideHome":
                 let url: URL = try makeWorkingFolder("outside/\(slug)")
                 remembered = RememberedFolder.make(for: url)
@@ -187,7 +210,7 @@ final class ReopeningTheLastWorkingFolderTests: XCTestCase {
                 continue
             }
             let outcome: RememberedFolder.Outcome = RememberedFolder.decide(
-                RememberedFolder.observe(remembered, trashRoots: [trash.path])
+                RememberedFolder.observe(remembered)
             )
             switch outcome {
             case .reopen(let path, _):
@@ -200,7 +223,85 @@ final class ReopeningTheLastWorkingFolderTests: XCTestCase {
             }
             played += 1
         }
-        XCTAssertGreaterThanOrEqual(played, 11)
+        XCTAssertGreaterThanOrEqual(played, 13)
+    }
+
+    /// The injected-location form of the Trash check still works (kept for a
+    /// Trash with a name of its own), and a near-miss name is not a Trash.
+    @MainActor
+    func testTheTrashCanAlsoBeNamedAndANearMissIsNot() throws {
+        let somewhere: URL = try makeFolder("elsewhere/Bin")
+        XCTAssertTrue(RememberedFolder.isInTrash(somewhere.appendingPathComponent("Notes").path, trashRoots: [somewhere.path]))
+        XCTAssertTrue(RememberedFolder.isInTrash("/Volumes/Drive/.Trashes/501/Notes", trashRoots: nil))
+        XCTAssertTrue(RememberedFolder.isInTrash("/Users/ann/.Trash/Notes", trashRoots: nil))
+        XCTAssertFalse(RememberedFolder.isInTrash("/Users/ann/.Trashy/Notes", trashRoots: nil))
+        XCTAssertFalse(RememberedFolder.isInTrash("/Users/ann/Trash/Notes", trashRoots: nil))
+    }
+
+    /// "Gone" and "not allowed" are told apart by the error, never by
+    /// whether the folder seems to exist.
+    @MainActor
+    func testTheErrorDecidesGoneFromNotAllowed() throws {
+        XCTAssertEqual(RememberedFolder.presence(forErrno: ENOENT), .missing)
+        XCTAssertEqual(RememberedFolder.presence(forErrno: ENOTDIR), .missing)
+        XCTAssertEqual(RememberedFolder.presence(forErrno: EPERM), .denied(.privacy))
+        XCTAssertEqual(RememberedFolder.presence(forErrno: EACCES), .denied(.permissions))
+        // A folder inside a parent this account cannot search: stat says
+        // EACCES, and the teacher is told about permissions, not "can't be
+        // found".
+        let parent: URL = try makeFolder("locked-\(UUID().uuidString)")
+        let inside: URL = try makeWorkingFolder(parent.lastPathComponent + "/Notes")
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: parent.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: parent.path) }
+        XCTAssertEqual(RememberedFolder.presence(atPath: inside.path), .denied(.permissions))
+        let outcome: RememberedFolder.Outcome = RememberedFolder.decide(
+            RememberedFolder.observe(RememberedFolder(path: inside.path, bookmark: nil))
+        )
+        if case .cannotReopen(let reason, _, _) = outcome {
+            XCTAssertEqual(reason, .unreadable)
+        } else {
+            XCTFail("a folder behind a denied parent must not reopen")
+        }
+    }
+
+    /// Once quitting has begun, a window becoming key as others close must
+    /// not record itself as the last working folder (#311 implementation
+    /// review 1).
+    @MainActor
+    func testQuittingDoesNotRewriteTheLastWorkingFolder() throws {
+        let defaults: UserDefaults = TestDefaults.make()
+        let front: URL = try makeWorkingFolder("front-\(UUID().uuidString)")
+        let behind: URL = try makeWorkingFolder("behind-\(UUID().uuidString)")
+        let first: WorkspaceModel = WorkspaceModel(defaults: defaults)
+        let second: WorkspaceModel = WorkspaceModel(defaults: defaults)
+        WorkspaceModel.registerWindowModel(first)
+        WorkspaceModel.registerWindowModel(second)
+        defer {
+            WorkspaceModel.isTerminating = false
+            WorkspaceModel.unregisterWindowModel(first)
+            WorkspaceModel.unregisterWindowModel(second)
+        }
+        second.chooseWorkspace(at: behind)
+        first.chooseWorkspace(at: front)
+        XCTAssertEqual(first.lastWorkingFolder()?.path, front.path)
+
+        WorkspaceModel.isTerminating = true
+        second.rememberAsTheLastWorkingFolder()
+        XCTAssertEqual(first.lastWorkingFolder()?.path, front.path, "the window the teacher quit from stays the last one")
+    }
+
+    /// The view's one-decision rule, held by the claimant: a window that has
+    /// already settled never claims a remembered entry, and leaves it for
+    /// the window it belongs to.
+    @MainActor
+    func testASettledWindowNeverClaimsAnEntry() {
+        let path: String = scratch.appendingPathComponent("someone-elses").path
+        WindowFolderMemory.reset(with: [WindowFolderMemory.Entry(path: path, frame: "{{1, 1}, {900, 700}}")])
+        let settled: WindowFolderClaimant = WindowFolderClaimant()
+        XCTAssertNil(settled.frameDidSettle("{{1, 1}, {900, 700}}", windowHasSettled: true))
+        XCTAssertNil(settled.giveUp(windowHasSettled: true))
+        let owner: WindowFolderClaimant = WindowFolderClaimant()
+        XCTAssertEqual(owner.frameDidSettle("{{1, 1}, {900, 700}}")?.path, path, "the entry is still there for its own window")
     }
 
     /// Every reason's sentence, THROUGH `sentence(for:)` — so swapping two

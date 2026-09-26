@@ -97,9 +97,11 @@ nonisolated enum WindowStartRule {
     ///   system setting; on Windows, `RestoreWindowsOnLaunch`).
     /// - `windowsLeftOpen`: the folders of the windows open at quit.
     /// - `lastWorkedIn`: the last working folder remembered.
-    /// - `windowsMacOSOpens`: how many windows appear WITHOUT a remembered
-    ///   folder to claim — 1 for an ordinary launch; more after a log-in
-    ///   that brought windows back although the setting said not to.
+    /// - `windowsMacOSOpens`: how many windows macOS shows in all — the
+    ///   restored ones (one per window left open, when windows come back)
+    ///   plus any without a remembered folder: 1 for an ordinary launch with
+    ///   nothing to restore, more after a log-in that brought windows back
+    ///   although the setting said not to.
     static func playLaunch(
         windowsComeBack: Bool,
         windowsLeftOpen: [String],
@@ -107,15 +109,41 @@ nonisolated enum WindowStartRule {
         windowsMacOSOpens: Int
     ) -> [String?] {
         var folders: [String?] = []
-        if windowsComeBack && !windowsLeftOpen.isEmpty {
-            // Each restored window claims its own entry.
-            for path in windowsLeftOpen {
-                folders.append(path)
-            }
-            return folders
+        var entries: [String] = []
+        if windowsComeBack {
+            entries = windowsLeftOpen
         }
         var windowIndex: Int = 0
-        while windowIndex < windowsMacOSOpens {
+        // The windows macOS restores with a remembered folder each: they go
+        // through `start` like any window — which must make them WAIT for
+        // their claim rather than reopen the last folder or show the picker
+        // — and then take their entry, in order. (Frame matching, which
+        // decides WHICH entry, is `WindowRestorationScenarioTests`' job.)
+        while windowIndex < entries.count {
+            let start: Start = WindowStartRule.start(
+                requestedFolder: nil,
+                aClaimMayStillArrive: true,
+                isDuringLaunch: true,
+                otherWindowCount: folders.count,
+                otherOpenFolderPaths: [],
+                mostRecentKeyPath: nil,
+                hasLastWorkingFolder: lastWorkedIn != nil
+            )
+            if start == .waitForRememberedWindow {
+                folders.append(entries[windowIndex])
+            } else if start == .lastWorkingFolder {
+                folders.append(lastWorkedIn)
+            } else {
+                folders.append(nil)
+            }
+            windowIndex += 1
+        }
+        windowIndex = 0
+        var extraWindows: Int = windowsMacOSOpens - entries.count
+        if entries.isEmpty {
+            extraWindows = windowsMacOSOpens
+        }
+        while windowIndex < extraWindows {
             var openFolders: [String] = []
             for folder in folders {
                 if let folder {
