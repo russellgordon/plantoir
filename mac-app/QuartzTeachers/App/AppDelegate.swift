@@ -17,9 +17,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// A click on a scheduled publish's notification still waiting for the
+    /// windows is dropped when the app goes to the background (#306), so it
+    /// can never capture a window the teacher opens later.
+    func applicationDidResignActive(_ notification: Notification) {
+        SectionFromNotification.forgetPendingRequest()
+    }
+
     /// Opens the trail for this launch.
     func applicationDidFinishLaunching(_ notification: Notification) {
         ActivityTrail.noteLaunch()
+        // A launch started by a click on a notification may show no window of
+        // its own; a click still waiting for one is decided now (#306).
+        let launchedByANotification: Bool =
+            notification.userInfo?[NSApplication.launchUserNotificationUserInfoKey] != nil
+        SectionFromNotification.launchFinished(launchedByANotification: launchedByANotification)
         // Built websites are kept outside the working folder, so a folder the
         // teacher has thrown away leaves its builds behind with nothing left
         // to name them. Once a launch, off the main thread — it is a few
@@ -194,5 +206,30 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
         return [.banner, .list]
+    }
+
+    /// A click on a scheduled publish's notification opens that section
+    /// (#306), whether Plantoir was running or the click launched it.
+    ///
+    /// Thin on purpose: which responses count is decided by
+    /// `NotificationClickTarget.requested`, and what the click does by
+    /// `SectionFromNotification`, both tested. Returns at once — the window
+    /// work happens on the main actor, and may wait there for the launch
+    /// windows to decide their folders.
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse
+    ) async {
+        let request: NotificationClickTarget.Request = NotificationClickTarget.requested(
+            identifier: response.notification.request.identifier,
+            isAClick: response.actionIdentifier == UNNotificationDefaultActionIdentifier,
+            userInfo: response.notification.request.content.userInfo
+        )
+        guard case .click(let target) = request else {
+            return
+        }
+        await MainActor.run {
+            SectionFromNotification.receive(target)
+        }
     }
 }

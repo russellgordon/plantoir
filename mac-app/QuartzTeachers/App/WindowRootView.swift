@@ -25,6 +25,10 @@ struct WindowRootView: View {
     /// Identifies this window in the log, so two windows can be told apart.
     @State var windowIdentity: String = String(UUID().uuidString.prefix(4))
 
+    /// Handed to `SectionFromNotification`, which opens a new window when a
+    /// clicked notification's folder is open in none (#306).
+    @Environment(\.openWindow) var openWindow
+
     // MARK: - Body
 
     var body: some View {
@@ -33,6 +37,10 @@ struct WindowRootView: View {
             .focusedSceneValue(\.workspace, workspace)
             .onAppear {
                 WorkspaceModel.registerWindowModel(workspace)
+                // Every window installs it; any live one opens the next.
+                SectionFromNotification.openMainWindow = {
+                    openWindow(id: "main")
+                }
                 // Before the first frame commits, so the picker never shows
                 // on the way in: the window decides its folder here — the
                 // last working folder when it is on its own, the key
