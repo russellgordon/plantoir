@@ -155,6 +155,12 @@ extension AssistToolRunner {
     /// CODE, so publishing its schema would spend routing accuracy to buy
     /// something it already has.
     ///
+    /// The three How I Teach tools joined for the curriculum tools' reason
+    /// (#209): drafting a teacher's account of their own teaching from the
+    /// course's pages is judgement about meaning, and the wrong job for a
+    /// small local model — and the local surface would owe a routing
+    /// re-measurement for them.
+    ///
     /// What they share is only the test that matters: none of them costs the
     /// thirteen-tool surface the routing figures were measured against.
     static let mcpOnlyTools: [AssistToolDefinition] = [
@@ -168,6 +174,9 @@ extension AssistToolRunner {
         listCurriculumExpectationsTool,
         planCurriculumMentionsTool,
         addCurriculumMentionsTool,
+        readHowITeachTool,
+        planWriteHowITeachTool,
+        writeHowITeachTool,
     ]
 
     /// Everything the MCP client may call: every tool that exists, plus the
@@ -867,6 +876,71 @@ extension AssistToolRunner {
     private static let howManyClassesHelp: AssistSchemaProperty = AssistSchemaProperty(
         kind: .integer,
         description: "How many class pages to add to that unit."
+    )
+
+    // MARK: - The How I Teach page (#209), MCP only
+
+    private static let readHowITeachTool: AssistToolDefinition = AssistToolDefinition(
+        name: "read_how_i_teach",
+        description: "Read the teacher's How I Teach page for a course: their own account of how the course "
+                   + "is taught. Read it before drafting or revising any page in the course, and keep to it. "
+                   + "If there is none yet, it says how to offer to draft one. Changes nothing.",
+        parameters: [
+            "course": courseHelp,
+        ],
+        required: ["course"],
+        readOnly: true,
+        needsApproval: false
+    )
+
+    private static let howITeachTextHelp: AssistSchemaProperty = AssistSchemaProperty(
+        kind: .string,
+        description: "The whole page, in Markdown, as the teacher agreed to it — words only, with no --- "
+                   + "settings block at the top."
+    )
+
+    /// A MARK, never a boolean: this surface carries no boolean anywhere, and
+    /// a mark is something the model can only copy from the plan it showed
+    /// the teacher (`howITeachPage.tools.replacingIsAMarkNotABoolean`).
+    private static let howITeachReplacingHelp: AssistSchemaProperty = AssistSchemaProperty(
+        kind: .string,
+        description: "Only when replacing a page the teacher already has: the mark plan_write_how_i_teach "
+                   + "gave for it, passed only after the teacher agreed to replace their page. Leave empty "
+                   + "for a new page."
+    )
+
+    private static let planWriteHowITeachTool: AssistToolDefinition = AssistToolDefinition(
+        name: "plan_write_how_i_teach",
+        description: "Shows where the teacher's How I Teach page would be saved and whether it replaces one "
+                   + "they already have, changing nothing. Use it before write_how_i_teach, and show the "
+                   + "teacher the whole text.",
+        parameters: [
+            "course": courseHelp,
+            "text": howITeachTextHelp,
+            "replacing": howITeachReplacingHelp,
+        ],
+        required: ["course", "text"],
+        readOnly: true,
+        needsApproval: false
+    )
+
+    private static let writeHowITeachTool: AssistToolDefinition = AssistToolDefinition(
+        name: "write_how_i_teach",
+        description: "Save the teacher's How I Teach page for a course, once they have read the whole text "
+                   + "and agreed. Call plan_write_how_i_teach FIRST. The course is backed up first, and the "
+                   + "page is never put on the website.",
+        parameters: [
+            "course": courseHelp,
+            "text": howITeachTextHelp,
+            "replacing": howITeachReplacingHelp,
+        ],
+        required: ["course", "text"],
+        readOnly: false,
+        // Backed up first and taken back by `undo_last_change`, as every
+        // write on this surface is; the teacher agreed to the text in the
+        // conversation, and the write refuses to replace their page without
+        // the mark its plan gave.
+        needsApproval: false
     )
 
     private static let listCurriculumExpectationsTool: AssistToolDefinition = AssistToolDefinition(

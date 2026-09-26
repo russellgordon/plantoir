@@ -2042,6 +2042,9 @@ enum ScheduledDeploy {
         // from the log for the same reason as the line above: nobody is
         // watching a console at half six in the morning.
         WorkspaceInUseReport.noteOnTheTrail(from: text)
+        // A How I Teach page kept off the website this run (#209) — the same
+        // reader as the console's, for the same reason as the lines above.
+        HowITeachKeptOffReport.noteOnTheTrail(from: text)
         noteFolderProblems(in: text)
         var markerLines: [String] = []
         // Split on scalars, not Characters: Swift folds "\r\n" into one

@@ -907,6 +907,11 @@ final class AppRulesContractTests: XCTestCase {
         XCTAssertEqual(section["greetingIsTheSameForEveryAgent"] as? Bool, true)
         XCTAssertEqual(section["serverName"] as? String, "plantoir")
         XCTAssertFalse(greeting.contains("\""), "greetingCarriesNoDoubleQuotes")
+        // The How I Teach sentence (#209), verbatim, in the one greeting both
+        // doors send.
+        let howITeach: String = try XCTUnwrap(section["greetingHowITeachSentence"] as? String)
+        XCTAssertEqual(ClaudeCodeLauncher.howITeachGreetingSentence, howITeach)
+        XCTAssertTrue(greeting.contains(howITeach), greeting)
 
         for agent in agents {
             let key: String = try XCTUnwrap(agent["key"] as? String)

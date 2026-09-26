@@ -203,7 +203,7 @@ nonisolated struct AssistSectionGraph {
     @MainActor
     static func read(forSection sectionNumber: Int, in course: Course, workspaceURL: URL?) -> AssistSectionGraph {
         var pages: [AssistSectionPage] = []
-        for pageURL in ClassPages.pagesOfSection(sectionNumber, in: course) {
+        for pageURL in ClassPages.pagesTheAssistantLists(forSection: sectionNumber, in: course) {
             guard let text = try? String(contentsOf: pageURL, encoding: .utf8) else {
                 continue
             }

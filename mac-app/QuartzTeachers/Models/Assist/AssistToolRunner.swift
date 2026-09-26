@@ -478,6 +478,12 @@ final class AssistToolRunner {
             return planCurriculumMentions(arguments)
         case "add_curriculum_mentions":
             return addCurriculumMentions(arguments)
+        case "read_how_i_teach":
+            return readHowITeach(arguments)
+        case "plan_write_how_i_teach":
+            return planWriteHowITeach(arguments)
+        case "write_how_i_teach":
+            return writeHowITeach(arguments)
         default:
             return AssistToolOutcome.couldNotRead(
                 "There is no tool called “\(call.function.name)”."
@@ -495,7 +501,7 @@ final class AssistToolRunner {
 
         let filter: String = text("matching", in: arguments).trimmingCharacters(in: .whitespaces)
         var paths: [String] = []
-        for pageURL in ClassPages.pagesOfSection(located.sectionNumber, in: located.course) {
+        for pageURL in ClassPages.pagesTheAssistantLists(forSection: located.sectionNumber, in: located.course) {
             let path: String = AssistSectionGraph.relativePath(
                 of: pageURL, workspaceURL: workspace.workspaceURL
             )
@@ -1346,6 +1352,18 @@ final class AssistToolRunner {
             forSection: located.sectionNumber, in: located.course,
             workspaceURL: workspace.workspaceURL
         )
+
+        // The How I Teach page is never on the website (#209), so the graph
+        // leaves it out — and a request for it by name is answered in plain
+        // words rather than with "no page is called that", which would be
+        // untrue. Only when no ORDINARY page has the title: one inside a
+        // folder is a page like any other, and publishing it works.
+        for title in titles where HowITeachPage.isItsTitle(title) && graph.page(titled: title) == nil {
+            if HowITeachPage.isThere(forSection: located.sectionNumber, in: located.course) {
+                return .failure(.howITeachIsNeverPublished(located.course.code))
+            }
+        }
+
         let classPages: [ClassPageSummary] = ClassPages.list(
             forSection: located.sectionNumber, in: located.course
         )
@@ -3780,6 +3798,7 @@ final class AssistToolRunner {
                     + "  kept for reference — never deployed"
                     + "\n  school year: \(AssistToolRunner.schoolYearText(of: course, today: readToday()))"
                     + "\n  sections: \(sectionList)"
+                    + howITeachLine(for: course)
                 )
                 continue
             }
@@ -3794,6 +3813,7 @@ final class AssistToolRunner {
                 // and prints BLANK for a course set to a folder that has not been
                 // chosen yet — a state the product models on purpose.
                 + "  publishes to: \(AssistToolRunner.destination(of: course))"
+                + howITeachLine(for: course)
             )
         }
 
@@ -3802,6 +3822,37 @@ final class AssistToolRunner {
             ? "There is 1 course in this working folder."
             : "There are \(courses.count) courses in this working folder."
         return AssistToolOutcome.read(summary, detail: said, showingTheTeacher: said)
+    }
+
+    /// Whether a course has a How I Teach page, as one more `list_courses`
+    /// line — to an MCP client ONLY (#209 plan review, item 1). The local
+    /// window reaches `list_courses` through a phrase matched in code and
+    /// shows the answer to the teacher, and the local assistant neither reads
+    /// nor drafts the page, so a line there would be a suggestion that window
+    /// cannot act on (`howITeachPage.listCoursesLine`).
+    private func howITeachLine(for course: Course) -> String {
+        if surface != .mcp {
+            return ""
+        }
+        if HowITeachPage.existingURL(for: course) != nil {
+            return "\n" + AssistWording.howITeachListedAsWritten
+        }
+        return "\n" + AssistWording.howITeachListedAsNotWritten
+    }
+
+    /// The LIVE courses whose How I Teach page exists, by the name they are
+    /// addressed by, sorted — for the MCP session briefing
+    /// (`howITeachPage.briefingInInstructions`). Empty in most folders, and
+    /// then the briefing says nothing about it at all.
+    func coursesWithAHowITeachPage() -> [String] {
+        var codes: [String] = []
+        for course in workspace.courses where !course.isKeptForReference {
+            if HowITeachPage.existingURL(for: course) != nil {
+                codes.append(course.code)
+            }
+        }
+        codes.sort()
+        return codes
     }
 
     /// One line per reference course, for the MCP session briefing: the name
@@ -4093,13 +4144,249 @@ final class AssistToolRunner {
 
     // MARK: - Finding the course and section
 
+    // MARK: - The How I Teach page (#209), MCP only
+
+    /// `read_how_i_teach`: the course's page, or — when there is none — where
+    /// it would go and how to offer a draft.
+    ///
+    /// Works on a course kept for reference (it is read-only), because last
+    /// year's page is evidence of how the course was taught.
+    private func readHowITeach(_ arguments: [String: Any]) -> AssistToolOutcome {
+        let course: Course
+        switch locateCourse(arguments) {
+        case .failure(let refusal):
+            return AssistToolOutcome.couldNotRead(refusal.message)
+        case .success(let found):
+            course = found
+        }
+
+        guard let pageURL = HowITeachPage.existingURL(for: course) else {
+            ActivityTrail.note(
+                .howITeachPageRead,
+                "\(course.code) · " + HowITeachPage.trailLineForARead(words: nil, cutShort: false)
+            )
+            let answer: String = AssistWording.howITeachMissing(course: course.code)
+                + "\n\n" + AssistWording.howITeachDraftingBrief
+            return AssistToolOutcome.read(answer, detail: answer)
+        }
+        guard let pageData = try? Data(contentsOf: pageURL), let pageText = HowITeachPage.text(of: pageData) else {
+            return AssistToolOutcome.couldNotRead(AssistToolRefusal.unreadablePage(HowITeachPage.title).message)
+        }
+
+        let body: String = HowITeachPage.trimmed(HowITeachPage.body(of: pageText))
+        let words: Int = HowITeachPage.wordCount(of: pageText)
+        var shown: String = body
+        var cutShort: Bool = false
+        if body.count > HowITeachPage.mostCharacters {
+            cutShort = true
+            shown = String(body.prefix(HowITeachPage.mostCharacters)) + "\n\n"
+                + AssistWording.howITeachCutShort(
+                    course: course.code,
+                    path: AssistSectionGraph.relativePath(of: pageURL, workspaceURL: workspace.workspaceURL)
+                )
+        }
+        ActivityTrail.note(
+            .howITeachPageRead,
+            "\(course.code) · " + HowITeachPage.trailLineForARead(words: words, cutShort: cutShort)
+        )
+        let answer: String = AssistWording.howITeachRead(course: course.code, text: shown)
+        return AssistToolOutcome.read(answer, detail: answer)
+    }
+
+    /// What a write of the page would do, worked out once for the plan and
+    /// the write, so the plan refuses exactly what the write refuses
+    /// (`howITeachPage.tools.planAndWriteAgree`).
+    private struct PlannedHowITeach {
+        let course: Course
+        let text: String
+        /// The page the teacher has, found by its real name — nil for a new one.
+        let existingURL: URL?
+        let existingText: String?
+        let existingMark: String?
+        /// The mark the caller passed, trimmed; empty when none.
+        let replacing: String
+    }
+
+    private func howITeachPlan(_ arguments: [String: Any]) -> Result<PlannedHowITeach, AssistToolRefusal> {
+        let course: Course
+        switch locateCourse(arguments) {
+        case .failure(let refusal):
+            return .failure(refusal)
+        case .success(let found):
+            course = found
+        }
+        // The write is refused on a reference course by the gate every write
+        // shares; the PLAN is read-only and so passes that gate, and must not
+        // promise what the write will refuse.
+        if course.isKeptForReference {
+            return .failure(.keptForReference(course.displayCode))
+        }
+
+        let pageText: String = text("text", in: arguments)
+        if pageText.isEmpty {
+            return .failure(.notInThisBuild(AssistWording.howITeachNeedsWords))
+        }
+        if pageText.count > HowITeachPage.mostCharacters {
+            return .failure(.notInThisBuild(AssistWording.howITeachTooLong))
+        }
+        if HowITeachPage.opensWithAFence(pageText) {
+            return .failure(.notInThisBuild(AssistWording.howITeachCarriesNoSettings))
+        }
+
+        let replacing: String = text("replacing", in: arguments).lowercased()
+        var existingText: String? = nil
+        var existingMark: String? = nil
+        let existingURL: URL? = HowITeachPage.existingURL(for: course)
+        if let existingURL {
+            guard let data = try? Data(contentsOf: existingURL),
+                  let decoded = HowITeachPage.text(of: data) else {
+                return .failure(.unreadablePage(HowITeachPage.title))
+            }
+            existingText = decoded
+            existingMark = HowITeachPage.mark(of: data)
+            if !replacing.isEmpty && replacing != existingMark {
+                return .failure(.notInThisBuild(AssistWording.howITeachChangedSincePlanned(course: course.code)))
+            }
+        }
+        return .success(PlannedHowITeach(
+            course: course,
+            text: pageText,
+            existingURL: existingURL,
+            existingText: existingText,
+            existingMark: existingMark,
+            replacing: replacing
+        ))
+    }
+
+    /// `plan_write_how_i_teach`: where it would go, and whether it replaces
+    /// the page the teacher has — with the mark the write then needs.
+    private func planWriteHowITeach(_ arguments: [String: Any]) -> AssistToolOutcome {
+        let planned: PlannedHowITeach
+        switch howITeachPlan(arguments) {
+        case .failure(let refusal):
+            return AssistToolOutcome.couldNotRead(refusal.message)
+        case .success(let found):
+            planned = found
+        }
+        guard let existingURL = planned.existingURL,
+              let existingText = planned.existingText,
+              let existingMark = planned.existingMark else {
+            let path: String = AssistSectionGraph.relativePath(
+                of: HowITeachPage.newPageURL(for: planned.course), workspaceURL: workspace.workspaceURL
+            )
+            let plan: String = AssistWording.howITeachPlanCreates(course: planned.course.code, path: path)
+            return AssistToolOutcome.planned("Worked out where the How I Teach page would go.", plan: plan)
+        }
+        let path: String = AssistSectionGraph.relativePath(of: existingURL, workspaceURL: workspace.workspaceURL)
+        var changed: String = "at a time that could not be read"
+        if let modified = (try? existingURL.resourceValues(forKeys: [.contentModificationDateKey]))?
+            .contentModificationDate {
+            changed = CalendarDay.today(modified).text
+        }
+        let plan: String = AssistWording.howITeachPlanReplaces(
+            course: planned.course.code,
+            path: path,
+            words: String(HowITeachPage.wordCount(of: existingText)),
+            changed: changed,
+            mark: existingMark
+        )
+        return AssistToolOutcome.planned("Worked out what replacing the How I Teach page would do.", plan: plan)
+    }
+
+    /// `write_how_i_teach`: save the page the teacher agreed to.
+    ///
+    /// Never replaces the teacher's page without the mark its plan gave;
+    /// backs the course up first (once per conversation, as every write
+    /// does); keeps a replaced page's settings block byte for byte; and
+    /// records ONE undo entry that never touches a preview, because the page
+    /// is never on the site.
+    private func writeHowITeach(_ arguments: [String: Any]) -> AssistToolOutcome {
+        let planned: PlannedHowITeach
+        switch howITeachPlan(arguments) {
+        case .failure(let refusal):
+            return AssistToolOutcome.refused(refusal.message)
+        case .success(let found):
+            planned = found
+        }
+        if planned.existingURL != nil && planned.replacing.isEmpty {
+            return AssistToolOutcome.refused(AssistWording.howITeachAlreadyWritten(course: planned.course.code))
+        }
+
+        let pageURL: URL = planned.existingURL ?? HowITeachPage.newPageURL(for: planned.course)
+        let newText: String
+        if let existingText = planned.existingText {
+            newText = HowITeachPage.replacedPageText(existing: existingText, with: planned.text)
+        } else {
+            newText = HowITeachPage.newPageText(planned.text)
+        }
+
+        // A backup and an undo entry both want a SECTION; the page belongs to
+        // the course, so the lowest section stands in. The backup's name says
+        // "before an assistant chat about Section 1" — accepted rather than
+        // teaching the backup-name parser a new maker on both platforms
+        // (#209 plan review, item 6); the zip holds the whole course.
+        var sections: [Int] = planned.course.sectionNumbers
+        sections.sort()
+        let standInSection: Int = sections.first ?? 1
+        let backedUp: Bool = backUpOnceForThisConversation(planned.course, forSection: standInSection)
+
+        do {
+            try newText.write(to: pageURL, atomically: true, encoding: .utf8)
+        } catch {
+            return AssistToolOutcome.refused("Nothing was saved: \(error.localizedDescription)")
+        }
+
+        // `after` is the file as the undo will READ it back — Foundation's
+        // reading drops a byte-order mark, and an `after` that kept one would
+        // never match, so the undo would leave the page alone as "edited
+        // since". `before` keeps it, so taking the change back restores it.
+        let readBack: String = (try? String(contentsOf: pageURL, encoding: .utf8)) ?? newText
+        let created: Bool = planned.existingText == nil
+        history.record(AssistChange(
+            whatHappened: created ? "wrote a new How I Teach page" : "replaced the How I Teach page",
+            courseCode: planned.course.code,
+            sectionNumber: standInSection,
+            rebuildsThePreview: false,
+            files: [AssistSavedFile(fileURL: pageURL, before: planned.existingText, after: readBack)],
+            appliesToTheWholeCourse: true
+        ))
+
+        var wordsBefore: Int? = nil
+        if let existingText = planned.existingText {
+            wordsBefore = HowITeachPage.wordCount(of: existingText)
+        }
+        var backupName: String? = nil
+        if backedUp, let backupURL = conversationBackups[planned.course.code] {
+            backupName = backupURL.lastPathComponent
+        }
+        ActivityTrail.note(
+            .howITeachPageWritten,
+            "\(planned.course.code) · " + HowITeachPage.trailLineForAWrite(
+                wordsBefore: wordsBefore,
+                wordsAfter: HowITeachPage.wordCount(of: newText),
+                backupName: backupName
+            )
+        )
+
+        let saved: String = AssistWording.howITeachSaved(course: planned.course.code)
+        var detail: String = saved
+        if backedUp {
+            detail += "\n\n" + AssistToolRunner.backedUpNote
+        }
+        return AssistToolOutcome.wrote(saved, detail: detail)
+    }
+
     /// A course and section the model named, both found.
     private struct Located {
         let course: Course
         let sectionNumber: Int
     }
 
-    private func locate(_ arguments: [String: Any]) -> Result<Located, AssistToolRefusal> {
+    /// The course the model named, found — the first half of `locate`, for
+    /// the tools that take a course and no section (the How I Teach page,
+    /// #209). `locate` calls it, so every other tool finds a course exactly
+    /// as it always has.
+    private func locateCourse(_ arguments: [String: Any]) -> Result<Course, AssistToolRefusal> {
         if workspace.workspaceURL == nil {
             return .failure(.noWorkingFolder)
         }
@@ -4125,6 +4412,17 @@ final class AssistToolRunner {
         }
         guard let course else {
             return .failure(.noSuchCourse(code))
+        }
+        return .success(course)
+    }
+
+    private func locate(_ arguments: [String: Any]) -> Result<Located, AssistToolRefusal> {
+        let course: Course
+        switch locateCourse(arguments) {
+        case .failure(let refusal):
+            return .failure(refusal)
+        case .success(let found):
+            course = found
         }
 
         var numbers: [Int] = course.sectionNumbers
