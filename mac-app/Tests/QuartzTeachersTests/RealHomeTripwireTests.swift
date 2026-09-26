@@ -126,10 +126,11 @@ final class RealHomeTripwireTests: XCTestCase {
         // `~/…` as a teacher would type it, expanded by `RealHome` into the
         // suite's throwaway home — the check that it is not the real one.
         "QuartzTeachersTests/SuiteStaysOutOfRealFoldersTests.swift | \"~/": 3,
-        // The opt-in UI test, in the RUNNER, looking for the weights the
-        // app it drives will load. It is sandboxed, hence the password
-        // database rather than `HOME`.
-        "QuartzTeachersUITests/AssistantRolloverUITests.swift | getpwuid": 1,
+        // The UI target's one door (#154), in the RUNNER: it links the real
+        // assistant weights into a launch's state folder one file at a time,
+        // and reads the real state the redirect test watches stay still. The
+        // runner is sandboxed, hence the password database rather than `HOME`.
+        "QuartzTeachersUITests/IsolatedLaunch.swift | getpwuid": 1,
     ]
 
     // MARK: - The product asks only the seam
