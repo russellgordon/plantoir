@@ -384,6 +384,18 @@ else
   cat /tmp/verify_preview_reach_test.log
 fi
 
+# The first-run block every launcher shares, RUN against every case in
+# contracts/app-rules.json → helperBootstrap (GitHub #312): the helper programs
+# copied out of the Mac app or downloaded and checked, the install stamp, and
+# the website builder created from the app's starting disk. Stand-ins for the
+# network and the programs; real shasum, cp -c, xattr and bash 3.2.
+if (cd scripts && python3 test_helper_bootstrap.py) >/tmp/verify_helper_bootstrap_test.log 2>&1; then
+  pass "the launchers install the helper programs from inside the app, or download and check them, and create the website builder from the app's starting disk (scripts/test_helper_bootstrap.py)"
+else
+  fail "the launchers install the helper programs from inside the app, or download and check them, and create the website builder from the app's starting disk (scripts/test_helper_bootstrap.py)"
+  cat /tmp/verify_helper_bootstrap_test.log
+fi
+
 if (cd scripts && python3 test_preflight_exclusions.py) >/tmp/verify_preflight_exclusions_test.log 2>&1; then
   pass "build_site.py: preflight excluded_items discovery skipping & index.md notes (scripts/test_preflight_exclusions.py)"
 else

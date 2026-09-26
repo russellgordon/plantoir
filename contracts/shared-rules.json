@@ -497,6 +497,64 @@
         "appliesOnWhy": "PERMANENT, the same case as 'workspace was in use': Windows' preview.ps1 serves on the PC itself, with no workspace and no forward to lose (app-rules.json -> previewPorts.whenAnotherAccountHasTheAddress.appliesOnWhy). Whether the Windows WALK sees another account's listeners is a separate question, asked in the windows issue from #310."
       },
       {
+        "carries": "which of the four helper programs were installed into Plantoir's tools folder (Colima, Lima, the Docker CLI, Buildx) and at which pinned versions; whether they were set up from inside Plantoir or downloaded; why they were installed (not yet on this Mac, other versions were there, a copy there was damaged, or the copies there were set up before Plantoir kept a record of them); and for a download, why Plantoir's own copy was not used (this Plantoir does not carry one, it is for another kind of Mac, or it did not pass its check)",
+        "event": "helper programs installed",
+        "marker": {
+          "prefix": "PLANTOIR_HELPERS_INSTALLED:",
+          "shape": "PLANTOIR_HELPERS_INSTALLED: <bundled|downloaded> <missing|different|damaged|unrecorded> <which, comma-separated, of colima limactl docker buildx> <colima=…,lima=…,docker=…,buildx=…> [<none-in-app|other-arch|bundle-check-failed>, on a download only]",
+          "examples": [
+            "PLANTOIR_HELPERS_INSTALLED: bundled missing colima,limactl,docker colima=v0.10.3,lima=2.2.0,docker=29.7.2,buildx=v0.36.1",
+            "PLANTOIR_HELPERS_INSTALLED: bundled unrecorded colima,limactl,docker colima=v0.10.3,lima=2.2.0,docker=29.7.2,buildx=v0.36.1",
+            "PLANTOIR_HELPERS_INSTALLED: downloaded missing buildx colima=v0.10.3,lima=2.2.0,docker=29.7.2,buildx=v0.36.1 none-in-app",
+            "PLANTOIR_HELPERS_INSTALLED: downloaded damaged docker colima=v0.10.3,lima=2.2.0,docker=29.7.2,buildx=v0.36.1 bundle-check-failed"
+          ],
+          "why": "Printed by setup.sh, preview.sh and deploy.sh alike, from the first-run block they share (app-rules.json -> helperBootstrap), and read by the APP, which writes the line: ScriptRunner from the console of a run it started, ScheduledDeploy from the log of a publish launchd ran (a scheduled run is started by Plantoir itself, so it carries PLANTOIR_BUNDLED_HELPERS and can install). The console a teacher reads leaves it out (rule 1). The versions travel in the line because the app must not guess them: the launcher's pins are what was installed. A run typed at the command line prints it and leaves no trail line."
+        },
+        "lineWhenBundled": "set up {programs} for the website builder from inside Plantoir — {why}",
+        "lineWhenDownloaded": "downloaded {programs} for the website builder — {why}; Plantoir's own copy was not used because {whyNot}",
+        "programsAre": "each program's name and pinned version, joined with commas and a final 'and': Colima {colima}, Lima {lima}, Docker CLI {docker}, Buildx {buildx} — in that order, and only the ones in the line",
+        "whyWords": {
+          "missing": "not yet on this Mac",
+          "different": "replacing other versions",
+          "damaged": "replacing a damaged copy",
+          "unrecorded": "replacing copies set up before Plantoir kept a record of them"
+        },
+        "whyNotWords": {
+          "none-in-app": "this Plantoir does not carry one",
+          "other-arch": "it is for another kind of Mac",
+          "bundle-check-failed": "it did not pass its check"
+        },
+        "why": "GitHub #312. A silent fallback to a 135 MB download is the failure that reports success: the first run still works, only slower, and without this line nobody can tell an app copy that is doing its job from one that is broken and quietly downloading every time. It is also the only record of a version change reaching a teacher's Mac. Tool names are allowed here as they are in 'helpers described': the trail is support's record, not the console. Never a path.",
+        "appliesOn": [
+          "mac"
+        ],
+        "appliesOnWhy": "PERMANENT: Windows builds natively and carries its runtime inside its installer, so it installs no helper programs (app-rules.json -> helperBootstrap.appliesOnWhy)."
+      },
+      {
+        "carries": "that the website builder was created on this Mac for the first time, how many seconds creating it took, and where its starting disk came from: inside Plantoir, downloaded because this Plantoir carries none for this Mac, or downloaded because starting from the copy inside Plantoir was refused as damaged or failed",
+        "event": "website builder created",
+        "marker": {
+          "prefix": "PLANTOIR_BUILDER_CREATED:",
+          "shape": "PLANTOIR_BUILDER_CREATED: <seeded|downloaded|seed-refused-then-downloaded|seed-failed-then-downloaded> <seconds>",
+          "examples": [
+            "PLANTOIR_BUILDER_CREATED: seeded 27",
+            "PLANTOIR_BUILDER_CREATED: downloaded 41",
+            "PLANTOIR_BUILDER_CREATED: seed-refused-then-downloaded 44",
+            "PLANTOIR_BUILDER_CREATED: seed-failed-then-downloaded 255"
+          ],
+          "why": "Printed by the first-run block of every launcher when it creates the website builder, and read by the app from the same two places as 'helper programs installed'. refused means Colima's own SHA-512 check turned the copy down (its output says 'checksum mismatch'); failed is any other failure, a boot that timed out included. Nothing is printed when creating it failed twice: the launcher then says the website builder did not start."
+        },
+        "lineWhenSeeded": "created the website builder from the starting disk inside Plantoir in {seconds} s",
+        "lineWhenDownloaded": "created the website builder in {seconds} s, downloading its starting disk",
+        "lineWhenSeedRefused": "created the website builder in {seconds} s, downloading its starting disk because the copy inside Plantoir was refused as damaged",
+        "lineWhenSeedFailed": "created the website builder in {seconds} s, downloading its starting disk because starting from the copy inside Plantoir failed",
+        "why": "GitHub #312. 'The first run took forever' is the report #312 exists for, and the seconds, from the teacher's own Mac, are what the next decision needs: one fresh start in five took 255 s instead of about 25 while it was being measured, for a reason not yet found. The refused and failed lines flag a damaged install, or a Colima whose disk does not match, before a second teacher meets it.",
+        "appliesOn": [
+          "mac"
+        ],
+        "appliesOnWhy": "PERMANENT: Windows has no virtual machine to create."
+      },
+      {
         "carries": "the course and the section, and which of: told with a notification; not sent because notifications are turned off; not sent because permission was never given; could not be sent; and, when a teacher first schedules from the app, that the permission question was put and what the answer was. Since #306 (2026-09-26), also what a CLICK on the notification did: the section shown - in a window already on its working folder, in the window that was choosing a folder, or in a new window; the window brought forward and left as it was because it was in the middle of something; the working folder shown without the section because the section is no longer in it; or Plantoir only brought forward because the working folder is gone, could not be opened here (out of the builder's reach, or refused when a window choosing a folder tried it), or the notification named no section. NEVER the notification's text, and never the working folder's path.",
         "event": "scheduled publish notification",
         "why": "Added with #212. 'I never got told' is answerable only if the trail says whether the notification went out, or that notifications were off for the app — from the teacher's side a notification that was blocked and one that was never sent look identical. The question's own line is written BEFORE the answer, because a question that is ignored, or arrives under a Focus, may never be answered. See scheduledPublishStopped.notification. 'I clicked it and nothing happened' (#306) is answered by the same line: each honest reason - the folder gone, the window busy, the section gone - has its own wording, and NO line at all means the click never reached this copy of the app (the launch line's bundle path says which copy a click started). See scheduledPublishStopped.notification.onClick."
