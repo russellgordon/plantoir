@@ -562,6 +562,29 @@ def wrap(text: str, width: int = 76) -> str:
     return "\n".join(textwrap.wrap(text, width=width)) if text else text
 
 
+# Words whose first letter misleads about their first SOUND. The article
+# follows the sound: "a unit", "a European", "a one-page", but "an hour".
+# A first-letter check alone gets every one of these wrong. Kept in step with
+# WizardWording.article(for:) in the mac app (#336), which renders the
+# wizard's "Start from a/an … skeleton" by the same rule.
+CONSONANT_SOUND_VOWEL_STARTS = ("uni", "use", "usu", "uti", "ubi", "ura", "eu", "one", "once", "ewe")
+VOWEL_SOUND_CONSONANT_STARTS = ("hour", "honest", "honour", "honor", "heir")
+
+
+def article_for(word: str) -> str:
+    """"a" or "an" for the word that follows it, by its first sound."""
+    lowered = word.lower()
+    for start in CONSONANT_SOUND_VOWEL_STARTS:
+        if lowered.startswith(start):
+            return "a"
+    for start in VOWEL_SOUND_CONSONANT_STARTS:
+        if lowered.startswith(start):
+            return "an"
+    if lowered[:1] in ("a", "e", "i", "o", "u"):
+        return "an"
+    return "a"
+
+
 def subject_with_article(subject: str, noun: str) -> str:
     """The subject used in front of a noun, with the article it needs.
 
@@ -570,16 +593,14 @@ def subject_with_article(subject: str, noun: str) -> str:
     "a %SUBJECT% course" shipped "a this course course", "a the language
     course" and "a English course" (#328). So the phrase is built here:
     "this course" stays itself, a subject that begins with "the" drops it
-    ("the arts" -> "an arts course"), and the article follows the sound.
+    ("the arts" -> "an arts course"), and the article follows the sound
+    (article_for).
     """
     if subject == "this course":
         return f"this {noun}"
     if subject.startswith("the "):
         subject = subject[len("the "):]
-    article = "a"
-    if subject[0].lower() in "aeio":
-        article = "an"
-    return f"{article} {subject} {noun}"
+    return f"{article_for(subject)} {subject} {noun}"
 
 
 def capitalised(phrase: str) -> str:
