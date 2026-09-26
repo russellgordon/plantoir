@@ -502,7 +502,8 @@ enum SpecialFolderRenamer {
         _ oldName: String,
         to newName: String,
         scope: FolderScope,
-        in values: [String: Any]
+        in values: [String: Any],
+        foldersWithPages: [String] = []
     ) -> [String: Any] {
         var updated: [String: Any] = values
 
@@ -513,10 +514,24 @@ enum SpecialFolderRenamer {
         let wasTheClassFolder: Bool = (scope == .perSection) && wasSurelyTheClassFolder(
             oldName, in: perSectionFolders, recorded: values["class_folder"] as? String
         )
-        let wasTheCurriculumFolder: Bool = (scope == .shared) && CurriculumFolderRule
-            .resolvedCurriculumFolder(
-                configured: values["curriculum_folder"] as? String, in: sharedFolders
-            )?.caseInsensitiveCompare(oldName) == .orderedSame
+        // ONE OF the course's curriculum folders (#128) — the declared ones
+        // and the ones it resolves to, the second read from the disk by the
+        // caller (`foldersWithPages`), so a scratch LCS course renaming the
+        // Ontario folder its map comes from is recognised even though the
+        // by-name rule would have picked College Board.
+        let declaredCurriculum: [String] = CurriculumFolderRule.declaredFolders(
+            list: values["curriculum_folders"], legacy: values["curriculum_folder"]
+        )
+        let resolvedCurriculum: [String] = CurriculumFolderRule.resolvedFolders(
+            declared: declaredCurriculum, in: sharedFolders, withPages: foldersWithPages
+        )
+        var wasACurriculumFolder: Bool = false
+        if scope == .shared {
+            for name in declaredCurriculum + resolvedCurriculum
+            where name.caseInsensitiveCompare(oldName) == .orderedSame {
+                wasACurriculumFolder = true
+            }
+        }
 
         updated[scope.configurationKey] = renaming(
             oldName, to: newName, inList: values[scope.configurationKey] as? [String] ?? []
@@ -534,8 +549,20 @@ enum SpecialFolderRenamer {
         if wasTheClassFolder {
             updated["class_folder"] = newName
         }
-        if wasTheCurriculumFolder {
-            updated["curriculum_folder"] = newName
+        if wasACurriculumFolder {
+            // The declared list, or — for a course that declared nothing —
+            // the folders it resolves to, with the old name replaced IN PLACE:
+            // the primary folder stays primary, and its map keeps its title.
+            let base: [String] = declaredCurriculum.isEmpty ? resolvedCurriculum : declaredCurriculum
+            var materialised: [String] = []
+            for name in base {
+                if name.caseInsensitiveCompare(oldName) == .orderedSame {
+                    materialised.append(newName)
+                } else {
+                    materialised.append(name)
+                }
+            }
+            updated["curriculum_folders"] = materialised
         }
 
         // Three flat lists that name folders from EITHER scope, so each is

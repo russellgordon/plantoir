@@ -48,6 +48,15 @@ struct SpecialFoldersHelpView: View {
     /// rather than name, and only in that one case.
     nonisolated static let noCurriculumFolderYet: String = "Your curriculum folder"
 
+    /// The coverage row's explanation, for one map page and for several.
+    nonisolated static let coverageWhy: String =
+        "Do not write your own page with this name — it is replaced "
+        + "each time, so anything you put there would be lost."
+
+    nonisolated static let coverageWhyForSeveral: String =
+        "Do not write your own pages with these names — they are replaced "
+        + "each time, so anything you put there would be lost."
+
     /// What a list of names reads as when there are none.
     nonisolated static let noneChosen: String = "None chosen"
 
@@ -69,55 +78,30 @@ struct SpecialFoldersHelpView: View {
                 + "out which pages your course actually teaches."
         ))
 
-        // **The folder the build would use, not the name the course happens to
-        // have recorded.** `curriculum_folder` has only been written since
-        // 2026-08-23, and even now it is null for a course made without a
-        // ready-made payload or a skeleton — so a course older than that has
-        // no such key at all and is found by name alone. Measured on this Mac
-        // on 2026-09-06, across 15 course folders — most of them scratch
-        // working folders from test sessions, so read it as a shape rather
-        // than as a teacher population: 12 have no key, 1 has it null, 2 have
-        // it set and correct. **11 of the 15 were being shown the "Your
-        // curriculum folder" placeholder while a real folder sat in the
-        // vault.** Of those 11, 8 are now named exactly the folder the build
-        // uses, 1 names a folder the build finds no expectation pages in (so
-        // no map is built either way, and the teacher is at least told which
-        // folder to fill), and 2 are named the alphabetically first of TWO
-        // curriculum folders where the build uses the other — see the last
-        // paragraph, which is not hypothetical.
+        // **The folders the build maps, not the names the course happens to
+        // have recorded (#128).** A course can have several curriculum
+        // folders, each with a coverage map of its own, and this row names
+        // every one — found the way the build finds them: the folders the
+        // course declares (`curriculum_folders`, then the legacy
+        // `curriculum_folder`) that hold an expectation page on disk, or, when
+        // none does, the one folder the old scan finds. While no folder holds
+        // a page yet, it names the one folder the by-name rule gives, so a new
+        // course is still told where its expectations go.
         //
-        // The other half is sharper: a folder renamed in Finder or Obsidian
-        // leaves the key naming something that is no longer there, and a name
-        // a teacher cannot find is worse than the placeholder, because it
-        // looks like an answer. (A rename made in Course Settings does not do
-        // that — `SpecialFolderRenamer` materialises the key at the one moment
-        // Plantoir witnesses the rename.)
+        // Before #128 this was decided by NAME alone, and on a course keeping
+        // both an "Ontario Curriculum" and a "College Board Curriculum" folder
+        // it named College Board (alphabetically first) while the map was
+        // built from Ontario — measured on this Mac on 2026-09-06, on two real
+        // courses. Reading the disk, as the build does, is what closed it
+        // (`contracts/shared-rules.json` → `specialNames.curriculumFoldersResolution`).
         //
-        // `CurriculumFolderRule` is the same rule folder protection uses, and
-        // asks in the same ORDER as `_find_curriculum_folder` in
-        // `build_site.py` — the recorded name first, then the folder whose
-        // name mentions the curriculum — among the shared folders the course
-        // has recorded. It is narrower in two ways neither app can see from
-        // configuration: the build scans the merged tree on disk, per-section
-        // folders included, and it also wants an expectation page inside the
-        // folder.
-        //
-        // **So the build can pass over the folder named here in favour of
-        // another, and on this Mac it does — for two courses that keep both
-        // an "Ontario Curriculum" and a "College Board Curriculum" folder.**
-        // The tie-break is alphabetical (pinned by `specialNames`
-        // → `curriculumFolderResolution`), the College Board pages are named
-        // "1.A" rather than in expectation-code form, and so the build builds
-        // the map from Ontario Curriculum while this row says College Board.
-        // Both apps agree, which is why it is not fixed here on a whim:
-        // teaching the apps to break the tie the way the build does means
-        // reading the vault, and that is a shared decision, written up in
-        // `TODO.md`. Naming a real folder of the teacher's is still righter
-        // than telling them to create one they already have.
+        // A recorded name the course no longer has is never shown: a name a
+        // teacher cannot find is worse than the placeholder, because it looks
+        // like an answer.
+        let resolvedCurriculum: [String] = CurriculumFolderRule.resolvedFolders(for: course)
         let curriculumName: String
-        if let resolved = CurriculumFolderRule.resolvedCurriculumFolder(for: course),
-           !resolved.isEmpty {
-            curriculumName = resolved
+        if !resolvedCurriculum.isEmpty {
+            curriculumName = SpecialFoldersHelpView.listed(resolvedCurriculum)
         } else {
             curriculumName = SpecialFoldersHelpView.noCurriculumFolderYet
         }
@@ -169,14 +153,30 @@ struct SpecialFoldersHelpView: View {
                 + "your site. Your own copy is left exactly as you wrote it."
         ))
 
+        // Every map page the course has (#128), primary first — so a teacher
+        // with two maps knows both names they must not write.
+        let mapTitles: [String] = coveragePageTitles
         rows.append(SpecialFolderEntry(
-            name: "Curriculum Coverage",
+            name: mapTitles.isEmpty
+                ? CurriculumFolderRule.primaryMapTitle
+                : SpecialFoldersHelpView.listed(mapTitles),
             what: "Written for you, every time you build",
-            why: "Do not write your own page with this name — it is replaced "
-                + "each time, so anything you put there would be lost."
+            why: mapTitles.count > 1
+                ? SpecialFoldersHelpView.coverageWhyForSeveral
+                : SpecialFoldersHelpView.coverageWhy
         ))
 
         return rows
+    }
+
+    /// The title of every coverage map this course has, from the disk.
+    var coveragePageTitles: [String] {
+        let configuration: CourseConfiguration = course.configuration
+        return CurriculumFolderRule.coveragePageTitles(
+            declared: configuration.curriculumFolders,
+            in: configuration.sharedFolders,
+            withPages: CurriculumFolderRule.foldersWithPages(for: course)
+        )
     }
 
     /// The graded folders as a teacher would say them, including the case where

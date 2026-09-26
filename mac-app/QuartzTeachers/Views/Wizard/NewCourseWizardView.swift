@@ -142,6 +142,12 @@ struct NewCourseWizardView: View {
     @State var perSectionFiles: [String] = WizardDefaults.perSectionFiles
     @State var gradedFolders: [String] = ["Tasks"]
 
+    /// The curriculum folders the teacher ticked under "Curriculum folders"
+    /// (#128), or nil while they have not touched the list — in which case
+    /// nothing is written and setup records the payload's own folder, exactly
+    /// as before, so the file every earlier path wrote is unchanged.
+    @State var curriculumFolderTicks: [String]? = nil
+
     /// What the last adoption put into the five lists above, so that turning
     /// the skeleton toggle off can put the defaults back for exactly the
     /// lists the teacher has NOT edited since. Nil until a skeleton is
@@ -452,10 +458,86 @@ struct NewCourseWizardView: View {
         )
     }
 
-    var wizardResolvedCurriculumFolder: String? {
-        let declared: String? = ExampleContentCatalog.curriculumFolder(forCode: courseCode)
+    /// The one curriculum folder the payload or skeleton declares, if any.
+    var wizardDeclaredPayloadFolder: String? {
+        return ExampleContentCatalog.curriculumFolder(forCode: courseCode)
             ?? SkeletonCatalog.family(forCode: courseCode)?.curriculumFolder
-        return CurriculumFolderRule.resolvedCurriculumFolder(configured: declared, in: sharedFolders)
+    }
+
+    /// What this course will declare: the teacher's ticks, or the payload's
+    /// folder while they have not touched the list.
+    var wizardDeclaredCurriculumFolders: [String] {
+        if let curriculumFolderTicks {
+            return curriculumFolderTicks
+        }
+        if let declared = wizardDeclaredPayloadFolder {
+            return [declared]
+        }
+        return []
+    }
+
+    /// Nothing is on disk yet: the payload's folder is the one that WILL hold
+    /// expectation pages, when they are being installed (#128).
+    var wizardCurriculumFoldersWithPages: [String] {
+        guard effectiveCurriculumPagesEnabled, let declared = wizardDeclaredPayloadFolder else {
+            return []
+        }
+        for folder in sharedFolders where folder.lowercased() == declared.lowercased() {
+            return [folder]
+        }
+        return []
+    }
+
+    var wizardResolvedCurriculumFolders: [String] {
+        return CurriculumFolderRule.resolvedFolders(
+            declared: wizardDeclaredCurriculumFolders,
+            in: sharedFolders,
+            withPages: wizardCurriculumFoldersWithPages
+        )
+    }
+
+    /// The "Curriculum folders" checkboxes (#128): offered only when there
+    /// are two or more to choose between.
+    var offeredCurriculumFolders: [String] {
+        return CurriculumFoldersOffer.offered(folders: sharedFolders, declared: wizardDeclaredCurriculumFolders)
+    }
+
+    var tickedCurriculumFolders: [String] {
+        let declared: [String] = wizardDeclaredCurriculumFolders
+        let mapped: [String] = CurriculumFolderRule.mappedFolders(
+            declared: declared, in: sharedFolders, withPages: wizardCurriculumFoldersWithPages
+        )
+        return CurriculumFoldersOffer.ticked(folders: sharedFolders, declared: declared, mapped: mapped)
+    }
+
+    var curriculumFolderTicksBinding: Binding<[String]> {
+        return Binding(
+            get: {
+                return tickedCurriculumFolders
+            },
+            set: { newValue in
+                let current: [String] = tickedCurriculumFolders
+                for folder in newValue where !current.contains(folder) {
+                    curriculumFolderTicks = CurriculumFoldersOffer.ticking(
+                        folder, ticked: current, folders: sharedFolders
+                    )
+                    return
+                }
+                for folder in current where !newValue.contains(folder) {
+                    if let written = CurriculumFoldersOffer.unticking(folder, ticked: current) {
+                        curriculumFolderTicks = written
+                    }
+                    return
+                }
+            }
+        )
+    }
+
+    func curriculumFolderTickProtection(for folder: String) -> ItemProtection {
+        if CurriculumFoldersOffer.canUntick(folder, ticked: tickedCurriculumFolders) {
+            return .ordinary
+        }
+        return .blocked(reason: CurriculumFoldersOffer.lastStaysTicked)
     }
 
     /// What a teacher is told when this course will start with nothing in
@@ -1211,6 +1293,17 @@ struct NewCourseWizardView: View {
                             onRemove: { _ in reconcileGradedFolders() },
                             protection: wizardSharedFolderProtection
                         )
+                        if !offeredCurriculumFolders.isEmpty {
+                            VStack(alignment: .leading, spacing: 4) {
+                                MembershipToggleListView(
+                                    title: CurriculumFoldersOffer.label,
+                                    allItems: offeredCurriculumFolders,
+                                    members: curriculumFolderTicksBinding,
+                                    protection: curriculumFolderTickProtection
+                                )
+                                ExampleCaption(CurriculumFoldersOffer.caption)
+                            }
+                        }
                         StringListEditorView(
                             title: "Shared files",
                             hidesMarkdownExtension: true,
@@ -1459,18 +1552,17 @@ struct NewCourseWizardView: View {
     }
 
     func wizardSharedFolderProtection(for folder: String) -> ItemProtection {
-        if let resolvedCurriculum = wizardResolvedCurriculumFolder, folder == resolvedCurriculum {
-            if effectiveCurriculumCoverageEnabled {
-                return .blocked(reason: SpecialNames.curriculumFolderBlockedByCoverageMap)
-            } else if effectiveCurriculumPagesEnabled {
-                let jurisdiction: String = ExampleContentCatalog.jurisdictionName(forCode: courseCode)
-                return .blocked(reason: SpecialNames.curriculumFolderBlockedByCurriculumPages(jurisdiction: jurisdiction))
-            } else {
-                return .consequential(
-                    title: SpecialNames.removeCurriculumFolderTitle(for: folder),
-                    message: SpecialNames.removeCurriculumFolderMessage
-                )
-            }
+        // One rule with Course Settings (#128): `CurriculumFolderProtection`.
+        if let curriculum = CurriculumFolderProtection.decide(
+            folder: folder,
+            resolved: wizardResolvedCurriculumFolders,
+            coverageOn: effectiveCurriculumCoverageEnabled,
+            pagesOn: effectiveCurriculumPagesEnabled,
+            declaredPayloadFolder: wizardDeclaredPayloadFolder,
+            surface: .wizard,
+            jurisdiction: ExampleContentCatalog.jurisdictionName(forCode: courseCode)
+        ) {
+            return curriculum
         }
         if gradedFolders.contains(folder) {
             if effectiveCurriculumCoverageEnabled && gradedFolders.count <= 1 {
@@ -1817,6 +1909,20 @@ struct NewCourseWizardView: View {
             "show_section_marker": ["sections": markerMap],
             "color_schemes": schemeMap,
         ]
+
+        // The curriculum folders the teacher ticked (#128), in the order the
+        // ticks left them, the payload's own folder first. Written ONLY when
+        // they touched the list: otherwise setup records the payload's folder
+        // itself, and the file is the one every earlier path wrote.
+        if let curriculumFolderTicks {
+            var declared: [String] = []
+            for name in curriculumFolderTicks where chosenSharedFolders.contains(name) {
+                declared.append(name)
+            }
+            if !declared.isEmpty {
+                config["curriculum_folders"] = declared
+            }
+        }
 
         // Omitted entirely rather than written as `[]` when nobody has
         // opted in — a course that never touches this feature writes the

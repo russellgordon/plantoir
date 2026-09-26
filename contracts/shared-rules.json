@@ -760,17 +760,58 @@
           "why": "An AP Essential Knowledge code. Not measured on a real course, so refused until one is: admitting it is a deliberate change to this case, not an accident of a wider pattern."
         },
         {
-          "code": "CRD-1.A",
-          "expect": false,
-          "why": "An AP Learning Objective code - refused for the same reason as 1.A.1."
-        },
-        {
           "code": "1.A Investigate the situation",
           "expect": false,
           "why": "Whole-name match, in this shape as in the other."
+        },
+        {
+          "code": "CRD-1.A",
+          "expect": true,
+          "why": "A College Board learning objective (AP Computer Science Principles): two to four CAPITAL letters, a hyphen, digits, a dot, one capital letter. Added for Russell's marketing course, 2026-09-26."
+        },
+        {
+          "code": "AAP-2.B",
+          "expect": true
+        },
+        {
+          "code": "IOC-1.F",
+          "expect": true
+        },
+        {
+          "code": "DAT-12.C",
+          "expect": true,
+          "why": "A two-digit number after the hyphen."
+        },
+        {
+          "code": "CRD-1.a",
+          "expect": false,
+          "why": "The learning-objective shape is capitals only - unlike the other two shapes, which accept either case."
+        },
+        {
+          "code": "crd-1.A",
+          "expect": false
+        },
+        {
+          "code": "C-1.A",
+          "expect": false,
+          "why": "At least two letters before the hyphen."
+        },
+        {
+          "code": "ABCDE-1.A",
+          "expect": false,
+          "why": "At most four."
+        },
+        {
+          "code": "CRD-1.A.1",
+          "expect": false,
+          "why": "An Essential Knowledge code - refused for the reason 1.A.1 is."
+        },
+        {
+          "code": "CRD-1",
+          "expect": false
         }
       ],
-      "note": "An expectation page is named by its code, the WHOLE name, not a prefix, in one of two shapes: a letter, digits, a dot, digits (Ontario's and BC's A1.1, B2.3), or digits, a dot, one letter (the College Board's 1.A, #128). Index and strand-heading pages sit in the same folder and must not be counted. Measured before the second shape was admitted (2026-09-26): none of the 2,842 curriculum pages shipped under support/ (39 payloads, 50 skeleton families) changes classification. Three readers run these cases: build_site.is_expectation_code (scripts/test_coverage_maps.py - the build had disagreed with this list about b2.3 until then, because nothing ran it), the mac's AssistCurriculumMentions.isExpectationCode, and Windows' CurriculumRules.IsExpectationCode. The build and the mac do not trim the name; Windows does, and no case here depends on it."
+      "note": "An expectation page is named by its code, the WHOLE name, not a prefix, in one of three shapes: a letter, digits, a dot, digits (Ontario's and BC's A1.1, B2.3); digits, a dot, one letter (a College Board skill, 1.A, #128); or two to four capital letters, a hyphen, digits, a dot, one capital letter (a College Board learning objective, CRD-1.A, added the same day for a marketing course). Index and strand-heading pages sit in the same folder and must not be counted. Measured before the second shape was admitted (2026-09-26): none of the 2,842 curriculum pages shipped under support/ (39 payloads, 50 skeleton families) changes classification. Three readers run these cases: build_site.is_expectation_code (scripts/test_coverage_maps.py - the build had disagreed with this list about b2.3 until then, because nothing ran it), the mac's AssistCurriculumMentions.isExpectationCode, and Windows' CurriculumRules.IsExpectationCode. The build and the mac do not trim the name; Windows does, and no case here depends on it."
     },
     "coveragePageTitles": {
       "rule": "One map per mapped curriculum folder, in the order given (primary first). The PRIMARY folder's map is titled 'Curriculum Coverage'; every other map is '<Folder> Coverage'. A title that would repeat an earlier one, ignoring letter case, gets ' (2)', ' (3)'... The primary is the first folder the course declares (curriculum_folders, then the legacy curriculum_folder) - or, when no declared folder holds an expectation page, the one folder the old scan finds.",
@@ -844,6 +885,56 @@
             "Curriculum Coverage (2)"
           ],
           "why": "A second folder literally called Curriculum would otherwise overwrite the first map."
+        }
+      ]
+    },
+    "coverageMapOrder": {
+      "rule": "How a coverage map lays out its codes. Each code sits in a column: a letter-first code under its letter, UPPER-CASED (b2.3 is column B); a skill under its number (1.A is column 1); a learning objective under its prefix (CRD-1.A is column CRD). Columns: letters alphabetically, then skill numbers in number order, then learning-objective prefixes alphabetically. Within a column: by number, then by the part after the dot (A2.1 before A10.1; CRD-2.A before CRD-10.A). Only letter-first codes have an overall expectation (B2 for b2.3), and so chips.",
+      "why": "The map is drawn by the build alone, so only scripts/test_coverage_maps.py runs these; they are here because the order is a decision somebody will be asked about, and the old sort key crashed on the first code it had not been written for (int('') for 1.A).",
+      "cases": [
+        {
+          "codes": [
+            "CRD-10.A",
+            "A10.1",
+            "b2.3",
+            "1.A",
+            "12.A",
+            "AAP-2.B",
+            "CRD-2.A",
+            "A2.1",
+            "2.C",
+            "CRD-2.B"
+          ],
+          "sorted": [
+            "A2.1",
+            "A10.1",
+            "b2.3",
+            "1.A",
+            "2.C",
+            "12.A",
+            "AAP-2.B",
+            "CRD-2.A",
+            "CRD-2.B",
+            "CRD-10.A"
+          ],
+          "columns": {
+            "A2.1": "A",
+            "A10.1": "A",
+            "b2.3": "B",
+            "1.A": "1",
+            "2.C": "2",
+            "12.A": "12",
+            "AAP-2.B": "AAP",
+            "CRD-2.A": "CRD",
+            "CRD-2.B": "CRD",
+            "CRD-10.A": "CRD"
+          },
+          "overall": {
+            "A2.1": "A2",
+            "b2.3": "B2",
+            "1.A": null,
+            "CRD-2.A": null
+          }
         }
       ]
     },
@@ -4962,11 +5053,12 @@
     "curriculumFoldersOffer": {
       "label": "Curriculum folders",
       "caption": "Tick each folder that holds curriculum expectations. Each one gets its own coverage map on your website.",
-      "rule": "Course Settings and the new-course wizard list, as checkboxes, every shared folder whose name mentions 'curriculum' plus every declared folder the course has - but only when there are at least TWO such folders, because with one there is nothing to choose. A folder is ticked when it is in curriculumFoldersResolution's `resolved` list (the wizard: when it is declared, or is the payload's folder). Ticking writes curriculum_folders as the ticked folders in the order the list shows them, with the ones already resolved first, so the primary folder - whose map is 'Curriculum Coverage' - stays primary. The last ticked folder cannot be unticked. Nothing is ever ticked for the teacher.",
-      "why": "Russell's ruling on #128: maps only for DECLARED folders, and the apps OFFER to declare one rather than deciding for the teacher. Showing the folder the build maps today as ticked, even on a course that declared nothing, is what stops the first tick from quietly dropping that map: declaring only College Board would otherwise end the fallback that found Ontario.",
+      "lastStaysTicked": "At least one curriculum folder stays ticked, so your course keeps its coverage map. Tick another folder first.",
+      "rule": "Course Settings and the new-course wizard list, as checkboxes, every shared folder whose name mentions 'curriculum' plus every declared folder the course has, in the order the list shows them - but only when there are at least TWO such folders, because with one there is nothing to choose. TICKED are the folders the build maps (curriculumFoldersResolution's `mapped`), or, while none holds a page, the declared folders the course has; the wizard, which has no pages yet, ticks the payload's declared folder and whatever the teacher ticked. A folder is never ticked just because of its name. Ticking writes curriculum_folders as the folders already ticked, in their order - so the primary folder, whose map is 'Curriculum Coverage', stays primary - then the new one. Unticking writes the others; the last ticked folder cannot be unticked.",
+      "why": "Russell's ruling on #128: maps only for DECLARED folders, and the apps OFFER to declare one rather than deciding for the teacher. Showing the folder the build maps today as ticked, even on a course that declared nothing, is what stops the first tick from quietly dropping that map: declaring only College Board would otherwise end the fallback that found Ontario. Rejected: ticking every folder whose name mentions the curriculum by default (the by-name guess this piece removes from the build, back by another route), and a checkbox on every shared folder (one choice buried in a dozen that are not curriculum at all).",
       "cases": [
         {
-          "name": "LCS default, nothing declared",
+          "name": "LCS default, nothing declared, Ontario holds the map",
           "folders": [
             "Concepts",
             "Ontario Curriculum",
@@ -4974,7 +5066,7 @@
             "Tasks"
           ],
           "declared": [],
-          "resolved": [
+          "mapped": [
             "Ontario Curriculum"
           ],
           "offered": [
@@ -4994,7 +5086,7 @@
             "Tasks"
           ],
           "declared": [],
-          "resolved": [
+          "mapped": [
             "Ontario Curriculum"
           ],
           "tick": "College Board Curriculum",
@@ -5004,7 +5096,7 @@
           ]
         },
         {
-          "name": "the list's order after the resolved ones",
+          "name": "the ticked folders keep their order ahead of the list's",
           "folders": [
             "College Board Curriculum",
             "Ontario Curriculum"
@@ -5012,7 +5104,7 @@
           "declared": [
             "Ontario Curriculum"
           ],
-          "resolved": [
+          "mapped": [
             "Ontario Curriculum"
           ],
           "tick": "College Board Curriculum",
@@ -5031,7 +5123,7 @@
             "Ontario Curriculum",
             "College Board Curriculum"
           ],
-          "resolved": [
+          "mapped": [
             "Ontario Curriculum",
             "College Board Curriculum"
           ],
@@ -5039,6 +5131,54 @@
           "writes": [
             "Ontario Curriculum"
           ]
+        },
+        {
+          "name": "the last ticked folder stays ticked",
+          "folders": [
+            "Ontario Curriculum",
+            "College Board Curriculum"
+          ],
+          "declared": [],
+          "mapped": [
+            "Ontario Curriculum"
+          ],
+          "untick": "Ontario Curriculum",
+          "writes": null,
+          "why": "Refused: with nothing declared, the build would find the map again by itself, and the box would seem to do nothing."
+        },
+        {
+          "name": "declared but no pages yet: the declared folders are ticked",
+          "folders": [
+            "Ontario Curriculum",
+            "College Board Curriculum"
+          ],
+          "declared": [
+            "Ontario Curriculum",
+            "College Board Curriculum"
+          ],
+          "mapped": [],
+          "offered": [
+            "Ontario Curriculum",
+            "College Board Curriculum"
+          ],
+          "ticked": [
+            "Ontario Curriculum",
+            "College Board Curriculum"
+          ]
+        },
+        {
+          "name": "a new LCS course from scratch: nothing ticked for the teacher",
+          "folders": [
+            "Ontario Curriculum",
+            "College Board Curriculum"
+          ],
+          "declared": [],
+          "mapped": [],
+          "offered": [
+            "Ontario Curriculum",
+            "College Board Curriculum"
+          ],
+          "ticked": []
         },
         {
           "name": "one curriculum folder: nothing offered",
@@ -5050,11 +5190,10 @@
           "declared": [
             "Curriculum"
           ],
-          "resolved": [
+          "mapped": [
             "Curriculum"
           ],
-          "offered": [],
-          "ticked": []
+          "offered": []
         },
         {
           "name": "a declared folder that does not say curriculum is offered too",
@@ -5066,13 +5205,13 @@
             "Ontario Curriculum",
             "AP CSP"
           ],
-          "resolved": [
+          "mapped": [
             "Ontario Curriculum",
             "AP CSP"
           ],
           "offered": [
-            "Ontario Curriculum",
-            "AP CSP"
+            "AP CSP",
+            "Ontario Curriculum"
           ],
           "ticked": [
             "Ontario Curriculum",

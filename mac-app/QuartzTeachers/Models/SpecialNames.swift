@@ -51,6 +51,13 @@ enum SpecialNames {
     nonisolated static let removeCurriculumFolderMessage: String =
         "This folder holds your curriculum expectations. Removing it means expectations will not be available if you later enable curriculum coverage."
 
+    /// Asked, rather than refused, when the map is on and the course has
+    /// another curriculum folder with a map (#128). It does not promise that
+    /// another map stays: on a course whose second folder is still empty, it
+    /// would not.
+    nonisolated static let removeCurriculumFolderWithItsMapMessage: String =
+        "This folder holds curriculum expectations with a coverage map of their own. Removing it takes that map off your website."
+
     nonisolated static let renameFolderExplanation: String =
         "This renames the folder on your Mac — in every section that has one — and points your pages’ links at the new name. It happens straight away, so Cancel in Settings will not undo it."
 
@@ -198,29 +205,238 @@ enum SpecialNames {
     }
 }
 
-/// Determines which folder holds a course's curriculum expectation pages.
+/// Which folders hold a course's curriculum expectation pages (#128).
 ///
-/// Matches `_find_curriculum_folder` in `scripts/build_site.py`:
-/// if `curriculum_folder` is configured and present, it is used;
-/// otherwise the alphabetically first folder containing 'curriculum' (case-insensitive) is used.
+/// A course can have SEVERAL — an Ontario and a College Board folder — and
+/// each one that holds an expectation page gets a coverage map of its own. The
+/// build decides which (`configured_curriculum_folders`, `plan_coverage_maps`
+/// in `scripts/build_site.py`); this is the same rule, over the course's
+/// SHARED folders, and both are pinned by `contracts/shared-rules.json` →
+/// `specialNames.curriculumFoldersResolution`.
+///
+/// Three answers, because three questions are asked:
+/// - `declaredFolders` — what the course has written down: `curriculum_folders`
+///   in order, then the legacy `curriculum_folder`.
+/// - `mappedFolders` — what the BUILD maps: every declared folder holding an
+///   expectation page, or, when none does, the one folder the old scan finds.
+/// - `resolvedFolders` — what the apps protect and name: `mappedFolders`, or
+///   while no folder holds a page yet, the single folder the by-name rule
+///   gives, so a course whose folders are still empty is protected exactly as
+///   it was before.
 enum CurriculumFolderRule {
 
     // MARK: - Functions
 
-    /// Resolves the curriculum folder name from the configured `curriculum_folder` (if present and in the list)
-    /// or by scanning the available folder names sorted alphabetically for the first one
-    /// containing "curriculum" (case-insensitive).
-    nonisolated static func resolvedCurriculumFolder(
-        configured: String?,
-        in folders: [String]
-    ) -> String? {
-        if let configured = configured, !configured.isEmpty {
-            for folder in folders {
-                if folder == configured {
-                    return folder
+    /// The names a course declares: `curriculum_folders` (a list), then the
+    /// legacy `curriculum_folder` when it is not already there. Non-strings,
+    /// empty names, path-like names and repeats in any letter case are dropped
+    /// — the build refuses the same ones, because each is used to build a path.
+    nonisolated static func declaredFolders(list: Any?, legacy: Any?) -> [String] {
+        var candidates: [Any] = []
+        if let entries = list as? [Any] {
+            for entry in entries {
+                candidates.append(entry)
+            }
+        }
+        if let legacy {
+            candidates.append(legacy)
+        }
+        var names: [String] = []
+        var seen: Set<String> = []
+        for candidate in candidates {
+            guard let name = candidate as? String, isSingleFolderName(name) else {
+                continue
+            }
+            let key: String = name.lowercased()
+            if seen.contains(key) {
+                continue
+            }
+            seen.insert(key)
+            names.append(name)
+        }
+        return names
+    }
+
+    /// The folders the build draws a coverage map from, primary first.
+    ///
+    /// `withPages` names the folders (as the LIST spells them) that hold at
+    /// least one expectation page.
+    nonisolated static func mappedFolders(declared: [String], in folders: [String], withPages: [String]) -> [String] {
+        var mapped: [String] = []
+        for name in declared {
+            guard let folder = folderNamed(name, in: folders) else {
+                continue
+            }
+            if mapped.contains(folder) || !withPages.contains(folder) {
+                continue
+            }
+            mapped.append(folder)
+        }
+        if !mapped.isEmpty {
+            return mapped
+        }
+        for candidate in foldersMentioningTheCurriculum(in: folders) {
+            if withPages.contains(candidate) {
+                return [candidate]
+            }
+        }
+        return []
+    }
+
+    /// The folders the apps protect and name: the mapped ones, or — while no
+    /// folder holds an expectation page — the ONE folder the by-name rule
+    /// gives: the first declared name the course has, else the alphabetically
+    /// first folder whose name mentions the curriculum.
+    nonisolated static func resolvedFolders(declared: [String], in folders: [String], withPages: [String]) -> [String] {
+        let mapped: [String] = mappedFolders(declared: declared, in: folders, withPages: withPages)
+        if !mapped.isEmpty {
+            return mapped
+        }
+        for name in declared {
+            if let folder = folderNamed(name, in: folders) {
+                return [folder]
+            }
+        }
+        if let first = foldersMentioningTheCurriculum(in: folders).first {
+            return [first]
+        }
+        return []
+    }
+
+    /// The title of each map over `mapped`, in order: the primary folder's map
+    /// is "Curriculum Coverage", every other "<Folder> Coverage", and a title
+    /// that would repeat an earlier one gets " (2)", " (3)"…
+    /// `contracts/shared-rules.json` → `curriculumRules.coveragePageTitles`.
+    nonisolated static func coveragePageTitles(for mapped: [String], primary: String?) -> [String] {
+        var titles: [String] = []
+        var taken: Set<String> = []
+        for name in mapped {
+            var title: String
+            if let primary, name.lowercased() == primary.lowercased() {
+                title = CurriculumFolderRule.primaryMapTitle
+            } else {
+                title = "\(name) Coverage"
+            }
+            let base: String = title
+            var number: Int = 2
+            while taken.contains(title.lowercased()) {
+                title = "\(base) (\(number))"
+                number += 1
+            }
+            taken.insert(title.lowercased())
+            titles.append(title)
+        }
+        return titles
+    }
+
+    /// The primary folder: the first declared name, when any declared folder
+    /// has a map; otherwise the one folder the scan found.
+    nonisolated static func primaryFolder(declared: [String], mapped: [String]) -> String? {
+        for folder in mapped {
+            for name in declared {
+                if name.lowercased() == folder.lowercased() {
+                    return declared.first
                 }
             }
         }
+        return mapped.first
+    }
+
+    /// Every map's title for a course, from the declared names and the disk.
+    nonisolated static func coveragePageTitles(declared: [String], in folders: [String], withPages: [String]) -> [String] {
+        let mapped: [String] = mappedFolders(declared: declared, in: folders, withPages: withPages)
+        return coveragePageTitles(for: mapped, primary: primaryFolder(declared: declared, mapped: mapped))
+    }
+
+    /// Which of `names` hold at least one expectation page anywhere inside —
+    /// the same test the build makes (`_holds_expectation_pages`), recursive,
+    /// with the same code rule (`AssistCurriculumMentions.isExpectationCode`).
+    nonisolated static func foldersHoldingExpectationPages(in courseDirectory: URL, among names: [String]) -> [String] {
+        var holding: [String] = []
+        for name in names {
+            let folder: URL = courseDirectory.appendingPathComponent(name, isDirectory: true)
+            if folderHoldsAnExpectationPage(folder) {
+                holding.append(name)
+            }
+        }
+        return holding
+    }
+
+    /// The names worth looking inside: every declared folder the course has,
+    /// and every folder whose name mentions the curriculum.
+    nonisolated static func candidateFolders(declared: [String], in folders: [String]) -> [String] {
+        var candidates: [String] = []
+        for name in declared {
+            if let folder = folderNamed(name, in: folders), !candidates.contains(folder) {
+                candidates.append(folder)
+            }
+        }
+        for folder in folders {
+            if folder.lowercased().contains("curriculum") && !candidates.contains(folder) {
+                candidates.append(folder)
+            }
+        }
+        return candidates
+    }
+
+    /// The declared names of a course's configuration.
+    static func declaredFolders(of configuration: CourseConfiguration) -> [String] {
+        return configuration.curriculumFolders
+    }
+
+    /// The folders of `course` holding expectation pages, read from its folder.
+    ///
+    /// Asked once per row when Course Settings draws its folder lists, so the
+    /// answer is kept for a moment per course and per candidate list: a walk of
+    /// a hundred-page folder for each of a dozen rows on every redraw is work
+    /// for nothing. The window is short because a teacher can add the first
+    /// page in Obsidian while the window is open.
+    static func foldersWithPages(for course: Course) -> [String] {
+        let configuration: CourseConfiguration = course.configuration
+        let candidates: [String] = candidateFolders(declared: declaredFolders(of: configuration),
+                                                    in: configuration.sharedFolders)
+        let key: String = course.directoryURL.path + "\u{0}" + candidates.joined(separator: "\u{0}")
+        let now: Date = Date()
+        if let remembered = recentlyRead[key], now.timeIntervalSince(remembered.when) < 2 {
+            return remembered.holding
+        }
+        let holding: [String] = foldersHoldingExpectationPages(in: course.directoryURL, among: candidates)
+        recentlyRead[key] = (when: now, holding: holding)
+        return holding
+    }
+
+    /// See `foldersWithPages(for:)`.
+    private static var recentlyRead: [String: (when: Date, holding: [String])] = [:]
+
+    /// The curriculum folders of a course, for protection and the help sheet.
+    static func resolvedFolders(for course: Course) -> [String] {
+        let configuration: CourseConfiguration = course.configuration
+        return resolvedFolders(declared: declaredFolders(of: configuration),
+                               in: configuration.sharedFolders,
+                               withPages: foldersWithPages(for: course))
+    }
+
+    // MARK: - Stored properties
+
+    /// The one title every course with one map has always had.
+    nonisolated static let primaryMapTitle: String = "Curriculum Coverage"
+
+    // MARK: - Private helpers
+
+    /// The folder in the list a name refers to: the exact spelling first, then
+    /// in any letter case — and the LIST's spelling is returned, because
+    /// everything downstream builds paths and titles from the answer.
+    nonisolated private static func folderNamed(_ name: String, in folders: [String]) -> String? {
+        for folder in folders where folder == name {
+            return folder
+        }
+        for folder in folders where folder.lowercased() == name.lowercased() {
+            return folder
+        }
+        return nil
+    }
+
+    nonisolated private static func foldersMentioningTheCurriculum(in folders: [String]) -> [String] {
         var candidates: [String] = []
         for folder in folders {
             if folder.lowercased().contains("curriculum") {
@@ -228,14 +444,184 @@ enum CurriculumFolderRule {
             }
         }
         candidates.sort()
-        return candidates.first
+        return candidates
     }
 
-    /// Resolves the curriculum folder name for a course.
-    static func resolvedCurriculumFolder(for course: Course) -> String? {
-        return resolvedCurriculumFolder(
-            configured: course.configuration.curriculumFolder,
-            in: course.configuration.sharedFolders
+    nonisolated private static func isSingleFolderName(_ name: String) -> Bool {
+        if name.isEmpty || name == "." || name == ".." {
+            return false
+        }
+        if name.contains("/") || name.contains("\\") {
+            return false
+        }
+        return true
+    }
+
+    nonisolated private static func folderHoldsAnExpectationPage(_ folder: URL) -> Bool {
+        guard let enumerator = FileManager.default.enumerator(
+            at: folder, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]
+        ) else {
+            return false
+        }
+        for case let url as URL in enumerator {
+            if url.pathExtension.lowercased() != "md" {
+                continue
+            }
+            if AssistCurriculumMentions.isExpectationCode(url.deletingPathExtension().lastPathComponent) {
+                return true
+            }
+        }
+        return false
+    }
+}
+
+/// What removing a curriculum folder does (#128): refused only when it would
+/// take the course's LAST map away, asked first otherwise.
+/// `contracts/shared-rules.json` → `specialNames.curriculumFolderProtection`.
+enum CurriculumFolderProtection {
+
+    // MARK: - Stored properties
+
+    nonisolated enum Surface {
+        case settings
+        case wizard
+    }
+
+    // MARK: - Functions
+
+    /// The protection for `folder`, or nil when it is not one of the
+    /// `resolved` curriculum folders and the other rules (the marks pool)
+    /// decide. `jurisdiction` words the wizard's pages sentence.
+    nonisolated static func decide(
+        folder: String,
+        resolved: [String],
+        coverageOn: Bool,
+        pagesOn: Bool,
+        declaredPayloadFolder: String?,
+        surface: Surface,
+        jurisdiction: String
+    ) -> ItemProtection? {
+        if !resolved.contains(folder) {
+            return nil
+        }
+        if coverageOn && resolved.count == 1 {
+            switch surface {
+            case .settings:
+                return .blocked(reason: SpecialNames.curriculumFolderBlockedByCoverageSetting)
+            case .wizard:
+                return .blocked(reason: SpecialNames.curriculumFolderBlockedByCoverageMap)
+            }
+        }
+        if surface == .wizard && pagesOn && folder == declaredPayloadFolder {
+            return .blocked(reason: SpecialNames.curriculumFolderBlockedByCurriculumPages(jurisdiction: jurisdiction))
+        }
+        if coverageOn {
+            return .consequential(
+                title: SpecialNames.removeCurriculumFolderTitle(for: folder),
+                message: SpecialNames.removeCurriculumFolderWithItsMapMessage
+            )
+        }
+        return .consequential(
+            title: SpecialNames.removeCurriculumFolderTitle(for: folder),
+            message: SpecialNames.removeCurriculumFolderMessage
         )
+    }
+}
+
+/// The "Curriculum folders" checkboxes in Course Settings and the wizard
+/// (#128): the apps OFFER to declare a folder; neither declares one silently.
+/// `contracts/shared-rules.json` → `specialNames.curriculumFoldersOffer`.
+enum CurriculumFoldersOffer {
+
+    // MARK: - Stored properties
+
+    nonisolated static let label: String = "Curriculum folders"
+
+    nonisolated static let caption: String =
+        "Tick each folder that holds curriculum expectations. Each one gets its own coverage map on your website."
+
+    /// Why the last ticked folder cannot be unticked.
+    nonisolated static let lastStaysTicked: String =
+        "At least one curriculum folder stays ticked, so your course keeps its coverage map. Tick another folder first."
+
+    // MARK: - Functions
+
+    /// The folders offered as checkboxes, in the list's order: every folder
+    /// whose name mentions the curriculum, and every declared folder — or none
+    /// at all when there are fewer than two, since there is nothing to choose.
+    nonisolated static func offered(folders: [String], declared: [String]) -> [String] {
+        var offered: [String] = []
+        for folder in folders {
+            var isDeclared: Bool = false
+            for name in declared where name.lowercased() == folder.lowercased() {
+                isDeclared = true
+            }
+            if isDeclared || folder.lowercased().contains("curriculum") {
+                offered.append(folder)
+            }
+        }
+        if offered.count < 2 {
+            return []
+        }
+        return offered
+    }
+
+    /// The folders shown ticked: the ones the build maps, or — while none
+    /// holds a page — the declared folders the course has. Never a folder
+    /// just because of its name.
+    nonisolated static func ticked(folders: [String], declared: [String], mapped: [String]) -> [String] {
+        if !mapped.isEmpty {
+            return mapped
+        }
+        var ticked: [String] = []
+        for name in declared {
+            for folder in folders where folder.lowercased() == name.lowercased() && !ticked.contains(folder) {
+                ticked.append(folder)
+            }
+        }
+        return ticked
+    }
+
+    /// The `curriculum_folders` a tick writes: the folders already ticked, in
+    /// their order, so the primary stays primary; then the new one.
+    nonisolated static func ticking(_ folder: String, ticked: [String], folders: [String]) -> [String] {
+        var written: [String] = ticked
+        if !written.contains(folder) {
+            written.append(folder)
+        }
+        return keepingOrder(written, resolvedFirst: ticked, folders: folders)
+    }
+
+    /// What an untick writes: the ticked folders without it — or nil when it
+    /// is the last one, which stays ticked.
+    nonisolated static func unticking(_ folder: String, ticked: [String]) -> [String]? {
+        if !canUntick(folder, ticked: ticked) {
+            return nil
+        }
+        var written: [String] = []
+        for name in ticked where name != folder {
+            written.append(name)
+        }
+        return written
+    }
+
+    nonisolated static func canUntick(_ folder: String, ticked: [String]) -> Bool {
+        return ticked.contains(folder) && ticked.count > 1
+    }
+
+    /// The resolved folders in their own order, then everything else in the
+    /// order the list shows it.
+    nonisolated private static func keepingOrder(_ names: [String], resolvedFirst: [String], folders: [String]) -> [String] {
+        var ordered: [String] = []
+        for name in resolvedFirst where names.contains(name) {
+            ordered.append(name)
+        }
+        for folder in folders where names.contains(folder) && !ordered.contains(folder) {
+            ordered.append(folder)
+        }
+        for name in names where !ordered.contains(name) {
+            ordered.append(name)
+        }
+        return ordered
     }
 }

@@ -298,7 +298,7 @@ build means a re-run of the setup wizard (or a hand edit of
 | C2-2 | **Reading time toggle** | `quartz/components/ContentMeta.tsx` | Sets `showReadingTime` (and its trailing comma display) in `defaultOptions` to match `show_reading_time`. |
 | C2-3 | **Expand-on-navigate wiring** | `Explorer.tsx`, `explorer.inline.ts` | Injects `expandOnFolderClick` from course config as a `data-expand-on-navigate` attribute and gates the client script's "auto-open folders on the current page's path" logic behind it. Without the gate, navigating to a page inside a folder always sprang that folder open even when the teacher chose chevron-only expansion. |
 | C2-4 | **Patched Backlinks component** | `quartz/components/Backlinks.tsx` | Whole-file replacement from `support/Backlinks.tsx` — see D below. |
-| C2-5 | **Sidebar omit set** | `quartz.layout.ts` | First brings the section's copy of the B1 filter up to the current version (`ensure_sidebar_hide_rule_current`), then rewrites the anchor's `const omit = new Set([...])` with the course's `hidden` list AS STORED — `.md` kept, each name a JSON string — plus `Media` and `Curriculum Coverage.md` (`names_the_sidebar_hides`, never written back). This is the moment "hide from sidebar" choices become real. |
+| C2-5 | **Sidebar omit set** | `quartz.layout.ts` | First brings the section's copy of the B1 filter up to the current version (`ensure_sidebar_hide_rule_current`), then rewrites the anchor's `const omit = new Set([...])` with the course's `hidden` list AS STORED — `.md` kept, each name a JSON string — plus `Media`, `Curriculum Coverage.md` and every other coverage map's file this build wrote (#128: one map per curriculum folder) (`names_the_sidebar_hides`, never written back). This is the moment "hide from sidebar" choices become real. |
 | C2-6 | **Folder click behaviour** | `quartz.layout.ts` | Sets `folderClickBehavior` on every `Component.Explorer({...})` to `"collapse"` (name click expands) or `"link"` (name click navigates), per `expandOnFolderClick`. |
 | C2-7 | **Custom footer** | `quartz.layout.ts`, `quartz/components/Footer.tsx` | Normalizes the layout to `Component.Footer()` and replaces the footer JSX with the teacher's raw HTML (via `dangerouslySetInnerHTML`, backtick-escaped). Typically a licence notice. |
 | C2-8 | **Page title** | `quartz.config.ts` | Sets `pageTitle` to `"<emoji> <label> S<N>"` — per-section emoji, the uppercased course code (or the club's custom short label when the code has no grade digit), and the optional section marker. |
@@ -315,7 +315,7 @@ build means a re-run of the setup wizard (or a hand edit of
 | C2-19 | **Google Fonts request filtered** | `quartz/util/theme.ts`, `quartz/components/Head.tsx` | Quartz builds ONE stylesheet request from all three font choices, and this app offers system stacks. Google rejects the whole request if any family is unknown to it — HTTP 400, so NO fonts downloaded, including the code font mermaid measures in. System stacks and families are now filtered out, and an empty request is dropped entirely. |
 | C2-20 | **mhchem enabled** | `quartz/plugins/transformers/latex.ts` | Adds `import "katex/contrib/mhchem"`, so `$\ce{CaCO3(s) <=> CaO(s) + CO2(g)}$` renders. KaTeX runs at build time here, and the `katex` package Quartz already installs ships the extension, so this downloads nothing. |
 | C2-21 | **Curriculum coverage map styles** | `quartz/styles/base.scss` (appended) | The grid, chips, and the five-step red → orange → yellow → green → blue scale for the generated `Curriculum Coverage` page. The colours are deliberately NOT taken from the course's colour scheme — the map's whole meaning is that ordered reading, and a scheme that recoloured it would destroy that. The scale was SEARCHED rather than picked by eye: `scripts/choose_coverage_scale.py` scores candidates on CIEDE2000 separation and through deuteranopia and protanopia simulation, which is why the top step is blue rather than a darker green — the closest pair an ordinary-sighted reader now sees is ΔE 31, against ΔE 10 before. Cells carry the expectation's code and nothing else: a digit in every cell turned the map into a table of numbers, so the count now reaches a screen reader through the cell's label and a teacher through the hover preview. The legend is a vertical list below a rule, worded "addressed once", "addressed twice", and so on. The ring marking assessed work is two rings — white inside dark — so that it stays legible on all five cell colours; a single tone disappeared on either the yellow or the darkest step depending on which was chosen. The style block is REPLACED rather than skipped when it is already present, so a stylesheet surviving from an earlier build still picks up changes. |
-| C2-22 | **Backlinks "structural pages" set** | `quartz/components/Backlinks.tsx` | Rewrites the `const structural = new Set<string>([…])` block behind the `// CQ4T-STRUCTURAL-ANCHOR` comment in `support/Backlinks.tsx`, inserting the course's curriculum folder name and `Curriculum Coverage` in both title and slug form. Those pages link to everything by nature, so without this every content page's backlinks panel is dominated by the curriculum index and the generated coverage map — noise that buries the pages a teacher actually wants to see listed. |
+| C2-22 | **Backlinks "structural pages" set** | `quartz/components/Backlinks.tsx` | Rewrites the `const structural = new Set<string>([…])` block behind the `// CQ4T-STRUCTURAL-ANCHOR` comment in `support/Backlinks.tsx`, inserting every mapped curriculum folder's name and every coverage map's title (#128 — `Curriculum Coverage` always among them) in both title and slug form. Those pages link to everything by nature, so without this every content page's backlinks panel is dominated by the curriculum index and the generated coverage map — noise that buries the pages a teacher actually wants to see listed. |
 | C2-23 | **Page title text shrinking & navbar vertical centering** | `quartz/styles/base.scss` (appended) | Prevents the navbar course code and section number from wrapping onto a second line on mobile by dynamically scaling the page title font size (`clamp(0.875rem, 4.5vw, 1.75rem)`) down to 50% of its original size and setting `white-space: nowrap`, while vertically centering the course emoji, code, section, and the light/dark mode toggle button with the adjacent search field. |
 | C2-24 | **Deploy domain & `baseUrl` sync** | `quartz.config.ts` | Sets `baseUrl` to the section's actual public domain (from advanced custom domains, `.netlify_sites/`, or `.cloudflare_sites/`), or clears it when unpublished. Ensures OpenGraph (`og:image`, `og:url`) and Twitter card tags point to the teacher's live site rather than the stock `quartz.jzhao.xyz` default. |
 | C2-25 | **The site's icon** | `quartz/static/{favicon.ico,icon.svg,apple-touch-icon.png,icon.png}`, `content/favicon.ico` | `install_favicon()` copies the generated set from `/opt/support/favicon` (see `scripts/brand_images.py`, which draws it from `mac-app/Plantoir.icon`). `icon.png` is overwritten rather than merely unlinked, so a built site carries no Quartz logo even where nothing points at one. `favicon.ico` is installed TWICE on purpose: the `static/` copy is what the A5 tags link, while the CONTENT-ROOT copy is the only way to get a file to `public/favicon.ico` — Quartz's Assets emitter copies non-Markdown files out of `content/` unchanged, and the Static emitter cannot write above `public/static/`. That root copy is what answers the implicit `GET /favicon.ico` made by feed readers, link unfurlers and older browsers that never read the page. It runs after the content folder is rebuilt from scratch, because a copy made any earlier is deleted a few lines later — silently, since the page still looks correct. |
@@ -334,14 +334,19 @@ adapt *Obsidian conventions* to *Quartz expectations* and are detailed in
 - Curriculum folders' `created` timestamps synced to the section's newest
   page.
 - `content/Media` created as a symlink to the course-level media folder.
-- **`Curriculum Coverage.md` generated** (when the course has curriculum
-  pages and `include_curriculum_coverage` is not false): a heat map of every
+- **One coverage map per curriculum folder generated** (#128; when the
+  course has curriculum pages and `include_curriculum_coverage` is not
+  false — one switch covers every map). The primary folder's map is
+  `Curriculum Coverage.md`, exactly as before; each further DECLARED
+  folder holding expectation pages gets `<Folder> Coverage.md` (see
+  "Curriculum maps" below and `documentation/05-build-pipeline.md` → "The
+  curriculum coverage maps"). Each is a heat map of every
   specific expectation, coloured by how many pages TRANSCLUDE it, with
   assessed work marked and one chip per overall expectation. It is written
   into the assembled content, never into the teacher's vault, so it is
   rebuilt from the site's own links every time and cannot drift. The link to
-  it is inserted into the BUILT copy of `Key Links`, directly under the
-  curriculum entry. The page is also added to the Explorer's omit set, so
+  each is inserted into the BUILT copy of `Key Links`, directly under the
+  entry pointing into its folder. The page is also added to the Explorer's omit set, so
   it never appears in the sidebar: it is a teacher's instrument, reached
   from Key Links, and it sits at the content root where it would otherwise
   be listed above every folder. **Only published pages count** — a page held back with
@@ -385,8 +390,37 @@ Complements the locale change, and carries two changes. First, an
 on a specific page — useful where "when did we do this?" makes no sense (a
 style guide, a syllabus) or where the link graph would mislead. Second, the
 `CQ4T-STRUCTURAL-ANCHOR` set that C2-22 rewrites each build, which keeps the
-curriculum index and the generated coverage map out of every other page's
+curriculum indexes and the generated coverage maps out of every other page's
 backlinks.
+
+### Curriculum maps: a second curriculum, and the codes a map reads (#128)
+
+A course has one coverage map per curriculum folder it DECLARES
+(`curriculum_folders` in `course_config.json`) that holds expectation pages.
+The first folder's map keeps the page every course has always had,
+`Curriculum Coverage`; every other is `<Folder> Coverage` — `College Board
+Curriculum Coverage`, say — so declaring a second folder never renames the
+first map. A course that declares nothing gets the one map it always had,
+from the folder whose name mentions the curriculum.
+
+A page is an expectation when its whole name is a code in one of three
+shapes: `A1.1` (Ontario, BC; either case), `1.A` (a College Board skill), or
+`CRD-1.A` — two to four capital letters, a hyphen, a number, a dot and one
+capital letter (a College Board learning objective, such as `AAP-2.B` or
+`IOC-1.F`). `12.3`, `B2`, `1.A.1` and `CRD-1.A.1` are not. On the map,
+Ontario's strands come first by letter, then the skills by number, then
+the learning objectives in a column per prefix (`CRD`), ordered by number
+and letter. Only Ontario-style strands carry the chips for overall
+expectations; a map with none leaves out every sentence about them.
+
+**Adding a second curriculum** — AP Computer Science Principles, say.
+Nothing Plantoir ships contains the College Board's pages: the framework's
+text is the teacher's to bring. A teacher makes a folder such as
+`College Board Curriculum`, ticks it under Course Settings → "Curriculum
+folders", and asks "Revise with Claude…" to draft one page per expectation
+code from the framework they have — `1.A`, `CRD-1.A` and so on, one page
+each, named by the code alone. The next preview or publish draws a second
+coverage map for it, linked from Key Links under that folder's entry.
 
 ---
 

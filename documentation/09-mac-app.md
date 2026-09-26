@@ -1879,6 +1879,42 @@ curriculum folder is what let the retired sentence sit unguarded, and the
 banned-word sweep could not stand in for it — a banned word catches only that
 word.
 
+### Curriculum folders: several maps, protection and the offer (#128)
+
+A course has one coverage map per declared curriculum folder that holds
+expectation pages (the rule and its reasons: `05-build-pipeline.md` → "The
+curriculum coverage maps"). Three places in the app follow it, all through
+`CurriculumFolderRule` in `SpecialNames.swift`, which is the build's rule over
+the course's SHARED folders:
+
+- **Protection** (`CurriculumFolderProtection.decide`, asked by Course Settings
+  and the wizard alike): only the LAST folder with a map is refused while the
+  map is on; the others ask first with
+  `SpecialNames.removeCurriculumFolderWithItsMapMessage`, which deliberately
+  does not promise that another map stays. The folders with a map are read
+  from the disk (`CurriculumFolderRule.foldersWithPages`, recursive, the same
+  code rule as the build); the wizard, with nothing on disk yet, counts the
+  payload's folder when its pages are being installed. Course Settings asks
+  once per row, so the disk answer is kept for two seconds per course — long
+  enough to cover one drawing of the lists, short enough that a page added in
+  Obsidian shows up.
+- **"Folders Plantoir uses"** names every curriculum folder with a map and
+  every map page, `whyForSeveral` when there is more than one.
+- **"Curriculum folders"** — checkboxes under the shared folders, in both
+  Course Settings and the wizard, shown only when there are two or more
+  folders to choose between (`CurriculumFoldersOffer`). The folders with a
+  map are shown ticked even on a course that declared nothing, so the first
+  tick writes them FIRST and never drops the map the build's fallback found;
+  the last ticked folder cannot be unticked. The wizard writes
+  `curriculum_folders` only when the teacher touched the list, so every
+  existing wizard path writes the same file as before
+  (`WizardStructureTests`' golden).
+
+The build's `PLANTOIR_MAPS:` line is read by `CoverageMapsBuilt` (console and
+scheduled log) into `curriculum maps built` on the trail, and since this piece
+`BuildMarkerLine` keeps ANY `PLANTOIR_…:` line out of the console, so a marker
+the app has no reader for yet never reaches a teacher as raw JSON.
+
 ## The wizard's Starting Content section, and what governs what
 
 Five toggles can appear there, and their ORDER is their dependency, read
@@ -2626,9 +2662,12 @@ Folder rows in Course Settings carry a pencil. It renames the folder **on
 disk** — in every section that has one — rewrites the qualified links that name
 it, and carries across every `course_config.json` key that mentioned it
 (`shared_folders`/`per_section_folders`, `graded_folders`, `curriculum_folder`,
-`class_folder`, `hidden`, `expandable`, `excluded_items`). Renaming the class
-folder or the curriculum folder also WRITES its key, even on a course that
-never had one — a rename is the one moment Plantoir witnesses the change, and
+`curriculum_folders`, `class_folder`, `hidden`, `expandable`, `excluded_items`).
+Renaming the class folder or ANY curriculum folder also WRITES its key, even on
+a course that never had one — `curriculum_folders`, the declared list (or the
+folders the course resolves to, read from the disk BEFORE the move) with the
+new name in the old one's place, so the primary map keeps its title (#128); the
+legacy `curriculum_folder` is only rewritten, never created — a rename is the one moment Plantoir witnesses the change, and
 without it the guess that finds those folders stops finding them with nobody
 told.
 

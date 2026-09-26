@@ -5148,16 +5148,18 @@ COVERAGE_NOTES_NO_CHIPS = """The ring on a cell shows which expectations
 carry assessed work."""
 
 # What names a specific expectation's page: its code, the WHOLE name (#128).
-# Two shapes. Ontario's (and BC's) letter-first `A1.1`, `b2.3` — a letter,
-# digits, a dot, digits — and the College Board's digit-first `1.A` — digits, a
-# dot, ONE letter. Measured before widening: none of the 2,842 curriculum pages
-# shipped under support/ changes classification. Still refused: `12.3` (a
-# numbered or versioned page), `B2` and `A1. Heading` (strand and overall
-# pages), `1.A.1` and `CRD-1.A` (AP codes not measured on a real course).
+# Three shapes. Ontario's (and BC's) letter-first `A1.1`, `b2.3` — a letter,
+# digits, a dot, digits; the College Board's skills, `1.A` — digits, a dot, ONE
+# letter; and its learning objectives, `CRD-1.A`, `AAP-2.B` — two to four
+# CAPITAL letters, a hyphen, digits, a dot, one capital letter. Measured before
+# widening: none of the 2,842 curriculum pages shipped under support/ changes
+# classification. Still refused: `12.3` (a numbered or versioned page), `B2`
+# and `A1. Heading` (strand and overall pages), `1.A.1` and `CRD-1.A.1` (AP
+# essential-knowledge codes, not measured on a real course).
 # `contracts/shared-rules.json` -> `curriculumRules.isExpectationCode` is the
 # list both apps run too; `fullmatch`, not `^...$`, because `$` also matches
 # before a trailing newline.
-EXPECTATION_CODE = re.compile(r"[A-Za-z]\d+\.\d+|\d+\.[A-Za-z]")
+EXPECTATION_CODE = re.compile(r"[A-Za-z]\d+\.\d+|\d+\.[A-Za-z]|[A-Z]{2,4}-\d+\.[A-Z]")
 OVERALL_FILE = re.compile(r"^([A-Za-z]\d+)\.\s")
 CURRICULUM_BLOCK = re.compile(r"%%curriculum-start%%(.*?)%%curriculum-end%%", re.S)
 BLOCK_LINK = re.compile(r"!?\[\[([^\]|#]+?)(?:\\?\|[^\]]*)?(?:#[^\]|]*)?\]\]")
@@ -5169,8 +5171,13 @@ def is_expectation_code(stem: str) -> bool:
     return EXPECTATION_CODE.fullmatch(str(stem)) is not None
 
 
+def _is_learning_objective(code: str) -> bool:
+    """`CRD-1.A`: a College Board learning objective, grouped by its prefix."""
+    return "-" in code
+
+
 def _is_letter_first(code: str) -> bool:
-    return code[:1].isalpha()
+    return code[:1].isalpha() and not _is_learning_objective(code)
 
 
 def strand_of(code: str) -> str:
@@ -5178,8 +5185,11 @@ def strand_of(code: str) -> str:
     The column a code sits in. Letter-first codes group by their letter,
     UPPER-CASED so a lower-case `b2.3` joins strand B rather than opening a
     column of its own; digit-first codes (`1.A`) by their number — a College
-    Board skill category.
+    Board skill category; learning objectives (`CRD-1.A`) by their prefix, the
+    big idea (`CRD`).
     """
+    if _is_learning_objective(code):
+        return code.split("-", 1)[0]
     if _is_letter_first(code):
         return code[0].upper()
     return code.split(".")[0]
@@ -5197,10 +5207,16 @@ def overall_of(code: str):
 def code_sort_key(code: str):
     """
     Order within and across strands. Letter-first before digit-first, then by
-    number — so `A2.1` before `A10.1`, and `2.A` before `12.A`. The old key
-    read `int(code.split(".")[0][1:])`, which is `int("")` for `1.A`: widening
-    the rule without this would have stopped the build.
+    number — so `A2.1` before `A10.1`, `2.A` before `12.A`, and learning
+    objectives last, by prefix, then number, then letter (`AAP-2.B` before
+    `CRD-1.A` before `CRD-2.A`). The old key read `int(code.split(".")[0][1:])`,
+    which is `int("")` for `1.A`: widening the rule without this would have
+    stopped the build.
     """
+    if _is_learning_objective(code):
+        prefix, rest = code.split("-", 1)
+        number, letter = rest.split(".", 1)
+        return (2, prefix, int(number), 0, letter.upper())
     head, tail = code.split(".", 1)
     if _is_letter_first(code):
         return (0, head[0].upper(), int(head[1:]), int(tail), "")
@@ -5208,8 +5224,11 @@ def code_sort_key(code: str):
 
 
 def _strand_sort_key(strand: str):
+    """Letter strands, then skill numbers, then learning-objective prefixes."""
     if strand.isdigit():
         return (1, int(strand), "")
+    if len(strand) > 1:
+        return (2, 0, strand)
     return (0, 0, strand)
 
 
