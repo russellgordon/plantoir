@@ -858,8 +858,8 @@ mistake there is a mistake in nineteen hundred courses.
 | Assistant routing | **Nothing.** Measured by hand — see below. |
 | Publishing (any destination, `deploy.sh`/`deploy.py`, the preview→publish path) | `./verify-deploy.sh` — publishes to a folder, Netlify and Cloudflare, and every primary+secondary pairing, then FETCHES EACH SITE BACK and reads it. Deliberately NOT part of `verify.sh`: it needs three credentials, the network, and it creates real sites. Run it when the publishing path changes. |
 
-`verify.sh` **does not run on Windows** (bash, and it expects `docker` on PATH;
-in the normal Windows setup Docker Engine lives inside WSL2). What Windows does
+`verify.sh` **does not run on Windows** (bash, and it builds a Docker image;
+Windows has had no Docker at all since 2026-08-19). What Windows does
 and does not get from that, corrected 2026-09-07 — this used to say toolchain
 changes made there have "no automated gate" at all, which is no longer true:
 

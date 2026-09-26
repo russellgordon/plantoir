@@ -174,8 +174,9 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > inside the app, and the xUnit suite deliberately never touches Docker — so
    > a green test run says nothing about the thing teachers actually run.
    > `verify.sh`, the real toolchain gate, is bash and expects `docker` on
-   > `PATH`, which does not hold on Windows where Docker Engine lives in WSL2.
-   > **On Windows the hand smoke is the only DOCKER verification there is.**
+   > `PATH`, which does not hold on Windows, where there is no Docker at all
+   > since 2026-08-19. **On Windows the hand smoke is the only check of the
+   > bundled runtime there is.**
    > (It is no longer the only toolchain verification: since 2026-09-07
    > `PythonToolchainTests` runs EVERY shared `scripts/test_*.py` file inside
    > `dotnet test` — the same files `verify.sh` runs on the mac, which nothing
