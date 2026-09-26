@@ -1994,13 +1994,17 @@ read from `contentIndex.json` and the rendered article):
 
 **The rule, in short** — written out to be implemented from in
 `contracts/shared-rules.json` → `readingALink.whatIsCode`, with its limits in
-`whatIsCodeLimits` and 24 cases in `readingALink.cases`. The page is read a
-line at a time; a line's BODY has any `>` markers taken off. A fence opens on a
-body starting with three or more backticks or tildes (backticks with another
-backtick later on the line are inline code instead), closes on a run of the
-SAME character at least as long with nothing after it, and runs to the end of
+`whatIsCodeLimits` and 27 cases in `readingALink.cases`. The page is read a
+line at a time; a line's BODY has any `>` markers taken off, and its DEPTH is
+how many there were. A fence opens on a body starting with three or more
+backticks or tildes (backticks with another backtick later on the line are
+inline code instead), closes on a line at the same depth holding a run of the
+SAME character at least as long with nothing after it, ends at a line with
+fewer `>` (a fence in a callout ends with the callout), and runs to the end of
 the page if never closed. Code spans live within a paragraph — which breaks at
-a blank line, a fence, a list marker, a heading or a table row — and a run of N
+a blank line, a fence, a deeper quote, a list marker, a heading (which is a
+paragraph on its own), a table row or a rule line such as frontmatter's
+`---` — and a run of N
 backticks closes on the next run of EXACTLY N; a run never closed is plain
 text; outside a span a backslash escapes. Nothing else is code: not indented
 code, not HTML `<code>`, not math, not `%%` comments (a separate question,
@@ -2010,13 +2014,25 @@ match that starts in code is not merely dropped: the search starts again where
 that code ENDS.** The link pattern crosses a `[`, so in "Type `` `[[` `` to
 start one, then [[Real Page]]" a match from the example's brackets runs on to
 "Real Page" and swallows the real link; dropping that match would drop the
-link with it. That case was found while implementing, with two more — a bare
-`~~~` line inside a backtick fence, and a TILDE fence inside a callout —
+link with it. That case was found while implementing, with five more. Two —
+a bare `~~~` line inside a backtick fence, and a TILDE fence inside a callout —
 because two mutations of the rule passed the first 21: the traceback case
 carries text after its tildes, and the backtick callout's fence lines happen to
-pair up as an inline span. None of the three was built in Quartz; all 34 cases
-were checked against its parser stack (remark-parse 11 + remark-gfm 4, with
-Quartz's own link pattern run over text nodes), which agrees with every one.
+pair up as an inline span. Three came from the implementation review, each a
+place where the first version DROPPED a real link Quartz draws: a fence left
+open inside a callout ran on to the end of the page (it now ends with the
+callout — the fence belongs to its opener's quote DEPTH, and only a line at
+that depth closes it); a `> ```` line inside an unquoted fence closed it; and a
+backtick in frontmatter paired with one in the body (a rule line — `---`,
+`***`, `___`, `===` — now breaks a paragraph, and a heading is a paragraph on
+its own). None of the six was built in Quartz; all 37 cases were checked
+against its parser stack (remark-parse 11 + remark-gfm 4 + remark-frontmatter,
+with Quartz's own link pattern run over text nodes), which agrees with every
+one. The same stack judged 20,000 random texts built from backticks, tildes,
+`>`, list and heading markers, rule lines, indents and `[[x]]`: every text in
+which the rule reads as code a link Quartz draws contains a four-space or tab
+indent or a list marker — the two stated limits, indented code and list
+containers.
 
 **One implementation per language, shared by every reader and rewriter in it.**
 On the mac, `MarkdownCode` (UTF-16 offsets, the unit `NSRegularExpression`
@@ -2112,12 +2128,19 @@ rewritten become more correct, not untrue.
   measured for its effect on publishing:
   [#331](https://github.com/russellgordon/plantoir/issues/331).
 
-Not covered, on purpose: `SectionIndexPointer.repointing` reads a front page's
-whole-line `![[…]]` by hand and does not consult the mask, so a front page
-that shows `![[Unit 1, Day 2]]` alone on a line inside a fence could have that
-line repointed. 0 of the 89 section front pages in `support/` hold a fence; it is a separate reader of one
-line shape, not a link reader, and Windows' version is described in
-`class-planning.json` → `sectionIndexPointer`.
+**Not covered, on purpose — readers of one fixed shape, not of links in
+general, named so nobody has to find them again** (from the implementation
+review): `SectionIndexPointer.repointing` and its build twin
+`build_site._class_embed_target` read a front page's whole-line `![[…]]` by
+hand, so a front page showing `![[Unit 1, Day 2]]` alone on a line inside a
+fence could have that line repointed — 0 of the 89 section front pages in
+`support/` hold a fence; `AssistCurriculumMentions` asks whether a page
+already says `[[A1.1]]` with a plain text search, so an example of it in code
+counts as "already there" and the real mention is not added; and
+`build_site.rewrite_section_wikilinks` rewrites a section-path alias link in
+the BUILT copy only, so an example in code is displayed shortened and the
+teacher's file is untouched. Each would take the mask in a line; none has
+shipped content that reaches it.
 
 ### No booleans, and separate verbs
 

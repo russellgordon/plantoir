@@ -46,7 +46,7 @@ def link_cases():
         toolchain_paths.CONTRACTS_DIR = repo_contracts
     contracts.reset_cache()
     cases = contracts.load("shared-rules")["readingALink"]["cases"]
-    assert len(cases) >= 34, "readingALink lost cases"
+    assert len(cases) >= 37, "readingALink lost cases"
     return cases
 
 
@@ -172,6 +172,20 @@ class UnlinkTests(unittest.TestCase):
                     carried_to = end
                 outside += unlinked[carried_to:]
                 self.assertNotIn("\\|", outside, "an escaped pipe's backslash was left behind")
+                # And no other backslash is lost or left: outside code, the
+                # unlink removes exactly the escaped pipes of the links it
+                # unlinks.
+                before = 0
+                carried_to = 0
+                for start, end in markdown_code.code_ranges(case["text"]):
+                    before += case["text"][carried_to:start].count("\\")
+                    carried_to = end
+                before += case["text"][carried_to:].count("\\")
+                escaped_pipes = 0
+                for match in markdown_code.matches_outside_code(
+                        re.compile(r"!?\[\[[^\]]*\]\]"), case["text"]):
+                    escaped_pipes += match.group(0).count("\\|")
+                self.assertEqual(outside.count("\\"), before - escaped_pipes)
                 for start, end in markdown_code.code_ranges(case["text"]):
                     self.assertIn(case["text"][start:end], unlinked, "code was rewritten")
                 self.assertEqual(self.unlink(case["text"], {"Nothing Here"}), case["text"])
