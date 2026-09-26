@@ -458,7 +458,7 @@ def resolved(name: str) -> dict:
 
 FOLDER_BLURBS = {
     "Concepts": ("One page per idea, written once and linked from everywhere it comes up.",
-                 "When an idea in {subject} needs explaining more than once, it belongs here rather than inside a lesson plan — then every class that touches it can link to the same page."),
+                 "When an idea in %SUBJECT% needs explaining more than once, it belongs here rather than inside a lesson plan — then every class that touches it can link to the same page."),
     "Conventions": ("The shared vocabulary of the form, one page per convention.",
                     "A convention is a way of making meaning that everyone in the room agrees on. Name each one, show it, and link to it from the day it is first used."),
     "Repertoire": ("The pieces this course works on, one page each.",
@@ -481,7 +481,7 @@ FOLDER_BLURBS = {
                   "A critique page holds the protocol and the questions, so the conversation is about the work rather than about who made it."),
     "Investigations": ("Hands-on work, one page per investigation.",
                        "Each page carries the question, the safety notes, the procedure, and what to record — everything a student needs to run it without you standing beside them."),
-    "Fieldwork": ("Work done outside the {room}.",
+    "Fieldwork": ("Work done outside the %ROOM%.",
                   "Fieldwork pages hold the site, what to bring, what to record, and how the data gets back into the course."),
     "Observations": ("What was seen, and when.",
                      "Observation pages are dated records — sky, weather, growth, whatever this course watches over time."),
@@ -548,7 +548,12 @@ FOLDER_BLURBS = {
 
 # ---------------------------------------------------------------------------
 # Page templates. Placeholders are %TOKENS% rather than {braces}, because the
-# pages contain LaTeX and YAML, both of which use braces in earnest.
+# pages contain LaTeX and YAML, both of which use braces in earnest. A
+# {brace} placeholder is therefore never filled — it ships as written, which
+# is how every Concepts page came to say "{subject}" (#328) — and
+# lint_skeletons.py refuses one. %SUBJECT% fits after a preposition; in
+# front of a noun use %A_SUBJECT_COURSE% or %A_SUBJECT_CLASS_START%, which
+# carry the right article (see subject_with_article).
 # ---------------------------------------------------------------------------
 
 def wrap(text: str, width: int = 76) -> str:
@@ -557,8 +562,37 @@ def wrap(text: str, width: int = 76) -> str:
     return "\n".join(textwrap.wrap(text, width=width)) if text else text
 
 
+def subject_with_article(subject: str, noun: str) -> str:
+    """The subject used in front of a noun, with the article it needs.
+
+    `%SUBJECT%` reads well after a preposition ("in music", "in this
+    course") but not in front of a noun: a template that wrote
+    "a %SUBJECT% course" shipped "a this course course", "a the language
+    course" and "a English course" (#328). So the phrase is built here:
+    "this course" stays itself, a subject that begins with "the" drops it
+    ("the arts" -> "an arts course"), and the article follows the sound.
+    """
+    if subject == "this course":
+        return f"this {noun}"
+    if subject.startswith("the "):
+        subject = subject[len("the "):]
+    article = "a"
+    if subject[0].lower() in "aeio":
+        article = "an"
+    return f"{article} {subject} {noun}"
+
+
+def capitalised(phrase: str) -> str:
+    """The phrase with its first letter raised, for the start of a sentence."""
+    return phrase[:1].upper() + phrase[1:]
+
+
 def fill(text: str, fam: dict) -> str:
+    a_subject_course = subject_with_article(fam["subject"], "course")
+    a_subject_class = subject_with_article(fam["subject"], "class")
     return (text
+            .replace("%A_SUBJECT_COURSE%", a_subject_course)
+            .replace("%A_SUBJECT_CLASS_START%", capitalised(a_subject_class))
             .replace("%SUBJECT%", fam["subject"])
             .replace("%LABEL%", fam["label"])
             .replace("%ROOM%", fam["room"])
@@ -582,7 +616,7 @@ def page(title: str, body: str, *, tags=None, toc=False, extra_frontmatter=None,
 
 
 PLACEHOLDER_NOTE = """> [!note] This page is a starting point
-> Everything below is a placeholder written for a %SUBJECT% course. Edit it,
+> Everything below is a placeholder written for %A_SUBJECT_COURSE%. Edit it,
 > or delete it — the site does not need this page to work. What it is
 > showing you is the SHAPE: a page with a title, a short reason to exist,
 > and links out to the pages that follow from it."""
@@ -705,7 +739,7 @@ aloud on the first day.
 
 ## Why it matters here
 
-A %SUBJECT% class asks people to try things in front of each other. That
+%A_SUBJECT_CLASS_START% asks people to try things in front of each other. That
 only works in a room where it is safe to be a beginner — which is a thing
 the group builds, not a thing the teacher announces.
 

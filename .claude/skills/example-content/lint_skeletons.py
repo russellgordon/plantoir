@@ -5,8 +5,9 @@ taking example content — the ~1,900 codes that have no payload, and the 38
 that have one the teacher declined — so a mistake here is a mistake in
 about 1,900 courses. The checks
 are deliberately blunt: every link resolves, every page is titled, every
-sentinel is where the installer expects it, and no template token survived
-into the output.
+sentinel is where the installer expects it, no template token — %PERCENT% or
+{brace} — survived into the output, and the subject never lands in front of a
+noun it does not fit ("a this course course", #328).
 
     python3 .claude/skills/example-content/lint_skeletons.py [family ...]
 """
@@ -22,6 +23,26 @@ SKELETONS = ROOT / "support" / "skeletons"
 
 LINK = re.compile(r"!?\[\[([^\]|#]+?)(?:\\?\|[^\]]*)?(?:#[^\]|]*)?\]\]")
 CLASS_SENTINEL = re.compile(r"created: __CREATED_CLASS_(\d+)__")
+
+# A {brace} placeholder is never filled — the generator's tokens are
+# %PERCENT% ones, because the pages carry LaTeX and YAML in earnest — so one
+# that reaches a page ships as written. Every Concepts page said "{subject}"
+# and three Fieldwork pages "{room}" until #328. A brace opened straight after
+# a letter, a backslash, `^`, `_`, `$` or another brace is LaTeX (`\frac{a}{b}`,
+# `x^{2}`, `\begin{aligned}`) and is left alone.
+BRACE_PLACEHOLDER = re.compile(r"(?<![\\\w}^_$])\{[A-Za-z_][A-Za-z0-9_ ]*\}")
+
+# The subject dropped in front of a noun where it does not fit: "a this
+# course course", "A this course class", "a the language course", "a English
+# course" — all shipped until #328. `%SUBJECT%` belongs after a preposition;
+# in front of a noun the generator has %A_SUBJECT_COURSE% and
+# %A_SUBJECT_CLASS_START%. "a u…" is not flagged, because "a unit" is right.
+MISFIT_SUBJECT = [
+    (re.compile(r"\bthis course (course|class)\b", re.IGNORECASE),
+     "the subject \"this course\" in front of a noun"),
+    (re.compile(r"\b[Aa] (this|the) \w+"), "\"a\" in front of \"this\" or \"the\""),
+    (re.compile(r"\b[Aa] [aeioAEIO]\w*"), "\"a\" in front of a vowel"),
+]
 
 
 def frontmatter(text: str) -> dict:
@@ -119,6 +140,14 @@ def check(family: str) -> list:
 
         prose = re.sub(r"```[\s\S]*?```", "", text)
         prose = re.sub(r"`[^`\n]*`", "", prose)
+
+        unfilled = BRACE_PLACEHOLDER.findall(prose)
+        if unfilled:
+            problems.append(f"{relative}: unfilled placeholder(s) left in the page: {sorted(set(unfilled))}")
+        for pattern, what in MISFIT_SUBJECT:
+            misfit = pattern.search(prose)
+            if misfit:
+                problems.append(f"{relative}: {what}: {misfit.group(0)!r}")
         for link in LINK.finditer(prose):
             target = link.group(1).strip().rstrip("\\")
             if "/" in target:
