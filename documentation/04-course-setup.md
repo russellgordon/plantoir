@@ -1206,7 +1206,9 @@ build counted the same pages and no mark was missing. What differed:
 **What changed.** The app owns the answer, because it is the only party that
 knows the course is new. `ExampleContentCatalog.marksPool(fromManifest:)`
 mirrors `graded_folders_for` exactly as setup calls it for a payload: the
-shared folders without `Media`, then the per-section ones; a declared name kept
+shared folders without `Media` (and — on the command line only — without the
+curriculum folder when its pages are declined, which no payload's pool names,
+so the apps do not model that step), then the per-section ones; a declared name kept
 when it matches a folder exactly, respelled to the folder's spelling when it
 matches ignoring case, dropped otherwise; blanks, nulls, non-names and repeats
 dropped; a declared null or `[]` gives `[]`; inference only when the key is

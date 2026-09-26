@@ -454,7 +454,9 @@ TWO routes — the command line's `setup_course.graded_folders_for`, and each
 app reading the manifest itself when its wizard writes the new course's file
 (#292, `gradedFolders.newCourse`, which sweeps every payload through both) —
 and that linter check is what keeps the two identical: an exact folder name
-means neither route has anything to respell or drop.
+means neither route has anything to respell or drop (except `Media`, which
+the linter accepts as a shared folder and both routes drop from the pool —
+so do not declare it).
 
 Declare it rather than letting it be inferred. Inference is a SUBSTRING
 ("does the folder mention tasks?") while the build matches a pooled name

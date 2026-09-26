@@ -115,8 +115,11 @@ enum ExampleContentCatalog {
         guard let declaredValue = manifest["graded_folders"] else {
             return GradedFolderRule.inferredPool(from: courseFolders)
         }
-        // A declared null (NSNull) or anything that is not a list reads as
-        // an empty declaration, as Python's `manifest.get(...) or []` does.
+        // A declared null (NSNull) reads as an empty declaration, as
+        // Python's `manifest.get(...) or []` does. Other malformed shapes —
+        // a pool that is a string or an object, a number whose text names a
+        // folder — cannot pass `lint_payload.py`, and this mirror does not
+        // follow Python into them: it reads them as empty or drops them.
         let declaredEntries: [Any] = declaredValue as? [Any] ?? []
 
         // A later folder with the same name ignoring case wins the
