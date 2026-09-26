@@ -13,6 +13,8 @@
 # item and the app: the SAME team as the app, the hardened runtime, and — for
 # the helpers — none of the app's entitlements. Prints each fault; exit 1 on any.
 #
+# And, outside the tests, a secure timestamp on every item.
+#
 # The team is read from the app's own signature rather than typed in, so it is
 # not a second copy of a value. An app with no team (ad-hoc) is refused: that
 # is exactly what a release must never be. --ad-hoc-for-tests lifts that ONE
@@ -64,6 +66,14 @@ for item in "${items[@]}"; do
   team="$(printf '%s\n' "${info}" | sed -n 's/^TeamIdentifier=//p')"
   if [[ "${team}" != "${WANT_TEAM}" ]]; then
     echo "WRONG TEAM (${team:-none}, expected ${WANT_TEAM}): ${name}"
+    faults=$((faults + 1))
+  fi
+  # A secure timestamp on every item (the slice-2 review's L2): an item
+  # signed --timestamp=none, or whose call to Apple's timestamp server failed,
+  # would otherwise pass here and be refused by notarization five minutes later.
+  # Not asked in --ad-hoc-for-tests mode, whose signatures have none by design.
+  if [[ "${AD_HOC_ALLOWED}" != true ]] && ! printf '%s\n' "${info}" | grep -q '^Timestamp='; then
+    echo "NO SECURE TIMESTAMP: ${name}"
     faults=$((faults + 1))
   fi
   if ! printf '%s\n' "${info}" | grep -q 'flags=.*runtime'; then

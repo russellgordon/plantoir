@@ -68,7 +68,14 @@ echo "============================================================"
 # offered teachers' real updates, and one on another host is a feed nobody
 # checks. The dress rehearsal is RELEASING.md → "The dress rehearsal".
 if [[ -n "${REHEARSAL_FEED}" ]]; then
-  if [[ "${REHEARSAL_FEED}" != https://plantoir.app/updates/* ]] || [[ "${REHEARSAL_FEED}" == "${PRODUCTION_FEED}" ]]; then
+  # Only with -Sign — a rehearsal is two SIGNED builds — and only an exact,
+  # plain address: no query, no fragment (the slice-2 review's L9;
+  # check-update-keys.sh pins the exact value in the bundle as well).
+  if [[ "${SIGN}" != true ]]; then
+    echo "❌ --rehearsal-feed is for the signed dress-rehearsal builds; pass -Sign too."
+    exit 1
+  fi
+  if ! [[ "${REHEARSAL_FEED}" =~ ^https://plantoir\.app/updates/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+\.xml$ ]] || [[ "${REHEARSAL_FEED}" == "${PRODUCTION_FEED}" ]]; then
     echo "❌ --rehearsal-feed must be a throwaway feed under https://plantoir.app/updates/, never ${PRODUCTION_FEED}."
     exit 1
   fi

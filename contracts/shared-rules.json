@@ -469,7 +469,7 @@
         "why": "Added with #204. Written only when the TEACHER asked (Check for Updates...): the daily check is not something a teacher did, and would add a line a day. 'I checked and it said I was up to date' is a report worth being able to confirm."
       },
       {
-        "carries": "the version and which answer: install, skip this version, or not now (Remind Me Later and closing the window are one answer to the updater, so the line does not pretend to tell them apart)",
+        "carries": "the version and which answer: install, skip this version, not now (Remind Me Later and closing the window are one answer to the updater, so the line does not pretend to tell them apart), or install on quit (the resumed window). Never written for the stand-down a quit sends on the teacher's behalf - that is update set aside",
         "event": "update answered",
         "why": "Added with #204. Separates 'never offered' from 'offered and skipped' - the two answers to the same report."
       },

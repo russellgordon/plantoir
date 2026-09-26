@@ -246,8 +246,12 @@ def verify_feeds_live() -> str:
     config = read_config()
     base_url = config.get("base_url", "").strip()
     outcome = "match"
-    feeds = sorted((SITE_DIR / "updates").glob("*.xml")) if (SITE_DIR / "updates").is_dir() else []
+    # The mac's feed only — the checker reads Sparkle's shape (see
+    # update_feeds.problems_with); windows.xml brings its own with v1.4.0.
+    feeds = [SITE_DIR / "updates" / "macos.xml"]
     for feed in feeds:
+        if not feed.is_file():
+            continue
         result = update_feeds.verify_live(base_url, feed)
         if result == "mismatch":
             outcome = "mismatch"

@@ -51,11 +51,11 @@ An adversarial architecture review uncovered five potential failure points that 
 The automated script executes the following sequence:
 1. Fetches native `llama.cpp` (`mac-app/Vendor/fetch-llama.sh`) and Sparkle, the updater (`mac-app/Vendor/fetch-sparkle.sh`, #204).
 2. Generates Xcode project (`xcodegen generate`) and builds Release (`xcodebuild`), then refuses a built bundle whose update feed, public key or ask-first key is wrong (`mac-app/release/check-update-keys.sh`).
-3. Relocates `.dylib` files into `Contents/Frameworks/` and `llama-server` into `Contents/Helpers/`.
+3. Does NOT relocate anything, whatever trap 1 above suggests: `llama-server` and its dylibs are signed where the build puts them, in `Contents/Resources/llama/`, and every release since v1.0.0 has notarized that way. (This step said they were moved to `Contents/Frameworks/` and `Contents/Helpers/`; corrected 2026-09-25 with #204, from `publish.sh` as it stands.)
 4. Bottom-up codesigning:
    - Signs the updater's own code first, item by item — Autoupdate, Updater.app, the framework last; never `--deep`, never the app's entitlements (`mac-app/release/sign-updater.sh`, #204).
    - Signs all real `.dylib` files (preserving symlinks) with Developer ID + `--timestamp` + `--options runtime`.
-   - Signs `Contents/Helpers/llama-server` with Developer ID + `--timestamp` + `--options runtime`.
+   - Signs `Contents/Resources/llama/llama-server` with Developer ID + `--timestamp` + `--options runtime`.
    - Signs `Plantoir.app` with Developer ID + `--timestamp` + `--options runtime` + entitlements.
    - Refuses unless every updater item and the app are on the app's own team with the hardened runtime (`mac-app/release/check-signatures.sh`) — `codesign --verify --deep --strict` cannot see a helper left ad-hoc.
 5. Creates APFS-formatted `dist/Plantoir-macOS.dmg` with `/Applications` symlink.

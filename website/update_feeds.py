@@ -108,7 +108,14 @@ def newest_version(feed: Path) -> str | None:
 
 
 def problems_with(feed: Path) -> list[str]:
-    """Why a feed must not be published, or an empty list."""
+    """Why the MAC's feed must not be published, or an empty list.
+
+    It reads Sparkle's shape — a `sparkle:shortVersionString` child and a
+    whole-number `sparkle:version` — and is run only on `macos.xml`. A
+    NetSparkle `windows.xml` may carry its version as an attribute; it needs
+    a checker of its own, written with v1.4.0, and build.py does not call this
+    on it (the slice-2 review's L6).
+    """
     problems: list[str] = []
     name = feed.name
     own_asset = PLATFORM_ASSETS.get(name)
