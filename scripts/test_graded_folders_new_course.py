@@ -192,5 +192,22 @@ class NewCourseGetsItsMarksPool(unittest.TestCase):
                     case["expect"])
 
 
+    def test_every_reconciling_case(self):
+        """gradedFolders.reconcilingAChosenPool through graded_folders_for (#152).
+
+        The reference the mac's `GradedFolderRule.reconciled` and Windows'
+        `GradedFolderRule.Reconciled` are held to.
+        """
+        rule = contracts.section("shared-rules", "gradedFolders", "reconcilingAChosenPool")
+        cases = rule["cases"]
+        self.assertGreaterEqual(len(cases), 7, "the contract lost reconciling cases")
+        for case in cases:
+            with self.subTest(case=case["name"]):
+                self.assertEqual(
+                    setup_course.graded_folders_for(
+                        {"graded_folders": case["declared"]}, case["folders"], []),
+                    case["expect"])
+
+
 if __name__ == "__main__":
     unittest.main()

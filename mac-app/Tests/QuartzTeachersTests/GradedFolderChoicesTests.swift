@@ -70,6 +70,11 @@ final class GradedFolderChoicesTests: XCTestCase {
     /// A course folder holding the given directories, and a configuration to
     /// go with it. Nothing here writes `course_config.json` into the course
     /// folder itself: a file is not a folder, and the walk must not offer one.
+    ///
+    /// `writesTheFile` puts a real `course_config.json` in the course folder
+    /// and reads the configuration back from it, for the tests that Save,
+    /// Revert or add a section — each of which reads the file. A file is not
+    /// a folder, so the walk does not offer it.
     @discardableResult
     private func makeCourse(
         named name: String,
@@ -77,7 +82,9 @@ final class GradedFolderChoicesTests: XCTestCase {
         perSectionFolders: [String] = [],
         gradedFolders: [String]? = nil,
         excludedItems: [String: [String]]? = nil,
-        directories: [String] = []
+        coverage: Bool? = nil,
+        directories: [String] = [],
+        writesTheFile: Bool = false
     ) throws -> Course {
         let courseURL: URL = root.appendingPathComponent(name)
         try FileManager.default.createDirectory(at: courseURL, withIntermediateDirectories: true)
@@ -99,6 +106,18 @@ final class GradedFolderChoicesTests: XCTestCase {
         }
         if let excludedItems {
             values["excluded_items"] = excludedItems
+        }
+        if let coverage {
+            values["include_curriculum_coverage"] = coverage
+        }
+        if writesTheFile {
+            let fileURL: URL = courseURL.appendingPathComponent("course_config.json")
+            try JSONSerialization.data(withJSONObject: values, options: [.prettyPrinted, .sortedKeys])
+                .write(to: fileURL)
+            return Course(
+                code: "ICS3U", directoryURL: courseURL,
+                configuration: try CourseConfiguration(contentsOf: fileURL)
+            )
         }
         let configuration: CourseConfiguration = CourseConfiguration(values: values, lastSavedData: Data())
         return Course(code: "ICS3U", directoryURL: courseURL, configuration: configuration)
@@ -232,8 +251,8 @@ final class GradedFolderChoicesTests: XCTestCase {
         let rule: [String: Any] = try GradedFolderChoicesTests.gradedFoldersSection()["removingAFolder"] as? [String: Any] ?? [:]
         let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
         XCTAssertGreaterThanOrEqual(
-            cases.count, 7,
-            "The contract lost removal cases: \(cases.count) present, 7 expected at least."
+            cases.count, 8,
+            "The contract lost removal cases: \(cases.count) present, 8 expected at least."
         )
 
         var index: Int = 0
@@ -269,31 +288,186 @@ final class GradedFolderChoicesTests: XCTestCase {
         }
     }
 
-    /// A removal through the list editor leaves its line on the trail (rule 5):
-    /// one `.itemExcluded` line naming the folder, the list it left and the
-    /// course. Pinned here because the contract runner above now drives the
-    /// same path, and a line that went missing from it would otherwise be
-    /// noticed only when a teacher's report came back without it.
-    func testARemovalThroughTheListEditorLeavesItsLineOnTheTrail() throws {
-        let course: Course = try makeCourse(
-            named: "trail",
+    // MARK: - The floor
+
+    /// `contracts/shared-rules.json` → `gradedFolders.floor`, every case, on a
+    /// real tree, through the protection Course Settings asks at the moment
+    /// of the gesture: the Marks checklist's for an untick, the row's in the
+    /// shared or per-section folder list for a removal (#152).
+    ///
+    /// The three outcomes are asserted WITH their sentence, so a case cannot
+    /// pass on another block — a per-section fixture with one per-section
+    /// folder would otherwise be "refused" by `lastPerSectionFolderBlocked`.
+    /// Every failing case is collected and reported together, so a mutation's
+    /// red set reads as one line.
+    func testTheMarksFloorMatchesTheContract() throws {
+        let rule: [String: Any] = try GradedFolderChoicesTests.gradedFoldersSection()["floor"] as? [String: Any] ?? [:]
+        let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(
+            cases.count, 17,
+            "The contract lost marks-floor cases: \(cases.count) present, 17 expected at least."
+        )
+
+        var failures: [String] = []
+        var index: Int = 0
+        for testCase in cases {
+            let caseName: String = try XCTUnwrap(testCase["name"] as? String)
+            var directories: [String] = try XCTUnwrap(testCase["directories"] as? [String])
+            directories.append("section1")
+            let course: Course = try makeCourse(
+                named: "floor\(index)",
+                sharedFolders: try XCTUnwrap(testCase["sharedFolders"] as? [String]),
+                perSectionFolders: try XCTUnwrap(testCase["perSectionFolders"] as? [String]),
+                gradedFolders: testCase["graded"] as? [String],
+                coverage: testCase["coverage"] as? Bool ?? true,
+                directories: directories
+            )
+            index += 1
+            let view: CourseSettingsView = CourseSettingsView(course: course)
+
+            let gesture: [String: Any] = try XCTUnwrap(testCase["gesture"] as? [String: Any], caseName)
+            let folder: String
+            let answer: ItemProtection
+            if let unticked = gesture["untick"] as? String {
+                folder = unticked
+                answer = view.gradedFolderProtection(for: unticked)
+            } else {
+                let removal: [String: Any] = try XCTUnwrap(gesture["remove"] as? [String: Any], caseName)
+                folder = try XCTUnwrap(removal["name"] as? String, caseName)
+                if (removal["scope"] as? String) == "per_section" {
+                    answer = view.perSectionFolderProtection(for: folder)
+                } else {
+                    answer = view.sharedFolderProtection(for: folder)
+                }
+            }
+
+            let expect: String = try XCTUnwrap(testCase["expect"] as? String, caseName)
+            let expected: ItemProtection
+            switch expect {
+            case "refused":
+                expected = .blocked(reason: SpecialNames.lastGradedFolderBlocked)
+            case "confirmed":
+                expected = .consequential(
+                    title: SpecialNames.removeGradedFolderTitle(for: folder),
+                    message: SpecialNames.removeGradedFolderMessage
+                )
+            default:
+                XCTAssertEqual(expect, "ordinary", "\(caseName): an unknown outcome")
+                expected = .ordinary
+            }
+            if answer != expected {
+                failures.append(caseName + " — expected " + expect + ", got " + String(describing: answer))
+            }
+        }
+        XCTAssertEqual(failures, [], "\n" + failures.joined(separator: "\n"))
+    }
+
+    // MARK: - The trail, written when the file is
+
+    /// How many trail lines record `Labs` leaving the per-section folders.
+    private func linesExcludingLabs() -> Int {
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        var matchingLines: Int = 0
+        for line in trail.components(separatedBy: "\n") {
+            if line.hasSuffix("excluded per-section folder Labs in ICS3U") {
+                matchingLines += 1
+            }
+        }
+        return matchingLines
+    }
+
+    /// A course with a real `course_config.json` and a `Labs` folder in its
+    /// only section — the course the trail tests remove `Labs` from.
+    private func makeCourseWithLabs(named name: String) throws -> Course {
+        return try makeCourse(
+            named: name,
             sharedFolders: ["Concepts"],
             perSectionFolders: ["All Classes", "Labs"],
-            directories: ["Concepts", "Labs"]
+            directories: ["Concepts", "section1/All Classes", "section1/Labs"],
+            writesTheFile: true
         )
+    }
+
+    /// (i) A removal the teacher takes back with Revert leaves NO line: the
+    /// file never changed, so the site never lost the folder (#152, from
+    /// #85's third item). Until #152 the line was written on the click and
+    /// outlived the Revert.
+    func testARemovalRevertedBeforeSavingLeavesNoLineOnTheTrail() throws {
+        let course: Course = try makeCourseWithLabs(named: "reverted")
         let view: CourseSettingsView = CourseSettingsView(course: course)
 
         removeThroughTheListEditor("Labs", scope: .perSection, in: view)
+        try course.configuration.revertToFile(at: course.configFileURL)
 
+        XCTAssertEqual(linesExcludingLabs(), 0)
+        XCTAssertEqual(course.configuration.perSectionFolders, ["All Classes", "Labs"])
+    }
+
+    /// (ii) A removal that is saved leaves exactly ONE line (rule 5) — the
+    /// point the old on-click test made, kept.
+    func testARemovalSavedLeavesExactlyOneLineOnTheTrail() throws {
+        let course: Course = try makeCourseWithLabs(named: "saved")
+        let view: CourseSettingsView = CourseSettingsView(course: course)
+
+        removeThroughTheListEditor("Labs", scope: .perSection, in: view)
+        view.save()
+
+        XCTAssertEqual(linesExcludingLabs(), 1, ActivityTrail.store.activityText(includingPrompts: true))
+        let onDisk: CourseConfiguration = try CourseConfiguration(contentsOf: course.configFileURL)
+        XCTAssertEqual(onDisk.excludedItems(forScope: "per_section"), ["Labs"])
+    }
+
+    /// (iii) Removed and added back before Save: the file's exclusions did
+    /// not change, so there is nothing to record — not an "excluded" and a
+    /// "re-included" for a folder that never left the site.
+    func testARemovalAddedBackBeforeSavingLeavesNoLineOnTheTrail() throws {
+        let course: Course = try makeCourseWithLabs(named: "added-back")
+        let view: CourseSettingsView = CourseSettingsView(course: course)
+
+        removeThroughTheListEditor("Labs", scope: .perSection, in: view)
+        CourseSettingsGestureScript.editor(for: .perSectionFolders, of: view).add(typedName: "Labs")
+        course.configuration.courseName = "Something to save"
+        view.save()
+
+        XCTAssertEqual(linesExcludingLabs(), 0)
         let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
-        var matchingLines: [String] = []
-        for line in trail.components(separatedBy: "\n") {
-            if line.hasSuffix("excluded per-section folder Labs in ICS3U") {
-                matchingLines.append(line)
-            }
+        XCTAssertFalse(trail.contains("re-included per-section folder Labs"), trail)
+    }
+
+    /// (iv) A removal saved by ANOTHER writer of the same configuration
+    /// leaves its line too. Remove `Labs` in Settings without saving, add a
+    /// section from the sidebar: `excluded_items` reaches the file through
+    /// Add Section, and a comparison made only at Settings' Save would find it
+    /// already there and record nothing, ever (#152's plan review, finding 1).
+    func testARemovalSavedByAddingASectionLeavesItsLineOnTheTrail() throws {
+        let course: Course = try makeCourseWithLabs(named: "add-section")
+        let view: CourseSettingsView = CourseSettingsView(course: course)
+
+        removeThroughTheListEditor("Labs", scope: .perSection, in: view)
+        try SectionAdder.addSection(2, to: course)
+
+        XCTAssertEqual(linesExcludingLabs(), 1, ActivityTrail.store.activityText(includingPrompts: true))
+        view.save()
+        XCTAssertEqual(linesExcludingLabs(), 1, "a later Save must not record it a second time")
+    }
+
+    /// (v) A write that fails records nothing: the removal did not reach the
+    /// file, so a line would be false. The course folder is made read-only,
+    /// so the atomic write cannot place its file.
+    func testARemovalWhoseSaveFailsLeavesNoLineOnTheTrail() throws {
+        let course: Course = try makeCourseWithLabs(named: "read-only")
+        let view: CourseSettingsView = CourseSettingsView(course: course)
+        removeThroughTheListEditor("Labs", scope: .perSection, in: view)
+
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: course.directoryURL.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: course.directoryURL.path)
         }
-        XCTAssertEqual(matchingLines.count, 1, trail)
-        XCTAssertEqual(course.configuration.perSectionFolders, ["All Classes"])
+        view.save()
+
+        XCTAssertEqual(linesExcludingLabs(), 0)
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(trail.contains("could not save the settings for ICS3U"), trail)
     }
 
     /// The still-offered question itself, asked the way the BUILD asks it.
