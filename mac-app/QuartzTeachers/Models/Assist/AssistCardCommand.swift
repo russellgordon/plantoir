@@ -1626,14 +1626,32 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     /// The `.` and `!` a teacher types at the end are still accepted, because
     /// the shared tidier at the top of this file strips them before anything
     /// here runs, and that is shipped behaviour rather than a new tolerance.
+    ///
+    /// **Two more openings since #197, and only these two:** "publish all
+    /// the classes in unit " and "publish everything in unit ", read by the
+    /// SAME rule — a literal opening and a bare number, nothing before and
+    /// nothing after. Measured 2026-09-26 on the smaller assistant (b10435,
+    /// the app's own flags, body and prompt, temperature 0): "Publish all the
+    /// classes in Unit 2." went to `publish_class_on` with TODAY's date 3
+    /// times in 3 — on a teaching day that publishes today's class and
+    /// reports success, about a request for a unit. The sentence is a fixed
+    /// frame around a number, which is what this family is for, so it is
+    /// answered here and the router never sees it. The strictness is kept
+    /// whole: "publish all the classes in unit 2 for ICS3U section 1" still
+    /// goes to the model (another course named must never bind to this
+    /// window), and so do "please …", "…?" and a comma — each a contract row
+    /// in `pagesNamingNoPage.everythingInAUnit.refused`.
     private static func wholeUnitToPublish(_ tidied: String) -> AssistCardCommand? {
-        let opening: String = "publish unit "
-        guard tidied.hasPrefix(opening) else {
-            return nil
+        let openings: [String] = [
+            "publish unit ",
+            "publish all the classes in unit ",
+            "publish everything in unit ",
+        ]
+        var rest: String? = nil
+        for opening in openings where tidied.hasPrefix(opening) {
+            rest = String(tidied.dropFirst(opening.count)).trimmingCharacters(in: .whitespaces)
         }
-        let rest: String = String(tidied.dropFirst(opening.count))
-            .trimmingCharacters(in: .whitespaces)
-        guard !rest.isEmpty, !rest.contains(","), Int(rest) != nil else {
+        guard let rest, !rest.isEmpty, !rest.contains(","), Int(rest) != nil else {
             return nil
         }
         return AssistCardCommand(
@@ -1782,6 +1800,21 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
                               + "unpublishing errs safe, a question mark on a publish request is "
                               + "plausibly a teacher ASKING, and this phrasing is answered correctly "
                               + "by the model anyway, so there is nothing to buy by widening it."
+            ),
+            ParsedShape(
+                shape: "publish all the classes in unit <number> | publish everything in unit <number>",
+                tool: "publish_pages",
+                fills: ["pages": "Unit <number>"],
+                example: "publish all the classes in unit 2",
+                notThis: "publish all the classes in unit 2 for ICS3U section 1",
+                becauseNotThis: "The same frame as 'publish unit <number>', with two more openings "
+                              + "and nothing else widened (#197): measured, 'Publish all the classes "
+                              + "in Unit 2.' went to publish_class_on with TODAY's date 3 times in 3 "
+                              + "on the smaller assistant. A matched card binds this window's course "
+                              + "and section into the call, so a sentence naming a course or section "
+                              + "must fall through to the model, where the guard against another "
+                              + "course runs. Every accepted and refused spelling is in "
+                              + "pagesNamingNoPage.everythingInAUnit."
             ),
             ParsedShape(
                 shape: "[please] hide|unpublish unit <number>[, day <number>] [please]",

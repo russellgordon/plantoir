@@ -343,6 +343,33 @@ struct AssistPublishPlan {
         return quoted.joined(separator: ", ") + " and \(names.count - mostNamed) more"
     }
 
+    /// "“a” or “b”", "“a”, “b” or “c”" — the way a sentence says "none of
+    /// these", naming at most `mostNamed` and counting the rest (#197).
+    ///
+    /// Its own function rather than `listing` with a different last word,
+    /// because "is called “a” and “b”" says one page has two names.
+    nonisolated static func listingEither(_ names: [String], mostNamed: Int = 3) -> String {
+        var quoted: [String] = []
+        for name in names {
+            quoted.append("“\(name)”")
+        }
+        if quoted.count <= 1 {
+            return quoted.first ?? ""
+        }
+        if quoted.count > mostNamed {
+            var shown: [String] = []
+            var position: Int = 0
+            while position < mostNamed {
+                shown.append(quoted[position])
+                position += 1
+            }
+            let others: Int = quoted.count - mostNamed
+            return shown.joined(separator: ", ") + " or \(others) \(others == 1 ? "other" : "others")"
+        }
+        let last: String = quoted.removeLast()
+        return quoted.joined(separator: ", ") + " or " + last
+    }
+
     static func listing(_ names: [String]) -> String {
         var quoted: [String] = []
         for name in names {
@@ -1254,6 +1281,19 @@ enum AssistToolRefusal: LocalizedError, Equatable {
     case unreadableTime(String)
     case nothingNamed
     case openEndedPublish(CalendarDay)
+    /// A publish or a hide whose page list was nothing but a word meaning
+    /// every page — "all", "everything" — with no dates to narrow it (#197).
+    ///
+    /// Its own case rather than `nothingNamed`, whose sentence ("No pages and
+    /// no dates were given") is false about a call that said "all". The
+    /// example is something the teacher can type next, built from the
+    /// section's own pages by `AssistToolRunner.exampleOfWhichPages`.
+    case askedForEveryPage(publishing: Bool, example: String)
+    /// Every name in a publish or a hide matched no page in the section
+    /// (#197). Refused by name, instead of a plan that changes nothing and a
+    /// "Nothing needed changing." that reports success about a request that
+    /// found nothing at all.
+    case noPageByThatName(names: [String], course: String, section: Int)
     case notInThisBuild(String)
     /// The course named is kept for reference, so nothing may write to it and
     /// nothing may deploy it.
@@ -1304,6 +1344,21 @@ enum AssistToolRefusal: LocalizedError, Equatable {
                  + "almost certainly not what was meant. For ONE day's class, use publish_class_on with "
                  + "that date. For a stretch of classes, give both onOrAfter and before. To publish "
                  + "particular pages, name them."
+        case .askedForEveryPage(let publishing, let example):
+            if publishing {
+                return AssistWording.everyPageIsNotAPageToPublish(example: example)
+            }
+            return AssistWording.everyPageIsNotAPageToHide(example: example)
+        case .noPageByThatName(let names, let code, let number):
+            // The teacher's sentences, not `noSuchPage`'s, which tells the
+            // MODEL to use list_pages: a write's refusal ends the turn and is
+            // read by the teacher (#167's reason for `noPageCalled`).
+            if names.count == 1 {
+                return AssistWording.noPageCalled(page: names[0], course: code, section: String(number))
+            }
+            return AssistWording.noPagesCalled(
+                pages: AssistPublishPlan.listingEither(names), course: code, section: String(number)
+            )
         case .notInThisBuild(let what):
             return what
         case .askedForACourseByItsCodeAlone(let code, let candidates):

@@ -27,9 +27,16 @@ import Foundation
 /// than silently widening a gap nobody restates. The prose still has to be
 /// grepped for and corrected by hand, which is how these were found.
 ///
-/// The descriptions are the Windows server's own, put through the same
-/// shortening rule the narrowed surface uses there: keep the `TEACHERS SAY:`
-/// clause whole, then the first sentence of the rest, and nothing else.
+/// **There is ONE description per tool, and it is pinned in the contract**
+/// (#114, decided 2026-09-09 and 2026-09-26): `contracts/assist-cases.json`
+/// → `toolDescriptions`, hand-written, which `AssistToolDescriptionContractTests`
+/// holds equal to every description below byte for byte. So editing one here
+/// fails the mac suite until the contract is edited too — and a description
+/// is a routing change, so measure first (doc 10, "One description per
+/// tool"). The local model is shown the same text, never a shortened copy.
+/// (This comment used to say the descriptions were the Windows server's own,
+/// shortened; they had diverged — 28 of 32 by 2026-09-26 — and the mac's text
+/// is the one both servers now serve.)
 ///
 /// The `TEACHERS SAY` phrasings are load-bearing rather than decorative — they
 /// are what took routing from 69% to 91% — so they are COPIED, not improved.
@@ -332,7 +339,15 @@ extension AssistToolRunner {
         // recommendation rather than a boundary. The over-publish it was
         // meant to prevent is handled in code instead — see
         // `AssistToolRunner`'s refusal of an open-ended range — which cannot
-        // cost accuracy because it changes nothing the model reads.
+        // cost accuracy because it changes nothing the model reads. So is
+        // `"pages": "all"` (#197): a page list naming no page is answered in
+        // `AssistToolRunner.pagePlan`, not by a sentence here.
+        //
+        // Pinned in `toolDescriptions` (#114). Windows' "optionally along
+        // with every page they link to" was measured against this text on
+        // the smaller assistant: it ran "Put up Unit 3, Day 2 … along with
+        // everything it points at" to the length cap 10 times in 10, and this
+        // text does not.
         description: "Make pages visible to students, along with every page they link to, then rebuild "
                    + "the section preview. The linked pages come by themselves — there is nothing to ask "
                    + "for and no way to leave them out, because a published page whose links lead nowhere "
