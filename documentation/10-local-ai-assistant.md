@@ -2937,7 +2937,8 @@ for behaviour only one platform has.
 
 `assist-cases.json` → `toolSchemas` now carries the tool definitions **exactly
 as each client sends them** — name, description and parameter schema, for both
-the 13-tool local surface and the 32-tool MCP one. (It said 23; corrected
+the 13-tool local surface and the 35-tool MCP one (32 until #209 added three
+How I Teach tools). (It said 23; corrected
 2026-09-06 when the list was first run against this side. `plantoir-mcp.exe`
 serves 37, and the twelve it has beyond the contract are named in
 `AssistSurfaceContractTests`.) The mac's own test has
@@ -4750,7 +4751,7 @@ routing re-measurement. The surface is 22 / 13 local / 35 MCP (was 32).
 docstring) gives, after regeneration:
 
 - `local 13 tools 46b965622213567d49aae523c70f9bcd2c9fd3d1c21279e167d0da2b2cd96cb6` — unchanged, and now PINNED in full by `scripts/test_tool_surface_digest.py`;
-- `mcp 35 tools 777bf545185efd47333e13877c263884c9a3e3d19d6deb82388f6eb5c2fdcc54` — moved, as it must with three new tools; recorded here, not pinned.
+- `mcp 35 tools 777bf545185efd47333e13877c263884c9a3e3d19d6deb82388f6eb5c2fdcc54` — moved, as it must with three new tools; recorded here, not pinned. Re-hashed after merging `dev` 9eb779ac (#204, which touched no tool): both digests unchanged.
 
 What the write keeps, and why:
 
@@ -4758,10 +4759,16 @@ What the write keeps, and why:
   `replacing: true`; this surface carries no boolean anywhere
   (`toolSchemas.departures`, `testNothingOnThisSurfaceIsAPreviewFlagOrAnyBoolean`),
   because a boolean is an argument the model decides under pressure. The mark
-  is the first eight hex digits of the SHA-256 of the page's bytes, which
-  `plan_write_how_i_teach` reports and the model can only COPY. It also refuses
-  a replace when the teacher edited the page after the plan — which a boolean
-  could not. With no mark, an existing page is never replaced.
+  is the first eight hex digits of the SHA-256 of the page's bytes as they are
+  on disk (`howITeachPage.tools.markCases` pins the recipe, BOM included), which
+  `plan_write_how_i_teach` reports. It DETECTS a page that changed after the
+  plan — a teacher's edit between the plan and the write refuses the write,
+  which a boolean could not. It is not an enforcement boundary: an agent with a
+  shell can hash the file itself (no easier than calling the plan), and could
+  write the file with its own tools anyway. The gates are the teacher reading
+  the plan and the client's permission prompt; the mark steers the agent
+  through the plan and catches a stale one. With no mark, an existing page is
+  never replaced.
 - **Refused, by the plan and the write alike:** empty text, more than 8,000
   characters, text whose first non-blank line (after a byte-order mark) is a
   `---` fence (so an agent cannot write `publish: true` into it), a wrong mark,
@@ -4897,7 +4904,10 @@ toolSchemas.local  n=13  sha256 = 1b3666437802e1038b7801727abbe0968232c32ff878c3
 toolSchemas.mcp    n=32  sha256 = 079594d16aad00a8339a6e2cf560fcb508f98711339e14c0ae07bb97f8e76c84
 ```
 
-Both identical afterwards. Nothing here is a routing change, so the 29-probe
+Both identical afterwards. (These full digests were made with an earlier
+recipe, not `research/ai-assist/toolhash.py`'s, so they do not match the
+`46b96562…` that script gives for the same local thirteen; the truncated
+digests elsewhere in this page are toolhash.py's.) Nothing here is a routing change, so the 29-probe
 suite does not need re-running: the gate is code in front of the dispatch, and
 the sentences are tool OUTPUT rather than definitions.
 

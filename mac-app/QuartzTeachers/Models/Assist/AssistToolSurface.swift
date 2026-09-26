@@ -900,8 +900,8 @@ extension AssistToolRunner {
     )
 
     /// A MARK, never a boolean: this surface carries no boolean anywhere, and
-    /// a mark is something the model can only copy from the plan it showed
-    /// the teacher (`howITeachPage.tools.replacingIsAMarkNotABoolean`).
+    /// a mark is tied to the exact bytes the plan described, so a page edited
+    /// since the plan is not replaced (`howITeachPage.tools.replacingIsAMarkNotABoolean`).
     private static let howITeachReplacingHelp: AssistSchemaProperty = AssistSchemaProperty(
         kind: .string,
         description: "Only when replacing a page the teacher already has: the mark plan_write_how_i_teach "

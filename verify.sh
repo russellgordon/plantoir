@@ -1093,10 +1093,35 @@ docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
 # is spelled in capitals, whose web address a case-sensitive name check would
 # miss (#209 plan review, item 9). The course's settings are made to LIST the
 # two reserved pages, the way a course whose page predates the rule does, so
-# the preflight drop runs for real; they are put back afterwards.
+# the preflight drop runs for real.
+#
+# They are put back by an EXIT trap, not only at the end of 6h: the fixture is
+# the developer's own git-ignored course, and a run stopped between here and
+# the check (^C, HUP, a hard exit) must not leave three pages and an edited
+# configuration for the next run to start from (#209 implementation review,
+# item 4). The build's preflight also rewrites course_config.backup.json, so
+# that is kept and put back too — or removed if there was none.
 HIT_COURSE="courses/EXC2O"
 HIT_CONFIG_BACKUP="$(mktemp -t cq4t-hit-config)"
+HIT_CONFIG_BACKUP_BACKUP="$(mktemp -t cq4t-hit-config-backup)"
 cp "$HIT_COURSE/course_config.json" "$HIT_CONFIG_BACKUP"
+HIT_HAD_CONFIG_BACKUP="no"
+if [[ -f "$HIT_COURSE/course_config.backup.json" ]]; then
+  cp "$HIT_COURSE/course_config.backup.json" "$HIT_CONFIG_BACKUP_BACKUP"
+  HIT_HAD_CONFIG_BACKUP="yes"
+fi
+restore_hit_fixture() {
+  [[ -n "${HIT_CONFIG_BACKUP:-}" && -f "$HIT_CONFIG_BACKUP" ]] || return 0
+  rm -f "$HIT_COURSE/How I Teach.md" "$HIT_COURSE/section1/HOW I TEACH.md" "$HIT_COURSE/How I Teach 1.md"
+  cp "$HIT_CONFIG_BACKUP" "$HIT_COURSE/course_config.json"
+  if [[ "$HIT_HAD_CONFIG_BACKUP" == "yes" ]]; then
+    cp "$HIT_CONFIG_BACKUP_BACKUP" "$HIT_COURSE/course_config.backup.json"
+  else
+    rm -f "$HIT_COURSE/course_config.backup.json"
+  fi
+  rm -f "$HIT_CONFIG_BACKUP" "$HIT_CONFIG_BACKUP_BACKUP"
+}
+trap 'restore_hit_fixture; release_verify_lock' EXIT
 printf 'I teach by plantoir-hit-sentinel-course-7f3a.\n' > "$HIT_COURSE/How I Teach.md"
 printf 'I teach by plantoir-hit-sentinel-section-7f3a.\n' > "$HIT_COURSE/section1/HOW I TEACH.md"
 printf 'A look-alike page: plantoir-hit-sentinel-lookalike-7f3a.\n' > "$HIT_COURSE/How I Teach 1.md"
@@ -1220,9 +1245,8 @@ for planted in "$HIT_COURSE/How I Teach.md" "$HIT_COURSE/section1/HOW I TEACH.md
   fi
 done
 [[ "$HIT_OK" == "true" ]] && pass "No How I Teach page reaches the built site, the look-alike does, and the teacher's own pages are untouched (#209)"
-rm -f "$HIT_COURSE/How I Teach.md" "$HIT_COURSE/section1/HOW I TEACH.md" "$HIT_COURSE/How I Teach 1.md"
-cp "$HIT_CONFIG_BACKUP" "$HIT_COURSE/course_config.json"
-rm -f "$HIT_CONFIG_BACKUP"
+restore_hit_fixture
+trap release_verify_lock EXIT
 
 # -------------------- 6c. An existing teacher's container is recreated ------
 # Every container that exists today was made WITHOUT the builds mount, and a
