@@ -371,11 +371,14 @@ and the `…-REHEARSAL.dmg` name already say what they are.
 **The standard account's first run is a real first run** (the slice-2
 review's M2): it has none of this Mac's tools, its own Colima virtual machine
 and its own image, and it downloads and builds all of them the first time a
-preview is asked for — about FIRST_RUN_MINUTES minutes on this Mac (measured
-FIRST_RUN_WHEN: the image built from nothing in IMAGE_MINUTES with
-`./verify.sh --no-cache`; `colima start` takes about 40 seconds on a first
-run, `documentation/09-mac-app.md`; the tool download was not measured here,
-where the tools come from Homebrew). Its virtual machine sees only its own
+preview is asked for — plan on several minutes, most of it waiting. What was
+measured on this Mac, 2026-09-25: the image built with no layer cache in 60.6
+seconds (`./verify.sh --no-cache`, 45 steps, the base image already present —
+a new account's VM also has to download that base image, which was NOT
+measured); `colima start` on a first run takes about 40 seconds
+(`documentation/09-mac-app.md`). The tool download was not measured here,
+where the tools come from Homebrew. Start the first preview before anything
+else in the account, and time it: that number belongs in this paragraph. Its virtual machine sees only its own
 containers, so a preview Russell has open in his own account can take the same
 port block: close his previews for the rehearsal.
 
