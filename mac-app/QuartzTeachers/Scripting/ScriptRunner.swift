@@ -735,6 +735,9 @@ class ScriptRunner {
         // A preview whose address was held by something else on this Mac,
         // or whose look could not be made (#310).
         PreviewAddressHeldReport.noteOnTheTrail(from: text)
+        // A How I Teach page the course had listed for the website, kept off
+        // it by this build (#209).
+        HowITeachKeptOffReport.noteOnTheTrail(from: text)
         for finding in SiteHealthFinding.findings(in: text) {
             if healthFindings.contains(finding) {
                 continue
@@ -899,6 +902,9 @@ class ScriptRunner {
             return false
         }
         if PreviewAddressHeldReport.isMarkerLine(line) {
+            return false
+        }
+        if HowITeachKeptOffReport.isMarkerLine(line) {
             return false
         }
         if line.hasSuffix(":") || line.hasSuffix("?") || line.hasSuffix(">") {

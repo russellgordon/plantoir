@@ -113,8 +113,11 @@ def is_reserved_place(relative_path: str) -> bool:
         return is_the_how_i_teach_page(parts[0])
     if len(parts) == 2:
         folder = parts[0]
-        is_a_section = folder.startswith("section") and folder[len("section"):].isdigit() \
-            and len(folder) > len("section")
+        # ASCII digits only, as the app checks — `str.isdigit` would also
+        # accept other scripts' digits, which Swift's check does not.
+        digits = folder[len("section"):]
+        is_a_section = (folder.startswith("section") and len(digits) > 0
+                        and all("0" <= character <= "9" for character in digits))
         return is_a_section and is_the_how_i_teach_page(parts[1])
     return False
 

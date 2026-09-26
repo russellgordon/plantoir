@@ -197,6 +197,19 @@ nonisolated enum ClaudeCodeLauncher {
     ///   SAME code as this one, each as "ICS3U-2025 (2025–26)". Empty for the
     ///   overwhelming majority of courses, and then the greeting is exactly
     ///   the paragraph it has always been.
+    /// The sentence that asks the session to read the teacher's How I Teach
+    /// page (#209), verbatim from `contracts/app-rules.json` →
+    /// `outsideAgents.greetingHowITeachSentence`.
+    ///
+    /// The same whether or not a page exists: the read tool's answer handles
+    /// a missing one (and offers a draft), so neither platform looks at the
+    /// disk when the menu item is clicked, and it is one string both pin. The
+    /// load-bearing channel for the page: measured for the Codex door, a tool
+    /// description saying "call first" was deferred while the greeting was
+    /// acted on at once.
+    static let howITeachGreetingSentence: String =
+        "Then read my How I Teach page for this course, and keep to it in anything you write for me."
+
     static func greeting(
         courseCode: String,
         courseName: String,
@@ -209,6 +222,7 @@ nonisolated enum ClaudeCodeLauncher {
         }
         text.append(" in Plantoir. Use the plantoir tools for anything to do with this course. ")
         text.append("Start by listing its sections so we both know what's there. ")
+        text.append(ClaudeCodeLauncher.howITeachGreetingSentence + " ")
         text.append("Before changing anything, use the matching plan tool first and show me what it says, ")
         text.append("in plain words, and wait for me to agree.")
         // **Decision (s): the two Revise doors are NOT offered on a reference

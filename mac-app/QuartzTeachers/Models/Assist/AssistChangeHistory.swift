@@ -70,12 +70,24 @@ struct AssistChange: Equatable {
 
     let files: [AssistSavedFile]
 
+    /// Whether the change belongs to the COURSE rather than to one section —
+    /// the How I Teach page (#209), which is one page per course. Such a
+    /// change still carries a section number, because an undo entry and a
+    /// backup name need one, but `description` does not say it: "wrote the
+    /// How I Teach page in ICS4U Section 1" would be wrong about a page that
+    /// belongs to every section (#209 plan review, item 6).
+    var appliesToTheWholeCourse: Bool = false
+
     // MARK: - Computed properties
 
     /// The same clause with the section on the end, for anywhere that has not
     /// already said which section it is talking about: "unpublished Unit 4,
-    /// Day 23 in ADA1O Section 1".
+    /// Day 23 in ADA1O Section 1". A change to the whole course names the
+    /// course alone.
     var description: String {
+        if appliesToTheWholeCourse {
+            return "\(whatHappened) in \(courseCode)"
+        }
         return "\(whatHappened) in \(courseCode) Section \(sectionNumber)"
     }
 }

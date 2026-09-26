@@ -125,6 +125,7 @@ final class ClaudeCodeLauncherTests: XCTestCase {
             "I'm a teacher working on ICS3U (Grade 11 Computer Science) in Plantoir. "
                 + "Use the plantoir tools for anything to do with this course. "
                 + "Start by listing its sections so we both know what's there. "
+                + "Then read my How I Teach page for this course, and keep to it in anything you write for me. "
                 + "Before changing anything, use the matching plan tool first and show me what it says, "
                 + "in plain words, and wait for me to agree."
         )

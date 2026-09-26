@@ -269,6 +269,26 @@ enum ClassPages {
         return pages
     }
 
+    /// The pages the assistant LISTS for one section — `pagesOfSection`
+    /// without the teacher's How I Teach page (#209), which is never on the
+    /// website and so is never offered to publish, hide or list.
+    ///
+    /// A separate function rather than a skip inside `pagesOfSection`, on
+    /// purpose (#209 plan review): that walk is also what renaming classes
+    /// rewrites links through, and a How I Teach page that links to
+    /// [[Unit 2, Day 3]] must follow that class when it is renamed. See
+    /// `contracts/shared-rules.json` → `howITeachPage.notListedAsAPage`.
+    static func pagesTheAssistantLists(forSection sectionNumber: Int, in course: Course) -> [URL] {
+        var listed: [URL] = []
+        for page in pagesOfSection(sectionNumber, in: course) {
+            if HowITeachPage.isTheHowITeachPage(page, in: course) {
+                continue
+            }
+            listed.append(page)
+        }
+        return listed
+    }
+
     /// Every markdown page under a folder, recursively. `nonisolated` because
     /// the unit-word rename walks class folders off the main actor.
     nonisolated static func markdownPages(under root: URL) -> [URL] {

@@ -818,6 +818,21 @@ nonisolated enum ActivityTrail {
         /// in the same breath, and this is the line that is still there next
         /// week, when "why is this page still showing?" arrives.
         case pageSettingsLeftAsTheyWere = "page settings left as they were"
+        /// An outside assistant read a course's How I Teach page through
+        /// Plantoir (#209), or found there was none: carries the course, and
+        /// the word count and whether it was cut short — never the words.
+        /// Present means read THROUGH PLANTOIR; its absence does not prove
+        /// the page was never read, because an agent's own file tools can
+        /// open it from the working folder and leave no line.
+        case howITeachPageRead = "How I Teach page read"
+        /// An outside assistant saved a course's How I Teach page (#209):
+        /// created or replaced, word counts before and after, and the backup
+        /// made first. Answers "did I write this, or did an assistant?".
+        case howITeachPageWritten = "How I Teach page written"
+        /// A build dropped a How I Teach page the course's settings had
+        /// LISTED for the website (#209) — one earlier builds published.
+        /// Read from the build's `PLANTOIR_KEPT_OFF:` line.
+        case howITeachPageKeptOff = "How I Teach page kept off the website"
     }
 
     // MARK: - Stored properties

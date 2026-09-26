@@ -1266,6 +1266,135 @@ nonisolated enum AssistWording {
         return "“\(page)” could not be opened, so I can’t say what it links to."
     }
 
+    // MARK: - The How I Teach page (#209)
+
+    // Said by the three MCP-only tools that read and write a course's How I
+    // Teach page, and by publishing when a teacher names it. Agent-facing
+    // unless marked (T): the teacher reads it, relayed or on screen. The rule
+    // they serve is `contracts/shared-rules.json` → `howITeachPage`. FIRST
+    // DRAFTS for Russell's wording pass.
+
+    /// The page, as `read_how_i_teach` hands it over: a header naming the
+    /// course and what to do with it, then the teacher's words.
+    static func howITeachRead(course: String, text: String) -> String {
+        return "Here is the How I Teach page for \(course): the teacher's own account of how this course "
+             + "is taught. Keep to it in anything you draft or revise for \(course). It is never put on "
+             + "the website.\n\n" + text
+    }
+
+    /// There is no page yet. States the exact name and place, so an agent
+    /// relaying it sets the teacher up to write one that is kept private — a
+    /// page with any other name is published (#209 plan review, item 8).
+    static func howITeachMissing(course: String) -> String {
+        return "\(course) has no How I Teach page yet. It would be a page named exactly “How I Teach”, "
+             + "at the top of the \(course) course folder beside its other pages — only a page with "
+             + "exactly that name, in exactly that place, is kept off the website. The teacher can write "
+             + "it there in Obsidian, or you can offer to draft one."
+    }
+
+    /// How to offer, and draft, a page: the product decision in prose.
+    ///
+    /// Names no teaching approach on purpose. Whatever lean the ready-made
+    /// courses have should be FOUND in the pages, not asserted by Plantoir
+    /// about a teacher who may have rewritten every one of them.
+    static let howITeachDraftingBrief: String =
+        "If you offer to draft it: offer first, and draft only if the teacher says yes. Before drafting, "
+      + "read the course's own pages with the plantoir tools — the section's landing page, class pages "
+      + "from at least two different units, and a few of its warm-ups, tasks and discussions where "
+      + "there are any; if a course kept for reference has the same code, read that too. Write in the "
+      + "teacher's own first person. Say what the pages SHOW — how a class is shaped, whether ideas are "
+      + "explored before they are named, how practice and feedback work, the kinds of page that keep "
+      + "coming back and what each is for, and how the pages speak to students — and never invent "
+      + "what they do not show. Aim for 200 to 500 words. Show the teacher the whole draft and change "
+      + "it until they agree. Then save it with plan_write_how_i_teach and write_how_i_teach, never "
+      + "with your own file tools, so it is kept off the website, backed up first and can be undone."
+
+    /// The page is longer than one answer carries.
+    static func howITeachCutShort(course: String, path: String) -> String {
+        return "The How I Teach page for \(course) is longer than one answer can carry, so it stops "
+             + "here. The rest is in \(path) — read it with your own tools."
+    }
+
+    /// The plan for a NEW page.
+    static func howITeachPlanCreates(course: String, path: String) -> String {
+        return "This would save a new How I Teach page for \(course) at \(path), set so it is never put "
+             + "on the website. Show the teacher the whole text and wait for them to agree before "
+             + "calling write_how_i_teach."
+    }
+
+    /// The plan for REPLACING the page the teacher has. The mark is what the
+    /// write must be handed (`howITeachPage.tools.replacingIsAMarkNotABoolean`).
+    static func howITeachPlanReplaces(course: String, path: String, words: String,
+                                      changed: String, mark: String) -> String {
+        return "\(course) already has a How I Teach page, at \(path) (\(words) words, last changed "
+             + "\(changed)). Saving would REPLACE what it says; any settings at its top are kept. Show "
+             + "the teacher the whole new text, tell them it replaces the page they have, and only if "
+             + "they agree call write_how_i_teach with replacing: “\(mark)”."
+    }
+
+    /// Refused: a page is there, and nothing said it may be replaced.
+    static func howITeachAlreadyWritten(course: String) -> String {
+        return "Nothing was saved: \(course) already has a How I Teach page, and a teacher's own page is "
+             + "never replaced without their agreement. Use plan_write_how_i_teach, show the teacher what "
+             + "it says, and pass the mark it gives as replacing only if they agree to replace their page."
+    }
+
+    /// Refused: the page is not the one that was planned.
+    static func howITeachChangedSincePlanned(course: String) -> String {
+        return "Nothing was saved: the How I Teach page for \(course) is not the one that was planned — "
+             + "it has changed since, or that is not its mark. Plan again with plan_write_how_i_teach "
+             + "and show the teacher before replacing it."
+    }
+
+    /// Refused: no words.
+    static let howITeachNeedsWords: String =
+        "Nothing was saved: the page's text is empty. Pass the words of the page as text."
+
+    /// Refused: too long.
+    static let howITeachTooLong: String =
+        "Nothing was saved: that is longer than a How I Teach page can be (\(HowITeachPage.mostCharacters) "
+      + "characters). Make it shorter and show the teacher again."
+
+    /// Refused: the text opens with a settings block.
+    static let howITeachCarriesNoSettings: String =
+        "Nothing was saved: pass the page's words only, without a --- settings block at the top. "
+      + "Plantoir writes the page's settings itself."
+
+    /// (T) Saved.
+    static func howITeachSaved(course: String) -> String {
+        return "Saved the How I Teach page for \(course). It’s in the course folder beside your other "
+             + "pages, so you can change it in Obsidian any time. It’s never put on your website."
+    }
+
+    /// (T) Asked to publish or hide the page by name. The local window can
+    /// show this, with no routing change: the model still picks
+    /// `publish_pages`, and the refusal is in the tool.
+    static func howITeachIsNeverPublished(course: String) -> String {
+        return "The How I Teach page for \(course) is never put on the website — it is for you and your "
+             + "assistant. To share something like it with students, make a page with a different name."
+    }
+
+    /// The MCP session briefing's paragraph (mac only —
+    /// `howITeachPage.briefingInInstructions`), naming each live course whose
+    /// page exists.
+    static func howITeachBriefing(courses: [String]) -> String {
+        var lines: [String] = []
+        lines.append(
+            "These courses have a How I Teach page — the teacher's own account of how the course is "
+            + "taught. Read it with read_how_i_teach before drafting or revising anything in that "
+            + "course, and keep to it:"
+        )
+        for course in courses {
+            lines.append("  \(course)")
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    /// `list_courses`' line for a course, to an MCP client only
+    /// (`howITeachPage.listCoursesLine`).
+    static let howITeachListedAsWritten: String = "  How I Teach page: yes"
+    static let howITeachListedAsNotWritten: String = "  How I Teach page: not written yet"
+
     // MARK: - Shared fragments
 
     /// One phrasing for "go and look at what happened", because it was two:
