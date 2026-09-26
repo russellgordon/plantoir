@@ -31,6 +31,32 @@ HOURS_TOLERANCE = 6
 MINIMUM_REVIEW_CLASSES = 3
 
 
+def curriculum_links_outside_folder(text, curriculum_root, curriculum_folder, link_pattern):
+    """
+    Every link or embed on a curriculum page whose target is not a page in
+    the curriculum folder itself (#253). Code spans and fenced blocks are
+    skipped: a link written as an example is not a link. A target is inside
+    the folder when it names one of the folder's pages by its stem, or by a
+    path that starts with the folder's own name.
+    """
+    stems = {"index"}
+    for folder_page in curriculum_root.rglob("*.md"):
+        stems.add(folder_page.stem)
+    without_fences = re.sub(r"(`{3,})[\s\S]*?\1", "", text)
+    without_code = re.sub(r"`[^`\n]*`", "", without_fences)
+    outside = []
+    for link in link_pattern.finditer(without_code):
+        target = link.group(1).strip().rstrip("\\")
+        if "/" in target:
+            prefix, _, rest = target.partition("/")
+            inside = prefix == curriculum_folder and rest.split("/")[-1] in stems
+        else:
+            inside = target in stems
+        if not inside:
+            outside.append(target)
+    return outside
+
+
 def lint(course_code: str) -> int:
     root = REPO_ROOT / "support" / "example_content" / course_code
     if not root.is_dir():
@@ -294,6 +320,23 @@ def lint(course_code: str) -> int:
             text = page.read_text(encoding="utf-8")
             if "^text" in text and text.split("^text", 1)[1].strip():
                 problems.append(f"shared/{curriculum_folder}/{page.name}: content after the ^text anchor — expectation pages carry the verbatim wording only")
+
+    # A curriculum page links only inside its own folder (#253). Since #251
+    # this folder is installed into SKELETON courses too, when a teacher
+    # declines the ready-made pages, so a link from it to a lesson, a task or
+    # a project page points at a page that course does not have. Point at an
+    # expectation page instead, or say it in plain words that are true
+    # without the payload.
+    if curriculum_folder:
+        curriculum_root = root / "shared" / curriculum_folder
+        for page in sorted(curriculum_root.rglob("*.md")):
+            text = page.read_text(encoding="utf-8")
+            for target in curriculum_links_outside_folder(text, curriculum_root, curriculum_folder, link_pattern):
+                problems.append(
+                    f"shared/{curriculum_folder}/{page.relative_to(curriculum_root)}: links to "
+                    f"[[{target}]], outside the curriculum folder. Since #251 this folder "
+                    f"is installed into skeleton courses too, where {target} does not exist (#253)"
+                )
 
     # Exercises answer callouts carry no repeated "(click to expand)"
     # hint — the Exercises index opens with the how-to message instead.
