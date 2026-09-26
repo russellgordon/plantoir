@@ -176,8 +176,11 @@ def code_ranges(text: str) -> list:
                     close_paragraph()
                 if paragraph_start < 0:
                     paragraph_start = line_start
+                    # Compared with the paragraph's FIRST line: an unquoted
+                    # line inside a callout paragraph is a lazy continuation
+                    # and does not lower it.
+                    paragraph_depth = depth
                 paragraph_end = line_end
-                paragraph_depth = depth
                 if _HEADING.match(body):
                     close_paragraph()
 

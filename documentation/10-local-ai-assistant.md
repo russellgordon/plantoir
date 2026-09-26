@@ -1883,7 +1883,7 @@ it as a link wherever it is: `quartz/plugins/transformers/ofm.ts` lines
 excludes a backslash and the alias is `\\?\|`.
 
 **The rule** (`contracts/shared-rules.json` → `readingALink`, ten cases both
-apps and the build read): the name runs from `[[` up to the first `]`, `|` or
+apps and the build read when #294 landed — forty since #313, below): the name runs from `[[` up to the first `]`, `|` or
 `#`, and a backslash immediately before that character is not part of it. The
 pattern is `(!?\[\[)([^\]|#]+?)(?=\\?[\]|#])` — lazy, stopping BEFORE an
 optional backslash, with the backslash in a zero-width lookahead. That last part
@@ -1994,7 +1994,7 @@ read from `contentIndex.json` and the rendered article):
 
 **The rule, in short** — written out to be implemented from in
 `contracts/shared-rules.json` → `readingALink.whatIsCode`, with its limits in
-`whatIsCodeLimits` and 29 cases in `readingALink.cases`. The page is read a
+`whatIsCodeLimits` and 30 of the 40 cases in `readingALink.cases`. The page is read a
 line at a time; a line's BODY has any `>` markers taken off, and its DEPTH is
 how many there were. A fence opens on a body starting with three or more
 backticks or tildes (backticks with another backtick later on the line are
@@ -2014,19 +2014,22 @@ match that starts in code is not merely dropped: the search starts again where
 that code ENDS.** The link pattern crosses a `[`, so in "Type `` `[[` `` to
 start one, then [[Real Page]]" a match from the example's brackets runs on to
 "Real Page" and swallows the real link; dropping that match would drop the
-link with it. That case was found while implementing, with seven more. Four —
+link with it. That case was found while implementing, with eight more. Four —
 a bare `~~~` line inside a backtick fence, a TILDE fence inside a callout, a
 heading, and a callout line straight after a paragraph — because four
 mutations of the rule passed the cases before them; for the first two: the traceback case
 carries text after its tildes, and the backtick callout's fence lines happen to
-pair up as an inline span. Three came from the implementation review, each a
+pair up as an inline span. Three came from the first implementation review, each a
 place where the first version DROPPED a real link Quartz draws: a fence left
 open inside a callout ran on to the end of the page (it now ends with the
 callout — the fence belongs to its opener's quote DEPTH, and only a line at
 that depth closes it); a `> ```` line inside an unquoted fence closed it; and a
 backtick in frontmatter paired with one in the body (a rule line — `---`,
 `***`, `___`, `===` — now breaks a paragraph, and a heading is a paragraph on
-its own). None of the eight was built in Quartz; all 39 cases were checked
+its own). A fourth came from the second review: a paragraph's quote depth is
+its FIRST line's, because an unquoted line inside a callout paragraph is a
+lazy continuation and must not make the next `>` line look deeper. None of
+the nine was built in Quartz; all 40 cases were checked
 against its parser stack (remark-parse 11 + remark-gfm 4 + remark-frontmatter,
 with Quartz's own link pattern run over text nodes), which agrees with every
 one. The same stack judged 20,000 random texts built from backticks, tildes,
@@ -2041,7 +2044,7 @@ reports — never `Character`s, since `"\r\n"` is one grapheme and a scan for
 `"\n"` misses every line ending of a page written on Windows), behind
 `WikiLinkRewriter.linkMatches`; in the build and the installer,
 `scripts/markdown_code.py`. Measured, the two agree offset for offset on all
-12,490 pages of `support/` and on 40,000 fuzzed texts built from backticks,
+12,490 pages of `support/` and on 50,000 fuzzed texts built from backticks,
 tildes, `>`, `[[`, `]]`, backslashes, CRLFs, an accent and an emoji. What
 changed on the mac:
 

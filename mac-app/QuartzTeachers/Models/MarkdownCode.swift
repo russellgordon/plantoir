@@ -31,6 +31,9 @@ import Foundation
 ///   `support/` sit in it, and getting it right needs list tracking: a
 ///   shortcut drops real links from nested lists, in the direction that
 ///   leaves pages unpublished while the plan looks right.
+/// * A fence opener indented four or more spaces (or a tab) opens a fence
+///   here; CommonMark reads it as indented code at the top level, and telling
+///   that from a fence inside a list item needs the same list tracking.
 /// * A fence opened inside a list item whose lines fall back to column 0 runs
 ///   to its own closer here; CommonMark ends it with the item. TEJ2O's lab
 ///   page had that shape and was fixed; the payload linter refuses it.
@@ -171,9 +174,12 @@ nonisolated enum MarkdownCode {
                 }
                 if paragraphStart < 0 {
                     paragraphStart = lineStart
+                    // Compared with the paragraph's FIRST line: an unquoted
+                    // line inside a callout paragraph is a lazy continuation
+                    // and does not lower it.
+                    paragraphDepth = depth
                 }
                 paragraphEnd = lineEnd
-                paragraphDepth = depth
                 if MarkdownCode.isAHeading(units, from: bodyStart, to: contentEnd) {
                     // A heading is one line: the next begins a new paragraph.
                     MarkdownCode.addSpans(units, from: paragraphStart, to: paragraphEnd, into: &found)
