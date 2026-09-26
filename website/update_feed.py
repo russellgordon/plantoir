@@ -26,6 +26,20 @@ What it does, in order — and what it refuses:
    warning is marked critical from every version (no Skip, no Remind Me
    Later); otherwise the newest earlier release that had one stays critical
    for teachers below it.
+   Since #312 the app carries the website builder's helpers and a ~450 MB
+   DMG, so the new item carries DELTAS from the three newest builds already
+   in the feed (`--maximum-deltas 3`): their DMGs are fetched from the
+   addresses the feed itself gives — the exact bytes teachers installed, so
+   no copy has to be kept anywhere — checked for length and build, and put
+   beside this one under their build's name. generate_appcast REWRITES the
+   item of every archive it is given — measured with --versions: the earlier
+   item's download pointed at THIS release and lost its notes — so each
+   earlier item is put back exactly as it was in the feed, the feed is signed
+   again with the same key, and every earlier item must then compare equal
+   to the one that was there, or the cut is refused. The
+   `.delta` files are written beside the DMG, to be uploaded to the same
+   release (their addresses use the same prefix). A Swift-only release's
+   delta measured 3.7 MB against a 466 MB DMG.
 4. Verifies the result with `sign_update --verify` and checks the new item's
    download address and length, then copies feed and notes into
    `website/updates/`. `website/build.py` copies the feed into `site/` byte for
@@ -47,6 +61,8 @@ from __future__ import annotations
 import argparse
 import html
 import plistlib
+import urllib.request
+import xml.etree.ElementTree as ElementTree
 import re
 import shutil
 import subprocess
@@ -61,6 +77,10 @@ KEYCHAIN_ACCOUNT = "plantoir-macos"
 DOWNLOADS = "https://github.com/russellgordon/plantoir/releases/download/"
 ASSET = "Plantoir-macOS.dmg"
 REHEARSAL_ASSET = "Plantoir-macOS-REHEARSAL.dmg"
+# How many earlier builds the new item carries a delta from (#312). Each costs
+# one earlier DMG downloaded at the cut (~450 MB) and a few MB uploaded.
+MAXIMUM_DELTAS = 3
+SPARKLE_NS = "http://www.andymatuschak.org/xml-namespaces/sparkle"
 STYLE_LINE = ("<style>div.sparkle-installed-version, div.sparkle-installed-version ~ div "
               "{ display: none; }</style>")
 
@@ -254,6 +274,88 @@ def critical_version(notes: str, required_warning: bool) -> str | None:
     return None
 
 
+def earlier_builds(existing_feed: Path, build: str) -> list[dict]:
+    """The newest MAXIMUM_DELTAS items already in the feed, other than this build.
+
+    The builds IN THE FEED, not the newest tags: releases before Sparkle, and
+    Windows-only tags, are not in it, and no app below the feed's oldest item
+    can ever ask for a delta (the plan review's H4).
+    """
+    if not existing_feed.is_file():
+        return []
+    import update_feeds
+    items = [item for item in update_feeds.items_of(existing_feed) if item["build"] != build]
+    items.sort(key=update_feeds.build_number, reverse=True)
+    return items[:MAXIMUM_DELTAS]
+
+
+def download_earlier_dmg(item: dict, folder: Path) -> Path:
+    """An earlier release's DMG, from the address its feed item gives."""
+    target = folder / f"download-{item['build']}.dmg"
+    with urllib.request.urlopen(item["url"]) as response, open(target, "wb") as handle:
+        shutil.copyfileobj(response, handle)
+    return target
+
+
+def items_by_build(feed: Path) -> dict[str, bytes]:
+    """Each item of a feed, keyed by its build, as canonical XML — so an item
+    can be compared across a run of generate_appcast, which rewrites the file."""
+    ElementTree.register_namespace("sparkle", SPARKLE_NS)
+    root = ElementTree.fromstring(feed.read_bytes())
+    found: dict[str, bytes] = {}
+    for item in root.iter("item"):
+        build = (item.findtext(f"{{{SPARKLE_NS}}}version") or "").strip()
+        found[build] = ElementTree.canonicalize(ElementTree.tostring(item), strip_text=True).encode()
+    return found
+
+
+def deltas_of(feed: Path, build: str) -> list[dict]:
+    """The delta enclosures of one item: from which build, where, how long."""
+    root = ElementTree.fromstring(feed.read_bytes())
+    for item in root.iter("item"):
+        if (item.findtext(f"{{{SPARKLE_NS}}}version") or "").strip() != build:
+            continue
+        found: list[dict] = []
+        for deltas in item.findall(f"{{{SPARKLE_NS}}}deltas"):
+            for enclosure in deltas.findall("enclosure"):
+                found.append({
+                    "from": enclosure.get(f"{{{SPARKLE_NS}}}deltaFrom", ""),
+                    "url": enclosure.get("url", ""),
+                    "length": enclosure.get("length", ""),
+                })
+        return found
+    return []
+
+
+ITEM_PATTERN = re.compile(r"<item>.*?</item>", re.DOTALL)
+SIGNATURE_PATTERN = re.compile(r"\n?<!-- sparkle-signatures:.*?-->\n?", re.DOTALL)
+
+
+def item_texts(text: str) -> dict[str, str]:
+    """Each item of a feed as the text it was written with, keyed by its build."""
+    found: dict[str, str] = {}
+    for match in ITEM_PATTERN.finditer(text):
+        build = re.search(r"<sparkle:version>\s*([^<\s]+)\s*</sparkle:version>", match.group(0))
+        if build:
+            found[build.group(1)] = match.group(0)
+    return found
+
+
+def restore_earlier_items(written: str, original: str, build: str) -> str:
+    """The feed generate_appcast wrote, with every item but `build` put back
+    as it was in `original`, and no signature (it no longer matches)."""
+    before = item_texts(original)
+
+    def put_back(match: re.Match) -> str:
+        text = match.group(0)
+        found = re.search(r"<sparkle:version>\s*([^<\s]+)\s*</sparkle:version>", text)
+        if found and found.group(1) != build and found.group(1) in before:
+            return before[found.group(1)]
+        return text
+
+    return SIGNATURE_PATTERN.sub("\n", ITEM_PATTERN.sub(put_back, written)).rstrip("\n") + "\n"
+
+
 def key_arguments(ed_key_file: Path | None) -> list[str]:
     if ed_key_file is not None:
         return ["--ed-key-file", str(ed_key_file)]
@@ -262,8 +364,13 @@ def key_arguments(ed_key_file: Path | None) -> list[str]:
 
 def build_feed(version: str, dmg: Path, notes_markdown: str, required_warning: bool,
                updates_dir: Path, ed_key_file: Path | None = None,
-               rehearsal: Path | None = None, download_prefix: str | None = None) -> Path:
-    """Build, sign, verify and install the feed. Returns where it was written."""
+               rehearsal: Path | None = None, download_prefix: str | None = None,
+               earlier_dmg=download_earlier_dmg) -> Path:
+    """Build, sign, verify and install the feed. Returns where it was written.
+
+    `earlier_dmg(item, folder) -> Path` fetches an earlier release's DMG for a
+    delta; the tests hand theirs over directly. Deltas land beside `dmg`.
+    """
     generate = tool("generate_appcast")
     sign = tool("sign_update")
 
@@ -296,18 +403,43 @@ def build_feed(version: str, dmg: Path, notes_markdown: str, required_warning: b
     notes = cumulative_notes(existing_notes, section)
     critical = critical_version(notes, required_warning)
 
+    sys.path.insert(0, str(WEBSITE))
+    import update_feeds
+
     with tempfile.TemporaryDirectory(prefix="plantoir-feed-") as work:
         folder = Path(work) / "archives"
         folder.mkdir()
         shutil.copyfile(dmg, folder / asset)
         (folder / (Path(asset).stem + ".html")).write_text(notes, encoding="utf-8")
+        # The earlier releases a delta is made from, each under its own build's
+        # name: every release's asset has the same name, so they cannot share
+        # one folder as downloaded.
+        downloads = Path(work) / "earlier"
+        downloads.mkdir()
+        earlier = earlier_builds(existing_feed, build)
+        for item in earlier:
+            fetched = Path(earlier_dmg(item, downloads))
+            if item["length"] and str(fetched.stat().st_size) != item["length"]:
+                raise Refusal(f"The DMG for build {item['build']} is {fetched.stat().st_size} bytes; "
+                              f"its feed item says {item['length']}.")
+            if read_dmg_version(fetched)[1] != item["build"]:
+                raise Refusal(f"The DMG at {item['url']} is not build {item['build']}.")
+            shutil.copyfile(fetched, folder / f"Plantoir-{item['build']}.dmg")
         output = Path(work) / "macos.xml"
+        before: dict[str, bytes] = {}
+        original_text = ""
         if existing_feed.is_file():
             shutil.copyfile(existing_feed, output)
+            before = items_by_build(output)
+            original_text = output.read_text(encoding="utf-8")
         command = [str(generate)] + key_arguments(ed_key_file) + [
             "--download-url-prefix", prefix,
             "--link", "https://plantoir.app/",
-            "--maximum-deltas", "0",
+            "--maximum-deltas", str(MAXIMUM_DELTAS),
+            # Write THIS item only; the earlier DMGs are delta sources, and
+            # without this generate_appcast infers items for them too, with
+            # this release's download prefix (the plan review's H4).
+            "--versions", build,
             "--embed-release-notes",
             "-o", str(output),
         ]
@@ -317,14 +449,40 @@ def build_feed(version: str, dmg: Path, notes_markdown: str, required_warning: b
         result = subprocess.run(command, capture_output=True, text=True)
         if result.returncode != 0:
             raise Refusal(f"generate_appcast failed:\n{result.stdout}{result.stderr}")
+        if earlier:
+            # Put the earlier items back as they were, and sign again.
+            output.write_text(restore_earlier_items(output.read_text(encoding="utf-8"), original_text, build),
+                              encoding="utf-8")
+            signed = subprocess.run([str(sign)] + key_arguments(ed_key_file) + [str(output)],
+                                    capture_output=True, text=True)
+            if signed.returncode != 0:
+                raise Refusal(f"Signing the feed again failed:\n{signed.stdout}{signed.stderr}")
 
         verify = subprocess.run([str(sign), "--verify"] + key_arguments(ed_key_file) + [str(output)],
                                 capture_output=True, text=True)
         if verify.returncode != 0:
             raise Refusal(f"The feed did not verify:\n{verify.stdout}{verify.stderr}")
 
-        sys.path.insert(0, str(WEBSITE))
-        import update_feeds
+        # Every item that was in the feed and is still in it is unchanged.
+        after = items_by_build(output)
+        for earlier_build, earlier_xml in before.items():
+            if earlier_build == build or earlier_build not in after:
+                continue
+            if after[earlier_build] != earlier_xml:
+                raise Refusal(f"generate_appcast changed the item for build {earlier_build}; "
+                              f"only this release's item may change.")
+        deltas = deltas_of(output, build)
+        wanted = sorted(item["build"] for item in earlier)
+        if sorted(delta["from"] for delta in deltas) != wanted:
+            raise Refusal(f"The new item carries deltas from {sorted(d['from'] for d in deltas)}; "
+                          f"expected {wanted}.")
+        delta_files: list[Path] = []
+        for delta in deltas:
+            name = delta["url"].rsplit("/", 1)[-1]
+            if not delta["url"].startswith(prefix) or not name.endswith(".delta") or not (folder / name).is_file():
+                raise Refusal(f"A delta downloads {delta['url']}, which this cut did not make under {prefix}.")
+            delta_files.append(folder / name)
+
         newest = update_feeds.newest_item(output)
         if newest is None or newest["build"] != build:
             raise Refusal("The new release is not the newest item in the feed.")
@@ -332,6 +490,12 @@ def build_feed(version: str, dmg: Path, notes_markdown: str, required_warning: b
             raise Refusal(f"The new item downloads {newest['url']}, not {prefix + asset}.")
         if newest["length"] != str(dmg.stat().st_size):
             raise Refusal(f"The new item says {newest['length']} bytes; the DMG is {dmg.stat().st_size}.")
+
+        # Beside the DMG, to be uploaded to the same release.
+        for delta_file in delta_files:
+            shutil.copyfile(delta_file, dmg.parent / delta_file.name)
+            print(f"   delta from an earlier build: {dmg.parent / delta_file.name} "
+                  f"({delta_file.stat().st_size:,} bytes) — upload it to the release beside the DMG")
 
         updates_dir.mkdir(parents=True, exist_ok=True)
         if rehearsal is not None:

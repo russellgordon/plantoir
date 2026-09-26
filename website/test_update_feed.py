@@ -101,8 +101,15 @@ class UpdateFeedTests(unittest.TestCase):
     def setUp(self) -> None:
         self.updates = Path(tempfile.mkdtemp(prefix="updates-", dir=self.folder))
 
+    def earlier(self, item: dict, folder: Path) -> Path:
+        """An earlier release's DMG, handed over rather than downloaded."""
+        self.fetched.append(item["build"])
+        return {"3100": self.dmg_one, "3150": self.dmg_two}[item["build"]]
+
     def cut(self, version: str, dmg: Path, notes: str, required: bool = False) -> Path:
-        return update_feed.build_feed(version, dmg, notes, required, self.updates, ed_key_file=self.key)
+        self.fetched = []
+        return update_feed.build_feed(version, dmg, notes, required, self.updates, ed_key_file=self.key,
+                                      earlier_dmg=self.earlier)
 
     def verifies(self, feed: Path) -> bool:
         result = subprocess.run([str(update_feed.SPARKLE_BIN / "sign_update"), "--verify",
@@ -138,6 +145,42 @@ class UpdateFeedTests(unittest.TestCase):
         self.assertLess(notes.index('data-sparkle-version="3150"'), notes.index('data-sparkle-version="3100"'))
         self.assertEqual(notes.count(update_feed.STYLE_LINE), 1)
         self.assertIn(b"3100", first)
+
+    # MARK: deltas (#312)
+
+    def test_a_second_cut_carries_a_delta_from_the_first_and_leaves_its_item_alone(self) -> None:
+        first = self.cut("1.3.2", self.dmg_one, "- First.")
+        self.assertEqual(self.fetched, [], "a first cut has nothing to make a delta from")
+        first_item = update_feed.items_by_build(first)["3100"]
+        feed = self.cut("1.3.3", self.dmg_two, "- Second.")
+        self.assertEqual(self.fetched, ["3100"], "the delta source is the build in the feed")
+        self.assertTrue(self.verifies(feed))
+        self.assertEqual(update_feed.items_by_build(feed)["3100"], first_item, "the first release's item changed")
+        deltas = update_feed.deltas_of(feed, "3150")
+        self.assertEqual(len(deltas), 1, feed.read_text(encoding="utf-8"))
+        self.assertEqual(deltas[0]["from"], "3100")
+        name = deltas[0]["url"].rsplit("/", 1)[-1]
+        self.assertEqual(deltas[0]["url"], update_feeds.RELEASE_DOWNLOADS + "v1.3.3/" + name)
+        self.assertTrue(name.endswith(".delta"), name)
+        written = self.dmg_two.parent / name
+        self.assertTrue(written.is_file(), "the delta is not beside the DMG, to be uploaded")
+        self.assertEqual(str(written.stat().st_size), deltas[0]["length"])
+        self.assertEqual(update_feeds.problems_with(feed), [])
+        written.unlink()
+
+    def test_a_delta_that_is_not_under_its_own_release_is_refused_by_the_check(self) -> None:
+        self.cut("1.3.2", self.dmg_one, "- First.")
+        feed = self.cut("1.3.3", self.dmg_two, "- Second.")
+        for delta in update_feed.deltas_of(feed, "3150"):
+            (self.dmg_two.parent / delta["url"].rsplit("/", 1)[-1]).unlink(missing_ok=True)
+        moved = self.updates / "check-delta" / "macos.xml"
+        moved.parent.mkdir()
+        data = feed.read_bytes()
+        index = data.index(b".delta")
+        start = data.rindex(b'url="', 0, index)
+        moved.write_bytes(data[:start] + data[start:index].replace(b"/v1.3.3/", b"/v1.3.2/") + data[index:])
+        self.assertTrue(any("delta" in problem for problem in update_feeds.problems_with(moved)),
+                        update_feeds.problems_with(moved))
 
     def test_a_required_warning_makes_the_release_critical_and_keeps_it_critical_below_it(self) -> None:
         feed = self.cut("1.3.2", self.dmg_one, "- Update both Macs first.", required=True)
@@ -267,6 +310,26 @@ class UpdateFeedTests(unittest.TestCase):
         self.assertEqual(update_feeds.verify_live("https://plantoir.app", feed, site(good, 200)), "match")
         self.assertEqual(update_feeds.verify_live("https://plantoir.app", feed, site(good + b" ", 200)), "mismatch")
         self.assertEqual(update_feeds.verify_live("https://plantoir.app", feed, site(good, 404)), "mismatch")
+
+    def test_the_live_check_catches_a_delta_that_was_not_uploaded(self) -> None:
+        self.cut("1.3.2", self.dmg_one, "- First.")
+        feed = self.cut("1.3.3", self.dmg_two, "- Second.")
+        for delta in update_feed.deltas_of(feed, "3150"):
+            (self.dmg_two.parent / delta["url"].rsplit("/", 1)[-1]).unlink(missing_ok=True)
+        good = feed.read_bytes()
+        size = str(self.dmg_two.stat().st_size)
+
+        def site(delta_status: int):
+            def fetch(url: str, method: str):
+                if url.endswith("/updates/macos.xml"):
+                    return 200, {}, good
+                if url.endswith(".delta"):
+                    return delta_status, {}, b""
+                return 200, {"Content-Length": size}, b""
+            return fetch
+
+        self.assertEqual(update_feeds.verify_live("https://plantoir.app", feed, site(200)), "match")
+        self.assertEqual(update_feeds.verify_live("https://plantoir.app", feed, site(404)), "mismatch")
 
 
 if __name__ == "__main__":

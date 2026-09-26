@@ -15,6 +15,15 @@
 #
 # And, outside the tests, a secure timestamp on every item.
 #
+# Since GitHub #312 the same questions are asked of every program the app
+# carries for the website builder (Contents/Resources/helpers), plus two of
+# their own: limactl MUST carry com.apple.security.virtualization (a hardened
+# limactl without it cannot start a vz virtual machine, and that would be
+# found only at a teacher's first start), and no other helper may carry any
+# entitlement at all. And the helpers' MANIFEST must still describe the signed
+# bytes, or every teacher's Mac would refuse the app's copy and quietly
+# download instead.
+#
 # The team is read from the app's own signature rather than typed in, so it is
 # not a second copy of a value. An app with no team (ad-hoc) is refused: that
 # is exactly what a release must never be. --ad-hoc-for-tests lifts that ONE
@@ -57,6 +66,23 @@ else
   echo "NO UPDATER: ${FW} is missing"
   faults=$((faults + 1))
 fi
+HELPERS="${APP}/Contents/Resources/helpers"
+helper_programs=()
+if [[ -f "${HELPERS}/MANIFEST" ]]; then
+  while IFS= read -r -d '' program; do
+    if file -b "${program}" | grep -q '^Mach-O'; then
+      helper_programs+=("${program}")
+      items+=("${program}")
+    fi
+  done < <(find "${HELPERS}" -type f -print0)
+  if ! (cd "${HELPERS}" && grep '^[0-9a-f]\{64\}  ' MANIFEST | shasum -a 256 -c --status); then
+    echo "MANIFEST DOES NOT MATCH THE SIGNED HELPERS: Contents/Resources/helpers/MANIFEST (run release/sign-helpers.sh, which writes it again)"
+    faults=$((faults + 1))
+  fi
+else
+  echo "NO HELPER PROGRAMS: ${HELPERS} is missing (Vendor/fetch-helpers.sh before the build)"
+  faults=$((faults + 1))
+fi
 items+=("${APP}")
 
 for item in "${items[@]}"; do
@@ -80,7 +106,21 @@ for item in "${items[@]}"; do
     echo "NO HARDENED RUNTIME: ${name}"
     faults=$((faults + 1))
   fi
-  if [[ "${item}" != "${APP}" ]]; then
+  if [[ "${item}" == "${HELPERS}/"* ]]; then
+    entitlements="$(codesign -d --entitlements - --xml "${item}" 2>/dev/null)"
+    if printf '%s' "${entitlements}" | grep -q 'disable-library-validation'; then
+      echo "CARRIES THE APP'S ENTITLEMENTS: ${name}"
+      faults=$((faults + 1))
+    elif [[ "$(basename "${item}")" == "limactl" ]]; then
+      if ! printf '%s' "${entitlements}" | grep -q 'com.apple.security.virtualization'; then
+        echo "CANNOT START THE WEBSITE BUILDER (no com.apple.security.virtualization): ${name}"
+        faults=$((faults + 1))
+      fi
+    elif printf '%s' "${entitlements}" | grep -q '<key>'; then
+      echo "CARRIES ENTITLEMENTS IT DOES NOT NEED: ${name}"
+      faults=$((faults + 1))
+    fi
+  elif [[ "${item}" != "${APP}" ]]; then
     entitlements="$(codesign -d --entitlements - --xml "${item}" 2>/dev/null)"
     if printf '%s' "${entitlements}" | grep -q 'disable-library-validation\|network.server'; then
       echo "CARRIES THE APP'S ENTITLEMENTS: ${name}"
@@ -93,4 +133,4 @@ if [[ ${faults} -gt 0 ]]; then
   echo "❌ ${faults} signing fault(s) — not a bundle to notarize."
   exit 1
 fi
-echo "✅ The updater and the app are signed by team ${WANT_TEAM}, with the hardened runtime, and no helper carries the app's entitlements."
+echo "✅ The updater, the ${#helper_programs[@]} helper programs and the app are signed by team ${WANT_TEAM}, with the hardened runtime; no helper carries the app's entitlements, limactl carries its own, and the helpers' MANIFEST matches."
