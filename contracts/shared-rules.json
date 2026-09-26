@@ -363,9 +363,9 @@
         "why": "Scheduling a section that already has a scheduled deploy removes the old one - deliberately, since a section has one per working folder (one per Mac until #237) - and until issue #195 (2026-09-23) nothing said so, before or after. The old job leaves nothing behind once it is replaced, so a teacher who set Friday and then Saturday and asks why it went on Saturday has no answer anywhere unless this line exists. The approval card and the schedule sheet now say it BEFORE anything is written (wording.scheduleReplaces); this is the record AFTERWARDS. Written where the replacement happens, in the one function every way of scheduling reaches, so it cannot be missing from one of them. Not written when the old deploy was set for the same minute, or had already gone by: neither is a promise being broken. Since #237 the old deploy is always THIS working folder's - another folder's deploy of the same section is a different alarm, left standing and not named - and that includes one this folder set before #237 under the old name, which scheduling again retires."
       },
       {
-        "carries": "the course code, the section number, the moment asked for, and - when the section already had a scheduled deploy - whether that one still stands",
+        "carries": "the course code, the section number, the moment asked for, and - when the section already had a scheduled deploy - whether that one still stands; or, since #322, for a deploy refused BEFORE anything was written, the destination it was refused for by kind (Netlify, Cloudflare Pages or a folder - never a folder's path) and the refusal's first sentence",
         "event": "scheduled deploy could not be set",
-        "why": "Added 2026-09-24 with issue #195's fix review. 'I set it for Friday and it never went' is otherwise answered only by the refusal that was on screen at the time, which nobody quotes a week later. The two ways it fails leave DIFFERENT things behind, and the line has to say which: when the new deploy's files could not be WRITTEN, the old deploy's plist is still on disk (the failed write is atomic and everything before it writes elsewhere), so it is handed back to macOS and the line says it still stands - saying 'turned off' there would be false, because the old job would still fire; when macOS REFUSED the new one after its plist was written, the old one's plist has been overwritten, so it is gone, and 'scheduled deploy turned off' says so beside this line - including when the old one was set for the same minute, which the card rightly leaves unsaid but whose loss is still a loss."
+        "why": "Added 2026-09-24 with issue #195's fix review. 'I set it for Friday and it never went' is otherwise answered only by the refusal that was on screen at the time, which nobody quotes a week later. The two ways it fails leave DIFFERENT things behind, and the line has to say which: when the new deploy's files could not be WRITTEN, the old deploy's plist is still on disk (the failed write is atomic and everything before it writes elsewhere), so it is handed back to macOS and the line says it still stands - saying 'turned off' there would be false, because the old job would still fire; when macOS REFUSED the new one after its plist was written, the old one's plist has been overwritten, so it is gone, and 'scheduled deploy turned off' says so beside this line - including when the old one was set for the same minute, which the card rightly leaves unsaid but whose loss is still a loss. Widened by #322 (2026-09-26) to a refusal at the ACT - the schedule sheet's button, or schedule_deploy from either assistant - because #322 took a code read to diagnose: the assistant refused a course the teacher had just saved as deploying to a folder, as 'never deployed', from a copy of the settings that still said Netlify, and nothing on the trail named the destination. With this line the contradiction would have sat two lines under 'saved the settings'. NOT written by the approval card or plan_scheduled_deploy, which are advisory and repeat; the destination is named by kind, so no path reaches the trail."
       },
       {
         "carries": "the folder it was given, the code and school year it shows, how many sections came across, and which course it was copied from - and, only when the copy was made without any (#255), the Obsidian add-ons left behind by FOLDER name, or that the add-ons folder or the settings folder was a link or could not be read, or that Obsidian Publish's site setting stayed behind (referenceCourses.obsidianAddOns). A course with none leaves a line byte-identical to before. Never anything read from inside an add-on",
@@ -2183,10 +2183,23 @@
         "given": {
           "hasDeployedBefore": false
         },
+        "destinationNamed": "Netlify",
         "name": "a section that has never been deployed",
-        "why": "The FIRST deploy of a section asks what to call the website. Nobody is there to answer at the scheduled time and it would simply wait. Deploy once by hand, then it can be scheduled - which is what the refusal says."
+        "why": "The FIRST deploy of a section asks what to call the website. Nobody is there to answer at the scheduled time and it would simply wait. Deploy once by hand, then it can be scheduled - which is what the refusal says. No target is set, so the course deploys to Netlify - an ABSENT deploy_target is named as Netlify, which is what the launcher does (#322)."
       },
       {
+        "destinationNamed": "Cloudflare Pages",
+        "expectRefusal": "neverDeployed",
+        "given": {
+          "cloudflareAccountID": "0123456789abcdef0123456789abcdef",
+          "hasDeployedBefore": false,
+          "target": "cloudflare_pages"
+        },
+        "name": "a section never deployed to Cloudflare Pages names Cloudflare Pages",
+        "why": "Issue #322: the refusal names the destination it was reached for, so a teacher who expected somewhere else sees the disagreement at once - Russell read the old sentence as 'it thinks I am deploying to Netlify' and had to guess. This case is what a sentence with 'Netlify' written into it fails. A valid Account ID is given so THAT check passes first."
+      },
+      {
+        "destinationNamed": "Cloudflare Pages",
         "expectRefusal": "additionalDestinationNeverDeployed",
         "given": {
           "additionalTarget": "cloudflare_pages",
@@ -2205,7 +2218,189 @@
         "name": "everything in order"
       }
     ],
-    "note": "Everything a deploy running at 06:30 would ASK is asked NOW instead, while somebody is awake to answer. A scheduled deploy that stops at a prompt in the dark is the worst outcome available: it reports nothing, changes nothing, and is discovered by a class looking at yesterday's site. Checked in this ORDER - the first match is what the teacher is told, so a time in the past is answered before a missing account."
+    "note": "Everything a deploy running at 06:30 would ASK is asked NOW instead, while somebody is awake to answer. A scheduled deploy that stops at a prompt in the dark is the worst outcome available: it reports nothing, changes nothing, and is discovered by a class looking at yesterday's site. Checked in this ORDER - the first match is what the teacher is told, so a time in the past is answered before a missing account.",
+    "wording": {
+      "note": "Since #322 the two never-deployed refusals are pinned WHOLE, rendered from these templates with {course}, {section} and {destination} filled in, and compared as a whole sentence rather than by a substring: both contain 'has never been deployed to', so a Contains check cannot tell the primary's refusal from an additional destination's. {destination} is 'Netlify' or 'Cloudflare Pages' - a folder keeps no first-deploy marker and never reaches either. The runner that reads these may still classify the OTHER refusals by a phrase.",
+      "neverDeployed": "{course} Section {section} has never been deployed to {destination}, so deploying it there asks what to call the website. Nobody would be there to answer that at the scheduled time, and it would wait. Deploy it to {destination} once from Plantoir, and after that it can be scheduled.",
+      "additionalDestinationNeverDeployed": "{course} Section {section} has never been deployed to {destination}, so deploying it there asks what to call that site. Nobody would be there to answer that at the scheduled time, and it would wait. Deploy it there once from Plantoir, and after that it can be scheduled."
+    }
+  },
+  "assistantReadsSettingsAtTheCall": {
+    "note": "Issue #322. AUTHORED, and applies on both platforms. A harness makes a working folder with ICS3U (section 1; no deploy_target unless 'opened' says so; a first-deploy marker for Netlify only when opened.hasDeployedBefore is true), starts the assistant on the named surface, and only THEN changes the files on disk as 'thenSaved' or 'thenCreated' say - as Course Settings in another window, or another program, would. Then it makes the one call. {savedFolder} is an existing folder the harness makes and saves as the destination. 'window' is the app's own assistant; 'outsideAssistant' is the MCP server, which runs with no window.",
+    "rule": "Every assistant tool call, on either surface - the app's own assistant window and the outside-assistant (MCP) server - reads the course list and each course_config.json at the moment of the call. It never acts on a copy taken when the window opened or the server started.",
+    "why": "Russell, 2026-09-26, in the #204 rehearsal: he set ICS3U to deploy to a folder, deployed it by hand (it went --to-folder), asked the assistant to deploy at 3:54 PM, and was refused as 'never been deployed, so deploying it asks what to call the website'. The mac's assistant window and its MCP server each read the courses ONCE, when they started, and #265's follow-the-Save reaches only windows; the server is another process that nothing in-process can reach. Reproduced in a test before the fix, with two worse cases the report did not name: the approval card said 'to Netlify' for a course that now deploys to a folder, and a headless outside-assistant deploy went to the OLD destination and reported success. It matters beyond the card because a scheduled deploy has its destination written into the job WHEN IT IS SET (only the lateness window is read when it fires), and because the MCP server lives for a whole Claude Code session. Windows' AssistWorkspace.Courses() already rediscovers the courses on every lookup, which is the design the mac converged on - keep it uncached.",
+    "rejected": [
+      "Sharing one observable course object between the main window and the assistant: it cannot reach the MCP server, which is another process and the worse half, and it ties the assistant's life to a window's.",
+      "Putting the assistant's copy into the list a Save follows (#265's followWrite): the same process-boundary hole, it misses writers outside the app, and it would be a second answer to 'how fresh is the assistant'.",
+      "A file watcher: a Save replaces the file atomically, so a watcher on it loses the file, and a watcher is still a race between the event and the call. Reading at the call is exact.",
+      "Reloading the whole folder per call (the mac's reloadCourses): it rewrites launchers, sweeps staging leftovers, re-links built sites and measures every backup - folder-level work a tool call has no business re-triggering, from two surfaces.",
+      "Re-reading only the courses already known: fixes the settings but leaves a course created after the server started invisible, and diverges from Windows.",
+      "Refreshing only where a course is located: misses the approval card, list_courses and the reference-course gate, which read the course list directly."
+    ],
+    "neverTouches": "A window's own copy of a course. It holds Course Settings' UNSAVED edits, and reading the file into it would throw them away. The per-call read is for the assistant's and the server's copies only.",
+    "cases": [
+      {
+        "name": "a destination changed to a folder after the window opened is scheduled to the folder",
+        "surface": "window",
+        "opened": {
+          "hasDeployedBefore": false
+        },
+        "thenSaved": {
+          "target": "local_folder"
+        },
+        "call": {
+          "tool": "schedule_deploy",
+          "arguments": {
+            "course": "ICS3U",
+            "section": 1,
+            "when": "2030-09-09 06:30"
+          }
+        },
+        "expect": {
+          "outcome": "scheduled",
+          "destination": "{savedFolder}"
+        },
+        "why": "The #322 report, as it happened. Before the fix: refused as never deployed, from a copy that still said Netlify."
+      },
+      {
+        "name": "the approval card names the destination saved now",
+        "surface": "window",
+        "opened": {
+          "hasDeployedBefore": false
+        },
+        "thenSaved": {
+          "target": "local_folder"
+        },
+        "call": {
+          "tool": "schedule_deploy",
+          "arguments": {
+            "course": "ICS3U",
+            "section": 1,
+            "when": "2030-09-09 06:30"
+          }
+        },
+        "expect": {
+          "cardNames": "a folder",
+          "cardDoesNotName": "Netlify"
+        },
+        "why": "The card is what the teacher approves. Before the fix it said 'to Netlify' for a course that deploys to a folder. On Windows this is the card for the same call - the one most likely to be read from a snapshot."
+      },
+      {
+        "name": "plan_scheduled_deploy agrees it can be scheduled",
+        "surface": "window",
+        "opened": {
+          "hasDeployedBefore": false
+        },
+        "thenSaved": {
+          "target": "local_folder"
+        },
+        "call": {
+          "tool": "plan_scheduled_deploy",
+          "arguments": {
+            "course": "ICS3U",
+            "section": 1,
+            "when": "2030-09-09 06:30"
+          }
+        },
+        "expect": {
+          "schedulable": true
+        },
+        "why": "The plan twin reads the same settings the act does; a plan that refuses what the act would allow teaches a session not to try."
+      },
+      {
+        "name": "an outside assistant's deploy goes where the course deploys now",
+        "surface": "outsideAssistant",
+        "opened": {
+          "hasDeployedBefore": true
+        },
+        "thenSaved": {
+          "target": "local_folder"
+        },
+        "call": {
+          "tool": "deploy_section",
+          "arguments": {
+            "course": "ICS3U",
+            "section": 1
+          }
+        },
+        "expect": {
+          "deployedTo": [
+            "local_folder"
+          ]
+        },
+        "why": "The fail-OPEN one: before the fix the server published to the old Netlify site and said 'deployed'. The mac's harness records the destinations the deploy was handed; Windows' records the launcher's --to-folder."
+      },
+      {
+        "name": "the reverse: a folder course saved as Netlify is refused as never deployed to Netlify",
+        "surface": "window",
+        "opened": {
+          "target": "local_folder",
+          "hasDeployedBefore": false
+        },
+        "thenSaved": {
+          "target": "netlify"
+        },
+        "call": {
+          "tool": "schedule_deploy",
+          "arguments": {
+            "course": "ICS3U",
+            "section": 1,
+            "when": "2030-09-09 06:30"
+          }
+        },
+        "expect": {
+          "outcome": "refused",
+          "refusal": "neverDeployed",
+          "destinationNamed": "Netlify"
+        },
+        "why": "Proves the read goes both ways, and ties the rule to the sentence: the refusal is scheduledDeployRefusals.wording.neverDeployed with Netlify filled in, compared whole."
+      },
+      {
+        "name": "a section added after the window opened is found",
+        "surface": "window",
+        "opened": {
+          "hasDeployedBefore": false
+        },
+        "thenSaved": {
+          "sections": [
+            1,
+            2
+          ]
+        },
+        "call": {
+          "tool": "check_section",
+          "arguments": {
+            "course": "ICS3U",
+            "section": 2
+          }
+        },
+        "expect": {
+          "found": true
+        },
+        "why": "Not only the destination: every setting is read at the call. The harness makes section 2's folder as Add Section would."
+      },
+      {
+        "name": "a course created after the server started is listed",
+        "surface": "outsideAssistant",
+        "opened": {
+          "hasDeployedBefore": false
+        },
+        "thenCreated": {
+          "code": "SPH4U"
+        },
+        "call": {
+          "tool": "list_courses",
+          "arguments": {}
+        },
+        "expect": {
+          "lists": [
+            "ICS3U",
+            "SPH4U"
+          ]
+        },
+        "why": "The course LIST is rediscovered, not only the settings of courses already known - the one thing re-reading known courses in place would miss."
+      }
+    ]
   },
   "sidebarFilter": {
     "cases": [

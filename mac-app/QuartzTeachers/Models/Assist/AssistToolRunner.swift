@@ -155,6 +155,25 @@ final class AssistToolRunner {
         return readToday()
     }
 
+    /// The courses in the working folder, each with its settings AS SAVED
+    /// NOW — read from disk at the moment it is asked for (GitHub #322).
+    ///
+    /// The ONLY way this file reads the course list, and a source test holds
+    /// it to that. The runner's model is made once, when the assistant's
+    /// window opens or the outside-assistant server starts, and a Save in
+    /// Course Settings never reaches it; reading at the call is what stops a
+    /// destination changed to a folder being refused as "never deployed to
+    /// Netlify", the approval card naming the old destination, and an outside
+    /// assistant's deploy going, silently, to where the course USED to deploy.
+    /// Structural rather than one call at the top of `run`: there are six
+    /// public ways in, and a seventh added later would be a stale reader
+    /// nobody noticed. Each reading costs one directory listing and one small
+    /// JSON file per course (measured in docs 10), at human pace.
+    private var coursesAsSavedNow: [Course] {
+        workspace.readCoursesAsSavedNow()
+        return workspace.courses
+    }
+
     /// The tools, as the LOCAL model sees them.
     ///
     /// Thirteen of the twenty-two that exist. A small local model routes worse
@@ -231,7 +250,7 @@ final class AssistToolRunner {
     /// working folder can afford.
     func knownCourseCode(matching code: String) -> String? {
         let wanted: String = code.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        for candidate in workspace.courses where candidate.code.lowercased() == wanted {
+        for candidate in coursesAsSavedNow where candidate.code.lowercased() == wanted {
             return candidate.code
         }
         return nil
@@ -248,7 +267,7 @@ final class AssistToolRunner {
         let number: Int = number("section", in: arguments) ?? 0
 
         var destination: String = "the web"
-        for course in workspace.courses where course.code.lowercased() == code.lowercased() {
+        for course in coursesAsSavedNow where course.code.lowercased() == code.lowercased() {
             destination = AssistToolRunner.destination(of: course)
         }
 
@@ -288,7 +307,7 @@ final class AssistToolRunner {
                 return card
             }
             var filedCode: String = code
-            for course in workspace.courses where course.code.lowercased() == code.lowercased() {
+            for course in coursesAsSavedNow where course.code.lowercased() == code.lowercased() {
                 filedCode = course.code
             }
             // This working folder's deploy only (#237): another folder's of
@@ -383,7 +402,7 @@ final class AssistToolRunner {
         if code.isEmpty {
             return nil
         }
-        for candidate in workspace.courses
+        for candidate in coursesAsSavedNow
         where candidate.code.lowercased() == code.lowercased() && candidate.isKeptForReference {
             return candidate
         }
@@ -676,7 +695,7 @@ final class AssistToolRunner {
     /// code, since the matcher cannot see the pages (fix review F2).
     func sectionHasAPage(called title: String, course code: String, section number: Int) -> Bool {
         var course: Course? = nil
-        for candidate in workspace.courses where candidate.code.lowercased() == code.lowercased() {
+        for candidate in coursesAsSavedNow where candidate.code.lowercased() == code.lowercased() {
             course = candidate
         }
         guard let course else {
@@ -1959,7 +1978,7 @@ final class AssistToolRunner {
     /// The course with this code, or nil when the working folder no longer has
     /// one — a course renamed or archived mid-conversation.
     private func course(withCode code: String) -> Course? {
-        for candidate in workspace.courses where candidate.code.lowercased() == code.lowercased() {
+        for candidate in coursesAsSavedNow where candidate.code.lowercased() == code.lowercased() {
             return candidate
         }
         return nil
@@ -2161,6 +2180,12 @@ final class AssistToolRunner {
         // Everything the plan refuses is something that would ASK A QUESTION
         // at the scheduled moment, with nobody there to answer it.
         if let problem = asked.plan.problem {
+            ScheduledDeploy.noteRefusedBeforeAnythingWasWritten(
+                course: asked.located.course,
+                sectionNumber: asked.located.sectionNumber,
+                when: asked.when,
+                refusal: problem
+            )
             return AssistToolOutcome.refused("Nothing was scheduled. \(problem)")
         }
 
@@ -3501,7 +3526,7 @@ final class AssistToolRunner {
         // Matched the way every other tool here matches a course code, so a
         // teacher typing "ics3u" reaches the same course either way.
         var found: Course? = nil
-        for candidate in workspace.courses
+        for candidate in coursesAsSavedNow
         where candidate.code.lowercased() == asked.lowercased() && found == nil {
             found = candidate
         }
@@ -3748,7 +3773,7 @@ final class AssistToolRunner {
         // local assistant is told nothing about a reference course, so this is
         // where that is true rather than nearly true.
         var courses: [Course] = []
-        for course in workspace.courses {
+        for course in coursesAsSavedNow {
             if surface == .local && course.isKeptForReference {
                 continue
             }
@@ -3811,7 +3836,7 @@ final class AssistToolRunner {
     /// knows the courses. Empty when there are none, which is most folders.
     func referenceCourseBriefingLines() -> [String] {
         var lines: [String] = []
-        for course in workspace.courses where course.isKeptForReference {
+        for course in coursesAsSavedNow where course.isKeptForReference {
             lines.append(
                 "  \(course.code) — \(course.displayCode), "
                 + AssistToolRunner.schoolYearText(of: course, today: readToday())
@@ -4106,7 +4131,7 @@ final class AssistToolRunner {
 
         let code: String = text("course", in: arguments).trimmingCharacters(in: .whitespaces)
         var course: Course? = nil
-        for candidate in workspace.courses where candidate.code.lowercased() == code.lowercased() {
+        for candidate in coursesAsSavedNow where candidate.code.lowercased() == code.lowercased() {
             course = candidate
         }
         // **A reference course is addressed by its FOLDER NAME and nothing
@@ -4152,7 +4177,7 @@ final class AssistToolRunner {
             return []
         }
         var result: [String] = []
-        for candidate in workspace.courses
+        for candidate in coursesAsSavedNow
         where candidate.isKeptForReference && candidate.displayCode.lowercased() == wanted {
             result.append(candidate.code)
         }

@@ -1430,6 +1430,94 @@ class WorkspaceModel {
 
     /// Scans `<workspace>/courses/` for course folders containing a
     /// `course_config.json` and loads each one.
+    /// Which folders in `courses/` are courses, each read from its
+    /// `course_config.json` as it is on disk now, sorted by code.
+    ///
+    /// The ONE answer to "which folders are courses" — `reloadCourses()` and
+    /// `readCoursesAsSavedNow()` both ask it, the same shape as Windows'
+    /// `Workspace.DiscoverCourses`. A malformed config hides only its own
+    /// course. Throws only when the folder itself cannot be listed.
+    static func discoverCourses(in coursesDirectoryURL: URL) throws -> [Course] {
+        return courses(among: try listCoursesFolder(coursesDirectoryURL))
+    }
+
+    /// Everything in `courses/` that is not hidden — courses, and whatever
+    /// else is there (`reloadCourses()` needs the rest too).
+    static func listCoursesFolder(_ coursesDirectoryURL: URL) throws -> [URL] {
+        return try FileManager.default.contentsOfDirectory(
+            at: coursesDirectoryURL,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        )
+    }
+
+    /// The entries that are courses, each read from its settings file,
+    /// sorted by code.
+    static func courses(among entryURLs: [URL]) -> [Course] {
+        let fileManager: FileManager = FileManager.default
+        var loadedCourses: [Course] = []
+        for entryURL in entryURLs {
+            let configURL: URL = entryURL.appendingPathComponent("course_config.json")
+            if !fileManager.fileExists(atPath: configURL.path) {
+                continue
+            }
+            do {
+                let configuration: CourseConfiguration = try CourseConfiguration(contentsOf: configURL)
+                let course: Course = Course(
+                    code: entryURL.lastPathComponent,
+                    directoryURL: entryURL,
+                    configuration: configuration
+                )
+                loadedCourses.append(course)
+            } catch {
+                // A malformed config should not hide every other course.
+                continue
+            }
+        }
+
+        // Sort courses alphabetically by code for a stable sidebar.
+        loadedCourses.sort { firstCourse, secondCourse in
+            return firstCourse.code < secondCourse.code
+        }
+        return loadedCourses
+    }
+
+    /// Reads the course list and every course's settings from disk again,
+    /// for a model NO WINDOW SHOWS — the assistant's and the MCP server's
+    /// (GitHub #322).
+    ///
+    /// Those models are made once, when the assistant's window opens or the
+    /// server starts, and a Save in Course Settings does not reach them:
+    /// `followWrite` walks window models only, and the server is another
+    /// process. So the assistant reads the settings at the moment of each
+    /// call instead — which is what "act on the course as it is" means.
+    ///
+    /// Deliberately NOTHING else `reloadCourses()` does: no launcher refresh,
+    /// no reference-course upkeep, no staging sweep, no `.merged_output`
+    /// placement, no backup listing. Those are folder-level acts a tool call
+    /// has no business re-triggering. And never on a window's model: its
+    /// `CourseConfiguration` objects hold Course Settings' UNSAVED edits, and
+    /// replacing them would throw those away — the guard makes that
+    /// impossible rather than merely unlikely.
+    func readCoursesAsSavedNow() {
+        guard !WorkspaceModel.isShownInAWindow(self) else {
+            return
+        }
+        guard let coursesDirectoryURL else {
+            return
+        }
+        guard FileManager.default.fileExists(atPath: coursesDirectoryURL.path) else {
+            return
+        }
+        do {
+            courses = try WorkspaceModel.discoverCourses(in: coursesDirectoryURL)
+        } catch {
+            // The folder could not be listed at this moment. Keep what was
+            // read before rather than reporting every course gone.
+            return
+        }
+    }
+
     func reloadCourses() {
         courses = []
         archivedItems = []
@@ -1465,42 +1553,14 @@ class WorkspaceModel {
             return
         }
 
-        var loadedCourses: [Course] = []
         var entryURLs: [URL] = []
         do {
-            entryURLs = try fileManager.contentsOfDirectory(
-                at: coursesDirectoryURL,
-                includingPropertiesForKeys: [.isDirectoryKey],
-                options: [.skipsHiddenFiles]
-            )
+            entryURLs = try WorkspaceModel.listCoursesFolder(coursesDirectoryURL)
         } catch {
             workspaceProblem = "Could not read the courses folder: \(error.localizedDescription)"
             return
         }
-
-        for entryURL in entryURLs {
-            let configURL: URL = entryURL.appendingPathComponent("course_config.json")
-            if !fileManager.fileExists(atPath: configURL.path) {
-                continue
-            }
-            do {
-                let configuration: CourseConfiguration = try CourseConfiguration(contentsOf: configURL)
-                let course: Course = Course(
-                    code: entryURL.lastPathComponent,
-                    directoryURL: entryURL,
-                    configuration: configuration
-                )
-                loadedCourses.append(course)
-            } catch {
-                // A malformed config should not hide every other course.
-                continue
-            }
-        }
-
-        // Sort courses alphabetically by code for a stable sidebar.
-        loadedCourses.sort { firstCourse, secondCourse in
-            return firstCourse.code < secondCourse.code
-        }
+        let loadedCourses: [Course] = WorkspaceModel.courses(among: entryURLs)
         courses = loadedCourses
         // A reference course says it is frozen; this is what makes that still
         // true after a restore, after a second Mac has had the folder, or
