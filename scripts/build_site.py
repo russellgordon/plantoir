@@ -1770,8 +1770,10 @@ def _extract_wikilink_targets(text: str) -> set[str]:
     # and the rstrip below stays as a second guard. Shared contract:
     # contracts/shared-rules.json -> readingALink.
     # The heading stops at '[' (#314), as Quartz's own wikilinkRegex does: a
-    # stray "[[" in prose would otherwise run on through the next real
-    # link's name and swallow it. Measured 0 change over all of support/.
+    # stray "[[" followed by a heading would otherwise run on through the
+    # next real link's name and swallow it. (The name still crosses '[', so
+    # a stray "[[" with no '#' before the next link still can; not widened.)
+    # Measured 0 change over all of support/.
     link_pattern = re.compile(r"!?\[\[([^\]|#]+?)(?:#[^\[\]|]*)?(?:\\?\|[^\]]*)?\]\]")
     targets = set()
     for match in link_pattern.finditer(outside_fences):
