@@ -25,6 +25,11 @@ mac-app/build/
 # llama.cpp builds, fetched by Vendor/fetch-llama scripts.
 # ~25-35 MB of build output; the scripts pin the version.
 mac-app/Vendor/llama/
+# Sparkle (the app finding and installing its own updates, #204), fetched by
+# mac-app/Vendor/fetch-sparkle.sh — pinned by version and SHA-256, never committed.
+mac-app/Vendor/Sparkle/
+# A dress-rehearsal feed (#204) is deployed by hand and deleted after; never committed.
+website/updates/rehearsal-*/
 windows-app/Vendor/llama/
 
 # The native Windows toolchain runtime (node, python, patched Quartz,
