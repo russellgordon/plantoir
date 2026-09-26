@@ -41,6 +41,16 @@ enum ScheduledDeploy {
     /// why a plist that does not carry one fails open.
     nonisolated static let scheduledForKey: String = "PLANTOIR_SCHEDULED_FOR"
 
+    /// The environment key carrying where the deploy was SET to go, as a JSON
+    /// array of the destinations' descriptions (GitHub #323).
+    ///
+    /// A note of what the teacher was told, and nothing more: the run reads
+    /// WHERE to deploy from the course's own settings at the moment it fires,
+    /// and a test pins that this value never decides it. It exists because
+    /// the wrapper is written afresh at the run, so the wrapper can no longer
+    /// be where "what was promised" is kept.
+    nonisolated static let scheduledToKey: String = "PLANTOIR_SCHEDULED_TO"
+
     // MARK: - Functions
 
     /// This section's agent label, in the working folder it is set from:
@@ -468,25 +478,47 @@ enum ScheduledDeploy {
         if when <= now {
             return "\(dayAndTimeText(when, locale: locale)) has already passed. Pick a time still to come."
         }
+        return destinationRefusal(
+            course: course, sectionNumber: sectionNumber, cloudflareAccountID: cloudflareAccountID
+        )?.sentence(course: course, section: sectionNumber)
+    }
 
+    /// Why a deploy of this section cannot go ahead the way the course is set
+    /// NOW, or nil when it can — everything `problem()` refuses except a time
+    /// already passed (GitHub #323).
+    ///
+    /// Asked at three moments: when the deploy is SET (`problem()`), when it
+    /// RUNS (`readAtTheRun`, because the destination is read then) and after
+    /// a Save in Course Settings (`SettingsSaveNotice`). One function, so the
+    /// three cannot disagree about what would ask a question at half six. In
+    /// `problem()`'s order, which `scheduledDeployRefusals.cases` pins: the
+    /// first match is what the teacher is told.
+    static func destinationRefusal(
+        course: Course,
+        sectionNumber: Int,
+        cloudflareAccountID: String
+    ) -> ScheduledDeployRefusal? {
+        if course.isKeptForReference {
+            return .keptForReference
+        }
         let configuration: CourseConfiguration = course.configuration
 
-        // The PRIMARY destination — unchanged wording and order from
-        // before a course could have more than one, so every existing
-        // check against this function still passes byte for byte.
+        // A folder deploy with no usable folder would fail at the scheduled
+        // moment, so it is refused now, with the same reasons the settings
+        // screen gives.
         if configuration.deployTarget == "local_folder" {
             if let folderProblem = CourseConfiguration.deployFolderProblem(forPath: configuration.deployFolderPath) {
-                return "\(course.code) deploys to a folder, and that folder needs attention first: \(folderProblem)"
+                return .deployFolderNeedsAttention(problem: folderProblem)
             }
         }
 
         // Cloudflare needs an Account ID that only the app has. Unlike the
         // Windows app — where the scheduled task cannot be handed one —
-        // the plist carries `--account`, so the question is asked HERE and
+        // the wrapper carries `--account`, so the question is asked HERE and
         // answered once rather than making Cloudflare unschedulable.
         if configuration.deploysToCloudflare {
             if let accountProblem = CourseConfiguration.cloudflareAccountProblem(forID: cloudflareAccountID) {
-                return "\(course.code) deploys to Cloudflare Pages, which needs your Account ID. \(accountProblem) Add it in this course’s settings, under Deploying, then schedule this again."
+                return .cloudflareAccountMissing(problem: accountProblem)
             }
         }
 
@@ -498,12 +530,12 @@ enum ScheduledDeploy {
         for target in configuration.additionalDeployTargets {
             if target.type == "local_folder" {
                 if let folderProblem = CourseConfiguration.deployFolderProblem(forPath: target.path) {
-                    return "\(course.code) also deploys to a folder, and that folder needs attention first: \(folderProblem)"
+                    return .additionalDeployFolderNeedsAttention(problem: folderProblem)
                 }
             }
             if target.type == "cloudflare_pages" {
                 if let accountProblem = CourseConfiguration.cloudflareAccountProblem(forID: cloudflareAccountID) {
-                    return "\(course.code) also deploys to Cloudflare Pages, which needs your Account ID. \(accountProblem) Add it in this course’s settings, under Deploying, then schedule this again."
+                    return .additionalCloudflareAccountMissing(problem: accountProblem)
                 }
             }
         }
@@ -512,11 +544,7 @@ enum ScheduledDeploy {
             // Names the destination (#322): the refusal only fires for a
             // Netlify or Cloudflare primary — a folder keeps no marker and
             // `hasDeployedBefore` calls it always ready.
-            return ScheduledDeployWording.neverDeployed(
-                course: course.code,
-                section: sectionNumber,
-                destination: DeployCommand.destinationDescription(for: configuration)
-            )
+            return .neverDeployed(destination: DeployCommand.destinationDescription(for: configuration))
         }
 
         // Same reasoning, for any additional destination that has never
@@ -528,9 +556,7 @@ enum ScheduledDeploy {
                 let destinationName: String = DeployCommand.destinationDescription(
                     for: CourseConfiguration.DeployDestination(type: target.type, path: target.path)
                 )
-                return ScheduledDeployWording.additionalDestinationNeverDeployed(
-                    course: course.code, section: sectionNumber, destination: destinationName
-                )
+                return .additionalDestinationNeverDeployed(destination: destinationName)
             }
         }
 
@@ -608,7 +634,7 @@ enum ScheduledDeploy {
         sectionNumber: Int,
         when: Date,
         workspaceURL: URL,
-        deployArguments: [String],
+        scheduledTo: [String] = [],
         calendar: Calendar = Calendar.current,
         homeFolder: URL = RealHome.forFiles
     ) -> [String: Any] {
@@ -634,6 +660,16 @@ enum ScheduledDeploy {
         // folder itself.
         environment["PATH"] = HelperPrograms.pathValue(inheriting: nil, inHomeFolder: homeFolder)
         environment[scheduledForKey] = ISO8601DateFormatter().string(from: when)
+        // Where the teacher was told it would go (#323) — a NOTE, never read
+        // to decide where to deploy: the run reads the course's settings for
+        // that. Kept so the trail can say "set to deploy to Netlify; the
+        // course deploys to … now" when the two differ. Absent for a job set
+        // before #323, and then nothing is compared.
+        if !scheduledTo.isEmpty,
+           let encoded = try? JSONSerialization.data(withJSONObject: scheduledTo),
+           let text = String(data: encoded, encoding: .utf8) {
+            environment[scheduledToKey] = text
+        }
 
         var plist: [String: Any] = [:]
         plist["Label"] = label
@@ -735,7 +771,41 @@ enum ScheduledDeploy {
         // The folder's id, baked in once, so every record this wrapper writes
         // is the one THIS folder's badge reads (#237). Taken from the label
         // rather than computed a second time, so the two cannot differ.
-        let thisFolderID: String = folderID(fromLabel: label) ?? ""
+        return oneShotCommand(
+            label: label,
+            folderID: folderID(fromLabel: label) ?? "",
+            courseCode: courseCode,
+            sectionNumber: sectionNumber,
+            workspaceURL: workspaceURL,
+            deployArgumentsList: deployArgumentsList,
+            destinationTypes: destinationTypes,
+            destinationDescriptions: destinationDescriptions,
+            homeFolder: homeFolder
+        )
+    }
+
+    /// The wrapper for a job whose NAME is given rather than worked out —
+    /// what the run uses when it writes its wrapper afresh (GitHub #323).
+    ///
+    /// **The label and the folder id are parameters, and that is the #237
+    /// trap.** A job set before #237 carries the old label, with no folder id
+    /// in it: its plist, log and success note are under that name, so the
+    /// wrapper written at its run must use THAT name, not the one `agentLabel`
+    /// would compute today. And its record must be filed under the id of the
+    /// folder the job names (`folderIDForRun`), not under
+    /// `folderID(fromLabel:) ?? ""`, which would make a third spelling
+    /// (`ICS3U-section1..txt`) that no badge reads.
+    static func oneShotCommand(
+        label: String,
+        folderID thisFolderID: String,
+        courseCode: String,
+        sectionNumber: Int,
+        workspaceURL: URL,
+        deployArgumentsList: [[String]],
+        destinationTypes: [String],
+        destinationDescriptions: [String],
+        homeFolder: URL = RealHome.forFiles
+    ) -> String {
         let plistPath: String = plistURL(label: label).path
         let scriptPath: String = workspaceURL.appendingPathComponent(DeployCommand.scriptName).path
         let logDirectory: String = logURL(
@@ -1147,6 +1217,43 @@ enum ScheduledDeploy {
         return HelperPrograms.shellQuoted(value)
     }
 
+    /// What a scheduled run hands `deploy.sh`, one entry per destination, in
+    /// `allDeployDestinations`' order: the primary first, then each
+    /// additional one.
+    struct DeployPlan: Equatable {
+
+        // MARK: - Stored properties
+
+        let argumentsList: [[String]]
+        let types: [String]
+        let descriptions: [String]
+    }
+
+    /// The deploy lines a scheduled run makes for this course AS IT IS SET —
+    /// at scheduling, and again at the run (#323). ONE function, so the
+    /// wrapper written when the deploy is set and the one written when it
+    /// fires cannot drift apart (the byte-identical test pins it).
+    static func deployPlan(course: Course, sectionNumber: Int, cloudflareAccountID: String) -> DeployPlan {
+        var argumentsList: [[String]] = []
+        var types: [String] = []
+        var descriptions: [String] = []
+        for destination in course.configuration.allDeployDestinations {
+            types.append(destination.type)
+            descriptions.append(DeployCommand.destinationDescription(for: destination))
+            argumentsList.append(DeployCommand.arguments(
+                courseCode: course.code,
+                sectionNumber: sectionNumber,
+                destination: destination,
+                cloudflareAccountID: cloudflareAccountID,
+                // Nobody is at the Mac at the scheduled moment, so the
+                // launcher must refuse a question rather than wait for an
+                // answer or pick one.
+                unattended: true
+            ))
+        }
+        return DeployPlan(argumentsList: argumentsList, types: types, descriptions: descriptions)
+    }
+
     // MARK: - Applying
 
     /// Sets the alarm. Returns nil on success, or what went wrong in words
@@ -1181,30 +1288,19 @@ enum ScheduledDeploy {
             return "This working folder is missing a piece it needs (\(DeployCommand.scriptName)), so there is nothing to schedule."
         }
 
-        // One argument list per configured destination — the same order
-        // `CourseConfiguration.allDeployDestinations` deploys in: the
-        // primary first, then each additional destination.
-        var deployArgumentsList: [[String]] = []
-        var destinationDescriptions: [String] = []
-        for destination in course.configuration.allDeployDestinations {
-            destinationDescriptions.append(DeployCommand.destinationDescription(for: destination))
-            deployArgumentsList.append(DeployCommand.arguments(
-                courseCode: course.code,
-                sectionNumber: sectionNumber,
-                destination: destination,
-                cloudflareAccountID: cloudflareAccountID,
-                // The one caller that passes this. Nobody is at the Mac at
-                // the scheduled moment, so the launcher must refuse a
-                // question rather than wait for an answer or pick one.
-                unattended: true
-            ))
-        }
+        // Written now so the job on disk is runnable on its own (an older
+        // copy of the app, a downgrade) — and written AGAIN, from the settings
+        // as they are then, when it runs (#323). The same function builds
+        // both, so they cannot drift.
+        let deploying: DeployPlan = deployPlan(
+            course: course, sectionNumber: sectionNumber, cloudflareAccountID: cloudflareAccountID
+        )
         let plist: [String: Any] = propertyList(
             courseCode: course.code,
             sectionNumber: sectionNumber,
             when: when,
             workspaceURL: workspaceURL,
-            deployArguments: deployArgumentsList.first ?? []
+            scheduledTo: deploying.descriptions
         )
         let label: String = agentLabel(
             courseCode: course.code, sectionNumber: sectionNumber, workingFolder: workspaceURL
@@ -1260,9 +1356,9 @@ enum ScheduledDeploy {
                 courseCode: course.code,
                 sectionNumber: sectionNumber,
                 workspaceURL: workspaceURL,
-                deployArgumentsList: deployArgumentsList,
-                destinationTypes: scheduledDestinationTypes(course: course),
-                destinationDescriptions: destinationDescriptions
+                deployArgumentsList: deploying.argumentsList,
+                destinationTypes: deploying.types,
+                destinationDescriptions: deploying.descriptions
             ) + "\n"
             try command.write(to: commandURL, atomically: true, encoding: .utf8)
             try FileManager.default.setAttributes(
@@ -1585,6 +1681,61 @@ enum ScheduledDeploy {
             }
         }
 
+        // WHERE DOES THE COURSE DEPLOY NOW? (#323) Read after the lateness
+        // check and after the wait, so a Save made while this run waited
+        // counts. The wrapper is written afresh from the settings as they are
+        // and run; one that would be refused now is not run at all. A plist
+        // from before v1.2.0 names no section, so there is nothing to read
+        // and it runs its wrapper as written — the one stale path left.
+        if let section, let jobLabel = ScheduledDeploy.label(fromScriptPath: script) {
+            let environment: [String: String] = ProcessInfo.processInfo.environment
+            // This process IS the app (same bundle, same defaults domain), so
+            // the Account ID is the one the teacher set; measured under
+            // launchd before this shipped — docs 07, "#323".
+            let reading: RunReading = MainActor.assumeIsolated {
+                let accountID: String = UserDefaults.standard.string(forKey: AppSettings.cloudflareAccountIDKey) ?? ""
+                return readAtTheRun(
+                    label: jobLabel,
+                    section: section,
+                    scheduledTo: scheduledDestinations(from: environment),
+                    cloudflareAccountID: accountID
+                )
+            }
+            let stands: Bool = jobStillStands(label: jobLabel, environment: environment)
+            var wrapper: WrapperWrite?
+            if stands, case .deploy(let command, _, _) = reading {
+                wrapper = writeTheRunsWrapper(command, to: URL(fileURLWithPath: script))
+            }
+            let step: RunStep = whatTheRunDoes(reading: reading, jobStillStands: stands, wrapper: wrapper)
+            if let line = trailLineAtTheRun(step: step, reading: reading) {
+                ActivityTrail.note(
+                    .scheduledPublishReadTheSettings, line,
+                    course: section.courseCode, section: section.sectionNumber
+                )
+            }
+            switch step {
+            case .run:
+                clearTheOldNamedRecord(label: jobLabel, section: section, homeFolder: RealHome.forFiles)
+            case .leaveQuietly:
+                for lease in leasesTaken {
+                    WorkLeaseFiles.remove(at: lease)
+                }
+                exit(0)
+            case .standDown(let refusal):
+                // The leases go FIRST: `standDown` never returns, and until
+                // #323 it was only ever reached holding none, so a refusal
+                // here would otherwise leave the course reading as busy until
+                // they went stale.
+                for lease in leasesTaken {
+                    WorkLeaseFiles.remove(at: lease)
+                }
+                standDown(
+                    script: script, section: section, now: Date(),
+                    kind: .couldNotRunAsSetNow, reason: refusal.reasonClause
+                )
+            }
+        }
+
         // The job's own name, from the script it was started with — NEVER
         // rebuilt from the course, section and folder (#237). On a Mac that
         // has just been updated every pending job carries the label from
@@ -1696,6 +1847,298 @@ enum ScheduledDeploy {
             ))
             exit(1)
         }
+    }
+
+    // MARK: - Where it deploys is read when it runs (#323)
+
+    /// Why a run could not deploy the way the course is set now.
+    nonisolated enum RunRefusal: Equatable, Sendable {
+
+        // MARK: - Cases
+
+        /// Something the schedule sheet would refuse now.
+        case refused(ScheduledDeployRefusal)
+
+        /// The course's settings file was gone or would not parse. Fails
+        /// CLOSED, the opposite of the lateness window's default, because a
+        /// destination has no safe default: guessing where to deploy is the
+        /// fault #323 is about.
+        case settingsCouldNotBeRead
+
+        /// The settings were read, but the run could not write its wrapper
+        /// (the #323 plan review's M2). Said as what happened, never as "could
+        /// not read the settings", which would be false.
+        case wrapperCouldNotBeWritten
+
+        // MARK: - Computed properties
+
+        /// The clause the record carries as its second line, and the trail
+        /// line's reason. True at the run, with no remedy and no path.
+        var reasonClause: String {
+            switch self {
+            case .refused(let refusal):
+                return refusal.reasonClause
+            case .settingsCouldNotBeRead:
+                return ScheduledDeployWording.settingsCouldNotBeRead
+            case .wrapperCouldNotBeWritten:
+                return ScheduledDeployWording.wrapperCouldNotBeWritten
+            }
+        }
+    }
+
+    /// What the settings said at the run: deploy with this wrapper, or not.
+    nonisolated enum RunReading: Equatable, Sendable {
+        case deploy(command: String, destinations: [String], scheduledTo: [String]?)
+        case refuse(RunRefusal, destinationsNow: [String], scheduledTo: [String]?)
+    }
+
+    /// What writing the run's wrapper did.
+    nonisolated enum WrapperWrite: Equatable, Sendable {
+
+        /// Written, over the job's own wrapper.
+        case written
+
+        /// There was no wrapper to write over: the job was cancelled a moment
+        /// ago (cancelling deletes the wrapper before the plist). Nothing is
+        /// written, so a cancelled deploy cannot be brought back to life.
+        case wasGone
+
+        /// The write failed.
+        case failed
+    }
+
+    /// The one decision the run makes after reading the settings.
+    nonisolated enum RunStep: Equatable, Sendable {
+
+        /// Run the wrapper just written.
+        case run
+
+        /// Deploy nothing, clear the job away, and say why.
+        case standDown(RunRefusal)
+
+        /// The job was cancelled or replaced while the run waited: deploy
+        /// nothing, write no record and no notification, and leave — the
+        /// teacher did this, and a new job under the same name must not be
+        /// booted out.
+        case leaveQuietly
+    }
+
+    /// Reads the course's settings AT THE RUN and writes the wrapper from
+    /// them, or says why it will not (GitHub #323).
+    ///
+    /// Until #323 the wrapper written at scheduling was what ran, with every
+    /// destination's `deploy.sh` arguments baked into it — so a course moved
+    /// to a folder after scheduling published to the OLD place at half six
+    /// and reported success. Everything `destinationRefusal` refuses is asked
+    /// again here: reading the destination WITHOUT the refusals would let a
+    /// course switched to a Cloudflare Pages destination never deployed to
+    /// publish to a guessed project name and report success, because
+    /// `publish_to_cloudflare` never refuses a first deploy.
+    ///
+    /// Pure apart from reading the settings file, so it is tested directly;
+    /// the run (`runScheduled`, which never returns) only acts on the answer.
+    /// `scheduledTo` is passed through for the trail and NEVER used to decide.
+    static func readAtTheRun(
+        label: String,
+        section: (courseDirectory: URL, courseCode: String, sectionNumber: Int),
+        scheduledTo: [String]?,
+        cloudflareAccountID: String,
+        homeFolder: URL = RealHome.forFiles
+    ) -> RunReading {
+        let coursesFolder: URL = section.courseDirectory.deletingLastPathComponent()
+        // Found the way the lateness window finds it: the exact name first,
+        // then a UNIQUE sanitised match (a job set before the course code went
+        // into the plist carries only its label's spelling).
+        guard let folderName = ScheduledDeployLateness.courseFolderName(
+            matching: section.courseCode, inCoursesFolder: coursesFolder
+        ) else {
+            return .refuse(.settingsCouldNotBeRead, destinationsNow: [], scheduledTo: scheduledTo)
+        }
+        let courseDirectory: URL = coursesFolder.appendingPathComponent(folderName)
+        guard let configuration = try? CourseConfiguration(
+            contentsOf: courseDirectory.appendingPathComponent("course_config.json")
+        ) else {
+            return .refuse(.settingsCouldNotBeRead, destinationsNow: [], scheduledTo: scheduledTo)
+        }
+        let course: Course = Course(code: folderName, directoryURL: courseDirectory, configuration: configuration)
+        let deploying: DeployPlan = deployPlan(
+            course: course, sectionNumber: section.sectionNumber, cloudflareAccountID: cloudflareAccountID
+        )
+        if let refusal = destinationRefusal(
+            course: course, sectionNumber: section.sectionNumber, cloudflareAccountID: cloudflareAccountID
+        ) {
+            return .refuse(.refused(refusal), destinationsNow: deploying.descriptions, scheduledTo: scheduledTo)
+        }
+        let command: String = "#!/bin/bash\n" + oneShotCommand(
+            label: label,
+            folderID: folderIDForRun(label: label, section: section),
+            courseCode: course.code,
+            sectionNumber: section.sectionNumber,
+            workspaceURL: workingFolderURL(forCourseDirectory: courseDirectory),
+            deployArgumentsList: deploying.argumentsList,
+            destinationTypes: deploying.types,
+            destinationDescriptions: deploying.descriptions,
+            homeFolder: homeFolder
+        ) + "\n"
+        return .deploy(command: command, destinations: deploying.descriptions, scheduledTo: scheduledTo)
+    }
+
+    /// Whether the job this run was started for still stands: its plist is
+    /// still on disk AND still names this run's moment (the #323 plan
+    /// review's M1).
+    ///
+    /// Only the wrapper's own first line removes the plist, and it has not
+    /// run yet, so a missing plist means the teacher cancelled it while this
+    /// run waited (#156 waits up to ten minutes). A plist naming another
+    /// moment means it was scheduled again under the same name. Either way
+    /// this run must not deploy — and, now that it writes its wrapper afresh,
+    /// the deleted wrapper is no longer what stops it, so this is.
+    nonisolated static func jobStillStands(
+        label: String,
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> Bool {
+        let plistURL: URL = launchAgentsDirectoryURL().appendingPathComponent("\(label).plist")
+        if !FileManager.default.fileExists(atPath: plistURL.path) {
+            return false
+        }
+        guard let stamp = environment[scheduledForKey],
+              let thisRunsMoment = ISO8601DateFormatter().date(from: stamp) else {
+            // A job set before the moment was recorded: the plist being there
+            // is all there is to go on.
+            return true
+        }
+        guard let standing = agent(readingPlistAt: plistURL)?.scheduledFor else {
+            return false
+        }
+        return standing == thisRunsMoment
+    }
+
+    /// Writes the run's wrapper over the job's own — only if it is still
+    /// there — and says what happened.
+    ///
+    /// Write-if-exists, so a job cancelled a moment ago (its wrapper deleted
+    /// first) is not brought back. The permissions are not a condition: the
+    /// run starts `/bin/bash <script>`, so the executable bit does not matter,
+    /// and a failure to set it must not cancel a publish over nothing.
+    nonisolated static func writeTheRunsWrapper(_ command: String, to scriptURL: URL) -> WrapperWrite {
+        if !FileManager.default.fileExists(atPath: scriptURL.path) {
+            return .wasGone
+        }
+        do {
+            try command.write(to: scriptURL, atomically: true, encoding: .utf8)
+        } catch {
+            return .failed
+        }
+        try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptURL.path)
+        return .written
+    }
+
+    /// The run's decision, as a pure function (the #323 plan review's M2).
+    ///
+    /// **The only way to `.run` is a wrapper written from the settings just
+    /// read.** There is no path that runs the wrapper left on disk from
+    /// scheduling: that is the stale deploy #323 exists to stop.
+    nonisolated static func whatTheRunDoes(
+        reading: RunReading,
+        jobStillStands: Bool,
+        wrapper: WrapperWrite?
+    ) -> RunStep {
+        if !jobStillStands {
+            return .leaveQuietly
+        }
+        switch reading {
+        case .refuse(let refusal, _, _):
+            return .standDown(refusal)
+        case .deploy:
+            guard let wrapper else {
+                return .standDown(.wrapperCouldNotBeWritten)
+            }
+            switch wrapper {
+            case .written:
+                return .run
+            case .wasGone:
+                return .leaveQuietly
+            case .failed:
+                return .standDown(.wrapperCouldNotBeWritten)
+            }
+        }
+    }
+
+    /// The line `scheduled publish read the course's settings` carries, or
+    /// nil when there is nothing to say.
+    ///
+    /// Written ONLY when something differs from what the teacher was told:
+    /// a run that went ahead somewhere other than where it was set to go
+    /// (shape A), or one that stood down (shape B). A run that went where it
+    /// was set to writes nothing here — `scheduled publish finished` already
+    /// names where it went, and a line per run saying "the same as before" is
+    /// noise. A job set before #323 recorded no promise, so it is never
+    /// "somewhere else".
+    nonisolated static func trailLineAtTheRun(step: RunStep, reading: RunReading) -> String? {
+        switch step {
+        case .leaveQuietly:
+            return nil
+        case .run:
+            guard case .deploy(_, let destinations, let scheduledTo) = reading,
+                  let scheduledTo, scheduledTo != destinations else {
+                return nil
+            }
+            return "a scheduled publish was set to deploy to " + scheduledTo.joined(separator: ", ")
+                + "; the course deploys to " + destinations.joined(separator: ", ")
+                + " now, so it is deploying there"
+        case .standDown(let refusal):
+            var line: String = "a scheduled publish could not deploy the way the course is set now ("
+                + refusal.reasonClause + ")"
+            var now: [String] = []
+            var then: [String]?
+            switch reading {
+            case .refuse(_, let destinationsNow, let scheduledTo):
+                now = destinationsNow
+                then = scheduledTo
+            case .deploy(_, let destinations, let scheduledTo):
+                now = destinations
+                then = scheduledTo
+            }
+            if let then, !now.isEmpty, then != now {
+                line += "; it was set to deploy to " + then.joined(separator: ", ")
+                    + ", and the course deploys to " + now.joined(separator: ", ") + " now"
+            }
+            return line
+        }
+    }
+
+    /// Where the deploy was set to go, from the environment launchd hands the
+    /// run — or nil for a job set before #323, or a value that does not read.
+    nonisolated static func scheduledDestinations(from environment: [String: String]) -> [String]? {
+        guard let text = environment[scheduledToKey],
+              let data = text.data(using: .utf8),
+              let decoded = try? JSONSerialization.jsonObject(with: data),
+              let list = decoded as? [String] else {
+            return nil
+        }
+        return list
+    }
+
+    /// Before the run's own wrapper runs, for a job set before #237: remove
+    /// the record under the OLD, folder-less name (the #323 plan review's H1).
+    ///
+    /// That job's own wrapper used to clear it as its first act. The wrapper
+    /// written at the run files its record under the folder's name instead,
+    /// so nothing would clear the old one — and `fileUnderTheFolder`, which
+    /// runs after every such job, would then move LAST WEEK's record over
+    /// tonight's: a failed run announced as last week's success. Removing it
+    /// here does what the old first line did, and drains the orphan.
+    nonisolated static func clearTheOldNamedRecord(
+        label: String,
+        section: (courseDirectory: URL, courseCode: String, sectionNumber: Int),
+        homeFolder: URL
+    ) {
+        if folderID(fromLabel: label) != nil {
+            return
+        }
+        try? FileManager.default.removeItem(at: ScheduledPublishOutcome.legacyRecordURL(
+            inHomeFolder: homeFolder, course: section.courseCode, section: section.sectionNumber
+        ))
     }
 
     // MARK: - Waiting for another build of the course (#156)
@@ -1896,7 +2339,8 @@ enum ScheduledDeploy {
         script: String,
         section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)?,
         now: Date = Date(),
-        kind: ScheduledPublishOutcome.Kind = .tooLateToRun
+        kind: ScheduledPublishOutcome.Kind = .tooLateToRun,
+        reason: String? = nil
     ) -> Never {
         let fileManager: FileManager = FileManager.default
         if let label = label(fromScriptPath: script) {
@@ -1923,7 +2367,11 @@ enum ScheduledDeploy {
             ScheduledPublishOutcome.recordStopped(
                 ScheduledPublishOutcome.Stopped(
                     kind: kind,
-                    destination: ScheduledPublishOutcome.nothingWasDeployedName,
+                    // The record's second line: the unshown stand-in for the
+                    // kinds that attempted nothing, and — for
+                    // `couldNotRunAsSetNow` — the reason, which IS shown
+                    // (#323). One shape for every record either way.
+                    destination: reason ?? ScheduledPublishOutcome.nothingWasDeployedName,
                     when: now
                 ),
                 inHomeFolder: home,
@@ -2003,15 +2451,6 @@ enum ScheduledDeploy {
             leave()
         }
         dispatchMain()
-    }
-
-    /// Which destination types this course publishes to, in deploy order.
-    static func scheduledDestinationTypes(course: Course) -> [String] {
-        var result: [String] = []
-        for destination in course.configuration.allDeployDestinations {
-            result.append(destination.type)
-        }
-        return result
     }
 
     /// Where a scheduled run leaves the folder problems it found, for the app

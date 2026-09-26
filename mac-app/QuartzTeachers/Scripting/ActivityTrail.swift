@@ -422,6 +422,21 @@ nonisolated enum ActivityTrail {
         /// written by the approval card or `plan_scheduled_deploy`, which are
         /// advisory and repeat.
         case scheduledDeployCouldNotBeSet = "scheduled deploy could not be set"
+        /// A scheduled publish read the course's settings when it fired and
+        /// something differed from what the teacher was told (GitHub #323):
+        /// it went ahead to where the course deploys NOW, somewhere other than
+        /// it was set to go; or it could not deploy the way the course is set
+        /// now and stood down, with the reason. Carries where it was set to
+        /// deploy (when that was recorded), where the course deploys now, and
+        /// the reason for a stand-down — never a credential.
+        ///
+        /// Written only when something differs, never on every run:
+        /// `scheduled publish finished` already names where a run went. What
+        /// it adds is that this was not where the teacher was told — the one
+        /// thing a teacher asking "why did it go THERE?" needs, and the thing
+        /// #323's stale deploys hid. Named "read" rather than "followed"
+        /// because it also carries the runs that stood down (plan review L3).
+        case scheduledPublishReadTheSettings = "scheduled publish read the course's settings"
         /// A folder or file was removed in Course Settings, excluding it
         /// from previews and deploys.
         case itemExcluded = "item excluded"

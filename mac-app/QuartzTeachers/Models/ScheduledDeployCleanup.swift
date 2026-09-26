@@ -68,6 +68,10 @@ enum ScheduledDeployCleanup {
         /// refused at half six with nobody there to read the refusal.
         case theCourseIsKeptForReference
 
+        /// The run read the course's settings when it fired and could not
+        /// deploy the way the course is set now (#323).
+        case itCouldNotDeployAsTheCourseIsSetNow
+
         // MARK: - Computed properties
 
         /// The end of the trail line: "turned off a scheduled deploy …".
@@ -81,6 +85,8 @@ enum ScheduledDeployCleanup {
                 return "because the day it was set for had gone by"
             case .theCourseIsKeptForReference:
                 return "because the course is kept for reference"
+            case .itCouldNotDeployAsTheCourseIsSetNow:
+                return "because it could not deploy the way the course is set now"
             }
         }
     }

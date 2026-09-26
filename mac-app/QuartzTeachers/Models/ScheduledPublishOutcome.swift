@@ -141,6 +141,18 @@ nonisolated enum ScheduledPublishOutcome {
         /// attempted, so there is no destination for a sentence to name.
         case courseWasBusy = "course was busy"
 
+        /// The run read the course's settings when it fired (GitHub #323)
+        /// and would not deploy the way the course is set NOW: everything the
+        /// schedule sheet refuses except a time already passed, or settings
+        /// that could not be read. So it STOOD DOWN — deployed nothing,
+        /// cleared the job away, and said why. Unlike the other stand-downs
+        /// the record's second line is SHOWN: it is the reason
+        /// (`ScheduledDeploy.RunRefusal.reasonClause`), a clause true at the
+        /// run. One kind rather than one per refusal: seven kinds for one
+        /// situation a teacher reads the same way, and the folder and account
+        /// reasons carry varying text anyway.
+        case couldNotRunAsSetNow = "could not run as set now"
+
         /// Whether this is something the teacher should be chased about.
         ///
         /// The test is not "did something break" but "is the site other than
@@ -157,7 +169,7 @@ nonisolated enum ScheduledPublishOutcome {
         var needsAttention: Bool {
             switch self {
             case .neededAnAnswer, .buildNeededAnAnswer, .buildDidNotFinish, .didNotFinish,
-                 .tooLateToRun, .courseWasBusy:
+                 .tooLateToRun, .courseWasBusy, .couldNotRunAsSetNow:
                 return true
             case .succeeded:
                 return false
@@ -519,6 +531,16 @@ nonisolated enum ScheduledPublishOutcome {
                 + "somewhere else after ten minutes",
                 course: course, section: section, at: stopped.when
             )
+        case .couldNotRunAsSetNow:
+            // The same event again, and generic, the `courseWasBusy`
+            // precedent: the run's own `scheduled publish read the course's
+            // settings` line carries the reason, just above this one.
+            ActivityTrail.note(
+                .scheduledDeployTurnedOff,
+                "turned off a scheduled deploy "
+                + ScheduledDeployCleanup.Reason.itCouldNotDeployAsTheCourseIsSetNow.trailPhrase,
+                course: course, section: section, at: stopped.when
+            )
         }
         return true
     }
@@ -592,6 +614,14 @@ nonisolated enum ScheduledPublishOutcome {
                  + "still being built somewhere else on this computer after ten minutes of waiting, "
                  + "so Plantoir left the site as it was rather than build it twice at once. Deploy it "
                  + "yourself when that has finished, or schedule another from the section’s menu."
+        case .couldNotRunAsSetNow:
+            // The reason is the record's second line: a clause true at the
+            // run, with no remedy of its own (#323 review, M3) — the remedy is
+            // this sentence's, and it is true for every reason.
+            return "\(course) Section \(section) was set to deploy on its own, but it could not deploy "
+                 + "the way the course is set now — \(stopped.destination) — so Plantoir left the site "
+                 + "as it was. Deploy it yourself from the section, or schedule another from the "
+                 + "section’s menu."
         }
     }
 }
