@@ -237,7 +237,7 @@ Windows uses, and check the *count of captured images*, never the exit code.
   off. With it off the assistant does not fail: it CARRIES OUT the request,
   the capture shows "Unpublished 1 page." instead of a plan, and the demo
   course really has a page hidden in it afterwards — which then poisons the
-  *other* appearance's capture with "It's already hidden." The harness must
+  *other* appearance's capture with `AssistWording.alreadyHiddenOne`. The harness must
   stage the setting on for the run and restore the teacher's own value after,
   exactly as it stages window frames (`capture.py` does this now). Windows
   keeps an equivalent setting; `capture_windows.py` photographs the assistant
