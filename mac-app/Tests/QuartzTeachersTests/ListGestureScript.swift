@@ -145,9 +145,10 @@ enum CourseSettingsGestureScript {
     /// `SpecialFoldersProtectionTests`, which remove through
     /// `removeItem(named:)` so the ORDER they check is the shipped one.
     ///
-    /// It is still a hand copy of `body`'s wiring: if `body` ever called
-    /// something other than `folderWasRemoved` from a folder list, every test
-    /// using this would stay green. That seam is known and unpinned
+    /// It is still a hand copy of `body`'s wiring: if `body` ever wired a
+    /// folder list differently — another method than `folderWasRemoved`, the
+    /// other scope, a binding to another list, or different `protection` or
+    /// `noticeAfterChange` — every test using this would stay green. That seam is known and unpinned
     /// (`documentation/04-course-setup.md`).
     static func editor(for list: GestureList, of view: CourseSettingsView) -> StringListEditorView {
         let configuration: CourseConfiguration = view.course.configuration
