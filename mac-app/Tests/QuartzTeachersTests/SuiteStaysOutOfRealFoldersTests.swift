@@ -75,6 +75,14 @@ final class SuiteStaysOutOfRealFoldersTests: XCTestCase {
         XCTAssertFalse(stopped.path.hasPrefix(realLibraryPath), stopped.path)
     }
 
+    /// The preferences door (#154) did not quietly move the unit host
+    /// somewhere the product's `=== PlantoirDefaults.shared` guards would no
+    /// longer recognise: under the suite it IS the standard store, which
+    /// every guard refuses to write.
+    func testThePreferencesDoorIsTheStandardStoreUnderTheSuite() {
+        XCTAssertTrue(PlantoirDefaults.shared === UserDefaults.standard)
+    }
+
     func testTheSuiteNeverReadsTheRealLaunchAgents() {
         let agents: URL = ScheduledDeploy.launchAgentsDirectoryURL()
         XCTAssertFalse(agents.path.hasPrefix(realLibraryPath), agents.path)
