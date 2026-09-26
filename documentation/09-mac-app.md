@@ -641,11 +641,27 @@ inherits the key window's folder). This is the shape Windows already had:
 returns. Upgrading from a build that only kept the last CHOSEN folder
 (`workspacePath`) reads that, so the first launch after the update reopens.
 
+**The last folder is not rewritten once quitting has begun**
+(`WorkspaceModel.isTerminating`): windows close one by one and AppKit makes
+the next one key, which would otherwise record IT as last in front.
+
+**Bookmark first, even over a different folder now at the old path.** If the
+bookmark finds the original folder elsewhere ("Notes old") and another folder
+now sits at the remembered path, the bookmark wins — it follows the folder the
+teacher worked in, and the trail's "found where it had been moved, from …"
+says so. Only the Trash is special-cased.
+
 **One decision per window** (#311 review B1). `settleItsFolder()` runs once,
 whichever way the folder became final — claimed, reopened, refused,
 inherited or left to the picker — and after it nothing decides again:
 `attemptClaim` returns straight away for a settled window, and its give-up
-no longer calls `adoptFolderForNewWindow` as a "harmless backstop". That
+no longer calls `adoptFolderForNewWindow` as a "harmless backstop"; the
+claimant itself refuses to claim for a settled window
+(`WindowFolderClaimant.frameDidSettle(_:windowHasSettled:)`, pinned by
+`testASettledWindowNeverClaimsAnEntry`), leaving the entry for its own
+window. The launch cases play restored windows through the same `start`,
+which must make them WAIT; which entry each then takes by frame is
+`WindowRestorationScenarioTests`' proof, not theirs. That
 backstop would have become a second decision once a lone window could
 reopen: a window whose folder had gone would have become a second window on
 a sibling's folder, wiping the sentence that said why. `settleItsFolder()`
@@ -691,8 +707,15 @@ could not be measured on 2026-09-26: a probe app (own bundle id, launched with
 `open`) blocked on the Desktop permission question, and the Mac's screen was
 locked, so nobody could answer it — the probe was killed and its folder
 removed. It is on Russell's list (`~/Downloads/plantoir-v1.3.2-run/ready/311-290.md`).
-Until then the `unreadable` sentence points at System Settings ▸ Privacy &
-Security ▸ Files and Folders, the fix that lasts, and offers choosing again.
+Meanwhile "can't be read" is two reasons, told apart by the error the disk
+gives (`RememberedFolder.presence`, `stat`'s errno — never `fileExists`, which
+answers false for "nothing there" and "you may not look" alike, and would
+have called a denied Desktop folder GONE): EPERM is macOS's privacy settings
+(`privacyDenied`, pointing at System Settings ▸ Privacy & Security ▸ Files &
+Folders — the spelling read from System Settings' own strings on macOS 26.6,
+`FILE_ACCESS_COMBINED`, not from memory), and EACCES is the folder's own
+permissions (`unreadable`, pointing at Finder's Get Info, since no setting
+would help).
 One thing the probe DID show: reading a protected folder for the first time
 blocks the calling thread until the question is answered — at launch that is
 the main thread, behind the permission sheet. Whether that reads as a hang
@@ -702,9 +725,12 @@ in a fresh account is on the same list.
 
 `RememberedFolder.decide`, in this order: in a Trash (a trashed folder
 EXISTS, so it goes first) → on a `/Volumes/<name>` that is not there (asked
-from the name alone, before touching anything under it) → gone → cannot be
-read → out of the website builder's reach (`outsideHome`,
-`coursesOutsideHome`, #290 below) → reopen. The window shows the picker with
+from the name alone, before touching anything under it) → gone (the disk said
+ENOENT/ENOTDIR) → out of the website builder's reach (`outsideHome`,
+`coursesOutsideHome`, #290 below) → not allowed in (`privacyDenied`,
+`unreadable`) → reopen. Out of reach comes before a denial because it needs
+only the folder's name from the disk, and fixing a permission only to be
+refused at the next launch is going round twice. The window shows the picker with
 ONE sentence (`ReopenWording`, keyed like the contract's `wording`), in the
 same slot a refused choice uses (`WorkspaceModel.folderNotOpened`), with the
 path bar only for a folder that is there. The memory is **kept** until
@@ -767,7 +793,11 @@ grapheme-based and answered false for a name beginning with a combining mark,
 and a plain prefix would call `/Users/ann2` inside `/Users/ann`. Applied also
 to `courses` when it is a LINK, read with the link's own attributes (a
 `fileExists` check follows links and would call a link to an unplugged drive
-absent).
+absent). A path the disk cannot name — gone, dangling, behind a denied
+permission — is spelled through the nearest folder above it that it CAN name
+(`WorkingFolderReach.diskSpelling`): `canonicalPath` alone falls back to the
+text, where `/var/…` is outside a home of `/private/var/…` and a `..` climbing
+out of the home still reads as inside.
 
 **Measured 2026-09-26** (`plans/290-plan.md` §0, re-measured by its review):
 `/Volumes/Macintosh HD` is a link to `/`, so `/Volumes/Macintosh HD/Users/<me>/
