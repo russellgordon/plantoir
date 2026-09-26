@@ -1263,16 +1263,18 @@ that exists is not listed at all, since it is not a page.
 **Measured before it was chosen**, on the 39 example-content payloads, each
 link counted once per page: read with `AssistSectionGraph.linksAsWritten`,
 **30,930 links and embeds, every one resolved to a page** — no false "leads
-nowhere". Two things that reading does differently from `linkTargets` (which
-publishing follows, and is untouched): links inside `code` and fenced blocks
+nowhere". Two things that reading did differently from `linkTargets` (which
+publishing follows) when it was written: links inside `code` and fenced blocks
 are examples, not links — left in, **188** targets read as dead, nearly all on
 the Scavenger Hunt pages that teach `[[Page Name]]`; and a table's escaped
-pipe, `[[Ohm's Law\|Ohm]]`, leaves a backslash on the target — left on, **69
-real links** read as dead. **That second finding is true of publishing too**:
-`linkTargets` keeps the backslash, so a link written inside a table with an
-alias is not followed when a class is published with what it links to. It is
-recorded here rather than fixed, because changing what publishing follows is a
-change of its own with its own measurement.
+pipe, `[[Ohm's Law\|Ohm]]`, left a backslash on the target — left on, **69
+real links** read as dead. **That second finding was true of publishing too**,
+and was recorded here rather than fixed at the time; it was fixed in
+[#294](https://github.com/russellgordon/plantoir/issues/294), for every reader
+at once, in the one pattern they all share — see
+["What counts as a link"](#what-counts-as-a-link) below. The code difference
+remains and is its own question,
+[#313](https://github.com/russellgordon/plantoir/issues/313).
 
 **The page asked about is found by file name first, then by the name the
 sidebar shows** — a folder's landing page by its folder's name as well, so
@@ -1855,6 +1857,90 @@ widened method is how the divergence happened at all. The contract is
 `contracts/class-planning.json` → `datingPagesAClassBrings.reachStopsAtAClassPage`.
 The three `followingLinks.publishing` booleans stay TRUE: the walk is still
 transitive and still takes what a page links to; it has one stop.
+
+### What counts as a link
+
+Settled 2026-09-26,
+[issue #294](https://github.com/russellgordon/plantoir/issues/294). The walk
+above — and everything else that reads a wikilink on the mac — reads it
+through ONE pattern, `WikiLinkRewriter.pattern`. That pattern had a hole:
+Obsidian writes an alias inside a Markdown table as `[[Ohm's Law\|Ohm]]`,
+escaping the pipe so the cell does not end there, and every reader took the
+name up to the pipe — `Ohm's Law\` — which matched no page and was silently
+dropped as "a link to something outside this section". The same form turns up
+in ordinary sentences as well, and Quartz v4.5.0, which draws the site, reads
+it as a link wherever it is (`ofm.ts`'s `wikilinkRegex`: the name excludes a
+backslash, the alias is `\\?\|`).
+
+**The rule** (`contracts/shared-rules.json` → `readingALink`, ten cases both
+apps and the build read): the name runs from `[[` up to the first `]`, `|` or
+`#`, and a backslash immediately before that character is not part of it. The
+pattern is `(!?\[\[)([^\]|#]+?)(?=\\?[\]|#])` — lazy, stopping BEFORE an
+optional backslash, with the backslash in a zero-width lookahead. That last part
+is load-bearing: the backslash is outside the match, so every rewriter that
+replaces the match or the name (`WikiLinkRewriter.rewriting`,
+`FolderPathRewriter`, `PageReferences`) leaves it where it was. A rename of
+`Unit 2, Day 3` writes `[[Module 2, Day 3\|Tuesday]]`; a rewrite that dropped
+the backslash would write `[[Module 2, Day 3|Tuesday]]` and split the table
+cell in two — which every "does the link point at the new name?" check passes.
+
+**Who reads it — eight places, one fix.**
+
+| Reader | What was wrong before #294 |
+|---|---|
+| `reachFollowingLinks` (publishing) | the page linked from a table did not go up, nor what it links to |
+| the dates a class brings (`dateMovesFollowingClasses`, `SectionReDatePlanner`) | the page did not take its class's date |
+| the site check (`linksIntoHiddenPages`, `visiblePagesNothingLinksTo`) | a link into a hidden page missed; a page linked only from a table called an orphan |
+| `AssistPublishPlan` (who links in, Key Links) | the table link did not count as a referrer |
+| `CoursePageCopy` — copying with the pages it links to (#207) | the linked page was not offered; `pagesEmbeddedIn`, a hand-rolled scanner, strips the backslash itself |
+| `PageReferences` — pictures carried by a copy | `![[pic.png\|300]]` in a table was not carried |
+| `WikiLinkRewriter.rewriting` / `countLinks` — the unit-word rename and CLASS INSERTION | the link was not renamed. After inserting a class, `[[Unit 2, Day 4\|Thursday]]` would still say Day 4 — which is now the class just inserted: a link to the wrong lesson, not a dead one |
+| `FolderPathRewriter` | harmless (it rewrites a folder prefix), but it held a COPY of the pattern string; it now references `WikiLinkRewriter.pattern` |
+
+`AssistSectionGraph.linksAsWritten` (#167) used to strip the backslash by hand;
+the strip is gone, because a second strip would only hide a regression of the
+first. An eleventh reader is deliberately out of scope:
+`SectionIndexPointer.repointing` hand-splits a front page's whole-line
+`![[…]]` on `|` and `#`, and a line cannot start with `![[` inside a table
+row; 0 such lines ship.
+
+**Measured** over the 12,128 pages Plantoir ships (39 payloads and 50
+skeletons), with `NSRegularExpression`: the old and new patterns match the
+**same 38,659 links at the same offsets**, and **229** names read differently —
+every one a name that used to end in the backslash of a `\|`: 142 in tables,
+87 in sentences and in code examples. In the payloads, fixing it adds 46
+page-to-page links that resolve within a course, and **104 of 3,258** class
+pages reach **137** more pages when published. 0 of the 229 point at a class
+page, so the insertion consequence is latent in shipped content and bites
+teacher-written tables.
+
+**What a teacher sees the day it ships.** A publish can take more pages than
+before, and the plan names them; `linkedClassWasLeftAlone` can now fire for a
+class linked from a table; the site check's hidden-link and orphan lists change
+on real courses (correct, but different); renames and insertions count and move
+more links; the copy checklist lists more pages. No sentence changed and no
+trail event was added — no line records what a publish reached, and the lines
+that carry a count of links rewritten become more correct, not untrue.
+
+**The build.** The shared Python (`build_site._extract_wikilink_targets`)
+already read `\|`. It did NOT read `[[Page#Heading|words]]` at all, because
+its alias group came before its heading group; that was reordered in the same
+piece, and it changes teachers' dates — see
+[05 → Links to directly](05-build-pipeline.md#dates-drive-everything).
+
+**Rejected.** Stripping the backslash in `linkTargets` alone (what the issue
+text implied): publishing would work and seven readers would not, one of them
+the insertion case above. Excluding the backslash from names altogether
+(`[^\]|#\\]+`, closer to Quartz's own class): `[[a\b]]` would then name `a`,
+and a rename of a page called `a` would rewrite it; the lookahead differs from
+the old pattern only at a backslash right before `]`, `|` or `#`. Skipping
+links inside code in the same change: a real difference (the links answer and
+Windows skip them, publishing does not), with its own measurement —
+[#313](https://github.com/russellgordon/plantoir/issues/313). A contract case
+for `[[a\b]]`: Quartz does not draw it as a link, and nobody has decided what it
+should mean. The install-time readers in `setup_course.py` and the
+curriculum-coverage patterns share the cause but not the feature —
+[#314](https://github.com/russellgordon/plantoir/issues/314).
 
 ### No booleans, and separate verbs
 

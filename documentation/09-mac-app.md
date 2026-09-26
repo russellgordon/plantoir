@@ -2544,7 +2544,12 @@ refactor simplifies away:
    folders included — a section's index or a shared overview may link at a
    class page. The link map carries the old name of every page being renamed
    AND of every page a stopped rename already moved, so finishing an
-   interrupted rename also repoints links to pages moved before the stop.
+   interrupted rename also repoints links to pages moved before the stop. A
+   link written in a table, `[[Unit 2, Day 3\|Tuesday]]`, is rewritten too and
+   keeps its backslash (since #294 — `WikiLinkRewriter.pattern` stops the name
+   before it, and only the name is replaced); the same holds for class
+   insertion, where a table link left on the old number would point at the
+   class just inserted. See 10 → "What counts as a link".
 6. **Writes `unit_word`** through `CourseConfiguration.recordOnDisk`, which
    compares-and-swaps against the build's own writer and updates the
    in-memory copy, so the form's other unsaved edits survive and Revert leaves
@@ -4535,6 +4540,17 @@ is listed with the reason it stayed. A page shown INSIDE another comes along
 whether or not it is ticked — inside ANY page being copied, not only inside the
 one the teacher named, because unticking a page that a LINKED page shows would
 put the same hole in it.
+
+**A link or a picture written in a table is carried like any other** (#294).
+Inside a table Obsidian escapes the alias pipe — `[[Ohm's Law\|Ohm]]`,
+`![[circuit.png\|300]]` — and until #294 every mac reader took the name with
+the backslash on it, so the linked page was not offered, the picture was not
+carried, and both were listed as leading nowhere. The graph and `PageReferences`
+pick the fix up through `WikiLinkRewriter.pattern`; `pagesEmbeddedIn`, a
+line-based scanner of its own, strips the backslash by hand. A picture renamed
+on the way keeps its backslash: `![[circuit (from ICS4U-2025).png\|300]]`.
+Contract: `copyingAPageBetweenCourses.cases` → "a picture and a link written in
+a table, with escaped pipes, are carried".
 
 **The checklist is in the FUTURE tense, and its numbers follow the ticks.** It
 is the screen whose whole purpose is to let a teacher change their mind, and it

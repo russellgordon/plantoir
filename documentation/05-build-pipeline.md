@@ -502,6 +502,33 @@ undated.
   shared with the first pass's walk) — never onto another class page, a
   folder's index, Key Links or Curriculum Coverage. A page two links away is
   not dated by the class at all.
+
+  **Which shapes are links** (`_extract_wikilink_targets`, the one reader both
+  passes share; contract `shared-rules.json` → `readingALink`, run by
+  `scripts/test_dates_follow_the_class.py`): `[[Page]]`, `[[Page|words]]`,
+  `[[Page#Heading]]`, and the escaped pipe Obsidian writes for an alias inside
+  a table, `[[Page\|words]]` — whose backslash is never part of the name — and,
+  **since [#294](https://github.com/russellgordon/plantoir/issues/294),
+  `[[Page#Heading|words]]` and `[[Page#Heading\|words]]`**, the form
+  Obsidian's own autocomplete writes for a heading link with an alias. Until
+  then the pattern put its alias group BEFORE its heading group, so a heading
+  followed by an alias did not match at all, and a page a class linked to only
+  that way was reset to the course's FIRST class date by the first pass instead
+  of taking its class's. **That changes dates in teachers' vaults on the next
+  build after #294 ships**, in every existing folder, because both passes run
+  on every build and rewrite the teacher's files: such a page moves from the
+  first class's date to its own class's. It is the right change, and not only
+  because the link is a link: the mac app's re-date already read `[[P#h|a]]`
+  as a link to P (its name stops at `#`), so until #294 the app and the build
+  disagreed about those pages and the build won by overwriting on every build.
+  Measured: 0 such links in the shipped payloads and skeletons, so no shipped
+  page moves; teacher-written ones will. No log line changes and none becomes
+  untrue — "Gave N of your page(s) the date of the first class that links to
+  them" and the first pass's "Synced non-class pages" line count whatever
+  moved, as they always did. The install-time readers in
+  `setup_course.py`, and the curriculum-coverage patterns (which already read
+  `\|` but share the old group order), are
+  [#314](https://github.com/russellgordon/plantoir/issues/314).
 - **A class dated with a plain YAML date** (`created: 2026-09-24`, unquoted —
   what Obsidian's Date property writes) counts, as midnight in Toronto. Until
   the fix round `_parse_created_value` read it as no date at all, so such a
