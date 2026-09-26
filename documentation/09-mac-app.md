@@ -5127,7 +5127,90 @@ fails. Refusing or dropping the line would be worse than the race.
 strict UTF-8, and one byte that was not UTF-8 — a launcher can `printf`
 anything — made the read come back empty, so the next write REPLACED the whole
 trail with its single line. The trim now reads bytes and decodes leniently, and
-a file that needs no trimming is never rewritten at all.
+a file that needs no trimming is never rewritten at all. The READER that builds
+a report from the file had the same strict read and was left behind; since
+[#301](https://github.com/russellgordon/plantoir/issues/301) it follows the same
+rule through the same function — see the next section.
+
+### When the trail holds characters that cannot be read
+
+Since 2026-09-26 ([#301](https://github.com/russellgordon/plantoir/issues/301)).
+`ProblemReportStore.activityText(includingPrompts:)` used to read `activity.txt`
+with `String(contentsOf:encoding: .utf8)` and return nothing when that failed.
+One byte that was not UTF-8, anywhere in the file, therefore made the report
+leave "what you were doing.txt" out entirely; `hasAnythingToReport` asked the
+same function, so a teacher with no task records was told there was nothing to
+send; and `hasAssistantPrompts` asked it too, so the question about the local AI
+assistant vanished. #238 had already made the TRIM lenient, so the file repaired
+itself — at the next trim, which with 1,200 lines kept to 600 can be hundreds of
+lines away.
+
+**What it does now.** `ProblemReportStore.trailText(at:)` is the ONE decode for
+this file, used by the trim and by the report so the two cannot drift:
+`String(decoding: data, as: UTF8.self)`, which replaces each maximal ill-formed
+sequence with one U+FFFD. The report keeps every line; when any line it SHOWS
+holds U+FFFD it puts a note at the top — `problemReportTrail.unreadableCharactersNote`
+in [`contracts/shared-rules.json`](../contracts/shared-rules.json), after the
+prompts note when both apply (`noteOrder`). A readable file with the prompts
+included comes back exactly as it is on disk, and a test asserts EQUALITY rather
+than containment, because some forty existing tests look for a phrase inside the
+trail and would not notice a changed shape. Twelve contract cases pin it, with
+`{XX}` standing for a raw byte.
+
+Three details that look optional and are not:
+
+- **Count by scalars, never with `contains`.** `{C3}{CC}{81}` decodes to U+FFFD
+  followed by a combining acute — one grapheme — and `String.contains` with a
+  `Character` or a `String`, and `range(of:)`, all answer false for it (measured,
+  Swift 6.3.3). `linesWithUnreadableCharacters(in:)` walks `unicodeScalars`.
+  (C#'s `string.Contains(char)` is ordinal, so Windows is not exposed to this.)
+- **Count every U+FFFD, not only the ones this read made.** After a trim the
+  file is valid UTF-8 and still carries the trim's U+FFFD; counting only fresh
+  replacements would show `�` with no explanation in a report made just after a
+  trim.
+- **Count only the lines SHOWN.** A damaged prompt line left out of the report
+  does not raise the note; it describes what the reader can see.
+
+**Measured: today's writers do not produce such a byte** (M-series Mac, macOS 26,
+APFS, Swift 6.3.3, `HOME` in a temp folder). The app's `addToTheEnd` writes a
+Swift `String` — always valid UTF-8 — in one `write`, and on a 4 MB APFS disk
+image filled to `ENOSPC` 80,954 appends (190 of 10,021 bytes, 80,764 of 38 bytes)
+produced **0 partial writes**: each landed whole or failed whole. The launchers'
+`note_on_the_trail` passes any byte through `printf "%s\n"` (measured: `$'… \xc3'`
+wrote `c3 0a`), but every call site passes a fixed sentence plus a course code,
+a section number or a directory name, and APFS refuses an invalid-UTF-8 name
+(`mkdir` → `EILSEQ`). So the reader is hardened for a launcher line that one day
+echoes a tool's output, and for a teacher who opens the file in an editor and
+saves it in another encoding — and because it is the reader that turned one byte
+into "nothing to report", an answer the teacher cannot see is wrong.
+
+**Rejected.**
+
+- **Skipping the damaged line.** It loses the time, course and section on the
+  line most likely to explain the failure, and disagrees with what the trim
+  writes. Lossy decoding never crosses a line break — 0x0A cannot occur inside a
+  UTF-8 multibyte sequence (measured: `a {E2}{80}\n` keeps the next line intact)
+  — so skipping buys nothing.
+- **Silent lossy decoding** (what .NET's `File.ReadAllText` does). A `�` with no
+  explanation looks like a broken report, and whoever reads it cannot tell a
+  replacement from the product's own text.
+- **Fixing the writers** (`iconv -c` in `note_on_the_trail`). No call site passes
+  arbitrary bytes today, it would change three byte-identical launchers and their
+  gate, and it would still not cover a foreign edit. The reader is the one place
+  every writer passes through.
+- **Repairing the file on read.** A read that writes needs the trail lock and
+  turns every Report a Problem… into a rewrite; the trim already repairs it under
+  the lock.
+- **Redacting again on read.** Redaction happens as the file is written; lossy
+  decoding cannot reveal anything that is not on disk.
+- **A trail event for it.** A line about the trail, written into the trail, would
+  describe the report the reader already holds and repeat on every report. The
+  note inside the report — the thing that gets sent — answers rule 5.
+
+**A known limit, not built for:** a bad byte inside the prompt marker itself
+(`"  asked: "`) would stop that line being recognised, so the teacher's words
+would appear with the box unticked. Plantoir's writers cannot produce it — the
+marker is written by Swift — and it is named here rather than handled.
 
 ## The local assistant
 
