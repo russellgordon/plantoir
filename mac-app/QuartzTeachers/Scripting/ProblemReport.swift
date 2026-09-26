@@ -626,6 +626,10 @@ nonisolated struct ProblemReportStore {
     static let mostActivityLines: Int = 1200
     static let keptActivityLines: Int = 600
 
+    /// Put at the top of the trail when the teacher's own sentences were
+    /// left out. `problemReportTrail.promptsLeftOutNote` in the contract.
+    static let promptsLeftOutNote: String = "(What the teacher typed was left out of this report.)"
+
     /// The folder for the running app.
     ///
     /// Under a test run this is a throwaway folder instead. The tests build
@@ -930,10 +934,6 @@ nonisolated struct ProblemReportStore {
         }
         return (notes + shownLines).joined(separator: "\n")
     }
-
-    /// Put at the top of the trail when the teacher's own sentences were
-    /// left out. `problemReportTrail.promptsLeftOutNote` in the contract.
-    static let promptsLeftOutNote: String = "(What the teacher typed was left out of this report.)"
 
     /// Put at the top of the trail when lines in it carry characters that
     /// could not be read (#301). No plural branch: "on 1 of these lines" and

@@ -5153,7 +5153,7 @@ holds U+FFFD it puts a note at the top — `problemReportTrail.unreadableCharact
 in [`contracts/shared-rules.json`](../contracts/shared-rules.json), after the
 prompts note when both apply (`noteOrder`). A readable file with the prompts
 included comes back exactly as it is on disk, and a test asserts EQUALITY rather
-than containment, because some forty existing tests look for a phrase inside the
+than containment, because some ninety existing test call sites look for a phrase inside the
 trail and would not notice a changed shape. Twelve contract cases pin it, with
 `{XX}` standing for a raw byte.
 
