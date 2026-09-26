@@ -673,7 +673,9 @@ each working folder's `.toolchain/`. The launchers:
   with the same function, so don't swap one for the other;
 - probe a free host port block per container (8081/8091/8101…, walking up
   through forty blocks and skipping any block another folder's container
-  holds, stopped ones included — `contracts/app-rules.json` → `previewPorts`,
+  holds, stopped ones included, or anything on the Mac, in ANY account, is
+  listening on — the kernel's `netstat` list joined to `lsof`, since #310 —
+  `contracts/app-rules.json` → `previewPorts`,
   one block of code shared by all three launchers), mapping to
   fixed container ports 8081–8084 for sites plus 9081–9084 for Quartz's
   live-reload websockets (`--wsPort` = port + 1000 — without it, concurrent

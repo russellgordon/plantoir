@@ -759,6 +759,26 @@ nonisolated enum ActivityTrail {
         /// running writes nothing. Mac only, permanently: Windows builds
         /// natively and has no workspace.
         case workspaceWasInUse = "workspace was in use"
+        /// A preview's address was held by something else on this Mac
+        /// (GitHub #310, found in the #204 rehearsal with two macOS accounts
+        /// signed in). Carries where the preview was for, the address — a
+        /// number on this Mac — and which of four it was: a STOPPED
+        /// workspace's address was in use, so it was set up again on free
+        /// addresses before it started; the address a running workspace was
+        /// about to announce was held by another account or by macOS itself,
+        /// so it was set up again once; it was STILL held after that, so the
+        /// preview stopped before building; or the look was not made, because
+        /// the run was pointed at an engine other than the one Plantoir sets
+        /// up (a developer's DOCKER_HOST; the app never sets one).
+        ///
+        /// Written by the app, from the line `preview.sh` prints
+        /// (`PreviewAddressHeldReport`), which `ScriptRunner` reads from a
+        /// run's console. On the trail because each outcome arrives later as a
+        /// report that reads like something else: a slow preview for no
+        /// reason, a preview that would not start, or somebody else's site.
+        /// Mac only, permanently: Windows serves a preview on the PC itself,
+        /// with no forward to lose.
+        case previewAddressHeldByAnotherAccount = "preview address held by another account"
 
         /// Whether the teacher was told, with a macOS notification, how a
         /// scheduled publish went (#212) — or why not: notifications turned
