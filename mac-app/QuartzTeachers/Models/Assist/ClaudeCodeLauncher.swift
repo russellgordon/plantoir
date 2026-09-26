@@ -326,14 +326,37 @@ nonisolated enum ClaudeCodeLauncher {
         let appSupportDirectory: URL
         if let supportDirectoryOverride {
             appSupportDirectory = supportDirectoryOverride
-        } else if BuildOutputLocation.isRunningTests {
-            appSupportDirectory = supportDirectoryWhileTesting
         } else {
-            appSupportDirectory = RealHome.forFiles
-                .appendingPathComponent("Library/Application Support/Plantoir/assist")
+            appSupportDirectory = supportDirectory(
+                isInsideTestBundle: RealHome.isInsideTestBundle,
+                isUnderUITest: RealHome.isUnderUITest,
+                stateDirectory: RealHome.stateDirectory,
+                homeForFiles: RealHome.forFiles
+            )
         }
         try FileManager.default.createDirectory(at: appSupportDirectory, withIntermediateDirectories: true)
         return appSupportDirectory
+    }
+
+    /// Where the launch files go, as a pure function: the throwaway folder
+    /// while test state belongs in one, otherwise `…/Plantoir/assist` in the
+    /// home `RealHome` resolves — a UI test's state folder (#154) included.
+    /// `homeForFiles` is only consulted without a state folder.
+    static func supportDirectory(
+        isInsideTestBundle: Bool,
+        isUnderUITest: Bool,
+        stateDirectory: URL?,
+        homeForFiles: URL
+    ) -> URL {
+        if RealHome.keepsTestStateInThrowawayFolders(
+            isInsideTestBundle: isInsideTestBundle,
+            isUnderUITest: isUnderUITest,
+            stateDirectory: stateDirectory
+        ) {
+            return supportDirectoryWhileTesting
+        }
+        return (stateDirectory ?? homeForFiles)
+            .appendingPathComponent("Library/Application Support/Plantoir/assist")
     }
 
     /// Single-quote a string safely for POSIX shell execution.

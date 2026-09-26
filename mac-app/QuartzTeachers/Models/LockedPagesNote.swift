@@ -22,7 +22,7 @@ enum LockedPagesNote {
 
     /// Replaceable, so a test never writes into the teacher's own
     /// preferences — the same seam every other stored list here uses.
-    static var defaults: UserDefaults = UserDefaults.standard
+    static var defaults: UserDefaults = PlantoirDefaults.shared
 
     // MARK: - Functions
 
