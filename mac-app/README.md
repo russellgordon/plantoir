@@ -61,7 +61,14 @@ The assistant's engine is not committed — 25 MB of llama.cpp build output
 
 ```bash
 ./Vendor/fetch-llama.sh
+./Vendor/fetch-sparkle.sh
 ```
+
+The second fetches Sparkle 2.9.6 (#204), which a released Plantoir finds and
+installs its own updates with — pinned by version and SHA-256, never committed,
+and embedded by `project.yml`, so generation fails without it too. A Debug
+build has no update feed and never checks for anything
+(`documentation/09-mac-app.md` → "Updating itself").
 
 `project.yml` declares `Vendor/llama` as a resource folder, so generation
 fails outright without it ("missing source directory") — this is not an

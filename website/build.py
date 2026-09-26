@@ -39,6 +39,8 @@ import argparse
 import json
 import re
 import shutil
+
+import update_feeds
 import struct
 import sys
 from pathlib import Path
@@ -572,6 +574,42 @@ def new_in_html(site: dict, counts: dict) -> str:
     return f'<ul class="plain new-in">\n{joined}\n  </ul>'
 
 
+def version_tuple(text: str) -> tuple:
+    parts: list[int] = []
+    for piece in str(text).split("."):
+        parts.append(int(piece) if piece.isdigit() else 0)
+    return tuple(parts)
+
+
+def release_readiness_refusal(site: dict, shots: dict) -> str | None:
+    """Why the site must not go live yet, or None.
+
+    Two ways a deploy can advertise what nobody can have: the "New this year"
+    list is written for a release AHEAD of `version` (the pages describe
+    features whose download does not exist yet — deploy after the cut), or a
+    shot the pages name is still `awaiting_capture` with no image (the section
+    would go out without its picture). `--check` lets both through, so the
+    site can be built and reviewed before the release; publishing does not.
+    """
+    listed = str(site.get("new_in", {}).get("version", ""))
+    current = ".".join(str(site.get("version", "")).split(".")[:2])
+    if listed and version_tuple(listed) > version_tuple(current):
+        return (f"Not deploying: the pages describe {listed} (site.json -> new_in) but the release is "
+                f"{site.get('version')}. Deploy after the {listed} cut sets `version`.")
+    waiting: list[str] = []
+    for shot in shots.get("shots", []):
+        if not shot.get("awaiting_capture"):
+            continue
+        light = IMAGE_DIR / f"{shot['id']}-light.png"
+        dark = IMAGE_DIR / f"{shot['id']}-dark.png"
+        if not (light.exists() and dark.exists()):
+            waiting.append(shot["id"])
+    if waiting:
+        return ("Not deploying: these pictures have not been taken yet, so their sections would go out "
+                f"without them: {', '.join(waiting)} (capture.py --scenes).")
+    return None
+
+
 def new_in_is_current(site: dict) -> bool:
     """Does the "New this year" list belong to the version being released?
 
@@ -673,6 +711,19 @@ def build(check_only: bool) -> int:
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_text(html, encoding="utf-8")
         written.append(destination)
+
+    # The update feeds (#204): checked in both modes, copied byte for byte —
+    # never parsed and rewritten, which would break their signatures.
+    feed_source = WEBSITE / "updates"
+    # Only the MAC's feed is checked: the checker reads Sparkle's shape, and
+    # NetSparkle's windows.xml (v1.4.0) will need a checker of its own (the
+    # slice-2 review's L6). Copied either way.
+    mac_feed = feed_source / "macos.xml"
+    if mac_feed.is_file():
+        for problem in update_feeds.problems_with(mac_feed):
+            problems.append(problem)
+    if not check_only:
+        update_feeds.copy_feeds(feed_source, OUTPUT / "updates")
 
     if not check_only:
         assets = OUTPUT / "assets"
@@ -783,6 +834,26 @@ def serve(port: int) -> int:
     return 1
 
 
+def feed_version_refusal(feed: Path, project_yml: Path) -> str | None:
+    """Why the mac feed must not be deployed with this site, or None (#204).
+
+    Deploys run from `main`, where the feed's newest version and
+    MARKETING_VERSION agree after a mac cut — and still agree after a
+    Windows-only cut, which leaves both alone. A disagreement means the feed
+    was not rebuilt for the version being released, or was rebuilt for one
+    that has not been.
+    """
+    if not feed.is_file():
+        return None
+    newest = update_feeds.newest_version(feed)
+    marketing = update_feeds.marketing_version(project_yml)
+    if newest != marketing:
+        return (f"Not deploying: updates/macos.xml offers {newest}, but mac-app/project.yml says "
+                f"{marketing}. Rebuild the feed with website/update_feed.py at the cut "
+                f"(RELEASING.md → \"The update feed (macOS)\").")
+    return None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build plantoir.app into site/.")
     parser.add_argument(
@@ -818,7 +889,11 @@ def main() -> int:
         if arguments.check or arguments.deploy or arguments.serve:
             parser.error("--verify-deploy stands alone: it neither builds nor deploys")
         import netlify_deploy
-        return {"match": 0, "mismatch": 2, "unknown": 1}[netlify_deploy.verify_live()]
+        outcome = netlify_deploy.verify_live()
+        feeds = netlify_deploy.verify_feeds_live()
+        if feeds == "mismatch" or (feeds == "unknown" and outcome == "match"):
+            outcome = feeds
+        return {"match": 0, "mismatch": 2, "unknown": 1}[outcome]
     if arguments.check and (arguments.deploy or arguments.serve):
         parser.error("--check writes nothing, so there is nothing to publish or preview")
     if arguments.deploy and arguments.serve:
@@ -832,6 +907,15 @@ def main() -> int:
         if result != 0:
             print("Not deploying: fix the build warnings above first.", file=sys.stderr)
             return result
+        refusal = feed_version_refusal(WEBSITE / "updates" / "macos.xml", REPO / "mac-app" / "project.yml")
+        if refusal:
+            print(refusal, file=sys.stderr)
+            return 1
+        refusal = release_readiness_refusal(read_json(WEBSITE / "site.json"),
+                                            read_json(WEBSITE / "shots.json"))
+        if refusal:
+            print(refusal, file=sys.stderr)
+            return 1
         site = read_json(WEBSITE / "site.json")
         if not new_in_is_current(site):
             # A reminder, not a refusal: the list is still true, only no
