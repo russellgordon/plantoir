@@ -268,6 +268,18 @@ issue #140, `decision`, Russell): **an app's answer must be the BUILT SITE's
 answer.** The governing rule underneath that is narrower and matters more —
 *Plantoir must never call a page hidden while students can read it.*
 
+**One page is kept off the site by its LOCATION, not by any key: the
+teacher's How I Teach page** (`How I Teach.md` at the top of the course folder,
+or of a section folder; #209). The keys below cannot be its guarantee, for a
+reason this table itself states: a later `publishForSection<N>: true` beats
+`publish: false`, and that is exactly what `publish_pages` and a teacher's
+publish toggle write on a course-level page — and a page typed in Obsidian has no
+key at all. So the build refuses the name wherever it would land at the top of a
+site, whatever its settings say, and the `publish: false` a new one is given
+matters only if the page is later moved into a folder. The rule and its name
+cases: `contracts/shared-rules.json` → `howITeachPage`; the build's four points:
+[05 → "The teacher's How I Teach page never reaches a site"](05-build-pipeline.md#how-i-teach).
+
 ### Why a hand-rolled reader gets this wrong
 
 **The build never shows Quartz what the teacher typed.** Every page copied into
