@@ -4973,9 +4973,10 @@ The decisions on #204 (2026-09-19, and Russell's answers of 2026-09-24):
    `generate_appcast`, `sign_update` and the licence (as `Sparkle-LICENSE`,
    bundled as a resource — MIT; there is no credit line in any window, because
    rule 1 keeps the updater's name out of what a teacher reads). **Why not
-   2.10.0:** it followed on 2026-09-13 with no security fix and a macOS 12
-   minimum; nothing in it is needed, and moving the pin means re-checking the
-   hook names below.
+   2.10.0:** it was already out when the pin was decided (released
+   2026-09-13, six days before), with no security fix over 2.9.6 and a macOS 12
+   minimum — nothing in it is needed, a six-day-old release was one more
+   unknown, and moving the pin means re-checking the hook names below.
 4. **No development feed; a Debug build never updates.** `SUFeedURL` is
    `$(PLANTOIR_UPDATE_FEED_URL)`, set in `project.yml` to `""` for Debug and
    `https://plantoir.app/updates/macos.xml` for Release. No feed → no updater →
@@ -5035,8 +5036,15 @@ and inside a scheduled publish before the checks that turn them away.
 product source for exactly this.
 
 "Check for Updates…" sits under "About Plantoir" (`CheckForUpdatesButton`),
-drawn only when the updater is running and greyed while an update session is
-open — including while an install is held here.
+drawn only when the updater is running. It is **not** greyed during an update
+session, and this corrects the first draft of this section (the slice-1
+review's M2): because the wrapper answers `showUpdateInFocus`, Sparkle turns
+`canCheckForUpdates` back on as soon as its window is shown
+(`SPUUpdater.m` :894-897), and a click brings that window forward. While an
+install is held here Sparkle's windows are already closed, so the click
+re-shows the held notice instead. Neither counts as a new check the teacher
+asked for. No second Install can reach the installer either way — the only
+kept answer is in `AppUpdates`.
 
 ### Holding an install: why the answer is KEPT, not postponed
 
@@ -5067,6 +5075,12 @@ to `AppUpdates.teacherAnsweredReady` first.
   `update installing` naming the work it waited for. *Rejected:* asking again
   ("Plantoir can finish updating now"), which the plan recommended and Russell
   overruled.
+- **The tests never read the machine.** The gate's facts come from
+  `AppUpdates.factsProvider`; the hold and quit tests hand in this app's own
+  record only, because the test host shares an executable with the Debug app
+  a teacher opens, whose scheduled publish the live scan would find (the
+  slice-1 review's L4). `SameExecutableProcessesTests` exercises the scan on
+  processes it starts itself.
 - **The waiting is event-driven, never on a clock:** `withObservationTracking`
   on `CourseActivity.store`, `ProcessEnding.ends(of:)` for each process being
   waited for (a `DispatchSource` process-exit event — the app's second
@@ -5102,9 +5116,32 @@ all six hooks the app relies on, and goes red on the near-miss.
 | held here | no (it has just ended) | installs as Plantoir quits |
 | postponed by the installer's last look | either | installs as Plantoir quits — the one case that cannot be stopped |
 
+**In the postponed state the notice says what really happens.** A quit there
+installs, so the held notice uses `UpdateWording.heldExplanationOnceInstalling`
+("…it finishes updating as it quits") instead of the "set aside" promise, and
+`appUpdates.rule` names the exception (the slice-1 review's L1). Making the
+state behave as the rule says instead is not cheap: the installer already has
+its "install", and nothing in Sparkle takes that back.
+
+**The resumed window is held too** (the slice-1 review's L3). When a check finds
+an installer already prepared, Sparkle shows its update window at the
+`installing` stage with "Install and Relaunch" and "Install on Quit", and would
+hand the answer straight to `finishInstallationWithResponse`.
+`HoldingUserDriver.showUpdateFound` intercepts that stage exactly as it
+intercepts "Ready to Install": Install goes through the gate, "Install on Quit"
+keeps the answer (a quit with nothing under way then installs, as promised; one
+with work under way sets it aside), and Skip goes on. A set-aside from this
+window answers "skip", which Sparkle also records as a skipped version
+(`SPUSkippedUpdate`); the three `SUSkipped…` defaults are saved first and put
+back at the end of the session, so the version is still offered. Known gap:
+after "Install on Quit" the session stays open with no window, so the menu
+item's click brings nothing forward until the quit.
+
 "Sets it aside" answers the kept reply with `.skip`, writes `update set aside`,
 and returns `.terminateLater`; the quit finishes when Sparkle reports the end
-of the session (`updater(_:didFinishUpdateCycleFor:error:)`). **That wait is
+of the session (`updater(_:didFinishUpdateCycleFor:error:)`) — which means the
+stand-down was SENT on Sparkle's asynchronous connection to its installer, not
+that the installer has acted on it (the slice-1 review's L5). **That wait is
 capped at ten seconds** — a bound, not a guess: a quit during a log out holds
 up the Mac, so if the report never comes the quit goes ahead and the trail
 says the installer may not have heard. A skip in THIS reply does not mark the
@@ -5181,8 +5218,11 @@ finished" while a quit installed anyway.
 
 **Sparkle's own windows are Sparkle's words** — "A new version of Plantoir is
 available!", its buttons, the progress and error windows — localized by it
-into 35 languages, and not changeable without a fork. None uses a word on the
-machinery list; the ones that lean technical appear only on failure ("An error
+into 35 languages, and not changeable without a fork. OURS never use a word on
+the machinery list; Sparkle's own error windows can — "feed" is on that list,
+and two of its failure strings say "update feed" (corrected after the slice-1
+review's L2, which caught the first draft claiming none did). Those, and the
+others that lean technical, appear only on failure ("An error
 occurred while parsing the update feed.", "The update feed is improperly
 signed…", "…extracting the archive…", "…launching the installer…"), and the
 trail's `update stopped` line is what makes each answerable.

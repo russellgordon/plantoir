@@ -45,9 +45,14 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
     /// this is true.
     private(set) var isRunning: Bool = false
 
-    /// The updater's own answer, kept in step with it: false while an update
-    /// session is open — including while an install is held here, which is
-    /// what stops a second "Install" from reaching the installer.
+    /// The updater's own answer, kept in step with it. NOT "false while a
+    /// session is open": because the wrapper answers `showUpdateInFocus`, the
+    /// updater turns this back on as soon as its window is shown
+    /// (`SPUUpdater.m` :894-897), and a click then brings that window
+    /// forward — or, while an install is held here, re-shows the held notice
+    /// (`checkForUpdates`). No second Install can reach the installer either
+    /// way: the only kept answer is here. It is false only in the moment
+    /// between starting a check and showing its window.
     private(set) var canCheckForUpdates: Bool = false
 
     @ObservationIgnored private var updater: SPUUpdater?
@@ -55,7 +60,16 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
     @ObservationIgnored private var canCheckObservation: NSKeyValueObservation?
 
     /// Where an update stands, as far as quitting is concerned.
-    @ObservationIgnored private(set) var prepared: UpdateGate.PreparedUpdate = .none
+    private(set) var prepared: UpdateGate.PreparedUpdate = .none
+
+    /// How many times the held notice has been put up — counted before the
+    /// test guard, so a test can see the menu item asked for it.
+    @ObservationIgnored private(set) var heldNoticesShown: Int = 0
+
+    /// Whether an install is being held here right now.
+    var isHoldingAnInstall: Bool {
+        return prepared == .heldForWork || prepared == .postponedAtInstall
+    }
 
     /// The installer's question, still unanswered: "Install and Relaunch?".
     @ObservationIgnored private var readyReply: ((SPUUserUpdateChoice) -> Void)?
@@ -91,6 +105,23 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
     /// What finishes a quit that is waiting for a set-aside update to stand
     /// down.
     @ObservationIgnored private var quitWaiter: (() -> Void)?
+
+    /// Whether the kept answer came from the updater's RESUMED window (an
+    /// installer already prepared, `showUpdateFound` at the installing stage)
+    /// rather than from "Ready to Install". A "skip" there also marks the
+    /// version skipped, so a set-aside puts the skipped-version values back.
+    @ObservationIgnored private var keptAnswerIsFromTheResumedWindow: Bool = false
+
+    /// The skipped-version values as they were before a set-aside from the
+    /// resumed window, restored when the session ends.
+    @ObservationIgnored private var skippedVersionsToRestore: [String: Any?]?
+
+    /// Where the gate's facts come from — the live Mac, or a test's own.
+    /// A test that read the real process table would go red whenever the
+    /// Debug app it shares an executable with had a scheduled publish going.
+    @ObservationIgnored var factsProvider: () -> UpdateGate.Facts = {
+        return UpdateGate.currentFacts()
+    }
 
     // MARK: - Computed properties
 
@@ -183,21 +214,58 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
     }
 
     /// Check for Updates…, from the menu.
+    ///
+    /// While an install is held here the updater's own windows are closed, so
+    /// the click re-shows the held notice instead. While any other session is
+    /// open, the updater brings its own window forward. Neither is a new check
+    /// the teacher asked for, so neither changes how its failures are written
+    /// (once per launch for the daily check).
     func checkForUpdates() {
+        if prepared == .heldForWork || prepared == .postponedAtInstall {
+            showHeldNotice(work: heldWork ?? "")
+            return
+        }
         guard let updater else {
             return
         }
-        teacherAskedForThisCheck = true
+        if !updater.sessionInProgress {
+            teacherAskedForThisCheck = true
+        }
         updater.checkForUpdates()
+    }
+
+    /// The gate, asked of wherever this instance's facts come from.
+    private func workUnderWayNow() -> String? {
+        return UpdateGate.workUnderWay(facts: factsProvider())
     }
 
     // MARK: - Functions: the install, held and let go
 
     /// The installer is prepared and asking "Install and Relaunch?". The
     /// question is kept here until the teacher answers it.
-    func updateIsReady(reply: @escaping (SPUUserUpdateChoice) -> Void) {
+    func updateIsReady(reply: @escaping (SPUUserUpdateChoice) -> Void, fromTheResumedWindow: Bool = false) {
         readyReply = reply
+        keptAnswerIsFromTheResumedWindow = fromTheResumedWindow
         prepared = .readyToInstall
+    }
+
+    /// The teacher answered the updater's RESUMED window — the one it shows
+    /// when a check finds an installer already prepared, with "Install and
+    /// Relaunch" and "Install on Quit" (the plan review of slice 1, L3). The
+    /// updater would hand that answer straight to the installer; it comes
+    /// here instead, so the quit protection holds on this path too.
+    /// "Install on Quit" keeps the answer — a quit with nothing under way then
+    /// installs, which is what it promised, and one with work under way sets it
+    /// aside. Skip This Version is the teacher's own, and goes on.
+    func teacherAnsweredResumedWindow(_ choice: SPUUserUpdateChoice) {
+        switch choice {
+        case .install:
+            teacherAnsweredReady(.install)
+        case .skip:
+            forwardReady(.skip)
+        default:
+            break
+        }
     }
 
     /// The teacher answered the updater's "Install and Relaunch".
@@ -206,7 +274,7 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
             forwardReady(choice)
             return
         }
-        guard let work = UpdateGate.workUnderWay() else {
+        guard let work = workUnderWayNow() else {
             installNow(.straightAway)
             return
         }
@@ -227,7 +295,7 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
         shouldPostponeRelaunchForUpdate item: SUAppcastItem,
         untilInvokingBlock installHandler: @escaping () -> Void
     ) -> Bool {
-        guard let work = UpdateGate.workUnderWay() else {
+        guard let work = workUnderWayNow() else {
             return false
         }
         postponedInstall = installHandler
@@ -259,7 +327,7 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
     /// watches FIRST and asks SECOND, so work that ends in between is seen.
     private func waitUntilNothingIsUnderWay() async {
         while !Task.isCancelled {
-            let facts: UpdateGate.Facts = UpdateGate.currentFacts()
+            let facts: UpdateGate.Facts = factsProvider()
             if UpdateGate.workUnderWay(facts: facts) == nil {
                 heldWorkIsDone()
                 return
@@ -272,7 +340,7 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
             for folder in targets.leaseFolders {
                 streams.append(AppUpdates.changes(at: folder))
             }
-            if UpdateGate.workUnderWay() == nil {
+            if workUnderWayNow() == nil {
                 heldWorkIsDone()
                 return
             }
@@ -332,7 +400,7 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
         if prepared == .none {
             return .nothingToDo
         }
-        let work: String? = UpdateGate.workUnderWay()
+        let work: String? = workUnderWayNow()
         let action: UpdateGate.QuitAction = UpdateGate.quitAction(prepared: prepared, workUnderWay: work != nil)
         if action == .installsAsItQuits {
             var stillGoing: String? = nil
@@ -348,8 +416,10 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
     }
 
     /// Tells the installer to stand down, and calls `whenDone` once the
-    /// updater says the session is over — which is when the installer has
-    /// been told, and the quit may finish.
+    /// updater says the session is over. That means the stand-down was SENT —
+    /// queued on the updater's connection to its installer — not that the
+    /// installer has acted on it; that it lands before the app is gone is a
+    /// runtime fact the dress rehearsal measures (V4b).
     ///
     /// **The one timed wait here, and it is a bound, not a guess.** If the
     /// updater never reports the end of the session, the quit would hang for
@@ -368,10 +438,44 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
         watchTask = nil
         closeHeldNotice()
         heldWork = nil
+        if keptAnswerIsFromTheResumedWindow {
+            // "Skip" in the resumed window also marks the version skipped,
+            // which would stop the daily check offering it again — the
+            // opposite of "set aside". Put the values back once the updater
+            // has written them, at the end of the session.
+            var saved: [String: Any?] = [:]
+            for key in AppUpdates.skippedVersionKeys {
+                saved[key] = UserDefaults.standard.object(forKey: key)
+            }
+            skippedVersionsToRestore = saved
+        }
         forwardReady(.skip)
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(10))
             self.finishWaitingQuit(heardBack: false)
+        }
+    }
+
+    /// The updater's skipped-version values (`SUConstants.m`), which a
+    /// set-aside from the resumed window puts back as they were.
+    static let skippedVersionKeys: [String] = [
+        "SUSkippedVersion",
+        "SUSkippedMajorVersion",
+        "SUSkippedMajorSubreleaseVersion"
+    ]
+
+    /// Puts the skipped-version values back, if a set-aside saved them.
+    private func restoreSkippedVersions() {
+        guard let saved = skippedVersionsToRestore else {
+            return
+        }
+        skippedVersionsToRestore = nil
+        for (key, value) in saved {
+            if let value {
+                UserDefaults.standard.set(value, forKey: key)
+            } else {
+                UserDefaults.standard.removeObject(forKey: key)
+            }
         }
     }
 
@@ -410,13 +514,21 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
     /// work it is waiting for from being seen to end, and would be on screen
     /// when the app quits to install.
     private func showHeldNotice(work: String) {
+        heldNoticesShown += 1
         closeHeldNotice()
         if WorkspaceModel.isRunningTests {
             return
         }
         let alert: NSAlert = NSAlert()
         alert.messageText = UpdateWording.heldTitle(work: work)
-        alert.informativeText = UpdateWording.heldExplanation
+        // In the one state where a quit cannot be stopped from installing,
+        // the notice must not promise that it sets the update aside
+        // (`appUpdates.atQuit`, postponedAtInstall).
+        if prepared == .postponedAtInstall {
+            alert.informativeText = UpdateWording.heldExplanationOnceInstalling
+        } else {
+            alert.informativeText = UpdateWording.heldExplanation
+        }
         alert.alertStyle = .informational
         alert.addButton(withTitle: UpdateWording.okButton)
         let button: NSButton = alert.buttons[0]
@@ -451,6 +563,7 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
     private func sessionEnded() {
         prepared = .none
         readyReply = nil
+        keptAnswerIsFromTheResumedWindow = false
         postponedInstall = nil
         heldWork = nil
         watchTask?.cancel()
@@ -542,6 +655,7 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
             }
         }
         sessionEnded()
+        restoreSkippedVersions()
         finishWaitingQuit(heardBack: true)
     }
 
@@ -692,7 +806,14 @@ final class HoldingUserDriver: NSObject, SPUUserDriver {
         state: SPUUserUpdateState,
         reply: @escaping (SPUUserUpdateChoice) -> Void
     ) {
-        standard.showUpdateFound(with: appcastItem, state: state, reply: reply)
+        guard state.stage == .installing, let owner else {
+            standard.showUpdateFound(with: appcastItem, state: state, reply: reply)
+            return
+        }
+        owner.updateIsReady(reply: reply, fromTheResumedWindow: true)
+        standard.showUpdateFound(with: appcastItem, state: state) { [weak owner] choice in
+            owner?.teacherAnsweredResumedWindow(choice)
+        }
     }
 
     func showUpdateReleaseNotes(with downloadData: SPUDownloadData) {
@@ -757,9 +878,9 @@ final class HoldingUserDriver: NSObject, SPUUserDriver {
 // MARK: - The menu item
 
 /// "Check for Updates…" under "About Plantoir" — drawn only when there is an
-/// updater, so a development build has no item that could never work, and
-/// greyed out while an update session is open (including while an install is
-/// held).
+/// updater, so a development build has no item that could never work. NOT
+/// greyed during a session: a click brings the updater's window forward, or
+/// re-shows the held notice while an install is held (`checkForUpdates`).
 struct CheckForUpdatesButton: View {
 
     // MARK: - Stored properties
@@ -773,7 +894,7 @@ struct CheckForUpdatesButton: View {
             Button(UpdateWording.menuItem) {
                 updates.checkForUpdates()
             }
-            .disabled(!updates.canCheckForUpdates)
+            .disabled(!updates.canCheckForUpdates && !updates.isHoldingAnInstall)
         }
     }
 }

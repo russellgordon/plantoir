@@ -10264,7 +10264,7 @@
   },
   "appUpdates": {
     "note": "GitHub issue #204: Plantoir finds and installs its own new versions. Written on the mac with #204 (Sparkle 2.9.6); Windows adopts the same rules and sentences with NetSparkleUpdater (the windows issue drafted with #204, milestone v1.4.0), and until then nothing on Windows reads this block - its cases are UNRUN there, not red. The mechanism on each side is platform code; what is shared is what a teacher is promised. The reasoning, what was measured and what was rejected: documentation/09-mac-app.md -> 'Updating itself'.",
-    "rule": "Plantoir checks for a new version once a day and never downloads or installs one without the teacher choosing to. It never installs while it is publishing or building a preview, or while a scheduled publish or another program is building one of the courses it has open: it waits, and restarts by itself as soon as that work is done. Quitting is never refused - a quit with an update ready and work still going sets the update aside, and it is offered again later.",
+    "rule": "Plantoir checks for a new version once a day and never downloads or installs one without the teacher choosing to. It never installs while it is publishing or building a preview, or while a scheduled publish or another program is building one of the courses it has open: it waits, and restarts by itself as soon as that work is done. Quitting is never refused - a quit with an update ready and work still going sets the update aside, and it is offered again later - except in one rare case: when work begins in the instant after the teacher's Install has already reached the installer, a quit then finishes the install as Plantoir goes, and the teacher is told so (atQuit, postponedAtInstall; wording.heldExplanationOnceInstalling).",
     "checkEverySeconds": 86400,
     "installsWithoutAsking": false,
     "installsWithoutAskingWhy": "Decision 1 on #204. RELEASING.md carries warnings a teacher MUST read before updating ('update both Macs'), and an update that installs on quit shows nobody anything. The notes, warnings included, travel in the signed feed and are shown in the update window.",
@@ -10335,13 +10335,14 @@
       "heldTitle": "Plantoir will finish updating once it is done {work}.",
       "scheduledWork": "publishing Section {section} of {course} on its schedule",
       "scheduledWorkUnnamed": "publishing on its schedule",
-      "elsewhereWork": "building {course} somewhere else on this Mac",
+      "elsewhereWork": "waiting for {course} to finish building somewhere else on this Mac",
       "heldExplanation": "The new version is ready. Plantoir will close and open again by itself as soon as that is finished. If you quit Plantoir before then, the update is set aside and offered again later.",
+      "heldExplanationOnceInstalling": "The new version is ready. Plantoir will close and open again by itself as soon as that is finished. If you quit Plantoir before then, it finishes updating as it quits.",
       "okButton": "OK",
       "needsAdministratorTitle": "Plantoir could not install the new version.",
-      "needsAdministratorExplanation": "Installing it on this Mac needs an administrator’s name and password. Whoever looks after this Mac can install it for you, or choose Check for Updates… again when an administrator is with you."
+      "needsAdministratorExplanation": "Installing it on this Mac needs an administrator’s name and password, and none was given. To try again, choose Check for Updates… in the Plantoir menu. If you do not have an administrator’s password, whoever looks after this Mac can install it for you."
     },
-    "updatersOwnWords": "Everything else a teacher reads while updating - the update window, its buttons, the progress and error windows - is the updater's own, localized by it into 35 languages, and cannot be changed without keeping a fork of it. None uses a word on the machinery list; the few that lean technical appear only when something has failed, and the trail's 'update stopped' line is what makes each of them answerable. The list is in documentation/09-mac-app.md -> 'Updating itself'.",
+    "updatersOwnWords": "Everything else a teacher reads while updating - the update window, its buttons, the progress and error windows - is the updater's own, localized by it into 35 languages, and cannot be changed without keeping a fork of it. Ours never use a word on the machinery list; the updater's own error windows can say \"update feed\" (\"An error occurred while parsing the update feed.\", \"The update feed is improperly signed...\") and a few others lean technical, all only when something has failed, and the trail's 'update stopped' line is what makes each of them answerable. The list is in documentation/09-mac-app.md -> 'Updating itself'.",
     "whatWasRejected": [
       "Letting a user default name the feed (the updater honours one by default) - a development feed by another name. The app clears any such value when the updater starts.",
       "A separate feed, or a working updater, for development builds (decision 5).",
