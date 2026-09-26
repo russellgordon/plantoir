@@ -213,8 +213,9 @@ GitHub #280, 2026-09-25. The rule is data in
 (`hostBlockCount`, `hostBlockProbe`, `hostBlockCases`, `hostBlockClash`,
 `whenNoBlockIsFree`); the code is one marked block, `# >>> PREVIEW PORT BLOCK
 >>>`, byte-identical in `setup.sh`, `preview.sh` and `deploy.sh`, and
-`scripts/test_port_blocks.py` runs it against a pretend Mac (fake `lsof` and
-`docker` on PATH) under `/bin/bash` 3.2 with `set -euo pipefail`.
+`scripts/test_port_blocks.py` runs it against a pretend Mac (fake `lsof`,
+`netstat` and `docker` on PATH) under `/bin/bash` 3.2 with `set -euo
+pipefail`, plus one check of the real `netstat` half on the Mac it runs on.
 
 **What went wrong.** The launchers tried six blocks (8081 … 8131) and gave up.
 A block is held by a workspace that EXISTS — running `tail -f /dev/null`,
@@ -240,9 +241,13 @@ and its sentence stays true.
 
 A block is taken when any of its eight ports is:
 
-- **listening on this Mac, by anybody** — read from ONE `lsof -nP -iTCP
-  -sTCP:LISTEN -Fn` listing, port = what follows the last colon (`n*:8081`,
-  `n127.0.0.1:8443`, `n[::1]:8443`). This check has to stay: a python server
+- **listening on this Mac, in ANY account** — read from TWO listings, each
+  once: the kernel's own list, `netstat -an -p tcp` (LISTEN rows only; port =
+  what follows the LAST dot: `*.8081`, `127.0.0.1.8443`, `::1.8443`), and
+  this account's `lsof -nP -iTCP -sTCP:LISTEN -Fn` (port = what follows the
+  last colon: `n*:8081`, `n127.0.0.1:8443`, `n[::1]:8443`), joined. Until
+  #310 (2026-09-26) it was `lsof` alone — see "Another account on the same
+  Mac" below for why that was wrong. This check has to stay: a python server
   on 127.0.0.1:18556 and then `docker run -p 18556:8081` → **exit 0**, both
   listening. Docker cannot see a host program on a port, so this is the only
   guard against another app (Supabase holds 8443 on the development Mac, so
@@ -274,11 +279,15 @@ its workspace is remade on free ports by the path below when it next starts.
 | The real walk on this Mac, six workspaces running and three stopped (all nine blocks among 8081 … 8131) | **8141**, in 0.25 s end to end (`lsof` + `docker ps` + `docker inspect`) |
 | `verify.sh` with those workspaces alive, after this change | 148 PASS, "All checks passed" (it had failed 5–7 launcher checks) |
 | A first preview after a workspace is remade (#225, a teacher's Mac) | **109.3 s** cold, against seconds warm |
+| (#310, 2026-09-26) `netstat -an -p tcp` + awk, the whole list | **0.00–0.01 s** (3 runs); 17 listeners against `lsof`'s 13 — root's `kdc` on 88 and screen sharing on 5900 are the difference |
+| (#310) `lsof` listing, for comparison | 0.06–0.07 s |
 
-A listing that cannot be read (`lsof` missing or failing) counts as nothing
-listening — the old probe's answer too, pinned by a test so nobody changes it
-quietly; the other workspaces are still skipped, and a clash with one is
-caught below.
+Each listing that cannot be read (missing or failing) counts as EMPTY on its
+own, so the other one's answer stands: a `netstat` whose columns change in a
+future macOS falls back to exactly the old `lsof` answer, never to "nothing
+listening". Only when both fail does the walk count nothing as listening —
+the old probe's answer too, pinned by a test so nobody changes it quietly; the
+other workspaces are still skipped, and a clash with one is caught below.
 
 **A clash at the moment of making.** The probe and `docker run` are two steps,
 so two launchers starting together can both see a block free. A `docker run`
@@ -302,6 +311,32 @@ exec` with nothing a teacher could read. With the stopped-workspace skip in
 the first pass, this path is reached when the SECOND pass has taken a stopped
 workspace's block, or for workspaces made before #280.
 
+**A preview looks before it starts one (#310).** Colima does NOT refuse a
+start onto a port something else holds — `docker start` exits 0 and the
+forward silently fails (measured with root's 5900) — so the refusal above
+never comes. So when `preview.sh` is about to SERVE (`WORKSPACE_WILL_SERVE`,
+which only `preview.sh` sets, and only without `--build-only`) and the engine
+is Colima (`the_engine_forwards_from_this_account`), `start_the_existing_workspace`
+first reads the workspace's own eight host ports from `docker inspect` and
+looks for any of them in the listings. A stopped workspace listens on nothing
+— its own forward is gone 0.011 s after the stop returns and back 0.011 s
+after a start (5 of 5 each way) — so a listener there is somebody else's,
+this account's own programs included. It then asks once more whether the
+workspace is RUNNING (another launcher for the same folder started it a
+moment ago: the listener is its forward, and it is used as it is), and
+otherwise takes the same remake as a refusal: the two ♻️ lines, a plain
+`docker rm`, `run_container_with_mount`, and — only once that has
+succeeded — the marker
+`PLANTOIR_PREVIEW_ADDRESS_HELD: before-start <port> <course>/<section>`,
+which the app writes onto the trail as the `preview address held by another
+account` event. If `docker rm` is refused and the workspace is not running,
+the run stops with `saysWhenAStartIsRefused` — there was no start, so there
+are no engine's words to print. `setup.sh` and `deploy.sh` never look: they
+never serve, so a squatted forward costs them nothing, and a six o'clock
+publish keeps its warm builder rather than pay a two-minute remake with a new
+way to fail. The block stays byte-identical in all three launchers because
+the look is switched on by that variable, not written in one copy only.
+
 **Never `docker rm -f` in either path.** A failed start proves nothing runs in
 that workspace, but two launchers on the same folder (a scheduled publish and
 a Preview) can both find it stopped; the second one's `-f` would kill the
@@ -324,18 +359,64 @@ existing `preview did not appear` event's second launcher line,
 the course and section (or the word `setup`). A walk that FOUND a high block
 writes nothing: the announced address already carries the port.
 
+**Another account on the same Mac (#310, 2026-09-26).** Found in the #204
+rehearsal: two macOS accounts signed in, each with Plantoir. `lsof` run as
+the teacher lists only the teacher's own programs, so the second account's
+walk saw 8081 as free while the first account's preview held it. Its
+`docker run -p 8081…` exited 0; under Colima the forward is this account's
+own `ssh`, and XNU refuses a port already bound by another uid, so the forward
+failed with a warning in Lima's `ha.stderr.log` (`failed to set up forwarding
+tcp port …`, ssh exit 255) and nowhere a launcher reads — `docker port` still
+names the port. #234's reach check was then answered by the FIRST account's
+forwarder, and the teacher's Preview opened somebody else's site. Measured
+with root's screen sharing on 5900 standing in for another account (a
+different uid, which is all XNU compares): `docker run -p 5900:8081` → exit
+0, `docker port` → `0.0.0.0:5900`, curl to it reaches screen sharing.
+
+Three layers now, each closing a hole the others cannot:
+
+1. **The walk** reads the kernel's list too (above), so another account's
+   listener, or root's, is stepped past like this account's own.
+2. **Before a preview starts a stopped workspace** it looks at its ports
+   (above). The walk cannot see another account's STOPPED workspace (its VM
+   is not ours to ask), so two accounts can still both hold 8081 on paper;
+   whichever starts second is caught here.
+3. **Before `preview.sh` announces the address** it asks whose it is:
+   "Before building, preview.sh makes sure the address is this account's
+   own", in the `preview.sh` section below.
+
 **Known limits, written down rather than fixed:**
 
-- `lsof` run as the teacher cannot see listeners owned by root (unchanged from
-  the old probe; `netstat -an -p tcp` would). A root-owned server in the range
-  is found only when Docker refuses — under Docker Desktop, which then walks
-  on; under Colima, not at all.
-- A STOPPED workspace restarted onto a block a HOST program took while it was
-  stopped starts anyway (Colima's `docker start` succeeds, as `docker run`
-  did above), and on macOS a 127.0.0.1 bind wins over `*`, so the announced
-  address could show the other program — the #235 hazard. Pre-existing;
-  checking the workspace's block against the listing before `docker start`
-  would close it.
+- Another account's STOPPED workspace is invisible by construction, so this
+  account can be handed its block while that account is logged out or its
+  workspace stopped. That account then pays one remake (about two minutes)
+  when it next previews. Documented, not a bug.
+- The look before a start, and the look before the announcement, run under
+  Colima only (`contracts/app-rules.json` → `previewPorts
+  .whenAnotherAccountHasTheAddress.gate`). Docker Desktop refuses a start
+  onto a held port itself ("Ports are not available"), which the refusal path
+  handles; any other engine was never measured and must not pay a remake on
+  a guess. A developer whose shell sets `DOCKER_HOST` to anything outside
+  `~/.colima/` (or `$COLIMA_HOME`, for a Colima kept elsewhere) switches both off — `docker context show` then says `default`
+  whatever the engine — and the preview says so on the trail (the
+  `unchecked` outcome) rather than going quiet. The app never sets it.
+- The look before a start can remake a workspace stopped a moment ago
+  whose own forward has not gone yet: 0.011 s on the development
+  Mac, unmeasured on a teacher's (#225's Mac took 0.10–0.24 s for a listener
+  to APPEAR). The cost is one cold preview, never a wrong site.
+- The likeliest follow-on on a two-account Mac looks like #225, not like
+  this: the other account quits Plantoir while this account's broken
+  workspace is still running, so nothing listens on the address at all and
+  #234 says "restart your Mac". That remedy works (the forward is made again
+  on the next start), but the diagnosis is #225's. Left alone deliberately:
+  #234 rejected restarting the builder from a launcher.
+- A root-owned or other-account server in the range is still found only by
+  the kernel's list; if some future macOS changes `netstat`'s columns, the
+  walk silently falls back to `lsof` alone, which is #310 again.
+  `scripts/test_port_blocks.py` → `TheRealListings` checks the `netstat`
+  half ON ITS OWN on whatever Mac runs the suite (non-empty whenever `lsof`'s
+  list is, and holding every port `lsof` lists), so that fallback shows up
+  as a red test rather than as a teacher's wrong site.
 
 **What was rejected, and why:**
 
@@ -365,6 +446,28 @@ writes nothing: the announced address already carries the port.
   every exit, Ctrl-C and hang-up included, and only by its own run.
   `scripts/test_verify_lock.py` proves each.
 - **One `lsof` per port** (the old probe) — 9.8 s for forty blocks.
+- **A bind probe** (#310's first suggestion). It does see other accounts, even
+  with `SO_REUSEADDR`, but it needs an interpreter: `/usr/bin/python3` on a
+  Mac without the Command Line Tools is a stub that opens the "install
+  developer tools" dialog, and one process per port cost 2.23 s for forty
+  blocks. It also answers the wrong question both ways: without
+  `SO_REUSEADDR` a port in TIME_WAIT (a preview closed a minute ago) reads as
+  taken; with it, a same-account listener on another address reads as free
+  (127.0.0.1 beside `*:5000`, measured).
+- **A connect probe for the walk** — 0.66 s for 320 ports, sees only what
+  answers on 127.0.0.1, and knocks on other people's servers.
+- **`netstat` alone** — a future column change would fail open to "nothing
+  listening", which is worse than before #310. Keeping `lsof` costs 0.06 s.
+- **Reading Lima's `ha.stderr.log`** for the failed forward — the direct
+  evidence, but an internal log in a Colima-version-specific place and shape,
+  and a Docker Desktop teacher has none.
+- **The look before a start in `setup.sh` and `deploy.sh` too** — neither
+  serves; the look would give a scheduled publish a two-minute remake and a
+  new way to fail for a clash that cannot hurt it.
+- **A launcher line under `workspace was in use`** for the #310 remakes (the
+  plan's first proposal) — that event is written by the app from its own
+  marker and says a remake with nothing running writes nothing; the remakes
+  got their own mac-only event instead.
 - **No ceiling** — the refusal would be unreachable and untestable, and past
   block 99 the site ports sit on the first block's websockets.
 
@@ -1173,9 +1276,10 @@ sentence in the window and `PreviewReachability` never starts a wait.
 empty reply (52), a timeout (28), no curl at all (127), anything —
 because none of them proves the forward is missing, and #225's check after the
 build is still there behind it. A listener that is NOT the forwarder (another
-program took the port after the workspace was made) also goes ahead; **do not
-tighten this to require a real page**: nothing is served before the build, so
-that would refuse every healthy Mac.
+program took the port after the workspace was made) answers too, so this
+check cannot see it; since #310 the look below asks whose the listener is.
+**Do not tighten this to require a real page**: nothing is served before the
+build, so that would refuse every healthy Mac.
 
 **Why a connection and not `lsof`.** Measured on the development Mac
 (Apple silicon, Colima vz aarch64, 2026-09-25): curl to a forwarded port with
@@ -1184,7 +1288,9 @@ nothing inside answers 52 in 0.01–0.03 s; to a port nothing listens on, 7 in
 the teacher sees only the teacher's own programs: a root-owned listener (:88,
 `kdc`) is invisible to it and answers curl. A forwarder owned by anybody else
 would read as missing and refuse a healthy Mac. All 48 host ports published by
-six running workspaces had a listener. `-q` comes first so the teacher's
+six running workspaces had a listener. (Since #310 `lsof` is asked below, but
+only for which listeners are THIS account's own, under an engine whose
+forwarder always is.) `-q` comes first so the teacher's
 `~/.curlrc` is never read, and `--noproxy '*'` so a proxy setting cannot
 answer for this Mac.
 
@@ -1243,6 +1349,83 @@ both go ahead.
 there is no forward to lose. If a preview there ever sits behind a forward
 (WSL2's relay has the same failure class), probe with a CONNECTION, not a
 listener list.
+
+#### Before building, preview.sh makes sure the address is this account's own (#310)
+
+Right after the reach check passes, and before anything is announced or
+built, `announce_the_preview_address` asks `held_by_someone_else <host port>`
+— under Colima only (`the_engine_forwards_from_this_account`, the same gate
+the look before a start uses). It reads ONE kernel list (`netstat -an -p
+tcp`) and ONE list of this account's listeners (`lsof`), and the address is
+somebody else's when **the kernel has more listening sockets on that port
+than this account owns**, and this account's list is not empty. On a healthy
+Colima Mac the counts are equal: the forward is this account's own `ssh`
+(measured). The cases, with harness-readable fields, are
+`contracts/app-rules.json` → `previewPorts.whenAnotherAccountHasTheAddress.cases`;
+`scripts/test_preview_reach.py` → `WhoseAddressItIs` runs every one with
+`netstat`, `lsof`, `docker` and the remake stubbed as shell functions (the
+harness's PATH is the real one, so a program stub would let the real
+`netstat` in), and `scripts/test_port_blocks.py` →
+`TheLookBeforeTheAnnouncement` runs the real remake behind it.
+
+When it is somebody else's: the ♻️ lines, `remake_the_workspace`, and only
+after it RETURNS the marker
+`PLANTOIR_PREVIEW_ADDRESS_HELD: remade <port> <course>/<section>` (a remake
+#94 refuses exits inside it, so the trail gets #94's line and never a claim
+of a rebuild that did not happen) — so #94's look applies, and an open preview of
+another section from this folder refuses with #94's own sentence rather than
+being ended. The remade workspace's walk reads the kernel's list, so its new
+block is free when it is picked; the address is asked for, reached and
+looked at AGAIN. Still somebody else's: `whenAnotherAccountHasTheAddress
+.sentence`, the `refused` marker, exit 1 with nothing announced — #235's
+shape, so the app needs no change. **Never a second remake**: rebuilding in a
+loop against a listener that follows costs two minutes a turn and fixes
+nothing. The remade workspace skips the earlier "Preflight: checking Quartz
+sidebar anchor" look; it only warns, and the new workspace is made from the
+image that was just looked at.
+
+**Why counts, not "is one of them ours".** Colima's forward is IPv4 only
+(`[::1]` refused, measured). A listener on `::1` alone in another account
+sits BESIDE it — different family, no collision — and `localhost`, which the
+app opens, tries `::1` first. Measured with a same-account stand-in on
+18282: `curl http://localhost:18282/` reached the OTHER server, `curl
+http://127.0.0.1:18282/` ours, and `lsof` listed our forward on the port.
+Presence would have announced that address; counts catch it (two kernel
+rows, one of ours). Only the SITE port is looked at: a shadowed live-reload
+port costs only refresh, and #234 declined the same widening.
+
+**It fails OPEN, like the reach check.** Not Colima, no kernel row on the
+port, an unreadable kernel list, a missing `lsof`, or an EMPTY `lsof` list
+(this account always owns `limactl`'s listeners under Colima, so empty means
+`lsof` did not work) — each goes ahead as before #310. `DOCKER_HOST` naming
+anything outside `~/.colima/` or `$COLIMA_HOME` switches the look off (a `tcp://` address at the Colima VM itself is still Colima, and is read as not — a developer-only corner) and prints the
+`unchecked` marker once, so a developer's trail says the look was not made.
+
+**Where "which account" is not said.** The sentence names both things the
+check proves it could be — another account, or macOS itself — because the
+kernel shows a listener and this account owns none. Telling them apart would
+mean `netstat -v`'s `process:pid` column (it has moved between macOS
+releases) and then `ps -o user=`, which puts another person's username a step
+from this teacher's trail. Rejected.
+
+**The trail.** All four outcomes (`before-start`, `remade`, `refused`,
+`unchecked`) are one mac-only event, `preview address held by another
+account`, written by the APP from the marker (`PreviewAddressHeldReport`,
+read by `ScriptRunner` and hidden from the console by `TranscriptBuilder`), the
+same arrangement as `workspace was in use` and for the same reason: one
+writer for its words. A preview typed at the command line leaves the console
+sentence and no trail line. A scheduled publish never prints the marker.
+
+**No gate exercises this against a real second account** — nothing here can
+sign in as one. `verify.sh` runs only `--build-only` previews, which ask
+nothing. The acceptance is Russell's, in the rehearsal account: account 1
+previews and holds 8081; account 2 sets up and previews and must announce
+8091 and show ITS site. Then, for the look before a start: with account 2's
+workspace stopped (quit Plantoir there), account 1 opens a second folder so
+it listens on 8091, and account 2 previews again — expect the two ♻️ lines
+and a site on a new address, not account 1's. Until that is done, the
+other-account half rests on root as the stand-in (a different uid, which is
+all XNU compares).
 
 ### `deploy.sh`
 

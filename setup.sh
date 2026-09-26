@@ -795,12 +795,23 @@ build_image_if_missing
 # refusal below reachable, so it can be tested and its sentence stays true.
 #
 # A block is taken if ANY of its eight ports is
-#   - listening on this Mac, by anybody — one `lsof` listing, parsed once
-#     (0.12 s measured, against 0.123 s PER PORT for the old one-call-per-port
-#     probe: 9.8 s for forty blocks). Docker cannot see a program on the Mac
-#     holding a port and publishes over it anyway (measured: exit 0), so this
-#     is the only guard against another app. A listing that cannot be read
-#     counts as nothing listening, which is what the old probe did too.
+#   - listening on this Mac, in ANY account — the kernel's own list
+#     (`netstat -an -p tcp`, every owner: 0.01 s) joined to this account's
+#     (`lsof`, 0.06-0.12 s), each read once for all 320 ports rather than
+#     per port (0.123 s PER PORT for the old probe: 9.8 s for forty blocks).
+#     Until #310 it was `lsof` alone, which run as the teacher lists only the
+#     teacher's own programs: a second account on the same Mac was handed
+#     8081 while the first account's preview held it, its forward quietly
+#     failed to bind, and its Preview opened the other person's site
+#     (measured in the #204 rehearsal). Root's listeners (`kdc` on 88,
+#     screen sharing on 5900) are invisible to `lsof` for the same reason.
+#     Docker cannot see a program on the Mac holding a port and publishes
+#     over it anyway (measured: exit 0, and under Colima `docker port` still
+#     claims the port), so this is the only guard against another app. Only
+#     LISTEN rows count: a port in TIME_WAIT, a preview closed a minute ago,
+#     is free. Each listing fails open on its own, so a `netstat` whose
+#     columns change in some future macOS falls back to exactly the old
+#     `lsof` answer rather than to "nothing listening".
 #   - published by ANOTHER working folder's workspace, stopped ones included
 #     — one `docker inspect` over every teaching-quartz-* workspace. A stopped
 #     workspace listens on nothing, so without this a new folder would take
@@ -821,13 +832,132 @@ FIRST_HOST_BLOCK=8081
 HOST_BLOCK_STEP=10
 HOST_BLOCK_COUNT=40
 
-# Every TCP port something on this Mac is listening on, one per line. lsof
-# writes `n*:8081`, `n127.0.0.1:8443` and `n[::1]:8443`; the port is what
-# follows the LAST colon, whichever of the three it is. Prints nothing, and
-# still succeeds, when lsof is missing or fails.
-listening_ports_on_this_mac() {
+# Every TCP port something in ANY account on this Mac is listening on, one
+# line per listening socket, from the kernel's own list. netstat writes the
+# local address as `*.8081`, `127.0.0.1.8443`, `::1.8443` (a long IPv6
+# address is cut short, but its port is kept: measured), so the port is what
+# follows the LAST dot. Only LISTEN rows: TIME_WAIT and ESTABLISHED are not
+# a listener. Prints nothing, and still succeeds, when netstat is missing or
+# fails.
+ports_listening_in_every_account() {
+  { netstat -an -p tcp 2>/dev/null || true; } \
+    | awk '$NF == "LISTEN" { n = split($4, part, "."); if (part[n] ~ /^[0-9]+$/) print part[n] }'
+}
+
+# Every TCP port a program of THIS account is listening on, one line per
+# listening socket (per program holding it). lsof writes `n*:8081`,
+# `n127.0.0.1:8443` and `n[::1]:8443`; the port is what follows the LAST
+# colon, whichever of the three it is. Prints nothing, and still succeeds,
+# when lsof is missing or fails.
+ports_listening_in_this_account() {
   { lsof -nP -iTCP -sTCP:LISTEN -Fn 2>/dev/null || true; } \
     | sed -n 's/^n.*:\([0-9][0-9]*\)$/\1/p'
+}
+
+# Every TCP port something on this Mac is listening on: both lists, so that
+# either one failing leaves the other's answer (GitHub #310).
+listening_ports_on_this_mac() {
+  ports_listening_in_every_account
+  ports_listening_in_this_account
+}
+
+# ---- Whose address is it? (GitHub #310) ---------------------------------
+# Under Colima, a workspace's published port is forwarded by THIS account's
+# own `ssh` (measured: `ssh … russellgordon *:<port>`, and limactl's own
+# listeners beside it). When another account already holds the port, the
+# forward fails to bind and NOTHING a launcher reads says so: `docker run`
+# and `docker start` exit 0 and `docker port` names the port anyway
+# (measured, with root's screen sharing on 5900 standing in for another
+# account: XNU refuses a port shared across uids). So two checks look for
+# it themselves — before a stopped workspace is started, and before
+# preview.sh announces an address — and both are switched on only for the
+# engine whose forwarder was measured. Under Docker Desktop a start onto a
+# held port is already REFUSED ("Ports are not available", which
+# start_the_existing_workspace handles), and an engine nobody measured
+# must not pay a two-minute rebuild on a guess.
+#
+# DOCKER_HOST switches the checks off unless it points into ~/.colima/ (or
+# into $COLIMA_HOME, where a developer keeps Colima somewhere else):
+# with it set, `docker context show` says "default" whatever the engine is,
+# so the only honest reading of an unfamiliar DOCKER_HOST is "not the engine
+# that was measured". The app never sets it; a developer who does gets a
+# line saying the check was not made (see preview.sh), rather than a check
+# that silently stopped happening.
+the_docker_host_is_colimas() {
+  case "${DOCKER_HOST:-}" in
+    */.colima/*) return 0 ;;
+  esac
+  # A Colima kept somewhere else (COLIMA_HOME) keeps its sockets there.
+  if [ -n "${COLIMA_HOME:-}" ]; then
+    case "$DOCKER_HOST" in
+      *"${COLIMA_HOME%/}/"*) return 0 ;;
+    esac
+  fi
+  return 1
+}
+
+the_engine_forwards_from_this_account() {
+  local context
+  if [ -n "${DOCKER_HOST:-}" ]; then
+    the_docker_host_is_colimas
+    return
+  fi
+  context="$(docker context show 2>/dev/null)" || return 1
+  case "$context" in
+    colima|colima-*) return 0 ;;
+  esac
+  return 1
+}
+
+# Whether DOCKER_HOST names an engine other than Colima, so the checks
+# above are off for that reason and not because the engine is Docker
+# Desktop.
+a_different_engine_was_named_by_hand() {
+  if [ -z "${DOCKER_HOST:-}" ] || the_docker_host_is_colimas; then
+    return 1
+  fi
+  return 0
+}
+
+# The line the app reads onto the activity trail: contracts/shared-rules.json
+# -> activityTrail.mustRecord."preview address held by another account" ->
+# marker. Machinery, so the console a teacher reads leaves it out; the app
+# writes the trail line from it, as it does for PLANTOIR_WORKSPACE_IN_USE.
+# "<before-start|remade|refused|unchecked> <port> <where this run was for>".
+tell_the_app_the_address_was_held() {
+  echo "PLANTOIR_PREVIEW_ADDRESS_HELD: $1 $2 ${WORKSPACE_TRAIL_PLACE:-setup}"
+}
+
+# What the console says when this folder's workspace is made again on free
+# addresses because something else has its own: a Docker refusal at start,
+# a listener on a stopped workspace's port, or (preview.sh) a forward that
+# did not bind. Pinned in contracts/app-rules.json -> previewPorts
+# .hostBlockClash.saysWhenAStoppedWorkspaceIsRemade.
+say_this_folder_is_set_up_again_on_free_addresses() {
+  echo "♻️  Something else is now using this folder's preview addresses, so Plantoir is setting this folder up again on free ones."
+  echo "   The next preview will be slower than usual — about two minutes — while it gets ready."
+}
+
+# The first of this folder's own published ports that something on this Mac
+# is listening on, printed; fails when there is none. Asked only of a STOPPED
+# workspace, which listens on nothing itself: under Colima its forward is
+# gone 0.011 s after the stop returns and back 0.011 s after a start (5 of 5
+# each way, measured), so a listener on one of its ports is somebody else's.
+a_port_of_this_stopped_workspace_that_is_taken() {
+  local own busy port
+  own="$(docker inspect -f '{{range $p, $b := .HostConfig.PortBindings}}{{range $b}}{{.HostPort}} {{end}}{{end}}' "$CONTAINER_NAME" 2>/dev/null)" || return 1
+  busy=" $(listening_ports_on_this_mac | tr '\n' ' ') "
+  for port in $own; do
+    case "$port" in
+      ""|*[!0-9]*) continue ;;
+    esac
+    case "$busy" in
+      *" $port "*)
+        echo "$port"
+        return 0 ;;
+    esac
+  done
+  return 1
 }
 
 # Every host port published by another working folder's workspace, one per
@@ -987,8 +1117,43 @@ create_the_workspace_on_free_ports() {
 # own words: setup.sh and deploy.sh used to end on the bare `docker start`
 # under `set -e` with only those words, and preview.sh carried on past it and
 # failed later at a step that could not say why.
+#
+# Before the start, a run that will SERVE a preview (WORKSPACE_WILL_SERVE,
+# set by preview.sh alone) under Colima looks at the workspace's own ports
+# first (GitHub #310): Colima does NOT refuse a start onto a port another
+# account holds — it exits 0 and the forward silently fails — so a listener
+# on one of them means the same remake, done before the start rather than
+# after a refusal that never comes. setup.sh and deploy.sh never serve, so
+# a squatted forward costs them nothing and they do not pay a two-minute
+# remake for it (a publish at six in the morning keeps its warm builder).
+# The workspace is asked once more whether it is RUNNING before anything is
+# removed: another launcher for this folder may have started it a moment
+# ago, and the listener is then its own forward.
 start_the_existing_workspace() {
-  local output
+  local output taken
+  if [ "${WORKSPACE_WILL_SERVE:-}" = "yes" ] \
+    && the_engine_forwards_from_this_account \
+    && taken="$(a_port_of_this_stopped_workspace_that_is_taken)"; then
+    if docker ps --format '{{.Names}}' 2>/dev/null | grep -Fxq -- "$CONTAINER_NAME"; then
+      return 0
+    fi
+    say_this_folder_is_set_up_again_on_free_addresses
+    if docker rm "$CONTAINER_NAME" >/dev/null 2>&1; then
+      run_container_with_mount
+      # Only now: the trail line says the workspace WAS set up again, so it
+      # is never printed for a rebuild that did not happen (a refused
+      # remove, or another launcher's workspace used as it is).
+      tell_the_app_the_address_was_held before-start "$taken"
+      return 0
+    fi
+    # Refused: another launcher got here first and it is running again. Use it.
+    if docker ps --format '{{.Names}}' 2>/dev/null | grep -Fxq -- "$CONTAINER_NAME"; then
+      return 0
+    fi
+    # There was no start, so there are no engine's words to show.
+    echo "❌ Plantoir could not start this folder's workspace. Try again, or restart this Mac if it happens again."
+    exit 1
+  fi
   if output="$(docker start "$CONTAINER_NAME" 2>&1)"; then
     return 0
   fi
@@ -997,8 +1162,7 @@ start_the_existing_workspace() {
     echo "❌ Plantoir could not start this folder's workspace. Try again, or restart this Mac if it happens again."
     exit 1
   fi
-  echo "♻️  Something else is now using this folder's preview addresses, so Plantoir is setting this folder up again on free ones."
-  echo "   The next preview will be slower than usual — about two minutes — while it gets ready."
+  say_this_folder_is_set_up_again_on_free_addresses
   if docker rm "$CONTAINER_NAME" >/dev/null 2>&1; then
     run_container_with_mount
     return 0

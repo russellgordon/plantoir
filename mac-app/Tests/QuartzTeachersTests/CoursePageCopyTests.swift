@@ -349,6 +349,44 @@ final class CoursePageCopyTests: XCTestCase {
         )
     }
 
+    /// #294. A picture sized inside a table is written `![[one.png\|300]]`
+    /// (the pipe escaped so the cell does not end there). Its name is
+    /// `one.png`, so it is found and carried; and when it has to be renamed,
+    /// only the NAME changes — the backslash stays where the table needs it.
+    func testARenamedPictureInATableKeepsItsBackslash() async throws {
+        let built: Built = try buildPair(
+            pageText: "| Picture |\n|---|\n| ![[one.png\\|300]] |\n",
+            destinationMedia: [("one.png", "THEIRS")]
+        )
+        let outcome: CoursePageCopyOutcome = await CoursePageCopier.copying(
+            try XCTUnwrap(built.request)
+        )
+        XCTAssertEqual(outcome.pagesCreated, ["Recursion"])
+        XCTAssertEqual(outcome.renamed.count, 1, "The picture in the table was not carried")
+
+        let page: String = try String(
+            contentsOf: built.destination.directoryURL
+                .appendingPathComponent("Concepts/Recursion.md"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(
+            page.contains("| ![[one (from ICS4U-2025).png\\|300]] |"),
+            "The renamed picture lost its backslash or was not renamed:\n\(page)"
+        )
+    }
+
+    /// #294, called DIRECTLY rather than through a copy: a page shown inside
+    /// another is forced along even when it is unticked, and that is the only
+    /// place this reader matters — a copy would also reach the page through
+    /// the ordinary link reader, and pass with this one broken.
+    func testAPageShownInsideAnotherFromATableComesAlong() {
+        let text: String = "| ![[Note\\|x]] | ![[Other#Part A\\|y]] |\n![[Third]]\n"
+        XCTAssertEqual(
+            CoursePageCopySource.pagesEmbeddedIn(text),
+            ["note", "other", "third"]
+        )
+    }
+
     /// A copy that cannot be shown to be hidden is DELETED and reported as not
     /// copied.
     ///
