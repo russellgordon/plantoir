@@ -27,7 +27,7 @@
       },
       {
         "event": "working folder reopened",
-        "carries": "the working folder's path (redacted), which it was — the window's own folder or the last working folder — and, when a bookmark found it moved, the path it had been at",
+        "carries": "the working folder's path (redacted), which it was — the window's own folder, the last working folder, or (since #306, on the mac) the folder a clicked scheduled publish notification named, taken by a window that was choosing one — and, when a bookmark found it moved, the path it had been at",
         "why": "\"Plantoir opened the wrong folder\" and \"my courses are gone\" are both answered by knowing the APP reopened a folder rather than the teacher choosing one. Until #311 (2026-09-26) a restore left nothing on the mac trail, and on Windows it wrote \"working folder opened\", indistinguishable from a choice. The moved clause answers \"it's opening my old copy\". Written only by a window's model, once per window that reopens. A window opened BESIDE another (⌘N) inherits the key window's folder and writes nothing on either platform — it is neither a choice nor a reopen."
       },
       {
@@ -497,9 +497,9 @@
         "appliesOnWhy": "PERMANENT, the same case as 'workspace was in use': Windows' preview.ps1 serves on the PC itself, with no workspace and no forward to lose (app-rules.json -> previewPorts.whenAnotherAccountHasTheAddress.appliesOnWhy). Whether the Windows WALK sees another account's listeners is a separate question, asked in the windows issue from #310."
       },
       {
-        "carries": "the course and the section, and which of: told with a notification; not sent because notifications are turned off; not sent because permission was never given; could not be sent; and, when a teacher first schedules from the app, that the permission question was put and what the answer was. NEVER the notification's text.",
+        "carries": "the course and the section, and which of: told with a notification; not sent because notifications are turned off; not sent because permission was never given; could not be sent; and, when a teacher first schedules from the app, that the permission question was put and what the answer was. Since #306 (2026-09-26), also what a CLICK on the notification did: the section shown - in a window already on its working folder, in the window that was choosing a folder, or in a new window; the window brought forward and left as it was because it was in the middle of something; the working folder shown without the section because the section is no longer in it; or Plantoir only brought forward because the working folder is gone or the notification named no section. NEVER the notification's text, and never the working folder's path.",
         "event": "scheduled publish notification",
-        "why": "Added with #212. 'I never got told' is answerable only if the trail says whether the notification went out, or that notifications were off for the app — from the teacher's side a notification that was blocked and one that was never sent look identical. The question's own line is written BEFORE the answer, because a question that is ignored, or arrives under a Focus, may never be answered. See scheduledPublishStopped.notification."
+        "why": "Added with #212. 'I never got told' is answerable only if the trail says whether the notification went out, or that notifications were off for the app — from the teacher's side a notification that was blocked and one that was never sent look identical. The question's own line is written BEFORE the answer, because a question that is ignored, or arrives under a Focus, may never be answered. See scheduledPublishStopped.notification. 'I clicked it and nothing happened' (#306) is answered by the same line: each honest reason - the folder gone, the window busy, the section gone - has its own wording, and NO line at all means the click never reached this copy of the app (the launch line's bundle path says which copy a click started). See scheduledPublishStopped.notification.onClick."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty.",
@@ -1584,7 +1584,7 @@
     "clearedBy": "A scheduled run that got ALL the way through \u2014 every destination, exit zero \u2014 OR the teacher dismissing it. Both, and the second is a decision rather than a convenience: clearing only on a successful run leaves the message standing after somebody has already fixed the problem by hand, and the next scheduled run that would clear it could be a week away.",
     "trail": "One line per RUN, dated to when the RUN wrote its record rather than to when the app read it — or an overnight problem is filed under the morning somebody noticed it. There are FOUR events, and not one per kind: the three outcomes of a run that HAPPENED share three of them (activityTrail.mustRecord: scheduled publish needed an answer, did not finish, finished), and a build that stopped for a question files under the first, because a question going unasked is what happened and an event of its own would put a distinction on the trail that means nothing to the person reading it. A build that failed outright (buildDidNotFinish) files under the second, `scheduled publish did not finish`, for the same reason, with a line that names no destination because none was reached (added 2026-09-25, #137). The fourth belongs to the kind where the run did not happen at all: tooLateToRun writes `scheduled deploy turned off`, the same event and the same words a REMOVAL writes, because the same thing happened to the teacher's alarm and the reason is what differs. (This said THREE events until 2026-09-20.) The line carries the course, the section, and which destination stopped — or, for a run that got through, where it WENT. NEVER the question's own text: that comes from a launcher's console, and a line naming a credential prompt would put a teacher's own words on the trail. An earlier draft had the app note the line when a teacher opened the section and mark the record as noted; rewriting the record changed its modification date, which is what the notice shows, so the teacher saw the morning they looked rather than the half six the run stopped at — and a teacher who never opened that section, who is exactly the one who reports that their site did not update, got no line at all. WHO writes it is platform-local and cannot be otherwise: see platformDifferences.",
     "notification": {
-      "note": "Added 2026-09-25 with GitHub issue #212. A publish set for half six runs with nobody looking, and until this the only places it said how it went were the section's band and the sidebar's warning — both inside an app the teacher may not open before class. So when a run finishes, WHATEVER happened, the teacher is sent ONE system notification (a macOS notification; a toast on Windows) that waits for them in the system's own list. Its text is the section's own sentence (`sentences.<kind>`, filled in exactly as the band fills it) with nothing added — no title of the app's own, since the system heads it with the app's name and every sentence already begins with the course and the section, which is also what survives a banner cut short. A SUCCESS is announced too, every time: Russell's decision, 2026-09-25 — the band carries it and `attention` gives it no badge, so without the notification a success reaches nobody who has not opened that section. One notification per SECTION (per section PER WORKING FOLDER since #237 - scheduledDeployCancellation.oneAlarmPerWorkingFolder - so one folder's run never replaces, and its Dismiss never withdraws, another folder's), keyed so that a later run of the same section REPLACES it (a teacher is not handed last week's news beside this week's), and dismissing the section's band WITHDRAWS it, so the two never disagree about whether it is still news. The RUN never asks for permission — a question at half six is a question to nobody — and a run that may not post writes why on the trail instead. The question is put the first time a teacher schedules a publish from the app's own window or its own assistant, never from an outside assistant (which has no window to explain it) and never at launch (most teachers never schedule anything). How a runner plays the cases: with a stand-in for the system's notifications that records what it was asked, keeps what is on show by identifier (a post replaces, a withdraw removes), and never reaches the real system. A platform whose notifications need no prompt (Windows toasts) plays only the rows whose `permission` is `allowed` or `notAllowed`; the `notAskedYet` rows carry `onlyWhereThereIsAPrompt` and exist only where there is a question to ask. `trailSays` is the line after the course/section prefix the trail already puts on every line of this kind.",
+      "note": "Added 2026-09-25 with GitHub issue #212. A publish set for half six runs with nobody looking, and until this the only places it said how it went were the section's band and the sidebar's warning — both inside an app the teacher may not open before class. So when a run finishes, WHATEVER happened, the teacher is sent ONE system notification (a macOS notification; a toast on Windows) that waits for them in the system's own list. Its text is the section's own sentence (`sentences.<kind>`, filled in exactly as the band fills it) with nothing added — no title of the app's own, since the system heads it with the app's name and every sentence already begins with the course and the section, which is also what survives a banner cut short. A SUCCESS is announced too, every time: Russell's decision, 2026-09-25 — the band carries it and `attention` gives it no badge, so without the notification a success reaches nobody who has not opened that section. One notification per SECTION (per section PER WORKING FOLDER since #237 - scheduledDeployCancellation.oneAlarmPerWorkingFolder - so one folder's run never replaces, and its Dismiss never withdraws, another folder's), keyed so that a later run of the same section REPLACES it (a teacher is not handed last week's news beside this week's), and dismissing the section's band WITHDRAWS it, so the two never disagree about whether it is still news. The RUN never asks for permission — a question at half six is a question to nobody — and a run that may not post writes why on the trail instead. The question is put the first time a teacher schedules a publish from the app's own window or its own assistant, never from an outside assistant (which has no window to explain it) and never at launch (most teachers never schedule anything). How a runner plays the cases: with a stand-in for the system's notifications that records what it was asked, keeps what is on show by identifier (a post replaces, a withdraw removes), and never reaches the real system. A platform whose notifications need no prompt (Windows toasts) plays only the rows whose `permission` is `allowed` or `notAllowed`; the `notAskedYet` rows carry `onlyWhereThereIsAPrompt` and exist only where there is a question to ask. `trailSays` is the line after the course/section prefix the trail already puts on every line of this kind. What a CLICK on it does is `onClick` (#306).",
       "announcing": {
         "note": "Play each row once for EVERY key of `kinds` when `record` is `everyKind` (so a kind added later is covered without touching this list), and once with no record when it is `none`. Write the record, set the stand-in's permission, run the announcement, and check: whether a notification was posted, that its text is exactly the kind's sentence, whether permission was asked (never, from a run), and the trail line.",
         "cases": [
@@ -1835,13 +1835,367 @@
             ]
           }
         ]
+      },
+      "onClick": {
+        "note": "Added 2026-09-26 with GitHub #306. What a click on a scheduled publish's notification does. Until then a click only brought Plantoir forward on whatever it last showed. The notification now carries the working folder's path, the course and the section - how is each platform's own (the notification's userInfo on the mac, the toast's launch arguments on Windows); the identifier's folder id is a hash, so the path has to travel beside it. The path is never shown and never written on the trail.",
+        "rule": "Show THAT section, in a window on the working folder the run was for. Use a window already on that folder (the one nearest the front); else let a window with no folder take it; else open a NEW window on it. Never point a window that is on another working folder somewhere else. A window in the middle of something (a dialog in front of it, a course being renamed in place) is brought forward with its selection left alone. A folder that is gone, or a notification that names nothing, only brings the app forward. A section that is no longer in the folder is not guessed at. Clicking changes nothing else: the record and the band stay until the teacher dismisses the band.",
+        "howToRunACase": "Build the windows the case lists, FRONT TO BACK (`folder` is `this` = the notification's working folder, `other` = another working folder, `none` = the folder chooser; `busy` = a dialog is in front of it or a course is being renamed in place; `settled: false` = still finding its folder at launch). `launching: true` = the app has not shown its first window yet. `carries: false` = the notification names no section. `folderExists` and `sectionInFolder` describe the disk. Then decide, and check `expect.action` and `expect.window` (an index into `windows`, the one used or brought forward). Then play the same case through the real click-handling with real folders and check the rest: `selectsTheSection`, `opensAWindow`, `otherWindowsUnchanged` (every listed window keeps its folder and its selection), `recordStillThere`, and `trailSays` - the line after the course/section prefix the trail puts on this event (the no-section case has no prefix). A `wait` case is decided again when each window's folder becomes final, and has no line until then.",
+        "cases": [
+          {
+            "name": "a window is already on that folder",
+            "carries": true,
+            "folderExists": true,
+            "sectionInFolder": true,
+            "windows": [
+              {
+                "folder": "this"
+              }
+            ],
+            "expect": {
+              "action": "useWindow",
+              "window": 0,
+              "selectsTheSection": true,
+              "opensAWindow": false
+            },
+            "trailSays": "opened the section from its scheduled publish notification"
+          },
+          {
+            "name": "two windows on that folder: the one nearer the front is used",
+            "carries": true,
+            "folderExists": true,
+            "sectionInFolder": true,
+            "windows": [
+              {
+                "folder": "other"
+              },
+              {
+                "folder": "this"
+              },
+              {
+                "folder": "this"
+              }
+            ],
+            "expect": {
+              "action": "useWindow",
+              "window": 1,
+              "selectsTheSection": true,
+              "opensAWindow": false,
+              "otherWindowsUnchanged": true
+            },
+            "trailSays": "opened the section from its scheduled publish notification",
+            "why": "Windows are listed front to back, the order the teacher sees them in. Not 'the key window': when a notification is clicked Plantoir is not the active app, so no window of it is key."
+          },
+          {
+            "name": "the front window on that folder is busy, the next one is not",
+            "carries": true,
+            "folderExists": true,
+            "sectionInFolder": true,
+            "windows": [
+              {
+                "folder": "this",
+                "busy": true
+              },
+              {
+                "folder": "this"
+              }
+            ],
+            "expect": {
+              "action": "useWindow",
+              "window": 1,
+              "selectsTheSection": true,
+              "opensAWindow": false,
+              "otherWindowsUnchanged": true
+            },
+            "trailSays": "opened the section from its scheduled publish notification"
+          },
+          {
+            "name": "every window on that folder is busy",
+            "carries": true,
+            "folderExists": true,
+            "sectionInFolder": true,
+            "windows": [
+              {
+                "folder": "this",
+                "busy": true
+              }
+            ],
+            "expect": {
+              "action": "bringForwardOnly",
+              "window": 0,
+              "selectsTheSection": false,
+              "opensAWindow": false
+            },
+            "trailSays": "brought the working folder's window forward from a scheduled publish notification, and left it as it was because it was in the middle of something",
+            "why": "A selection change moves the keyboard, and a course being renamed in place commits whatever was typed when it loses focus (#293). A dialog in front of the window is the teacher's work too."
+          },
+          {
+            "name": "only windows on other folders: a new window, the others untouched",
+            "carries": true,
+            "folderExists": true,
+            "sectionInFolder": true,
+            "windows": [
+              {
+                "folder": "other"
+              }
+            ],
+            "expect": {
+              "action": "openNewWindow",
+              "selectsTheSection": true,
+              "opensAWindow": true,
+              "otherWindowsUnchanged": true
+            },
+            "trailSays": "opened the section from its scheduled publish notification, in a new window",
+            "why": "Pointing the teacher's window at another folder would let go of everything it shows (workingFolderSelection) for a click about something else."
+          },
+          {
+            "name": "the only window is choosing a folder",
+            "carries": true,
+            "folderExists": true,
+            "sectionInFolder": true,
+            "windows": [
+              {
+                "folder": "none"
+              }
+            ],
+            "expect": {
+              "action": "adoptInto",
+              "window": 0,
+              "selectsTheSection": true,
+              "opensAWindow": false
+            },
+            "trailSays": "opened the section from its scheduled publish notification, in the window that was choosing a working folder",
+            "why": "A window showing the folder chooser holds nobody's work. This is a launch with nothing to reopen."
+          },
+          {
+            "name": "the window choosing a folder has a dialog up",
+            "carries": true,
+            "folderExists": true,
+            "sectionInFolder": true,
+            "windows": [
+              {
+                "folder": "none",
+                "busy": true
+              }
+            ],
+            "expect": {
+              "action": "openNewWindow",
+              "selectsTheSection": true,
+              "opensAWindow": true,
+              "otherWindowsUnchanged": true
+            },
+            "trailSays": "opened the section from its scheduled publish notification, in a new window",
+            "why": "The new-course wizard is a dialog on a window with no folder yet; the folder is not changed underneath it."
+          },
+          {
+            "name": "no windows open",
+            "carries": true,
+            "folderExists": true,
+            "sectionInFolder": true,
+            "windows": [],
+            "expect": {
+              "action": "openNewWindow",
+              "selectsTheSection": true,
+              "opensAWindow": true
+            },
+            "trailSays": "opened the section from its scheduled publish notification, in a new window"
+          },
+          {
+            "name": "the app is still opening its first window",
+            "appliesOn": [
+              "mac"
+            ],
+            "carries": true,
+            "folderExists": true,
+            "sectionInFolder": true,
+            "launching": true,
+            "windows": [],
+            "expect": {
+              "action": "wait"
+            },
+            "why": "A click that launches Plantoir can arrive before its first window exists. Deciding then would open a second window beside the one launch is about to show."
+          },
+          {
+            "name": "a window is still finding its folder at launch",
+            "appliesOn": [
+              "mac"
+            ],
+            "carries": true,
+            "folderExists": true,
+            "sectionInFolder": true,
+            "windows": [
+              {
+                "folder": "none",
+                "settled": false
+              }
+            ],
+            "expect": {
+              "action": "wait"
+            },
+            "why": "A restored window takes its remembered folder a moment after it appears; deciding before then would put the section's folder in a window about to be given another. Decided again the moment each window's folder is final - an event, never a timer."
+          },
+          {
+            "name": "one window is on that folder, another is still finding its own",
+            "appliesOn": [
+              "mac"
+            ],
+            "carries": true,
+            "folderExists": true,
+            "sectionInFolder": true,
+            "windows": [
+              {
+                "folder": "this"
+              },
+              {
+                "folder": "none",
+                "settled": false
+              }
+            ],
+            "expect": {
+              "action": "wait"
+            },
+            "why": "The window still deciding may be the one in front once it has decided; nothing is chosen until every window has."
+          },
+          {
+            "name": "the working folder is gone",
+            "carries": true,
+            "folderExists": false,
+            "windows": [
+              {
+                "folder": "other"
+              }
+            ],
+            "expect": {
+              "action": "bringForwardOnly",
+              "selectsTheSection": false,
+              "opensAWindow": false,
+              "otherWindowsUnchanged": true
+            },
+            "trailSays": "a scheduled publish notification was clicked, but its working folder is no longer where it was, so Plantoir was only brought forward",
+            "why": "The notification already said how the publish went; a window on a folder that is not there would say nothing more. Nothing is said on screen."
+          },
+          {
+            "name": "the section is no longer in that folder",
+            "carries": true,
+            "folderExists": true,
+            "sectionInFolder": false,
+            "windows": [
+              {
+                "folder": "this"
+              }
+            ],
+            "expect": {
+              "action": "useWindow",
+              "window": 0,
+              "selectsTheSection": false,
+              "opensAWindow": false
+            },
+            "trailSays": "showed the working folder from a scheduled publish notification; that section is no longer in it",
+            "why": "The course was renamed, or the section archived or removed. Not guessed at: selecting the course instead would be a guess (workingFolderSelection)."
+          },
+          {
+            "name": "the section is no longer in that folder, and no window is on it",
+            "carries": true,
+            "folderExists": true,
+            "sectionInFolder": false,
+            "windows": [
+              {
+                "folder": "other"
+              }
+            ],
+            "expect": {
+              "action": "openNewWindow",
+              "selectsTheSection": false,
+              "opensAWindow": true,
+              "otherWindowsUnchanged": true
+            },
+            "trailSays": "showed the working folder from a scheduled publish notification; that section is no longer in it"
+          },
+          {
+            "name": "the notification names no section",
+            "carries": false,
+            "windows": [
+              {
+                "folder": "this"
+              }
+            ],
+            "expect": {
+              "action": "bringForwardOnly",
+              "selectsTheSection": false,
+              "opensAWindow": false
+            },
+            "trailSays": "a scheduled publish notification was clicked, but it did not say which section it was about",
+            "why": "Posted by a build from before #306 - only ever a development build, since #212 had not shipped. The only line with no course and section in front of it."
+          },
+          {
+            "name": "clicking leaves the record and the band",
+            "carries": true,
+            "folderExists": true,
+            "sectionInFolder": true,
+            "windows": [
+              {
+                "folder": "this"
+              }
+            ],
+            "expect": {
+              "action": "useWindow",
+              "window": 0,
+              "selectsTheSection": true,
+              "opensAWindow": false,
+              "recordStillThere": true
+            },
+            "trailSays": "opened the section from its scheduled publish notification",
+            "why": "Dismiss is the teacher's act on the band; the click is how they get there."
+          }
+        ],
+        "rejected": [
+          {
+            "instead": "Point the window in front at the notification's working folder.",
+            "why": "It lets go of everything that window shows (workingFolderSelection) - a preview being watched, a question waiting for an answer - for a click the teacher made about something else. A window on another working folder is never pointed elsewhere."
+          },
+          {
+            "instead": "Always open a new window.",
+            "why": "With the folder already open it makes a second window on one folder for no reason - the shape #265 had to make safe, not one to manufacture."
+          },
+          {
+            "instead": "Reuse the assistant's way of showing a section (revealSectionOnScreen on the mac).",
+            "why": "It waits for the window and the section by polling on a timer, and a window it opens first shows the key window's folder and then switches. The router answers at the event where a window's folder is final instead."
+          },
+          {
+            "instead": "Wait for the launch windows with a fixed delay.",
+            "why": "A delay long enough today is too short on a slower machine. Each window's folder becoming final is already an event (#311's one decision per window); the click is decided there."
+          },
+          {
+            "instead": "Say something on screen when the working folder is gone.",
+            "why": "The notification already said how the publish went, and a gone folder at launch is already said by reopeningTheLastWorkingFolder's own sentence. A second sentence for the same fact is a second thing to keep in step."
+          },
+          {
+            "instead": "Clear the record, or withdraw the notification, on the click.",
+            "why": "Dismiss is the teacher's act on the band, and the record is what the band and the sidebar's warning read. The system taking the clicked notification out of its list is the system's own doing."
+          },
+          {
+            "instead": "Buttons on the notification ('Open section', 'Dismiss').",
+            "why": "They need a category registered by the run, hide behind Options on a banner, and a Dismiss there would clear a record the teacher has not read in the app. The plain click is what teachers do."
+          },
+          {
+            "instead": "A link the notification opens (a plantoir:// address).",
+            "why": "A notification opens no address on its own without the app's code anyway, and an address scheme is a door any web page can knock on."
+          },
+          {
+            "instead": "Select the course when the section is gone, or recover the section from the notification's identifier.",
+            "why": "The first is a guess. The second cannot work: the identifier ends with the working folder's id, which is a hash and names no path."
+          },
+          {
+            "instead": "A new trail event for the click.",
+            "why": "It is the same notification and the same story; `scheduled publish notification` carries it, and a second name would split one story across two events."
+          }
+        ]
       }
     },
     "platformDifferences": {
       "asOf": "2026-09-25",
       "windows": "Records every outcome of a run that HAPPENED \u2014 neededAnAnswer, buildNeededAnAnswer, didNotFinish and succeeded \u2014 and lets the teacher dismiss it, both since 2026-09-09 (GitHub issue #130); ScheduledPublishOutcome, plus the readout in SectionDetailView. It has NOT got the three kinds added on the mac since: tooLateToRun (2026-09-20, owed only if their task runs a missed start late \u2014 see that kind), courseWasBusy (2026-09-25, #156, owed once their scheduled publish reads leases) and buildDidNotFinish (2026-09-25, #137). A build that fails outright there is recorded as didNotFinish with every configured destination joined, which is the shape #137 replaced.",
       "mac": "Every kind above, and dismissible. Russell decided on 2026-09-09 that a teacher should learn their overnight publish did not happen whatever the reason, because the SILENCE is the complaint rather than the cause, and that landed on both platforms the same day. buildDidNotFinish landed here 2026-09-25 (#137). A section scheduled BEFORE that keeps the wrapper it was given, so its one remaining run still records a failed build as didNotFinish and shows the old sentence once; that was accepted, as it was for #132.",
-      "owed": "By Windows: buildDidNotFinish, and whichKind.cases run against its own wrapper (#137); tooLateToRun and courseWasBusy on the conditions their kinds give. Nothing is owed by the mac. ONE difference remains and it is deliberate, because it cannot be otherwise: WHO writes the trail line. The mac's launchd agent runs Plantoir, so the RUN writes it as the trail key describes, while Windows' Task Scheduler runs plain PowerShell with no app process alive \u2014 so that side sweeps every record when the app next opens, dating each line from the record rather than from the reading. Writing it from the wrapper's own shell was REJECTED there: it would put the trail's line format in a second home, in generated PowerShell, where nothing tests it and the redaction rules do not reach. The property the contract actually asks for is kept either way \u2014 a teacher who never opens the failed section still gets the line, and that teacher is precisely the one who writes in to say their site did not update. ALSO owed by Windows since #212 (2026-09-25): the `notification` rules — every kind announced with its own sentence, one per section replaced by the next, withdrawn on dismissal, the run never asking, and `scheduled publish notification` on the trail. The rule is theirs to MATCH; the delivery is theirs to design, because their run is PowerShell under Task Scheduler with no app process, so a toast has to be attributed to Plantoir's own application identity, and a toast needs no permission prompt (so only the `allowed` and `notAllowed` rows apply there). Their trail lines for it are written the way their other scheduled-publish lines are, by the sweep when the app next opens."
+      "owed": "By Windows: buildDidNotFinish, and whichKind.cases run against its own wrapper (#137); tooLateToRun and courseWasBusy on the conditions their kinds give. Nothing is owed by the mac. ONE difference remains and it is deliberate, because it cannot be otherwise: WHO writes the trail line. The mac's launchd agent runs Plantoir, so the RUN writes it as the trail key describes, while Windows' Task Scheduler runs plain PowerShell with no app process alive \u2014 so that side sweeps every record when the app next opens, dating each line from the record rather than from the reading. Writing it from the wrapper's own shell was REJECTED there: it would put the trail's line format in a second home, in generated PowerShell, where nothing tests it and the redaction rules do not reach. The property the contract actually asks for is kept either way \u2014 a teacher who never opens the failed section still gets the line, and that teacher is precisely the one who writes in to say their site did not update. ALSO owed by Windows since #212 (2026-09-25): the `notification` rules — every kind announced with its own sentence, one per section replaced by the next, withdrawn on dismissal, the run never asking, and `scheduled publish notification` on the trail. The rule is theirs to MATCH; the delivery is theirs to design, because their run is PowerShell under Task Scheduler with no app process, so a toast has to be attributed to Plantoir's own application identity, and a toast needs no permission prompt (so only the `allowed` and `notAllowed` rows apply there). Their trail lines for it are written the way their other scheduled-publish lines are, by the sweep when the app next opens. ALSO owed by Windows since #306 (2026-09-26): `notification.onClick` - a click on the toast shows THAT section by the same rule, every case but the ones marked `appliesOn: [\"mac\"]`. Prerequisite: the toast itself (the #212 obligation above). The toast's launch arguments carry the working folder's path, the course and the section; a click on a toast of an unpackaged app can start a SECOND process, which must hand the arguments to the first."
     },
     "whereTheRecordLives": "Platform-local and deliberately NOT shared: %LOCALAPPDATA%\\Plantoir\\scheduled\\unanswered on Windows, ~/Library/Application Support/Plantoir/scheduled/stopped on the mac. What is shared is the BEHAVIOUR above; a path is not a rule. The mac's folder says `stopped` rather than `unanswered` because that side records more than unanswered questions; Windows records more than that too and KEPT the old name deliberately, because a task scheduled before 2026-09-09 points at a wrapper script already on disk that writes the old path, and nothing rewrites that wrapper until the section is scheduled again — so renaming buys a better name and costs a second directory read for ever, on pain of the first overnight run after an update going silent. The record says what it is on its own first line."
   },
