@@ -1089,9 +1089,11 @@ one cleaning left is of entries that cannot name a folder at all — null, a
 blank string, a non-string, an exact repeat — which only a hand edit writes
 and which the old path also removed (`saved_pool_without_malformed_entries`);
 every real name stays, including one with no folder behind it. Only a
-NEW course — no saved `course_config.json` at all — has its pool worked out
-from the payload or skeleton and reconciled against its folder lists by
-`graded_folders_for`. The contract is `contracts/shared-rules.json` →
+NEW course made on the command line — no saved `course_config.json` at all —
+has its pool worked out from the payload or skeleton and reconciled against
+its folder lists by `graded_folders_for`; a new course made in either app
+arrives with its pool already in the saved file, written by the wizard (see
+the #292 section below for what happened while one path did not). The contract is `contracts/shared-rules.json` →
 `gradedFolders.rerunningSetup`, eleven cases, run by
 `scripts/test_graded_folders_rerun.py`, which drives the real wizard in-process
 (`input` and `getch` replaced, every prompt answered with Return) — on the mac
@@ -1183,14 +1185,125 @@ behaviour rather than as a decision.
 
 ### Content declares its own pool
 
-All 38 payload manifests and all 50 skeleton families now carry
+All 39 payload manifests and all 50 skeleton families now carry
 `graded_folders`, and both linters refuse a manifest without one or one naming a
-folder the course does not have. `setup_course.py` writes it at creation from
-the manifest — shared Python, so both platforms get that unchanged.
+folder the course does not have. It reaches a NEW course by two routes, and they
+must write the same thing. On the command line `setup_course.py` writes it at
+creation from the manifest (`graded_folders_for`). In either app the WIZARD
+writes it — the payload's pool for a course taking ready-made pages, the
+skeleton's or the teacher's own ticks otherwise — into the `course_config.json`
+it creates before setup runs, because setup reads a saved file as answered and
+never works the pool out over one. That second half was missing for a
+pre-populated course until #292; see the next section.
 
 Declared rather than inferred deliberately: inference is a substring while the
 build matches exactly, and those two agree for 88 of the 89 courses here and
 disagree for the one that would have been broken by it.
+
+### A course made in either app from ready-made pages had no marks pool (#292)
+
+**The mechanism.** Both apps write `courses/<CODE>/course_config.json` FIRST
+and then run setup with no arguments (`NewCourseCreator.swift`;
+`NewCourseDialog` on Windows). `setup_course.py` decides the pool by whether a
+saved configuration EXISTS, not by whether the course is new: over a saved
+file it writes back a saved `graded_folders` (#192) and leaves the key ABSENT
+when the file had none; only with no saved file at all — a command-line run —
+does it call `graded_folders_for` on the manifest. And both wizards
+deliberately left the key out when the structure came from example content,
+believing setup would take the pool from the manifest. Windows' comment above
+`NewCourseDialog.BuildConfiguration` says so ("prefers a pool already present
+in the saved config over the manifest's"). That is half true: a saved pool does
+win, but a saved file WITHOUT one does not fall back to the manifest. So every
+pre-populated course either app made had no `graded_folders`, which reads as
+"never asked".
+
+**How long.** Two commits crossed on 2026-08-24. At 10:39 `11a70b7e` made a
+saved-config run stop deriving the pool (before it, `392bf357` wrote the
+manifest's pool on every run, the app's included). At 11:41 `e9d71d8d` made
+the wizard write the pool on every path EXCEPT a payload, on the old
+assumption. #192 did not touch this path.
+
+**Measured** (2026-09-26, the real `setup_course.setup_course` driven
+in-process): a command-line TAS2O or ADA1O with every prompt accepted is
+written `["Tasks"]`; the same run over the file the mac wizard wrote for ADA1O
+leaves the key absent; that file with `["Tasks"]` added keeps it.
+
+**What a teacher saw.** Not an empty Marks checklist, as the issue first said:
+with the key absent, Course Settings shows the inferred folders ticked. All 39
+payloads declare `["Tasks"]`, the historical rule infers the same from their
+lists, and the only "task" folder in any payload is `shared/Tasks`, so the
+build counted the same pages and no mark was missing. What differed:
+
+- the published Curriculum Coverage page said "any folder with “task” in its
+  name" where a command-line course said "**Tasks**"
+  (`build_site._graded_folders_in_words`);
+- the course stayed never-asked, so a later folder with "task" in its name was
+  counted automatically, renaming `Tasks` to a name without "task" silently
+  stopped counting it (`SpecialFolderRenamer` rewrites only a key that is
+  present), and removing `Tasks` left the key absent rather than writing `[]`;
+- a future payload whose pool is not `["Tasks"]` would have lost marks in the
+  apps while working on the command line.
+
+**What changed.** The app owns the answer, because it is the only party that
+knows the course is new. `ExampleContentCatalog.marksPool(fromManifest:)`
+mirrors `graded_folders_for` exactly as setup calls it for a payload: the
+shared folders without `Media` (and — on the command line only — without the
+curriculum folder when its pages are declined, which no payload's pool names,
+so the apps do not model that step), then the per-section ones; a declared name kept
+when it matches a folder exactly, respelled to the folder's spelling when it
+matches ignoring case, dropped otherwise; blanks, nulls, non-names and repeats
+dropped; a declared null or `[]` gives `[]`; inference only when the key is
+absent. `buildConfigurationDictionary` writes it when
+`takesExampleContent && hasContent` — so never for a club, which takes no
+ready-made pages. An unreadable manifest leaves the key absent, as before.
+`setup_course.py` did not change. Windows has the same gap and owes the same
+change (the `windows` issue for #292).
+
+One behaviour follows that is intended, not a regression: with the key now
+present, `removingAFolder` applies to a new payload course, so removing `Tasks`
+in Course Settings writes `[]` (with the coverage warning) instead of leaving
+the key absent — which is what a command-line course has always done.
+
+**REJECTED**, so they are not proposed again:
+
+- *A Python fix* that treats "the saved file is the only thing in the folder"
+  as a new course and derives the pool. Free for Windows, and that is its only
+  merit: it infers newness from disk state, which is wrong for a teacher who
+  deletes a course's pages and re-runs setup; it carves an exception into
+  `rerunningSetup` the day after it landed; and it makes two writers of one
+  answer, since the apps already write the pool on every other path.
+- *Dropping the wizard's guard and writing its own list.* The structure editors
+  are collapsed for a payload course, so that list is the wizard's default,
+  reconciled against the wizard's default folders rather than the payload's.
+  It happens to give `["Tasks"]` for all 39 today, which is exactly why it
+  would pass every literal test while being wrong — the contract's MCV4U case
+  with a hidden `["Tests"]` exists to catch it.
+- *Reusing `GradedFolderRule.reconciled`* (exact match) on the manifest's
+  pool. That reconciles a teacher's own ticks; this reproduces what the command
+  line writes, which matches ignoring case and infers when the key is absent.
+  The contract's respelling case is red for it on the mac and green in Python.
+- *Reading `SkeletonCatalog.adoptedGradedFolders`* — the wrong source, and it
+  reads a declared `[]` as "infer".
+
+**Not done: existing courses are not repaired.** A migration cannot tell such a
+course from a legacy course that was never asked, or from one where the
+teacher has since added "Performance Tasks", which the historical rule counts
+and a frozen `["Tasks"]` would not — the "Do not seed existing courses"
+argument above, again. Measured, no mark changes for any of them; what they
+keep is the unconfigured Coverage-page sentence and the rename edge, and the
+first tick in Course Settings → Marks makes the pool explicit, as it does for
+every legacy course.
+
+**Why the tests look the way they do.** Every shipped payload and the
+wizard's default say `["Tasks"]`, so any wrong source passes a literal case.
+What discriminates is the MCV4U case with a hidden `["Tests"]` (the wizard's
+own list leaks as `[]`; the mathematics skeleton's pool reads as `["Thinking
+Tasks", "Tasks"]`), the eight made-up `manifestCases`, and a club case whose
+own list is `["Exercises"]`. One mutation is honestly NOT caught on the command
+line: pointing setup at the skeleton instead of the payload stays green there,
+because `graded_folders_for` reconciles any declared pool against the
+PAYLOAD's folders and no payload has "Thinking Tasks". The mac catches it,
+because nothing there reconciles the skeleton's list against the payload's.
 
 ### Where the rules live
 
@@ -1199,8 +1312,12 @@ COUNT, run by `scripts/test_graded_folders.py` in the image — neither app
 implements that rule, so neither suite runs them), `gradedFolders.choices`
 (14 cases for what the checklist OFFERS, run by both apps) and
 `gradedFolders.rerunningSetup` (11 cases for what a re-run of setup writes back,
-run by `scripts/test_graded_folders_rerun.py`). The key itself is in
-`contracts/file-formats.json`.
+run by `scripts/test_graded_folders_rerun.py`) and `gradedFolders.newCourse`
+(6 cases and 8 `manifestCases` for the pool a NEW course is written, #292 — run
+by the mac's `WizardStructureTests` and `ExampleContentContractTests`, and on
+the command line by `scripts/test_graded_folders_new_course.py`, which Windows'
+`PythonToolchainTests` discovers; Windows owes the app half). The key itself is
+in `contracts/file-formats.json`.
 
 ## “Where do the class pages live?” had four answers
 
