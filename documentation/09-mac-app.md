@@ -139,6 +139,20 @@ sentence needs about one line per character.
 | 2026-09-05 | the synced-folder notice (`CloudSyncNoticeView`) | 1,548 points, and the same 1,548 whether 700 points or nothing was proposed | the `fixedSize` deleted; `CloudSyncNoticeLayoutTests` written |
 | 2026-09-19 | the folder-publish Done panel and the scheduled-publish notice (issue #211) | **1,980**, **3,100** and **1,372** points | the `fixedSize` deleted; seven cases added to `ProgressViewSizeTests` |
 
+**A fifth was caught before it reached a teacher**, 2026-09-26: the line that
+says Course Settings has unsaved changes, so the preview uses the saved ones
+(`SpecialNames.previewUsesSavedSettings`, #265), sat in the detail column
+above the site's stack with `.fixedSize(horizontal: false, vertical: true)` on
+its sentence. Squeezed it claimed **1,337** points; in a real
+`NavigationSplitView` window at the 900 × 600 minimum (a standalone replica,
+not Plantoir itself) the area under it where the site sits was laid out
+**1,305** points tall inside a 600-point window, against 525 without the
+modifier. Found by the #213 planner, fixed in the same piece: the notice is its
+own view, `UnsavedSettingsNoticeView`, with no `fixedSize`, and
+`UnsavedSettingsNoticeLayoutTests` pins the squeeze, the wrapping and — read
+from the source, since `SectionDetailView` cannot be mounted in a unit test —
+that nothing in `SectionDetailView.swift` is `.fixedSize(` at all.
+
 The fourth is the one to learn from, because the third had already produced a
 rule, a comment and a test file, and the fault still shipped twice more in the
 same window. The comment lived on the view it was written for; the test file

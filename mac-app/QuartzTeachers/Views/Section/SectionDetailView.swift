@@ -250,18 +250,8 @@ struct SectionDetailView: View {
                 )
             }
             if let unsavedSettingsNotice {
-                HStack(alignment: .firstTextBaseline) {
-                    Image(systemName: "info.circle")
-                        .foregroundStyle(.secondary)
-                    Text(unsavedSettingsNotice)
-                        .font(.callout)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Spacer()
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .accessibilityIdentifier("previewUsesSavedSettingsNotice")
-                Divider()
+                // Its own view, and never `fixedSize` — see the view.
+                UnsavedSettingsNoticeView(sentence: unsavedSettingsNotice)
             }
             ZStack {
                 // Base layer: always laid out in the normal, safe-area
