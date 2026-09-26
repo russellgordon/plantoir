@@ -15,9 +15,33 @@
 // browser window was bigger than the harness's.
 //
 // Usage: swift windowid.swift "Safari" [x y width height]
+//        swift windowid.swift --list "Notification Center"
+//
+// `--list` prints EVERY on-screen window of that owner, any layer, one per
+// line as "number x y width height layer". It exists for the notification
+// banner (capture.py, the notification-banner scene): a banner is not a
+// layer-0 window and its bounds are not known in advance, so it is found by
+// polling this list for a window that was not there a moment ago.
 
 import CoreGraphics
 import Foundation
+
+if CommandLine.arguments.count == 3 && CommandLine.arguments[1] == "--list" {
+    let listedOwner: String = CommandLine.arguments[2]
+    let everything = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] ?? []
+    for window in everything {
+        guard let name = window[kCGWindowOwnerName as String] as? String, name == listedOwner,
+              let number = window[kCGWindowNumber as String] as? Int,
+              let bounds = window[kCGWindowBounds as String] as? [String: Any],
+              let x = bounds["X"] as? Double, let y = bounds["Y"] as? Double,
+              let width = bounds["Width"] as? Double, let height = bounds["Height"] as? Double else {
+            continue
+        }
+        let layer: Int = window[kCGWindowLayer as String] as? Int ?? 0
+        print("\(number) \(Int(x)) \(Int(y)) \(Int(width)) \(Int(height)) \(layer)")
+    }
+    exit(0)
+}
 
 let owner = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "Safari"
 

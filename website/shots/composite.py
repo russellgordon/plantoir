@@ -214,3 +214,64 @@ def diagonal_hero(
     canvas.save(destination.with_suffix(".webp"), format="WEBP", quality=88, method=6)
     return destination
 
+
+
+# ---------- Per-appearance composites (v1.4.0 scenes) ----------
+#
+# These are ordinary light/dark PAIRS once assembled — `build.py` serves them
+# like any window shot — built from parts the scenes photograph once per
+# appearance. Each part is a real `screencapture -l` of a real window; the
+# composite only places them, it never paints over one.
+
+
+def pair_of_windows(sources: list[Path], destination: Path, gap: int = 40) -> Path:
+    """Two window captures side by side, tops aligned, same height.
+
+    Unlike `side_by_side` nothing is cropped: these are app windows, whose
+    title bars are part of the picture, not a browser's chrome.
+    """
+    cards: list[Image.Image] = []
+    for path in sources:
+        with Image.open(path) as opened:
+            cards.append(opened.convert("RGBA"))
+    height = min(card.height for card in cards)
+    scaled: list[Image.Image] = []
+    for card in cards:
+        if card.height != height:
+            card = card.resize((round(card.width * height / card.height), height), Image.LANCZOS)
+        scaled.append(card)
+    total = sum(card.width for card in scaled) + gap * (len(scaled) - 1)
+    canvas = Image.new("RGBA", (total, height), (0, 0, 0, 0))
+    offset = 0
+    for card in scaled:
+        canvas.alpha_composite(card, (offset, 0))
+        offset += card.width + gap
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    canvas.save(destination, format="PNG", optimize=True)
+    return destination
+
+
+def banner_over_window(window: Path, banner: Path, destination: Path, margin_fraction: float = 0.012) -> Path:
+    """A notification banner laid over a window's top-right corner.
+
+    macOS draws the banner at the top right of the SCREEN; placing it at the
+    window's top right keeps the figure the size of the window while reading
+    the way a teacher sees it. Both parts keep their own transparent corners.
+    """
+    with Image.open(window) as opened:
+        base = opened.convert("RGBA")
+    with Image.open(banner) as opened:
+        card = opened.convert("RGBA")
+    widest = round(base.width * 0.42)
+    if card.width > widest:
+        card = card.resize((widest, round(card.height * widest / card.width)), Image.LANCZOS)
+    margin = max(8, round(base.width * margin_fraction))
+    # Room above the window for the banner to sit partly outside it, so it
+    # reads as something on top of the window rather than part of it.
+    lift = round(card.height * 0.35)
+    canvas = Image.new("RGBA", (base.width, base.height + lift), (0, 0, 0, 0))
+    canvas.alpha_composite(base, (0, lift))
+    canvas.alpha_composite(card, (base.width - card.width - margin, 0))
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    canvas.save(destination, format="PNG", optimize=True)
+    return destination

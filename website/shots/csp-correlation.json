@@ -228,7 +228,7 @@
         "CRD-1.C"
       ],
       "reason": "Students try unexpected inputs on a classmate's program, record what they expected against what happened, and hand over findings respectfully.",
-      "evidence": "What I typed | What I expected | What happened"
+      "evidence": "For every break, fill out a bug card"
     },
     {
       "page": "Explorations/The Client Interview",
@@ -303,7 +303,7 @@
         "AAP-2.O"
       ],
       "reason": "Students work with a program whose comments record a deliberate decision not to store borrowers' names, and loop over the saved lines to report and count them.",
-      "evidence": "The file holds TITLES and a number of days — never who borrowed what."
+      "evidence": "never who borrowed what. That is a decision, taken"
     },
     {
       "page": "Programs/Talking to the User",

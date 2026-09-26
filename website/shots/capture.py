@@ -7,12 +7,23 @@ Run it from the top of the repository::
     python3 website/shots/capture.py --app      # just the app windows
     python3 website/shots/capture.py --sites    # just the class websites
 
+    # The v1.4.0 scenes, in the kept marketing folder (~/Plantoir Marketing):
+    python3 website/shots/capture.py --provision          # make or reuse the folder
+    python3 website/shots/capture.py --scenes             # all eleven scenes
+    python3 website/shots/capture.py --only reference     # one scene (or several, a,b)
+    python3 website/shots/capture.py --dry-run            # prove every scene can be set up
+
+See website/README.md, "Regenerating every image", and scenes.py.
+
 What it does, in order:
 
-1. **Provisions a demo working folder** (``~/Teaching`` by default) by driving
-   the app's own new-course panel for ENG2D, MCV4U and SCH3U -- three subjects
-   chosen so the class sites between them show prose, typeset mathematics and
-   chemistry. Skipped when the courses are already there.
+1. **Provisions a demo working folder** (``~/Desktop/Teaching`` by default,
+   ``--provision-demo``) by driving the app's own new-course panel for ENG2D,
+   MCV4U and SCH3U -- three subjects chosen so the class sites between them
+   show prose, typeset mathematics and chemistry. Skipped when the courses are
+   already there. (Until v1.4.0 this step only wrote launchers and site
+   markers and never ran the course-making test, although this docstring said
+   it did; it runs it now.)
 2. **Builds and publishes** each of those sections, so the address bar in a
    screenshot reads like a real class site rather than like localhost.
 3. **Photographs the app** by running the marketing UI tests, once with the
@@ -49,6 +60,7 @@ from images import (  # noqa: E402
 )
 from composite import fan, side_by_side, diagonal_hero, FIGURE_WIDTH    # noqa: E402
 from safari import SafariWindow, verify_appearance, verify_address_bar  # noqa: E402
+import scenes as scene_book  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent.parent
 WEBSITE = REPO / "website"
@@ -62,6 +74,9 @@ APP_BUNDLE_DEFAULTS_DOMAIN = "ca.russellgordon.Plantoir"
 # Mac now holds REAL courses (ADA1O, MCR3U), and a default pointing there
 # would provision demo courses into a teacher's actual working folder.
 DEFAULT_WORKSPACE = Path.home() / "Desktop" / "Teaching"
+
+# The kept marketing folder the v1.4.0 scenes are taken in (marketing_folder.py).
+MARKETING_FOLDER = Path.home() / "Plantoir Marketing"
 
 # The courses the marketing shots are taken from, and the Netlify site each is
 # published to. The naming scheme is per-SECTION — <code>-s<n>-2026-gordon —
@@ -270,8 +285,12 @@ def run_ui_test(test_identifier: str, workspace: Path, label: str,
     return bundle
 
 
-def export_attachments(bundle: Path, suffix: str) -> list[str]:
-    """Copy a result bundle's screenshots into site/img/<name>-<suffix>.png."""
+def export_attachments(bundle: Path, suffix: str, parts: set[str] | None = None) -> list[str]:
+    """Copy a result bundle's screenshots into site/img/<name>-<suffix>.png.
+
+    A name in ``parts`` is a piece of a composite, not a picture a page shows,
+    so it goes to the scratch parts folder instead.
+    """
     exported = SCRATCH / f"{bundle.stem}-attachments"
     if exported.exists():
         shutil.rmtree(exported)
@@ -297,6 +316,9 @@ def export_attachments(bundle: Path, suffix: str) -> list[str]:
                 continue
             source = exported / attachment["exportedFileName"]
             destination = IMAGE_DIR / f"{shot_name}-{suffix}.png"
+            if parts and shot_name in parts:
+                PARTS.mkdir(parents=True, exist_ok=True)
+                destination = PARTS / f"{shot_name}-{suffix}.png"
             shutil.copy2(source, destination)
             # No corner masking: the attachment came from `screencapture -l`,
             # which hands back the real curve with the corners already
@@ -421,10 +443,27 @@ def ensure_launchers(workspace: Path) -> None:
 
 
 def provision(workspace: Path) -> None:
+    """The demo folder (hero and class-site shots): launchers, the build
+    recipe, the three courses THROUGH THE APP, and the live sites' markers.
+
+    Idempotent: a course already there is not made again (the UI test skips
+    it), and a marker already there is not rewritten.
+    """
     announce(f"Provisioning the demo courses in {workspace}")
     workspace.mkdir(parents=True, exist_ok=True)
     ensure_launchers(workspace)
     mirror_toolchain(workspace)
+
+    missing: list[str] = []
+    for course in DEMO_COURSES:
+        if not workspace_has_course(workspace, course["code"]):
+            missing.append(course["code"])
+    if missing:
+        print(f"   Making {', '.join(missing)} through the app's own new-course panel…")
+        run_ui_test("QuartzTeachersUITests/DemoWorkspaceProvisioning/testCreateDemoCourses",
+                    workspace, "provision-demo")
+    else:
+        print("   ENG2D, MCV4U and SCH3U are already there.")
 
     for course in DEMO_COURSES:
         marker_dir = workspace / "courses" / course["code"] / ".netlify_sites"
@@ -967,16 +1006,257 @@ def preflight_permissions() -> None:
         print("   Both permissions are in place.")
 
 
+# ---------- The v1.4.0 scenes, in the kept marketing folder ----------
+
+def ced_on_this_mac(folder: Path) -> Path | None:
+    """The Course and Exam Description, if it is already on this Mac."""
+    codes = json.loads((Path(__file__).resolve().parent / "marketing" / "csp-codes.json").read_text(encoding="utf-8"))
+    candidates: list[Path] = []
+    if os.environ.get("PLANTOIR_CED_PDF"):
+        candidates.append(Path(os.environ["PLANTOIR_CED_PDF"]))
+    candidates.append(folder / ".sources" / codes["source"]["fileName"])
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def provision_marketing(folder: Path) -> int:
+    """Make the kept marketing folder when it is absent; reuse it when present.
+
+    In order, each step saying "made" or "already there":
+    the launchers and build recipe; ICS3U (1, 2) and ICS4U (1) through the
+    app; the College Board pages from the public document (fetched once into
+    .sources/, hash-checked); the correlation's embeds, How I Teach and the
+    folder destination (marketing_folder.py); and a reference copy of ICS3U
+    for 2025–26, through the app. Declaring the second curriculum is NOT here:
+    the curriculum-settings scene does it through Course Settings, because
+    that is the picture.
+    """
+    import marketing_folder
+    import college_board
+
+    announce(f"Setting up the marketing folder, {folder}")
+    marketing_folder.refuse_foreign_courses(folder)
+    folder.mkdir(parents=True, exist_ok=True)
+    ensure_launchers(folder)
+    mirror_toolchain(folder)
+
+    missing: list[str] = []
+    for course in marketing_folder.COURSES:
+        if not workspace_has_course(folder, course["code"]):
+            missing.append(course["code"])
+    if missing:
+        print(f"   Making {', '.join(missing)} through the app's new-course panel, from the ready-made content…")
+        run_ui_test(f"{scene_book.PROVISIONING_CLASS}/testCreateMarketingCourses", folder, "provision-marketing")
+    else:
+        print("   ICS3U and ICS4U are already there.")
+
+    sources = folder / ".sources"
+    try:
+        pdf = college_board.fetch_ced(sources)
+    except college_board.SourceChanged as changed:
+        print(f"   ✗ {changed}", file=sys.stderr)
+        return 1
+    extraction = college_board.build_pages(pdf, overrides=sources / college_board.OVERRIDES_NAME)
+    for problem in extraction.problems:
+        print(f"   ✗ {problem}", file=sys.stderr)
+    if extraction.problems:
+        print("   The College Board pages were not written: the document's copies disagree somewhere above. "
+              "Read those, then record a ruling in marketing/csp-codes.json -> whereCopiesDiffer.", file=sys.stderr)
+        return 1
+    if extraction.needs_a_person:
+        drafts = sources / college_board.DRAFTS_NAME
+        drafts.mkdir(parents=True, exist_ok=True)
+        for code, draft in extraction.needs_a_person.items():
+            path = drafts / f"{code}.md"
+            if not path.exists():
+                path.write_text(draft, encoding="utf-8")
+        print(f"   {len(extraction.needs_a_person)} learning objectives quote drawn code and need a person: "
+              f"{', '.join(sorted(extraction.needs_a_person))}.\n"
+              f"   Drafts are in {drafts}; set each out from the document and save it in "
+              f"{sources / college_board.OVERRIDES_NAME}, then run --provision again.")
+
+    report = marketing_folder.apply_file_steps(folder, extraction.pages)
+    print(f"   {marketing_folder.summary(report)}")
+
+    if not any(True for _ in reference_copies_of(folder, "ICS3U")):
+        print("   Keeping a copy of ICS3U for reference (2025–26), through the app…")
+        run_ui_test(f"{scene_book.PROVISIONING_CLASS}/testKeepACopyForReference", folder, "provision-reference")
+    else:
+        print("   A reference copy of ICS3U is already there.")
+    return 1 if extraction.needs_a_person else 0
+
+
+def reference_copies_of(folder: Path, code: str):
+    courses = folder / "courses"
+    if not courses.is_dir():
+        return
+    for entry in courses.iterdir():
+        config_path = entry / "course_config.json"
+        if not config_path.is_file():
+            continue
+        try:
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        if config.get("kept_for_reference") is True and config.get("course_code") == code:
+            yield entry
+
+
+def capture_note_in_obsidian(note: Path, destination: Path) -> bool:
+    """Obsidian showing one note, photographed as its own window."""
+    run(["open", f"obsidian://open?path={note}"], capture_output=True)
+    time.sleep(2.5)
+    script = """
+    tell application "Obsidian" to activate
+    delay 0.4
+    tell application "System Events"
+      tell process "Obsidian"
+        set position of window 1 to {60, 60}
+        set size of window 1 to {1280, 800}
+      end tell
+    end tell
+    """
+    subprocess.run(["osascript", "-e", script], capture_output=True)
+    time.sleep(1.5)
+    helper = Path(__file__).resolve().parent / "windowid.swift"
+    result = subprocess.run(["swift", str(helper), "Obsidian", "60", "60", "1280", "800"],
+                            capture_output=True, text=True)
+    if result.returncode != 0 or not result.stdout.strip():
+        return False
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["screencapture", "-x", "-o", "-l", result.stdout.strip(), str(destination)], check=True)
+    subprocess.run(["osascript", "-e", 'tell application "iTerm" to activate'], capture_output=True)
+    return True
+
+
+def image_path(name: str, suffix: str) -> Path:
+    """Where a scene's picture lands: a composite's part in the scratch parts
+    folder, anything a page shows in site/img/."""
+    for composite in scene_book.COMPOSITES.values():
+        if name in composite["of"]:
+            return PARTS / f"{name}-{suffix}.png"
+    return IMAGE_DIR / f"{name}-{suffix}.png"
+
+
+def run_scenes(folder: Path, chosen: list) -> int:
+    """Photograph the chosen scenes in both appearances, then check them.
+
+    A scene FAILS, and is named, when a picture it should make is missing or
+    does not show the words shots.json expects of it. The exit code says so:
+    "judge it by the count, never the exit code" (the skill) is the exit code
+    now.
+    """
+    import marketing_folder
+    announce(f"Photographing {len(chosen)} scene(s) in {folder}")
+    if not (folder / "courses" / marketing_folder.CURRICULUM_COURSE / "course_config.json").exists():
+        print("   The marketing folder is not set up yet — run capture.py --provision first.", file=sys.stderr)
+        return 1
+    app_binary = app_bundle_resources().parent / "MacOS" / "Plantoir"
+    parts: set[str] = set()
+    for composite in scene_book.COMPOSITES.values():
+        parts.update(composite["of"])
+
+    tests: list[str] = []
+    for scene in chosen:
+        if scene.kind == "ui-test" and scene.test not in tests:
+            tests.append(scene.test)
+
+    failures: list[str] = []
+    kill_orphaned_model_servers()
+    try:
+        with RememberedWindowFrames(), BackupsSetAside(folder):
+            for dark in (False, True):
+                suffix = "dark" if dark else "light"
+                print(f"   {suffix} appearance")
+                with Appearance(dark=dark):
+                    time.sleep(2)
+                    if tests:
+                        target = ",".join(f"{scene_book.SCENE_CLASS}/{test}" for test in tests)
+                        bundle = run_ui_test(target, folder, f"scenes-{suffix}", allow_failure=True)
+                        saved = export_attachments(bundle, suffix, parts=parts)
+                        print(f"   saved {len(saved)} image(s): {', '.join(saved)}")
+                    for scene in chosen:
+                        if scene.kind == "notification":
+                            destination = image_path("notification-banner", suffix)
+                            PARTS.mkdir(parents=True, exist_ok=True)
+                            for problem in scene_book.capture_notification(app_binary, folder, destination):
+                                failures.append(f"{scene.name} ({suffix}): {problem}")
+                        elif scene.kind == "obsidian":
+                            note = folder / "courses" / marketing_folder.CURRICULUM_COURSE / marketing_folder.HOW_I_TEACH_NAME
+                            with scene_book.ObsidianRegistryKept():
+                                if not capture_note_in_obsidian(note, image_path("how-i-teach", suffix)):
+                                    failures.append(f"{scene.name} ({suffix}): Obsidian's window was not found")
+                    for scene in chosen:
+                        for name in scene.produces:
+                            picture = image_path(name, suffix)
+                            if not picture.exists():
+                                failures.append(f"{scene.name} ({suffix}): {picture.name} was not made")
+                                continue
+                            missing = scene_book.missing_words(picture, scene_book.expected_text(name))
+                            if missing:
+                                failures.append(f"{scene.name} ({suffix}): {picture.name} does not show {missing}")
+                            elif picture.parent == IMAGE_DIR:
+                                prepare(picture, WIDEST_WINDOW_PIXELS)
+    finally:
+        kill_orphaned_model_servers()
+        for scene in chosen:
+            if scene.kind == "notification":
+                scene_book.cancel_leftover_schedule(app_binary, folder)
+                record = scene_book.scheduled_record(folder, "ICS3U", 1)
+                if record.exists():
+                    record.unlink()
+                print("   Cleared the scheduled run's record for this folder. The delivered notification stays "
+                      "in Notification Center: a script cannot withdraw another app's notification.")
+
+    compose_scene_figures()
+    for failure in failures:
+        print(f"   ✗ {failure}", file=sys.stderr)
+    if failures:
+        print(f"\n   {len(failures)} scene check(s) failed. Nothing above counts as done until each is re-taken.",
+              file=sys.stderr)
+        return 1
+    print("   Every scene made every picture it owes, and each says what its caption says.")
+    return 0
+
+
+def compose_scene_figures() -> None:
+    """Assemble each composite whose parts exist, per appearance."""
+    from composite import pair_of_windows, banner_over_window
+    for name, composite in scene_book.COMPOSITES.items():
+        for suffix in ("light", "dark"):
+            sources = [PARTS / f"{part}-{suffix}.png" for part in composite["of"]]
+            if not all(path.exists() for path in sources):
+                continue
+            destination = IMAGE_DIR / f"{name}-{suffix}.png"
+            if composite["arrange"] == "banner":
+                banner_over_window(sources[0], sources[1], destination)
+            else:
+                pair_of_windows(sources, destination)
+            prepare(destination, WIDEST_WINDOW_PIXELS)
+            print(f"   saved {destination.name}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Capture every screenshot plantoir.app uses.")
     parser.add_argument("--workspace", default=str(DEFAULT_WORKSPACE),
                         help="the demo working folder (must be inside your home folder)")
-    parser.add_argument("--provision", action="store_true", help="only create the demo courses")
+    parser.add_argument("--provision", action="store_true",
+                        help="make or reuse the kept marketing folder (ICS3U, ICS4U, the College Board "
+                             "pages and the correlation) for the v1.4.0 scenes")
+    parser.add_argument("--provision-demo", action="store_true",
+                        help="only create the demo courses (ENG2D, MCV4U, SCH3U) in the demo folder")
+    parser.add_argument("--scenes", action="store_true", help="photograph every v1.4.0 scene")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="prove each scene's set-up is reachable, launching nothing and changing nothing")
+    parser.add_argument("--marketing-folder", default=str(MARKETING_FOLDER),
+                        help="the kept marketing folder (must be inside your home folder)")
     parser.add_argument("--publish", action="store_true", help="only build and publish the demo sites")
     parser.add_argument("--app", action="store_true", help="only photograph the app")
     parser.add_argument("--only", default=None,
-                        help="with --app, run just the named captures, comma-separated "
-                             "(e.g. test4Progress,test6Assistant) instead of all of them")
+                        help="run just these, comma-separated: scene names (reference, two-maps, … — "
+                             "see scenes.py) or, with --app, test names (test4Progress,test6Assistant)")
     parser.add_argument("--sites", action="store_true", help="only photograph the class websites")
     parser.add_argument("--phone", action="store_true",
                         help="only photograph the class site on the phone, both appearances")
@@ -992,6 +1272,32 @@ def main() -> int:
     workspace = Path(arguments.workspace).expanduser()
     if Path.home() not in workspace.parents:
         raise SystemExit("The demo folder has to be inside your home folder, or the site builder sees it as empty.")
+
+    marketing = Path(arguments.marketing_folder).expanduser()
+    if Path.home() not in marketing.parents:
+        raise SystemExit("The marketing folder has to be inside your home folder, or the site builder sees it as empty.")
+
+    if arguments.dry_run:
+        return scene_book.dry_run(marketing, ced_on_this_mac(marketing))
+
+    only_scenes: list = []
+    if arguments.only and not arguments.app:
+        only_scenes = scene_book.scenes_for(arguments.only.split(","))
+    if arguments.provision or arguments.scenes or only_scenes:
+        SCRATCH.mkdir(parents=True, exist_ok=True)
+        keeping_awake = stay_awake()
+        try:
+            if not arguments.skip_preflight:
+                preflight_permissions()
+            result = 0
+            if arguments.provision:
+                result = provision_marketing(marketing)
+            if result == 0 and (arguments.scenes or only_scenes):
+                result = run_scenes(marketing, only_scenes or list(scene_book.SCENES))
+                rebuild_site()
+        finally:
+            keeping_awake.terminate()
+        return result
 
     if arguments.hero:
         build_hero_figures()
@@ -1013,7 +1319,7 @@ def main() -> int:
         rebuild_site()
         return 0
 
-    everything = not (arguments.provision or arguments.publish or arguments.app
+    everything = not (arguments.provision_demo or arguments.publish or arguments.app
                       or arguments.sites or arguments.figures)
     SCRATCH.mkdir(parents=True, exist_ok=True)
 
@@ -1024,7 +1330,7 @@ def main() -> int:
                   "stalls on a system dialog, re-run without --skip-preflight.")
         else:
             preflight_permissions()
-        if everything or arguments.provision:
+        if everything or arguments.provision_demo:
             provision(workspace)
         if everything or arguments.publish:
             publish_demo_sites(workspace)
