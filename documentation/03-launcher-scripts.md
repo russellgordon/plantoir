@@ -506,14 +506,20 @@ happens to have one — the launcher uses it as-is and does nothing else.
 lightweight Linux VM with a Docker engine inside, driven entirely from the
 command line. The bash launchers:
 
-1. Use whatever is already on the machine — Homebrew installs included —
-   found by `command -v`. Nothing is installed over a working tool.
-2. Download whatever is missing as a pinned static binary into
+1. Use whatever is already on the machine OUTSIDE Plantoir's own folder —
+   Homebrew installs included — found by `command -v`. Nothing is installed
+   over such a tool, one program at a time.
+2. Install what is missing — and, since GitHub #312, replace Plantoir's own
+   copies when they are of other versions or damaged — into
    `~/Library/Application Support/Plantoir/tools/bin` (buildx into
    `~/.docker/cli-plugins`): Colima `v0.10.3`, Lima `2.2.0`, Docker CLI
-   `29.7.2`, buildx `v0.36.1`. **No Homebrew and no administrator rights** —
-   a teacher cannot be asked for a password they may not have.
-3. Start Colima (`--vm-type vz` when the VM is first created) — sized from the Mac it is running on rather than pinned.
+   `29.7.2`, buildx `v0.36.1`. **Copied out of the Mac app** when it carries
+   them (Apple silicon), **downloaded** otherwise, and every download is
+   checked against a pinned SHA-256 for its kind of Mac. **No Homebrew and no
+   administrator rights** — a teacher cannot be asked for a password they
+   may not have. How, and why: "Where the helper programs come from" below.
+3. Start Colima (`--vm-type vz` when the VM is first created, from the app's
+   copy of its starting disk when there is one) — sized from the Mac it is running on rather than pinned.
    `_colima_cpus` takes half the cores (floor 2, cap 6) and
    `_colima_memory_gb` a third of the RAM (floor 4 GB, cap 12 GB), so an 8 GB
    laptop gets exactly the old 2 CPU / 4 GB default and a 48 GB desktop gets
@@ -546,13 +552,150 @@ command line. The bash launchers:
    `colima` command, and a restart is what cleared the wedged builder in
    GitHub #225.
 
-   Every line this step and steps 2–3 print — the whole block from
-   `_download()` to the bare `ensure_container_runtime` call, byte-identical
-   in `setup.sh`, `preview.sh` and `deploy.sh` — is pinned by
+   Every line this step and steps 2–3 print — the whole block from its
+   `# >>> FIRST-RUN BLOCK >>>` line to the bare `ensure_container_runtime`
+   call, byte-identical in `setup.sh`, `preview.sh` and `deploy.sh` (it began
+   at `_download()` until #312 moved the start up to take in the pinned
+   versions and checksums) — is pinned by
    `AppRulesContractTests.testTheFirstRunLinesNameNoMachinery`: no Colima,
    Lima, Docker, buildx, container, image, script or toolchain on a printed
-   line, and the three copies still identical. The rest of each launcher still
-   names the machinery in places; that is its own follow-up issue.
+   line, and the three copies still identical. The one exemption is an `echo`
+   of a `PLANTOIR_` line, which the app reads and keeps out of the console.
+   The rest of each launcher still names the machinery in places; that is its
+   own follow-up issue.
+
+### Where the helper programs come from (GitHub #312)
+
+**What a first run cost before.** Measured 2026-09-26 on an M4 Pro (~320
+Mbit/s): Lima 37.6 MB, Colima 15.7 MB, the Docker CLI 18.9 MB and buildx 62.5
+MB (135 MB), then Colima's Ubuntu disk image, 332 MB, then about 390 MB while
+the website builder's image was built (88 s and 137 s on two cold runs) —
+**about 857 MB**, while the launcher said "About 600 MB is downloaded once".
+Estimated for a school connection: about 7 minutes at 25 Mbit/s, 14 at 10.
+Russell's own fresh-account run took "nearly five minutes" on gigabit.
+
+**What the app carries.** `Plantoir.app/Contents/Resources/helpers`, Apple
+silicon only, put there by `mac-app/Vendor/fetch-helpers.sh`:
+`bin/{colima,limactl,lima,docker}`, `cli-plugins/docker-buildx`,
+`share/lima/{lima-guestagent.Linux-aarch64.gz,templates}`,
+`vm/ubuntu-24.04-minimal-cloudimg-arm64-docker.raw.gz` (the upstream bytes,
+never recompressed) and a `MANIFEST` (`arch`, the pins line, `image`, and a
+SHA-256 for every file but the disk). The app says where through
+`PLANTOIR_BUNDLED_HELPERS`, set by `HelperPrograms.environment` only when the
+folder exists — so every run the app starts carries it, the MCP server's and
+the publishes launchd starts THROUGH Plantoir included. A launcher typed at
+the command line has no such variable and downloads, as before.
+
+**Installed into the tools folder, never run from the app.** Rejected, for
+three reasons: `HelperPrograms`, the quit path (#220), the MCP server and
+every scheduled-publish script already look in `tools/bin`, and the app can be
+moved, translocated or renamed; limactl's host agent runs for the life of the
+virtual machine, and a Sparkle update would swap the app out from under it;
+and anything written inside the app turns every Sparkle delta into a full
+download. Nothing in #312 writes inside the app, and
+`scripts/test_helper_bootstrap.py` checks the app's copy is byte-for-byte
+unchanged after every case. Copies are made with `cp -c` (APFS clones;
+0.04 s here, and a plain copy across volumes), the browser's
+`com.apple.quarantine` mark is removed from the COPIES, the copies are checked
+against the MANIFEST in a staging folder inside the tools folder, and each
+file is then moved into place with one rename, so a program that is running
+keeps the copy it started with. The whole install is about two seconds, most
+of it two SHA-256 passes over 135 MB.
+
+**The install stamp, `tools/.installed`,** records the pins line (the four
+versions and the disk's SHA-512), where the copies came from, and the SHA-256
+of each program as installed. It is read as three separate questions, and only
+for Plantoir's own copies:
+
+- **different** — the stamp's pins are not this launcher's. Replaced, from the
+  app or by downloading. Before #312 presence was the only test, so a pin bump
+  never reached a Mac that already had tools; now it does.
+- **damaged** — a program no longer hashes to what was installed. Only that
+  program is replaced.
+- **unrecorded** — no stamp at all, which is every Mac set up before #312.
+  Replaced from the app when the app carries a usable copy (so the installed
+  base moves onto the signed copies at its next slow start), and otherwise
+  LEFT EXACTLY AS IT IS — today's rule. Rejected: treating a missing stamp as
+  "different" everywhere, which would re-download 135 MB on every such Mac
+  run from Terminal or on an Intel Mac, and stop one behind a download filter.
+
+**Compared on the pins line, never on the app's hashes.** Every release signs
+the programs again, so their bytes change while their versions do not; a stamp
+compared with the MANIFEST's per-file hashes would reinstall after every
+update and tell the trail the programs were "older" when only their
+signatures had changed (plan review H1).
+
+**The app's copy is used only when** `arch` in its MANIFEST is this Mac's, its
+pins line is the launcher's own — an app built after a pin bump but before a
+re-fetch carries old programs whose MANIFEST agrees with them, and would
+otherwise be installed and stamped as current — and the files asked for still
+hash to it. Otherwise the reason (`none-in-app`, `other-arch`,
+`bundle-check-failed`) goes into the trail line, because a silent fallback to
+a 135 MB download is the failure that reports success.
+
+**Downloads are checked** against eight pinned SHA-256s, one per file per kind
+of Mac (`LIMA_SHA256_ARM64`, `…_X86_64`, and the same for Colima, the Docker
+CLI and buildx). Nothing was checked before #312. A mismatch deletes the file
+and is reported as a failed download. With only the Apple-silicon set pinned,
+every Intel first run would have been refused (plan review H2). A download
+that fails while only REPLACING copies that work is not fatal: "Carrying on
+with what is already on this Mac." — the stamp stays as it was, so the next
+start tries again.
+
+**buildx sits outside the stamp.** It lives in `~/.docker/cli-plugins`, which
+Docker Desktop and Homebrew share: it is installed only when `docker buildx
+version` fails, from the app first, and a link there is never replaced,
+because it is Docker Desktop's.
+
+**The first start.** With the app's disk, `colima start --cpu … --memory …
+--vm-type vz --disk-image <app>/…/vm/<image>`: 22–27 s in four of five fresh
+starts measured, nothing downloaded, nothing written to
+`~/Library/Caches/{colima,lima}` (a path with a space in it measured fine).
+Colima checks the file's SHA-512 against the list compiled into it, so a
+damaged copy is refused in about a second ("hash failure: SHA512 checksum
+mismatch"), leaving `~/.colima/default` behind; ANY failure is then retried
+once with the same size and no disk, which downloads it as before and heals
+the refused case (measured: the persisted `diskImage` goes back to ""). The
+path Colima remembers is never read again — a restart and a resize with the
+file moved away both worked — so the app can move afterwards. Rejected:
+seeding `~/Library/Caches/colima/caches/<sha256 of the URL>` (Colima's private
+layout; `--disk-image` is the documented flag and brings the check with it),
+and copying the disk into Application Support (needed exactly once).
+
+**One start in five took 255 s instead of about 25**, two ssh waits of exactly
+two minutes each, while this was measured. Not reproduced with the same
+binaries; the hardened runtime was tested as a cause and not shown to be one
+(a re-signed limactl and colima with a new identity started in 21 s). It is
+recorded as unexplained. The "website builder created" trail line carries the
+seconds from every teacher's Mac, which is how its frequency in the field
+will be known.
+
+**Two lines for the app.** `PLANTOIR_HELPERS_INSTALLED: <bundled|downloaded>
+<missing|different|damaged|unrecorded> <which> <versions> [<why not the app's
+copy>]` and `PLANTOIR_BUILDER_CREATED: <seeded|downloaded|seed-refused-then-downloaded|seed-failed-then-downloaded> <seconds>`
+become the trail events "helper programs installed" and "website builder
+created" (`contracts/shared-rules.json`; `HelperBootstrapReport`), read by
+`ScriptRunner` and by a scheduled publish's log, and kept out of the console.
+
+**What a teacher reads.** "📦 Getting what your website builder needs ready…"
+when copying; the download lines as before; after the unchanged first-start
+line, "This takes about a minute." or "About 350 MB is downloaded once; this
+can take several minutes." (the Intel disk is 358 MB); and "🧱 Building your
+website builder — the first time downloads about 400 MB and takes a few
+minutes…" only when no website builder has been built on this Mac before — a
+rebuild after an update keeps the older line, because most of those bytes are
+already cached (plan review M6). The words are pinned in
+`contracts/app-rules.json` → `helperBootstrap.printed`.
+
+**What is still downloaded on a first run:** the website builder's image
+build, about 390 MB from Docker Hub, the Debian and nodesource mirrors, npm
+and GitHub (the Quartz clone). It is now the largest stage by far; trimming it
+is its own follow-up.
+
+The rule, its cases and what was rejected are in `contracts/app-rules.json` →
+`helperBootstrap` (18 install cases and 6 first-start cases, mac-only), run
+for real — every case under `set -euo pipefail` and without it — by
+`scripts/test_helper_bootstrap.py`, which skips on anything that is not a Mac.
 
 One consequence worth knowing: Colima's VM mounts the teacher's home
 directory by default, so the working folder containing `courses/` must live

@@ -2042,6 +2042,10 @@ enum ScheduledDeploy {
         // from the log for the same reason as the line above: nobody is
         // watching a console at half six in the morning.
         WorkspaceInUseReport.noteOnTheTrail(from: text)
+        // A scheduled run is started by Plantoir itself, so it carries the
+        // app's helpers folder and can install from it, or create the
+        // website builder, while nobody is watching (#312).
+        HelperBootstrapReport.noteOnTheTrail(from: text)
         noteFolderProblems(in: text)
         var markerLines: [String] = []
         // Split on scalars, not Characters: Swift folds "\r\n" into one

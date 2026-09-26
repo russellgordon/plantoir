@@ -19,6 +19,17 @@ What a build still fetches from the network, the first time: the
 Quartz v4.5.0 clone from GitHub, and npm dependencies. After that the build
 is cached and everything runs offline.
 
+**Measured on a first run (GitHub #312, 2026-09-26, M4 Pro, ~320 Mbit/s):**
+about **390 MB** received (the virtual machine's own network counter,
+389,826,558 bytes), and **88 s and 137 s** on two cold builds in a fresh
+3-CPU / 4 GB virtual machine. Since #312 the Mac app carries the helper
+programs and the virtual machine's starting disk, so this build is the only
+large download left on a first run, and the largest stage by far; the
+launchers say "about 400 MB" only when no website builder has been built on
+the Mac before (`documentation/03-launcher-scripts.md` → "Where the helper
+programs come from"). Trimming it — the base image, `apt`'s Node.js and fonts,
+wrangler, Quartz's `npm install` — is a follow-up of its own.
+
 ## Anatomy of the Dockerfile
 
 The image is layered as follows (in order):
