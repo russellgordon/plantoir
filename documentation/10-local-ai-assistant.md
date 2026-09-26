@@ -2564,6 +2564,13 @@ different in WinUI.
 is shared and must be, because `build_site.py` decides what ships and an app
 that disagreed would report coverage the site does not have. What a coverage
 plan SAYS to a teacher, and how it is offered, is the app's own.
+Since #128 the code rule admits the College Board's `1.A` (skills) and
+`CRD-1.A` (learning objectives) beside `A1.1`, so the assistant offers those
+pages as a course's expectations too — they are what the second coverage map
+counts. What it does NOT yet follow is a declared curriculum folder whose name
+does not mention "curriculum" (an `AP CSP` folder has a map but its pages are
+not offered): `curriculumRules.isCurriculumPage.note` says so, and it is left
+for its own issue.
 
 ### The working-folder path bar — reported missing in use, 2026-08-16
 

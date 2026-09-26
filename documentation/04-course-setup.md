@@ -134,7 +134,7 @@ PAGE" — against the payload's **61**. Forcing all three curriculum keys
 true changed *nothing*: no code path read the payload once the skeleton was
 the starting point, so `include_curriculum_pages: true` merely switched the
 map on over that one fake cell. Applying `build_site.py`'s own
-`_find_curriculum_folder` and `_collect_expectations` to the tree gave **1
+`_find_curriculum_folder` (now `_find_curriculum_folders`, #128) and `_collect_expectations` to the tree gave **1
 specific expectation and 0 overall**, against the payload's **47 and 12**.
 Enabling coverage without copying the pages is not half a fix; it is a
 worse state than the fault.
@@ -177,7 +177,9 @@ timestamps aside.
 
 **The pages are installed into the SKELETON's `curriculum_folder` name**,
 because that is the name `course_config.json` records for a course with
-`prepopulate_example_content: false`, and the name the build looks in. All
+`prepopulate_example_content: false` (since #128 as `curriculum_folders`, a
+list of that one name — the manifest key itself stays singular), and the name
+the build looks in. All
 38 payloads and all 50 skeleton families call it `Curriculum` today
 (measured 2026-09-21), so the parameter buys nothing this morning; it buys
 a future payload that disagreed landing where the build will look rather
@@ -640,12 +642,12 @@ that is not there simply contributes nothing.
 | What | Where the name comes from |
 |---|---|
 | The lessons folder | Every per-section folder the build counts as a class folder — the recorded `class_folder`, plus any whose name mentions classes; failing both, the guess described in [`08`](08-course-config-reference.md). New class pages are written to one; the coverage map counts all of them. |
-| The curriculum folder | `curriculum_folder` if it names a folder the course has, otherwise the alphabetically first shared folder whose name mentions the curriculum. The BUILD asks one thing more than either app can see from configuration: the folder must actually hold a page carrying an expectation code. |
+| The curriculum folders | Every folder the course declares in `curriculum_folders` (then the legacy `curriculum_folder`) that holds a page named by an expectation code — both apps read the disk for that, as the build does (#128); when none does, the one alphabetically first shared folder mentioning the curriculum. Each has a coverage map of its own. Both apps OFFER to declare another folder mentioning the curriculum under "Curriculum folders", and never do it for the teacher. |
 | The folders that count for marks | `graded_folders`, or — for a course never asked — every folder whose name contains "task". An ABSENT key and an EMPTY list are different answers; see [`08-course-config-reference.md`](08-course-config-reference.md). |
 | `Media` | Managed by the build and kept out of the sidebar. |
 | `index.md` | The page a folder opens on, in every section and every folder. |
 | `Key Links.md` | The sidebar's shortcut list. The build adds the curriculum map to it and leaves the teacher's own entries alone. |
-| `Curriculum Coverage` | Written by the build on every run. A teacher's own page of that name would be replaced. |
+| `Curriculum Coverage` (and `<Folder> Coverage` for each further curriculum folder) | Written by the build on every run. A teacher's own page of that name would be replaced. |
 
 **Both apps can show a teacher this list for their own course**, from Course
 Settings → "What else does Plantoir use my folders for?". Two things about
@@ -663,13 +665,14 @@ that sheet are deliberate and easy to undo by accident:
   to create one they already have is the one failure a sheet about folder names
   cannot afford. **Both apps do this** — Windows from the start, the mac from
   2026-09-06, when it stopped reading the key and started asking the same rule
-  that decides which folder is protected from removal. Two things narrow the
-  answer, in both apps equally: the scan looks at the SHARED folders only,
-  where the build walks the merged tree, and neither app can see whether the
-  folder actually holds an expectation page — and when the recorded folder has
-  none, the build does not give up, it falls through to the same scan. So the
-  sheet can name a folder the build passes over in favour of another. Still
-  righter than naming one that is not there.
+  that decides which folder is protected from removal. Since #128 that rule
+  reads the DISK as the build does — which declared folders hold an
+  expectation page — so the sheet names every folder with a map and every map
+  page, and the #90 tie (the sheet naming College Board while the map came
+  from Ontario) is gone. One narrowing is left, in both apps equally: they look
+  at the SHARED folders only, where the build walks the merged tree —
+  unreachable in practice, because every manifest declares the folder as
+  shared.
 
 The rows, the sentences and the cases are
 [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
@@ -690,7 +693,8 @@ Windows needs exactly three UI behaviours:
 - **Detection**: example content exists for a code when the bundled
   `support/example_content/<CODE>/manifest.json` exists; the curriculum
   toggle additionally needs the manifest's `curriculum_folder` to be
-  non-empty (reference logic: `ExampleContentCatalog.swift`).
+  non-empty (the MANIFEST key stays singular after #128; the course records it
+  as the list `curriculum_folders`) (reference logic: `ExampleContentCatalog.swift`).
 - **Starting Content section** in the new-course wizard: "Pre-populate
   course with example content" (default ON) with "Include Ontario
   curriculum pages" beneath it (default ON, disabled when the first is

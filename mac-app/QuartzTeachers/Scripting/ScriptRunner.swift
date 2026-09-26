@@ -729,6 +729,8 @@ class ScriptRunner {
                 course: report.course, section: report.section
             )
         }
+        // Which curriculum maps the build wrote (#128), read the same way.
+        CoverageMapsBuilt.noteOnTheTrail(from: text)
         // A launcher that waited for, or refused on, something running in
         // the folder's workspace before remaking it (#94).
         WorkspaceInUseReport.noteOnTheTrail(from: text)
@@ -893,6 +895,9 @@ class ScriptRunner {
     /// teacher as something to answer, raw JSON and all.
     static func looksLikeQuestion(_ line: String) -> Bool {
         if SiteHealthFinding.isMarkerLine(line) || PagesDatedByTheBuild.isMarkerLine(line) {
+            return false
+        }
+        if BuildMarkerLine.isMachineLine(line) {
             return false
         }
         if WorkspaceInUseReport.isMarkerLine(line) {

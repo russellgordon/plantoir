@@ -77,6 +77,11 @@ struct TranscriptBuilder {
         if PreviewAddressHeldReport.isMarkerLine(currentLine) {
             return ""
         }
+        // Every other marker too, by the one rule (#128): a marker the app has
+        // no reader for yet is still machinery.
+        if BuildMarkerLine.isMachineLine(currentLine) {
+            return ""
+        }
         return currentLine
     }
 
@@ -186,6 +191,9 @@ struct TranscriptBuilder {
             return
         }
         if PreviewAddressHeldReport.isMarkerLine(line) {
+            return
+        }
+        if BuildMarkerLine.isMachineLine(line) {
             return
         }
         lines.append(line)

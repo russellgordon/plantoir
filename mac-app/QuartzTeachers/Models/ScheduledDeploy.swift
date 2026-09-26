@@ -2037,6 +2037,9 @@ enum ScheduledDeploy {
             return
         }
         notePagesDatedByTheBuild(in: text)
+        // Which curriculum maps this run's build wrote (#128) — the build
+        // nobody watches is the one "my map is missing" is asked about.
+        CoverageMapsBuilt.noteOnTheTrail(from: text)
         // A launcher of this run that waited for, or refused on, something
         // running in the folder's workspace before remaking it (#94) — read
         // from the log for the same reason as the line above: nobody is

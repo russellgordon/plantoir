@@ -152,6 +152,38 @@ class TheCodeRule(unittest.TestCase):
         self.assertIsNone(build_site.overall_of("1.A"))
 
 
+class TheOrderOnTheMap(unittest.TestCase):
+    """`curriculumRules.coverageMapOrder`: columns and order for all three
+    shapes, learning objectives (`CRD-1.A`) included."""
+
+    def test_every_case(self):
+        use_the_repository_contracts()
+        cases = contracts.section("shared-rules", "curriculumRules", "coverageMapOrder", "cases")
+        self.assertGreaterEqual(len(cases), 1)
+        for case in cases:
+            self.assertEqual(sorted(case["codes"], key=build_site.code_sort_key), case["sorted"])
+            for code, column in case["columns"].items():
+                self.assertEqual(build_site.strand_of(code), column, code)
+            for code, overall in case["overall"].items():
+                self.assertEqual(build_site.overall_of(code), overall, code)
+
+    def test_learning_objectives_draw_a_column_per_prefix(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for code in ("CRD-2.A", "CRD-1.A", "AAP-1.B", "1.A"):
+                write(root / "College Board Curriculum" / f"{code}.md", "x")
+            write(root / "All Classes" / "Unit 1, Day 1.md",
+                  "---\ntitle: Unit 1, Day 1\n---\n![[CRD-1.A]]\n")
+            maps, _ = build(root, ["College Board Curriculum"])
+            self.assertEqual(maps[0]["expectations"], 4)
+            page = (root / "Curriculum Coverage.md").read_text(encoding="utf-8")
+            letters = [part.split("</div>")[0] for part in page.split('<div class="coverage-letter">')[1:]]
+            self.assertEqual(letters, ["1", "AAP", "CRD"])
+            self.assertLess(page.index(">CRD-1.A<"), page.index(">CRD-2.A<"))
+            self.assertIn('aria-label="CRD-1.A, addressed once"', page)
+            self.assertNotIn("coverage-chips", page)
+
+
 class TheTitles(unittest.TestCase):
     """T2: `curriculumRules.coveragePageTitles`."""
 

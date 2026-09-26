@@ -1892,6 +1892,14 @@ final class SharedRulesContractTests: XCTestCase {
                 XCTAssertEqual(afterPerSection[key] as? [String], ["Assessments", "Private Notes.md"])
             case "expandable":
                 XCTAssertEqual(afterShared[key] as? [String], ["Assessments", "Concepts"])
+            case "curriculum_folders":
+                // Materialised (#128): the legacy name was the course's one
+                // curriculum folder, so the list is written with the new name.
+                XCTAssertEqual(afterShared[key] as? [String], ["Assessments"])
+                XCTAssertNil(
+                    afterPerSection[key],
+                    "The curriculum folders are SHARED; a per-section rename must not write them"
+                )
             case "curriculum_folder":
                 XCTAssertEqual(afterShared[key] as? String, "Assessments")
                 XCTAssertEqual(
@@ -2086,19 +2094,177 @@ final class SharedRulesContractTests: XCTestCase {
         )
     }
 
-    func testCurriculumFolderResolutionCases() throws {
+    /// `specialNames.curriculumFoldersResolution` (#128): what the build maps
+    /// and what the apps protect and name, over the declared names and the
+    /// folders holding pages. The Python half runs the same cases against the
+    /// build (`scripts/test_coverage_maps.py`).
+    func testCurriculumFoldersResolutionCases() throws {
         let section: [String: Any] = try SharedRulesContractTests.section("specialNames")
-        let resolutionSection: [String: Any] = try XCTUnwrap(section["curriculumFolderResolution"] as? [String: Any])
-        let cases: [[String: Any]] = try XCTUnwrap(resolutionSection["cases"] as? [[String: Any]])
+        let resolution: [String: Any] = try XCTUnwrap(section["curriculumFoldersResolution"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(resolution["cases"] as? [[String: Any]])
+        // A floor: a loop over a list an edit has emptied passes having read nothing.
+        XCTAssertGreaterThanOrEqual(cases.count, 12)
+        XCTAssertNil(section["curriculumFolderResolution"],
+                     "the singular rule was replaced by curriculumFoldersResolution and must stay gone")
 
         for testCase in cases {
-            let configured: String? = testCase["configured"] as? String
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let declared: [String] = CurriculumFolderRule.declaredFolders(
+                list: testCase["curriculumFolders"], legacy: testCase["curriculumFolder"]
+            )
             let folders: [String] = try XCTUnwrap(testCase["folders"] as? [String])
-            let expected: String? = testCase["resolved"] as? String
-            let why: String = testCase["why"] as? String ?? ""
+            let withPages: [String] = try XCTUnwrap(testCase["withPages"] as? [String])
+            XCTAssertEqual(
+                CurriculumFolderRule.mappedFolders(declared: declared, in: folders, withPages: withPages),
+                try XCTUnwrap(testCase["mapped"] as? [String]), "mapped: \(name)"
+            )
+            XCTAssertEqual(
+                CurriculumFolderRule.resolvedFolders(declared: declared, in: folders, withPages: withPages),
+                try XCTUnwrap(testCase["resolved"] as? [String]), "resolved: \(name)"
+            )
+            XCTAssertEqual(
+                CurriculumFolderRule.coveragePageTitles(declared: declared, in: folders, withPages: withPages),
+                try XCTUnwrap(testCase["titles"] as? [String]), "titles: \(name)"
+            )
+        }
+    }
 
-            let actual: String? = CurriculumFolderRule.resolvedCurriculumFolder(configured: configured, in: folders)
-            XCTAssertEqual(actual, expected, "Failed case: \(why)")
+    /// `curriculumRules.coveragePageTitles` (#128).
+    func testCoveragePageTitlesCases() throws {
+        let rules: [String: Any] = try SharedRulesContractTests.section("curriculumRules")
+        let titles: [String: Any] = try XCTUnwrap(rules["coveragePageTitles"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(titles["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 6)
+        for testCase in cases {
+            let folders: [String] = try XCTUnwrap(testCase["folders"] as? [String])
+            XCTAssertEqual(
+                CurriculumFolderRule.coveragePageTitles(for: folders, primary: testCase["primary"] as? String),
+                try XCTUnwrap(testCase["titles"] as? [String]), "\(folders)"
+            )
+        }
+        XCTAssertEqual(CurriculumFolderRule.primaryMapTitle, "Curriculum Coverage")
+    }
+
+    /// `specialNames.curriculumFolderProtection` (#128): only the LAST folder
+    /// with a map is refused while the map is on.
+    func testCurriculumFolderProtectionCases() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("specialNames")
+        let protection: [String: Any] = try XCTUnwrap(section["curriculumFolderProtection"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(protection["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 10)
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let folder: String = try XCTUnwrap(testCase["folder"] as? String)
+            let surface: CurriculumFolderProtection.Surface =
+                (testCase["surface"] as? String) == "wizard" ? .wizard : .settings
+            let decided: ItemProtection? = CurriculumFolderProtection.decide(
+                folder: folder,
+                resolved: try XCTUnwrap(testCase["resolved"] as? [String]),
+                coverageOn: try XCTUnwrap(testCase["coverageOn"] as? Bool),
+                pagesOn: try XCTUnwrap(testCase["pagesOn"] as? Bool),
+                declaredPayloadFolder: testCase["declaredPayloadFolder"] as? String,
+                surface: surface,
+                jurisdiction: "Ontario"
+            )
+            let expected: ItemProtection?
+            let sentenceKey: String = testCase["sentence"] as? String ?? ""
+            switch sentenceKey {
+            case "curriculumFolderBlockedByCoverageSetting":
+                expected = .blocked(reason: SpecialNames.curriculumFolderBlockedByCoverageSetting)
+            case "curriculumFolderBlockedByCoverageMap":
+                expected = .blocked(reason: SpecialNames.curriculumFolderBlockedByCoverageMap)
+            case "curriculumFolderBlockedByCurriculumPages":
+                expected = .blocked(reason: SpecialNames.curriculumFolderBlockedByCurriculumPages(jurisdiction: "Ontario"))
+            case "removeCurriculumFolderWithItsMapConfirmation":
+                expected = .consequential(
+                    title: SpecialNames.removeCurriculumFolderTitle(for: folder),
+                    message: SpecialNames.removeCurriculumFolderWithItsMapMessage
+                )
+            case "removeCurriculumFolderConfirmation":
+                expected = .consequential(
+                    title: SpecialNames.removeCurriculumFolderTitle(for: folder),
+                    message: SpecialNames.removeCurriculumFolderMessage
+                )
+            default:
+                expected = nil
+            }
+            XCTAssertEqual(decided, expected, name)
+            XCTAssertEqual(decided == nil, (testCase["kind"] as? String) == "notACurriculumFolder", name)
+        }
+
+        let sentence: [String: Any] = try XCTUnwrap(section["removeCurriculumFolderWithItsMapConfirmation"] as? [String: Any])
+        XCTAssertEqual(SpecialNames.removeCurriculumFolderWithItsMapMessage, sentence["message"] as? String)
+        XCTAssertEqual(
+            SpecialNames.removeCurriculumFolderTitle(for: "Ontario Curriculum"),
+            (sentence["title"] as? String)?.replacingOccurrences(of: "{name}", with: "Ontario Curriculum")
+        )
+    }
+
+    /// `specialNames.curriculumFoldersOffer` (#128): the checkboxes, what is
+    /// ticked, and what a tick or an untick writes.
+    func testCurriculumFoldersOfferCases() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("specialNames")
+        let offer: [String: Any] = try XCTUnwrap(section["curriculumFoldersOffer"] as? [String: Any])
+        XCTAssertEqual(CurriculumFoldersOffer.label, offer["label"] as? String)
+        XCTAssertEqual(CurriculumFoldersOffer.caption, offer["caption"] as? String)
+        XCTAssertEqual(CurriculumFoldersOffer.lastStaysTicked, offer["lastStaysTicked"] as? String)
+        let cases: [[String: Any]] = try XCTUnwrap(offer["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 8)
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let folders: [String] = try XCTUnwrap(testCase["folders"] as? [String])
+            let declared: [String] = try XCTUnwrap(testCase["declared"] as? [String])
+            let mapped: [String] = try XCTUnwrap(testCase["mapped"] as? [String])
+            let ticked: [String] = CurriculumFoldersOffer.ticked(folders: folders, declared: declared, mapped: mapped)
+            if let offered = testCase["offered"] as? [String] {
+                XCTAssertEqual(CurriculumFoldersOffer.offered(folders: folders, declared: declared), offered, name)
+            }
+            if let expected = testCase["ticked"] as? [String] {
+                XCTAssertEqual(ticked, expected, name)
+            }
+            if let tick = testCase["tick"] as? String {
+                XCTAssertEqual(
+                    CurriculumFoldersOffer.ticking(tick, ticked: ticked, folders: folders),
+                    try XCTUnwrap(testCase["writes"] as? [String]), name
+                )
+            }
+            if let untick = testCase["untick"] as? String {
+                XCTAssertEqual(
+                    CurriculumFoldersOffer.unticking(untick, ticked: ticked),
+                    testCase["writes"] as? [String], name
+                )
+            }
+        }
+    }
+
+    /// `renameFolder.materialisesOnRename.curriculumFoldersCases` (#128).
+    func testARenameMaterialisesTheCurriculumFolders() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("specialNames")
+        let rename: [String: Any] = try XCTUnwrap(section["renameFolder"] as? [String: Any])
+        let materialises: [String: Any] = try XCTUnwrap(rename["materialisesOnRename"] as? [String: Any])
+        XCTAssertEqual(materialises["keys"] as? [String], ["class_folder", "curriculum_folders"])
+        let cases: [[String: Any]] = try XCTUnwrap(materialises["curriculumFoldersCases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 5)
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let before: [String: Any] = try XCTUnwrap(testCase["before"] as? [String: Any])
+            var values: [String: Any] = [:]
+            for (key, value) in before where !(value is NSNull) {
+                values[key] = value
+            }
+            let scope: FolderScope = (testCase["scope"] as? String) == "perSection" ? .perSection : .shared
+            let updated: [String: Any] = SpecialFolderRenamer.renaming(
+                try XCTUnwrap(testCase["old"] as? String),
+                to: try XCTUnwrap(testCase["new"] as? String),
+                scope: scope,
+                in: values,
+                foldersWithPages: try XCTUnwrap(testCase["withPages"] as? [String])
+            )
+            let after: [String: Any] = try XCTUnwrap(testCase["after"] as? [String: Any])
+            XCTAssertEqual(updated["curriculum_folders"] as? [String], after["curriculum_folders"] as? [String],
+                           "curriculum_folders: \(name)")
+            XCTAssertEqual(updated["curriculum_folder"] as? String, after["curriculum_folder"] as? String,
+                           "curriculum_folder: \(name)")
         }
     }
 
