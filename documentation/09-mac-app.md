@@ -2018,7 +2018,21 @@ first: ordinary removes; consequential asks (the existing confirmation);
 blocked removes nothing, shows the SAME named reason from the − button and
 notes `removalBlocked` with the SAME trail line the row's info button writes.
 Nothing new is recorded on the trail — what is written did not change, only
-which control triggers it. A fixed gesture script (`ListGestureScript.swift`)
+which control triggers it. **What that line SAYS changed with #171**
+(2026-09-26): it names the course and the screen, in Windows' words —
+`new course SNC4M: could not remove “Tasks” from the shared folders — <reason>`
+in the New Course wizard, `SNC4M: could not remove …` in Course Settings, and
+"the marks list" for an untick — built by `RemovalTrail`, which both editors
+take as a REQUIRED parameter. Before, it named no course, and three of the
+five list titles are the same on both screens, so a refusal while a course
+was being made could not be told from the same refusal in one that exists.
+REJECTED: an optional context with a course-less fallback (a new call site
+that forgets it brings #171 back without a sound); pinning the words in the
+contract (only a line with two writers is pinned — `lineWhy`; the `carries`
+of `activityTrail.mustRecord` → "removal blocked" says what it holds);
+copying Windows' " - " separator, which is its own outlier among its trail
+lines. `ListTableGoldenTests.testTheInfoButtonWritesTheSameLineAsABlockedRemoval`
+holds the two paths to one line, which until then nothing did. A fixed gesture script (`ListGestureScript.swift`)
 was run through the OLD code before the redraw and captured into
 `Tests/Goldens/266-course-settings-gestures.json` and `266-wizard-gestures.json`;
 `ListTableGoldenTests` runs it through the new entry points and demands the

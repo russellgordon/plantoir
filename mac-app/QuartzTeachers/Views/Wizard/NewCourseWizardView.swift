@@ -1207,23 +1207,27 @@ struct NewCourseWizardView: View {
                     DisclosureGroup("Folders and files") {
                         StringListEditorView(
                             title: "Shared folders",
+                            removalTrail: removalTrail(for: .sharedFolders),
                             items: $sharedFolders,
                             onRemove: { _ in reconcileGradedFolders() },
                             protection: wizardSharedFolderProtection
                         )
                         StringListEditorView(
                             title: "Shared files",
+                            removalTrail: removalTrail(for: .sharedFiles),
                             hidesMarkdownExtension: true,
                             items: $sharedFiles
                         )
                         StringListEditorView(
                             title: "Per-section folders",
+                            removalTrail: removalTrail(for: .perSectionFolders),
                             items: $perSectionFolders,
                             onRemove: { _ in reconcileGradedFolders() },
                             protection: wizardPerSectionFolderProtection
                         )
                         StringListEditorView(
                             title: "Per-section files",
+                            removalTrail: removalTrail(for: .perSectionFiles),
                             hidesMarkdownExtension: true,
                             items: $perSectionFiles,
                             protection: wizardPerSectionFileProtection
@@ -1234,6 +1238,7 @@ struct NewCourseWizardView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         MembershipToggleListView(
                             title: GradedFolderWording.listTitle,
+                            removalTrail: removalTrail(for: .marks),
                             allItems: gradedFolderChoices,
                             members: gradedFoldersBinding,
                             protection: wizardGradedFolderProtection
@@ -1558,6 +1563,12 @@ struct NewCourseWizardView: View {
         progressTitle = "Adding the example course"
         hasStarted = true
         creator.installExampleCourse(workspaceURL: workspaceURL)
+    }
+
+    /// What a blocked removal in one of this wizard's lists leaves on the
+    /// trail: the course being made, by the code typed so far (#171).
+    func removalTrail(for list: RemovalTrail.List) -> RemovalTrail {
+        return RemovalTrail.inNewCourse(typedCode: courseCode, list: list)
     }
 
     func startCreation() {

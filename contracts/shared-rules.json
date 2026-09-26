@@ -230,9 +230,9 @@
         "why": "A teacher added back a previously excluded folder or file in Course Settings, returning it to previews and deploys."
       },
       {
-        "carries": "the item name, which list it is in, and the reason sentence the teacher was shown (a specialNames sentence, never page content)",
+        "carries": "the course code — after the words 'new course' when the refusal came in the New Course wizard, so it can be told from the same refusal in Course Settings — which list it is in ('the shared folders', 'the shared files', 'the per-section folders', 'the per-section files' or 'the marks list'), the item name, and the reason sentence the teacher was shown (a specialNames sentence, never page content)",
         "event": "removal blocked",
-        "why": "A teacher tried to remove or untick a folder or file a feature depends on (Course Settings or the New Course Wizard) and was shown why it cannot go. 'I could not remove the folder' is a report support will receive; the line says which rule refused."
+        "why": "A teacher tried to remove or untick a folder or file a feature depends on (Course Settings or the New Course Wizard) and was shown why it cannot go. 'I could not remove the folder' is a report support will receive; the line says which rule refused, and whether it happened while a course was being made or in one that already exists."
       },
       {
         "carries": "the course code, the old folder name, the new one, which list it was in, and how many folders on disk were moved",
