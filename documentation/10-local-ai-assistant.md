@@ -1273,8 +1273,16 @@ and was recorded here rather than fixed at the time; it was fixed in
 [#294](https://github.com/russellgordon/plantoir/issues/294), for every reader
 at once, in the one pattern they all share — see
 ["What counts as a link"](#what-counts-as-a-link) below. The code difference
-remains and is its own question,
-[#313](https://github.com/russellgordon/plantoir/issues/313).
+was settled in [#313](https://github.com/russellgordon/plantoir/issues/313):
+every reader now skips code by one shared mask, so this answer and publishing
+read exactly the same links — see
+["Code is never a link"](#code-is-never-a-link-313) below. The answer's own
+stripper, it turned out, had been wrong in the other direction as well: it
+flipped its fence on any line that STARTED with `~~~`, so a Python traceback's
+`~~~~^^^^` inside a ```` ```text ```` block ended the fence, and the real
+closer opened a new one — **22 real links** left out of the answer on four ICS4U
+pages (Testing and Regression 8, Reading a Traceback 7, Spot the Bug 5, Name
+That Error 2).
 
 **The page asked about is found by file name first, then by the name the
 sidebar shows** — a folder's landing page by its folder's name as well, so
@@ -1899,6 +1907,11 @@ cell in two — which every "does the link point at the new name?" check passes.
 | `WikiLinkRewriter.rewriting` / `countLinks` — the unit-word rename and CLASS INSERTION | the link was not renamed. After inserting a class, `[[Unit 2, Day 4\|Thursday]]` would still say Day 4 — which is now the class just inserted: a link to the wrong lesson, not a dead one |
 | `FolderPathRewriter` | harmless (it rewrites a folder prefix), but it held a COPY of the pattern string; it now references `WikiLinkRewriter.pattern` |
 
+Since #313 every one of these reads its matches through ONE entry point,
+`WikiLinkRewriter.linkMatches` (or, for the Markdown-link and `src` shapes,
+`MarkdownCode.matches(of:in:outside:)`), which applies the same code mask —
+see ["Code is never a link"](#code-is-never-a-link-313).
+
 `AssistSectionGraph.linksAsWritten` (#167) used to strip the backslash by hand;
 the strip is gone, because a second strip would only hide a regression of the
 first. An eleventh reader is deliberately out of scope:
@@ -1943,15 +1956,164 @@ the insertion case above. Excluding the backslash from names altogether
 (`[^\]|#\\]+`, closer to Quartz's own class): `[[a\b]]` would then name `a`,
 and a rename of a page called `a` would rewrite it; the lookahead differs from
 the old pattern only at a backslash right before `]`, `|` or `#`. Skipping
-links inside code in the same change: a real difference (the links answer and
-Windows skip them, publishing does not), with its own measurement —
-[#313](https://github.com/russellgordon/plantoir/issues/313). A contract case
+links inside code in the same change: deferred because it changes what
+publishing takes by a different rule and needed its own measurement, and
+decided since in [#313](https://github.com/russellgordon/plantoir/issues/313)
+— below. A contract case
 for `[[a\b]]`: Quartz does not draw it as a link, and nobody has decided what it
 should mean. The install-time readers in `setup_course.py` and the
 curriculum-coverage patterns shared the cause but not the feature, and were
 fixed separately in
 [#314](https://github.com/russellgordon/plantoir/issues/314) — see
 [05 → Which shapes are links](05-build-pipeline.md#dates-drive-everything).
+
+#### Code is never a link (#313)
+
+Settled 2026-09-26, [issue #313](https://github.com/russellgordon/plantoir/issues/313).
+**A `[[…]]` or `![[…]]` whose opening brackets sit inside a fenced code block
+or an inline code span is an EXAMPLE of a link, not a link.** It is not
+followed by publishing, the dates a class brings, the site check, "what does
+this page link to?", copying, the installer or the coverage map, and it is not
+rewritten by a page rename, a unit-word rename, a class insertion or a folder
+rename. That is what Quartz already does: `ofm.ts` builds links with
+`mdast-util-find-and-replace` over TEXT nodes only (lines 209–378 at v4.5.0),
+so `code` and `inlineCode` are never searched.
+
+**Built in real Quartz, shape by shape** (`npx quartz build` on v4.5.0, links
+read from `contentIndex.json` and the rendered article):
+
+| Shape | Quartz draws a link? |
+|---|---|
+| `` `[[X]]` ``, ``` ``a ` [[X]] `` ```, a span across two lines of one paragraph, a span in a table cell | no |
+| ```` ``` ```` fence, `~~~` fence, ```` ```` ```` holding ```` ``` ````, a fence inside a `>` callout, a fence never closed | no |
+| four-space indented code after a paragraph and a blank line | no |
+| an indented line that continues a LIST item | **yes** |
+| a lone, never-closed backtick before the link | **yes** |
+| `<code>[[X]]</code>` (raw HTML) | **yes** |
+| `~~~` inside a ```` ``` ```` fence, then a link after the ```` ``` ```` closes | **yes**, the link after |
+
+**The rule, in short** — written out to be implemented from in
+`contracts/shared-rules.json` → `readingALink.whatIsCode`, with its limits in
+`whatIsCodeLimits` and 22 cases in `readingALink.cases`. The page is read a
+line at a time; a line's BODY has any `>` markers taken off. A fence opens on a
+body starting with three or more backticks or tildes (backticks with another
+backtick later on the line are inline code instead), closes on a run of the
+SAME character at least as long with nothing after it, and runs to the end of
+the page if never closed. Code spans live within a paragraph — which breaks at
+a blank line, a fence, a list marker, a heading or a table row — and a run of N
+backticks closes on the next run of EXACTLY N; a run never closed is plain
+text; outside a span a backslash escapes. Nothing else is code: not indented
+code, not HTML `<code>`, not math, not `%%` comments (a separate question,
+[#331](https://github.com/russellgordon/plantoir/issues/331)). A link is in
+code when its `[[`, or the `!` of `![[`, starts inside a code range. **And a
+match that starts in code is not merely dropped: the search starts again where
+that code ENDS.** The link pattern crosses a `[`, so in "Type `` `[[` `` to
+start one, then [[Real Page]]" a match from the example's brackets runs on to
+"Real Page" and swallows the real link; dropping that match would drop the
+link with it. This twenty-second case was found while implementing, and is
+not one the plan built in Quartz — Quartz's own pattern stops at `[`, so it
+draws that link, which is what the case expects.
+
+**One implementation per language, shared by every reader and rewriter in it.**
+On the mac, `MarkdownCode` (UTF-16 offsets, the unit `NSRegularExpression`
+reports — never `Character`s, since `"\r\n"` is one grapheme and a scan for
+`"\n"` misses every line ending of a page written on Windows), behind
+`WikiLinkRewriter.linkMatches`; in the build and the installer,
+`scripts/markdown_code.py`. Measured, the two agree offset for offset on all
+12,490 pages of `support/` and on 40,000 fuzzed texts built from backticks,
+tildes, `>`, `[[`, `]]`, backslashes, CRLFs, an accent and an emoji. What
+changed on the mac:
+
+- `AssistSectionGraph.linkTargets` (publishing, dating, the site check,
+  copying) read EVERY match, code and all — 1,896 across `support/`.
+- `AssistSectionGraph.linksAsWritten` had its own stripper, `withoutCode`,
+  now DELETED: the `~~~` flip above dropped 22 real links, and it saw no fence
+  inside a callout, so 270 examples on the Scavenger Hunt pages read as links.
+- `WikiLinkRewriter.rewriting` and `countLinks` (page rename, unit-word
+  rename, class insertion), `FolderPathRewriter` (both link styles),
+  `PageReferences` (the copy's pictures, all three of its shapes, inline code
+  now included) and `CoursePageCopy.pagesEmbeddedIn` (a hand-rolled scanner,
+  now `linkMatches` keeping the `![[`).
+
+**Measured with Quartz's own parser** (remark-parse 11 + remark-gfm 4, the
+stack v4.5.0 uses, classifying every match by its enclosing node; it skips
+Quartz's `textTransform` pre-pass, which cannot create or remove a code node
+in shipped content, and it measures what the SITE shows, not Obsidian's
+editor). Over all of `support/` (39 payloads, 50 skeletons, the example
+course; 12,490 pages), 39,570 links match: **37,674 outside code, 1,139 in
+inline code, 757 in fenced code and 0 in indented code**. Only **8**
+page-to-page links existed solely inside code, on 3 pages: SBI4U's and SPH3U's
+"What This Site Can Do" naming a concept as syntax, and six on TEJ2O's
+"Control Something with Code", in code only because its fence was broken (see
+below). By an emulation of the section graph (an estimate), **no class page —
+of 3,258 in the payloads and 600 in the skeletons — reaches fewer pages when
+published.** 0 class names and 0 real folder paths sit in shipped code, so the
+rewriter half moves nothing that ships; it matters for what teachers write.
+
+| Reader, before #313 | Real links it dropped | Examples it read as links |
+|---|---|---|
+| mac `linksAsWritten` (`withoutCode`) | **22** | 277 |
+| mac `linkTargets` (publishing, dating, site check, copy) | 0 | **1,896** |
+| Windows `WikiLinks.Parse` (`WithoutCode`, emulated) | 0 | 277 |
+| build `_extract_wikilink_targets` | 0 | 7 (TEJ2O only) |
+| the rule | **0** | 7 before the TEJ2O fix, **0** after |
+
+**The shipped page this exposed.** TEJ2O's `shared/Labs/Control Something with
+Code.md` opened `   ```python` at three spaces inside step 4 of a numbered
+list and wrote the program at column 0. CommonMark cannot continue a fence
+lazily, so the list item — and the fence — ended at the first column-0 line,
+and the column-0 closer then OPENED a fence that ran to the end of the page:
+on the site, `[[Debugging Basics]]` showed as raw text and the whole curriculum
+block as code (built in Quartz and seen). Re-indented in the same piece, so
+the coverage map keeps B2.3, B2.4, B5.1, B5.2 and B5.4 for that page under the
+new rule; it reaches NEW TEJ2O courses only (existing folders keep a page whose
+site was already broken — no migration). `lint_payload.py` now refuses the
+shape: a fence opened on an indented line whose lines fall back before the
+closer.
+
+**What a teacher can see change.** A publish plan no longer names a page that
+is only shown as syntax; the site check stops warning about example "links"
+into hidden pages, and a visible page mentioned only in code can now be called
+an orphan — which is true, since the site has no link to it; the links answer
+lists the ICS4U traceback pages' links in full; a new TEJ2O course's lab page
+renders. No sentence changed and no trail event was added: no line records
+which links a reader followed, and the lines that carry a count of links
+rewritten become more correct, not untrue.
+
+**Rejected**, with the reasons that travel:
+
+- **Readers skip code, rewriters do not.** Two definitions of a link again: a
+  rename plan would count links publishing does not follow, and a folder
+  rename would edit an example the teacher wrote (`PageReferences` already
+  refused that for fenced code).
+- **Recognising indented code.** 0 shipped links sit in it, and doing it
+  properly needs list-container tracking in three languages. Obsidian writes
+  nested lists with tabs, and an "indented after a blank line" shortcut drops
+  links from loose nested lists — silently, in the direction that leaves
+  pages unpublished. The case "an indented line in a list is not code" pins
+  it.
+- **Treating HTML `<code>` as code.** Quartz draws a link inside it, so the
+  site HAS that link; skipping it would leave a linked page unpublished.
+- **Each platform keeping its own stripper.** That is how three came to
+  disagree. One written rule and its cases, one implementation per language.
+- **A real Markdown parser in the app** (swift-markdown, cmark). Nothing like
+  it is shared by Swift, Python and C#, so the three would drift at exactly
+  the edges the contract pins, and it is a dependency to vendor and sign. The
+  measurement used one — remark — to JUDGE the portable rule, which is the
+  right place for it.
+- **Leaving TEJ2O alone and matching CommonMark's container rule**: the list
+  tracking rejected above, to "correctly" hide seven links on a page whose
+  author plainly meant them.
+- **Stripping `%%` comments in the same change** — not this question and not
+  measured for its effect on publishing:
+  [#331](https://github.com/russellgordon/plantoir/issues/331).
+
+Not covered, on purpose: `SectionIndexPointer.repointing` reads a front page's
+whole-line `![[…]]` by hand and does not consult the mask, so a front page
+that shows `![[Unit 1, Day 2]]` alone on a line inside a fence could have that
+line repointed. 0 of the 89 section front pages in `support/` hold a fence; it is a separate reader of one
+line shape, not a link reader, and Windows' version is described in
+`class-planning.json` → `sectionIndexPointer`.
 
 ### No booleans, and separate verbs
 
