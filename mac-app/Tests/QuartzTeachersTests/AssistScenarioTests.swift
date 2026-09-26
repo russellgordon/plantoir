@@ -260,6 +260,17 @@ final class AssistScenarioTests: XCTestCase {
             FakePreview.shared.watch(pageAt: AssistFixture.pageURL(of: "Unit 1, Day 1", in: made.course))
         }
 
+        // Class pages a direct call needs, published (#96): the first is
+        // the first class a start-of-year plan keeps.
+        var day: Int = 8
+        for title in scenario.given["visibleClasses"] as? [String] ?? [] {
+            try AssistFixture.write(
+                page: title, publish: "true", date: String(format: "2026-09-%02d", day),
+                body: "The words of \(title).", in: made.course
+            )
+            day += 1
+        }
+
         switch scenario.when {
         case "approve", "decline", "say":
             try await runApproval(scenario, made: made)
@@ -272,6 +283,9 @@ final class AssistScenarioTests: XCTestCase {
         var arguments: [String: Any] = ["course": "ICS3U", "section": 1]
         if scenario.when == "unpublish_pages" {
             arguments["pages"] = "Unit 1, Day 1"
+        }
+        for (key, value) in scenario.given["arguments"] as? [String: Any] ?? [:] {
+            arguments[key] = value
         }
         let outcome: AssistToolOutcome = await made.runner.run(
             call: AssistScenarioTests.call(scenario.when, arguments: arguments)

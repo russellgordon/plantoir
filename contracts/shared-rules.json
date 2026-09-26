@@ -500,6 +500,24 @@
         "carries": "the course and the section, and which of: told with a notification; not sent because notifications are turned off; not sent because permission was never given; could not be sent; and, when a teacher first schedules from the app, that the permission question was put and what the answer was. Since #306 (2026-09-26), also what a CLICK on the notification did: the section shown - in a window already on its working folder, in the window that was choosing a folder, or in a new window; the window brought forward and left as it was because it was in the middle of something; the working folder shown without the section because the section is no longer in it; or Plantoir only brought forward because the working folder is gone, could not be opened here (out of the builder's reach, or refused when a window choosing a folder tried it), or the notification named no section. NEVER the notification's text, and never the working folder's path.",
         "event": "scheduled publish notification",
         "why": "Added with #212. 'I never got told' is answerable only if the trail says whether the notification went out, or that notifications were off for the app — from the teacher's side a notification that was blocked and one that was never sent look identical. The question's own line is written BEFORE the answer, because a question that is ignored, or arrives under a Focus, may never be answered. See scheduledPublishStopped.notification. 'I clicked it and nothing happened' (#306) is answered by the same line: each honest reason - the folder gone, the window busy, the section gone - has its own wording, and NO line at all means the click never reached this copy of the app (the launch line's bundle path says which copy a click started). See scheduledPublishStopped.notification.onClick."
+      },
+      {
+        "carries": "the course and section; where it was asked from (the app, the assistant, an outside assistant); how many classes and how many other pages went into draft, the other pages split into those first used by a later class and those nothing students can see links to; how many pages were left as they were; the backup's FILE NAME; whether the preview was rebuilt. Never a page's name - the backup is how anyone finds the pages.",
+        "event": "section made ready for the start of the year",
+        "line": "{course}/{section} · made ready for the start of the year {from the app|from the assistant|from an outside assistant} — {N classes} and {N other pages} put into draft ({N} first used later, {N} that nothing students can see links to), {N} left as they were; backup {file name}; preview {rebuilt|not rebuilt}",
+        "why": "Added with #96. The single largest change the app makes to a teacher's files on one press, usually weeks before anyone looks at the site. 'Why is everything after Day 1 gone?' arrives in September, and without this line the trail shows a teacher who never pressed anything. One line per act; the declined count is carried here rather than as a second 'page settings left as they were' line."
+      },
+      {
+        "carries": "the course and section; where it was undone from (the app's undo sheet, the assistant, an outside assistant's undo_last_change); how many pages were put back; how many were left as they are because they had changed since",
+        "event": "start of the year change undone",
+        "line": "{course}/{section} · undid getting ready for the start of the year {from …} — {N pages} put back, {N} left as they are because they had changed since",
+        "why": "Added with #96. An undo that skips files is a partial undo, and 'some of my pages came back and some did not' needs the skipped count on record."
+      },
+      {
+        "carries": "the course and section; where it was asked from; the reason: changedSinceShown, backupFailed, writeFailed, noFirstClass, missingPlanCode, or nothingToDo. nothingToDo and missingPlanCode come only from an assistant: the app's Go button is not offered when there is nothing to do, and the app always has the plan it showed.",
+        "event": "start of the year not done",
+        "line": "{course}/{section} · did not get ready for the start of the year {from …} — nothing was changed ({reason})",
+        "why": "Added with #96. 'I pressed the button and nothing happened': a refused Go leaves no file changed, so without this line nothing records that it was pressed."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty.",
@@ -11414,6 +11432,983 @@
       {
         "instead": "Forget a remembered folder that is out of reach, so the reason is said once (#290's plan).",
         "why": "Reversed when #290 was folded into #311: one remembering rule for every reason. The teacher cannot go on without choosing, so the repetition ends at one choice."
+      }
+    ]
+  },
+  "startOfYear": {
+    "appliesOn": [
+      "mac",
+      "windows"
+    ],
+    "note": "Getting a section ready for the start of the year (#96): every class after the first goes into draft, with the pages only later classes use, previewed and undoable. Russell, 2026-09-26: an explicit, previewed, undoable operation, reachable as a named action in the app AND as an MCP tool that shows its plan first. It is NEVER part of a rollover: the 2026-09-08 decision (rolling a section over leaves visibility alone; hiding stays a separate deliberate act) stands, and this is that separate act.",
+    "rule": {
+      "firstClass": "The first NUMBERED class by position (unit, then day; a club's 'Week 1' is unit 1) - the one a rollover gives the first date to. Left exactly as it is, published or not. The operation only ever HIDES. No numbered class: nothing is changed (wording.noFirstClass).",
+      "neverTouched": "The first class; the pages it links to DIRECTLY; the Key Links page and every page it lists; every folder's own page (index.md); every curriculum page (any folder segment containing 'curriculum', build_site.py's rule). A CLASS page is never in this set except the first class: step 1 wins.",
+      "step1Classes": "Every other class page goes into draft (reason laterClass). Already hidden ones are named and not written.",
+      "step2FirstUsedLater": "Every other page that any class links to DIRECTLY goes into draft (reason firstUsedLater, naming the earliest such class by position). Decided from LINKS, never from stored dates: straight after a rollover a page's date comes from a transitive walk and says the first day about pages first used in Unit 3 (plan review H1).",
+      "step3Leftovers": "To a fixed point: every visible page outside the never set that no page students will still see links to goes into draft (reasons onlyHiddenPagesLinkToIt, onlyAFolderListsIt, nothingLinksToIt). A folder's own page listing it is a listing, not a use; a page's link to itself does not count; the section's own front page (its index.md) DOES count, because students land on it.",
+      "perSection": "A course-level page gets publishForSection<N>: false, so the course's other sections are untouched. Dates and page bodies are never changed; the section's front page is repointed at its newest visible class, as every publish or hide does.",
+      "nothingReachesStudents": "It changes files and the preview. A deploy puts it in front of students, and it never deploys.",
+      "afterwards": "Only the assistant's publish takes the pages a class uses with it. A class published by its own line in Obsidian after this goes live with links to hidden pages, so the plan and the sheet say so (wording.publishingFromNowOn); issue #333 is the fix for that."
+    },
+    "planShows": "Every page going into draft with its reason; what stays (the first class and its pages, Key Links and its pages); the links left on pages students will see that will lead to hidden pages, grouped by the page they are on; and three warnings: classes dated before today that are going into draft (wording.alreadyTaught), this section's scheduled deploy in this working folder (wording.scheduledDeploy), and a first class that is itself in draft (wording.firstClassIsHidden).",
+    "planCode": {
+      "line": "Plan code: {code}",
+      "guards": "That a write is a plan that was MADE, and that the section has not changed since. Each platform issues and checks its own code; only this guarantee is shared, never the algorithm. The code is on a line of its own in the plan's text, in exactly the shape above, so a client or a test harness finds it in one fixed place.",
+      "missingOrStale": "Nothing is written. The reply is wording.startOfYearNeedsItsPlan (no code) or wording.startOfYearPlanHasChanged (a code that does not fit the plan as it stands now), followed by the current plan and its code.",
+      "notRequired": "planCode is NOT in the MCP schema's required list: a call without it must be reachable, because its answer is the plan.",
+      "honestLimit": "It proves a plan was made, not that a person read it. The tool's description asks the client to show the teacher the plan and wait."
+    },
+    "backup": "A FRESH backup of the course for this act, and if it cannot be made nothing is written (wording.backupFailed; over MCP AssistWording.startOfYearNeedsABackup). From the app it is the teacher's (they pressed the button); over MCP it is the assistant's. Backup file names are unchanged (course-management.json).",
+    "undo": {
+      "whole": "Whole-file copies, and the assistant's skip rule: a file changed since is left as it is and named.",
+      "app": "The app holds one undo per section, shared by every window on the working folder, offered BESIDE the menu item (never in its place) and always as a sheet that lists what would go back. It ends at the section's next deploy, at the next visibility change in the section from anywhere, and when Plantoir quits (wording.undoEndsWhenYouQuit). After that, the backup is the way back.",
+      "mcp": "undo_last_change, for as long as that MCP session lasts.",
+      "separate": "The app's undo, the assistant window's 'undo that' and an outside assistant's undo_last_change are three stores; none reaches another."
+    },
+    "howToRunACase": "Lay the course out from `pages`, one section, section 1. kind: class (a class page in the section's classes folder, `publish:`), page (a course-level page, `publishForSection1:`), keyLinks (the section's Key Links page), folderIndex (the index.md of a course-level folder named by the title), curriculum (a page in a course-level folder named Curriculum), sectionFrontPage (the section's own index.md). `visible` sets the flag; `links` are written as `See [[name]].` paragraphs; `date` sets the page's date (default the same day for every page) and `undated` writes none; `strayPublishForSection` adds `publishForSection1: true` to a class page. `naming` sets the course's unit word, scheme and noun. Then plan and write through the MCP pair, passing the plan's code. Every page in expectDraft must read HIDDEN for section 1 by the built site's reading and keep its body byte for byte; every page in expectUntouched must be byte-identical. `expectWarnings` names warnings the plan must carry; `expectIntroContains` a fragment of the plan's intro; `runTwice` runs the pair again and expects wording.nothingToDo with nothing written.",
+    "cases": [
+      {
+        "name": "the plain year",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "links": [
+              "Ohm's Law"
+            ]
+          },
+          {
+            "title": "Unit 1, Day 2",
+            "kind": "class",
+            "visible": true,
+            "links": [
+              "Watt"
+            ]
+          },
+          {
+            "title": "Unit 1, Day 3",
+            "kind": "class",
+            "visible": false,
+            "links": [
+              "Joule"
+            ]
+          },
+          {
+            "title": "Ohm's Law",
+            "kind": "page",
+            "visible": true,
+            "links": []
+          },
+          {
+            "title": "Watt",
+            "kind": "page",
+            "visible": true,
+            "links": []
+          },
+          {
+            "title": "Joule",
+            "kind": "page",
+            "visible": true,
+            "links": []
+          },
+          {
+            "title": "Key Links",
+            "kind": "keyLinks",
+            "visible": true,
+            "links": [
+              "How Marks Work"
+            ]
+          },
+          {
+            "title": "How Marks Work",
+            "kind": "page",
+            "visible": true,
+            "links": [
+              "Watt"
+            ]
+          },
+          {
+            "title": "Overall Expectations",
+            "kind": "curriculum",
+            "visible": true,
+            "links": []
+          },
+          {
+            "title": "Concepts",
+            "kind": "folderIndex",
+            "visible": true,
+            "links": [
+              "Ohm's Law",
+              "Watt",
+              "Joule"
+            ]
+          }
+        ],
+        "expectDraft": [
+          "Unit 1, Day 2",
+          "Watt",
+          "Joule"
+        ],
+        "expectUntouched": [
+          "Unit 1, Day 1",
+          "Ohm's Law",
+          "Key Links",
+          "How Marks Work",
+          "Overall Expectations",
+          "Concepts",
+          "Unit 1, Day 3"
+        ],
+        "why": "The whole rule in one section. Watt is first used in Day 2 and goes, although a Key Links page (How Marks Work) links it: a visible page outside the classes does not hold a page up when a later class uses it directly (step 2 comes before step 3). Joule is already hidden and stays exactly as it is. Unit 1, Day 3 is already in draft and is not written. The folder's own page lists all three concepts and holds none of them up."
+      },
+      {
+        "name": "a page the first class shares with a later one stays",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "links": [
+              "Circuits"
+            ]
+          },
+          {
+            "title": "Unit 3, Day 4",
+            "kind": "class",
+            "visible": true,
+            "links": [
+              "Circuits"
+            ]
+          },
+          {
+            "title": "Circuits",
+            "kind": "page",
+            "visible": true,
+            "links": []
+          }
+        ],
+        "expectDraft": [
+          "Unit 3, Day 4"
+        ],
+        "expectUntouched": [
+          "Unit 1, Day 1",
+          "Circuits"
+        ],
+        "why": "The first class uses it, so students keep it."
+      },
+      {
+        "name": "a page the first class links to stays, whatever its date",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "links": [
+              "Syllabus"
+            ]
+          },
+          {
+            "title": "Unit 1, Day 2",
+            "kind": "class",
+            "visible": true,
+            "links": []
+          },
+          {
+            "title": "Syllabus",
+            "kind": "page",
+            "visible": true,
+            "links": [],
+            "date": "2027-01-15"
+          }
+        ],
+        "expectDraft": [
+          "Unit 1, Day 2"
+        ],
+        "expectUntouched": [
+          "Unit 1, Day 1",
+          "Syllabus"
+        ],
+        "why": "Stored dates play no part. What Day 1 links to directly is in the never set."
+      },
+      {
+        "name": "the stored date says the first day, but the first class that links it is later: it goes",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "links": []
+          },
+          {
+            "title": "Unit 3, Day 2",
+            "kind": "class",
+            "visible": true,
+            "links": [
+              "Ohm's Law"
+            ]
+          },
+          {
+            "title": "Ohm's Law",
+            "kind": "page",
+            "visible": true,
+            "links": [],
+            "date": "2026-09-08"
+          }
+        ],
+        "expectDraft": [
+          "Unit 3, Day 2",
+          "Ohm's Law"
+        ],
+        "expectUntouched": [
+          "Unit 1, Day 1"
+        ],
+        "why": "The rollover trap as data (plan review H1). A rollover dates pages by a TRANSITIVE walk, so straight after one, pages like this carry the first day's date. Step 2 is decided from LINKS: the earliest class that links the page directly is not the first class, so it goes. Reading the date instead left 53 (SNC1W) to 79 (ICS3U) concepts published in the review's measurement."
+      },
+      {
+        "name": "an investigation nothing links to, and the concept only it links to, both go",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "links": []
+          },
+          {
+            "title": "Investigation",
+            "kind": "page",
+            "visible": true,
+            "links": [
+              "Astronomical Phenomena"
+            ]
+          },
+          {
+            "title": "Astronomical Phenomena",
+            "kind": "page",
+            "visible": true,
+            "links": []
+          }
+        ],
+        "expectDraft": [
+          "Investigation",
+          "Astronomical Phenomena"
+        ],
+        "expectUntouched": [
+          "Unit 1, Day 1"
+        ],
+        "why": "The real session in the issue: Astronomical Phenomena was reachable only from an investigation that is itself unreferenced. Step 3 runs to a fixed point: the investigation goes because nothing links to it, and then the concept goes because only a hidden page links to it."
+      },
+      {
+        "name": "a page only a folder's own page lists goes",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "links": []
+          },
+          {
+            "title": "Concepts",
+            "kind": "folderIndex",
+            "visible": true,
+            "links": [
+              "Friction"
+            ]
+          },
+          {
+            "title": "Friction",
+            "kind": "page",
+            "visible": true,
+            "links": []
+          }
+        ],
+        "expectDraft": [
+          "Friction"
+        ],
+        "expectUntouched": [
+          "Unit 1, Day 1",
+          "Concepts"
+        ],
+        "why": "A folder's own page is a LISTING, not a use. Counting it held every concept up in the first rule measured (35 of 37 SNC1W Concepts, GUI-IMPROVEMENTS row 220)."
+      },
+      {
+        "name": "a class that is not numbered goes, even one dated before the first class",
+        "pages": [
+          {
+            "title": "Field Trip",
+            "kind": "class",
+            "visible": true,
+            "links": [],
+            "date": "2026-09-01"
+          },
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "links": [],
+            "date": "2026-09-08"
+          }
+        ],
+        "expectDraft": [
+          "Field Trip"
+        ],
+        "expectUntouched": [
+          "Unit 1, Day 1"
+        ],
+        "why": "Classes go by POSITION: the first class is the first NUMBERED class, the one a rollover gives the first date to. Every other class page goes, numbered or not, whatever its date."
+      },
+      {
+        "name": "a page nothing links to, with no date, goes",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "links": []
+          },
+          {
+            "title": "Scratch Page",
+            "kind": "page",
+            "visible": true,
+            "links": [],
+            "undated": true
+          }
+        ],
+        "expectDraft": [
+          "Scratch Page"
+        ],
+        "expectUntouched": [
+          "Unit 1, Day 1"
+        ],
+        "why": "Step 3. Written ahead and linked from nowhere is the case the issue was filed about."
+      },
+      {
+        "name": "a stray per-section key cannot keep a class visible",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "links": []
+          },
+          {
+            "title": "Unit 1, Day 2",
+            "kind": "class",
+            "visible": true,
+            "links": [],
+            "strayPublishForSection": true
+          }
+        ],
+        "expectDraft": [
+          "Unit 1, Day 2"
+        ],
+        "expectUntouched": [
+          "Unit 1, Day 1"
+        ],
+        "why": "A class page carrying `publishForSection1: true` beside `publish: true`: the build reads the per-section key first, so writing only `publish: false` leaves it published. 'Goes into draft' is asserted by the BUILT SITE's reading of the page, not by which line was written."
+      },
+      {
+        "name": "the first class wins over Key Links and over what it links to, for a class",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "links": [
+              "Unit 1, Day 2"
+            ]
+          },
+          {
+            "title": "Unit 1, Day 2",
+            "kind": "class",
+            "visible": true,
+            "links": []
+          },
+          {
+            "title": "Unit 3, Day 4",
+            "kind": "class",
+            "visible": true,
+            "links": []
+          },
+          {
+            "title": "Key Links",
+            "kind": "keyLinks",
+            "visible": true,
+            "links": [
+              "Unit 3, Day 4"
+            ]
+          }
+        ],
+        "expectDraft": [
+          "Unit 1, Day 2",
+          "Unit 3, Day 4"
+        ],
+        "expectUntouched": [
+          "Unit 1, Day 1",
+          "Key Links"
+        ],
+        "why": "Precedence (plan review M3): a CLASS page is never in the never set except the first class. Step 1 wins, by position, so a Day 1 that says 'Next: [[Unit 1, Day 2]]' does not keep Day 2 up, and neither does Key Links naming a later class."
+      },
+      {
+        "name": "the section's front page is a use, not a listing",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "links": []
+          },
+          {
+            "title": "Section 1",
+            "kind": "sectionFrontPage",
+            "visible": true,
+            "links": [
+              "Help Sessions",
+              "Unit 1, Day 1"
+            ]
+          },
+          {
+            "title": "Help Sessions",
+            "kind": "page",
+            "visible": true,
+            "links": []
+          }
+        ],
+        "expectDraft": [],
+        "expectUntouched": [
+          "Unit 1, Day 1",
+          "Help Sessions"
+        ],
+        "why": "The section's own index.md is what students land on, and it embeds pages like Help Sessions. It is a folder's own page, so it is never touched itself, but unlike any other folder's page its links COUNT as a use in step 3."
+      },
+      {
+        "name": "a club: every meeting after the first goes",
+        "naming": {
+          "word": "Week",
+          "scheme": "numbered",
+          "noun": "meeting"
+        },
+        "pages": [
+          {
+            "title": "Week 1",
+            "kind": "class",
+            "visible": true,
+            "links": [
+              "Club Rules"
+            ]
+          },
+          {
+            "title": "Week 2",
+            "kind": "class",
+            "visible": true,
+            "links": [
+              "Robots"
+            ]
+          },
+          {
+            "title": "Club Rules",
+            "kind": "page",
+            "visible": true,
+            "links": []
+          },
+          {
+            "title": "Robots",
+            "kind": "page",
+            "visible": true,
+            "links": []
+          }
+        ],
+        "expectDraft": [
+          "Week 2",
+          "Robots"
+        ],
+        "expectUntouched": [
+          "Week 1",
+          "Club Rules"
+        ],
+        "expectIntroContains": "Every meeting after “Week 1”",
+        "why": "A numbered course (#267) names its pages 'Week 1', held as unit 1; the first meeting is Week 1 by position, and the sentences say 'meeting'."
+      },
+      {
+        "name": "the first class already in draft is left as it is, and said",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": false,
+            "links": [
+              "Syllabus"
+            ]
+          },
+          {
+            "title": "Unit 1, Day 2",
+            "kind": "class",
+            "visible": true,
+            "links": []
+          },
+          {
+            "title": "Syllabus",
+            "kind": "page",
+            "visible": true,
+            "links": []
+          }
+        ],
+        "expectDraft": [
+          "Unit 1, Day 2"
+        ],
+        "expectUntouched": [
+          "Unit 1, Day 1",
+          "Syllabus"
+        ],
+        "expectWarnings": [
+          "firstClassIsHidden"
+        ],
+        "why": "The operation only ever hides, so a hidden first class stays hidden, and students would see no class at all after it runs. The plan says so before Go (plan review M5)."
+      },
+      {
+        "name": "run twice: nothing to do the second time",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "links": []
+          },
+          {
+            "title": "Unit 1, Day 2",
+            "kind": "class",
+            "visible": true,
+            "links": [
+              "Watt"
+            ]
+          },
+          {
+            "title": "Watt",
+            "kind": "page",
+            "visible": true,
+            "links": []
+          }
+        ],
+        "expectDraft": [
+          "Unit 1, Day 2",
+          "Watt"
+        ],
+        "expectUntouched": [
+          "Unit 1, Day 1"
+        ],
+        "runTwice": true,
+        "why": "The second run finds every page already right, writes nothing, and says wording.nothingToDo."
+      }
+    ],
+    "wordingNote": "Every sentence the app's sheet says, and the plan an outside assistant is shown. Placeholders: {course} {section} {first} (the first class's name) {noun} {nouns} (\"class\"/\"classes\", or \"meeting\"/\"meetings\" in a club) {page} {pages} (a number with its word: \"1 page\", \"12 pages\") {classes} (the same, with the noun) {links} (\"1 link\", \"3 links\") {moment} {backup} (a backup's file name) {code}. The mac pins StartOfYearWording to these key by key (StartOfYearPlannerTests); the two refusals only an outside assistant meets are AssistWording's, in assist-wording.json (startOfYearNeedsItsPlan, startOfYearPlanHasChanged, startOfYearNeedsABackup).",
+    "wording": {
+      "menuItem": "Get Ready for the Start of the Year…",
+      "undoMenuItem": "Undo Getting Ready for the Start of the Year…",
+      "sheetTitle": "Get {course} Section {section} Ready for the Start of the Year",
+      "intro": "Every {noun} after “{first}” goes into draft, with the pages only later {nouns} use. Students keep “{first}”, the pages it links to, your Key Links and the pages they list. Nothing changes for students until you deploy.",
+      "classesHeading": "Going into draft: {classes}",
+      "pagesHeading": "Also going into draft: {pages} only later {nouns} use",
+      "staysHeading": "Staying as they are: {pages}",
+      "alreadyInDraft": "Already in draft, and left as they are: {classes}.",
+      "reasonLaterClass": "comes after “{first}”",
+      "reasonFirstUsedIn": "first used in “{page}”",
+      "reasonOnlyHiddenPagesLink": "only “{page}” links to it, and students will not see that page",
+      "reasonOnlyAFolderLists": "only the “{page}” folder's own page lists it",
+      "reasonNothingLinks": "nothing links to it",
+      "staysFirstClass": "“{first}”, and the {pages} it links to",
+      "staysKeyLinks": "Key Links, and the {pages} it lists",
+      "staysEverythingElse": "Every folder's own page, every curriculum page, and every page something students can still see links to.",
+      "linksLeftHeading": "After this, links on these pages will lead to pages students cannot see yet:",
+      "linksLeftLine": "“{page}”: {links}",
+      "publishingFromNowOn": "From now on, each {noun} you publish needs the pages it uses published with it. Publishing through the assistant does that for you. Publishing a {noun} by changing its page in Obsidian does not, and would leave it with links students cannot follow.",
+      "alreadyTaught": "Dated before today, and going into draft: {classes}. If you have already taught them, students will lose them when you next deploy.",
+      "scheduledDeploy": "This section is set to deploy on its own at {moment}. That will put these changes in front of students.",
+      "firstClassIsHidden": "“{first}” is in draft itself, so students will see no {noun} until you publish it.",
+      "goButton": "Put These into Draft",
+      "nothingToDo": "There is nothing to do: every one of the {nouns} after “{first}” is already in draft, and so is every page only later {nouns} use.",
+      "done": "Put into draft: {pages}. Nothing has changed for students yet — that happens when you deploy.",
+      "undoAvailable": "You can undo this from this section's menu until the section is next deployed, until any of its pages is next published or put into draft, or until you quit Plantoir. After that, the backup “{backup}” is the way back.",
+      "changedSinceShown": "The section changed after this list was made, so nothing was changed. This is the list as it stands now.",
+      "backupFailed": "Plantoir could not save a copy of {course} first, so nothing was changed.",
+      "writeFailed": "Plantoir could not finish putting the pages into draft. The backup “{backup}” holds the course as it was before you pressed the button.",
+      "noFirstClass": "{course} Section {section} has no numbered {noun} yet, so there is no first {noun} to keep. Nothing was changed.",
+      "undoTitle": "Undo Getting {course} Section {section} Ready?",
+      "undoIntro": "Going back to how they were before you got this section ready for the start of the year: {pages}. Nothing changes for students until you deploy.",
+      "undoSkipped": "Changed after that, so staying as they are: {pages}.",
+      "undoButton": "Put Them Back",
+      "undone": "Put back as they were: {pages}.",
+      "undoLeftSome": "Left as they are, because they changed after the section was got ready: {pages}. The backup “{backup}” holds them as they were.",
+      "undoButtonAfterward": "Undo…",
+      "undoHasEnded": "This can no longer be undone here: the section has been deployed, or some of its pages published or put into draft, since.",
+      "backupHoldsIt": "The backup “{backup}” holds the course as it was before.",
+      "undoEndsWhenYouQuit": "This undo is kept only while Plantoir is open. Quitting ends it."
+    },
+    "rejected": [
+      {
+        "instead": "Part of the rollover, or a suggestion in the rollover's reply.",
+        "why": "Decided 2026-09-08 and restated 2026-09-26. A nudge there is one step from coupling them, and that is Russell's call."
+      },
+      {
+        "instead": "Today's unpublish sweep over the later classes (unpublish_pages with onOrAfter).",
+        "why": "Measured by emulation over the payloads: folder landing pages hold every concept up - ~150 SNC1W pages stay published, 35 of 37 Concepts. GUI-IMPROVEMENTS row 220 and the issue's 32 pages are this failure."
+      },
+      {
+        "instead": "Keep what the first class and Key Links reach, hide the rest.",
+        "why": "Concepts link to each other and a Key Links demo page links concepts, so 16 to 25 Concepts survive per payload."
+      },
+      {
+        "instead": "Stored dates for step 2 (the plan as first written).",
+        "why": "After a rollover with no completed build the dates are wrong: 53 (SNC1W) and 79 (ICS3U) concepts stayed published; with no dates, 68 to 97. The link rule needs no dates, no build and no rollover (plan review H1)."
+      },
+      {
+        "instead": "'Everything past Unit 1'.",
+        "why": "Russell said past Day 1, and a unit is weeks of material handed out at once."
+      },
+      {
+        "instead": "An explicit 'not yet taught' flag.",
+        "why": "A new frontmatter key for both apps, the build and the contract; the links already carry the fact."
+      },
+      {
+        "instead": "A local tool, or a fixed phrasing in the assistant window, in this piece.",
+        "why": "A tool shown to the local model is a routing change that needs the suites re-run. The app's button already gives a teacher without the assistant the same act."
+      },
+      {
+        "instead": "Options (a toggle for orphans, 'leave folder-listed pages').",
+        "why": "Two operations, twice the cases, and a boolean on a surface that deliberately has none. One rule, fully previewed, plus undo."
+      },
+      {
+        "instead": "No plan code (the re_date_classes precedent).",
+        "why": "With 170 pages behind one sentence and a plan that can go stale between reading and Go, the code is the only guard against both."
+      },
+      {
+        "instead": "A new backup suffix.",
+        "why": "Backup file names are frozen and shared by both platforms (course-management.json)."
+      },
+      {
+        "instead": "A persistent undo, or one held for the whole app session in place of the action.",
+        "why": "An undo weeks later would put every untouched future page back ahead of a deploy nobody connected with it (plan review M1). The backup is the durable way back."
+      },
+      {
+        "instead": "Publishing the first class, or deploying afterwards.",
+        "why": "It only hides. A deploy is always the teacher's own press."
+      }
+    ]
+  },
+  "sectionCheck": {
+    "appliesOn": [
+      "mac",
+      "windows"
+    ],
+    "note": "What check_section reports: three groups of pages a teacher should know about, and the rules for each. Groups 1 and 2 shipped long before this; they became contract data with #96 (2026-09-26), when the third group was added, because the third is only useful if both apps agree on the other two.",
+    "groups": {
+      "linksIntoHiddenPages": "A link on a page students can see that leads to a page they cannot. Each (page, target) once.",
+      "linkedFromNowhere": "A visible page no page links to. Never a class page, a folder's own page, a curriculum page or the Key Links page.",
+      "linkedButMissed": "A visible page that a class students CANNOT see links to directly, and no class they CAN see links to directly. A visible non-class page linking to it does not rescue it. Never a class page, a folder's own page, a curriculum page, the Key Links page or a page Key Links lists. Its being empty is what proves a bulk change - Get Ready for the Start of the Year, or anything else - finished."
+    },
+    "disjoint": "linkedFromNowhere and linkedButMissed never share a page: a page in the second has a class linking to it.",
+    "whyTheIssuesDefinition": "The plan first defined linkedButMissed as the start-of-year rule's own step 3, which made it empty by construction after the operation - an audit that agrees with the planner by definition and is silent when the planner is wrong. The issue's definition flagged 55 (SNC1W) and 81 (ICS3U) pages in the states where the rule leaks, and 0 when it does not (plan review H2, ruled 2026-09-26).",
+    "sentencesNote": "The three paragraphs check_section writes are inline in each app and are NOT pinned here; the cases pin group MEMBERSHIP. Moving the sentences into named keys is a separate piece.",
+    "howToRunACase": "Lay the section out as startOfYear.howToRunACase does, then read the groups: the page each link is on and the page it leads to, both by title, for expectLinksIntoHidden; titles for the other two. The mac also checks that check_section's text names each page under the right paragraph.",
+    "cases": [
+      {
+        "name": "one page in each group, and a page a visible class also links to in none",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "links": [
+              "Both",
+              "Draft Worksheet"
+            ]
+          },
+          {
+            "title": "Unit 1, Day 2",
+            "kind": "class",
+            "visible": false,
+            "links": [
+              "Missed",
+              "Both"
+            ]
+          },
+          {
+            "title": "Both",
+            "kind": "page",
+            "visible": true,
+            "links": []
+          },
+          {
+            "title": "Missed",
+            "kind": "page",
+            "visible": true,
+            "links": []
+          },
+          {
+            "title": "Draft Worksheet",
+            "kind": "page",
+            "visible": false,
+            "links": []
+          },
+          {
+            "title": "Orphan",
+            "kind": "page",
+            "visible": true,
+            "links": []
+          }
+        ],
+        "expectLinksIntoHidden": [
+          [
+            "Unit 1, Day 1",
+            "Draft Worksheet"
+          ]
+        ],
+        "expectLinkedFromNowhere": [
+          "Orphan"
+        ],
+        "expectLinkedButMissed": [
+          "Missed"
+        ],
+        "why": "The three groups side by side. Both is linked by a hidden class AND a visible one, so it is in no group."
+      },
+      {
+        "name": "class pages and folder pages are never linked from nowhere or linked but missed",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "links": []
+          },
+          {
+            "title": "Unit 1, Day 2",
+            "kind": "class",
+            "visible": false,
+            "links": [
+              "Concepts"
+            ]
+          },
+          {
+            "title": "Concepts",
+            "kind": "folderIndex",
+            "visible": true,
+            "links": []
+          }
+        ],
+        "expectLinksIntoHidden": [],
+        "expectLinkedFromNowhere": [],
+        "expectLinkedButMissed": [],
+        "why": "A class is reached through the site's own list of classes, and a folder's own page is the way in to its folder; 'nothing links to it' is their ordinary state."
+      },
+      {
+        "name": "a hidden page is never linked from nowhere or linked but missed",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "links": []
+          },
+          {
+            "title": "Unit 1, Day 2",
+            "kind": "class",
+            "visible": false,
+            "links": [
+              "Hidden Concept"
+            ]
+          },
+          {
+            "title": "Hidden Concept",
+            "kind": "page",
+            "visible": false,
+            "links": []
+          },
+          {
+            "title": "Hidden Orphan",
+            "kind": "page",
+            "visible": false,
+            "links": []
+          }
+        ],
+        "expectLinksIntoHidden": [],
+        "expectLinkedFromNowhere": [],
+        "expectLinkedButMissed": [],
+        "why": "Both groups are about what students can see."
+      },
+      {
+        "name": "a visible page linking it does not rescue it; only a class counts",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "links": []
+          },
+          {
+            "title": "Unit 2, Day 1",
+            "kind": "class",
+            "visible": false,
+            "links": [
+              "Ohm's Law"
+            ]
+          },
+          {
+            "title": "How Marks Work",
+            "kind": "page",
+            "visible": true,
+            "links": [
+              "Ohm's Law"
+            ]
+          },
+          {
+            "title": "Ohm's Law",
+            "kind": "page",
+            "visible": true,
+            "links": []
+          },
+          {
+            "title": "Key Links",
+            "kind": "keyLinks",
+            "visible": true,
+            "links": [
+              "How Marks Work"
+            ]
+          }
+        ],
+        "expectLinksIntoHidden": [],
+        "expectLinkedFromNowhere": [],
+        "expectLinkedButMissed": [
+          "Ohm's Law"
+        ],
+        "why": "The issue's definition (plan review H2): linked by a class students cannot see, and by no class they can. The concept web and pages like How Marks Work are exactly what held concepts up when the first start-of-year rule leaked, so they must not hide the leak from the audit."
+      },
+      {
+        "name": "a page only a folder lists: in neither group unless a hidden class links it",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "links": []
+          },
+          {
+            "title": "Unit 1, Day 2",
+            "kind": "class",
+            "visible": false,
+            "links": [
+              "Friction"
+            ]
+          },
+          {
+            "title": "Concepts",
+            "kind": "folderIndex",
+            "visible": true,
+            "links": [
+              "Friction",
+              "Gravity"
+            ]
+          },
+          {
+            "title": "Friction",
+            "kind": "page",
+            "visible": true,
+            "links": []
+          },
+          {
+            "title": "Gravity",
+            "kind": "page",
+            "visible": true,
+            "links": []
+          }
+        ],
+        "expectLinksIntoHidden": [],
+        "expectLinkedFromNowhere": [],
+        "expectLinkedButMissed": [
+          "Friction"
+        ],
+        "why": "The folder's own page links both, so neither is 'linked from nowhere'. Friction is used by a hidden class and no visible one, so it is linked but missed. Gravity is in NEITHER group: the audit reports what a class links to; a page nothing but a folder lists is the start-of-year rule's step 3, a different fact."
+      },
+      {
+        "name": "curriculum pages and Key Links are left out",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "links": []
+          },
+          {
+            "title": "Unit 1, Day 2",
+            "kind": "class",
+            "visible": false,
+            "links": [
+              "Overall Expectations",
+              "Glossary"
+            ]
+          },
+          {
+            "title": "Overall Expectations",
+            "kind": "curriculum",
+            "visible": true,
+            "links": []
+          },
+          {
+            "title": "A1.1",
+            "kind": "curriculum",
+            "visible": true,
+            "links": []
+          },
+          {
+            "title": "Key Links",
+            "kind": "keyLinks",
+            "visible": true,
+            "links": [
+              "Glossary"
+            ]
+          },
+          {
+            "title": "Glossary",
+            "kind": "page",
+            "visible": true,
+            "links": []
+          }
+        ],
+        "expectLinksIntoHidden": [],
+        "expectLinkedFromNowhere": [],
+        "expectLinkedButMissed": [],
+        "why": "Group 2 MATCHES Windows, whose LinkGraph.Unreferenced has always left out curriculum pages and the Key Links page (IsExcludedFromSweep): a curriculum page is reached through the coverage map, and Key Links through the panel on every page. Decided with #96 (2026-09-26) rather than pinning the mac's old behaviour, which reported them. Group 3 leaves out the same pages and the pages Key Links lists, which stay up all year by design."
+      },
+      {
+        "name": "a page that links only to itself, used by a hidden class, is linked but missed",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "links": []
+          },
+          {
+            "title": "Unit 1, Day 2",
+            "kind": "class",
+            "visible": false,
+            "links": [
+              "Loop"
+            ]
+          },
+          {
+            "title": "Loop",
+            "kind": "page",
+            "visible": true,
+            "links": [
+              "Loop"
+            ]
+          }
+        ],
+        "expectLinksIntoHidden": [],
+        "expectLinkedFromNowhere": [],
+        "expectLinkedButMissed": [
+          "Loop"
+        ],
+        "why": "A page's link to itself rescues nothing. (Whether a self-link alone keeps a page out of group 2 is left as each app has it today and not pinned here.)"
       }
     ]
   }

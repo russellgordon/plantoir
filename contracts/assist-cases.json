@@ -2875,9 +2875,36 @@
         "name" : "what a page links to is answered in code, marks the draft, and ends the turn",
         "when" : "say",
         "why" : "Measured on 2026-09-25 (issue #167): \"What does Unit 2, Day 3 link to?\" reached read_page 0 times in 84 on BOTH assistants, across six courses and fourteen dates. It is answered in code now, and the half this case exists for is the END of the turn: a code-matched turn never puts the teacher's sentence into the model's conversation, so handing the answer back would give the model a tool result with no question in front of it - the lap on which the smaller assistant turned this read-only question into a publish plan. The fixture is a published \"Unit 1, Day 1\" whose body links to \"Unit 1, Day 2\", a draft. expectModelRequests counts the requests the engine received over the whole conversation; a transcript cannot show an ABSENCE, so this is the assertion that proves the model was never asked."
+      },
+      {
+        "expectReply" : "wording.startOfYearNeedsItsPlan",
+        "given" : {
+          "visibleClasses" : [
+            "Unit 1, Day 1",
+            "Unit 1, Day 2"
+          ]
+        },
+        "name" : "getting a section ready without the plan's code writes nothing and hands back the plan",
+        "when" : "prepare_for_start_of_year",
+        "why" : "The write is reachable without a code - planCode is deliberately not required in the schema - and its answer is the plan with its code, not an error. A client that skipped the plan must not be able to hide a whole year behind one sentence (#96)."
+      },
+      {
+        "expectReply" : "wording.startOfYearPlanHasChanged",
+        "given" : {
+          "arguments" : {
+            "planCode" : "00000000"
+          },
+          "visibleClasses" : [
+            "Unit 1, Day 1",
+            "Unit 1, Day 2"
+          ]
+        },
+        "name" : "getting a section ready with a code that no longer fits writes nothing",
+        "when" : "prepare_for_start_of_year",
+        "why" : "A code is a promise that the section is still the one the teacher was shown. A page changed between plan and write, or a code from another plan, gets the plan as it stands now and nothing written (#96). '00000000' stands for any code this platform's plan did not issue."
       }
     ],
-    "note" : "What must happen, and in what ORDER. The order is the assertion: every wrong ordering still passes a test that only checks all three events occurred. Event names are this contract's own; map them to whatever your app calls them. `given.saying` is a CONVERSATION — what the teacher types, in order, each turn settled before the next — because some behaviour exists only across turns; when it is absent a single turn is run, using whichever fixed phrasing reaches `given.pending`. `when` says what the teacher does on the LAST turn: \"approve\" presses Go on the card that is waiting (and fails if none is), \"decline\" presses Cancel, \"say\" means the last turn is ANSWERED rather than proposed, so nothing is waiting and a card there is the failure the case exists to catch; anything else is a tool name, called directly. `expectTranscriptContains` matches each named line by speaker PREFIX and sentence SUBSTRING, in order but not necessarily adjacent, and a line may satisfy more than one expectation — one reply often composes several named sentences into a single bubble. A literal line that is not a `wording.` name is matched as written, which is how a case anchors later expectations to a particular TURN. `expectModelRequests`, when present, is how many requests the engine must have received over the WHOLE conversation - 0 means the model was never asked. A transcript cannot show an absence, so a turn that must END in code (and not hand its answer back to the model for another lap) is proved by this count; the mac runs such a case against a stub engine that answers whatever it is sent, so a regression fails on the count rather than hanging."
+    "note" : "What must happen, and in what ORDER. The order is the assertion: every wrong ordering still passes a test that only checks all three events occurred. Event names are this contract's own; map them to whatever your app calls them. `given.saying` is a CONVERSATION — what the teacher types, in order, each turn settled before the next — because some behaviour exists only across turns; when it is absent a single turn is run, using whichever fixed phrasing reaches `given.pending`. `when` says what the teacher does on the LAST turn: \"approve\" presses Go on the card that is waiting (and fails if none is), \"decline\" presses Cancel, \"say\" means the last turn is ANSWERED rather than proposed, so nothing is waiting and a card there is the failure the case exists to catch; anything else is a tool name, called directly. `expectTranscriptContains` matches each named line by speaker PREFIX and sentence SUBSTRING, in order but not necessarily adjacent, and a line may satisfy more than one expectation — one reply often composes several named sentences into a single bubble. A literal line that is not a `wording.` name is matched as written, which is how a case anchors later expectations to a particular TURN. `expectModelRequests`, when present, is how many requests the engine must have received over the WHOLE conversation - 0 means the model was never asked. A transcript cannot show an absence, so a turn that must END in code (and not hand its answer back to the model for another lap) is proved by this count; the mac runs such a case against a stub engine that answers whatever it is sent, so a regression fails on the count rather than hanging. `given.visibleClasses`, when present, lays out those class pages, published, in section 1 before the call (the first is the first class); `given.arguments` is merged into the direct call's arguments, which are otherwise just the course and section (#96)."
   },
   "tools" : {
     "all" : [
@@ -2929,17 +2956,20 @@
       "back_up_course",
       "list_curriculum_expectations",
       "plan_curriculum_mentions",
-      "add_curriculum_mentions"
+      "add_curriculum_mentions",
+      "plan_prepare_for_start_of_year",
+      "prepare_for_start_of_year"
     ],
     "needsApproval" : [
       "deploy_section",
       "schedule_deploy"
     ],
-    "note" : "Three lists, deliberately. `all` is what the runner can execute; `local` is what the small model is SHOWN (the plan twins and remember_timetable are taken off, because the model never has to name a plan and dates it supplies are dates it may have invented); `mcpOnly` is the ten offered to Claude Code on top of everything — three asking for judgement about meaning, the rest either never needed by a model scoped to one section or already reachable by it through a fixed phrasing.",
+    "note" : "Three lists, deliberately. `all` is what the runner can execute; `local` is what the small model is SHOWN (the plan twins and remember_timetable are taken off, because the model never has to name a plan and dates it supplies are dates it may have invented); `mcpOnly` is the twelve offered to Claude Code on top of everything — three asking for judgement about meaning, two that get a whole section ready for the start of the year (a change a person should read in full, with a button of its own in the app), the rest either never needed by a model scoped to one section or already reachable by it through a fixed phrasing.",
     "planTwins" : {
       "add_classes" : "plan_add_classes",
       "add_next_class" : "plan_add_next_class",
       "make_room_for_classes" : "plan_make_room_for_classes",
+      "prepare_for_start_of_year" : "plan_prepare_for_start_of_year",
       "publish_class_on" : "plan_publish_class_on",
       "publish_pages" : "plan_publish_pages",
       "re_date_classes" : "plan_re_date_classes",
@@ -4292,6 +4322,58 @@
               "section",
               "page",
               "codes"
+            ],
+            "type" : "object"
+          }
+        },
+        "type" : "function"
+      },
+      {
+        "function" : {
+          "description" : "Work out what getting a section ready for the start of the year would do, changing nothing. Lists every page that would go into draft and why, what stays, the links that would lead to hidden pages, and the plan code prepare_for_start_of_year needs.",
+          "name" : "plan_prepare_for_start_of_year",
+          "parameters" : {
+            "properties" : {
+              "course" : {
+                "description" : "The course code, for example ICS3U.",
+                "type" : "string"
+              },
+              "section" : {
+                "description" : "The section number, for example 1.",
+                "type" : "integer"
+              }
+            },
+            "required" : [
+              "course",
+              "section"
+            ],
+            "type" : "object"
+          }
+        },
+        "type" : "function"
+      },
+      {
+        "function" : {
+          "description" : "TEACHERS SAY: \"get ready for the start of the year\", \"put everything after the first class into draft\", \"hide every class past Day 1\". Put every class after the first into draft, with the pages only later classes use, leaving the first class, the pages it links to, Key Links and the pages it lists, folder pages and curriculum pages as they are. Call plan_prepare_for_start_of_year FIRST, show the teacher the whole plan and wait for them to agree; then pass the code the plan gave. The course is backed up first, and undo_last_change takes it back. Nothing reaches students until they deploy.",
+          "name" : "prepare_for_start_of_year",
+          "parameters" : {
+            "properties" : {
+              "course" : {
+                "description" : "The course code, for example ICS3U.",
+                "type" : "string"
+              },
+              "planCode" : {
+                "description" : "The code on the last line of the plan plan_prepare_for_start_of_year gave, for example \"3f9a1c07\". Without it, or if the section has changed since, nothing is changed and the current plan comes back instead.",
+                "type" : "string"
+              },
+              "section" : {
+                "description" : "The section number, for example 1.",
+                "type" : "integer"
+              }
+            },
+            "required" : [
+              "course",
+              "section"
             ],
             "type" : "object"
           }
