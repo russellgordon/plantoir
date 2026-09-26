@@ -851,10 +851,9 @@ nonisolated struct ProblemReportStore {
     /// its own single line. A file that needs no trimming is never
     /// rewritten, so its bytes are left exactly as they were.
     static func trimIfTooLong(_ url: URL) {
-        guard let data = try? Data(contentsOf: url) else {
+        guard let text = ProblemReportStore.trailText(at: url) else {
             return
         }
-        let text: String = String(decoding: data, as: UTF8.self)
         let kept: String = ProblemReportStore.trimmed(text)
         if kept.utf8.count == text.utf8.count {
             return
@@ -899,27 +898,91 @@ nonisolated struct ProblemReportStore {
     /// teacher ticks the box. Everything else — which tool was chosen, with
     /// which arguments filled in, how long it took — goes either way, and
     /// that is most of what a routing problem is diagnosed from.
+    ///
+    /// Read leniently (#301): one byte that cannot be read used to make this
+    /// come back empty, so the report left the trail out and a teacher with
+    /// no task records was told there was nothing to send. Every line is
+    /// kept, what cannot be read shows as U+FFFD, and a note at the top says
+    /// how many of the lines SHOWN carry one. A readable file with the
+    /// prompts included comes back exactly as it is on disk. The rule, with
+    /// its cases, is `contracts/shared-rules.json` → `problemReportTrail`.
     func activityText(includingPrompts: Bool) -> String {
         let url: URL = folderURL.appendingPathComponent(ProblemReportStore.activityFileName)
-        guard let text = try? String(contentsOf: url, encoding: .utf8) else {
+        guard let text = ProblemReportStore.trailText(at: url) else {
             return ""
         }
-        if includingPrompts {
-            return text
-        }
-        var kept: [String] = []
+        var shownLines: [String] = []
         var droppedAny: Bool = false
         for line in text.components(separatedBy: "\n") {
-            if line.hasPrefix(AssistTurnRecord.promptMarker) {
+            if !includingPrompts && line.hasPrefix(AssistTurnRecord.promptMarker) {
                 droppedAny = true
                 continue
             }
-            kept.append(line)
+            shownLines.append(line)
         }
+        var notes: [String] = []
         if droppedAny {
-            kept.insert("(What the teacher typed was left out of this report.)", at: 0)
+            notes.append(ProblemReportStore.promptsLeftOutNote)
         }
-        return kept.joined(separator: "\n")
+        let damagedLineCount: Int = ProblemReportStore.linesWithUnreadableCharacters(in: shownLines)
+        if damagedLineCount > 0 {
+            notes.append(ProblemReportStore.unreadableCharactersNote(lineCount: damagedLineCount))
+        }
+        return (notes + shownLines).joined(separator: "\n")
+    }
+
+    /// Put at the top of the trail when the teacher's own sentences were
+    /// left out. `problemReportTrail.promptsLeftOutNote` in the contract.
+    static let promptsLeftOutNote: String = "(What the teacher typed was left out of this report.)"
+
+    /// Put at the top of the trail when lines in it carry characters that
+    /// could not be read (#301). No plural branch: "on 1 of these lines" and
+    /// "on 3 of these lines" both read naturally. No word about bytes or
+    /// encodings, because a teacher reads it (rule 1).
+    /// `problemReportTrail.unreadableCharactersNote` in the contract.
+    static func unreadableCharactersNote(lineCount: Int) -> String {
+        return "(Some characters on \(lineCount) of these lines could not be read, and are shown as \u{FFFD}.)"
+    }
+
+    /// How many of `lines` hold U+FFFD anywhere — whether this read put it
+    /// there or an earlier trim did, since in this file it always means
+    /// "something here could not be read".
+    ///
+    /// Walks SCALARS on purpose. U+FFFD followed by a combining mark is one
+    /// grapheme, and `String.contains` — with a `Character` or a `String` —
+    /// then answers false (measured: `{C3}{CC}{81}` decodes to exactly that).
+    static func linesWithUnreadableCharacters(in lines: [String]) -> Int {
+        var count: Int = 0
+        for line in lines {
+            var holdsOne: Bool = false
+            for scalar in line.unicodeScalars {
+                if scalar.value == 0xFFFD {
+                    holdsOne = true
+                    break
+                }
+            }
+            if holdsOne {
+                count += 1
+            }
+        }
+        return count
+    }
+
+    /// The trail file as text, or nil when it cannot be read at all.
+    ///
+    /// The ONE decode rule for this file, used by the trim and by the report
+    /// alike so the two cannot drift apart. Lenient, because the file has
+    /// writers that are not the app — every launcher appends with `printf`,
+    /// which passes any byte — and a teacher can open it in any editor. Each
+    /// ill-formed sequence becomes one U+FFFD, and since 0x0A never occurs
+    /// inside a UTF-8 multibyte sequence a replacement never swallows a line
+    /// break (measured: `a {E2}{80}\n` keeps the next line intact). What the
+    /// report shows is therefore what the file will say after its next trim.
+    static func trailText(at url: URL) -> String? {
+        guard let data = try? Data(contentsOf: url) else {
+            return nil
+        }
+        return String(decoding: data, as: UTF8.self)
     }
 
     /// Drops the oldest lines once the file has grown past its limit.
