@@ -308,6 +308,25 @@ else
   cat /tmp/verify_reference_course_test.log
 fi
 
+# The teacher's How I Teach page is never on the website (#209): the name
+# rule against the contract's nameCases, discovery, preflight, the lists the
+# copy loops read and the final sweep. The real build is checked further down.
+if (cd scripts && python3 test_how_i_teach.py) >/tmp/verify_how_i_teach_test.log 2>&1; then
+  pass "the How I Teach page is never listed, copied or left in a site's pages (scripts/test_how_i_teach.py)"
+else
+  fail "the How I Teach page is never listed, copied or left in a site's pages (scripts/test_how_i_teach.py)"
+  cat /tmp/verify_how_i_teach_test.log
+fi
+
+# What the LOCAL model is shown has not moved a byte (#209's plan review):
+# the full digest of toolSchemas.local, made by research/ai-assist/toolhash.py.
+if (cd scripts && python3 test_tool_surface_digest.py) >/tmp/verify_tool_digest_test.log 2>&1; then
+  pass "the local assistant's thirteen tools are the ones routing was measured against (scripts/test_tool_surface_digest.py)"
+else
+  fail "the local assistant's thirteen tools are the ones routing was measured against (scripts/test_tool_surface_digest.py)"
+  cat /tmp/verify_tool_digest_test.log
+fi
+
 # RUNS deploy.sh, where the test above only reads it. That distinction is the
 # reason this exists: the flag was written on a machine with no bash, and
 # starting the script found two things in prompt_for_cf_account that reading it
@@ -1011,6 +1030,7 @@ check_baked scripts/site_health.py        /opt/scripts/site_health.py
 # stands for the directory — the Dockerfile copies it wholesale.
 check_baked contracts/class-planning.json /opt/contracts/class-planning.json
 check_baked scripts/page_visibility.py    /opt/scripts/page_visibility.py
+check_baked scripts/how_i_teach.py        /opt/scripts/how_i_teach.py
 check_baked scripts/setup_course.py       /opt/scripts/setup_course.py
 check_baked scripts/build_site.py         /opt/scripts/build_site.py
 check_baked scripts/deploy.py             /opt/scripts/deploy.py
@@ -1065,6 +1085,29 @@ echo ""
 echo "🧹 Removing existing '$CONTAINER_NAME' container so the launcher recreates it"
 echo "   from ${DEV_TEST_IMAGE}…"
 docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+
+# ---- #209: How I Teach pages, planted for the build below ----
+# Three pages, each carrying its own sentinel phrase so the check after the
+# build can look for the WORDS anywhere in the site (pages, contentIndex.json,
+# the sitemap, the RSS feed) rather than for a file name — the section's page
+# is spelled in capitals, whose web address a case-sensitive name check would
+# miss (#209 plan review, item 9). The course's settings are made to LIST the
+# two reserved pages, the way a course whose page predates the rule does, so
+# the preflight drop runs for real; they are put back afterwards.
+HIT_COURSE="courses/EXC2O"
+HIT_CONFIG_BACKUP="$(mktemp -t cq4t-hit-config)"
+cp "$HIT_COURSE/course_config.json" "$HIT_CONFIG_BACKUP"
+printf 'I teach by plantoir-hit-sentinel-course-7f3a.\n' > "$HIT_COURSE/How I Teach.md"
+printf 'I teach by plantoir-hit-sentinel-section-7f3a.\n' > "$HIT_COURSE/section1/HOW I TEACH.md"
+printf 'A look-alike page: plantoir-hit-sentinel-lookalike-7f3a.\n' > "$HIT_COURSE/How I Teach 1.md"
+python3 - "$HIT_COURSE/course_config.json" <<'PY'
+import json, sys
+path = sys.argv[1]
+config = json.load(open(path, encoding="utf-8"))
+config.setdefault("shared_files", []).append("How I Teach.md")
+config.setdefault("per_section_files", []).append("HOW I TEACH.md")
+json.dump(config, open(path, "w", encoding="utf-8"), indent=2, ensure_ascii=False)
+PY
 
 STAMP_FILE="$(mktemp -t cq4t-stamp)"
 echo ""
@@ -1137,6 +1180,49 @@ if [[ -f "$SITE_INDEX" ]]; then
   done
   [[ "$ICON_OK" == "true" ]] && pass "Built site carries and links the Plantoir icon (tab, root, Apple touch)"
 fi
+
+# -------------------- 6h. The How I Teach page never reaches the site (#209) ----
+# The pages planted before the build above, looked for by their WORDS across
+# everything the site serves. Two halves that fail independently: the two
+# reserved pages must be nowhere, and the look-alike MUST be there — a site
+# that built nothing would pass the first half alone.
+HIT_OK="true"
+if [[ -d "$SITE_PUBLIC" ]]; then
+  for sentinel in plantoir-hit-sentinel-course-7f3a plantoir-hit-sentinel-section-7f3a; do
+    if grep -rIliq -- "$sentinel" "$SITE_PUBLIC"; then
+      fail "A How I Teach page reached the built site: '$sentinel' is in $(grep -rIli -- "$sentinel" "$SITE_PUBLIC" | head -3 | tr '\n' ' ')"
+      HIT_OK="false"
+    fi
+  done
+  if ! grep -rIliq -- plantoir-hit-sentinel-lookalike-7f3a "$SITE_PUBLIC"; then
+    fail "The look-alike page 'How I Teach 1' is missing from the built site — it is an ordinary page and must be published (without it the check above proves nothing)"
+    HIT_OK="false"
+  fi
+else
+  fail "No built site at $SITE_PUBLIC to check for How I Teach pages"
+  HIT_OK="false"
+fi
+if python3 - "$HIT_COURSE/course_config.json" <<'PY'
+import json, sys
+config = json.load(open(sys.argv[1], encoding="utf-8"))
+listed = [n for n in config.get("shared_files", []) + config.get("per_section_files", [])
+          if n.lower() in ("how i teach.md",)]
+sys.exit(1 if listed else 0)
+PY
+then :; else
+  fail "The course's settings still list a How I Teach page after a build — preflight did not drop it"
+  HIT_OK="false"
+fi
+for planted in "$HIT_COURSE/How I Teach.md" "$HIT_COURSE/section1/HOW I TEACH.md"; do
+  if [[ ! -f "$planted" ]]; then
+    fail "The build removed the teacher's own $planted — only the site's copy may ever be removed"
+    HIT_OK="false"
+  fi
+done
+[[ "$HIT_OK" == "true" ]] && pass "No How I Teach page reaches the built site, the look-alike does, and the teacher's own pages are untouched (#209)"
+rm -f "$HIT_COURSE/How I Teach.md" "$HIT_COURSE/section1/HOW I TEACH.md" "$HIT_COURSE/How I Teach 1.md"
+cp "$HIT_CONFIG_BACKUP" "$HIT_COURSE/course_config.json"
+rm -f "$HIT_CONFIG_BACKUP"
 
 # -------------------- 6c. An existing teacher's container is recreated ------
 # Every container that exists today was made WITHOUT the builds mount, and a

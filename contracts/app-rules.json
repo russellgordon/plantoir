@@ -1535,12 +1535,15 @@
     ],
     "courseIsNamedInTheGreetingOnly" : "The server is given the WORKING FOLDER, never a course, so every course in the folder is reachable from either door. The only thing that points a session at one course is the greeting. This is a real difference from the assistant Plantoir carries itself, whose window is bound to one section and refuses any other course (assist-cases.json -> windowBinding), and it is stated here because a reader who assumed otherwise would give a door a narrowing it does not have.",
     "greetingCarriesNoDoubleQuotes" : "The greeting is passed as one shell argument, so double quotes are replaced with apostrophes before it goes anywhere near a command line.",
+    "greetingHowITeachSentence" : "Then read my How I Teach page for this course, and keep to it in anything you write for me.",
+    "greetingHowITeachSentenceWhy" : "GitHub #209. The sentence is the same whether or not a page exists (the read tool's answer handles a missing one, and offers a draft), so it is one string both platforms pin and neither has to look at the disk when the menu item is clicked. It names no tool, because the teacher sees the greeting in their terminal as their own words. It is the LOAD-BEARING channel for the page: measured for the Codex door (documentation/10, 'What was MEASURED for the Codex door'), a tool whose description says 'call first' was deferred, while the greeting was acted on at once. Comes straight after the sentence about listing the sections. See shared-rules.json -> howITeachPage.",
     "greetingIsTheSameForEveryAgent" : true,
     "greetingMustSay" : [
       "the course it is about, by code, and its name when that differs",
       "that the plantoir tools are the way to do anything to do with this course",
       "that the session should start by listing the course's sections",
-      "that before anything is changed the matching plan tool is used first, shown to the teacher in plain words, and agreed to"
+      "that before anything is changed the matching plan tool is used first, shown to the teacher in plain words, and agreed to",
+      "that the session should read the teacher's How I Teach page for the course and keep to it (greetingHowITeachSentence, verbatim)"
     ],
     "handedToATerminal" : "The mac writes an executable .command script into the app's own data directory and hands it to iTerm (when it is already running) or Terminal, through LaunchServices rather than AppleScript so that no Automation permission is asked for. Windows has no such file: it hands the command line straight to `wt.exe -d <folder> cmd /k …`, or to cmd when Windows Terminal is absent. The SCRIPT is therefore the mac's mechanism, which is why it is listed separately from what is written for the CONNECTION.",
     "hiddenWhenNotInstalled" : true,

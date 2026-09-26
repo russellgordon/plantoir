@@ -73,6 +73,10 @@ COPY scripts/class_pages.py /opt/scripts/class_pages.py
 # One home for "does the built site show this page?" — read by build_site.py
 # and setup_course.py, and pinned by contracts/file-formats.json.
 COPY scripts/page_visibility.py /opt/scripts/page_visibility.py
+# The teacher's How I Teach page is never on the website (#209): build_site.py
+# asks this at discovery, preflight, the copy lists and a final sweep. Imported
+# by bare name, so it must be baked beside it (test_baked_modules.py).
+COPY scripts/how_i_teach.py /opt/scripts/how_i_teach.py
 # Which processes belong to a section's preview — the one answer, imported by
 # build_site.py before a build for publishing so the preview server cannot
 # overwrite what was just built. `preview.sh --stop` does NOT run this copy:
