@@ -325,7 +325,8 @@ this account's own programs included. It then asks once more whether the
 workspace is RUNNING (another launcher for the same folder started it a
 moment ago: the listener is its forward, and it is used as it is), and
 otherwise takes the same remake as a refusal: the two ♻️ lines, a plain
-`docker rm`, `run_container_with_mount`, and the marker
+`docker rm`, `run_container_with_mount`, and — only once that has
+succeeded — the marker
 `PLANTOIR_PREVIEW_ADDRESS_HELD: before-start <port> <course>/<section>`,
 which the app writes onto the trail as the `preview address held by another
 account` event. If `docker rm` is refused and the workspace is not running,
@@ -396,7 +397,7 @@ Three layers now, each closing a hole the others cannot:
   onto a held port itself ("Ports are not available"), which the refusal path
   handles; any other engine was never measured and must not pay a remake on
   a guess. A developer whose shell sets `DOCKER_HOST` to anything outside
-  `~/.colima/` switches both off — `docker context show` then says `default`
+  `~/.colima/` (or `$COLIMA_HOME`, for a Colima kept elsewhere) switches both off — `docker context show` then says `default`
   whatever the engine — and the preview says so on the trail (the
   `unchecked` outcome) rather than going quiet. The app never sets it.
 - The look before a start can remake a workspace stopped a moment ago
@@ -1359,9 +1360,11 @@ harness's PATH is the real one, so a program stub would let the real
 `netstat` in), and `scripts/test_port_blocks.py` →
 `TheLookBeforeTheAnnouncement` runs the real remake behind it.
 
-When it is somebody else's: the ♻️ lines, the marker
-`PLANTOIR_PREVIEW_ADDRESS_HELD: remade <port> <course>/<section>`, and
-`remake_the_workspace` — so #94's look applies, and an open preview of
+When it is somebody else's: the ♻️ lines, `remake_the_workspace`, and only
+after it RETURNS the marker
+`PLANTOIR_PREVIEW_ADDRESS_HELD: remade <port> <course>/<section>` (a remake
+#94 refuses exits inside it, so the trail gets #94's line and never a claim
+of a rebuild that did not happen) — so #94's look applies, and an open preview of
 another section from this folder refuses with #94's own sentence rather than
 being ended. The remade workspace's walk reads the kernel's list, so its new
 block is free when it is picked; the address is asked for, reached and
@@ -1387,7 +1390,7 @@ port costs only refresh, and #234 declined the same widening.
 port, an unreadable kernel list, a missing `lsof`, or an EMPTY `lsof` list
 (this account always owns `limactl`'s listeners under Colima, so empty means
 `lsof` did not work) — each goes ahead as before #310. `DOCKER_HOST` naming
-anything outside `~/.colima/` switches the look off and prints the
+anything outside `~/.colima/` or `$COLIMA_HOME` switches the look off (a `tcp://` address at the Colima VM itself is still Colima, and is read as not — a developer-only corner) and prints the
 `unchecked` marker once, so a developer's trail says the look was not made.
 
 **Where "which account" is not said.** The sentence names both things the
