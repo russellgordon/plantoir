@@ -1,0 +1,528 @@
+{
+  "note": "Which ICS3U activity pages reach which AP Computer Science Principles learning objectives, for the marketing working folder (~/Plantoir Marketing) only — never the shipped ICS3U payload. marketing_folder.py appends one embed per code (![[CRD-2.I]]) inside each page's existing '## Curriculum connection' block, after the Ontario embeds, so the College Board map counts the page exactly as the Ontario map does. Drafted 2026-09-26 from the website plan's skill-keyed table and RE-KEYED to learning objectives (ruling Q1); every row was checked against the page's full text by three independent Opus readers, and 'evidence' quotes the ICS3U page (our words, not the College Board's). A row nobody could defend from the page was dropped, not softened; they are listed under 'dropped' so they are not proposed again. The reasons are in our own words.",
+  "course": "ICS3U",
+  "folder": "College Board Curriculum",
+  "rows": [
+    {
+      "page": "Concepts/Boolean Logic",
+      "codes": [
+        "AAP-2.F",
+        "AAP-2.E",
+        "AAP-2.L"
+      ],
+      "reason": "Students combine conditions with and/or/not using a truth table, store a comparison's True/False result in a variable, and see that a negated compound condition can be rewritten as an equivalent one.",
+      "evidence": "Conditions that combine deserve an operator, not a staircase."
+    },
+    {
+      "page": "Concepts/Computers and Society",
+      "codes": [
+        "IOC-2.A",
+        "IOC-1.D",
+        "IOC-1.A"
+      ],
+      "reason": "Students question how much personal data their own program stores, look for rules and biases a program quietly builds in, and weigh computing's harms against the good it does.",
+      "evidence": "A face-recognition system that works less well on some faces than others is a design decision showing up as a failure rate"
+    },
+    {
+      "page": "Concepts/Computers and the Environment",
+      "codes": [
+        "IOC-1.A"
+      ],
+      "reason": "Students weigh the environmental and health harms of making, running and discarding devices against the ways computing helps environmental work.",
+      "evidence": "The same machines also make environmental work possible"
+    },
+    {
+      "page": "Concepts/Decomposition and Design",
+      "codes": [
+        "AAP-3.B",
+        "CRD-2.F",
+        "AAP-2.G"
+      ],
+      "reason": "Students break a request into small pieces that each become a function, and describe the design in pseudocode with a branch and in charts the person who asked can check.",
+      "evidence": "One piece, one function"
+    },
+    {
+      "page": "Concepts/Files and Persistence",
+      "codes": [
+        "IOC-2.A",
+        "CRD-2.I"
+      ],
+      "reason": "Students write and read files, handle the missing-file error their program is certain to meet, and decide what personal information a file should hold at all.",
+      "evidence": "Storing data about people is a decision, not a default"
+    },
+    {
+      "page": "Concepts/Formulas as Algorithms",
+      "codes": [
+        "AAP-2.B",
+        "AAP-2.C",
+        "CRD-2.J"
+      ],
+      "reason": "Students turn a formula into ordered, named arithmetic steps and check the program against one hand-worked example kept as a test case.",
+      "evidence": "Order the calculations so nothing is used before it exists."
+    },
+    {
+      "page": "Concepts/From Source to Running Program",
+      "codes": [
+        "CRD-2.I"
+      ],
+      "reason": "Students learn why a syntax error stops a program before it starts while an error like a NameError appears only when the running program reaches that line.",
+      "evidence": "the translation failed before the work began"
+    },
+    {
+      "page": "Concepts/Functions",
+      "codes": [
+        "AAP-3.C",
+        "AAP-3.A",
+        "AAP-3.B"
+      ],
+      "reason": "Students write a function so a repeated chunk lives in one place, name its parts, and work out what a call returns, including why a printing function returns None.",
+      "evidence": "A function is the fix: name a chunk of thinking once, then use the name."
+    },
+    {
+      "page": "Concepts/Input and Output",
+      "codes": [
+        "CRD-2.C",
+        "CRD-2.D",
+        "AAP-1.A"
+      ],
+      "reason": "Students read typed input into variables, convert it from text to the right type, and design the prompts and formatted output a user sees.",
+      "evidence": "always as text, never as a number"
+    },
+    {
+      "page": "Concepts/Keeping Data Safe",
+      "codes": [
+        "IOC-2.C",
+        "IOC-2.B"
+      ],
+      "reason": "Students learn how malware and phishing get in and build a protection routine of updates, strong unique passwords with two-factor, and backups.",
+      "evidence": "Long, unique passwords in a password manager; two-factor on anything that matters"
+    },
+    {
+      "page": "Concepts/Lists",
+      "codes": [
+        "AAP-1.D",
+        "AAP-2.N",
+        "AAP-2.O"
+      ],
+      "reason": "Students replace many separate variables with one list, index, insert and remove elements, and traverse a list to search it and find the highest value.",
+      "evidence": "Data that arrives together should live together."
+    },
+    {
+      "page": "Concepts/Making Decisions",
+      "codes": [
+        "AAP-2.H",
+        "AAP-2.I",
+        "AAP-2.G"
+      ],
+      "reason": "Students draw a decision as a flow chart, write if/elif/else chains and nested ifs, and predict which branch runs, including one that can never be reached.",
+      "evidence": "In an `elif` chain, the most demanding condition goes first"
+    },
+    {
+      "page": "Concepts/Parameters, Returns, and Scope",
+      "codes": [
+        "AAP-3.A",
+        "AAP-3.C",
+        "AAP-3.B"
+      ],
+      "reason": "Students write functions with parameters, defaults and return values, trace what each call produces, and build reusable small functions out of other functions.",
+      "evidence": "which is what modularity actually buys you"
+    },
+    {
+      "page": "Concepts/Repetition",
+      "codes": [
+        "AAP-2.K",
+        "AAP-2.O",
+        "AAP-2.M"
+      ],
+      "reason": "Students write counted and conditional loops, spot a loop that never ends, and use the accumulator pattern over a list as a reusable skeleton for totals, maximums and counts.",
+      "evidence": "the same skeleton finds a highest value, counts how many items match a condition"
+    },
+    {
+      "page": "Concepts/Testing and Debugging",
+      "codes": [
+        "CRD-2.I",
+        "CRD-2.J"
+      ],
+      "reason": "Students tell syntax, run-time and logic errors apart, find a bug by hand-tracing, and write a test plan of chosen inputs with expected results at the boundaries.",
+      "evidence": "A test plan is a table"
+    },
+    {
+      "page": "Concepts/The Software Development Process",
+      "codes": [
+        "CRD-2.E",
+        "CRD-2.F"
+      ],
+      "reason": "Students follow the phases from problem definition to maintenance, build a thin end-to-end version first, and gather requirements by interviewing the person the program is for.",
+      "evidence": "Specifications come from people"
+    },
+    {
+      "page": "Concepts/Variables and Data Types",
+      "codes": [
+        "AAP-1.A",
+        "AAP-1.B",
+        "DAT-1.A"
+      ],
+      "reason": "Students name values in variables, read assignment as replacing a stored value, choose among int, float, str and bool, and see that every type is stored as bits.",
+      "evidence": "RAM holds nothing but binary"
+    },
+    {
+      "page": "Concepts/What a Program Is",
+      "codes": [
+        "CRD-2.B",
+        "CRD-2.C",
+        "CRD-2.D"
+      ],
+      "reason": "Students learn what a program is and name the input, processing and output of a small program before writing any code.",
+      "evidence": "Input: the minutes for each day. Process: add them up, divide by seven. Output: one sentence she can read on the bus."
+    },
+    {
+      "page": "Concepts/Where the Field Is Going",
+      "codes": [
+        "CRD-1.A"
+      ],
+      "reason": "Students look at how computing joined with other fields produces results neither field could reach alone.",
+      "evidence": "Pointed at another field's questions, it produces results neither could reach alone"
+    },
+    {
+      "page": "Concepts/Where to Take It, and Who to Ask",
+      "codes": [
+        "IOC-2.A"
+      ],
+      "reason": "Students learn that a device given away with their files still on it exposes personal data, and how to erase it properly.",
+      "evidence": "A donated laptop with your files still on it is a privacy incident wearing a good deed's clothes."
+    },
+    {
+      "page": "Concepts/Working with Text",
+      "codes": [
+        "AAP-1.C",
+        "AAP-2.D",
+        "AAP-3.D"
+      ],
+      "reason": "Students index and slice strings, join them, and clean user input with built-in string methods rather than writing their own.",
+      "evidence": "A string is characters in order, indexed exactly like a list"
+    },
+    {
+      "page": "Discussions/Who Gets to Build",
+      "codes": [
+        "CRD-1.A",
+        "IOC-1.D"
+      ],
+      "reason": "Students discuss how a team that shares one background overlooks other people's problems, and what that does to who software serves.",
+      "evidence": "Whose problems get solved first when a team all share the same background"
+    },
+    {
+      "page": "Exercises/Formula Practice",
+      "codes": [
+        "AAP-1.A",
+        "AAP-2.C",
+        "CRD-2.J"
+      ],
+      "reason": "Students turn formulas into programs with well-named variables and arithmetic, then check results against a known input and output.",
+      "evidence": "Check it against a pair you know: 100 must give 212."
+    },
+    {
+      "page": "Explorations/The Bad Input Hunt",
+      "codes": [
+        "CRD-2.J",
+        "CRD-2.I",
+        "CRD-1.C"
+      ],
+      "reason": "Students try unexpected inputs on a classmate's program, record what they expected against what happened, and hand over findings respectfully.",
+      "evidence": "What I typed | What I expected | What happened"
+    },
+    {
+      "page": "Explorations/The Client Interview",
+      "codes": [
+        "CRD-2.F",
+        "CRD-1.A"
+      ],
+      "reason": "Students interview a classmate about a repeated chore to pin down the real problem before any design begins.",
+      "evidence": "Read it back to them out loud. Watch their face. They will correct you"
+    },
+    {
+      "page": "Explorations/The Data Pile",
+      "codes": [
+        "AAP-1.D",
+        "DAT-2.A"
+      ],
+      "reason": "Students find patterns in forty daily counts to answer a real question, then discover that forty separate variables cannot be managed and a list is needed.",
+      "evidence": "forty separate names for forty related values is not merely tedious, it is unworkable"
+    },
+    {
+      "page": "Explorations/The Hundred-Line Problem",
+      "codes": [
+        "AAP-2.B",
+        "AAP-2.K"
+      ],
+      "reason": "Students extend a sequential program by copying lines, hit a changed requirement, and are led to replace the copies with a loop.",
+      "evidence": "There has to be a way to just tell it to do that a hundred times."
+    },
+    {
+      "page": "Explorations/The Repeated Chunk",
+      "codes": [
+        "AAP-2.H",
+        "AAP-3.B",
+        "CRD-2.J"
+      ],
+      "reason": "Students predict the output of a grading if-chain, test a boundary mark after a change, and see how four copied blocks make changes error-prone compared with one named procedure.",
+      "evidence": "grade their change with a mark of exactly 71 in every position"
+    },
+    {
+      "page": "Explorations/The Unplugged Algorithm",
+      "codes": [
+        "AAP-2.A",
+        "CRD-2.I"
+      ],
+      "reason": "Students write step-by-step instructions in plain language for a partner to follow literally, note where they failed, and revise them.",
+      "evidence": "Write a numbered list of instructions that gets your partner from six loose shapes to your exact figure."
+    },
+    {
+      "page": "Programs/Branching Programs",
+      "codes": [
+        "AAP-2.H",
+        "AAP-2.I",
+        "AAP-2.F"
+      ],
+      "reason": "Students trace which branch of an if/elif chain runs for each input, then extend it with a nested if and a condition joined with and.",
+      "evidence": "Exactly one of the four branches runs, and which one depends entirely on days_late"
+    },
+    {
+      "page": "Programs/Looping Programs",
+      "codes": [
+        "AAP-2.K",
+        "AAP-2.M"
+      ],
+      "reason": "Students read and modify loops that validate input, total values, and track the largest value seen so far.",
+      "evidence": "accumulating: total_kilograms starts at zero and grows by one day's weight per pass"
+    },
+    {
+      "page": "Programs/Reading and Writing Files",
+      "codes": [
+        "CRD-2.G",
+        "IOC-2.A",
+        "AAP-2.O"
+      ],
+      "reason": "Students work with a program whose comments record a deliberate decision not to store borrowers' names, and loop over the saved lines to report and count them.",
+      "evidence": "The file holds TITLES and a number of days — never who borrowed what."
+    },
+    {
+      "page": "Programs/Talking to the User",
+      "codes": [
+        "CRD-2.C",
+        "CRD-2.I",
+        "AAP-2.C"
+      ],
+      "reason": "Students take typed input, see the run-time error a non-number causes and guard against it, and use integer division and remainder to format a result.",
+      "evidence": "ValueError: invalid literal for int() with base 10: 'seven'"
+    },
+    {
+      "page": "Programs/Working with Lists",
+      "codes": [
+        "AAP-2.O",
+        "AAP-1.D",
+        "IOC-2.A"
+      ],
+      "reason": "Students traverse a list of marks to total it, find the extremes and build a new list, in a program deliberately designed to hold no names.",
+      "evidence": "One list holds ten values under one name, so the program can ask questions of all of them at once."
+    },
+    {
+      "page": "Programs/Writing Functions",
+      "codes": [
+        "AAP-3.C",
+        "AAP-3.A",
+        "AAP-3.B"
+      ],
+      "reason": "Students write three small functions with parameters and return values, work out how a nested call is evaluated, and see why putting repeated arithmetic in one function makes later changes a one-place edit.",
+      "evidence": "this awkward little pair of lines now exists in exactly one place"
+    },
+    {
+      "page": "Programs/Your First Python Program",
+      "codes": [
+        "AAP-2.B",
+        "AAP-1.A",
+        "AAP-2.C"
+      ],
+      "reason": "Students run a program that executes top to bottom, storing changeable quantities in meaningfully named variables and computing results with arithmetic including // and %.",
+      "evidence": "Python starts at the top and runs one line at a time to the bottom"
+    },
+    {
+      "page": "Style/Writing About Code",
+      "codes": [
+        "CRD-2.G"
+      ],
+      "reason": "Students practise writing precise comments, journal entries and handover notes that explain what a program does for a reader who cannot ask them.",
+      "evidence": "Write for the next person, who might be you"
+    },
+    {
+      "page": "Tasks/Final Examination",
+      "codes": [
+        "CRD-2.I",
+        "CRD-2.B"
+      ],
+      "reason": "On paper, students trace programs to state their exact output and find, classify and fix syntax, logic and run-time errors in short programs.",
+      "evidence": "Identify syntax, logic, and run-time errors, and say which is which"
+    },
+    {
+      "page": "Tasks/Launch Day",
+      "codes": [
+        "CRD-1.C",
+        "CRD-2.A"
+      ],
+      "reason": "Students state the problem their app solves in the client's own words while the client runs it, and give classmates specific, respectful critique aimed at design decisions rather than people.",
+      "evidence": "attack the design question, never the designer"
+    },
+    {
+      "page": "Tasks/The Community App",
+      "codes": [
+        "CRD-2.F",
+        "CRD-2.E",
+        "IOC-2.A"
+      ],
+      "reason": "Students interview a real client to set requirements, build through dated milestones including a test with that user, and design the app to collect only the personal data it genuinely needs.",
+      "evidence": "Collect nothing you do not need"
+    },
+    {
+      "page": "Tasks/The Data Digest",
+      "codes": [
+        "DAT-2.D",
+        "DAT-2.A",
+        "DAT-2.C"
+      ],
+      "reason": "Students write a program that computes findings from a collected data set, clean up messy values, and turn the results into a recommendation while stating what the data cannot show.",
+      "evidence": "Data always arrives dirtier than promised"
+    },
+    {
+      "page": "Tasks/The Green Audit",
+      "codes": [
+        "IOC-1.A",
+        "CRD-2.J"
+      ],
+      "reason": "Students measure the energy cost of computers in a real space, weigh it against a way computing saves resources, and test their calculating program with a hand-worked case.",
+      "evidence": "One paragraph on the other side of the ledger"
+    },
+    {
+      "page": "Tasks/The Helper Script",
+      "codes": [
+        "CRD-2.F",
+        "AAP-2.H",
+        "CRD-2.C"
+      ],
+      "reason": "Students investigate one person's chore, sketch the conversation, and build a short script that takes that person's typed input and uses a conditional to give different advice.",
+      "evidence": "At least one decision: something the program handles differently depending on the answer"
+    },
+    {
+      "page": "Tasks/The Research Brief",
+      "codes": [
+        "CRD-2.A",
+        "CRD-1.A"
+      ],
+      "reason": "Students research a real computing project at the border with another field, explaining what problem it serves and what each field's expertise contributes to it.",
+      "evidence": "What the other field contributes, which is usually the part students skip"
+    },
+    {
+      "page": "Tasks/The Toolbox",
+      "codes": [
+        "AAP-3.C",
+        "AAP-3.D",
+        "CRD-2.G"
+      ],
+      "reason": "Students build a module of reusable functions, import it from a separate program, and document each function so a classmate can use the library from the notes alone.",
+      "evidence": "a classmate will import your toolbox and use it from your notes alone"
+    },
+    {
+      "page": "Tutorials/Keeping a Project Board",
+      "codes": [
+        "CRD-2.E",
+        "CRD-1.C"
+      ],
+      "reason": "Students organise a team project into finishable cards and milestones, including an early end-to-end skeleton, and report weekly on what is done, in progress and blocked.",
+      "evidence": "The walking-skeleton milestone is the one that saves projects"
+    },
+    {
+      "page": "Tutorials/Reading the Documentation",
+      "codes": [
+        "AAP-3.D",
+        "AAP-3.A"
+      ],
+      "reason": "Students read a library function's reference entry to learn its parameters, defaults and return value, then call it on their own data to confirm its behaviour.",
+      "evidence": "What does it give back? A list of strings"
+    },
+    {
+      "page": "Tutorials/Starting from a Skeleton",
+      "codes": [
+        "AAP-3.D",
+        "CRD-2.E"
+      ],
+      "reason": "Students adapt existing code shapes from documentation, snippets or their own earlier work, filling one placeholder at a time and running the program after each step.",
+      "evidence": "Run it after each `TODO` you close"
+    },
+    {
+      "page": "Tutorials/Using the Debugger",
+      "codes": [
+        "CRD-2.I"
+      ],
+      "reason": "Students locate a logic error with print statements and a debugger's breakpoints and stepping, and read a traceback to explain a run-time error.",
+      "evidence": "total = score replaces where it should add"
+    },
+    {
+      "page": "Tutorials/Ways to Find a Bug",
+      "codes": [
+        "CRD-2.I"
+      ],
+      "reason": "Students learn a sequence of strategies for locating errors, from reading the message to printing values, halving the program, stepping through, and shrinking the failing input.",
+      "evidence": "You are printing to find the first place where the machine disagrees with you"
+    },
+    {
+      "page": "Tutorials/Writing a Test Plan",
+      "codes": [
+        "CRD-2.J"
+      ],
+      "reason": "Students build a test table of inputs with expected results decided in advance, choosing typical, boundary, empty and hostile cases.",
+      "evidence": "If the rule changes at 13, test 12 and 13"
+    },
+    {
+      "page": "Warm-Ups/Trace It",
+      "codes": [
+        "AAP-2.K",
+        "AAP-2.H",
+        "AAP-2.C"
+      ],
+      "reason": "Students hand-trace a loop containing a conditional and a remainder test, recording each variable per pass to determine the printed result.",
+      "evidence": "One row per pass through the loop"
+    }
+  ],
+  "dropped": [
+    {
+      "page": "Concepts/Applications, Languages, and Operating Systems",
+      "why": "The page explains operating systems, languages and applications as layers of software; CSP has no objective on system software, and the page gives students nothing to do that matches one."
+    },
+    {
+      "page": "Concepts/Inside the Machine",
+      "why": "The page is about the CPU, RAM, cache and storage and how they run a program; CSP has no objective on hardware components, and one line on a video card's parallel arithmetic is not enough to claim the parallel-computing objectives."
+    },
+    {
+      "page": "Concepts/Reading a Spec Sheet",
+      "why": "The page teaches reading hardware specifications and recommending a machine for a person's needs; no CSP learning objective covers choosing computer hardware."
+    },
+    {
+      "page": "Explorations/The Machine on the Bench",
+      "why": "The page is about identifying internal hardware components (memory, processor, cooling, data paths); no CSP learning objective covers computer architecture, and the network/device objectives do not fit."
+    },
+    {
+      "page": "Explorations/The Spec Hunt",
+      "why": "The page has students choose hardware components and a budget for a client; CSP objectives on design and user investigation concern programs, not hardware purchasing, so nothing is defensible without stretching."
+    },
+    {
+      "page": "Explorations/Where the Watts Go",
+      "why": "The page measures and multiplies device power use; environmental energy cost is not among the CSP learning objectives, and treating it as extracting information from data or as a beneficial/harmful effect would be a stretch."
+    },
+    {
+      "page": "Tasks/The Spec Sheet",
+      "why": "The page is about matching hardware components and peripherals to a person's needs and budget; no CSP learning objective covers choosing computer hardware, and stretching the program-design objective to a purchase recommendation would not hold up."
+    },
+    {
+      "page": "Tutorials/Backing Up Your Work",
+      "why": "Teaches keeping copies of your work in more than one place. The nearest objective, CSN-1.E, is about how the Internet's redundancy survives failures, not about a student's backups; claiming it would be a stretch."
+    }
+  ]
+}

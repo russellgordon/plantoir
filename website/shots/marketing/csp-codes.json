@@ -1,0 +1,23 @@
+{
+  "note": "Where the marketing course's College Board Curriculum pages come from. NO College Board text is kept in this repository (it is public): college_board.py downloads the document into the kept marketing folder's .sources/, checks this hash, and writes the pages there. The pages are the LEARNING OBJECTIVES (director's ruling Q1, 2026-09-26), each with its essential knowledge statements verbatim beneath; the twenty Computational Thinking Practice skills are not pages.",
+  "source": {
+    "title": "AP Computer Science Principles Course and Exam Description",
+    "edition": "Effective Fall 2023",
+    "url": "https://apcentral.collegeboard.org/media/pdf/ap-computer-science-principles-course-and-exam-description.pdf",
+    "fileName": "ap-computer-science-principles-course-and-exam-description.pdf",
+    "bytes": 7498387,
+    "sha256": "144e1af475c01ced6d068356d5494e09d8ed8136d397872ce03c448a4886b1f5"
+  },
+  "folder": "College Board Curriculum",
+  "counts": {
+    "learningObjectives": 66,
+    "essentialKnowledge": 331,
+    "why": "Counted from the document's Course Framework and Appendix, 2026-09-26. The plan's 67 and 332 counted one code twice over: an exclusion statement in the document cites 'EK APP-1.D.6', a misprint for AAP-1.D.6, and a bare pattern match counts it as a 67th objective (APP-1.D) and a 332nd statement."
+  },
+  "whereCopiesDiffer": {
+    "AAP-4.A.7": {
+      "page": 102,
+      "why": "The document prints this statement twice and the two copies differ by one word: the Course Framework (page 102) and the Appendix's conceptual framework (page 255). The Course Framework copy is used, because it is the statement the course is taught from; the Appendix restates it. Chosen by the implementer of the website piece, 2026-09-26, for Russell to overrule."
+    }
+  }
+}
