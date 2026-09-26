@@ -179,6 +179,7 @@ final class AppUpdatesContractTests: XCTestCase {
             "scheduledWorkUnnamed": UpdateWording.scheduledWorkUnnamed,
             "elsewhereWork": UpdateWording.elsewhereWork(course: "{course}"),
             "heldExplanation": UpdateWording.heldExplanation,
+            "heldExplanationOnceInstalling": UpdateWording.heldExplanationOnceInstalling,
             "okButton": UpdateWording.okButton,
             "needsAdministratorTitle": UpdateWording.needsAdministratorTitle,
             "needsAdministratorExplanation": UpdateWording.needsAdministratorExplanation

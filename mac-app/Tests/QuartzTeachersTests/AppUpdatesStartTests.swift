@@ -166,6 +166,25 @@ final class AppUpdatesStartTests: XCTestCase {
         XCTAssertFalse(app.contains("SPU"))
     }
 
+    /// A user-defaults feed would point a released copy anywhere — a
+    /// development feed by another name (the plan review's M4). `start`
+    /// clears it BEFORE the updater starts. A source scan, because the only
+    /// behavioural test would write the app's real defaults domain.
+    func testAUserDefaultsFeedIsClearedBeforeTheUpdaterStarts() throws {
+        let source: String = try String(
+            contentsOf: AppUpdatesStartTests.repositoryFile("mac-app/QuartzTeachers/App/AppUpdates.swift"),
+            encoding: .utf8
+        )
+        let startFunction: Range<String.Index> = try XCTUnwrap(source.range(of: "func start() {"))
+        let cleared: Range<String.Index> = try XCTUnwrap(
+            source.range(of: "clearFeedURLFromUserDefaults()", range: startFunction.upperBound..<source.endIndex)
+        )
+        let started: Range<String.Index> = try XCTUnwrap(
+            source.range(of: "try made.start()", range: startFunction.upperBound..<source.endIndex)
+        )
+        XCTAssertTrue(cleared.lowerBound < started.lowerBound, "The feed is cleared after the updater starts")
+    }
+
     // MARK: - Helpers
 
     static let releaseShaped: [String: Any] = [

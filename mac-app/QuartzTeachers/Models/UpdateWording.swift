@@ -38,15 +38,27 @@ nonisolated enum UpdateWording {
         + "that is finished. If you quit Plantoir before then, the update is set aside and "
         + "offered again later."
 
+    /// The held notice's explanation in the ONE state where a quit cannot be
+    /// stopped from installing: work began in the instant after the teacher's
+    /// Install had already reached the installer (`appUpdates.atQuit`,
+    /// postponedAtInstall — the slice-1 review's L1). It must not promise a
+    /// set-aside that cannot happen.
+    static let heldExplanationOnceInstalling: String =
+        "The new version is ready. Plantoir will close and open again by itself as soon as "
+        + "that is finished. If you quit Plantoir before then, it finishes updating as it quits."
+
     /// When the updater asked for an administrator and nobody gave one — the
     /// managed school Mac. The updater itself says nothing at all (it drops
     /// error 4007 silently), so this is the only explanation there is.
     static let needsAdministratorTitle: String = "Plantoir could not install the new version."
 
+    /// Neutral on purpose (the slice-1 review's L7): the same error comes from
+    /// a managed Mac with no administrator at hand AND from an administrator
+    /// who simply cancelled the password prompt.
     static let needsAdministratorExplanation: String =
-        "Installing it on this Mac needs an administrator’s name and password. Whoever looks "
-        + "after this Mac can install it for you, or choose Check for Updates… again when an "
-        + "administrator is with you."
+        "Installing it on this Mac needs an administrator’s name and password, and none was "
+        + "given. To try again, choose Check for Updates… in the Plantoir menu. If you do not have an administrator’s "
+        + "password, whoever looks after this Mac can install it for you."
 
     // MARK: - Functions
 
@@ -72,7 +84,11 @@ nonisolated enum UpdateWording {
     /// `AssistWording.courseIsBeingBuiltElsewhere` does and for its reason:
     /// the lease names only the course, and the sentence has to be true
     /// whichever program holds it.
+    ///
+    /// Phrased as what PLANTOIR is doing — waiting — so the title's "once it
+    /// is done …" is about Plantoir and not the other program (the slice-1
+    /// review's L7).
     static func elsewhereWork(course: String) -> String {
-        return "building \(course) somewhere else on this Mac"
+        return "waiting for \(course) to finish building somewhere else on this Mac"
     }
 }

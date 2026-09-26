@@ -12,9 +12,10 @@
 # new copies of the app is the one piece of code whose silent substitution
 # would matter most, so a mismatch refuses and installs NOTHING.
 #
-# **Why 2.9.6 and not a later one.** Decided on issue #204 on 2026-09-19, when
-# 2.9.6 was current. 2.10.0 followed on 2026-09-13 with no security fix and a
-# macOS 12 minimum; nothing in it is needed here, so the pin stays until a
+# **Why 2.9.6 and not a later one.** Decided on issue #204 on 2026-09-19.
+# 2.10.0 was already out (2026-09-13, six days before) and was not taken: no
+# security fix over 2.9.6, a macOS 12 minimum, and one more unknown in a release
+# week; nothing in it is needed here, so the pin stays until a
 # release brings something we need — and moving it means re-reading the
 # delegate hooks, because a near-miss Swift name compiles and is never called
 # (documentation/09-mac-app.md → "Updating itself").
