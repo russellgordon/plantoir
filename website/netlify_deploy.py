@@ -239,6 +239,23 @@ def verify_live() -> str:
     return "unknown"
 
 
+def verify_feeds_live() -> str:
+    """Every update feed in site/updates/ is live as built, and its newest
+    download exists (#204). Advisory after a deploy, like verify_live."""
+    import update_feeds
+    config = read_config()
+    base_url = config.get("base_url", "").strip()
+    outcome = "match"
+    feeds = sorted((SITE_DIR / "updates").glob("*.xml")) if (SITE_DIR / "updates").is_dir() else []
+    for feed in feeds:
+        result = update_feeds.verify_live(base_url, feed)
+        if result == "mismatch":
+            outcome = "mismatch"
+        elif result == "unknown" and outcome == "match":
+            outcome = "unknown"
+    return outcome
+
+
 def deploy() -> int:
     if not (SITE_DIR / "index.html").exists():
         raise SystemExit("site/ has no index.html — run website/build.py first.")
@@ -295,6 +312,7 @@ def deploy() -> int:
             # CDN edge here must never turn a genuinely successful deploy
             # into a failing exit code. See verify_live()'s docstring.
             verify_live()
+            verify_feeds_live()
             return 0
         if state in ("error", "failed"):
             raise SystemExit(f"❌ Netlify reports the deploy state '{state}'.")
@@ -313,5 +331,8 @@ if __name__ == "__main__":
         # Standalone check, no deploy: "did the last publish actually reach
         # plantoir.app", runnable independently and after the fact.
         outcome = verify_live()
+        feeds = verify_feeds_live()
+        if feeds == "mismatch" or (feeds == "unknown" and outcome == "match"):
+            outcome = feeds
         raise SystemExit({"match": 0, "mismatch": 2, "unknown": 1}[outcome])
     raise SystemExit(deploy())

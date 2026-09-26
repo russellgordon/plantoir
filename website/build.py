@@ -39,6 +39,8 @@ import argparse
 import json
 import re
 import shutil
+
+import update_feeds
 import struct
 import sys
 from pathlib import Path
@@ -388,6 +390,16 @@ def build(check_only: bool) -> int:
             destination.write_text(html, encoding="utf-8")
         written.append(destination)
 
+    # The update feeds (#204): checked in both modes, copied byte for byte —
+    # never parsed and rewritten, which would break their signatures.
+    feed_source = WEBSITE / "updates"
+    if feed_source.is_dir():
+        for feed in sorted(feed_source.glob("*.xml")):
+            for problem in update_feeds.problems_with(feed):
+                problems.append(problem)
+    if not check_only:
+        update_feeds.copy_feeds(feed_source, OUTPUT / "updates")
+
     if not check_only:
         assets = OUTPUT / "assets"
         assets.mkdir(parents=True, exist_ok=True)
@@ -495,6 +507,26 @@ def serve(port: int) -> int:
     return 1
 
 
+def feed_version_refusal(feed: Path, project_yml: Path) -> str | None:
+    """Why the mac feed must not be deployed with this site, or None (#204).
+
+    Deploys run from `main`, where the feed's newest version and
+    MARKETING_VERSION agree after a mac cut — and still agree after a
+    Windows-only cut, which leaves both alone. A disagreement means the feed
+    was not rebuilt for the version being released, or was rebuilt for one
+    that has not been.
+    """
+    if not feed.is_file():
+        return None
+    newest = update_feeds.newest_version(feed)
+    marketing = update_feeds.marketing_version(project_yml)
+    if newest != marketing:
+        return (f"Not deploying: updates/macos.xml offers {newest}, but mac-app/project.yml says "
+                f"{marketing}. Rebuild the feed with website/update_feed.py at the cut "
+                f"(RELEASING.md → \"The update feed (macOS)\").")
+    return None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build plantoir.app into site/.")
     parser.add_argument(
@@ -530,7 +562,11 @@ def main() -> int:
         if arguments.check or arguments.deploy or arguments.serve:
             parser.error("--verify-deploy stands alone: it neither builds nor deploys")
         import netlify_deploy
-        return {"match": 0, "mismatch": 2, "unknown": 1}[netlify_deploy.verify_live()]
+        outcome = netlify_deploy.verify_live()
+        feeds = netlify_deploy.verify_feeds_live()
+        if feeds == "mismatch" or (feeds == "unknown" and outcome == "match"):
+            outcome = feeds
+        return {"match": 0, "mismatch": 2, "unknown": 1}[outcome]
     if arguments.check and (arguments.deploy or arguments.serve):
         parser.error("--check writes nothing, so there is nothing to publish or preview")
     if arguments.deploy and arguments.serve:
@@ -544,6 +580,10 @@ def main() -> int:
         if result != 0:
             print("Not deploying: fix the build warnings above first.", file=sys.stderr)
             return result
+        refusal = feed_version_refusal(WEBSITE / "updates" / "macos.xml", REPO / "mac-app" / "project.yml")
+        if refusal:
+            print(refusal, file=sys.stderr)
+            return 1
         import netlify_deploy
         return netlify_deploy.deploy()
     return result
