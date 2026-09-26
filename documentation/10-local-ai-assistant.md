@@ -4429,6 +4429,136 @@ reasoning. The published date is in what the teacher was told instead
 ("Published the class on 2026-09-09."), which is why that sentence names the
 day it settled on rather than the word it was sent.
 
+### Settings are read at the call, not when the window opened (#322)
+
+Written on the mac, 2026-09-26. The same failure shape as the clock above, one
+level up: the day was read once per conversation, and so were the course
+SETTINGS.
+
+**What was reported.** Russell, in the #204 rehearsal: he set ICS3U to deploy
+to a folder, deployed it by hand (the launcher went `--to-folder`), then asked
+the assistant to "deploy at 3:54 PM" and was refused — "has never been
+deployed, so deploying it asks what to call the website". Nothing about a
+folder deploy asks that.
+
+**The cause, reproduced in a test before designing.** `AssistSession.beginConversation`
+and `AssistMCPServer.serve` each build their OWN `WorkspaceModel`, and
+`reloadCourses()` runs once, so each course's `CourseConfiguration` was read
+once — when the assistant's window opened, or when the `--mcp-stdio` server
+started. Every tool reads its course from that list. #265's `followWrite`
+brings other copies up to date after a Save, but it walks WINDOW models only
+(the assistant's and the server's are deliberately not windows —
+`isShownInAWindow` exists to tell them apart), and the server is another
+process that nothing in-process could reach anyway. There is no file watcher.
+The repro, with the fixture's ICS3U (no target, so Netlify, never deployed) and
+a Save from a second copy of the file, gave Russell's sentence word for word —
+and two worse things the report did not name:
+
+- **the approval card said "to Netlify"** for a course that now deploys to a
+  folder;
+- **an outside assistant's deploy went to the OLD destination and reported
+  success.** `--mcp-stdio` with no section window runs the headless
+  `AssistToolchainWork.deploy`, which takes `allDeployDestinations` from the
+  course it is handed. A Claude Code session started before the teacher moved
+  a course from Netlify to Cloudflare published to the old Netlify site and
+  said "deployed". Fail-open, which is why this is more than a wrong refusal.
+
+It also matters because **a scheduled deploy's destination is written into the
+job when it is SET** (`ScheduledDeploy.scheduleDeploy` writes each
+destination's `deploy.sh` arguments into the one-shot command); only the
+lateness window is read when it fires (docs 07). So "read at scheduling" has
+to mean "read from disk", or the stale destination is baked into a job that
+runs at 06:30 with nobody watching.
+
+**What landed.**
+
+- `WorkspaceModel.discoverCourses(in:)` — the one answer to "which folders are
+  courses", the same shape as Windows' `Workspace.DiscoverCourses`.
+  `reloadCourses()` uses it, unchanged in behaviour.
+- `WorkspaceModel.readCoursesAsSavedNow()` rediscovers the courses into a model
+  NO WINDOW SHOWS, and does nothing else — no launcher refresh, no
+  reference-course upkeep, no staging sweep, no `.merged_output` placement, no
+  backup listing or measuring. It refuses a window's model outright: that
+  model's `CourseConfiguration` objects hold Course Settings' UNSAVED edits,
+  and replacing them would throw those away. The guard makes that impossible
+  rather than unlikely (`AssistSettingsFreshnessTests.testReadingAtTheCallNeverTouchesAWindowsCopy`).
+- `AssistToolRunner.coursesAsSavedNow` reads it, and is the ONLY way the runner
+  reads the course list: all twelve reads go through it (`locate`,
+  `course(withCode:)`, the card's `explain`, `list_courses`, the
+  reference-course gates, the briefing lines…). Structural rather than one
+  call at the top of `run`, because there are six public ways in and a seventh
+  added later would be a stale reader nobody noticed; a source test
+  (`testTheRunnerReadsCoursesOnlyThroughTheFreshReading`) holds the file to it.
+- The never-deployed refusal now **names its destination**
+  (`scheduledDeployRefusals.wording.neverDeployed`): Russell read the old
+  sentence as "it thinks I am deploying to Netlify" and had to guess. After
+  this fix it appears only when that IS the destination, and saying so lets a
+  teacher who expected a folder see the disagreement at once. The schedule
+  sheet shows the same `problem()` sentence.
+- The trail's `scheduled deploy could not be set` now also records a refusal
+  at the ACT — `schedule_deploy`, or the sheet's button — naming the
+  destination by kind (Netlify, Cloudflare Pages, a folder; never a path) and
+  the refusal's first sentence. #322 took a code read to diagnose; with this
+  line the contradiction would have sat two lines under "saved the settings".
+  Not written by the card or `plan_scheduled_deploy`, which are advisory and
+  repeat.
+
+**What it costs.** One directory listing and one small JSON read per course,
+per read — and one tool call can read more than once (the card, then `locate`,
+then a reference gate). Measured 2026-09-26 on an Apple M4 Pro, Debug build,
+warm cache: **0.40 ms per reading** of a folder of ten courses, each with a
+~1.8 KB `course_config.json` (200 readings averaged). The calls are human-paced. If it ever
+mattered, the fallback is one snapshot per `run`; not done, because a
+structural rule beats a micro-optimisation. Two readings inside one call are
+both fresh, and nothing in the runner compares `Course` objects by identity:
+history and backups are keyed by CODE (`AssistChangeHistory`), so an undo finds
+its course by code in whatever the latest reading is.
+
+**Rejected**, and why:
+
+- *One observable `Course` shared by the main window and the assistant* —
+  cannot reach the MCP server (another process, and the worse half), cannot see
+  a build's own writes, and ties the assistant's life to a window's.
+- *Adding the assistant's model to `followWrite`'s list* — the same process
+  hole, misses writers outside the app, and would be a second answer to "how
+  fresh is the assistant".
+- *A file watcher* — `write(to:)` is atomic, so each Save replaces the inode
+  and a vnode watcher loses the file; and a watcher is still a race between the
+  event and the call. Reading at the call is exact.
+- *`reloadCourses()` per call* — rewrites launchers, sweeps staging leftovers,
+  re-links `.merged_output`, lists and measures backups: folder-level work, on
+  every call, from two surfaces.
+- *Re-reading only the courses already known* — smaller, and fixes #322, but a
+  course created after the server started stays invisible, which Windows does
+  not do.
+- *Refreshing only inside `locate`* — misses the card, `list_courses` and the
+  reference gate, which read the list directly.
+
+**Windows** already rediscovers on every lookup (`AssistWorkspace.Courses()` →
+`Workspace.DiscoverCourses`), so it very probably never had this bug. Do not
+add a cache there "for speed": that cache is this bug. What they owe is in the
+contract: `shared-rules.json` → `assistantReadsSettingsAtTheCall` (seven cases;
+case 2 is their approval card, the one most likely to be read from a
+snapshot), and the named refusal sentence, compared WHOLE, because
+`Contains("has never been deployed to")` now matches both the primary's and an
+additional destination's refusal.
+
+**Known limits, left as they are.**
+
+- **A destination changed AFTER a deploy is scheduled** still goes to the old
+  one — the destination is in the job. Pre-existing, outside the assistant, and
+  the same fail-open shape: [issue #323](https://github.com/russellgordon/plantoir/issues/323).
+- **Settings saved between the card and the Approve press**: the act reads
+  fresh, so it may differ from what the card said. The `schedule_deploy` result
+  names the destination it used, so the teacher sees it.
+- **A config mid-write or malformed at the call** drops that course for that
+  call ("no such course") — fail-closed, and what `reloadCourses` and Windows
+  do too.
+- **`AssistSession.classNoun` / `classPageNaming`** are read once, when the
+  session starts, and used only for the window's own chrome (suggestions, the
+  dates offer). Stale after a mid-conversation change of the class noun;
+  display-only.
+
 ## The other doors: handing a course to an assistant the teacher already has
 
 Written 2026-09-19 with [issue #205](https://github.com/russellgordon/plantoir/issues/205),

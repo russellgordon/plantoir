@@ -2191,6 +2191,18 @@ two lists.
 - *A file watcher per window*: a new moving part, for what reload-after-Save and
   reload-on-open already cover.
 
+**`followWrite` reaches WINDOW models only — the assistant reads at the call
+instead** (#322). The assistant's window and the `--mcp-stdio` server each own
+a `WorkspaceModel` that no window shows, and a Save never reached either: they
+held the settings as they were when they started, until a folder deploy was
+refused as "never deployed" and an outside assistant deployed to a
+destination the course had left. They now rediscover the courses on every
+tool call (`WorkspaceModel.readCoursesAsSavedNow()`), which never touches a
+window's model. Two mechanisms on purpose: an in-process follow cannot reach
+another process, and a per-call read must never replace a window's unsaved
+edits. The whole story is docs 10 → "Settings are read at the call, not when
+the window opened (#322)".
+
 **What a Save tells you** (`SettingsSaveNotice`). A preview and a publish read
 the settings once, when their build begins — measured: 20 s after a Save the
 served sidebar filter was unchanged. So:

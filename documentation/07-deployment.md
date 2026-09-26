@@ -1894,6 +1894,17 @@ do. The folder-open sweep asks the same question through the same function; two
 answers to "how late is too late for this course" is one more than anybody can
 keep in step.
 
+**The lateness window is the ONLY setting read when the job fires.** The
+DESTINATION is fixed when the deploy is scheduled: `ScheduledDeploy.scheduleDeploy`
+writes each destination's `deploy.sh` arguments into the one-shot command at
+that moment. Since #322 that moment reads the settings from disk, from the
+sheet and from either assistant (docs 10 → "Settings are read at the call, not
+when the window opened"), so a deploy is scheduled to where the course deploys
+NOW. But changing the destination AFTER scheduling does not move a job already
+set: it still deploys to the old one, and says nothing. That is
+[issue #323](https://github.com/russellgordon/plantoir/issues/323), not yet
+fixed; until it is, re-schedule after changing where a course deploys.
+
 **Finding the course folder is not `fileExists` on a built path, and that is
 measured.** A job written before the course code went into the plist carries it
 only in its LABEL, uppercased with every non-alphanumeric turned into a hyphen —
