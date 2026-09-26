@@ -665,8 +665,12 @@ which must make them WAIT; which entry each then takes by frame is
 backstop would have become a second decision once a lone window could
 reopen: a window whose folder had gone would have become a second window on
 a sibling's folder, wiping the sentence that said why. `settleItsFolder()`
-also calls `WindowSettling.windowSettled` — an empty seam today, which #306
-(open the section a notification names) fills.
+also calls `WindowSettling.windowSettled`, which #306 fills: a click on a
+scheduled publish's notification that arrived while any window was still
+deciding is decided there (`SectionFromNotification.windowSettled`), never
+after a delay. **Any new way a window gets its folder must still end in
+`settleItsFolder()`**, or such a click is parked for good (it is dropped when
+the app next resigns active). See "A window opened by a notification" below.
 
 **A second window at launch with no remembered folder shows the picker**
 (#311 review B2). "Close windows when quitting" governs ⌘Q; "Reopen windows
@@ -676,8 +680,42 @@ one folder nobody asked for, so only the first window reopens.
 
 **A window opened for a reason of its own takes that folder first.** The
 assistant revealing a section sets `WorkspaceModel.folderForNextNewWindow`
-before it opens a window; without it the new window would reopen the last
-folder, write a reopen the teacher never saw, and be moved a moment later.
+before it opens a window, and so does a click on a scheduled publish's
+notification (#306). Without it the new window would reopen the last folder,
+write a reopen the teacher never saw, and be moved a moment later.
+
+### A window opened by a notification (#306)
+
+A click on a scheduled publish's notification shows that section. The rule and
+the per-state table are in `documentation/07-deployment.md` → "Clicking the
+notification opens the section (#306)". What belongs here is how it sits on
+the window machinery above:
+
+- **It never adds a folder route.** A window already on the folder is used as
+  it is. A window with no folder takes the notification's through
+  `reopen(_:occasion: .scheduledPublishNotification)`, the route that checks a
+  remembered folder. A new window takes it as a requested folder
+  (`folderForNextNewWindow` → `WindowStartRule.start` → `.requested`), through
+  the caller of `adoptRestoredPath` that `AdoptRestoredPathCallersTests` already
+  allows. That caller does NOT check reach, so the router asks
+  `WorkingFolderReach.refusal` first and refuses a folder #290 would refuse,
+  bringing the app forward only. The router itself calls neither
+  `adoptRestoredPath` nor `chooseWorkspace`.
+- **The requested folder is taken before the launch-time claims wait**, and a
+  settled window never claims (`testTheClicksWindowTakesItsFolderWhileClaimsAreOpen`).
+  A window opened for a click at launch therefore cannot take a leftover
+  remembered entry, and cannot flash the key window's folder first.
+  `AssistToolRunner.revealSectionOnScreen` sets the same field since #311, but
+  still waits for its window and section by polling on a timer, which is why
+  the router does not reuse it. Moving the assistant onto this router is a
+  possible follow-up, not part of #306.
+- **A window on another working folder is never pointed elsewhere.** Doing so
+  would let go of everything it shows ("What a window lets go of when it
+  changes working folder", above) for a click about something else.
+- **Busy** means a sheet attached to the window, `renamingCourseCode` set, or
+  an app-modal dialog (`NSApp.modalWindow`), which makes every window busy.
+  A busy window is brought forward with its selection left alone, because of
+  the #293 focus-loss commit below.
 
 ### How the folder is found: bookmark, then path
 
