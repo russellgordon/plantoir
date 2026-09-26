@@ -39,6 +39,28 @@ struct WorkspacePickerView: View {
                     .foregroundStyle(.red)
             }
 
+            // Why the folder this window was about to open is not open: a
+            // remembered one that could not be reopened (#311), or a chosen
+            // one the website builder cannot reach (#290). Never red — it
+            // describes where a folder is, not a mistake.
+            if let notOpened = workspace.folderNotOpened, !notOpened.isShownAsAlert {
+                VStack(spacing: 10) {
+                    if notOpened.showsPathBar {
+                        WorkspacePickerView.chosenFolderPathBar(for: URL(fileURLWithPath: notOpened.folderPath))
+                    }
+                    if let headline = notOpened.headline {
+                        Text(headline)
+                            .bold()
+                            .multilineTextAlignment(.center)
+                    }
+                    Text(notOpened.detail)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: 520)
+                .accessibilityIdentifier("folderNotOpened")
+            }
+
             // The folder under discussion, named FIRST — before the
             // empty-folder offer, and before the note about syncing, both
             // of which are about it.
