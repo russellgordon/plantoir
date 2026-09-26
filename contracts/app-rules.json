@@ -2006,7 +2006,9 @@
               "own" : 1
             }
           ],
-          "markers" : [],
+          "markers" : [
+
+          ],
           "netstatAsked" : true,
           "outcome" : "announces",
           "reach" : 52,
@@ -2084,8 +2086,12 @@
         },
         {
           "context" : "colima",
-          "looks" : [],
-          "markers" : [],
+          "looks" : [
+
+          ],
+          "markers" : [
+
+          ],
           "netstatAsked" : false,
           "outcome" : "reachRefuses",
           "reach" : 7,
@@ -2101,7 +2107,9 @@
               "own" : "empty"
             }
           ],
-          "markers" : [],
+          "markers" : [
+
+          ],
           "netstatAsked" : true,
           "outcome" : "announces",
           "reach" : 52,
@@ -2117,7 +2125,9 @@
               "own" : "missing"
             }
           ],
-          "markers" : [],
+          "markers" : [
+
+          ],
           "netstatAsked" : true,
           "outcome" : "announces",
           "reach" : 52,
@@ -2133,7 +2143,9 @@
               "own" : 0
             }
           ],
-          "markers" : [],
+          "markers" : [
+
+          ],
           "netstatAsked" : true,
           "outcome" : "announces",
           "reach" : 52,
@@ -2149,7 +2161,9 @@
               "own" : 0
             }
           ],
-          "markers" : [],
+          "markers" : [
+
+          ],
           "netstatAsked" : false,
           "outcome" : "announces",
           "reach" : 52,
@@ -2202,8 +2216,12 @@
         {
           "buildOnly" : true,
           "context" : "colima",
-          "looks" : [],
-          "markers" : [],
+          "looks" : [
+
+          ],
+          "markers" : [
+
+          ],
           "netstatAsked" : false,
           "outcome" : "asksNothing",
           "reach" : 52,
