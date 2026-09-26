@@ -57,9 +57,10 @@ import Foundation
 /// A folder segment BEFORE it is still rewritten correctly, because the rest
 /// of the link is copied as it stands, but a folder whose OLD name contains a
 /// `<` or `>` written that way is not recognised. Rare of rare: Windows
-/// refuses those characters in a name outright. Likewise an unterminated
-/// `](<…` followed later on the same line by a stray `>` is read as a link —
-/// the pattern does not check for the `)` after the `>` — which costs a rewrite
+/// refuses those characters in a name outright. Likewise the pattern does not
+/// check what FOLLOWS the `>`, so two shapes that are not links are read as
+/// one: a `>` inside the target (`](<Tasks/a>b.md>)`), and an unterminated
+/// `](<…` followed later on the same line by a stray `>`. That costs a rewrite
 /// of text that was never a link, only when the folder's name is in it.
 enum FolderPathRewriter {
 

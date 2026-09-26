@@ -1023,8 +1023,10 @@ list. `specialNames.renameFolder.linkRewriting.cases` grew from 13 to **25**,
 rows in a list both suites already deserialise, and the new
 `linkRewriting.insideAngleBrackets` holds prose plus two lists of STRINGS
 (`characters`, `rejected`), which the walker rightly does not count.
-**Windows fails ten of the twelve new cases on arrival** (all but the
-web-address and page-name guards) in `FolderPathRewriterTests`; that is the
+**Windows fails eleven of the twelve new cases on arrival** (all but the
+page-name guard) in `FolderPathRewriterTests`; the web-address guard among
+them is a LIVE Windows defect today (its anchored `Scheme` test misses
+`<https://…`), which the mirrored fix clears. That is the
 request, owed by the `windows` issue from #97, and a named gap if it cannot
 land in its milestone. `activityTrail.mustRecord` is unchanged at **83** (no
 new event: `folder renamed` records no link counts, so its line stays true).
