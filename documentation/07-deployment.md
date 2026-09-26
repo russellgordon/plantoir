@@ -246,9 +246,12 @@ to run against it. Its `notShared` says what the cases deliberately leave out.
   such a page clean while the app, reading bytes, rebuilt first), so #136 wrote
   it down rather than touch the launcher. With `-z` (next bullet) a record is
   the whole FILE: `LC_ALL=en_US.UTF-8 grep -zq` on a real preview page with
-  `\xff\n` prepended exits **1**, `LC_ALL=C` exits **0** — any invalid byte
-  anywhere in a preview's page would read it as clean, and a preview's page
-  read as clean is a preview PUBLISHED. So `deploy.sh` now carries `LC_ALL=C`
+  `\xff\n` prepended exits **1** and `LC_ALL=C` exits **0**; a stray `E9` just
+  before `<body` gives the same 1 and 0. A bad byte AFTER the client does not
+  cause the miss (0 in both locales). Quartz writes the client at the end of
+  `<body>`, so an invalid byte almost anywhere in a preview's page — anywhere
+  before the client — would read it as clean, and a preview's page read as
+  clean is a preview PUBLISHED. So `deploy.sh` now carries `LC_ALL=C`
   (`site_carries_preview_client`), and the case is pinned (case 15,
   `invalidUTF8Before`). The Python test and the overnight test both run their
   shell under `en_US.UTF-8`, so neither passes by borrowing a C locale from
@@ -313,8 +316,8 @@ to minutes, so it stays synchronous on the main actor.
 
 **The fault.** Every reader looked for the bare `ws://localhost:`, and any page
 whose note MENTIONS the address carries that. Measured in a production build of
-stock Quartz v4.5.0: one networking lesson carried it **8 times** (title, four
-meta tags, breadcrumb, prose, code). So a folder publish of that course waited
+stock Quartz v4.5.0: one networking lesson carried it **20 times on 7 lines**
+(title, meta tags, breadcrumb, heading, link, prose, code). So a folder publish of that course waited
 30 s for a clean tree it could never get and refused, every time; on Netlify
 and Cloudflare, and in the app and the overnight check, it rebuilt on every
 publish.
@@ -389,9 +392,13 @@ so nothing migrates it.
 
 **Raising Quartz means re-measuring the client's bytes.** If they move, the
 rule matches nothing, every preview reads as production, and a preview is
-PUBLISHED. Two canaries fail on that day: `verify.sh` asks the image's Quartz
-for the three source lines that write the client (seconds, no serve cycle),
-and `verify-deploy.sh` reads a real serve-mode page against `asABasicRegex`.
+PUBLISHED. Two canaries fail on that day: `verify.sh` reads the image's
+Quartz template for the client as one record in the C locale and requires the
+inline script to open with nothing but whitespace before `const socket = new
+WebSocket(` — an ADJACENCY check, so a comment or `"use strict"` inserted first
+fails it (mutation-checked); three separate fixed-string greps, its first form,
+would have passed that change (found by review) — plus the address and the
+tag's type as words (seconds, no serve cycle); and `verify-deploy.sh` reads a real serve-mode page against `asABasicRegex`.
 
 **Cancelling a publish ends it quietly (GitHub #259, 2026-09-25).** The
 progress view's Cancel types a `^C` (`ScriptRunner.cancelByUser`), which reaches

@@ -725,7 +725,8 @@ fi
 # statement, with only whitespace between (#291). The bare address
 # "ws://localhost:" was the rule until 2026-09-26, and any page whose note
 # MENTIONS it carries that too: one networking lesson, measured in a
-# production build, carried it 8 times, so a folder publish of that course
+# production build, carried it 20 times on 7 lines (title, meta tags,
+# breadcrumb, heading, prose, code), so a folder publish of that course
 # refused every time and every other publish rebuilt. A page's own words
 # cannot produce the tag, because Quartz writes "<" as "&lt;" in text and in
 # attributes alike.
@@ -734,8 +735,10 @@ fi
 #   -z         Quartz puts the tag and the statement on DIFFERENT lines, so
 #              each page is read as one record rather than line by line.
 #   LC_ALL=C   Under a UTF-8 locale BSD grep -z misses the client in a file
-#              that holds ANY byte that is not UTF-8 (measured: exit 1, and
-#              0 under LC_ALL=C), and a preview's page read as clean is a
+#              with a byte that is not UTF-8 anywhere BEFORE the client (in
+#              practice nearly the whole page, since Quartz writes the client
+#              at the end of <body>; measured: exit 1, and 0 under LC_ALL=C;
+#              a bad byte after the client does not cause it), and a preview's page read as clean is a
 #              preview PUBLISHED. #136 judged LC_ALL=C here "correct, but not
 #              worth a publishing-path change" when the miss needed the byte on
 #              the same line and erred safe; -z made it whole-file and unsafe,

@@ -840,8 +840,9 @@ enum ScheduledDeploy {
         //     `BuildFreshness.liveReloadPattern`), and Quartz writes those on
         //     different lines;
         //   `LC_ALL=C` — a byte match. Under a UTF-8 locale macOS's grep -z
-        //     does not find the client in a file that holds ANY byte that is
-        //     not valid UTF-8 (measured, grep 2.6.0-FreeBSD), which would call
+        //     does not find the client in a file with a byte that is not
+        //     valid UTF-8 anywhere BEFORE the client — in practice nearly the
+        //     whole page (measured, grep 2.6.0-FreeBSD), which would call
         //     a preview's page clean; the Swift compares bytes. launchd gives
         //     the C locale anyway, but the line must not depend on that.
         // A job scheduled before #291 keeps the old line (the bare address,
