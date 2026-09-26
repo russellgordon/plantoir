@@ -26,10 +26,16 @@ import Foundation
 ///   teacher's own words and are never touched
 /// * `[the quiz](Tasks/Quiz%201.md)` and `![](Tasks/diagram.png)` — Markdown
 ///   style, with or without percent-encoded spaces, and with a leading `./`
+/// * `[the quiz](<Tasks/Quiz 1.md>)` — a Markdown destination written inside
+///   ANGLE BRACKETS, the CommonMark way of putting a space in a link without
+///   `%20`. Only a teacher types this form (Obsidian's own links never use
+///   it), and until #97 a rename missed it whenever the folder was the FIRST
+///   segment: the plain pattern read the target as `<Tasks/Quiz`.
 ///
 /// A Markdown destination ends at the first space, so a new name that has one
-/// is percent-encoded on the way in and a wikilink's is not. That rule, and
-/// what it is measured against, is in `spelled(_:likeThe:in:)`.
+/// is percent-encoded on the way in and a wikilink's is not; inside angle
+/// brackets a space is fine and the name goes in plain. That rule, and what it
+/// is measured against, is in `spelled(_:likeThe:in:)`.
 ///
 /// ## What is NOT handled, on purpose
 ///
@@ -45,33 +51,48 @@ import Foundation
 /// in it as an ordinary segment, and the walk below is blind to what a path
 /// means, so a rename used to repoint that link at a page on somebody else's
 /// website. Found by adversarial review, 2026-09-01.
+///
+/// **A backslash escape inside angle brackets is not decoded.** CommonMark
+/// lets `<a\>b.md>` carry a literal `>`; here the match stops at the `\>`.
+/// A folder segment BEFORE it is still rewritten correctly, because the rest
+/// of the link is copied as it stands, but a folder whose OLD name contains a
+/// `<` or `>` written that way is not recognised. Rare of rare: Windows
+/// refuses those characters in a name outright. Likewise an unterminated
+/// `](<…` followed later on the same line by a stray `>` is read as a link —
+/// the pattern does not check for the `)` after the `>` — which costs a rewrite
+/// of text that was never a link, only when the folder's name is in it.
 enum FolderPathRewriter {
 
     // MARK: - Nested types
 
-    /// Which of the two link styles a target was written in.
+    /// Which of the three link styles a target was written in.
     ///
-    /// The rewriter has to know, because the two spell the SAME folder name
+    /// The rewriter has to know, because they spell the SAME folder name
     /// differently. `[[All Tasks/Quiz 1]]` is exactly how Obsidian writes a
     /// wikilink whose folder has a space in it, while `](All Tasks/Quiz 1.md)`
     /// is not a link at all — a Markdown destination ends at the first space.
-    /// See `spelled(_:likeThe:in:)`, where the difference is decided.
+    /// Inside angle brackets, `](<All Tasks/Quiz 1.md>)`, the space is fine
+    /// again. See `spelled(_:likeThe:in:)`, where the difference is decided.
     nonisolated enum LinkStyle {
 
         case wikiLink
         case markdown
+        case angleBracketedMarkdown
 
         // MARK: - Computed properties
 
         /// The compiled pattern that finds this style's targets —
-        /// `wikiLinkPattern` or `markdownLinkPattern`, built once for the
-        /// whole run rather than per page.
+        /// `wikiLinkPattern`, `markdownLinkPattern` or
+        /// `angleBracketedLinkPattern`, built once for the whole run rather
+        /// than per page.
         var expression: NSRegularExpression? {
             switch self {
             case .wikiLink:
                 return FolderPathRewriter.wikiLinkExpression
             case .markdown:
                 return FolderPathRewriter.markdownLinkExpression
+            case .angleBracketedMarkdown:
+                return FolderPathRewriter.angleBracketedLinkExpression
             }
         }
     }
@@ -93,7 +114,29 @@ enum FolderPathRewriter {
     /// A Markdown link or embed's target: everything between `](` and the
     /// closing bracket. Titles (`](path "title")`) are left in place because
     /// the path is taken only up to the first space.
-    nonisolated static let markdownLinkPattern: String = #"(\]\()([^)\s]+)"#
+    ///
+    /// **`(?!<)` since #97: a destination that opens with `<` belongs to
+    /// `angleBracketedLinkPattern`, so each link is read by exactly ONE
+    /// pattern.** Without it this one read `](<Units/Tasks/Quiz 1.md>)` as
+    /// `<Units/Tasks/Quiz`, rewrote the deeper segment by luck (percent-encoded),
+    /// counted the link twice, and rewrote an unterminated `](<Units/Tasks/…)`
+    /// that is not a link at all. The lookahead adds no group, so group 2 is
+    /// still the target.
+    nonisolated static let markdownLinkPattern: String = #"(\]\()(?!<)([^)\s]+)"#
+
+    /// A Markdown destination written in angle brackets:
+    /// `](<Tasks/Quiz 1.md>)` or `](<Tasks/Quiz 1.md> "title")`. Group 1 is
+    /// `](<`, group 2 the target without its brackets. The target runs to the
+    /// `>`, and may hold spaces, because CommonMark ends this form only at
+    /// `<`, `>` or a line break.
+    ///
+    /// **The closing `>` is a LOOKAHEAD, and that is load-bearing.**
+    /// `rewritingTargets` writes group 1, the rewritten target, and then copies
+    /// on from the END of the match — so a `>` consumed by the match would be
+    /// deleted from every link it rewrote, leaving `](<All Tasks/Quiz 1.md)`,
+    /// which is not a link. Requiring the `>` at all is what keeps an
+    /// unterminated `](<…` (plain text to every Markdown reader) out.
+    nonisolated static let angleBracketedLinkPattern: String = #"(\]\(<)([^<>\r\n]+)(?=>)"#
 
     /// Compiled ONCE, not per file. A rename walks every page in the course
     /// and each page used to build four of these; the cost is small but it is
@@ -104,6 +147,9 @@ enum FolderPathRewriter {
 
     nonisolated private static let markdownLinkExpression: NSRegularExpression? =
         try? NSRegularExpression(pattern: markdownLinkPattern)
+
+    nonisolated private static let angleBracketedLinkExpression: NSRegularExpression? =
+        try? NSRegularExpression(pattern: angleBracketedLinkPattern)
 
     /// The name percent-encoded so that Quartz gets the folder's real name
     /// back out of it.
@@ -164,8 +210,11 @@ enum FolderPathRewriter {
         let afterWikiLinks: String = rewritingTargets(
             in: text, written: .wikiLink, folderNamed: trimmedOld, to: trimmedNew
         )
+        let afterAngleBracketedLinks: String = rewritingTargets(
+            in: afterWikiLinks, written: .angleBracketedMarkdown, folderNamed: trimmedOld, to: trimmedNew
+        )
         return rewritingTargets(
-            in: afterWikiLinks, written: .markdown, folderNamed: trimmedOld, to: trimmedNew
+            in: afterAngleBracketedLinks, written: .markdown, folderNamed: trimmedOld, to: trimmedNew
         )
     }
 
@@ -177,7 +226,7 @@ enum FolderPathRewriter {
             return 0
         }
         var total: Int = 0
-        for style in [LinkStyle.wikiLink, LinkStyle.markdown] {
+        for style in [LinkStyle.wikiLink, LinkStyle.angleBracketedMarkdown, LinkStyle.markdown] {
             for target in targets(in: text, written: style) {
                 if pathNames(trimmed, in: target) {
                     total += 1
@@ -189,7 +238,7 @@ enum FolderPathRewriter {
 
     // MARK: - Private helpers
 
-    /// Every link target in the text, for one of the two link styles.
+    /// Every link target in the text, for one of the three link styles.
     nonisolated private static func targets(in text: String, written style: LinkStyle) -> [String] {
         guard let expression = style.expression else {
             return []
@@ -358,8 +407,21 @@ enum FolderPathRewriter {
     /// The old rule is kept as a second reason to escape rather than replaced
     /// by the new one: a segment that ARRIVED percent-encoded goes back
     /// percent-encoded, so a link a teacher already had keeps the shape it had.
+    ///
+    /// **Inside angle brackets the name goes in PLAIN (#97)**, unless it holds
+    /// a `<`, a `>` or a line break — the only characters that end that form.
+    /// The site's Markdown reader turns `<All Tasks/Quiz 1.md>` into the same
+    /// address the escaped form gives (`All%20Tasks/Quiz%201.md`, measured
+    /// with remark-parse 11 / remark-rehype 11, the majors Quartz v4.5.0
+    /// uses), and the whole reason a teacher writes the brackets is to avoid
+    /// `%20`. Applying the Markdown rule here would resolve too, and would
+    /// quietly rewrite the spelling the teacher chose — the drift the contract
+    /// cases for `Unit 1, Day 2` and `Top 10%` inside brackets exist to catch.
     nonisolated private static func spelled(_ name: String, likeThe segment: String, in style: LinkStyle) -> String {
         if style == .markdown && wouldBreakAMarkdownTarget(name) {
+            return percentEncoded(name)
+        }
+        if style == .angleBracketedMarkdown && wouldBreakAnAngleBracketedTarget(name) {
             return percentEncoded(name)
         }
         if wasPercentEncoded(segment) {
@@ -388,6 +450,20 @@ enum FolderPathRewriter {
     nonisolated private static func wouldBreakAMarkdownTarget(_ name: String) -> Bool {
         for character in name {
             if character.isWhitespace || character == "(" || character == ")" {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Whether this name, dropped PLAIN inside `](<…>)`, would end the
+    /// destination early or stop it being a link: `<`, `>` or a line break,
+    /// and nothing else. Measured: `[q](<Unit 1 > Review/Quiz 1.md>)` renders
+    /// as literal text, while `%3E` — outside the reserved set `decodeURI`
+    /// keeps — comes back as the real `>`.
+    nonisolated private static func wouldBreakAnAngleBracketedTarget(_ name: String) -> Bool {
+        for character in name {
+            if character == "<" || character == ">" || character.isNewline {
                 return true
             }
         }
