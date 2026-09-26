@@ -24,7 +24,8 @@ enum BuildFreshness {
             return true
         }
         // A preview's build is never deploy-fresh: serve mode bakes a
-        // live-reload client pointed at ws://localhost into every page,
+        // live-reload client pointed at ws://localhost into every page
+        // (recognised by its script tag, not the address: issue #291),
         // and publishing that makes browsers ask visitors about
         // "access to other apps and services on this device". Every page,
         // not the front page alone (issue #136) — see `builtForPreview`.
@@ -72,14 +73,74 @@ enum BuildFreshness {
     /// The marker's file name, as `build_site.py` writes it.
     static let buildStartedMarkerName: String = ".build-started"
 
-    /// What the preview server's live-reload client carries, and what marks
-    /// a built site as a preview's. `contracts/app-rules.json` →
-    /// `buildFreshness.previewBuild.signature`.
-    static let liveReloadSignature: String = "ws://localhost:"
+    /// The tag Quartz opens the preview server's live-reload client with.
+    /// `contracts/app-rules.json` → `buildFreshness.previewBuild.signature.scriptTag`.
+    static let liveReloadScriptTag: String = "<script type=\"application/javascript\">"
+
+    /// The client's first statement, as Quartz writes it, up to the port.
+    /// `contracts/app-rules.json` → `buildFreshness.previewBuild.signature.client`.
+    static let liveReloadClient: String = "const socket = new WebSocket('ws://localhost:"
+
+    /// The same rule as a basic regular expression, for the scheduled
+    /// publish's own shell check (`ScheduledDeploy.oneShotCommand`), which
+    /// runs when the app is closed. `contracts/app-rules.json` →
+    /// `buildFreshness.previewBuild.signature.asABasicRegex`.
+    static let liveReloadPattern: String = liveReloadScriptTag + "[[:space:]]*" + liveReloadClient
+
+    /// The bytes allowed between the tag and the client: POSIX `[[:space:]]`
+    /// in the C locale — space, tab, line feed, vertical tab, form feed,
+    /// carriage return. `contracts/app-rules.json` →
+    /// `buildFreshness.previewBuild.signature.between`.
+    static let liveReloadWhitespace: Set<UInt8> = [0x20, 0x09, 0x0A, 0x0B, 0x0C, 0x0D]
+
+    /// True when the page holds the live-reload client's first statement
+    /// directly after its script tag, with only `liveReloadWhitespace`
+    /// between (issue #291).
+    ///
+    /// The bare address `ws://localhost:` was the rule until 2026-09-26, and
+    /// any page whose note MENTIONS the address carries that too — one
+    /// networking lesson, measured in a production build, carried it 8 times
+    /// — so its site read as a preview's on every Publish and was rebuilt.
+    /// A page's own words cannot produce the raw tag, because Quartz writes
+    /// `<` as `&lt;` in text and in attributes alike.
+    ///
+    /// EVERY occurrence of the client is tried, not only the first: a
+    /// preview's page about networking mentions the statement in its words
+    /// (inline code, a code block) before Quartz writes the real client at
+    /// the end of the body. And "the tag and the client both appear" is not
+    /// the rule either: a production page already holds the same tag for
+    /// Quartz's own inline script.
+    static func carriesLiveReloadClient(_ page: Data) -> Bool {
+        let tagBytes: Data = Data(liveReloadScriptTag.utf8)
+        let clientBytes: Data = Data(liveReloadClient.utf8)
+        var searchStart: Data.Index = page.startIndex
+        while let clientRange = page.range(of: clientBytes, in: searchStart..<page.endIndex) {
+            // Step back over the whitespace in front of this occurrence.
+            var tagEnd: Data.Index = clientRange.lowerBound
+            while tagEnd > page.startIndex {
+                let previousByte: UInt8 = page[page.index(before: tagEnd)]
+                if !liveReloadWhitespace.contains(previousByte) {
+                    break
+                }
+                tagEnd = page.index(before: tagEnd)
+            }
+            // Then compare what comes before that with the tag.
+            let tagLength: Int = tagBytes.count
+            if page.distance(from: page.startIndex, to: tagEnd) >= tagLength {
+                let tagStart: Data.Index = page.index(tagEnd, offsetBy: -tagLength)
+                if page[tagStart..<tagEnd] == tagBytes {
+                    return true
+                }
+            }
+            searchStart = clientRange.upperBound
+        }
+        return false
+    }
 
     /// True when any page of the built site carries the preview server's
-    /// live-reload client — or when the front page cannot be read, since a
-    /// site whose front page is missing is rebuilt rather than trusted.
+    /// live-reload client (`carriesLiveReloadClient`, issue #291) — or when
+    /// the front page cannot be read, since a site whose front page is
+    /// missing is rebuilt rather than trusted.
     ///
     /// EVERY page, not the front page alone (issue #136). Serve mode bakes
     /// the client into all of them and the built tree is replaced file by
@@ -92,18 +153,19 @@ enum BuildFreshness {
     ///
     /// Pages are compared as BYTES, never decoded: one page that is not valid
     /// UTF-8 would otherwise force a rebuild on every publish, and no launcher
-    /// decodes either. A page that cannot be opened is passed over, as the
-    /// launchers pass it over. The front page is read first, so a real
-    /// preview's build answers from one file; a clean site is read to the end
-    /// (measured 12 ms for an 864-file section on an M4 Pro, warm).
+    /// decodes either. Each page is read WHOLE, because Quartz writes the tag
+    /// and the client on different lines. A page that cannot be opened is
+    /// passed over, as the launchers pass it over. The front page is read
+    /// first, so a real preview's build answers from one file; a clean site
+    /// is read to the end (measured 12 ms for an 864-file section on an M4
+    /// Pro, warm).
     static func builtForPreview(publicDirectory: URL) -> Bool {
-        let signatureBytes: Data = Data(liveReloadSignature.utf8)
         let indexURL: URL = publicDirectory.appendingPathComponent("index.html")
         guard let frontPage = try? Data(contentsOf: indexURL) else {
             // Unreadable: rebuild rather than trust it.
             return true
         }
-        if frontPage.range(of: signatureBytes) != nil {
+        if carriesLiveReloadClient(frontPage) {
             return true
         }
 
@@ -124,7 +186,7 @@ enum BuildFreshness {
             guard let page = try? Data(contentsOf: fileURL) else {
                 continue
             }
-            if page.range(of: signatureBytes) != nil {
+            if carriesLiveReloadClient(page) {
                 return true
             }
         }

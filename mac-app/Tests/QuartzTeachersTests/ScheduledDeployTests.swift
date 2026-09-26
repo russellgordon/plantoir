@@ -917,9 +917,13 @@ final class ScheduledDeployTests: XCTestCase {
         XCTAssertTrue(command.contains("-not -path '*/.*'"),
                       "Hidden entries are skipped, or .merged_output makes the site look stale the instant it is built")
         // A PREVIEW build is never deploy-fresh, however recent it looks:
-        // serve mode bakes a ws://localhost client into every page.
-        XCTAssertTrue(command.contains("ws://localhost:"),
+        // serve mode bakes a ws://localhost client into every page. Found by
+        // its script tag and first statement, each page read as one record
+        // (issue #291), not by the bare address a page's words can carry.
+        XCTAssertTrue(command.contains("LC_ALL=C /usr/bin/grep -rzqs"),
                       "A preview build must force a rebuild rather than being deployed")
+        XCTAssertTrue(command.contains(ScheduledDeploy.shellQuoted(BuildFreshness.liveReloadPattern)),
+                      "The overnight check reads the contract's rule, not the bare address")
 
         // The deploy is gated, so a failed build deploys nothing — the
         // button returns early rather than sending the previous build, and

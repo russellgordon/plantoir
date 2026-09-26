@@ -109,7 +109,8 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         section: Int,
         destinations: [String],
         descriptions: [String],
-        in folder: URL? = nil
+        in folder: URL? = nil,
+        locale: String? = nil
     ) throws {
         let workspace: URL = folder ?? self.workspace
         var argumentsList: [[String]] = []
@@ -131,6 +132,13 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         let process: Process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/bash")
         process.arguments = [scriptURL.path]
+        if let locale {
+            var environment: [String: String] = ProcessInfo.processInfo.environment
+            environment["LANG"] = locale
+            environment["LC_ALL"] = locale
+            environment["LC_CTYPE"] = locale
+            process.environment = environment
+        }
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
         try process.run()
@@ -845,7 +853,13 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
             lockedURLs.append(builtPage)
         }
 
-        try runWrapper(course: course, section: 1, destinations: destinations, descriptions: descriptions)
+        // Under a Terminal's UTF-8 locale, not launchd's C: the preview check
+        // must hold without borrowing that luck (issue #291 — under UTF-8,
+        // grep -z misses the client in a page with an invalid byte).
+        try runWrapper(
+            course: course, section: 1, destinations: destinations, descriptions: descriptions,
+            locale: "en_US.UTF-8"
+        )
         return FileManager.default.fileExists(atPath: buildNote.path)
     }
 
@@ -900,12 +914,14 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         let publicPath: String = workspace
             .appendingPathComponent("courses/ZZR9Q/.merged_output/section1/public").path
         let deployScript: String = "#!/bin/bash\n/usr/bin/touch \(deployNote.path)\n"
-            + "if /usr/bin/grep -rq --include='*.html' 'ws://localhost:' '\(publicPath)'; then exit 3; fi\n"
+            + "if LC_ALL=C /usr/bin/grep -rzqs --include='*.html' -- "
+            + "\(ScheduledDeploy.shellQuoted(BuildFreshness.liveReloadPattern)) '\(publicPath)'; then exit 3; fi\n"
             + "exit 0\n"
+        let previewPage: String = try BuildFreshnessTests.clientAsQuartzWritesIt()
         let mixedState: [String: Any] = [
             "pages": [
                 "index.html": "<html><body>Welcome</body></html>",
-                "notes/day-1.html": "<script>new WebSocket('ws://localhost:9081')</script>",
+                "notes/day-1.html": previewPage,
             ],
         ]
         let built: Bool = try overnightRunBuilt(

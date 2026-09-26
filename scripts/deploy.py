@@ -25,6 +25,7 @@ import sys as _sys
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
 import toolchain_paths
 import reference_course
+import contracts
 from collections import Counter
 
 # ---- Host OS signaling & example command helper -----------------------------
@@ -169,6 +170,24 @@ def safe_clean_public_dir(public_dir: Path):
         public_dir.mkdir(parents=True, exist_ok=True)
     except Exception:
         pass
+
+def _preview_client_pattern():
+    """
+    The live-reload client a PREVIEW build bakes into every page, as a bytes
+    pattern: contracts/app-rules.json -> buildFreshness.previewBuild.signature.
+    The tag, then any run of the `between` bytes (the C locale's [[:space:]],
+    spelled out rather than a Unicode \\s), then the client's first statement.
+    """
+    signature = contracts.section("app-rules", "buildFreshness", "previewBuild", "signature")
+    between = b""
+    for character in signature["between"]:
+        between += re.escape(character.encode("utf-8"))
+    return re.compile(
+        re.escape(signature["scriptTag"].encode("utf-8"))
+        + b"[" + between + b"]*"
+        + re.escape(signature["client"].encode("utf-8"))
+    )
+
 
 def rebuild_for_production(course_code: str, section: str, host_os: str):
     """
@@ -1164,10 +1183,21 @@ def main():
     # reading only the front page meant that state was published without a
     # rebuild. Stops at the first match, so a genuine preview build costs one
     # file. Found by review on 2026-09-05.
+    #
+    # WHAT is looked for is the contract's rule (app-rules.json ->
+    # buildFreshness.previewBuild.signature), read from the contract rather
+    # than retyped: the client's script TAG followed by its first statement,
+    # with only whitespace between (#291). The bare address "ws://localhost:"
+    # was the rule until 2026-09-26, and any page whose note MENTIONS it
+    # carries that too, so such a course was rebuilt on every publish. A page's
+    # own words cannot produce the raw tag, because Quartz writes "<" as "&lt;"
+    # in text and in attributes. Pages are read as BYTES and whole: the rule is
+    # about bytes, and Quartz puts the tag and the statement on different lines.
     is_preview_build = False
+    preview_client = _preview_client_pattern()
     for page in public_dir.rglob("*.html"):
         try:
-            if "ws://localhost:" in page.read_text(encoding="utf-8", errors="ignore"):
+            if preview_client.search(page.read_bytes()):
                 is_preview_build = True
                 break
         except OSError:
