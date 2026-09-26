@@ -444,6 +444,69 @@ final class WizardStructureTests: XCTestCase {
                        "A teacher who changed their mind must end where they started")
     }
 
+    // MARK: - A new course's marks pool (#292)
+
+    /// Every case in `contracts/shared-rules.json` → `gradedFolders.newCourse`
+    /// that applies to the mac, played through the wizard the way the Create
+    /// button plays it: a wizard in that state, then
+    /// `buildConfigurationDictionary`, which is the file setup reads.
+    ///
+    /// Setup keeps a saved pool and reads a saved file WITHOUT one as a
+    /// course that was never asked, so what this writes is what the course
+    /// gets. The expectation "manifest" is read from the payload's own
+    /// manifest in the checkout, never from the bundle, so a stale bundle
+    /// fails here rather than agreeing with itself.
+    func testANewCourseIsWrittenTheContractsMarksPool() throws {
+        let rule: [String: Any] = try WorkLeaseLivenessTests.sharedRules(["gradedFolders", "newCourse"])
+        let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 6, "the contract lost new-course cases")
+
+        var casesPlayed: Int = 0
+        for testCase in cases {
+            let caseName: String = testCase["name"] as? String ?? "unnamed"
+            if let platforms = testCase["appliesOn"] as? [String], !platforms.contains("mac") {
+                continue
+            }
+            var courseCodes: [String] = []
+            if testCase["everyPayload"] as? Bool == true {
+                courseCodes = try WizardStructureTests.payloadCodesInTheCheckout()
+                XCTAssertGreaterThanOrEqual(courseCodes.count, 39, "the sweep found too few payloads")
+            } else {
+                courseCodes.append(try XCTUnwrap(testCase["courseCode"] as? String, caseName))
+            }
+
+            for code in courseCodes {
+                let takesTheExample: Bool = (testCase["exampleContent"] as? String) == "taken"
+                let wizard: NewCourseWizardView = NewCourseWizardView(
+                    courseCode: code,
+                    prepopulatesExampleContent: takesTheExample,
+                    startsFromSkeleton: testCase["startsFromSkeleton"] as? Bool ?? true,
+                    gradedFolders: testCase["wizardGradedFolders"] as? [String] ?? ["Tasks"],
+                    isClubCourse: testCase["club"] as? Bool ?? false
+                )
+                let configuration: [String: Any] = wizard.buildConfigurationDictionary(
+                    code: code, name: "Marks Pool Course"
+                )
+
+                var expected: [String] = []
+                if let symbol = testCase["expect"] as? String {
+                    XCTAssertEqual(symbol, "manifest", "\(caseName): an unknown symbol")
+                    expected = try WizardStructureTests.declaredMarksPoolInTheCheckout(forCode: code)
+                } else {
+                    expected = try XCTUnwrap(testCase["expect"] as? [String], caseName)
+                }
+                XCTAssertEqual(
+                    configuration["graded_folders"] as? [String], expected,
+                    "\(caseName) (\(code)): a new course's file must carry the marks pool the "
+                    + "command line would write — an absent key is a course that was never asked "
+                    + "(contracts/shared-rules.json → gradedFolders.newCourse)."
+                )
+                casesPlayed += 1
+            }
+        }
+        XCTAssertGreaterThanOrEqual(casesPlayed, 44, "every case, and one per payload for the sweep")
+    }
+
     // MARK: - What must not move
 
     /// A teacher who TAKES the example content gets byte for byte the
@@ -458,6 +521,13 @@ final class WizardStructureTests: XCTestCase {
     /// British Columbia code with ready-made pages, ICS4U for the course
     /// this was reported against, and AMU3M twice for the ~1,900 codes the
     /// change was not for.
+    ///
+    /// The four payload goldens moved ONCE, on purpose, for GitHub issue
+    /// #292: each gained exactly one key, `"graded_folders" : ["Tasks"]` —
+    /// its manifest's own marks pool, which the command line always wrote
+    /// and the app had left out since 2026-08-24, so every such course read
+    /// as never asked (`gradedFolders.newCourse`). Nothing else in them
+    /// moved, and the AMU3M goldens did not move at all.
     func testTheFileForEveryPathThatExistedBeforeIsUnchanged() throws {
         let takenFromTheExample: [String] = ["ADA1O", "MCV4U", "MCMPR11", "ICS4U"]
         for code in takenFromTheExample {
@@ -696,6 +766,44 @@ final class WizardStructureTests: XCTestCase {
         XCTAssertEqual(
             String(data: built, encoding: .utf8), golden, reason, file: file, line: line
         )
+    }
+
+    /// Every course code with ready-made pages, read from the checkout's
+    /// `support/example_content/` rather than from the bundle.
+    static func payloadCodesInTheCheckout() throws -> [String] {
+        let folder: URL = WizardStructureTests.exampleContentInTheCheckout()
+        let entries: [String] = try FileManager.default.contentsOfDirectory(atPath: folder.path)
+        var codes: [String] = []
+        for entry in entries.sorted() {
+            let manifest: URL = folder.appendingPathComponent(entry).appendingPathComponent("manifest.json")
+            if FileManager.default.fileExists(atPath: manifest.path) {
+                codes.append(entry)
+            }
+        }
+        return codes
+    }
+
+    /// The `graded_folders` a payload's manifest declares, as written in the
+    /// checkout — the contract's "manifest" symbol. Every payload declares
+    /// one, and a runner fails if it does not.
+    static func declaredMarksPoolInTheCheckout(forCode code: String) throws -> [String] {
+        let manifestURL: URL = WizardStructureTests.exampleContentInTheCheckout()
+            .appendingPathComponent(code)
+            .appendingPathComponent("manifest.json")
+        let manifest: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: try Data(contentsOf: manifestURL)) as? [String: Any]
+        )
+        return try XCTUnwrap(manifest["graded_folders"] as? [String],
+                             "\(code)'s manifest declares no marks pool")
+    }
+
+    static func exampleContentInTheCheckout() -> URL {
+        return URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // QuartzTeachersTests
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // mac-app
+            .deletingLastPathComponent()   // the repository
+            .appendingPathComponent("support/example_content")
     }
 
     /// The wizard's own source, read from the checkout so the scan works

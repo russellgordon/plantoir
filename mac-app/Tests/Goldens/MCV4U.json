@@ -41,6 +41,9 @@
     }
   },
   "footer_html" : "",
+  "graded_folders" : [
+    "Tasks"
+  ],
   "hidden" : [
     "Media",
     "Ontario Curriculum",
