@@ -14,7 +14,7 @@ the left mirrors them exactly.
 - **Concepts** — One page per idea, written once and linked from
   everywhere it comes up.
 - **Sources** — The documents, images, and data this course reads.
-- **Fieldwork** — Work done outside the {room}.
+- **Fieldwork** — Work done outside the classroom.
 - **Discussions** — Questions the class talks through, one page each.
 - **Portfolios** — The record each student builds over the course.
 - **Tasks** — Assessed work, one page per task.

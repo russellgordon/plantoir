@@ -7,7 +7,7 @@ tags:
   - setup
 ---
 > [!note] This page is a starting point
-> Everything below is a placeholder written for a English course. Edit it,
+> Everything below is a placeholder written for an English course. Edit it,
 > or delete it — the site does not need this page to work. What it is
 > showing you is the SHAPE: a page with a title, a short reason to exist,
 > and links out to the pages that follow from it.

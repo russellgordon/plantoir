@@ -7,7 +7,7 @@ tags:
   - setup
 ---
 > [!note] This page is a starting point
-> Everything below is a placeholder written for a economics course. Edit it,
+> Everything below is a placeholder written for an economics course. Edit it,
 > or delete it — the site does not need this page to work. What it is
 > showing you is the SHAPE: a page with a title, a short reason to exist,
 > and links out to the pages that follow from it.
@@ -24,7 +24,7 @@ aloud on the first day.
 
 ## Why it matters here
 
-A economics class asks people to try things in front of each other. That
+An economics class asks people to try things in front of each other. That
 only works in a room where it is safe to be a beginner — which is a thing
 the group builds, not a thing the teacher announces.
 

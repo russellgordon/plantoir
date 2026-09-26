@@ -5,7 +5,7 @@ created: __CREATED__
 tags:
   - fieldwork
 ---
-Work done outside the {room}.
+Work done outside the lab.
 
 Fieldwork pages hold the site, what to bring, what to record, and how the
 data gets back into the course.

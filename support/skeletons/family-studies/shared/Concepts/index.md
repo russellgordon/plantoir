@@ -7,9 +7,9 @@ tags:
 ---
 One page per idea, written once and linked from everywhere it comes up.
 
-When an idea in {subject} needs explaining more than once, it belongs here
-rather than inside a lesson plan — then every class that touches it can link
-to the same page.
+When an idea in family studies needs explaining more than once, it belongs
+here rather than inside a lesson plan — then every class that touches it can
+link to the same page.
 
 %%
 Delete this comment once the folder has real pages in it. Anything between
