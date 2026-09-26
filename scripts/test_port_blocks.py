@@ -312,7 +312,7 @@ class PretendMac:
         return path.read_text(encoding="utf-8").splitlines() if path.exists() else []
 
     def run(self, launcher: str, action: str, serving: bool = False,
-            docker_host: str = None) -> subprocess.CompletedProcess:
+            docker_host: str = None, colima_home: str = None) -> subprocess.CompletedProcess:
         """`serving` sets WORKSPACE_WILL_SERVE the way preview.sh does for a
         preview (never for setup.sh, deploy.sh or a build for publishing)."""
         text = launcher_text(launcher)
@@ -346,6 +346,8 @@ class PretendMac:
         }
         if docker_host is not None:
             environment["DOCKER_HOST"] = docker_host
+        if colima_home is not None:
+            environment["COLIMA_HOME"] = colima_home
         return subprocess.run([BASH, "-c", program], capture_output=True, timeout=60, env=environment)
 
 
@@ -816,7 +818,7 @@ class TheLookBeforeAStart(unittest.TestCase):
 
     def start(self, launcher: str = "preview.sh", serving: bool = True, elsewhere: list = None,
               own: list = None, context: str = "colima", running: list = None, docker_host: str = None,
-              rm_refuses: bool = False) -> tuple:
+              rm_refuses: bool = False, colima_home: str = None) -> tuple:
         with tempfile.TemporaryDirectory() as scratch:
             mac = PretendMac(Path(scratch))
             mac.listening(own or [])
@@ -826,7 +828,7 @@ class TheLookBeforeAStart(unittest.TestCase):
             if rm_refuses:
                 mac.flag("rm_refuses")
             result = mac.run(launcher, 'start_the_existing_workspace; echo "CARRIED ON"',
-                             serving=serving, docker_host=docker_host)
+                             serving=serving, docker_host=docker_host, colima_home=colima_home)
             return result, mac.calls()
 
     def said(self, result) -> list:
@@ -865,6 +867,15 @@ class TheLookBeforeAStart(unittest.TestCase):
     def test_docker_host_into_colima_counts_as_colima(self):
         result, calls = self.start(context="default", docker_host="unix:///Users/t/.colima/default/docker.sock")
         self.assert_remade_before_starting(result, calls)
+
+    def test_docker_host_into_colima_home_counts_as_colima(self):
+        """A Colima kept somewhere else keeps its socket under COLIMA_HOME."""
+        result, calls = self.start(context="default", docker_host="unix:///opt/colima-dev/default/docker.sock",
+                                   colima_home="/opt/colima-dev")
+        self.assert_remade_before_starting(result, calls)
+        result, calls = self.start(context="default", docker_host="unix:///opt/other/docker.sock",
+                                   colima_home="/opt/colima-dev")
+        self.assertEqual(engine_calls(calls, "start"), ["docker start " + CONTAINER], output_of(result))
 
     def test_nothing_on_its_addresses_starts_it_as_before(self):
         result, calls = self.start(elsewhere=[8085, 9085])
@@ -909,6 +920,30 @@ class TheLookBeforeAStart(unittest.TestCase):
         self.assertNotIn("CARRIED ON", output_of(result))
         self.assertEqual(engine_calls(calls, "start") + engine_calls(calls, "run"), [])
         self.assertEqual(self.said(result)[-1], the_rules()["hostBlockClash"]["saysWhenAStartIsRefused"])
+        self.assertNotIn(address_held_prefix(), output_of(result),
+                         "the trail must never say it was set up again when it was not")
+
+    def test_a_remove_refused_because_it_is_running_now_claims_no_rebuild(self):
+        """Another launcher started it between the look and the remove: it is
+        used as it is, and nothing says it was set up again."""
+        with tempfile.TemporaryDirectory() as scratch:
+            mac = PretendMac(Path(scratch))
+            mac.listening([])
+            mac.listening_in_another_account([8081])
+            mac.workspaces({CONTAINER: block_ports(8081)}, [])
+            mac.flag("rm_refuses")
+            # Not running at the look; running by the time the remove fails.
+            (mac.bin / "docker").write_text(FAKE_DOCKER.replace(
+                'if [ "${2:-}" = "-a" ]; then cat "$FAKE/workspaces" 2>/dev/null; else cat "$FAKE/running" 2>/dev/null; fi',
+                'if [ "${2:-}" = "-a" ]; then cat "$FAKE/workspaces" 2>/dev/null; '
+                'elif grep -q "^docker rm" "$FAKE/calls"; then echo ' + CONTAINER + '; '
+                'else cat "$FAKE/running" 2>/dev/null; fi'), encoding="utf-8")
+            result = mac.run("preview.sh", 'start_the_existing_workspace; echo "CARRIED ON"', serving=True)
+            calls = mac.calls()
+        self.assertEqual(result.returncode, 0, output_of(result))
+        self.assertIn("CARRIED ON", output_of(result))
+        self.assertEqual(engine_calls(calls, "run") + engine_calls(calls, "start"), [])
+        self.assertNotIn(address_held_prefix(), output_of(result))
 
     def test_the_marker_is_the_contracts(self):
         block = between(launcher_text("setup.sh"), BLOCK_START, BLOCK_END)
@@ -1357,7 +1392,9 @@ class TheLookBeforeTheAnnouncement(unittest.TestCase):
             self.assertIn(line.replace("{course}", "ICS4U").replace("{section}", "1"), said)
         prefix = in_use_trail_entry()["marker"]["prefix"]
         self.assertIn(f"{prefix} preview 20 ICS4U/2 ICS4U/1", said)
-        self.assertIn(f"{address_held_prefix()} remade 8081 ICS4U/2", said)
+        # #94 refused, so nothing was set up again: its own line is the
+        # trail's, and no line may claim a rebuild that did not happen.
+        self.assertNotIn(address_held_prefix(), output_of(result))
         self.assertEqual(engine_calls(calls, "rm") + engine_calls(calls, "run"), [])
         self.assertNotIn("Preview will be available at", output_of(result))
 
@@ -1399,8 +1436,15 @@ class TheRealListings(unittest.TestCase):
         """Non-empty whenever lsof's is, and a superset of it: netstat sees
         this account too. Under Colima this account always owns listeners
         (limactl's), so on the development Mac this is never vacuous."""
-        everyone = self.ports_from("ports_listening_in_every_account")
+        # The kernel's list is read before AND after this account's, so a
+        # listener that comes or goes between the reads (other sessions make
+        # and remove workspaces all the time here) is in one of them.
+        before = self.ports_from("ports_listening_in_every_account")
         this_account = self.ports_from("ports_listening_in_this_account")
+        after = self.ports_from("ports_listening_in_every_account")
+        self.assertTrue(before and after or not this_account,
+                        "netstat's half read NOTHING on this macOS: the walk is back to lsof alone")
+        everyone = before | after
         if this_account:
             self.assertTrue(everyone, "netstat's half read NOTHING on this macOS: the walk is back to lsof alone")
         self.assertEqual(this_account - everyone, set(),

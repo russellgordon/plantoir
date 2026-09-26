@@ -236,6 +236,7 @@ def announce(refused_first: int, then_curl_exits, started_this_run: bool = False
             function_named("say_the_preview_address_is_unknown"),
             function_named("ports_listening_in_every_account"),
             function_named("ports_listening_in_this_account"),
+            function_named("the_docker_host_is_colimas"),
             function_named("the_engine_forwards_from_this_account"),
             function_named("a_different_engine_was_named_by_hand"),
             function_named("tell_the_app_the_address_was_held"),
@@ -531,8 +532,14 @@ class WhoseAddressItIs(unittest.TestCase):
         text = the_launcher_text()
         for line in the_ownership_rule()["sentence"]:
             self.assertIn(line, text)
-        for outcome in ["remade", "refused", "unchecked"]:
+        self.assertIn('tell_the_app_the_address_was_held remade "$held_port"', text)
+        for outcome in ["refused", "unchecked"]:
             self.assertIn(f"tell_the_app_the_address_was_held {outcome} \"$host_port\"", text)
+        # The remade line only after the remake returned (#310 review): a
+        # remake #94 refused must never be recorded as done.
+        body = function_named("announce_the_preview_address")
+        self.assertLess(body.find("    remake_the_workspace\n"),
+                        body.find('tell_the_app_the_address_was_held remade'))
 
 
 def the_hostblock_remade_lines() -> list:

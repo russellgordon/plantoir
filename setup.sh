@@ -876,19 +876,31 @@ listening_ports_on_this_mac() {
 # start_the_existing_workspace handles), and an engine nobody measured
 # must not pay a two-minute rebuild on a guess.
 #
-# DOCKER_HOST switches the checks off unless it points into ~/.colima/:
+# DOCKER_HOST switches the checks off unless it points into ~/.colima/ (or
+# into $COLIMA_HOME, where a developer keeps Colima somewhere else):
 # with it set, `docker context show` says "default" whatever the engine is,
 # so the only honest reading of an unfamiliar DOCKER_HOST is "not the engine
 # that was measured". The app never sets it; a developer who does gets a
 # line saying the check was not made (see preview.sh), rather than a check
 # that silently stopped happening.
+the_docker_host_is_colimas() {
+  case "${DOCKER_HOST:-}" in
+    */.colima/*) return 0 ;;
+  esac
+  # A Colima kept somewhere else (COLIMA_HOME) keeps its sockets there.
+  if [ -n "${COLIMA_HOME:-}" ]; then
+    case "$DOCKER_HOST" in
+      *"${COLIMA_HOME%/}/"*) return 0 ;;
+    esac
+  fi
+  return 1
+}
+
 the_engine_forwards_from_this_account() {
   local context
   if [ -n "${DOCKER_HOST:-}" ]; then
-    case "$DOCKER_HOST" in
-      */.colima/*) return 0 ;;
-    esac
-    return 1
+    the_docker_host_is_colimas
+    return
   fi
   context="$(docker context show 2>/dev/null)" || return 1
   case "$context" in
@@ -901,9 +913,9 @@ the_engine_forwards_from_this_account() {
 # above are off for that reason and not because the engine is Docker
 # Desktop.
 a_different_engine_was_named_by_hand() {
-  case "${DOCKER_HOST:-}" in
-    ""|*/.colima/*) return 1 ;;
-  esac
+  if [ -z "${DOCKER_HOST:-}" ] || the_docker_host_is_colimas; then
+    return 1
+  fi
   return 0
 }
 
@@ -1126,9 +1138,12 @@ start_the_existing_workspace() {
       return 0
     fi
     say_this_folder_is_set_up_again_on_free_addresses
-    tell_the_app_the_address_was_held before-start "$taken"
     if docker rm "$CONTAINER_NAME" >/dev/null 2>&1; then
       run_container_with_mount
+      # Only now: the trail line says the workspace WAS set up again, so it
+      # is never printed for a rebuild that did not happen (a refused
+      # remove, or another launcher's workspace used as it is).
+      tell_the_app_the_address_was_held before-start "$taken"
       return 0
     fi
     # Refused: another launcher got here first and it is running again. Use it.
