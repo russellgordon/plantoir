@@ -141,6 +141,11 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    `cd mac-app; ./publish.sh -Sign`. Output lands in `mac-app/dist/Plantoir-macOS.dmg`.
    Since #204 it also signs the updater inside the app item by item and REFUSES
    a bundle whose updater is not on the app's own team, before notarization.
+   Since #312 it also fetches and signs the website builder's helper programs
+   (Vendor/fetch-helpers.sh, release/sign-helpers.sh), and the DMG is about
+   **430 MB** (ULMO) rather than 59 MB — the notarization upload takes
+   correspondingly longer ("The update feed (macOS)" → "Deltas" for why
+   updates stay small).
 5. **Tell Claude "cut the release."** It drafts teacher-friendly notes, adds the
    SHA-256 table, creates the GitHub Draft Release, uploads the assets, publishes
    the release, **builds and signs the mac's update feed from the exact DMG it
@@ -327,6 +332,38 @@ the release side.
   verifies, and checks the new item points at `…/releases/download/v<v>/
   Plantoir-macOS.dmg` with the DMG's length. **Order is load-bearing**: a feed
   deployed before its download exists offers every teacher an update that 404s.
+- **Deltas, since #312 — which REVERSED #204's decision.** #204 rejected
+  deltas (`--maximum-deltas 0`) "to save part of a ~59 MB download once a
+  release"; since #312 the DMG carries the website builder's helper programs
+  and starting disk and is ~430 MB, so without deltas every update would be a
+  430 MB download, which defeats the reason the payload was allowed into the
+  app at all (Russell's decision on #312 relies on it). Measured with Sparkle
+  2.9.6's `BinaryDelta`: a Swift-only change is a **~3.7 MB** delta with or
+  without the 467 MB payload inside both apps (3,658,602 B without, 3,658,626
+  B with; 3,733,870 B with the four programs' signatures changed). So
+  `update_feed.py` now asks for deltas from the **three newest builds in the
+  feed** — not the newest three tags: releases before Sparkle and Windows-only
+  tags are not in the feed, and no app older than the feed can ask for a
+  delta. What that costs at the cut:
+  - **Each earlier DMG is downloaded** from the address its own feed item
+    gives — the exact bytes teachers installed, so no copy needs keeping — and
+    checked for length and build: up to 3 × ~430 MB, plus
+    `~/Library/Caches/Sparkle_generate_appcast`, which can grow to a few GB and
+    may be emptied afterwards.
+  - **Each `.delta` lands beside the DMG** (`mac-app/dist/Plantoir<new>-<old>.delta`)
+    and **must be uploaded to the SAME release** as the DMG, BEFORE the feed is
+    deployed. `build.py --deploy`'s live check follows every delta the newest
+    item offers, and refuses a missing one: Sparkle would fall back to the
+    full download without a word.
+  - `generate_appcast` rewrites the item of every archive it is given —
+    measured: the earlier item's download moved to the NEW release and lost
+    its notes, even with `--versions` — so `update_feed.py` puts every earlier
+    item back exactly as it was, signs the feed again with the same key (the
+    Keychain asks once more), and refuses the cut if any earlier item still
+    differs.
+  - **v1.4.0, the first release with Sparkle, has no deltas**: nothing before
+    it is in the feed. Its teachers download the whole DMG once, by hand; the
+    saving starts with the release after it.
 - **A REQUIRED warning makes the release important.** Pass `--required-warning`
   when "Warnings the release notes MUST carry" has a row for this release: the
   update window then has no Skip and no Remind Me Later, and the notes carry
