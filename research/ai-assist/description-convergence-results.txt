@@ -1,0 +1,154 @@
+#114: one description per tool - what each router text is worth on the
+smaller assistant. Measured 2026-09-26, before the decision landed, as the
+mac's reference for the DIRECTION. It is not the Windows measurement the
+decision requires (that one is owed on Windows' own hardware, before and
+after, with the veto in doc 10 -> "One description per tool").
+
+CONDITIONS
+  Mac16,8 (M4 Pro), 48 GiB, macOS 26.6. llama.cpp b10435, Metal.
+  Weights: qwen2.5-1.5b-instruct-q4_k_m.gguf (the SMALLER assistant) ONLY.
+  The larger assistant (Qwen3-4B) was ABSENT and was not downloaded.
+  Flags: AssistServerHost.serverArguments, small tier; temperature 0; the
+  app's request body; the shipped system prompt with the date appended.
+
+ARMS (built by description-arms.py beside this file; the builder was checked
+byte-identical to the arms the numbers below were taken with)
+  A  the contract's text - toolSchemas.local, which since #114 is pinned in
+     assist-cases.json -> toolDescriptions. The convergence target.
+  B  Windows' router text today: Briefly() of PlantoirTools.cs' descriptions.
+     Differs from A in exactly five tools: check_section, publish_pages,
+     unpublish_pages, read_remembered_timetable, add_next_class.
+  C  Briefly() of the contract text: what Windows would read if it kept
+     trimming. Differs from A in two: publish_pages, add_next_class.
+  Everything but the descriptions of those tools is identical across arms.
+
+RESULTS
+  trimmed-surface-suite.py <arm> 10 --date-appended --real-course --course VVH2O
+  --prompt shipped --app-body   (29 probes x 10 trials)
+
+                                  A (contract)  B (Windows today)  C (Briefly of contract)
+    the 22 the model sees         160/220       160/220            160/220
+    all 29                        200/290       200/290            210/290
+    polarity inversions           0             0                  0
+    calls cut off at the cap      10            20                 0
+
+    B's extra 10 cut-offs: "Put up Unit 3, Day 2 for EXC2O section 1, along
+    with everything it points at." is SCORED 10/10 by tool name under B, and
+    all ten are publish_pages calls that ran to 512 tokens and were cut off
+    mid-JSON - which the app refuses (wording.answerWasCutOff). Under A the
+    same probe is a clean 10/10. The score counts a truncated call as OK; the
+    app does not. Count cut-offs as misses.
+    C's +10 over A is "card: undo" (0 -> 10), a sentence the app answers in
+    code, so not a routing change the app sees.
+
+  teachers-say-suite.py (Windows' 25-probe suite, 10 trials), example course
+  rewritten to EXC2O (a first run without the rewrite copied ICS3U out of the
+  examples 200 times and is discarded - trap 1 of doc 10's "five traps")
+
+                                  A (contract)  B (Windows today)  C (Briefly of contract)
+    TEST (10 TEACHERS SAY probes)  90/100        90/100             100/100
+    CONTROL (15)                   120/150       90/150             80/150
+    OVERALL                        210/250 (84%) 180/250 (72%)      180/250 (72%)
+    wrong course / malformed / cut off   0/0/0   0/0/0              0/0/0
+
+    Probes that differ between arms (every other probe identical in all three):
+      dates: what dates        A 10  B  0  C 10
+      dates: know timetable    A  0  B 10  C 10
+      ctl list_pages           A 10  B 10  C  0
+      ctl read_page            A 10  B  0  C  0
+      ctl cancel_scheduled     A 10  B  0  C  0
+      ctl decline: delete      A 10  B  0  C  0
+
+READING
+  On the smaller tier, on this hardware, the contract's text is never worse
+  than Windows' current router text and is better where the suites disagree:
+  one 10/10 cut-off runaway fewer on the 29-probe suite, +30 control trials on
+  teachers-say. No arm inverts polarity. Trimming the contract text with
+  Briefly() (C) is NOT free: level on the 29-probe suite, 40 control trials
+  worse than A on teachers-say - which is why the decision is to stop
+  trimming rather than to trim the new text. The two timetable probes swap
+  between A and B and net to zero, which is why doc 10's veto is written per
+  TOOL rather than per probe.
+
+RAW: the 29-probe comparison, one row per probe (A | B | C)
+all probes                   200/290 (69%) | 200/290 (69%) | 210/290 (72%)
+the 22 the model SEES        160/220 (73%)   — the rest are answered  | 160/220 (73%)   — the rest are answered  | 160/220 (73%)   — the rest are answered 
+promise-card 11              80/110 | 80/110 | 90/110
+polarity inversions          0 | 0 | 0
+malformed tool calls         10   (HTTP errors, plus arguments that d | 20   (HTTP errors, plus arguments that d | 0   (HTTP errors, plus arguments that di
+misses that were a WRITE     50 | 50 | 50
+
+card: publish by name          10 10x publish_pages | 10 10x publish_pages | 10 10x publish_pages 
+card: publish tomorrow         10 10x publish_class_on  (answered in cod | 10 10x publish_class_on  (answered in cod | 10 10x publish_class_on  (answered in cod 
+card: unpublish by name        10 10x unpublish_pages  (answered in code | 10 10x unpublish_pages  (answered in code | 10 10x unpublish_pages  (answered in code 
+card: unpublish, mistake       10 10x unpublish_pages | 10 10x unpublish_pages | 10 10x unpublish_pages 
+card: plan a publish           10 10x publish_pages | 10 10x publish_pages | 10 10x publish_pages 
+card: check the section        10 10x check_section  (answered in code,  | 10 10x check_section  (answered in code,  | 10 10x check_section  (answered in code,  
+card: rebuild preview          10 10x rebuild_preview  (answered in code | 10 10x rebuild_preview  (answered in code | 10 10x rebuild_preview  (answered in code 
+card: undo                     0 10x (declined)  [MISS]  (answered in c | 0 10x (declined)  [MISS]  (answered in c | 10 10x undo_last_change  (answered in cod   <-- DIFFERS
+card: deploy now               0 10x (declined)  [MISS]  (answered in c | 0 10x (declined)  [MISS]  (answered in c | 0 10x (declined)  [MISS]  (answered in c 
+card: schedule a deploy        0 10x deploy_section  [MISS] | 0 10x deploy_section  [MISS] | 0 10x deploy_section  [MISS] 
+card: cancel the deploy        10 10x cancel_scheduled_deploy | 10 10x cancel_scheduled_deploy | 10 10x cancel_scheduled_deploy 
+publish tomorrow, with links   0 10x publish_pages  [MISS] | 0 10x publish_pages  [MISS] | 0 10x publish_pages  [MISS] 
+publish by name, informal      10 10x publish_pages | 10 10x publish_pages | 10 10x publish_pages 
+HIDE - the inversion case      10 10x unpublish_pages | 10 10x unpublish_pages | 10 10x unpublish_pages 
+hide, informal (verbatim cue)  10 10x unpublish_pages | 10 10x unpublish_pages | 10 10x unpublish_pages 
+hide, phrased as a mistake     10 10x unpublish_pages | 10 10x unpublish_pages | 10 10x unpublish_pages 
+list pages                     10 10x list_pages | 10 10x list_pages | 10 10x list_pages 
+read                           0 10x check_section  [MISS]  (answered i | 0 10x check_section  [MISS]  (answered i | 0 10x check_section  [MISS]  (answered i 
+check section                  10 10x check_section | 10 10x check_section | 10 10x check_section 
+rebuild preview                10 10x rebuild_preview | 10 10x rebuild_preview | 10 10x rebuild_preview 
+undo                           10 10x undo_last_change | 10 10x undo_last_change | 10 10x undo_last_change 
+schedule a deploy              0 10x deploy_section  [MISS] | 0 10x deploy_section  [MISS] | 0 10x deploy_section  [MISS] 
+deploy now                     0 10x publish_class_on  [MISS] | 0 10x publish_pages  [MISS] | 0 10x publish_pages  [MISS] 
+cancel scheduled deploy        10 10x cancel_scheduled_deploy | 10 10x cancel_scheduled_deploy | 10 10x cancel_scheduled_deploy 
+no course named: publish       0 10x publish_pages  [MISS] | 0 10x publish_pages  [MISS] | 0 10x publish_pages  [MISS] 
+no course named: hide          10 10x unpublish_pages | 10 10x unpublish_pages | 10 10x unpublish_pages 
+deletion - no such tool        0 10x rebuild_preview  [MISS] | 0 10x rebuild_preview  [MISS] | 0 10x rebuild_preview  [MISS] 
+out of scope                   10 10x (declined) | 10 10x (declined) | 10 10x (declined) 
+typos                          10 10x publish_class_on | 10 10x publish_class_on | 10 10x publish_class_on 
+
+=== teachers-say, arm A-contract (summary)
+TEST: 90/100 (90%)
+CONTROL: 120/150 (80%)
+OVERALL: 210/250 (84%)
+wrong course or section in a routed call: 0
+malformed tool calls: 0   (HTTP errors, plus arguments that did not parse)
+tool calls whose arguments were TRUNCATED mid-JSON: 0
+misroutes, by probe:
+   ctl check_section          (declined) x10
+   ctl publish_class_on       publish_pages x10
+   ctl schedule_deploy        deploy_section x10
+   dates: know timetable      (declined) x10
+
+=== teachers-say, arm B-windows-text (summary)
+TEST: 90/100 (90%)
+CONTROL: 90/150 (60%)
+OVERALL: 180/250 (72%)
+wrong course or section in a routed call: 0
+malformed tool calls: 0   (HTTP errors, plus arguments that did not parse)
+tool calls whose arguments were TRUNCATED mid-JSON: 0
+misroutes, by probe:
+   ctl cancel_scheduled       (declined) x10
+   ctl check_section          (declined) x10
+   ctl decline: delete        rebuild_preview x10
+   ctl publish_class_on       publish_pages x10
+   ctl read_page              check_section x10
+   ctl schedule_deploy        deploy_section x10
+   dates: what dates          (declined) x10
+
+=== teachers-say, arm C-briefly-contract (summary)
+TEST: 100/100 (100%)
+CONTROL: 80/150 (53%)
+OVERALL: 180/250 (72%)
+wrong course or section in a routed call: 0
+malformed tool calls: 0   (HTTP errors, plus arguments that did not parse)
+tool calls whose arguments were TRUNCATED mid-JSON: 0
+misroutes, by probe:
+   ctl cancel_scheduled       (declined) x10
+   ctl check_section          (declined) x10
+   ctl decline: delete        rebuild_preview x10
+   ctl list_pages             check_section x10
+   ctl publish_class_on       publish_pages x10
+   ctl read_page              check_section x10
+   ctl schedule_deploy        deploy_section x10
