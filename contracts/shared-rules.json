@@ -1190,6 +1190,169 @@
     },
     "secretLength": 40
   },
+  "problemReportTrail": {
+    "byteNotation": "In `input`, {XX} (two uppercase hex digits in braces) is one raw byte; everything else is UTF-8. No case uses a literal brace otherwise. In `expectLines`, {promptsLeftOutNote} and {unreadableCharactersNote:N} stand for the sentences below, with {count} filled by N. The result is compared split on line breaks, so a final empty entry means the text ended with one.",
+    "cases": [
+      {
+        "expectLines": [
+          "2026-09-26 08:31:39 · ICS3U/1 · started building the preview é",
+          "2026-09-26 08:31:39 · ICS3U/1 · built",
+          ""
+        ],
+        "expectSomethingToReport": true,
+        "includingPrompts": true,
+        "input": "2026-09-26 08:31:39 · ICS3U/1 · started building the preview é\n2026-09-26 08:31:39 · ICS3U/1 · built\n",
+        "name": "a clear trail comes back exactly",
+        "why": "The lenient read must not change a file that was already readable: no note, no line added or lost, the final empty piece after the last line break kept."
+      },
+      {
+        "expectLines": [
+          "{unreadableCharactersNote:1}",
+          "2026-09-26 08:31:39 · ICS3U/1 · truncated �",
+          "2026-09-26 08:31:39 · ICS3U/1 · after",
+          ""
+        ],
+        "expectSomethingToReport": true,
+        "includingPrompts": true,
+        "input": "2026-09-26 08:31:39 · ICS3U/1 · truncated {C3}\n2026-09-26 08:31:39 · ICS3U/1 · after\n",
+        "name": "a launcher line cut inside a two-byte character",
+        "why": "The issue's own shape. The neighbouring lines are intact, and the readable part of the damaged line - its time, course and section - is kept."
+      },
+      {
+        "expectLines": [
+          "{unreadableCharactersNote:1}",
+          "2026-09-26 08:31:39 · ICS3U/1 · a �",
+          ""
+        ],
+        "expectSomethingToReport": true,
+        "includingPrompts": true,
+        "input": "2026-09-26 08:31:39 · ICS3U/1 · a {E2}{80}\n",
+        "name": "cut inside a three-byte character",
+        "why": "One replacement per broken character, not one per byte."
+      },
+      {
+        "expectLines": [
+          "{unreadableCharactersNote:1}",
+          "2026-09-26 08:31:39 · ICS3U/1 · b �� c",
+          ""
+        ],
+        "expectSomethingToReport": true,
+        "includingPrompts": true,
+        "input": "2026-09-26 08:31:39 · ICS3U/1 · b {80}{80} c\n",
+        "name": "stray continuation bytes",
+        "why": "Each stray byte is its own replacement."
+      },
+      {
+        "expectLines": [
+          "{unreadableCharactersNote:2}",
+          "2026-09-26 08:31:39 · ICS3U/1 · one �",
+          "2026-09-26 08:31:39 · ICS3U/1 · two �",
+          ""
+        ],
+        "expectSomethingToReport": true,
+        "includingPrompts": true,
+        "input": "2026-09-26 08:31:39 · ICS3U/1 · one {C3}\n2026-09-26 08:31:39 · ICS3U/1 · two {C3}\n",
+        "name": "two damaged lines are counted as two",
+        "why": "The count is of LINES, and the sentence reads naturally with any number, so it has no plural branch."
+      },
+      {
+        "expectLines": [
+          "{unreadableCharactersNote:1}",
+          "2026-09-26 08:31:39 · ICS3U/1 · x � y",
+          ""
+        ],
+        "expectSomethingToReport": true,
+        "includingPrompts": true,
+        "input": "2026-09-26 08:31:39 · ICS3U/1 · x � y\n",
+        "name": "a character the trim already replaced",
+        "why": "The trim writes U+FFFD in place of what it could not read, so after a trim the file is valid UTF-8 and still carries the mark. It is still something that could not be read, and a report made just after a trim must explain it too."
+      },
+      {
+        "expectLines": [
+          "{unreadableCharactersNote:1}",
+          "2026-09-26 08:31:39 · ICS3U/1 · d �́",
+          ""
+        ],
+        "expectSomethingToReport": true,
+        "includingPrompts": true,
+        "input": "2026-09-26 08:31:39 · ICS3U/1 · d {C3}{CC}{81}\n",
+        "name": "a replacement followed by a combining mark",
+        "why": "U+FFFD followed by a combining acute is ONE grapheme, and a grapheme-based contains misses the U+FFFD inside it (measured on the mac). Count scalar by scalar."
+      },
+      {
+        "expectLines": [
+          "{promptsLeftOutNote}",
+          "2026-09-26 08:31:39 · ICS3U/1 · chose publish_pages(course, section)",
+          ""
+        ],
+        "expectSomethingToReport": true,
+        "includingPrompts": false,
+        "input": "2026-09-26 08:31:39 · ICS3U/1 · chose publish_pages(course, section)\n  asked: publish tomorrow{E2}{80}\n",
+        "name": "damage on a prompt line left out of the report",
+        "why": "The line is still recognised by its prefix and still withheld. The note counts only the lines SHOWN, so it is absent."
+      },
+      {
+        "expectLines": [
+          "{unreadableCharactersNote:1}",
+          "2026-09-26 08:31:39 · ICS3U/1 · chose publish_pages(course, section)",
+          "  asked: publish tomorrow�",
+          ""
+        ],
+        "expectSomethingToReport": true,
+        "includingPrompts": true,
+        "input": "2026-09-26 08:31:39 · ICS3U/1 · chose publish_pages(course, section)\n  asked: publish tomorrow{E2}{80}\n",
+        "name": "the same prompt line, included",
+        "why": "Shown, so counted."
+      },
+      {
+        "expectLines": [
+          "{unreadableCharactersNote:1}",
+          "2026-09-26 08:31:39 · ICS3U/1 · stopped �"
+        ],
+        "expectSomethingToReport": true,
+        "includingPrompts": true,
+        "input": "2026-09-26 08:31:39 · ICS3U/1 · stopped {F0}{9F}",
+        "name": "the whole trail is one torn line",
+        "why": "No final line break. Before #301 this whole file read back as nothing, and a teacher with no task records was told there was nothing to send - the answer the issue is about."
+      },
+      {
+        "expectLines": [
+          "{unreadableCharactersNote:1}",
+          "2026-09-26 08:31:39 · ICS3U/1 · caf�",
+          "2026-09-26 08:31:39 · ICS3U/1 · next",
+          ""
+        ],
+        "expectSomethingToReport": true,
+        "includingPrompts": true,
+        "input": "2026-09-26 08:31:39 · ICS3U/1 · caf{E9}\n2026-09-26 08:31:39 · ICS3U/1 · next\n",
+        "name": "a line saved in another encoding",
+        "why": "A Latin-1 é. A teacher who opens the file in an editor and saves it in another encoding is a writer the app does not control."
+      },
+      {
+        "expectLines": [
+          "{promptsLeftOutNote}",
+          "{unreadableCharactersNote:1}",
+          "2026-09-26 08:31:39 · ICS3U/1 · chose publish_pages(course, section)",
+          "2026-09-26 08:31:39 · ICS3U/1 · x �",
+          ""
+        ],
+        "expectSomethingToReport": true,
+        "includingPrompts": false,
+        "input": "2026-09-26 08:31:39 · ICS3U/1 · chose publish_pages(course, section)\n  asked: publish tomorrow{E2}{80}\n2026-09-26 08:31:39 · ICS3U/1 · x {C3}\n",
+        "name": "both notes, in order",
+        "why": "The order is fixed - the note about what was left out first, then the note about what could not be read - so the two apps' reports read the same."
+      }
+    ],
+    "counting": "Count the lines SHOWN that contain U+FFFD anywhere, scalar by scalar - not grapheme by grapheme, and not only those this read replaced. A prompt line left out of the report is not counted.",
+    "note": "How the breadcrumb trail is READ BACK into a problem report. The file has writers that are not the app (every launcher appends with printf, which passes any byte), and a teacher can open it in any editor, so the reader must not depend on every byte being readable. One unreadable byte used to empty the whole report on the mac (#301). Read leniently, replace what cannot be read with U+FFFD (one per maximal ill-formed sequence), never drop or merge a line, and say so at the top of the trail. A readable file with the prompts included comes back exactly as it is on disk.",
+    "noteOrder": [
+      "promptsLeftOutNote",
+      "unreadableCharactersNote"
+    ],
+    "promptsLeftOutNote": "(What the teacher typed was left out of this report.)",
+    "unreadableCharactersNote": "(Some characters on {count} of these lines could not be read, and are shown as �.)",
+    "wordingWhy": "A teacher reads this, so it names characters and lines - words they have - and nothing about bytes, encodings, decoding, files or the trail (rule 1). 'on 1 of these lines' and 'on 3 of these lines' both read naturally, so there is no plural branch. It carries the count rather than 'a few characters' because the number tells whoever helps how much of the trail to distrust."
+  },
   "scheduledPublishStopped": {
     "note": "What a teacher is told when a publish that was set to happen on its own did not get through. It usually runs at half six with the app closed, so the LAUNCHER writes a record and the APP reads it \u2014 that handover is the feature. Without it the run is indistinguishable from one that was never scheduled, which is exactly the shape of \"my site did not update on Tuesday and I do not know why\". (This said the app reads the record \"the next time it opens\" until 2026-09-19; see whenItIsShown, which is what made that false.)",
     "whenItIsShown": "On the section that is SHOWING, without the teacher navigating anywhere, as soon as the run writes its record \u2014 and the section's sentence and the sidebar's warning appear at the same moment, because both follow one counter. Waiting for the section to be reopened is the fault GitHub issue #216 closed on the mac on 2026-09-19: a teacher who stayed on the section while the run finished was told nothing until they clicked away and back. Two things make it work and both matter to whoever implements it elsewhere. The app watches the RECORD FOLDER, one watch for the whole app rather than one per view, since the folder is per user rather than per working folder. And the wrapper must land its record in ONE step: a folder watch sees an entry arrive but not a second line appended to a file already there, so a record written with two echoes arrived as one event carrying an empty file \u2014 measured on the mac, 0 of 40 \u2014 and the line that completed it produced no event at all. The mac assembles the record in a temporary file BESIDE the folder and moves it in (40 of 40), and separately watches any record that is there but cannot be read yet, which is what covers a job whose wrapper was written by an older build. And since #212 (2026-09-25), as a system notification sent by the run itself when it finishes, so a teacher who has not opened the app at all is told too — see `notification`.",

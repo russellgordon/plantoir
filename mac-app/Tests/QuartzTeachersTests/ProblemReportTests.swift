@@ -734,6 +734,122 @@ final class ProblemReportTests: XCTestCase {
         }
     }
 
+    // MARK: - A trail with characters that cannot be read (#301)
+
+    /// The issue's own shape: a launcher line cut inside a character, written
+    /// the way a launcher writes (a raw `O_APPEND`), between lines the app
+    /// wrote. Before #301 the whole trail read back as nothing, so the report
+    /// left it out and a teacher with no task records was told there was
+    /// nothing to send.
+    func testOneUnreadableByteNoLongerEmptiesTheReport() throws {
+        let store: ProblemReportStore = ProblemReportStore(folderURL: folderURL)
+        let prefix: String = "2026-09-26 08:31:39 · ICS3U/1 · "
+        store.appendActivityLine(prefix + "started building the preview")
+        store.appendActivityLine(prefix + "the preview is running")
+        store.appendActivityLine(prefix + "started publishing")
+        let trailURL: URL = folderURL.appendingPathComponent(ProblemReportStore.activityFileName)
+        var damagedLine: [UInt8] = Array((prefix + "the preview stopped before building \u{E9}t").utf8)
+        damagedLine.append(0xC3)
+        damagedLine.append(0x0A)
+        let handle: FileHandle = try FileHandle(forWritingTo: trailURL)
+        try handle.seekToEnd()
+        try handle.write(contentsOf: Data(damagedLine))
+        try handle.close()
+        store.appendActivityLine(prefix + "published")
+
+        XCTAssertTrue(store.runFileURLs().isEmpty)
+        XCTAssertTrue(store.hasAnythingToReport)
+
+        let destination: URL = folderURL.appendingPathComponent("out", isDirectory: true)
+        try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+        let assembled: URL = try XCTUnwrap(
+            ProblemReportBuilder(store: store).assembleFolder(includingAssistantPrompts: false, in: destination)
+        )
+        let trail: String = try String(
+            contentsOf: assembled.appendingPathComponent(ProblemReportBuilder.trailFileName),
+            encoding: .utf8
+        )
+        XCTAssertTrue(trail.hasPrefix(ProblemReportStore.unreadableCharactersNote(lineCount: 1)), trail)
+        for expected in [
+            "started building the preview",
+            "the preview is running",
+            "the preview stopped before building \u{E9}t\u{FFFD}",
+            "published",
+        ] {
+            XCTAssertTrue(trail.contains(prefix + expected), "\(expected) is missing from:\n\(trail)")
+        }
+    }
+
+    /// A readable trail must come back EXACTLY as it is on disk: a split and
+    /// join that changed its shape would still pass every test that only
+    /// looks for a phrase inside it.
+    func testAClearTrailIsReadBackExactly() throws {
+        let store: ProblemReportStore = ProblemReportStore(folderURL: folderURL)
+        store.appendActivityLine("2026-09-26 08:31:39 · ICS3U/1 · started building the preview é")
+        store.appendActivityLine("2026-09-26 08:31:40 · ICS3U/1 · built 🌱")
+        store.appendActivityLine("")
+        store.appendActivityLine("2026-09-26 08:31:41 · closed")
+        let onDisk: String = try String(
+            contentsOf: folderURL.appendingPathComponent(ProblemReportStore.activityFileName),
+            encoding: .utf8
+        )
+        XCTAssertEqual(store.activityText(includingPrompts: true), onDisk)
+        XCTAssertEqual(store.activityText(includingPrompts: false), onDisk)
+    }
+
+    /// The first test of #238's lenient trim, and the reason both reads share
+    /// one decode: a file past its limit with a bad byte in the half that is
+    /// kept is still trimmed, comes out readable, and the report still says
+    /// that a character could not be read — the trim's U+FFFD is counted too.
+    func testTheTrimStillWorksPastAnUnreadableByte() throws {
+        var bytes: [UInt8] = []
+        var index: Int = 0
+        while index < ProblemReportStore.mostActivityLines {
+            bytes.append(contentsOf: Array("2026-09-26 08:31:39 · line \(index)".utf8))
+            if index == 1000 {
+                bytes.append(0xC3)
+            }
+            bytes.append(0x0A)
+            index += 1
+        }
+        let trailURL: URL = folderURL.appendingPathComponent(ProblemReportStore.activityFileName)
+        try Data(bytes).write(to: trailURL)
+
+        let store: ProblemReportStore = ProblemReportStore(folderURL: folderURL)
+        store.appendActivityLine("2026-09-26 08:32:00 · one more")
+
+        let data: Data = try Data(contentsOf: trailURL)
+        let reread: String = try XCTUnwrap(
+            String(data: data, encoding: .utf8), "the trim should have written the file back readable"
+        )
+        XCTAssertLessThanOrEqual(
+            reread.components(separatedBy: "\n").count, ProblemReportStore.keptActivityLines + 1
+        )
+        XCTAssertTrue(reread.contains("line 1000\u{FFFD}"), String(reread.prefix(200)))
+        XCTAssertTrue(
+            store.activityText(includingPrompts: true)
+                .hasPrefix(ProblemReportStore.unreadableCharactersNote(lineCount: 1))
+        )
+    }
+
+    /// Rule one again, for the one new sentence: it names characters and
+    /// lines, never how the text is stored.
+    func testTheNoteAboutUnreadableCharactersNeverMentionsTheMachinery() {
+        let forbidden: [String] = [
+            "byte", "utf", "encod", "decod", "file", "trail", "log",
+            "toolchain", "script", "Docker", "container", "transcript",
+        ]
+        for count in [1, 2] {
+            let note: String = ProblemReportStore.unreadableCharactersNote(lineCount: count)
+            for word in forbidden {
+                XCTAssertFalse(
+                    note.lowercased().contains(word.lowercased()),
+                    "\"\(word)\" appears in what a teacher reads: \(note)"
+                )
+            }
+        }
+    }
+
     // MARK: - Environment and launch logging
 
     func testProblemReportEnvironmentCapturesOSAndHelpers() {
