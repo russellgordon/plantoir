@@ -115,7 +115,10 @@ final class WorkingFolderReachTests: XCTestCase {
                 try FileManager.default.createDirectory(at: courses, withIntermediateDirectories: true)
                 try FileManager.default.createSymbolicLink(at: folder.appendingPathComponent("courses"), withDestinationURL: courses)
             case "coursesRelativeLinkClimbingOut":
-                folder = home.appendingPathComponent(slug)
+                // The home spelled as the disk spells it, so the link's raw
+                // text BEGINS with the home's names: only taking the `..`
+                // away (or asking the disk) makes it outside.
+                folder = URL(fileURLWithPath: FolderIdentity.canonicalPath(home.path)).appendingPathComponent(slug)
                 try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
                 var climb: String = ""
                 for _ in 0..<(folder.pathComponents.count + 2) {
