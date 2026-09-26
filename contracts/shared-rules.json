@@ -680,7 +680,25 @@
       "takesLinkedPages": true,
       "transitive": true,
       "disclosedInThePlan": true,
-      "why": "Publishing a page whose links lead somewhere students cannot see is the one thing publishing must never do, so it always takes what it links to, and what those link to in turn. The plan names every page that will become visible, so a teacher agreeing to publish one class can see the four pages going with it. These three stay TRUE alongside stopsAtAClassPage below: the walk is still transitive and still takes what a page links to, it has ONE stop, and the plan names the classes it stopped at as well as the pages it took."
+      "why": "Publishing a page whose links lead somewhere students cannot see is the one thing publishing must never do, so it always takes what it links to, and what those link to in turn. The plan names every page that will become visible, so a teacher agreeing to publish one class can see the four pages going with it. These three stay TRUE alongside stopsAtAClassPage below: the walk is still transitive and still takes what a page links to, it has ONE stop, and the plan names the classes it stopped at as well as the pages it took.",
+      "casesNote": "Run through a REAL publish on a course laid out from `pages`, the same harness as stopsAtAClassPage.cases. A page is written with frontmatter (a title and whether students see it) and then a BODY: a page carrying `links` gets a one-sentence body and then one `See [[name]].` paragraph per link (an empty list: the sentence alone); a page carrying `body` gets that text EXACTLY as written instead, byte for byte, so a link can sit in a table with its pipe escaped. A page carries one or the other, never both - a harness given both must fail the case rather than choose. After the publish, each page's body - the text after its frontmatter - must be byte-identical to what was written: a publish changes whether students see a page, never what the page says, and a publish that 'tidied' a table's `\\|` would split the cell. Added by #294; what counts as a link is readingALink.",
+      "cases": [
+        {
+          "name": "links in a table, with aliases, are followed - and still stop at a class",
+          "pages": [
+            {"title": "Unit 2, Day 3", "isClassPage": true, "visible": false, "body": "| Today | Next |\n|---|---|\n| [[Ohm's Law\\|Ohm]], [[Watt\\|W]] | [[Unit 2, Day 4\\|tomorrow]] |\n"},
+            {"title": "Ohm's Law", "isClassPage": false, "visible": false, "body": "| Read next |\n|---|\n| [[Worked Example\\|example]] |\n"},
+            {"title": "Watt", "isClassPage": false, "visible": false, "links": []},
+            {"title": "Worked Example", "isClassPage": false, "visible": false, "links": []},
+            {"title": "Unit 2, Day 4", "isClassPage": true, "visible": false, "links": ["Worksheet"]},
+            {"title": "Worksheet", "isClassPage": false, "visible": false, "links": []}
+          ],
+          "publish": ["Unit 2, Day 3"],
+          "expectVisible": ["Unit 2, Day 3", "Ohm's Law", "Watt", "Worked Example"],
+          "expectUntouched": ["Unit 2, Day 4", "Worksheet"],
+          "why": "Three of the four pages that go up are reachable ONLY through a table link, so the case cannot pass on a reader that drops them. Ohm's Law -> Worked Example proves the walk is still transitive through a table; Unit 2, Day 4 proves the #173 stop still holds when the class is linked from one."
+        }
+      ]
     },
     "unpublishing": {
       "takesALinkedPageOnlyWhenNothingElseNeedsIt": true,
@@ -747,6 +765,43 @@
       "value": true,
       "why": "The exclusions are checked BEFORE the referrer test, so narrowing what counts as a referrer cannot reach them. Narrowing a sweep rule makes every exclusion above it matter more than it did the day before, which is why the exclusions are the thing to re-test after any change to what gets swept."
     }
+  },
+  "readingALink": {
+    "note": "What counts as a wikilink, and what it NAMES. One definition for every reader: publishing's walk, the dates a class brings, the site check, the answer to what a page links to, copying a page with the pages it links to, and renaming a page, a unit word or a folder. Pure: text in, the names it links to out.",
+    "rule": "The name runs from [[ (or ![[) up to the first ], | or #, and a backslash immediately before that character is not part of it. An escaped pipe, [[Ohm's Law\\|Ohm]], is the same link as [[Ohm's Law|Ohm]] wherever it is written. It is most often inside a Markdown table, where Obsidian escapes the alias pipe so that the cell does not end there, but it turns up in ordinary sentences too and is a link there as well. A backslash anywhere else in a name is left alone.",
+    "whenRewritten": "A rename changes only the name. The backslash, the alias, the heading and the ! stay exactly where they were: dropping the backslash would split a table cell in two.",
+    "expectIs": "Each distinct name once, in the order it first appears, as written: spaces inside the brackets trimmed, a trailing .md dropped, capitals and any folder in front kept. A reader that compares names without regard to case or folder (the mac's section graph, the build's dating walk) compares against these the same way it compares against a page's title.",
+    "why": "Found by #167 and filed as #294. The example payloads and skeletons (12,128 files) carry 229 links with an escaped pipe - 142 in tables, 87 in sentences and in code examples; 230 over all of support/, the example course included - and neither app followed one: every reader took the name up to the pipe, so it ended in a backslash and matched no page. By an emulation of the section graph (an estimate, not a measurement), publishing a class with what it links to left about 137 pages behind across about 104 of 3,258 payload classes. Quartz v4.5.0, which draws the site, reads every one of them as a link (quartz/plugins/transformers/ofm.ts lines 117-119 at the tag the image clones, wikilinkRegex: the name excludes a backslash, the alias is \\\\?\\|).",
+    "rejected": [
+      {
+        "option": "strip the backslash only where publishing reads links",
+        "why": "Publishing would follow the link, and a rename or a class insertion would still leave it on the old name. After a class is inserted the old name is a DIFFERENT lesson, so the link would point at the wrong class rather than at nothing. Every reader shares one definition, so one change fixes all of them."
+      },
+      {
+        "option": "treat a backslash as never part of a name",
+        "why": "Closer to Quartz's own pattern, but [[a\\b]] would then name a, and a rename of a page called a would rewrite it. Stopping only at a backslash right before ], | or # changes nothing else: measured over 12,128 shipped pages, the same 38,659 links matched at the same places, and the 229 that read differently are exactly the escaped pipes."
+      },
+      {
+        "option": "leave out links written inside code in the same change",
+        "why": "A real difference between the apps (Windows and the mac's answer to what a page links to skip them; the mac's publishing does not), but it changes what publishing takes by a different rule and needs its own measurement. Issue #313. No case here puts a link inside code, so this list does not decide it."
+      },
+      {
+        "option": "a case for a backslash inside a name, [[a\\b]]",
+        "why": "Quartz does not draw it as a link at all, and nobody has chosen what it should mean; a case would assert an answer nobody decided."
+      }
+    ],
+    "cases": [
+      {"name": "an aliased link in a table cell", "text": "| Topic | Notes |\n|---|---|\n| Circuits | [[Ohm's Law\\|Ohm]] |\n", "expect": ["Ohm's Law"]},
+      {"name": "links in the header row", "text": "| [[Unit 2, Day 3\\|Tuesday]] | [[Unit 2, Day 4\\|Wednesday]] |\n|---|---|\n| a | b |\n", "expect": ["Unit 2, Day 3", "Unit 2, Day 4"]},
+      {"name": "several links in one cell, escaped and not", "text": "| [[Watt\\|W]], [[Volt\\|V]] and [[Ampere]] |\n", "expect": ["Watt", "Volt", "Ampere"]},
+      {"name": "a heading and an escaped alias", "text": "| [[Ohm's Law#Worked example\\|example]] |\n", "expect": ["Ohm's Law"]},
+      {"name": "a heading and a plain alias", "text": "See [[Ohm's Law#Worked example|the example]].\n", "expect": ["Ohm's Law"]},
+      {"name": "a folder in front, escaped alias", "text": "| [[Concepts/Ohm's Law\\|Ohm]] |\n", "expect": ["Concepts/Ohm's Law"]},
+      {"name": "spaces inside the brackets", "text": "| [[ Ohm's Law \\|Ohm]] |\n", "expect": ["Ohm's Law"]},
+      {"name": "a picture with a size, in a table", "text": "| ![[circuit.png\\|300]] |\n", "expect": ["circuit.png"]},
+      {"name": "an escaped pipe outside a table is the same link", "text": "That is the lesson of [[Yes Lets\\|Yes, Let's]].\n", "expect": ["Yes Lets"]},
+      {"name": "an unescaped link reads as it always did", "text": "[[Ohm's Law|Ohm]] and [[Ohm's Law#Example]] and [[Watt]]\n", "expect": ["Ohm's Law", "Watt"]}
+    ]
   },
   "note": "The rule sets both apps need and neither platform owns. The MECHANISMS behind several of them differ completely - launchd against Task Scheduler, AppKit against WinUI, ~/Library/Logs against %LOCALAPPDATA% - which is exactly why the rules are written here instead: what must be refused, matched, stripped, or taken out of a problem report does not change with the machinery that does it.",
   "pageNaming": {
@@ -3893,7 +3948,7 @@
             "oldName": "All Tasks",
             "newName": "Q&A",
             "expect": "[q](Q&A/Quiz.md)",
-            "why": "The OTHER branch of the same rule, and the only case that reaches it. A segment that ARRIVED percent-encoded goes back percent-encoded even when the new name needs nothing — and it goes back through the SAME encoder, so an ampersand is left as it stands here too. Every other case that escapes at all is triggered by a space or a bracket, and the two that escape nothing (`Assignments`, `Café`) reach no encoder — so a `Uri.EscapeDataString` left behind in this branch alone would spell `Q%26A` and still pass all eleven of them. Proposed from Windows 2026-09-07 while replacing that encoder; both apps already behave this way — `spelled(_:likeThe:in:)` calls `percentEncoded` in both branches — so it should be green on the mac the day it is read."
+            "why": "The OTHER branch of the same rule, and the only case that reaches it. A segment that ARRIVED percent-encoded goes back percent-encoded even when the new name needs nothing — and it goes back through the SAME encoder, so an ampersand is left as it stands here too. Every other case that escapes at all is triggered by a space or a bracket, and the two that escape nothing (`Assignments`, `Café`) reach no encoder — so a `Uri.EscapeDataString` left behind in this branch alone would spell `Q%26A` and still pass every other case in this list. Proposed from Windows 2026-09-07 while replacing that encoder; both apps already behave this way — `spelled(_:likeThe:in:)` calls `percentEncoded` in both branches — so it should be green on the mac the day it is read."
           },
           {
             "given": "[q](Tasks/Quiz.md)",
@@ -3901,6 +3956,13 @@
             "newName": "Top 10%",
             "expect": "[q](Top%2010%25/Quiz.md)",
             "why": "Once escaping runs — here because of the space — a `%` is encoded with everything else outside `leaveUnescaped`. Half-escaping it to `Top%20100%` would be the failure this prevents. The `%` is NOT what triggers escaping; see needsEscapingInAMarkdownLink."
+          },
+          {
+            "given": "| [[Tasks/Quiz 1\\|quiz]] |",
+            "oldName": "Tasks",
+            "newName": "All Tasks",
+            "expect": "| [[All Tasks/Quiz 1\\|quiz]] |",
+            "why": "A GUARD, green before and after #294 on both apps: a folder rewrite changes only the folder at the front of the name, so the backslash of a table's escaped alias pipe was never at risk here. It is here because the pattern this rewriter finds links with changed in #294 (shared-rules.json -> readingALink), and a rewrite that dropped the backslash would split the table cell in two."
           }
         ]
       },
@@ -10180,6 +10242,61 @@
             "Tasks/Culminating.md"
           ],
           "mediaCreated": [],
+          "mediaReused": [],
+          "mediaRenamed": {},
+          "skipped": [],
+          "linksLeadingNowhere": []
+        }
+      },
+      {
+        "name": "a picture and a link written in a table, with escaped pipes, are carried",
+        "why": "Inside a table Obsidian escapes the alias pipe, so the picture reads ![[one.png\\|300]] and the link [[Ohm's Law\\|Ohm]]. Both name what is before the backslash (#294; readingALink): the picture is carried, the linked page comes along, and nothing is reported as leading nowhere. Before #294 the mac read both names with a trailing backslash, so neither was found.",
+        "source": {
+          "folder": "ICS4U-2025",
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [
+            {
+              "path": "Concepts/Circuits.md",
+              "text": "| Picture | Read |\n|---|---|\n| ![[one.png\\|300]] | [[Ohm's Law\\|Ohm]] |\n"
+            },
+            {
+              "path": "Concepts/Ohm's Law.md",
+              "text": "Body\n"
+            }
+          ],
+          "media": [
+            {
+              "name": "one.png",
+              "bytes": "aaa"
+            }
+          ]
+        },
+        "destination": {
+          "folder": "ICS4U",
+          "sections": [
+            1
+          ],
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [],
+          "media": []
+        },
+        "copy": {
+          "page": "Concepts/Circuits.md",
+          "intoFolder": "Concepts",
+          "alsoCopiesLinkedPages": "yes"
+        },
+        "expect": {
+          "pages": [
+            "Concepts/Circuits.md",
+            "Concepts/Ohm's Law.md"
+          ],
+          "mediaCreated": [
+            "one.png"
+          ],
           "mediaReused": [],
           "mediaRenamed": {},
           "skipped": [],

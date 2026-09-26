@@ -2231,6 +2231,17 @@
           ],
           "text": "[[Unit 2 Test]] and [[Unit 2, Day 1]]",
           "expect": "[[Unit 2 Test]] and [[Module 2, Day 1]]"
+        },
+        {
+          "name": "a link in a table follows too, and keeps its backslash",
+          "from": "Unit",
+          "to": "Module",
+          "pageTitles": [
+            "Unit 2, Day 3"
+          ],
+          "text": "| [[Unit 2, Day 3\\|Tuesday]] | [[Unit 2, Day 3]] |",
+          "expect": "| [[Module 2, Day 3\\|Tuesday]] | [[Module 2, Day 3]] |",
+          "why": "Inside a table Obsidian escapes the alias pipe so the cell does not end there (#294; what counts as a link is shared-rules.json -> readingALink). The name is the part before the backslash, and only the name moves: a rewrite that dropped the backslash would split the cell in two, and one that did not recognise the link would leave it on the old name."
         }
       ]
     }
