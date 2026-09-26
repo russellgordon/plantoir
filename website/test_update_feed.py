@@ -189,6 +189,19 @@ class UpdateFeedTests(unittest.TestCase):
         for shape in ("| File | Size | SHA-256 |", '"(Windows)"', "**New**, **Improved**, **Fixed**"):
             self.assertIn(shape, skill, f"The skill no longer writes {shape!r}; update the fixture and the renderer")
 
+    def test_the_renderers_edge_cases(self) -> None:
+        """An emptied heading is dropped, a quote is a quote, and backticks keep their stars."""
+        notes = "**New**\n\n- Mac thing.\n\n**Fixed**\n\n- Only Windows. (Windows)\n\n> Update both Macs first.\n\n- Use `**star**` here."
+        section = update_feed.notes_section("1.3.2", "3100", notes, False)
+        self.assertIn("<h3>New</h3>", section)
+        self.assertIn("<h3>Fixed</h3>", section, "Fixed still has the quote and the code line under it")
+        only_windows = update_feed.notes_section("1.3.2", "3100", "**New**\n\n- Mac.\n\n**Fixed**\n\n- Windows. (Windows)", False)
+        self.assertNotIn("<h3>Fixed</h3>", only_windows, "An emptied heading was shown")
+        self.assertIn("<blockquote><p>Update both Macs first.</p></blockquote>", section)
+        self.assertNotIn("&gt; Update", section)
+        self.assertIn("<code>**star**</code>", section)
+        self.assertNotIn("<code><strong>", section)
+
     def test_notes_are_text_never_markup(self) -> None:
         section = update_feed.notes_section("1.3.2", "3100", "- <script>alert(1)</script>", False)
         self.assertNotIn("<script>", section)

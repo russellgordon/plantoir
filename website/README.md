@@ -49,7 +49,7 @@ version's release, never the other platform's) — the MAC's feed only: the
 checker reads Sparkle's shape, and NetSparkle's `windows.xml` gets a checker of
 its own when Windows adopts it (v1.4.0). `--deploy` refuses when the mac
 feed's newest version is not `MARKETING_VERSION`, and afterwards — like
-`--verify-deploy` — fetches each live feed, compares its SHA-256 with `site/`,
+`--verify-deploy` — fetches the live mac feed, compares its SHA-256 with `site/`,
 and follows its newest download to a 200 of the right length: the check for a
 feed deployed before its release was published.
 
