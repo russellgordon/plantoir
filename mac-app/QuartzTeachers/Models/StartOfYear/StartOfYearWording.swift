@@ -194,6 +194,16 @@ nonisolated enum StartOfYearWording {
              + "ready. The backup “\(backup)” holds them as they were."
     }
 
+    static let undoButtonAfterward: String = "Undo…"
+
+    static let undoHasEnded: String =
+        "This can no longer be undone here: the section has been deployed, or some of its pages "
+      + "published or put into draft, since."
+
+    static func backupHoldsIt(backup: String) -> String {
+        return "The backup “\(backup)” holds the course as it was before."
+    }
+
     static let undoEndsWhenYouQuit: String =
         "This undo is kept only while Plantoir is open. Quitting ends it."
 }

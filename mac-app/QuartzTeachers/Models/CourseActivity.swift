@@ -81,6 +81,12 @@ enum CourseActivity {
         )
         store.activePublishes.append(record)
         WorkLeaseRegistry.reconcile()
+        // A deploy ends the start-of-the-year undo for this section (#96):
+        // after it, students have the drafted state, and an undo would only
+        // put pages back that the next deploy then publishes.
+        StartOfYearUndoRegistry.shared.deployStarted(
+            folderPath: folderPath, courseCode: courseCode, sectionNumber: sectionNumber
+        )
     }
 
     /// Records that a publish has finished, however it finished.
