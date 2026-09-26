@@ -163,6 +163,16 @@ class TheSidebarMatchesStoredTopLevelNames(unittest.TestCase):
         again = build_site.names_the_sidebar_hides(["media", "curriculum coverage.md"])
         self.assertEqual(again, ["media", "curriculum coverage.md"])
 
+    def test_every_coverage_map_is_hidden_by_file_name(self):
+        # #128: one map per curriculum folder, each by its own title.
+        names = build_site.names_the_sidebar_hides(
+            ["Tasks"], ["Curriculum Coverage", "College Board Curriculum Coverage"])
+        self.assertIn("Curriculum Coverage.md", names)
+        self.assertIn("College Board Curriculum Coverage.md", names)
+        self.assertEqual(names.count("Curriculum Coverage.md"), 1)
+        # Switched off, or no map at all: the one title is still hidden.
+        self.assertIn("Curriculum Coverage.md", build_site.names_the_sidebar_hides(["Tasks"], []))
+
     def test_the_filter_has_the_shape_the_patchers_and_the_browser_need(self):
         block = setup_course.EXPLORER_BLOCK
         self.assertIn(setup_course.HIDE_RULE_MARKER, block)

@@ -17,7 +17,7 @@ Scheduler with the app CLOSED and is the case that matters most.
 
 **Every check asks whether the FEATURE produced anything**, never whether a
 folder exists. Recreating an empty `Ontario Curriculum` folder does not restore
-a teacher's expectation pages — `_find_curriculum_folder` wants a page named
+a teacher's expectation pages — `_find_curriculum_folders` wants a page named
 for an expectation code — so an existence check with a Fix button would have
 silenced the warning AND left the map missing. A check that can be satisfied
 without fixing the problem is worse than no check at all.
@@ -174,14 +174,16 @@ def findings(facts: dict, course: str, section) -> list:
     which is what lets it be tested without building a site. The keys:
 
     * `coverage_wanted`      — is the map switched on for this section?
-    * `curriculum_found`     — did `_find_curriculum_folder` return a folder
-                               that actually holds expectation pages?
+    * `curriculum_found`     — did `_find_curriculum_folders` find at least
+                               one folder that actually holds expectation
+                               pages?
     * `class_pages_found`    — did the section have any class pages at all?
     * `graded_folders_found` — does any folder on disk count for marks?
     * `media_target_exists`  — does the COURSE-level `Media` folder exist? Not
                                `content/Media`, which every build recreates.
     * `section_index_exists`
-    * `hand_written_coverage_page`
+    * `hand_written_coverage_page` — the title of the first map whose page
+                               already exists in the teacher's notes, or None
     * `unreadable_pages`     — [{"page": name in the course folder, "line":
                                n or None}], the pages hidden because their
                                settings could not be read (#246)
@@ -222,8 +224,14 @@ def findings(facts: dict, course: str, section) -> list:
     if not facts.get("section_index_exists"):
         found.append(finding("sectionIndexMissing", course, section, table))
 
-    if facts.get("hand_written_coverage_page"):
-        found.append(finding("handWrittenCoveragePage", course, section, table))
+    # The title of the map the teacher's own page is about to be overwritten
+    # by (#128: a course can have several maps, each with its own title). An
+    # older caller's True still means the one title there used to be.
+    hand_written = facts.get("hand_written_coverage_page")
+    if hand_written:
+        page = hand_written if isinstance(hand_written, str) else "Curriculum Coverage"
+        found.append(finding("handWrittenCoveragePage", course, section, table,
+                             extra_fill={"page": page}))
 
     # LAST, so the findings above keep their places — the contract's marker
     # examples and #153's console cases are captured in this order.

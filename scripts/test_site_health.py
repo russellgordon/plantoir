@@ -143,6 +143,21 @@ class SiteHealthTests(unittest.TestCase):
         self.assertNotIn("{course}", found.sentence)
         self.assertNotIn("{section}", found.sentence)
 
+    def test_the_overwritten_page_is_named_by_its_own_title(self):
+        # #128: a course can have several maps; the finding names the one
+        # whose title the teacher's own page shares.
+        facts = dict(HEALTHY)
+        facts["hand_written_coverage_page"] = "College Board Curriculum Coverage"
+        found = site_health.findings(facts, "ICS3U", 1)[0]
+        self.assertEqual(found.name, "handWrittenCoveragePage")
+        self.assertEqual(found.sentence, "A page called College Board Curriculum Coverage "
+                                         "will be overwritten each time you build.")
+        self.assertIn("writes the College Board Curriculum Coverage page itself", found.detail)
+        self.assertNotIn("{page}", found.sentence + found.detail)
+        facts["hand_written_coverage_page"] = True
+        found = site_health.findings(facts, "ICS3U", 1)[0]
+        self.assertIn("A page called Curriculum Coverage will", found.sentence)
+
     def test_the_curriculum_finding_is_not_offered_as_fixable(self):
         """
         The check that must never grow a Fix button. Recreating an empty
