@@ -1236,7 +1236,7 @@ brought Plantoir forward, on whatever it had last shown. A teacher who read
 "ICS3U Section 2 was not published" then had to find the section by hand. Now
 the click shows **that section**. The rule is data, in
 `contracts/shared-rules.json` → `scheduledPublishStopped.notification.onClick`
-(its `rule`, sixteen `cases` and ten `rejected`). What follows is the reasoning
+(its `rule`, seventeen `cases` and ten `rejected`). What follows is the reasoning
 and the mechanics.
 
 **What the notification carries.** The working folder's path, the course and
@@ -1280,8 +1280,10 @@ with real folders):
    so none of its windows is key; `NSApp.orderedWindows`, then any window not on
    screen in the order the windows appeared). It is brought forward
    (deminiaturised if needed) and the section is selected with its course
-   unfolded. A window that is **busy** is skipped: a sheet is attached, or a
-   course is being renamed in place. If every window on the folder is busy, the
+   unfolded. A window that is **busy** is skipped: a sheet is attached, a course
+   is being renamed in place, or the app is running a modal dialog attached to no
+   window (`NSApp.modalWindow`: an open panel, the quit question), which makes
+   every window busy. If every window on the folder is busy, the
    front one is brought forward with its selection left alone. A selection change
    moves the keyboard, and a rename field commits whatever was typed when it
    loses focus (#293).
@@ -1290,9 +1292,16 @@ with real folders):
    `.scheduledPublishNotification`. That is #311's one route for a window taking
    a folder it did not choose, so a folder in the Trash or out of the builder's
    reach is said on the picker the way a remembered one is. Its trail line is
-   `working folder reopened`, whose `carries` names the occasion.
-6. Else **a new window** opens on the folder. A window on ANOTHER working folder
-   is never pointed elsewhere.
+   `working folder reopened`, whose `carries` names the occasion. When `reopen`
+   refuses it, the click's own line says the folder "could not be opened here"
+   (never "gone": the folder exists, and the reason is on the reopen line).
+6. Else **a new window** opens on the folder, but only when #290's check
+   (`WorkingFolderReach.refusal`) lets a window open there. A new window takes
+   its folder through `adoptRestoredPath`, which does not check. So a folder out
+   of the builder's reach is refused HERE, and the click only brings Plantoir
+   forward with the "could not be opened here" line (a mac-only case). Such a
+   folder is also the likeliest to have a failed run to click on (#221). A window
+   on ANOTHER working folder is never pointed elsewhere.
 7. The section is not in the folder (course renamed, section archived) → the
    window from 4, 5 or 6 is shown with its selection left as it was. It is not
    guessed at.
@@ -1306,7 +1315,14 @@ moment after it appears. Deciding early would either open a second window
 beside the one launch is about to show, or put the section's folder into a
 window about to be given its remembered one. So the router PARKS the click
 while it has seen no window settle (`hasSeenAWindowSettle`) or while any window
-has `hasSettledItsFolder == false`. It decides again inside
+has `hasSettledItsFolder == false`. The one exception: a launch that a
+notification started (`NSApplication.launchUserNotificationUserInfoKey`) and
+that FINISHED with no window registered. Nothing is about to appear then, so
+`applicationDidFinishLaunching` decides the click at once
+(`SectionFromNotification.launchFinished`), opening the window through the File
+menu's New Window item because no window has installed `openWindow`. Whether a
+notification launch shows SwiftUI's window at all is unmeasured, which is why
+this exists. Otherwise the router decides again inside
 `WindowSettling.windowSettled`, which #311's `WorkspaceModel.settleItsFolder()`
 calls exactly once per window, whichever way the window got its folder. That is
 the invariant any future way of giving a window its folder must keep: end in
@@ -1363,15 +1379,17 @@ ruled out. These are on Russell's list in the piece's hand-over:
   mitigation is a minimal delegate in the run that opens the GUI copy
   (`NSWorkspace.openApplication`), decided after measuring, not built blind;
 - the #311 restore ordering (a click that launches the app with two windows
-  remembered);
+  remembered), and before it the plainer question: with the default "Close
+  windows when quitting", quit, click, and check whether ANY window appears. If
+  none does, the File ▸ New Window fallback above is what should open one;
 - that `openWindow` captured from a window that has since closed still opens
   one (the "no windows open" row). The fallback, if not, is the App-level
   `@Environment(\.openWindow)`.
 
-**Windows** owes the same rule (every case but the three `appliesOn: ["mac"]`
-waits, which exist because the mac's windows find their folders a moment after
-they appear, while Windows builds its remembered windows synchronously in
-`OnLaunched`). The toast itself (#212's Windows half) comes first. The toast's
+**Windows** owes the same rule (every case but the four `appliesOn: ["mac"]`:
+three waits, which exist because the mac's windows find their folders a moment
+after they appear, while Windows builds its remembered windows synchronously in
+`OnLaunched`, and the reach case, because #290's check is mac-only). The toast itself (#212's Windows half) comes first. The toast's
 launch arguments carry the path, course and section. A cold start routes in
 `OnLaunched` after the remembered windows exist. An unpackaged app's toast
 activation can start a SECOND process, which must hand its arguments to the

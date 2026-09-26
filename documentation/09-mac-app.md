@@ -693,23 +693,27 @@ the window machinery above:
 
 - **It never adds a folder route.** A window already on the folder is used as
   it is. A window with no folder takes the notification's through
-  `reopen(_:occasion: .scheduledPublishNotification)`, the one route by which a
-  window takes a folder it did not choose in the picker. A new window takes it
-  as a requested folder (`folderForNextNewWindow` → `WindowStartRule.start` →
-  `.requested`), through the caller of `adoptRestoredPath` that
-  `AdoptRestoredPathCallersTests` already allows. The router itself calls
-  neither `adoptRestoredPath` nor `chooseWorkspace`.
+  `reopen(_:occasion: .scheduledPublishNotification)`, the route that checks a
+  remembered folder. A new window takes it as a requested folder
+  (`folderForNextNewWindow` → `WindowStartRule.start` → `.requested`), through
+  the caller of `adoptRestoredPath` that `AdoptRestoredPathCallersTests` already
+  allows. That caller does NOT check reach, so the router asks
+  `WorkingFolderReach.refusal` first and refuses a folder #290 would refuse,
+  bringing the app forward only. The router itself calls neither
+  `adoptRestoredPath` nor `chooseWorkspace`.
 - **The requested folder is taken before the launch-time claims wait**, and a
   settled window never claims (`testTheClicksWindowTakesItsFolderWhileClaimsAreOpen`).
   A window opened for a click at launch therefore cannot take a leftover
-  remembered entry, and cannot flash the key window's folder first. That flash
-  is the flaw in `AssistToolRunner.revealSectionOnScreen`'s older path, which
-  polls for the window and then moves it. Moving the assistant onto this
-  router is a possible follow-up, not part of #306.
+  remembered entry, and cannot flash the key window's folder first.
+  `AssistToolRunner.revealSectionOnScreen` sets the same field since #311, but
+  still waits for its window and section by polling on a timer, which is why
+  the router does not reuse it. Moving the assistant onto this router is a
+  possible follow-up, not part of #306.
 - **A window on another working folder is never pointed elsewhere.** Doing so
   would let go of everything it shows ("What a window lets go of when it
   changes working folder", above) for a click about something else.
-- **Busy** means a sheet attached to the window, or `renamingCourseCode` set.
+- **Busy** means a sheet attached to the window, `renamingCourseCode` set, or
+  an app-modal dialog (`NSApp.modalWindow`), which makes every window busy.
   A busy window is brought forward with its selection left alone, because of
   the #293 focus-loss commit below.
 

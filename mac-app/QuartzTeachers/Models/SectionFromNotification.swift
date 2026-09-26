@@ -58,6 +58,9 @@ enum SectionFromNotification {
         case namesNothing
         case folderGone
         case busy
+        /// The folder is there, but no window may open on it here (#290:
+        /// outside the home folder, or its courses lead outside it).
+        case cannotBeOpened
     }
 
     /// What a click does. `Int` is an index into the windows, front to back.
@@ -82,6 +85,7 @@ enum SectionFromNotification {
         case busy
         case sectionGone
         case folderGone
+        case cannotBeOpened
         case namesNothing
 
         // MARK: - Computed properties
@@ -104,6 +108,9 @@ enum SectionFromNotification {
             case .folderGone:
                 return "a scheduled publish notification was clicked, but its working folder is no longer "
                     + "where it was, so Plantoir was only brought forward"
+            case .cannotBeOpened:
+                return "a scheduled publish notification was clicked, but its working folder could not be opened "
+                    + "here, so Plantoir was only brought forward"
             case .namesNothing:
                 return "a scheduled publish notification was clicked, but it did not say which section it was about"
             }
@@ -124,6 +131,11 @@ enum SectionFromNotification {
     /// and "no windows yet" is not "no windows open" (review H2).
     static private(set) var hasSeenAWindowSettle: Bool = false
 
+    /// True when a launch started by a notification finished with no window
+    /// registered (review of #306, finding 3): nothing is "about to appear"
+    /// any more, so a parked click is decided rather than left waiting.
+    static private(set) var launchEndedWithNoWindow: Bool = false
+
     /// Opens a new main window. Installed by every `WindowRootView`.
     static var openMainWindow: (@MainActor () -> Void)?
 
@@ -136,6 +148,16 @@ enum SectionFromNotification {
 
     /// Whether a dialog is in front of the model's window. A seam for the tests.
     static var sheetIsUp: @MainActor (WorkspaceModel) -> Bool = SectionFromNotification.defaultSheetIsUp
+
+    /// Whether the app is running a modal dialog of its own — an open panel,
+    /// the quit question, a problem report's — which is not attached to any
+    /// window, so `sheetIsUp` cannot see it. Every window is busy then. A seam
+    /// for the tests.
+    static var appIsInAModalSession: @MainActor () -> Bool = SectionFromNotification.defaultAppIsInAModalSession
+
+    /// Whether a window may open on the folder here (#290's reach check). A
+    /// seam for the tests.
+    static var folderIsReachable: @MainActor (String) -> Bool = SectionFromNotification.defaultFolderIsReachable
 
     /// Brings a window (or, given nil, the app) to the front. A seam for the
     /// tests, which must never activate the app hosting them.
@@ -150,12 +172,16 @@ enum SectionFromNotification {
     /// - `sectionInFolder`: the section is in the notification's folder. Only
     ///   decides whether a window already on the folder selects it; a window
     ///   that takes the folder checks again once it has read its courses.
+    ///   - `folderIsReachable`: a NEW window may open on the folder (#290). A
+    ///   window already on it is used whatever this says; a window choosing a
+    ///   folder asks the same question through `reopen`.
     static func decide(
         target: NotificationClickTarget?,
         windows: [WindowState],
         isLaunching: Bool,
         folderExists: Bool,
-        sectionInFolder: Bool
+        sectionInFolder: Bool,
+        folderIsReachable: Bool = true
     ) -> Decision {
         if target == nil {
             return .bringForwardOnly(.namesNothing, window: nil)
@@ -195,6 +221,9 @@ enum SectionFromNotification {
                 return .adoptInto(index)
             }
             index += 1
+        }
+        if !folderIsReachable {
+            return .bringForwardOnly(.cannotBeOpened, window: nil)
         }
         return .openNewWindow
     }
@@ -248,6 +277,20 @@ enum SectionFromNotification {
         }
     }
 
+    /// Launch has finished (`AppDelegate.applicationDidFinishLaunching`). When
+    /// a notification started it and no window has appeared, the click is
+    /// decided now rather than left waiting for a window that may never come.
+    static func launchFinished(launchedByANotification: Bool) {
+        if !launchedByANotification || hasSeenAWindowSettle {
+            return
+        }
+        if !windowsFrontToBack().isEmpty {
+            return
+        }
+        launchEndedWithNoWindow = true
+        decideNow()
+    }
+
     /// The app went to the background with a click still waiting: drop it,
     /// and the folder it set aside for a new window, so a window the teacher
     /// opens an hour later is not captured by a stale click (review H1).
@@ -278,7 +321,10 @@ enum SectionFromNotification {
         request = nil
         isWaitingForNewWindow = false
         hasSeenAWindowSettle = false
+        launchEndedWithNoWindow = false
         openMainWindow = nil
+        appIsInAModalSession = SectionFromNotification.defaultAppIsInAModalSession
+        folderIsReachable = SectionFromNotification.defaultFolderIsReachable
         windowsFrontToBack = SectionFromNotification.defaultWindowsFrontToBack
         folderExists = SectionFromNotification.defaultFolderExists
         sheetIsUp = SectionFromNotification.defaultSheetIsUp
@@ -305,9 +351,10 @@ enum SectionFromNotification {
         let decision: Decision = decide(
             target: target,
             windows: states,
-            isLaunching: !hasSeenAWindowSettle,
+            isLaunching: !hasSeenAWindowSettle && !launchEndedWithNoWindow,
             folderExists: folderExists(target.workingFolderPath),
-            sectionInFolder: sectionInFolder
+            sectionInFolder: sectionInFolder,
+            folderIsReachable: folderIsReachable(target.workingFolderPath)
         )
         switch decision {
         case .wait:
@@ -323,6 +370,8 @@ enum SectionFromNotification {
                 note(.busy, for: target)
             case .folderGone:
                 note(.folderGone, for: target)
+            case .cannotBeOpened:
+                note(.cannotBeOpened, for: target)
             case .namesNothing:
                 ActivityTrail.note(.scheduledPublishNotification, Outcome.namesNothing.line)
             }
@@ -346,7 +395,10 @@ enum SectionFromNotification {
             )
             bringForward(model)
             if !opened {
-                note(.folderGone, for: target)
+                // The folder exists (decided above), so `reopen` refused it
+                // for a reason of its own — out of reach, unreadable — and
+                // said which on the picker and on its own trail line.
+                note(.cannotBeOpened, for: target)
             } else if sectionIsInFolder(model, course: target.course, section: target.section) {
                 select(target, in: model)
                 note(.shownInChooser, for: target)
@@ -355,15 +407,17 @@ enum SectionFromNotification {
             }
             finishRequest()
         case .openNewWindow:
-            guard let openMainWindow else {
-                // No window has ever installed the opener. Left parked: the
-                // next window to appear takes it, or the app going to the
-                // background drops it.
+            // No window has installed the opener when a launch ended with
+            // none: File ▸ New Window, the menu item ⌘N presses.
+            let opener: (@MainActor () -> Void)? = openMainWindow ?? menuNewWindowOpener()
+            guard let opener else {
+                // Left parked: the next window to appear takes it, or the
+                // app going to the background drops it.
                 return
             }
             WorkspaceModel.folderForNextNewWindow = target.workingFolderPath
             isWaitingForNewWindow = true
-            openMainWindow()
+            opener()
         }
     }
 
@@ -387,7 +441,7 @@ enum SectionFromNotification {
                 relation = .other
             }
         }
-        let isBusy: Bool = model.renamingCourseCode != nil || sheetIsUp(model)
+        let isBusy: Bool = model.renamingCourseCode != nil || sheetIsUp(model) || appIsInAModalSession()
         return WindowState(folder: relation, hasSettled: model.hasSettledItsFolder, isBusy: isBusy)
     }
 
@@ -443,6 +497,44 @@ enum SectionFromNotification {
 
     private static func defaultSheetIsUp(_ model: WorkspaceModel) -> Bool {
         return model.window?.attachedSheet != nil
+    }
+
+    private static func defaultAppIsInAModalSession() -> Bool {
+        return NSApp.modalWindow != nil
+    }
+
+    private static func defaultFolderIsReachable(_ path: String) -> Bool {
+        return WorkingFolderReach.refusal(forFolder: URL(fileURLWithPath: path)) == nil
+    }
+
+    /// The File menu's New Window item, as an opener — for a launch that
+    /// ended with no window, so no `WindowRootView` installed `openWindow`.
+    /// Nil under the tests and when the item cannot be found.
+    private static func menuNewWindowOpener() -> (@MainActor () -> Void)? {
+        if WorkspaceModel.isRunningTests {
+            return nil
+        }
+        guard let mainMenu = NSApp.mainMenu else {
+            return nil
+        }
+        for topItem in mainMenu.items {
+            guard let menu = topItem.submenu else {
+                continue
+            }
+            var index: Int = 0
+            while index < menu.items.count {
+                let item: NSMenuItem = menu.items[index]
+                let isCommandN: Bool = item.keyEquivalent == "n" && item.keyEquivalentModifierMask == [.command]
+                if isCommandN {
+                    let position: Int = index
+                    return {
+                        menu.performActionForItem(at: position)
+                    }
+                }
+                index += 1
+            }
+        }
+        return nil
     }
 
     private static func defaultBringForward(_ model: WorkspaceModel?) {

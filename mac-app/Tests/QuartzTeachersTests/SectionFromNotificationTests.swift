@@ -103,7 +103,8 @@ final class SectionFromNotificationTests: XCTestCase {
                 windows: states,
                 isLaunching: oneCase["launching"] as? Bool ?? false,
                 folderExists: oneCase["folderExists"] as? Bool ?? true,
-                sectionInFolder: oneCase["sectionInFolder"] as? Bool ?? true
+                sectionInFolder: oneCase["sectionInFolder"] as? Bool ?? true,
+                folderIsReachable: oneCase["reachable"] as? Bool ?? true
             )
             let expect: [String: Any] = try XCTUnwrap(oneCase["expect"] as? [String: Any], name)
             let action: String = try XCTUnwrap(expect["action"] as? String, name)
@@ -377,6 +378,82 @@ final class SectionFromNotificationTests: XCTestCase {
         XCTAssertNil(SectionFromNotification.request)
     }
 
+    /// A folder out of the builder's reach (#290) is not opened in a new
+    /// window by a side door; the click only brings the app forward.
+    func testAFolderOutOfReachIsNotOpenedInANewWindow() throws {
+        let outside: URL = try makeWorkingFolder("outside", outsideHome: true)
+        let other: URL = try makeWorkingFolder("other")
+        let onOther: WorkspaceModel = try window(on: other)
+        windows = [onOther]
+
+        SectionFromNotification.receive(target(outside.path, section: 2))
+
+        XCTAssertEqual(windowsOpened, 0)
+        XCTAssertNil(WorkspaceModel.folderForNextNewWindow)
+        XCTAssertEqual(onOther.workspaceURL?.path, other.path)
+        XCTAssertTrue(broughtForward.count == 1 && broughtForward[0] == nil)
+        XCTAssertEqual(trailLines(), ["ICS3U/2 · " + SectionFromNotification.Outcome.cannotBeOpened.line])
+    }
+
+    /// A window choosing a folder that `reopen` refuses says why on its
+    /// picker; the click's own line says it could not be opened — not "gone".
+    func testARefusedFolderInTheChooserIsNotCalledGone() throws {
+        let outside: URL = try makeWorkingFolder("outside", outsideHome: true)
+        let chooser: WorkspaceModel = newModel()
+        chooser.settleItsFolder()
+        windows = [chooser]
+
+        SectionFromNotification.receive(target(outside.path, section: 2))
+
+        XCTAssertNil(chooser.workspaceURL)
+        XCTAssertNotNil(chooser.folderNotOpened)
+        XCTAssertEqual(trailLines(), ["ICS3U/2 · " + SectionFromNotification.Outcome.cannotBeOpened.line])
+    }
+
+    /// An app-modal dialog (an open panel, the quit question) is attached to
+    /// no window, and still makes every window busy.
+    func testAnAppModalDialogMakesEveryWindowBusy() throws {
+        let folder: URL = try makeWorkingFolder("this")
+        let model: WorkspaceModel = try window(on: folder)
+        model.selection = .course("ICS3U")
+        windows = [model]
+        SectionFromNotification.appIsInAModalSession = { () -> Bool in
+            return true
+        }
+
+        SectionFromNotification.receive(target(folder.path, section: 2))
+
+        XCTAssertEqual(model.selection, .course("ICS3U"))
+        XCTAssertEqual(windowsOpened, 0)
+        XCTAssertEqual(trailLines(), ["ICS3U/2 · " + SectionFromNotification.Outcome.busy.line])
+    }
+
+    /// A launch a notification started that finished with NO window decides
+    /// the parked click then, rather than leaving it waiting (review finding 3).
+    /// A launch that was not a notification's, or that has a window coming,
+    /// changes nothing.
+    func testALaunchThatEndsWithNoWindowAnswersTheClick() throws {
+        let folder: URL = try makeWorkingFolder("this")
+        windows = []
+        SectionFromNotification.receive(target(folder.path, section: 2))
+        XCTAssertNotNil(SectionFromNotification.request)
+
+        SectionFromNotification.launchFinished(launchedByANotification: false)
+        XCTAssertEqual(windowsOpened, 0, "an ordinary launch is still showing its window")
+
+        let restoring: WorkspaceModel = newModel()
+        windows = [restoring]
+        SectionFromNotification.launchFinished(launchedByANotification: true)
+        XCTAssertEqual(windowsOpened, 0, "a window is on its way")
+
+        windows = []
+        SectionFromNotification.launchFinished(launchedByANotification: true)
+        XCTAssertEqual(windowsOpened, 1)
+        XCTAssertEqual(openedModels.first?.workspaceURL?.path, folder.path)
+        XCTAssertEqual(openedModels.first?.selection, .section("ICS3U", 2))
+        XCTAssertNil(SectionFromNotification.request)
+    }
+
     // MARK: - Functions
 
     /// Play one contract case through the router.
@@ -394,7 +471,10 @@ final class SectionFromNotificationTests: XCTestCase {
         ActivityTrail.store = ProblemReportStore(folderURL: scratch.appendingPathComponent("trail-\(UUID().uuidString)"))
 
         let slug: String = String(UUID().uuidString.prefix(6))
-        let thisFolder: URL = try makeWorkingFolder("this-" + slug)
+        // `reachable: false` is played with a REAL folder outside the test's
+        // home, so #290's own check refuses it.
+        let reachable: Bool = oneCase["reachable"] as? Bool ?? true
+        let thisFolder: URL = try makeWorkingFolder("this-" + slug, outsideHome: !reachable)
         let otherFolder: URL = try makeWorkingFolder("other-" + slug)
         let launching: Bool = oneCase["launching"] as? Bool ?? false
         if !launching {
@@ -578,9 +658,10 @@ final class SectionFromNotificationTests: XCTestCase {
     }
 
     /// A working folder inside the test's home, with ICS3U sections 1 and 2.
-    private func makeWorkingFolder(_ name: String) throws -> URL {
+    private func makeWorkingFolder(_ name: String, outsideHome: Bool = false) throws -> URL {
         let fileManager: FileManager = FileManager.default
-        let root: URL = home.appendingPathComponent(name, isDirectory: true)
+        let parent: URL = outsideHome ? scratch : home
+        let root: URL = parent.appendingPathComponent(name, isDirectory: true)
         let course: URL = root.appendingPathComponent("courses/ICS3U")
         for section in ["section1", "section2"] {
             try fileManager.createDirectory(
@@ -607,7 +688,7 @@ final class SectionFromNotificationTests: XCTestCase {
     private func trailLines() -> [String] {
         var outcomes: [String] = []
         let all: [SectionFromNotification.Outcome] = [
-            .shown, .shownInNewWindow, .shownInChooser, .busy, .sectionGone, .folderGone, .namesNothing,
+            .shown, .shownInNewWindow, .shownInChooser, .busy, .sectionGone, .folderGone, .cannotBeOpened, .namesNothing,
         ]
         for outcome in all {
             outcomes.append(outcome.line)
