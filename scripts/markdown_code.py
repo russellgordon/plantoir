@@ -55,7 +55,7 @@ _QUOTE_MARKERS = re.compile(r"^(?:[ \t]*>)+ ?")
 _FENCE = re.compile(r"^[ \t]*(`{3,}|~{3,})(.*)$")
 # The block starts that end a paragraph (so a code span cannot reach past
 # them): a list marker, a heading, a table row.
-_BLOCK_START = re.compile(r"^[ \t]*(?:[-*+][ \t]|\d{1,9}[.)][ \t]|#{1,6}(?:[ \t]|$)|\|)")
+_BLOCK_START = re.compile(r"^[ \t]*(?:[-*+][ \t]|[0-9]{1,9}[.)][ \t]|#{1,6}(?:[ \t]|$)|\|)")
 # Whitespace, for the rule: ASCII only, so every language agrees.
 _WHITESPACE = " \t\r\f\v"
 

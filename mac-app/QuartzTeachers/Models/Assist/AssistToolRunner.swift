@@ -586,7 +586,9 @@ final class AssistToolRunner {
     /// what is on disk, not because of how they are spelt — and a link to a
     /// picture or a handout that exists is not listed at all, since it is not
     /// a page. Links written as examples inside code are not links
-    /// (`AssistSectionGraph.linksAsWritten`).
+    /// (`AssistSectionGraph.linksAsWritten`, which since #313 reads through
+    /// the one mask every reader shares, `WikiLinkRewriter.linkMatches` — its
+    /// old stripper dropped 22 real links on four ICS4U pages).
     ///
     /// **The turn ends here** (`AssistToolOutcome.answered`), in every branch.
     /// The model was never asked; handing back would give it a tool result with

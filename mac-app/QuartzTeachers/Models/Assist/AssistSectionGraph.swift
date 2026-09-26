@@ -472,16 +472,17 @@ nonisolated struct AssistSectionGraph {
     /// it, and the site check counts it (#294 — before then the name was read
     /// as `Ohm's Law\`, matched no page, and was silently dropped).
     ///
-    /// Links inside code ARE read here, unlike `linksAsWritten`; whether a
-    /// publish should follow a link an inline-code example names is #313.
+    /// A link written inside code is an EXAMPLE of a link, and is not read
+    /// (#313): Quartz draws none, so publishing must not follow one, and the
+    /// site check must not count one. The matches come from
+    /// `WikiLinkRewriter.linkMatches`, the same entry point every other
+    /// reader and rewriter uses. Until #313 this read every match, code and
+    /// all: 1,896 across `support/`, each one a page a publish could take
+    /// along that nothing on the site leads to.
     static func linkTargets(in text: String) -> [String] {
-        guard let expression = try? NSRegularExpression(pattern: WikiLinkRewriter.pattern) else {
-            return []
-        }
-        let whole: NSRange = NSRange(text.startIndex..<text.endIndex, in: text)
         var targets: [String] = []
         var seen: Set<String> = []
-        for match in expression.matches(in: text, range: whole) {
+        for match in WikiLinkRewriter.linkMatches(in: text) {
             guard let targetRange = Range(match.range(at: 2), in: text) else {
                 continue
             }
@@ -510,7 +511,14 @@ nonisolated struct AssistSectionGraph {
     /// - A link inside `code` or a fenced code block is an EXAMPLE of a link,
     ///   not a link: the Scavenger Hunt pages show `[[Page Name]]` to teach the
     ///   syntax. Read with the code left in, 188 targets came back as links to
-    ///   pages that do not exist.
+    ///   pages that do not exist. This function used to strip code with its
+    ///   own line walker; since #313 every reader shares one mask
+    ///   (`WikiLinkRewriter.linkMatches`), because that walker was wrong in
+    ///   both directions: it flipped its fence on any line STARTING with `~~~`,
+    ///   so a Python traceback's `~~~~^^^^` inside a ```` ```text ```` block
+    ///   ended the fence and the real closer opened a new one — 22 real links
+    ///   dropped on four ICS4U pages — and it saw no fence inside a `>`
+    ///   callout, so 270 examples on the Scavenger Hunt pages read as links.
     /// - A link inside a table escapes its pipe, `[[Ohm's Law\|Ohm]]`. When
     ///   this was written the shared pattern kept the backslash on the name,
     ///   and read that way 69 real links came back dead, so this function
@@ -518,20 +526,17 @@ nonisolated struct AssistSectionGraph {
     ///   backslash, for every reader, and the hand strip is gone: a second
     ///   strip here would only hide a regression of the first.
     ///
-    /// So the one difference left from `linkTargets` is the code (#313).
+    /// So since #313 the two readers see exactly the same links, and differ
+    /// only in how they hand a name back: this one as written, that one
+    /// normalised for the index.
     static func linksAsWritten(in text: String) -> [String] {
-        guard let expression = try? NSRegularExpression(pattern: WikiLinkRewriter.pattern) else {
-            return []
-        }
-        let readable: String = AssistSectionGraph.withoutCode(text)
-        let whole: NSRange = NSRange(readable.startIndex..<readable.endIndex, in: readable)
         var written: [String] = []
         var seen: Set<String> = []
-        for match in expression.matches(in: readable, range: whole) {
-            guard let targetRange = Range(match.range(at: 2), in: readable) else {
+        for match in WikiLinkRewriter.linkMatches(in: text) {
+            guard let targetRange = Range(match.range(at: 2), in: text) else {
                 continue
             }
-            var target: String = String(readable[targetRange]).trimmingCharacters(in: .whitespaces)
+            var target: String = String(text[targetRange]).trimmingCharacters(in: .whitespaces)
             if target.lowercased().hasSuffix(".md") {
                 target = String(target.dropLast(3))
             }
@@ -543,38 +548,6 @@ nonisolated struct AssistSectionGraph {
             written.append(target)
         }
         return written
-    }
-
-    /// A page's text with its code taken out — fenced blocks and inline code
-    /// spans — so a link shown as an example is not read as a link.
-    static func withoutCode(_ text: String) -> String {
-        var lines: [String] = []
-        var insideAFence: Bool = false
-        for line in text.components(separatedBy: "\n") {
-            let opening: String = line.trimmingCharacters(in: .whitespaces)
-            if opening.hasPrefix("```") || opening.hasPrefix("~~~") {
-                insideAFence = !insideAFence
-                lines.append("")
-                continue
-            }
-            if insideAFence {
-                lines.append("")
-                continue
-            }
-            var kept: String = ""
-            var insideASpan: Bool = false
-            for character in line {
-                if character == "`" {
-                    insideASpan = !insideASpan
-                    continue
-                }
-                if !insideASpan {
-                    kept.append(character)
-                }
-            }
-            lines.append(kept)
-        }
-        return lines.joined(separator: "\n")
     }
 
     /// A link target or a teacher's page name reduced to the form the index
