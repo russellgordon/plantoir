@@ -72,6 +72,25 @@ class FileStepTests(unittest.TestCase):
                 mf.apply_file_steps(folder, FAKE_PAGES)
             self.assertFalse(how_i_teach.exists(), "nothing may be written to a folder that is refused")
 
+    def test_a_folder_this_set_up_did_not_make_is_refused(self):
+        # A Computer Science teacher's real folder holds ICS3U too.
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = staged_folder(Path(temporary))
+            (folder / mf.MARKER_NAME).unlink()
+            with self.assertRaises(mf.ForeignFolder):
+                mf.apply_file_steps(folder, FAKE_PAGES)
+
+    def test_a_netlify_destination_somebody_chose_is_left_alone(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = staged_folder(Path(temporary))
+            config_path = folder / "courses" / "ICS3U" / "course_config.json"
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+            config["deploy_target"] = "netlify"
+            config_path.write_text(json.dumps(config), encoding="utf-8")
+            mf.apply_file_steps(folder, FAKE_PAGES)
+            after = json.loads(config_path.read_text(encoding="utf-8"))
+        self.assertEqual(after["deploy_target"], "netlify")
+
     def test_a_reference_copy_of_ics3u_is_not_foreign(self):
         with tempfile.TemporaryDirectory() as temporary:
             folder = staged_folder(Path(temporary))
@@ -199,6 +218,12 @@ class ExtractionTests(unittest.TestCase):
         self.assertEqual(codes_used - objectives, set(), "the correlation names an objective the document lacks")
         for code, page in extraction.pages.items():
             self.assertIn(" ^text\n", page, code)
+            objective = page.split("---\n")[2].split(" ^text")[0]
+            # A skill badge left inside a multi-part objective, a tab stop
+            # read as spaces, or a word split in two: none is the document's.
+            self.assertNotRegex(objective, r"\b\d\.[A-F]\b", code)
+            self.assertNotIn("  ", page.replace("\n  - ", "\n- "), code)
+            self.assertNotRegex(page, r"\b(modif|Identif) y\b|\bE valuate\b", code)
             self.assertNotIn("§", page, code)
             self.assertNotIn("\u0007", page, code)
 

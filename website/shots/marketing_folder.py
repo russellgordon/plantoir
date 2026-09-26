@@ -70,6 +70,11 @@ ANY_HEADING = re.compile(r"^#{1,6}\s")
 EMBED = re.compile(r"^!\[\[([^\]|#]+)(?:[#|][^\]]*)?\]\]\s*$")
 
 
+# Written when this set-up creates the folder; its absence on a folder that
+# already holds courses means somebody else made it.
+MARKER_NAME = ".plantoir-marketing-folder"
+
+
 class ForeignFolder(Exception):
     """The folder holds a course this script did not make."""
 
@@ -120,6 +125,17 @@ def refuse_foreign_courses(folder: Path) -> None:
     courses = folder / "courses"
     if not courses.is_dir():
         return
+    if not (folder / MARKER_NAME).exists():
+        holds_a_course = False
+        for entry in courses.iterdir():
+            if (entry / "course_config.json").is_file():
+                holds_a_course = True
+        if holds_a_course:
+            raise ForeignFolder(
+                f"{folder} already holds courses and was not made by this set-up (no {MARKER_NAME} in it), "
+                "so it may be somebody's real working folder — a Computer Science teacher's would hold ICS3U "
+                "and ICS4U too. Nothing was changed. Point --marketing-folder at a folder of its own."
+            )
     allowed: set[str] = set()
     for course in COURSES:
         allowed.add(course["code"])
@@ -145,6 +161,15 @@ def refuse_foreign_courses(folder: Path) -> None:
 
 
 # ---------- Writing without overwriting ----------
+
+def mark_as_ours(folder: Path) -> None:
+    """Called when the set-up creates the folder, before any course is in it."""
+    folder.mkdir(parents=True, exist_ok=True)
+    marker = folder / MARKER_NAME
+    if not marker.exists():
+        marker.write_text("Made by website/shots/capture.py --provision, for plantoir.app's pictures.\n",
+                          encoding="utf-8")
+
 
 def write_if_absent(path: Path, text: str, report: Report, label: str) -> None:
     if path.exists():
@@ -204,7 +229,9 @@ def publish_to_folder(course_dir: Path, destination: Path, report: Report) -> No
         path = str(config.get("deploy_folder_path", ""))
         if target == FOLDER_DESTINATION and path == str(destination):
             return False
-        if target not in ("", "netlify") or (path and path != str(destination)):
+        # Only a course nobody has pointed anywhere: an empty target. "netlify"
+        # written out is a choice somebody made, and is left alone.
+        if target != "" or (path and path != str(destination)):
             report.skip(f"{course_dir.name} publishes to {target or 'Netlify'} {path}; left as it is")
             return False
         config["deploy_target"] = FOLDER_DESTINATION
@@ -322,6 +349,7 @@ def stage_from_payload(folder: Path, support: Path) -> None:
     folder.
     """
     payload = support / "example_content" / CURRICULUM_COURSE
+    mark_as_ours(folder)
     course_dir = folder / "courses" / CURRICULUM_COURSE
     shutil.copytree(payload / "shared", course_dir, dirs_exist_ok=True)
     manifest = json.loads((payload / "manifest.json").read_text(encoding="utf-8"))

@@ -58,6 +58,9 @@ ESSENTIAL_KNOWLEDGE = re.compile(r"^([A-Z]{3}-\d+\.[A-Z])\.(\d+)$")
 SKILL_BADGE = re.compile(r"\s*\b\d\.[A-F]\s*$")
 
 
+INNER_SKILL_BADGE = re.compile(r"\s\d\.[A-F](?=\s+[a-z]\.\s)")
+
+
 def load_codes() -> dict:
     return json.loads(CODES_FILE.read_text(encoding="utf-8"))
 
@@ -199,14 +202,19 @@ def clean_statement(code: str, text: str) -> str:
 
     statement = " ".join(paragraphs).strip()
     if LEARNING_OBJECTIVE.match(code):
+        # A multi-part objective ("a. … 4.C b. …") carries a badge after each
+        # part, not only at the end.
+        statement = INNER_SKILL_BADGE.sub("", statement)
         statement = SKILL_BADGE.sub("", statement)
         if re.fullmatch(r"\d\.[A-F]", statement):
             statement = ""
     for bullet in bullets:
         statement += "\n- " + bullet
     # A doubled comma is the reading (a comma at a line's end read twice),
-    # never the document's.
-    return re.sub(r",[ \t]*,", ",", statement).strip()
+    # never the document's; so are runs of spaces (the document indents
+    # "a.   Write …" with a tab stop).
+    statement = re.sub(r",[ \t]*,", ",", statement)
+    return re.sub(r"[ \t]{2,}", " ", statement).strip()
 
 
 def join_lines(before: str, after: str) -> str:
@@ -300,6 +308,50 @@ def check_copies(rows: list[dict]) -> dict[str, CheckedStatement]:
             entry.disagreements.insert(0, f"page {copies[0][0]} and the others differ, with no majority")
         checked[code] = entry
     return checked
+
+
+def rejoin_split_words(checked: dict[str, CheckedStatement]) -> None:
+    """Join a word the reading split in two ("modif y", "Identif y").
+
+    PDFKit sometimes reads a gap inside a word as a space. Every copy carries
+    the same split, so the copy-against-copy check cannot see it. A pair is
+    joined only when the joined word is printed elsewhere in the document and
+    the fragments are not both words themselves.
+    """
+    # How often each word is printed, over every copy of every statement. A
+    # fragment ("valuate", "modif") is counted too — it is in the split copy
+    # — so the test is not "is it a word" but "is the joined word printed
+    # more often than the fragment".
+    counts: dict[str, int] = {}
+    for entry in checked.values():
+        for _, text in entry.copies:
+            for word in re.findall(r"[A-Za-z]+", text):
+                counts[word.lower()] = counts.get(word.lower(), 0) + 1
+
+    def more_often_joined(first: str, second: str) -> bool:
+        joined = counts.get((first + second).lower(), 0)
+        return joined > counts.get(second.lower(), 0) and joined > counts.get(first.lower(), 0) // 50
+
+    def join(match: re.Match) -> str:
+        first, second = match.group(1), match.group(2)
+        if len(second) > 1 and counts.get(second.lower(), 0) > counts.get((first + second).lower(), 0):
+            return match.group(0)
+        if counts.get((first + second).lower(), 0) > 0 and counts.get(first.lower(), 0) < counts.get((first + second).lower(), 0):
+            return first + second
+        return match.group(0)
+
+    def join_capital(match: re.Match) -> str:
+        # "E valuate": a capital letter left on its own. "A" and "I" are words.
+        first, second = match.group(1), match.group(2)
+        if first in ("A", "I"):
+            return match.group(0)
+        if more_often_joined(first, second):
+            return first + second
+        return match.group(0)
+
+    for entry in checked.values():
+        entry.text = re.sub(r"\b([A-Za-z]{2,}) ([a-z]{1,2})\b(?![.)])", join, entry.text)
+        entry.text = re.sub(r"\b([A-Z]) ([a-z]{2,})\b", join_capital, entry.text)
 
 
 def learning_objectives(checked: dict[str, CheckedStatement]) -> list[tuple[CheckedStatement, list[CheckedStatement]]]:
@@ -484,6 +536,7 @@ def build_pages(pdf: Path, codes: dict | None = None, overrides: Path | None = N
             raw_by_code[row["code"]] = row["text"]
     checked = check_copies(rows)
     apply_rulings(checked, codes.get("whereCopiesDiffer", {}))
+    rejoin_split_words(checked)
 
     extraction = Extraction()
     objectives = learning_objectives(checked)

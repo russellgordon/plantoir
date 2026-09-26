@@ -111,6 +111,9 @@ class TypedCountTests(unittest.TestCase):
         body = "<p>Windows 10 or 11 (64-bit). A few gigabytes, plus whatever your courses need.</p>"
         self.assertEqual(build.typed_count_problems("x.html", body), [])
 
+    def test_a_school_year_is_not_a_count(self):
+        self.assertEqual(build.typed_count_problems("x", "Reference Courses, 2025–26, and a course"), [])
+
     def test_the_real_pages_type_no_count(self):
         for page in build.load_pages():
             self.assertEqual(build.typed_count_problems(page["slug"], page["body"], page["body_line"]), [])
@@ -192,6 +195,33 @@ class NewInTests(unittest.TestCase):
         html = build.new_in_html(site, build.site_counts())
         self.assertIn(build.site_counts()["ready_made_ontario"] + " Ontario courses", html)
         self.assertNotIn("{{ready_made", html)
+
+
+class FragmentTests(unittest.TestCase):
+
+    def test_a_link_to_a_missing_section_is_a_problem(self):
+        rendered = {"index": '<a href="./features/#nowhere">x</a>', "features": '<section id="here"></section>'}
+        self.assertEqual(len(build.broken_fragment_problems(rendered)), 1)
+
+    def test_a_link_to_a_section_that_exists_is_fine(self):
+        rendered = {"index": '<a href="./features/#here">x</a>', "features": '<section id="here"></section>'}
+        self.assertEqual(build.broken_fragment_problems(rendered), [])
+
+
+class ReleaseReadinessTests(unittest.TestCase):
+
+    def test_pages_ahead_of_the_release_are_not_deployed(self):
+        site = {"version": "1.3.1", "new_in": {"version": "1.4"}}
+        self.assertIn("Not deploying", build.release_readiness_refusal(site, {"shots": []}))
+
+    def test_a_missing_awaited_picture_is_not_deployed(self):
+        site = {"version": "1.4.0", "new_in": {"version": "1.4"}}
+        shots = {"shots": [{"id": "no-such-shot-anywhere", "awaiting_capture": True}]}
+        self.assertIn("no-such-shot-anywhere", build.release_readiness_refusal(site, shots))
+
+    def test_a_ready_release_deploys(self):
+        site = {"version": "1.4.1", "new_in": {"version": "1.4"}}
+        self.assertIsNone(build.release_readiness_refusal(site, {"shots": []}))
 
 
 class AwaitingCaptureTests(unittest.TestCase):

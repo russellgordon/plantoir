@@ -105,8 +105,10 @@ SCENES: list[Scene] = [
     Scene(
         name="curriculum-settings", produces=["curriculum-settings"], kind="ui-test",
         test="testDeclareSecondCurriculum",
-        identifiers=["courseNameField"],
-        identifiers_pending={"curriculumFolderToggle-": "#128"},
+        identifiers=["courseNameField", "saveButton"],
+        # #128's list is a MembershipToggleListView titled "Curriculum folders":
+        # the table is `table-<title>`, each row `toggle-<folder>`.
+        identifiers_pending={"symbol:CurriculumFoldersOffer": "#128 (its Curriculum folders list, table-Curriculum folders)"},
         what_it_sets_up="ICS3U's Course Settings with College Board Curriculum ticked beside Curriculum, and "
                         "saved — the declaration every later build needs, made through the app on purpose.",
     ),
@@ -114,13 +116,16 @@ SCENES: list[Scene] = [
         name="two-maps", produces=["map-ontario", "map-college-board"], kind="ui-test",
         test="testTwoMapsAndBothCurricula",
         identifiers=["previewButton", "stopPreviewButton"],
+        identifiers_pending={"symbol:CurriculumFoldersOffer": "#128 (a second map is built only for a declared folder)"},
         what_it_sets_up="ICS3U section 1 previewed in the app; each coverage map opened through the site's "
-                        "own search, after the preview's console has named BOTH maps.",
+                        "own search — the Ontario one checked for an Ontario code, the College Board one "
+                        "for an objective the correlation links, so neither can be the other or empty.",
     ),
     Scene(
         name="both-curricula", produces=["both-curricula"], kind="ui-test",
         test="testTwoMapsAndBothCurricula",
         identifiers=["previewButton"],
+        identifiers_pending={"symbol:CurriculumFoldersOffer": "#128 (the build must admit CRD-1.A-shaped codes)"},
         what_it_sets_up="The same preview, on The Unplugged Algorithm, scrolled to its curriculum "
                         "connection: an Ontario expectation and an AP learning objective together.",
     ),
@@ -251,6 +256,13 @@ def app_identifiers() -> set[str]:
     return found
 
 
+def app_source_mentions(name: str) -> bool:
+    for path in APP_SOURCE.rglob("*.swift"):
+        if name in path.read_text(encoding="utf-8", errors="replace"):
+            return True
+    return False
+
+
 def ui_test_methods() -> set[str]:
     text = UI_TESTS.read_text(encoding="utf-8")
     return set(re.findall(r"func (test\w+)\(\)", text))
@@ -309,7 +321,11 @@ def dry_run(marketing_folder: Path, ced_pdf: Path | None) -> int:
                                     "the Course and Exam Description is not on this Mac yet; --provision fetches it"))
         first = marketing_folder.apply_file_steps(scratch, pages)
         second = marketing_folder.apply_file_steps(scratch, pages)
-        state = "ready" if second.made == 0 and not first.named_and_skipped else "broken"
+        unexplained: list[str] = []
+        for skipped in first.named_and_skipped:
+            if not (pages is None and "no pages were supplied" in skipped):
+                unexplained.append(skipped)
+        state = "ready" if second.made == 0 and not unexplained else "broken"
         lines.append(DryRunLine("marketing folder file steps", state,
                                 f"first run: {marketing_folder.summary(first)}; second run made {second.made}"))
 
@@ -325,7 +341,12 @@ def dry_run(marketing_folder: Path, ced_pdf: Path | None) -> int:
             if identifier not in identifiers:
                 problems.append(f"the app has no '{identifier}'")
         for identifier, issue in scene.identifiers_pending.items():
-            if identifier not in identifiers:
+            if identifier.startswith("symbol:"):
+                # A name in the app's source rather than an identifier: the
+                # piece is on this tree when the name is.
+                if not app_source_mentions(identifier[len("symbol:"):]):
+                    waits.append(f"'{identifier[len('symbol:'):]}' arrives with {issue}")
+            elif identifier not in identifiers:
                 waits.append(f"'{identifier}' arrives with {issue}")
         for file_name, dotted in scene.wording:
             if contract_value(file_name, dotted) is None:
@@ -509,20 +530,37 @@ OBSIDIAN_REGISTRY = Path.home() / "Library" / "Application Support" / "obsidian"
 
 
 class ObsidianRegistryKept:
-    """Opening a note by path registers its folder as a vault. The registry is
-    copied first and put back after, then compared (CLAUDE.md rule 9)."""
+    """Opening a note by path can register its folder as a vault. The registry
+    is copied first and put back after, then compared (CLAUDE.md rule 9).
+
+    Obsidian keeps the list in memory too and writes it back when it quits,
+    so it is put back only after Obsidian has quit — and Obsidian is quit only
+    if it was not running before the scene (somebody's open notes are theirs).
+    If it WAS running, the registry is compared and a difference is reported,
+    for a person to put right; nothing is overwritten under a running app.
+    """
 
     def __enter__(self) -> "ObsidianRegistryKept":
         self.saved: bytes | None = OBSIDIAN_REGISTRY.read_bytes() if OBSIDIAN_REGISTRY.exists() else None
+        self.was_running: bool = subprocess.run(["pgrep", "-x", "Obsidian"], capture_output=True).returncode == 0
         return self
 
     def __exit__(self, exc_type, exc_value, traceback) -> bool:
-        if self.saved is not None:
+        if self.saved is None:
+            return False
+        if not self.was_running:
+            subprocess.run(["osascript", "-e", 'quit app "Obsidian"'], capture_output=True)
+            for _ in range(40):
+                if subprocess.run(["pgrep", "-x", "Obsidian"], capture_output=True).returncode != 0:
+                    break
+                time.sleep(0.25)
             OBSIDIAN_REGISTRY.write_bytes(self.saved)
-            if OBSIDIAN_REGISTRY.read_bytes() != self.saved:
-                print("   ✗ Obsidian's list of vaults did not go back as it was.", file=sys.stderr)
-            else:
-                print("   Put Obsidian's list of vaults back as it was.")
+        if OBSIDIAN_REGISTRY.read_bytes() != self.saved:
+            print("   ✗ Obsidian's list of vaults is not as it was (Obsidian was already open, so it was "
+                  f"left alone). The original is {len(self.saved)} bytes; compare {OBSIDIAN_REGISTRY}.",
+                  file=sys.stderr)
+        else:
+            print("   Obsidian's list of vaults is as it was.")
         return False
 
 

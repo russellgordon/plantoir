@@ -285,11 +285,14 @@ def run_ui_test(test_identifier: str, workspace: Path, label: str,
     return bundle
 
 
-def export_attachments(bundle: Path, suffix: str, parts: set[str] | None = None) -> list[str]:
+def export_attachments(bundle: Path, suffix: str, parts: set[str] | None = None,
+                       staging: Path | None = None) -> list[str]:
     """Copy a result bundle's screenshots into site/img/<name>-<suffix>.png.
 
     A name in ``parts`` is a piece of a composite, not a picture a page shows,
-    so it goes to the scratch parts folder instead.
+    so it goes to the scratch parts folder instead; so does a name starting
+    "demo-" (the demo folder's old window shots, kept only as parts). With
+    ``staging``, EVERYTHING goes there, to be checked before it is promoted.
     """
     exported = SCRATCH / f"{bundle.stem}-attachments"
     if exported.exists():
@@ -316,14 +319,18 @@ def export_attachments(bundle: Path, suffix: str, parts: set[str] | None = None)
                 continue
             source = exported / attachment["exportedFileName"]
             destination = IMAGE_DIR / f"{shot_name}-{suffix}.png"
-            if parts and shot_name in parts:
+            if (parts and shot_name in parts) or shot_name.startswith("demo-"):
                 PARTS.mkdir(parents=True, exist_ok=True)
                 destination = PARTS / f"{shot_name}-{suffix}.png"
+            if staging is not None:
+                staging.mkdir(parents=True, exist_ok=True)
+                destination = staging / f"{shot_name}-{suffix}.png"
             shutil.copy2(source, destination)
             # No corner masking: the attachment came from `screencapture -l`,
             # which hands back the real curve with the corners already
             # transparent. See the note at the top of images.py.
-            prepare(destination, WIDEST_WINDOW_PIXELS)
+            if staging is None and destination.parent == IMAGE_DIR:
+                prepare(destination, WIDEST_WINDOW_PIXELS)
             saved.append(destination.name)
     return saved
 
@@ -1038,7 +1045,7 @@ def provision_marketing(folder: Path) -> int:
 
     announce(f"Setting up the marketing folder, {folder}")
     marketing_folder.refuse_foreign_courses(folder)
-    folder.mkdir(parents=True, exist_ok=True)
+    marketing_folder.mark_as_ours(folder)
     ensure_launchers(folder)
     mirror_toolchain(folder)
 
@@ -1106,7 +1113,9 @@ def reference_copies_of(folder: Path, code: str):
 
 def capture_note_in_obsidian(note: Path, destination: Path) -> bool:
     """Obsidian showing one note, photographed as its own window."""
-    run(["open", f"obsidian://open?path={note}"], capture_output=True)
+    from urllib.parse import quote
+    # Percent-encoded: the folder and the note both have spaces in their names.
+    run(["open", f"obsidian://open?path={quote(str(note), safe='/')}"], capture_output=True)
     time.sleep(2.5)
     script = """
     tell application "Obsidian" to activate
@@ -1164,6 +1173,10 @@ def run_scenes(folder: Path, chosen: list) -> int:
             tests.append(scene.test)
 
     failures: list[str] = []
+    passed: list[str] = []          # "<name>-<suffix>", checked and promoted
+    staging: Path = SCRATCH / "scenes-staged"
+    if staging.exists():
+        shutil.rmtree(staging)
     kill_orphaned_model_servers()
     try:
         with RememberedWindowFrames(), BackupsSetAside(folder):
@@ -1175,30 +1188,39 @@ def run_scenes(folder: Path, chosen: list) -> int:
                     if tests:
                         target = ",".join(f"{scene_book.SCENE_CLASS}/{test}" for test in tests)
                         bundle = run_ui_test(target, folder, f"scenes-{suffix}", allow_failure=True)
-                        saved = export_attachments(bundle, suffix, parts=parts)
-                        print(f"   saved {len(saved)} image(s): {', '.join(saved)}")
+                        saved = export_attachments(bundle, suffix, staging=staging)
+                        print(f"   staged {len(saved)} image(s): {', '.join(saved)}")
                     for scene in chosen:
                         if scene.kind == "notification":
-                            destination = image_path("notification-banner", suffix)
-                            PARTS.mkdir(parents=True, exist_ok=True)
+                            destination = staging / f"notification-banner-{suffix}.png"
+                            staging.mkdir(parents=True, exist_ok=True)
                             for problem in scene_book.capture_notification(app_binary, folder, destination):
                                 failures.append(f"{scene.name} ({suffix}): {problem}")
                         elif scene.kind == "obsidian":
                             note = folder / "courses" / marketing_folder.CURRICULUM_COURSE / marketing_folder.HOW_I_TEACH_NAME
                             with scene_book.ObsidianRegistryKept():
-                                if not capture_note_in_obsidian(note, image_path("how-i-teach", suffix)):
+                                if not capture_note_in_obsidian(note, staging / f"how-i-teach-{suffix}.png"):
                                     failures.append(f"{scene.name} ({suffix}): Obsidian's window was not found")
+                    # Checked in STAGING, and only what passes is promoted —
+                    # to site/img, or to the parts folder for a composite. A
+                    # wrong picture never replaces a right one.
                     for scene in chosen:
                         for name in scene.produces:
-                            picture = image_path(name, suffix)
+                            picture = staging / f"{name}-{suffix}.png"
                             if not picture.exists():
                                 failures.append(f"{scene.name} ({suffix}): {picture.name} was not made")
                                 continue
                             missing = scene_book.missing_words(picture, scene_book.expected_text(name))
                             if missing:
-                                failures.append(f"{scene.name} ({suffix}): {picture.name} does not show {missing}")
-                            elif picture.parent == IMAGE_DIR:
-                                prepare(picture, WIDEST_WINDOW_PIXELS)
+                                failures.append(f"{scene.name} ({suffix}): {picture.name} does not show {missing} "
+                                                f"(kept for a look in {staging})")
+                                continue
+                            final = image_path(name, suffix)
+                            final.parent.mkdir(parents=True, exist_ok=True)
+                            shutil.copy2(picture, final)
+                            if final.parent == IMAGE_DIR:
+                                prepare(final, WIDEST_WINDOW_PIXELS)
+                            passed.append(f"{name}-{suffix}")
     finally:
         kill_orphaned_model_servers()
         for scene in chosen:
@@ -1210,7 +1232,8 @@ def run_scenes(folder: Path, chosen: list) -> int:
                 print("   Cleared the scheduled run's record for this folder. The delivered notification stays "
                       "in Notification Center: a script cannot withdraw another app's notification.")
 
-    compose_scene_figures()
+    compose_scene_figures(passed)
+    promote_captured_shots(passed)
     for failure in failures:
         print(f"   ✗ {failure}", file=sys.stderr)
     if failures:
@@ -1221,21 +1244,53 @@ def run_scenes(folder: Path, chosen: list) -> int:
     return 0
 
 
-def compose_scene_figures() -> None:
-    """Assemble each composite whose parts exist, per appearance."""
+def compose_scene_figures(passed: list[str]) -> None:
+    """Assemble each composite whose parts ALL passed this run, per appearance."""
     from composite import pair_of_windows, banner_over_window
     for name, composite in scene_book.COMPOSITES.items():
         for suffix in ("light", "dark"):
-            sources = [PARTS / f"{part}-{suffix}.png" for part in composite["of"]]
-            if not all(path.exists() for path in sources):
+            if not all(f"{part}-{suffix}" in passed for part in composite["of"]):
                 continue
+            sources = [PARTS / f"{part}-{suffix}.png" for part in composite["of"]]
             destination = IMAGE_DIR / f"{name}-{suffix}.png"
             if composite["arrange"] == "banner":
                 banner_over_window(sources[0], sources[1], destination)
             else:
                 pair_of_windows(sources, destination)
             prepare(destination, WIDEST_WINDOW_PIXELS)
+            passed.append(f"{name}-{suffix}")
             print(f"   saved {destination.name}")
+
+
+def promote_captured_shots(passed: list[str]) -> None:
+    """Bring shots.json up to date with pictures that now exist.
+
+    A shot taken in BOTH appearances this run loses `awaiting_capture`, and a
+    retaken one has its new words (`retake` → alt, caption, expectText, test)
+    promoted in the same change as its picture, so the words never describe a
+    picture that is not there. Written back in the file's own shape.
+    """
+    path = WEBSITE / "shots.json"
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    changed: list[str] = []
+    for shot in manifest["shots"]:
+        identifier = shot["id"]
+        if f"{identifier}-light" not in passed or f"{identifier}-dark" not in passed:
+            continue
+        if shot.pop("awaiting_capture", None):
+            changed.append(f"{identifier}: taken")
+        retake = shot.pop("retake", None)
+        if retake:
+            for key in ("alt", "caption", "expectText"):
+                if key in retake:
+                    shot[key] = retake[key]
+            if "test" in retake:
+                shot.setdefault("capture", {})["test"] = retake["test"]
+            changed.append(f"{identifier}: its new alt text and caption promoted")
+    if changed:
+        path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        for line in changed:
+            print(f"   shots.json — {line}")
 
 
 def main() -> int:
