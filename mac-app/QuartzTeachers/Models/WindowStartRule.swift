@@ -177,9 +177,11 @@ nonisolated enum WindowStartRule {
 /// reopened, refused, inherited or left to the picker. Called exactly once
 /// per window, by `WorkspaceModel.settleItsFolder()`.
 ///
-/// A seam, empty today: #306 (open the section a notification names) fills
-/// it, so a click that arrived while the window was still deciding is
-/// answered the moment it has decided rather than a second later.
+/// #306 hangs off it: a click on a scheduled publish's notification that
+/// arrived while a window was still deciding is answered the moment every
+/// window has decided (`SectionFromNotification.windowSettled`), rather than
+/// after a guessed delay. Any new way a window gets its folder must still end
+/// in `settleItsFolder()`, or such a click waits for nothing.
 @MainActor
 enum WindowSettling {
 
@@ -195,5 +197,6 @@ enum WindowSettling {
         if let observer {
             observer(model)
         }
+        SectionFromNotification.windowSettled(model)
     }
 }
