@@ -355,26 +355,52 @@ leaves the Mac · **[IDENTITY]** Russell's Developer ID, notarytool or the
 `plantoir-macos` key — his word first · **[OUTWARD]** public — his word first,
 at that moment.
 
+**Russell's own `/Applications/Plantoir.app` is NEVER touched** (the slice-2
+review's H1). The rehearsal builds are installed into their own folder,
+`/Applications/Plantoir Rehearsal/`, made with `sudo` so it is root-owned: a
+standard account cannot write it, which is exactly what makes the updater ask
+for an administrator — the case being measured — while his app stays where it
+is. Installing over `/Applications/Plantoir.app` instead would put an
+issue-branch build, with the same bundle identifier, in the path everything in
+HIS account opens (Launchpad, Spotlight, any scheduled publish set from it)
+until the cleanup, and the cleanup would then leave him with no Plantoir at
+all. The builds keep the real bundle identifier on purpose: the updater keys
+on it, and what is rehearsed must be what ships. The rehearsal version string
+and the `…-REHEARSAL.dmg` name already say what they are.
+
+**The standard account's first run is a real first run** (the slice-2
+review's M2): it has none of this Mac's tools, its own Colima virtual machine
+and its own image, and it downloads and builds all of them the first time a
+preview is asked for — about FIRST_RUN_MINUTES minutes on this Mac (measured
+FIRST_RUN_WHEN: the image built from nothing in IMAGE_MINUTES with
+`./verify.sh --no-cache`; `colima start` takes about 40 seconds on a first
+run, `documentation/09-mac-app.md`; the tool download was not measured here,
+where the tools come from Homebrew). Its virtual machine sees only its own
+containers, so a preview Russell has open in his own account can take the same
+port block: close his previews for the rehearsal.
+
 | Step | Tag | What |
 |---|---|---|
-| R0 | LOCAL | Russell creates a standard account (e.g. `plantoir-rehearsal`). Everything from V1 on happens logged in as it. |
-| R1 | IDENTITY | In Russell's account, on the issue branch: `./publish.sh -Sign --rehearsal-feed https://plantoir.app/updates/rehearsal-204/macos.xml` → build **A** (`<version>-rehearsal.<build>`, `dist/Plantoir-macOS-REHEARSAL.dmg`; keep a copy as A). Record build, size, SHA-256, the notarization id. **Must-fail (b) of the team check:** copy the staged app, re-sign ONLY `Autoupdate` ad-hoc (then the framework and the app with the identity), run `release/check-signatures.sh` on the copy — it must name `Autoupdate` alone. |
-| R2 | IDENTITY | One commit later, build **B** the same way. |
-| R3 | IDENTITY | `update_feed.py macos --rehearsal website/updates/rehearsal-204/macos.xml --download-prefix https://github.com/russellgordon/plantoir/releases/download/v<v>-rehearsal-204/` twice, A first then B with `--required-warning` and a fake warning in its notes — so the feed holds both and the notes of both. Never committed (`.gitignore`). |
+| R0 | LOCAL | Record Russell's app: `defaults read /Applications/Plantoir.app/Contents/Info.plist CFBundleShortVersionString` and `CFBundleVersion`, and `codesign -dvvv /Applications/Plantoir.app 2>&1 \| grep CDHash=` — written down, for C2. Russell creates a standard account (e.g. `plantoir-rehearsal`) and closes any preview open in his own account. |
+| R1 | IDENTITY | In Russell's account, on the issue branch: `./publish.sh -Sign --rehearsal-feed https://plantoir.app/updates/rehearsal-204/macos.xml` → build **A** (version `<v>-rehearsal.<build>`, `dist/Plantoir-macOS-REHEARSAL.dmg`; keep a copy as A). Record build, size, SHA-256, the notarization id. **The positive team check, and must-fail (b):** the run passing `check-signatures.sh` is the first; then copy the staged app, re-sign ONLY `Autoupdate` ad-hoc (then the framework and the app with the identity), run `release/check-signatures.sh` on the copy — it must name `Autoupdate` alone. |
+| R2 | IDENTITY | One commit later, build **B** the same way. Then `rm -rf mac-app/build` so no Release build is left registered with Launch Services in his account. |
+| R3 | IDENTITY | Twice, A first then B: `python3 website/update_feed.py macos --version <A's or B's own version, the "-rehearsal.<build>" string> --dmg <that DMG> --notes <a short notes file> --rehearsal website/updates/rehearsal-204/macos.xml --download-prefix https://github.com/russellgordon/plantoir/releases/download/v<v>-rehearsal-204/` — B's run with `--required-warning` and a fake warning in its notes, so the feed holds both items and both sections of notes. `--version` must be the rehearsal string or the DMG is refused as "built before the version was raised" (which here only means the wrong string was typed). Both items name the same download address, and only B is uploaded: harmless, since A is the version installed and never offered. The Keychain asks twice each run — **Allow**, not "Always Allow". Never committed (`.gitignore`). |
 | R4 | OUTWARD | `gh release create v<v>-rehearsal-204 --prerelease --target <the issue branch's commit> -R russellgordon/plantoir` with B's DMG (`Plantoir-macOS-REHEARSAL.dmg`). `--target` keeps the tag off `main`. Then V9. |
 | R5 | OUTWARD | From a worktree at `origin/main`: `python3 website/build.py`, drop the rehearsal feed into `site/updates/rehearsal-204/macos.xml` (not committed), `python3 website/netlify_deploy.py`; `curl` it back, SHA-256 equal. |
-| V1 | LOCAL | Russell installs A into `/Applications` (it needs his password — the account cannot). In the standard account, launch A, Check for Updates…: B offered as important — no Skip, no Remind Me Later — B's notes shown and A's hidden (screenshot). Trail: `update found`. |
-| V2 | LOCAL | Start a preview BUILD in A; Install Update → Install and Relaunch → the administrator prompt; **cancel it** → our `needsAdministrator…` notice, trail `update stopped` [4007]. Check again, Install, give the password while the preview is still building → our held notice naming the preview build; the menu item re-shows it; when the preview answers, Plantoir restarts by itself as B. Trail: `update answered`, `update held…`, `update installing … once …`, then `app updated … by its own updater`. |
-| V3 | LOCAL | Reinstall A. Schedule a publish to a FOLDER (nothing public) two minutes ahead; once `pgrep -f run-scheduled-deploy` shows it, Install and Relaunch → held "…on its schedule" → the run finishes → B. Also: while the run posts its notification, `NSWorkspace` running applications does not list it (doc 09 → the Quit-event caution). |
+| R6 | LOCAL | Russell, in his account: `sudo mkdir "/Applications/Plantoir Rehearsal"` and `sudo ditto <A>/Plantoir.app "/Applications/Plantoir Rehearsal/Plantoir.app"`. Then, logged in as the rehearsal account: open it from THAT path (never by name), let the first run finish (above), and make a scratch working folder `~/rehearsal-work` with the example course (the wizard's EXC2O). |
+| V1 | LOCAL | Check for Updates…: B offered as important — no Skip, no Remind Me Later — B's notes shown and A's hidden (screenshot). Trail: `update found`. |
+| V2 | LOCAL | **The administrator prompt comes at "Install Update"**, while the update is being extracted and before "Ready to Install" (the review's L5; `SPUCoreBasedUpdateDriver.m` :235 → `SPUInstallerDriver.m` :468-484). Press Install Update and **cancel** the prompt → our `needsAdministrator…` notice, trail `update stopped` [4007]. Check again, start a preview BUILD of EXC2O section 1, press Install Update and give the password → Ready to Install → Install and Relaunch while the preview is still building → our held notice naming the preview build; the menu item brings it back; when the preview answers, Plantoir restarts by itself as B. Trail: `update answered`, `update held…`, `update installing … now that it is no longer …`, then `app updated … by its own updater`. |
+| V3 | LOCAL | Reinstall A (R6's `ditto`). Schedule EXC2O to a FOLDER destination (nothing public) two minutes ahead; once `pgrep -f run-scheduled-deploy` shows it, Install and Relaunch → held "…on its schedule" → the run finishes → B. While the run posts its notification, `NSWorkspace` running applications does not list it (doc 09 → the Quit-event caution). |
 | V4 | LOCAL | Reinstall A. Install Update, and at "Ready to Install" press ⌘Q with nothing running: A quits, B is installed without relaunching. **V4b:** the same while a scheduled run is going — the quit SETS IT ASIDE: A is still A afterwards, the run completes, the trail says `update set aside`, and the next check offers B again. This is the one thing about the stand-down only a real installer can show. |
 | V5 | LOCAL | On installed B: `codesign --verify --deep --strict`; `spctl -a -vv -t exec` (accepted, Notarized Developer ID); no quarantine; `Autoupdate` on the app's team; `log show --last 15m --predicate 'process == "Autoupdate"'` has no "Skipping atomic rename/swap". |
 | V6 | LOCAL | Run A from its mounted DMG; Check → Sparkle's own "…read-only or a temporary location" window; trail `update stopped` [1003]. |
-| V7 | LOCAL | `Plantoir --write-contracts <tmp>` and `--mcp-stdio <scratch folder>` (initialize, close stdin): no `Autoupdate`/`Updater` process, `SULastCheckTime` unchanged. |
+| V7 | LOCAL | `".../Plantoir Rehearsal/Plantoir.app/Contents/MacOS/Plantoir" --write-contracts <tmp>` and `--mcp-stdio ~/rehearsal-work` (initialize, close stdin): no `Autoupdate`/`Updater` process, `SULastCheckTime` unchanged. |
 | V8 | LOCAL | The Debug build: `SUFeedURL` empty, no Check for Updates… item. |
 | V9 | LOCAL (read) | After R4: `curl -sI https://github.com/russellgordon/plantoir/releases/latest/download/Plantoir-macOS.dmg` still 302s to the last real release. |
-| V10 | LOCAL | `defaults write ca.russellgordon.Plantoir SUEnableAutomaticChecks -bool false`, delete `SULastCheckTime`, launch A: no check; the menu item still works — the support page's IT opt-out, confirmed. |
-| C1 | OUTWARD | `gh release delete v<v>-rehearsal-204 --cleanup-tag --yes -R russellgordon/plantoir`; on every clone `git tag -d v<v>-rehearsal-204` and `git fetch --prune-tags` (a stray tag would make the next cut's `git describe` start from it); redeploy from `origin/main` WITHOUT the rehearsal file; `curl` the rehearsal URL → 404. |
-| C2 | LOCAL | Russell deletes the rehearsal account; delete A and B from `/Applications`, both DMGs, `website/updates/rehearsal-204/`, `~/Library/Caches/Sparkle_generate_appcast`. iTerm to the front. Say what was touched and that it was put back. |
+| V10 | LOCAL | In the rehearsal account: `defaults write ca.russellgordon.Plantoir SUEnableAutomaticChecks -bool false`, delete `SULastCheckTime`, launch A: no check; the menu item still works — the support page's IT opt-out, confirmed. |
+| C1 | OUTWARD | `gh release delete v<v>-rehearsal-204 --cleanup-tag --yes -R russellgordon/plantoir`; on every clone `git tag -d v<v>-rehearsal-204` and `git fetch --prune-tags` (a stray tag would make the next cut's `git describe` start from it); redeploy from `origin/main` WITHOUT the rehearsal file. |
+| C2 | LOCAL | In the rehearsal account: quit Plantoir (which rests its builder) and **log out**, which stops its virtual machine and its launchd jobs. Russell deletes the account in System Settings choosing **"Delete the home folder"** (otherwise its `~/.colima` disk and tools stay in `/Users/Deleted Users`). Then `sudo rm -rf "/Applications/Plantoir Rehearsal"`, both DMGs, `website/updates/rehearsal-204/`, and `~/Library/Caches/Sparkle_generate_appcast` in his account. iTerm to the front. |
+| C3 | LOCAL (read) | **The end state, checked rather than asserted:** `git ls-remote --tags origin \| grep rehearsal` is empty; `gh release view v<v>-rehearsal-204 -R russellgordon/plantoir` fails as not found; `curl -sI https://plantoir.app/updates/rehearsal-204/macos.xml` is 404; `dscl . list /Users` has no `plantoir-rehearsal`; `/Users/Deleted Users` has nothing of it; `ls ~/Library/LaunchAgents \| grep -i rehearsal` is empty; `/Applications/Plantoir Rehearsal` is gone; and **Russell's `/Applications/Plantoir.app` has the version, build and CDHash R0 wrote down.** If any of those differ, do not report the machine as put back — say what differs. |
 
 **What it cannot cover:** Intel Macs (the app is universal, the assistant's
 engine arm64-only — unchanged by #204); a feed signature failure end to end

@@ -78,6 +78,14 @@ class ReleaseSigningTests(unittest.TestCase):
                      "--entitlements", str(ENTITLEMENTS), "--sign", "-", str(app))
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    @staticmethod
+    def cdhash(item: Path) -> str:
+        info = run("codesign", "-dvvv", str(item)).stderr
+        for line in info.splitlines():
+            if line.startswith("CDHash="):
+                return line
+        raise AssertionError(f"{item} has no CDHash")
+
     def check(self, app: Path, *options: str) -> subprocess.CompletedProcess:
         return run(str(RELEASE / "check-signatures.sh"), str(app), *options)
 
@@ -106,6 +114,8 @@ class ReleaseSigningTests(unittest.TestCase):
         for item in ("Autoupdate", "Updater.app", "Sparkle.framework", "Plantoir.app"):
             self.assertIn(item, refused.stdout, f"{item} was not named")
         self.assertEqual(refused.stdout.count("WRONG TEAM"), 4)
+        # Signed --timestamp=none, as every item here is: refused outside the tests.
+        self.assertEqual(refused.stdout.count("NO SECURE TIMESTAMP"), 4)
 
     def test_the_updaters_helpers_left_as_fetched_are_caught_by_the_team_and_not_by_verify(self) -> None:
         """The failure the check exists for: the app re-signed, the helpers left as Sparkle ships them."""
@@ -118,6 +128,14 @@ class ReleaseSigningTests(unittest.TestCase):
             "--entitlements", str(ENTITLEMENTS), "--sign", "-", str(app))
         verify = run("codesign", "--verify", "--deep", "--strict", str(app))
         self.assertEqual(verify.returncode, 0, "verify --deep --strict is expected to PASS here — that is the point")
+        # The helper really is the one Sparkle shipped: its code-signature hash is the vendored
+        # copy's. (After sign-updater.sh it is not — asserted below — so this test tells the two
+        # bundles apart, which a team comparison alone cannot do ad-hoc: the slice-2 review's L1.)
+        autoupdate = "Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate"
+        self.assertEqual(self.cdhash(app / autoupdate), self.cdhash(FRAMEWORK / "Versions" / "B" / "Autoupdate"))
+        signed = self.fake_app("untouched-then-signed")
+        self.sign_the_release_way(signed)
+        self.assertNotEqual(self.cdhash(signed / autoupdate), self.cdhash(FRAMEWORK / "Versions" / "B" / "Autoupdate"))
         refused = self.check(app, "--expect-team", REAL_TEAM)
         self.assertEqual(refused.returncode, 1)
         self.assertIn("Autoupdate", refused.stdout)

@@ -116,6 +116,12 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
     /// resumed window, restored when the session ends.
     @ObservationIgnored private var skippedVersionsToRestore: [String: Any?]?
 
+    /// True from the moment a quit hands the installer "skip" until the
+    /// session ends. The resumed window's answer passes through the updater's
+    /// own `userDidMake` before it acts, so without this the set-aside would
+    /// be written as the TEACHER answering Skip (the slice-2 review's L3).
+    @ObservationIgnored private var isSettingAside: Bool = false
+
     /// Where the gate's facts come from — the live Mac, or a test's own.
     /// A test that read the real process table would go red whenever the
     /// Debug app it shares an executable with had a scheduled publish going.
@@ -264,7 +270,13 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
         case .skip:
             forwardReady(.skip)
         default:
-            break
+            // "Install on Quit": the answer is kept here and never reaches the
+            // updater, so its own `userDidMake` is not called — the trail
+            // line is written here instead.
+            ActivityTrail.note(
+                .updateAnswered,
+                UpdateTrail.answeredLine(answer: .installOnQuit, version: versionInHand ?? "?")
+            )
         }
     }
 
@@ -449,6 +461,7 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
             }
             skippedVersionsToRestore = saved
         }
+        isSettingAside = true
         forwardReady(.skip)
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(10))
@@ -485,6 +498,9 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
             return
         }
         quitWaiter = nil
+        // Even when the bound fires: a version left marked "skipped" would not
+        // be offered by the daily check again.
+        restoreSkippedVersions()
         if !heardBack {
             ActivityTrail.note(
                 .updateStopped,
@@ -561,6 +577,7 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
 
     /// The session is over however it ended: nothing is prepared any more.
     private func sessionEnded() {
+        isSettingAside = false
         prepared = .none
         readyReply = nil
         keptAnswerIsFromTheResumedWindow = false
@@ -600,6 +617,9 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
         forUpdate updateItem: SUAppcastItem,
         state: SPUUserUpdateState
     ) {
+        if isSettingAside {
+            return
+        }
         let answer: UpdateTrail.Answer
         switch choice {
         case .install:

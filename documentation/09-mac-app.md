@@ -5285,10 +5285,24 @@ refused; against a real team every item is named; helpers left as fetched are
 caught; `--deep --entitlements` and a helper without the runtime are refused;
 `publish.sh` calls each step in its place. Four must-fails by copy-and-restore
 (framework signed first, no entitlement check, ad-hoc accepted, `publish.sh`
-skipping the updater) each go red. **Not provable ad-hoc:** that a correctly
-signed Developer ID bundle PASSES the team check — every ad-hoc item reports
-"not set". The dress rehearsal's R1 measures it, and its must-fail (b)
-(re-sign only Autoupdate ad-hoc; the check must name it alone).
+skipping the updater) each go red. The test of helpers "left as fetched"
+tells the two bundles apart by the helper's code-signature hash (the vendored
+one, against the one `sign-updater.sh` makes), because ad-hoc, a team
+comparison alone names every item either way (the slice-2 review's L1).
+Outside the tests the check also requires a secure timestamp on every item
+(L2), so a `--timestamp=none` or a failed timestamp call is refused here
+rather than by notarization.
+
+**The positive half WAS proven without Russell's identity**, by the slice-2
+review: a third-party app on this Mac (AppCleaner) ships a Developer ID signed
+Sparkle.framework (team `X85ZX835W9`); copied into a scratch app,
+`check-signatures.sh --expect-team X85ZX835W9` named only the scratch app
+itself (ad-hoc), passing every updater item including both XPC services and
+Downloader's own entitlements; with `Autoupdate` swapped for the vendored
+ad-hoc copy it named `Autoupdate` too; and the default mode refused the ad-hoc
+app. So the team comparison really does tell teams apart. That measurement
+depends on another vendor's app and is not a test here; the dress rehearsal's
+R1 repeats it on Plantoir's own signed build, with must-fail (b).
 
 **The feed** is built by `website/update_feed.py` at the cut, checked and
 copied by `website/update_feeds.py` — `website/README.md` → "The update feeds"

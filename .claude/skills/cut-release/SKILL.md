@@ -50,10 +50,12 @@ this skill automates its steps 5–6 and the note-writing.
    particular `Plantoir-macOS-REHEARSAL.dmg`, which `publish.sh
    --rehearsal-feed` writes for the #204 dress rehearsal and which must never
    reach a real release.
-3a. **When a mac DMG is attached, run the release test files first** —
+3a. **When a mac DMG is attached, the release test files must have passed
+   BEFORE it was built with `-Sign`** (`RELEASING.md` step 4) —
    `python3 mac-app/release/test_release_signing.py` and
    `python3 website/test_update_feed.py` (macOS only, ad-hoc and throwaway
-   keys only; no suite runs them). Red is a stop. And decide
+   keys only; no suite runs them). Ask; if nobody can say, run them now, and
+   treat red as a stop that means the DMG is rebuilt after the fix. And decide
    `--required-warning` for the update feed now: pass it when "Warnings the
    release notes MUST carry" has a row for this release.
 
@@ -185,8 +187,15 @@ python3 website/update_feed.py macos --version <version> \
 ```
 
    It must be the EXACT file you uploaded — hash it and compare with the
-   Downloads table first. The Keychain asks once to let Sparkle's tools use the
-   `plantoir-macos` key; that is expected, and nothing prints the key. It writes
+   Downloads table first. `--notes` is the SAME approved notes file: the
+   generator drops, for the Mac's update window, the Downloads section with
+   its checksum table, every line labelled "(Windows)", and the
+   "Windows: …" sentence — which is one more reason to label platform-only
+   lines as the style rules above say. The Keychain asks TWICE to let
+   Sparkle's tools use the `plantoir-macos` key (`generate_appcast`, then
+   `sign_update --verify`); answer **Allow**, not "Always Allow", which would
+   add that tool, in whichever checkout it ran from, to the key's access list
+   for good. Nothing prints the key. It writes
    `website/updates/macos.xml` and `website/updates/macos-notes.html`; commit
    both with the version line in step 2 (stage them by path). A cut with no mac
    DMG leaves both alone. See `RELEASING.md` → "The update feed (macOS)".

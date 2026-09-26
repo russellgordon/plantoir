@@ -212,11 +212,23 @@ final class AppUpdatesDelegateTests: XCTestCase {
         XCTAssertEqual(updates.decideAtQuit(), .setAside)
         updates.setAsideForQuit {}
         XCTAssertEqual(answers, [.skip])
+        // The updater's resumed window reports the forwarded skip as a choice
+        // before acting on it; the trail must not call it the teacher's.
+        updates.updater(
+            AppUpdatesDelegateTests.unstartedUpdater(),
+            userDidMake: .skip,
+            forUpdate: SUAppcastItem.empty(),
+            state: AppUpdatesDelegateTests.state(.installing)
+        )
+        XCTAssertFalse(
+            try AppUpdatesDelegateTests.trailText().contains(UpdateTrail.Answer.skip.rawValue),
+            "A set-aside was written as the teacher's Skip"
+        )
     }
 
     /// "Install on Quit" keeps the answer, so a quit with work under way can
     /// still set it aside.
-    func testInstallOnQuitInTheResumedWindowKeepsTheAnswer() {
+    func testInstallOnQuitInTheResumedWindowKeepsTheAnswer() throws {
         let updates: AppUpdates = AppUpdatesDelegateTests.updatesReadingOnlyThisApp()
         let windows: StandInWindows = StandInWindows()
         let driver: HoldingUserDriver = HoldingUserDriver(standard: windows, owner: updates)
@@ -230,6 +242,10 @@ final class AppUpdatesDelegateTests: XCTestCase {
         }
         windows.answerTheUpdateWindow(.dismiss)
         XCTAssertEqual(answers, [])
+        XCTAssertTrue(
+            try AppUpdatesDelegateTests.trailText().contains(UpdateTrail.answeredLine(answer: .installOnQuit, version: "?")),
+            "Install on Quit never reaches the updater, so the trail line is ours to write"
+        )
         CourseActivity.beginPreviewBuild(folderPath: "/pretend", courseCode: "ENG2D", sectionNumber: 1)
         XCTAssertEqual(updates.decideAtQuit(), .setAside)
     }

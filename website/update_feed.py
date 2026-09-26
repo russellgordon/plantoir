@@ -47,6 +47,7 @@ from __future__ import annotations
 import argparse
 import html
 import plistlib
+import re
 import shutil
 import subprocess
 import sys
@@ -91,12 +92,71 @@ def read_dmg_version(dmg: Path) -> tuple[str, str]:
             subprocess.run(["hdiutil", "detach", mount, "-quiet"], capture_output=True)
 
 
+# Lines the approved GitHub notes carry that do not belong in the Mac's update
+# window (the slice-2 review's M1): a label for the OTHER platform, and the
+# Downloads section with its SHA-256 table. The cut-release skill writes the
+# notes in exactly this shape ("Write the notes"), and marks platform-only
+# lines "(Windows)" / "(macOS)".
+OTHER_PLATFORM_LABEL = "(Windows)"
+OWN_PLATFORM_LABEL = "(macOS)"
+SECTIONS_NOT_SHOWN = ("downloads",)
+
+
+def inline(text: str) -> str:
+    """Escape a line, then turn back on what the notes template uses inline:
+    **bold**, `code` and [a link](https://…). Nothing else becomes markup."""
+    escaped = html.escape(text, quote=True)
+    escaped = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", escaped)
+    escaped = re.sub(r"`([^`]+)`", r"<code>\1</code>", escaped)
+    escaped = re.sub(r"\[([^\]]+)\]\((https?://[^)\s]+)\)", r'<a href="\2">\1</a>', escaped)
+    return escaped
+
+
+def heading_text(line: str) -> str | None:
+    """The text of a heading line — `## New` or a line that is only `**New**` — or None."""
+    if line.startswith("#"):
+        return line.lstrip("#").strip()
+    match = re.fullmatch(r"\*\*([^*]+)\*\*:?", line)
+    if match:
+        return match.group(1).strip()
+    return None
+
+
+def notes_for_the_mac(notes_markdown: str) -> list[str]:
+    """The approved notes, less what a Mac's update window must not show:
+    the Downloads section (its checksum table and the line under it), every
+    line labelled for Windows, and table rows anywhere. "(macOS)" labels are
+    dropped, since every line in this window is about the Mac."""
+    kept: list[str] = []
+    skipping_section = False
+    for raw in notes_markdown.splitlines():
+        line = raw.strip()
+        heading = heading_text(line)
+        if heading is not None:
+            skipping_section = heading.lower() in SECTIONS_NOT_SHOWN
+            if skipping_section:
+                continue
+        if skipping_section:
+            continue
+        if line.startswith("|"):
+            continue
+        if OTHER_PLATFORM_LABEL in line:
+            continue
+        # The one-platform sentence the skill requires ("Windows: no changes…")
+        # is about the other download, not this one.
+        if line.lower().startswith("windows:") or line.lower().startswith("- windows:"):
+            continue
+        kept.append(line.replace(" " + OWN_PLATFORM_LABEL, "").replace(OWN_PLATFORM_LABEL, "").rstrip())
+    return kept
+
+
 def notes_section(version: str, build: str, notes_markdown: str, required_warning: bool) -> str:
     """One release's notes as the HTML section the updater shows.
 
-    A deliberately small reading of the approved notes: `#` headings become
-    headings, `-` lines become a list, everything else a paragraph. Every
-    character is escaped — the notes are text, never markup.
+    A small reading of the approved notes, covering what the cut-release
+    template uses: headings (`#` or a line that is only **bold**), bullets,
+    **bold**, `code` and links. Every character is escaped first — the notes
+    are text, and only those four shapes become markup.
     """
     lines: list[str] = []
     attributes = f'data-sparkle-version="{html.escape(build)}"'
@@ -105,23 +165,23 @@ def notes_section(version: str, build: str, notes_markdown: str, required_warnin
     lines.append(f"<div {attributes}>")
     lines.append(f"<h2>Plantoir {html.escape(version)}</h2>")
     in_list = False
-    for raw in notes_markdown.splitlines():
-        line = raw.strip()
+    for line in notes_for_the_mac(notes_markdown):
         if line.startswith("- ") or line.startswith("* "):
             if not in_list:
                 lines.append("<ul>")
                 in_list = True
-            lines.append(f"<li>{html.escape(line[2:].strip())}</li>")
+            lines.append(f"<li>{inline(line[2:].strip())}</li>")
             continue
         if in_list:
             lines.append("</ul>")
             in_list = False
         if not line:
             continue
-        if line.startswith("#"):
-            lines.append(f"<h3>{html.escape(line.lstrip('#').strip())}</h3>")
+        heading = heading_text(line)
+        if heading is not None:
+            lines.append(f"<h3>{inline(heading)}</h3>")
         else:
-            lines.append(f"<p>{html.escape(line)}</p>")
+            lines.append(f"<p>{inline(line)}</p>")
     if in_list:
         lines.append("</ul>")
     lines.append("</div>")

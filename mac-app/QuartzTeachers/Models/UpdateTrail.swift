@@ -32,6 +32,9 @@ nonisolated enum UpdateTrail {
         case install = "install"
         case skip = "skip this version"
         case notNow = "not now (remind me later, or closed the window)"
+        /// The resumed window's "Install on Quit" — an installer already
+        /// prepared, told to finish when Plantoir next quits.
+        case installOnQuit = "install on quit"
     }
 
     // MARK: - Stored properties

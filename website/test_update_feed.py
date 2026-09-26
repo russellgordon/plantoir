@@ -170,6 +170,25 @@ class UpdateFeedTests(unittest.TestCase):
             update_feed.build_feed("1.3.3", self.dmg_two, "- x", False, self.updates, ed_key_file=self.key,
                                    rehearsal=self.updates / "macos.xml", download_prefix="https://x/")
 
+    def test_the_approved_notes_render_for_the_mac_window(self) -> None:
+        """The cut-release skill's own notes shape (website/testdata/release-notes-template.md,
+        kept in step with the skill below): headings, bullets, bold, code and links become
+        HTML; the Downloads section, its checksum table, Windows-only lines and the
+        one-platform sentence about Windows are not shown to a Mac (the slice-2 review's M1)."""
+        template = (WEBSITE / "testdata" / "release-notes-template.md").read_text(encoding="utf-8")
+        section = update_feed.notes_section("1.3.2", "3100", template, False)
+        for gone in ("|", "**", "SHA-256", "Downloads", "Course Settings opens faster", "Windows:",
+                     "(macOS)", "(Windows)", "5708cc"):
+            self.assertNotIn(gone, section, f"{gone!r} reached the update window")
+        for kept in ("<h3>New</h3>", "<h3>Improved</h3>", "<h3>Fixed</h3>",
+                     "<li>Plantoir finds its own new versions and asks before installing one.</li>",
+                     '<a href="https://plantoir.app/support.html">the support page</a>',
+                     "<code>brackets</code>"):
+            self.assertIn(kept, section)
+        skill = (WEBSITE.parent / ".claude" / "skills" / "cut-release" / "SKILL.md").read_text(encoding="utf-8")
+        for shape in ("| File | Size | SHA-256 |", '"(Windows)"', "**New**, **Improved**, **Fixed**"):
+            self.assertIn(shape, skill, f"The skill no longer writes {shape!r}; update the fixture and the renderer")
+
     def test_notes_are_text_never_markup(self) -> None:
         section = update_feed.notes_section("1.3.2", "3100", "- <script>alert(1)</script>", False)
         self.assertNotIn("<script>", section)
