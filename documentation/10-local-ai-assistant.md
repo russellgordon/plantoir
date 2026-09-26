@@ -1994,7 +1994,7 @@ read from `contentIndex.json` and the rendered article):
 
 **The rule, in short** — written out to be implemented from in
 `contracts/shared-rules.json` → `readingALink.whatIsCode`, with its limits in
-`whatIsCodeLimits` and 22 cases in `readingALink.cases`. The page is read a
+`whatIsCodeLimits` and 24 cases in `readingALink.cases`. The page is read a
 line at a time; a line's BODY has any `>` markers taken off. A fence opens on a
 body starting with three or more backticks or tildes (backticks with another
 backtick later on the line are inline code instead), closes on a run of the
@@ -2010,9 +2010,13 @@ match that starts in code is not merely dropped: the search starts again where
 that code ENDS.** The link pattern crosses a `[`, so in "Type `` `[[` `` to
 start one, then [[Real Page]]" a match from the example's brackets runs on to
 "Real Page" and swallows the real link; dropping that match would drop the
-link with it. This twenty-second case was found while implementing, and is
-not one the plan built in Quartz — Quartz's own pattern stops at `[`, so it
-draws that link, which is what the case expects.
+link with it. That case was found while implementing, with two more — a bare
+`~~~` line inside a backtick fence, and a TILDE fence inside a callout —
+because two mutations of the rule passed the first 21: the traceback case
+carries text after its tildes, and the backtick callout's fence lines happen to
+pair up as an inline span. None of the three was built in Quartz; all 34 cases
+were checked against its parser stack (remark-parse 11 + remark-gfm 4, with
+Quartz's own link pattern run over text nodes), which agrees with every one.
 
 **One implementation per language, shared by every reader and rewriter in it.**
 On the mac, `MarkdownCode` (UTF-16 offsets, the unit `NSRegularExpression`
