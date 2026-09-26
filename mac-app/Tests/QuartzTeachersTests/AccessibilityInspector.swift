@@ -43,7 +43,7 @@ enum AccessibilityInspector {
     /// 2026-09-26, Darwin 25.6.
     static let screenIsLockedKey: String = "CGSSessionScreenIsLocked"
 
-    /// 1 (or true) while this session owns the screen, 0 (or false) while
+    /// True (or 1) while this session owns the screen, false (or 0) while
     /// another account is using it through fast user switching.
     /// Undocumented; measured on 2026-09-26, Darwin 25.6.
     static let onConsoleKey: String = "kCGSSessionOnConsoleKey"
@@ -109,8 +109,9 @@ enum AccessibilityInspector {
     /// Reads the two session keys above out of a session dictionary. A nil
     /// dictionary or a missing key reads as unlocked and on the console,
     /// because "we could not tell" must never cause a skip. Each key is
-    /// accepted as a Bool or as a number: the window server hands back
-    /// OnConsole as the integer 1, not a Bool.
+    /// accepted as a Bool or as a number: measured in-process, both keys
+    /// arrive as a CFBoolean, while `ioreg` prints OnConsole as 1 or No —
+    /// so a number is accepted too, rather than bet on one spelling.
     static func sessionFacts(from dictionary: [String: Any]?) -> SessionFacts {
         guard let dictionary else {
             return SessionFacts.unlockedOnTheConsole
@@ -131,13 +132,11 @@ enum AccessibilityInspector {
     }
 
     /// True or false for a value that is a Bool or a number, nil for
-    /// anything else.
+    /// anything else. A Swift Bool and a CFBoolean both bridge to NSNumber,
+    /// so this one test covers all three.
     static func truthOf(_ value: Any) -> Bool? {
         if let number = value as? NSNumber {
             return number.intValue != 0
-        }
-        if let flag = value as? Bool {
-            return flag
         }
         return nil
     }

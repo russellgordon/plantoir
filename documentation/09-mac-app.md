@@ -5953,7 +5953,7 @@ it, and the scheduled-publish path registers a real Task Scheduler task. The
 `windows` issue for this asks for the intent — redirect `AppDataRoot` in the
 test assembly and add a source-scan test — not the Swift mechanism.
 
-## Testing: the tests that read the real window, and a window on another Space (#249)
+## Testing: the tests that read the real window, and a window on another Space or a locked screen (#249, #315)
 
 Written 2026-09-25. Six test classes read the real window through the
 accessibility tree, starting at `AXUIElementCreateApplication` on the test
@@ -6013,7 +6013,13 @@ that want `INTEGRATION_WORKSPACE` — plus a fourth,
 `QuitScriptRunsTests.testTheSharedMachineIsStoppedOnAClearAnswer`, whenever
 any launcher is running on the Mac (a preview in the app, another session's
 `verify.sh`; #243 is fixing that class). More than 3 means read the skip
-reasons: a Space skip says so, and so does that one. A test that always skips is a test nobody runs, and that
+reasons: a Space skip says so, and so does that one. **A run made while the
+screen is locked — the overnight gates, with nobody at the Mac — shows 8 more
+skipped and 0 failures** (`AccessibilityInspectorTests` 2 — the two live
+tests — `HitAreaTests` 1, `RemovalButtonTests` 1, `WindowPathBarTests` 1,
+`SidebarRestorationProbeTests` 2, `InAppUserInterfaceTests` 1), each reason
+naming #315; before #315 the same run showed 16 failures. A run with the
+window on a hidden Space skips the same 8, for the Space. A test that always skips is a test nobody runs, and that
 is the risk this change carries; the reason in the log is the defence. One
 way it could happen for good is the test host (the same bundle as the
 teacher's app) restoring a full-screen window. Checked 2026-09-25 after the
@@ -6041,15 +6047,107 @@ full-screen probe: there is no `Saved Application State` folder for
 - **Opt-in behind a flag**, as Windows' `PLANTOIR_UI_TESTS=1` is. An opt-in
   test is one nobody runs, and in the normal case these pass in the gate.
 
-**Test hygiene only**: no product file changed, so there is no
-`GUI-IMPROVEMENTS.md` row, no contract case, no trail event and no `windows`
-issue. Windows has no Spaces, and its UI Automation tests already require the
-foreground by design.
+**Test hygiene only**, for #249 and #315 alike: no product file changed, so
+there is no `GUI-IMPROVEMENTS.md` row, no contract case, no trail event and no
+`windows` issue. Windows has no Spaces, and its UI Automation tests already
+require the foreground by design, so nobody runs them locked. If one ever is,
+the rule below transfers: skip only when the app is absent from the tree AND
+the workstation is locked, never on the lock alone.
 
 **Honest limit.** Removing the check from one class and running it on the
 showing Space still passes, so the call sites are not proven by a must-fail;
 only the predicate is. The off-Space end-to-end path was measured with the
 probe above, before the helper existed, not re-run against it.
+
+### A locked screen, and another account on the screen (#315)
+
+Written 2026-09-26. The overnight gates run with the Mac locked, and every
+one of them showed the same 16 failures in the six classes above (`ready/`
+reports for #292, #294, #310 and #311 in the v1.3.2 run, each with
+`CGSSessionScreenIsLocked` read from `ioreg` at the time). A locked screen
+empties the tree as a hidden Space does, but the #249 check asks only about
+the Space, and on a locked screen it let every one of them through to fail
+(16 matches the class-by-class count of assertions exactly — which means the
+window read as visible and on the showing Space, or as hidden; the #249 check
+returns nil for both). A column of red that is always red for the same
+reason is one readers learn to ignore, and then a real failure hides in it.
+
+**What the window server says, measured.** `CGSessionCopyCurrentDictionary()`
+describes the login session the test host runs in; `ioreg -n Root -d1`
+shows the same record for every session under `IOConsoleUsers`.
+
+| Session state | `CGSSessionScreenIsLocked` | `kCGSSessionOnConsoleKey` | Where it was read |
+|---|---|---|---|
+| unlocked, at the Mac | **absent** (not false) | `1` (a `CFBoolean`) | in-process, in the test host, 2026-09-26, Darwin 25.6 |
+| locked | true | — | `ioreg`, four gate runs, 2026-09-2x |
+| another account using the screen (fast user switching) | absent | `No` | `ioreg`, the `plantoir` account behind Russell's, 2026-09-26 |
+
+The locked row has not yet been read inside the test host; see "Honest
+limit" below. A lock check on its own would miss the switched-away
+row — it carries no lock key at all — so both keys are read.
+
+**What the tests do now.** `AccessibilityInspector.SessionFacts` holds the
+two answers; `sessionFacts(from:)` reads them from the dictionary, accepting
+a Bool or a number, and reads a nil dictionary or a missing key as unlocked
+and on the console — "we could not tell" never causes a skip.
+`reasonTheWindowCannotBeRead` takes the session as a parameter with no
+default, so no caller can quietly leave it out, and asks in this order:
+
+1. The tree lists the test's window: nil. **First, so the session can only
+   ever EXPLAIN a window that is already missing — it cannot cause a skip
+   while the window can be read.** A reader stuck on "locked" therefore
+   skips only runs that were failing anyway.
+2. No test window among the app's windows: nil — a real fault, as before.
+3. The screen is locked: skip, saying so (#315).
+4. Another account has the screen: skip, saying so (#315).
+5. The window is not visible: nil, as before.
+6. On the showing Space: nil; otherwise the #249 Space skip.
+
+Steps 3 and 4 come before the visibility check on purpose: what AppKit says
+about visibility on a locked screen is not what a skip should rest on, and
+the only thing the order can mask is a hidden-window fault during a locked
+run, which the next unlocked run catches. No call site changed — all six
+classes already call `skipUnlessTheWindowCanBeRead` before every walk.
+
+Ten must-fail mutations over the decision and the reader went red
+(`AccessibilityInspectorTests`), among them: the session checked before the
+tree, the session checked before finding the test's window, the lock key
+misspelt, a number-only reader, and a live test
+(`testTheLiveSessionReadsUnlockedWhenTheWindowIsReadable`) that turns red if
+`currentSessionFacts` is stuck on locked while the tree can read the window.
+The six classes unlocked, after the change: 26 tests, 0 failures, 0 skipped.
+
+**Rejected:**
+
+- **Skip on the lock alone, with no tree check.** It would hide a real fault
+  in any locked run where the tree still works. The tree check is what makes
+  the lock a reason rather than an excuse.
+- **Skip while `ScreenSaverEngine` runs.** Whether a screensaver WITHOUT a
+  lock empties the tree is not measured; on this Mac the lock is immediate
+  (`sysadminctl -screenLock status`), so the lock key covers it. A skip on a
+  process being present is guesswork.
+- **Listen for `com.apple.screenIsLocked` notifications.** State kept across
+  a run, and blind to a lock that began before the test host launched.
+- **`IOConsoleLocked` from the registry root as the reader.** Just as
+  undocumented, and it does not cover another account on the screen. It is
+  the fallback if the session key ever stops appearing.
+- **Fail with a clearer message.** Still red on every away-from-desk run.
+- **Keep the Mac awake or unlocked for the run.** That changes Russell's
+  security settings; not ours to change.
+
+**If macOS renames either key**, the check stops firing and the tests go back
+to FAILING, not passing: it fails safe.
+
+**Honest limit.** The lock key was read from `ioreg` on a locked screen and
+from the test host's own session dictionary on an unlocked one, but not yet
+from inside the test host while locked: on 2026-09-26 the Mac stayed unlocked
+(display sleep held off) for the whole session, and locking it from a session
+that cannot unlock it again was not ours to do. `ioreg`'s `IOConsoleUsers`
+entry and the in-process dictionary carried the identical keys in the
+unlocked reading, so the two are the same record. The first locked gate run
+settles it: 8 skips naming #315 and 0 failures means the key fired; the old
+16 failures mean it did not, and `IOConsoleLocked` is the fallback. Either
+way the result is a failure or a skip with a reason, never a silent pass.
 
 ## A test host that segfaults, and the six levers that look like they should fix it
 
