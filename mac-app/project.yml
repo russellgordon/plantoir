@@ -93,6 +93,24 @@ targets:
         buildPhase: resources
       - path: ../deploy.ps1
         buildPhase: resources
+      # Sparkle's licence. MIT asks that the notice travel with every copy,
+      # and a file in the bundle is how llama.cpp's travels too — there is
+      # no credit line in the window (rule 1: the name of the machinery is
+      # not something a teacher reads while updating).
+      - path: Vendor/Sparkle/Sparkle-LICENSE
+        buildPhase: resources
+    dependencies:
+      # How the app finds and installs its own new versions (#204). Fetched by
+      # Vendor/fetch-sparkle.sh, pinned by version AND checksum and never
+      # committed — the llama.cpp arrangement — so run that script before
+      # `xcodegen generate`, or this line names a folder that is not there.
+      # CodeSignOnCopy re-signs the framework only, NOT the helpers inside it
+      # (Autoupdate, Updater.app); a Release that leaves this Mac is signed
+      # item by item by publish.sh (documentation/09-mac-app.md →
+      # "Updating itself").
+      - framework: Vendor/Sparkle/Sparkle.framework
+        embed: true
+        codeSign: true
     info:
       path: QuartzTeachers/Info.plist
       properties:
@@ -125,6 +143,30 @@ targets:
         NSDownloadsFolderUsageDescription: "Plantoir reads and writes the course notes in your working folder, so it can build your class websites."
         NSFileProviderDomainUsageDescription: "Plantoir reads and writes the course notes in your working folder, so it can build your class websites."
         NSHumanReadableCopyright: "MIT License"
+        # Updating itself (#204). The FEED is a build setting, set for Release
+        # only (below): a development build carries an EMPTY feed, so it has
+        # no updater, no menu item, and never checks anything — decision 5 on
+        # #204, "no separate feed for development builds". Every other key is
+        # the same in both, so the suite can read them off its own host.
+        SUFeedURL: "$(PLANTOIR_UPDATE_FEED_URL)"
+        # The public half of the `plantoir-macos` key. An update whose
+        # signature does not match it is refused.
+        SUPublicEDKey: "lYt8VK8iKB4jMy+b06j1m+GAedeTChAbX5NkMW2FSMw="
+        # Ask first (decision 1): CHECK once a day, never download or install
+        # without the teacher's click. `SUAllowsAutomaticUpdates` NO also
+        # hides the "install automatically" box, and a user default cannot
+        # switch it back on.
+        SUEnableAutomaticChecks: true
+        SUAutomaticallyUpdate: false
+        SUAllowsAutomaticUpdates: false
+        SUScheduledCheckInterval: 86400
+        # The feed itself is signed as well as the download (#204, Q4), so
+        # nobody who got into the website could change the notes, the
+        # warnings or where the download comes from.
+        SUVerifyUpdateBeforeExtraction: true
+        SURequireSignedFeed: true
+        # NOT `SUEnableInstallerLauncherService`: Plantoir is not sandboxed,
+        # and fetch-sparkle.sh removes the services that key would turn on.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ca.russellgordon.Plantoir
@@ -141,6 +183,16 @@ targets:
         # name. Never reset it, and never hand-maintain it here.
         CURRENT_PROJECT_VERSION: "0"
         CODE_SIGN_ENTITLEMENTS: QuartzTeachers/QuartzTeachers.entitlements
+        FRAMEWORK_SEARCH_PATHS: "$(PROJECT_DIR)/Vendor/Sparkle"
+      configs:
+        # Where a released Plantoir looks for a new version — one file per
+        # platform on plantoir.app, never a GitHub release asset (#204).
+        # `contracts/shared-rules.json` → `appUpdates.feed.mac` says the same,
+        # and `AppUpdatesStartTests` pins the two against each other.
+        Debug:
+          PLANTOIR_UPDATE_FEED_URL: ""
+        Release:
+          PLANTOIR_UPDATE_FEED_URL: "https://plantoir.app/updates/macos.xml"
 
   QuartzTeachersTests:
     type: bundle.unit-test
@@ -172,6 +224,8 @@ targets:
         # test — see Tests/QuartzTeachersTests/SheetAnimationSuppressor.swift
         # for the stack, the measurements, and the levers that do not work.
         INFOPLIST_KEY_NSPrincipalClass: PlantoirTestBundleSetup
+        # `@testable import QuartzTeachers` loads the Sparkle module too.
+        FRAMEWORK_SEARCH_PATHS: "$(PROJECT_DIR)/Vendor/Sparkle"
 
   QuartzTeachersUITests:
     type: bundle.ui-testing
