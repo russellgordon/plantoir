@@ -25,10 +25,14 @@ short:
 1. A fence opens on a line whose body (blockquote markers taken off, then
    leading spaces and tabs) starts with three or more backticks or tildes -
    unless it is backticks with another backtick later on the line, which is
-   inline code. It closes on a run of the SAME character at least as long,
-   with nothing but whitespace after it. Unclosed, it runs to the end.
-2. Paragraphs - for spans only - break at blank lines, fences, and lines that
-   begin a list item, a heading or a table row.
+   inline code. It belongs to its opener's quote DEPTH: it closes on a line at
+   that depth holding a run of the SAME character at least as long, with
+   nothing but whitespace after it, and a line at a smaller depth ends it (a
+   fence in a callout ends with the callout). Unclosed, it runs to the end.
+2. Paragraphs - for spans only - break at blank lines, fences, a deeper quote,
+   and lines that begin a list item, a heading or a table row or are a rule
+   line (--- *** ___ ===, frontmatter's --- among them); a heading is a
+   paragraph on its own.
 3. Within a paragraph a run of N backticks opens a span that closes at the
    next run of EXACTLY N; a run never matched is plain text; outside a span a
    backslash escapes the next character; inside, backslashes are literal.
@@ -54,10 +58,24 @@ _QUOTE_MARKERS = re.compile(r"^(?:[ \t]*>)+ ?")
 # A fence line, on a line's body: the run, and whatever follows it.
 _FENCE = re.compile(r"^[ \t]*(`{3,}|~{3,})(.*)$")
 # The block starts that end a paragraph (so a code span cannot reach past
-# them): a list marker, a heading, a table row.
-_BLOCK_START = re.compile(r"^[ \t]*(?:[-*+][ \t]|[0-9]{1,9}[.)][ \t]|#{1,6}(?:[ \t]|$)|\|)")
+# them): a list marker, a heading, a table row, and a line of three or more
+# of one of - * _ = (a thematic break, a setext underline, the --- around
+# frontmatter).
+_BLOCK_START = re.compile(
+    r"^[ \t]*(?:[-*+](?:[ \t]|$)|[0-9]{1,9}[.)](?:[ \t]|$)|#{1,6}(?:[ \t]|$)|\|"
+    r"|(?:-[ \t]*){3,}$|(?:\*[ \t]*){3,}$|(?:_[ \t]*){3,}$|(?:=[ \t]*){3,}$)")
+# A heading is one line: the line after it begins a new paragraph.
+_HEADING = re.compile(r"^[ \t]*#{1,6}(?:[ \t]|$)")
 # Whitespace, for the rule: ASCII only, so every language agrees.
 _WHITESPACE = " \t\r\f\v"
+
+
+def _quote_depth_and_body(line: str):
+    """How many blockquote markers open the line, and the line after them."""
+    markers = _QUOTE_MARKERS.match(line)
+    if markers is None:
+        return 0, line
+    return markers.group(0).count(">"), line[markers.end():]
 
 
 def _is_blank(text: str) -> bool:
@@ -108,8 +126,10 @@ def code_ranges(text: str) -> list:
     ranges = []
     fence_character = None
     fence_length = 0
+    fence_depth = 0
     paragraph_start = -1
     paragraph_end = -1
+    paragraph_depth = 0
 
     def close_paragraph():
         nonlocal paragraph_start, paragraph_end
@@ -127,12 +147,17 @@ def code_ranges(text: str) -> list:
         line = text[line_start:line_end]
         if line.endswith("\r"):
             line = line[:-1]
-        body = _QUOTE_MARKERS.sub("", line, count=1)
+        depth, body = _quote_depth_and_body(line)
+
+        if fence_character is not None and depth < fence_depth:
+            # A fence opened inside a callout ends with the callout: a line
+            # with fewer > markers is outside both, and is read as such.
+            fence_character = None
 
         if fence_character is not None:
             ranges.append((line_start, min(next_start, length)))
             fence = _FENCE.match(body)
-            if fence and fence.group(1)[0] == fence_character \
+            if depth == fence_depth and fence and fence.group(1)[0] == fence_character \
                     and len(fence.group(1)) >= fence_length \
                     and _is_blank(fence.group(2)):
                 fence_character = None
@@ -142,15 +167,19 @@ def code_ranges(text: str) -> list:
                 close_paragraph()
                 fence_character = fence.group(1)[0]
                 fence_length = len(fence.group(1))
+                fence_depth = depth
                 ranges.append((line_start, min(next_start, length)))
             elif _is_blank(body):
                 close_paragraph()
             else:
-                if _BLOCK_START.match(body):
+                if _BLOCK_START.match(body) or (paragraph_start >= 0 and depth > paragraph_depth):
                     close_paragraph()
                 if paragraph_start < 0:
                     paragraph_start = line_start
                 paragraph_end = line_end
+                paragraph_depth = depth
+                if _HEADING.match(body):
+                    close_paragraph()
 
         if newline < 0:
             break

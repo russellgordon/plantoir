@@ -5634,9 +5634,8 @@ def _coverage_counts(content_root: Path, curriculum_dir: Path, specific: dict,
         for link in markdown_code.matches_outside_code(TRANSCLUSION, text, code):
             targets.add(link.group(1).strip().rstrip("\\").split("/")[-1])
         for block_start, block_end in _curriculum_blocks_outside_code(text, code):
-            for link in BLOCK_LINK.finditer(text, block_start, block_end):
-                if markdown_code.is_in_code(code, link.start()):
-                    continue
+            inside = text[block_start:block_end]
+            for link in markdown_code.matches_outside_code(BLOCK_LINK, inside, code, block_start):
                 targets.add(link.group(1).strip().rstrip("\\").split("/")[-1])
 
         for target in targets:

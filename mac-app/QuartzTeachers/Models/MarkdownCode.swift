@@ -34,8 +34,11 @@ import Foundation
 /// * A fence opened inside a list item whose lines fall back to column 0 runs
 ///   to its own closer here; CommonMark ends it with the item. TEJ2O's lab
 ///   page had that shape and was fixed; the payload linter refuses it.
-/// * A paragraph breaks only at a blank line, a fence, a list marker, a
-///   heading or a table row, so a span can run on past another kind of block.
+/// * A paragraph breaks only at a blank line, a fence, a deeper quote, a list
+///   marker, a heading, a table row or a rule line (`---`, `***`, `___`,
+///   `===` — frontmatter's `---` among them), so a span can run on past
+///   another kind of block. A fence belongs to its opener's quote depth, so
+///   one left open in a callout ends with the callout.
 ///
 /// Measured with Quartz's own parser, these disagree with Quartz on 0 of the
 /// 39,570 shipped links.
@@ -75,15 +78,30 @@ nonisolated enum MarkdownCode {
     private static let closingParenthesis: UInt16 = 0x29
     private static let zero: UInt16 = 0x30
     private static let nine: UInt16 = 0x39
+    private static let underscore: UInt16 = 0x5F
+    private static let equals: UInt16 = 0x3D
 
     // MARK: - Nested types
 
     /// A run of three or more fence characters at the start of a line's body.
     private struct FenceRun {
+
+        // MARK: - Stored properties
+
         let character: UInt16
         let length: Int
         /// Where whatever follows the run begins.
         let restStart: Int
+    }
+
+    /// Where a line's body begins, and how many blockquote markers came
+    /// before it.
+    private struct LineBody {
+
+        // MARK: - Stored properties
+
+        let start: Int
+        let depth: Int
     }
 
     // MARK: - Functions
@@ -96,8 +114,10 @@ nonisolated enum MarkdownCode {
         var found: [NSRange] = []
         var fenceCharacter: UInt16 = 0
         var fenceLength: Int = 0
+        var fenceDepth: Int = 0
         var paragraphStart: Int = -1
         var paragraphEnd: Int = -1
+        var paragraphDepth: Int = 0
 
         var lineStart: Int = 0
         while lineStart <= length {
@@ -110,13 +130,22 @@ nonisolated enum MarkdownCode {
             if contentEnd > lineStart && units[contentEnd - 1] == carriageReturn {
                 contentEnd -= 1
             }
-            let bodyStart: Int = MarkdownCode.afterQuoteMarkers(units, from: lineStart, to: contentEnd)
+            let lineBody: LineBody = MarkdownCode.afterQuoteMarkers(units, from: lineStart, to: contentEnd)
+            let bodyStart: Int = lineBody.start
+            let depth: Int = lineBody.depth
             let fence: FenceRun? = MarkdownCode.fenceRun(units, from: bodyStart, to: contentEnd)
             let wholeLine: NSRange = NSRange(location: lineStart, length: min(nextStart, length) - lineStart)
+
+            if fenceCharacter != 0 && depth < fenceDepth {
+                // A fence opened inside a callout ends with the callout: a
+                // line with fewer > markers is outside both, and is read so.
+                fenceCharacter = 0
+            }
 
             if fenceCharacter != 0 {
                 found.append(wholeLine)
                 if let fence,
+                   depth == fenceDepth,
                    fence.character == fenceCharacter,
                    fence.length >= fenceLength,
                    MarkdownCode.isBlank(units, from: fence.restStart, to: contentEnd) {
@@ -129,12 +158,14 @@ nonisolated enum MarkdownCode {
                 paragraphStart = -1
                 fenceCharacter = fence.character
                 fenceLength = fence.length
+                fenceDepth = depth
                 found.append(wholeLine)
             } else if MarkdownCode.isBlank(units, from: bodyStart, to: contentEnd) {
                 MarkdownCode.addSpans(units, from: paragraphStart, to: paragraphEnd, into: &found)
                 paragraphStart = -1
             } else {
-                if MarkdownCode.startsABlock(units, from: bodyStart, to: contentEnd) {
+                let deeperQuote: Bool = paragraphStart >= 0 && depth > paragraphDepth
+                if MarkdownCode.startsABlock(units, from: bodyStart, to: contentEnd) || deeperQuote {
                     MarkdownCode.addSpans(units, from: paragraphStart, to: paragraphEnd, into: &found)
                     paragraphStart = -1
                 }
@@ -142,6 +173,12 @@ nonisolated enum MarkdownCode {
                     paragraphStart = lineStart
                 }
                 paragraphEnd = lineEnd
+                paragraphDepth = depth
+                if MarkdownCode.isAHeading(units, from: bodyStart, to: contentEnd) {
+                    // A heading is one line: the next begins a new paragraph.
+                    MarkdownCode.addSpans(units, from: paragraphStart, to: paragraphEnd, into: &found)
+                    paragraphStart = -1
+                }
             }
 
             if lineEnd >= length {
@@ -262,23 +299,68 @@ nonisolated enum MarkdownCode {
     }
 
     /// Where a line's body begins: past any blockquote markers — spaces or
-    /// tabs then `>`, repeated — and one optional space after the last.
-    private static func afterQuoteMarkers(_ units: [UInt16], from start: Int, to end: Int) -> Int {
+    /// tabs then `>`, repeated — and one optional space after the last; and
+    /// how many markers there were.
+    private static func afterQuoteMarkers(_ units: [UInt16], from start: Int, to end: Int) -> LineBody {
         var position: Int = start
-        var sawAMarker: Bool = false
+        var depth: Int = 0
         while true {
             let candidate: Int = MarkdownCode.afterSpacesAndTabs(units, from: position, to: end)
             if candidate < end && units[candidate] == greaterThan {
                 position = candidate + 1
-                sawAMarker = true
+                depth += 1
             } else {
                 break
             }
         }
-        if sawAMarker && position < end && units[position] == space {
+        if depth == 0 {
+            return LineBody(start: start, depth: 0)
+        }
+        if position < end && units[position] == space {
             position += 1
         }
-        return sawAMarker ? position : start
+        return LineBody(start: position, depth: depth)
+    }
+
+    /// Whether a body is an ATX heading: one to six `#`, then a space, a tab
+    /// or the end of the line.
+    private static func isAHeading(_ units: [UInt16], from start: Int, to end: Int) -> Bool {
+        let first: Int = MarkdownCode.afterSpacesAndTabs(units, from: start, to: end)
+        var runEnd: Int = first
+        while runEnd < end && units[runEnd] == hash {
+            runEnd += 1
+        }
+        let count: Int = runEnd - first
+        if count < 1 || count > 6 {
+            return false
+        }
+        return runEnd == end || MarkdownCode.isSpaceOrTab(units[runEnd])
+    }
+
+    /// Whether a body is three or more of one of `-`, `*`, `_` or `=`, with
+    /// nothing else on the line but spaces and tabs: a thematic break, a
+    /// setext underline, or the `---` around frontmatter.
+    private static func isARuleLine(_ units: [UInt16], from start: Int, to end: Int) -> Bool {
+        let first: Int = MarkdownCode.afterSpacesAndTabs(units, from: start, to: end)
+        if first >= end {
+            return false
+        }
+        let character: UInt16 = units[first]
+        if character != hyphen && character != asterisk && character != underscore && character != equals {
+            return false
+        }
+        var count: Int = 0
+        var index: Int = first
+        while index < end {
+            let unit: UInt16 = units[index]
+            if unit == character {
+                count += 1
+            } else if !MarkdownCode.isSpaceOrTab(unit) {
+                return false
+            }
+            index += 1
+        }
+        return count >= 3
     }
 
     /// A fence run at the start of a body (after spaces and tabs), if any.
@@ -301,30 +383,24 @@ nonisolated enum MarkdownCode {
         return FenceRun(character: character, length: runEnd - first, restStart: runEnd)
     }
 
-    /// Whether a body begins a list item, a heading or a table row — the
-    /// block starts that end a paragraph, so a span cannot reach past them.
+    /// Whether a body begins a list item, a heading, a table row or a rule
+    /// line — the block starts that end a paragraph, so a span cannot reach
+    /// past them.
     private static func startsABlock(_ units: [UInt16], from start: Int, to end: Int) -> Bool {
         let first: Int = MarkdownCode.afterSpacesAndTabs(units, from: start, to: end)
         if first >= end {
             return false
         }
+        if MarkdownCode.isAHeading(units, from: start, to: end)
+            || MarkdownCode.isARuleLine(units, from: start, to: end) {
+            return true
+        }
         let character: UInt16 = units[first]
         if character == hyphen || character == asterisk || character == plus {
-            return first + 1 < end && MarkdownCode.isSpaceOrTab(units[first + 1])
+            return first + 1 == end || MarkdownCode.isSpaceOrTab(units[first + 1])
         }
         if character == pipe {
             return true
-        }
-        if character == hash {
-            var runEnd: Int = first
-            while runEnd < end && units[runEnd] == hash {
-                runEnd += 1
-            }
-            let count: Int = runEnd - first
-            if count > 6 {
-                return false
-            }
-            return runEnd == end || MarkdownCode.isSpaceOrTab(units[runEnd])
         }
         if character >= zero && character <= nine {
             var runEnd: Int = first
@@ -332,14 +408,14 @@ nonisolated enum MarkdownCode {
                 runEnd += 1
             }
             let count: Int = runEnd - first
-            if count > 9 || runEnd + 1 >= end {
+            if count > 9 || runEnd >= end {
                 return false
             }
             let marker: UInt16 = units[runEnd]
             if marker != period && marker != closingParenthesis {
                 return false
             }
-            return MarkdownCode.isSpaceOrTab(units[runEnd + 1])
+            return runEnd + 1 == end || MarkdownCode.isSpaceOrTab(units[runEnd + 1])
         }
         return false
     }
