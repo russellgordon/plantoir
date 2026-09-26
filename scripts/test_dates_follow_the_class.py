@@ -482,7 +482,7 @@ class DatesFollowTheClassTests(unittest.TestCase):
         _load("sectionIndexPointer")  # points `contracts` at this checkout's files
         rules = contracts.load("shared-rules")["readingALink"]
         cases = rules["cases"]
-        self.assertGreaterEqual(len(cases), 37, "readingALink lost cases")
+        self.assertGreaterEqual(len(cases), 39, "readingALink lost cases")
         for case in cases:
             with self.subTest(case=case["name"]):
                 read = build_site._extract_wikilink_targets(case["text"])

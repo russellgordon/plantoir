@@ -46,7 +46,7 @@ def link_cases():
         toolchain_paths.CONTRACTS_DIR = repo_contracts
     contracts.reset_cache()
     cases = contracts.load("shared-rules")["readingALink"]["cases"]
-    assert len(cases) >= 37, "readingALink lost cases"
+    assert len(cases) >= 39, "readingALink lost cases"
     return cases
 
 
