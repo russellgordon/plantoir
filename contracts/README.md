@@ -1016,6 +1016,15 @@ sets (36 top-level keys, one of them `note`), unchanged: `onClick` sits inside
 `scheduledPublishStopped`. Review round (same day): `onClick.cases` grew from 16
 to 17 (a mac-only case, a folder out of the builder's reach) — a row, not a list.
 
+**Re-taken 2026-09-26 with [#150](https://github.com/russellgordon/plantoir/issues/150)
+and [#327](https://github.com/russellgordon/plantoir/issues/327)**, counted ON
+THIS BRANCH (off `dev` ff1213ed, which read **228**): still **228**. #150 adds
+one member to `assist-cases.json` → `cardPhrasings.parsed` (make-room's article
+form) and #327 one pair to `tools.planTwins` — both GENERATED, and neither a new
+list. `activityTrail.mustRecord` grows from 83 to **84** (#327's `assistant
+named a tool it was not offered`, owed by Windows — see the `windows` issue from
+#327).
+
 **Re-take it rather than trusting this paragraph** — a census nobody can repeat
 is a number that rots. A case list is *an array of objects reached through
 objects only*: an array inside a case is a FIELD of that case (each

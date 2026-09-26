@@ -1523,7 +1523,9 @@ definition — the schema is only READ, so no description, schema or prompt byte
 moved (hashes unchanged). `undo_last_change`'s schema has NO `required` key,
 which reads as requiring nothing; a Windows port must treat a missing key the
 same way. An unknown tool name is judged tool-blind and still reaches "There
-is no tool by that name."
+is no tool by that name." (A name that EXISTS but was not offered to the model
+in this window never reaches this gate: it is refused above it since #327 —
+see Part 6 → "A tool the model was not offered is refused, not run".)
 
 Re-taken after the change on 2026-09-23 by running the real gate over every
 definition on the surface (the local thirteen; the MCP-only nineteen never pass
@@ -1998,12 +2000,18 @@ assistant states what it understood and what it is about to do, and waits for
 Go or Cancel. This is applied by Swift, from whether the tool has a `plan_`
 twin — the model is not asked to decide whether something is risky.
 
-Four writes have no twin and no plan, deliberately: `rebuild_preview` (changes
-no page), `undo_last_change` (is the remedy), `cancel_scheduled_deploy`
-(re-scheduling is the remedy), and `deploy_section` — which instead waits on
-its own separate approval, in the teacher's words and naming the real
-destination, whether or not plan mode is on. Deploying is the one act that
-reaches students, so it never rides on a general setting.
+Four of the window's writes have no twin and no plan, deliberately:
+`rebuild_preview` (changes no page), `undo_last_change` (is the remedy),
+`cancel_scheduled_deploy` (re-scheduling is the remedy), and `deploy_section` —
+which instead waits on its own separate approval, in the teacher's words and
+naming the real destination, whether or not plan mode is on. Deploying is the
+one act that reaches students, so it never rides on a general setting. On the
+full thirty-two-tool surface a fifth has none: `back_up_course`, reached by the
+card "back up this course", writes a zip beside the course, changes no page and
+is its own safety net. `AssistPlanModeTests` pins all five, walking every write
+on the whole surface since #327 (it used to walk the twenty-two in `tools`,
+and the one write whose twin was named wrong — `add_curriculum_mentions` — was
+in the other ten).
 
 On a Mac running the smaller assistant, plan mode cannot be turned off. On a
 16 GB machine running the larger one, the app offers to stop asking after a
@@ -3403,6 +3411,96 @@ nothing happens until they press Go.
 - **Deploys always ask, plan mode or not.** A deploy puts work in front of
   students immediately and cannot be taken back by us.
 
+### A plan has to be able to SAY it is a plan (#150)
+
+The mark that puts Go and Cancel under a plan is `AssistToolOutcome.isPlan`,
+and only `AssistToolOutcome.planned` sets it. `AssistAgent.showPlan` treats an
+unmarked outcome as a REFUSAL — it prints the words and offers nothing to
+press — which is right for "no page is called that" and fatal for a real plan.
+Swift's type cannot go wrong the way Windows' did in #70 (a twin returning a
+bare `string`, which cannot carry the mark at all), but the CONSTRUCTOR can:
+`isPlan` defaults to false, so a twin whose happy path is built with `.read`,
+`.wrote` or a bare `AssistToolOutcome(...)` compiles, reads correctly in every
+text assertion, and makes its write unrunnable from the window. Measured on
+`ff1213ed`: all ten `plan_` tools marked their happy path, so this is a pin,
+not a fix. Two tests hold it:
+
+- `AssistPlanModeTests.testEveryPlanToolOnTheSurfaceCanSayItIsAPlan` runs every
+  tool on the MCP surface whose name begins `plan_` on a happy path and
+  requires `isPlan`. It walks what EXISTS rather than deriving twins through
+  `planTwinName`, because that derivation is the map under test and it once
+  missed `plan_curriculum_mentions` entirely; a `plan_` tool with no case in
+  its table fails by name. `plan_scheduled_deploy` is given a moment two days
+  ahead of the real clock, because its "That deploy cannot be scheduled." is
+  ALSO marked a plan (it lists what has to be true of the Mac, which a teacher
+  can act on and retry — left as it is, and harmless in the window, where the
+  approval gate asks first and never runs this twin), so a fixed past date
+  would pass for the wrong reason.
+- `testEveryCardThatReachesAPlannedWriteStopsAtGo` says every card whose tool
+  is a write with a twin, through `AssistAgent.say` with plan mode on, and
+  requires the pending call, no tool result, and `AssistWording.planQuestion`
+  last. `testTheArticleFormOfMakeRoomIsAPlanThatCanBeAccepted` then presses Go
+  on "make room for a class at Unit 3, Day 4" and checks Day 4 moved to Day 5.
+
+That sentence is also why `cardPhrasings.parsed` has ten entries for nine
+families. The matcher always took "a" as a count of one and refused "a
+classes", but the contract only ever DECLARED "two classes", so Windows could
+not know the article form was expected and shipped without it — on the
+sentence #70 and the tool's own `TEACHERS SAY` clause both use as their
+example. A generated contract can only describe what the generating side
+thought to put in it; a form this app accepts and does not declare is
+invisible to the other one. It is a second entry rather than a changed
+example, so the entry Windows already implements stays byte-for-byte.
+
+### A tool the model was not offered is refused, not run (#327)
+
+The window shows the local model thirteen tools; the runner can run all
+thirty-two, because the same runner answers Claude Code over `--mcp-stdio`,
+and `AssistToolRunner.definition(named:)` looks through all of them so the
+approval gate can read `needsApproval` off anything. Until #327 nothing in the
+agent asked whether the model had been OFFERED the tool it named, so a local
+model reaching past its list was obeyed — `re_date_classes` behind its plan
+(the tool kept off the local list precisely because re-dating a section is
+too large a change to reach through a router that is right four times in
+five), and `add_curriculum_mentions` with NO plan at all, because
+`planTwinName` derived `plan_add_curriculum_mentions`, which does not exist,
+and the gate runs a write it finds no twin for. The contract generator had
+the same blind spot in silence: it asks the surface whether a twin exists, so
+it simply left that pair out of `tools.planTwins`.
+
+Three changes, each closing one layer:
+
+- **`AssistToolDefinition.irregularPlanTwins`** lists both irregular pairs
+  (`schedule_deploy` → `plan_scheduled_deploy`, `add_curriculum_mentions` →
+  `plan_curriculum_mentions`) explicitly. `tools.planTwins` gains the second.
+- **`AssistAgent.think()` refuses a tool that exists but is not in
+  `tools.definitions`**, above the readability and course gates, because what
+  the model was not offered is not an answer whatever its arguments say. The
+  turn is wound back exactly as for an echo; the teacher reads
+  `AssistWording.didNotFollowThat` — reused on purpose, since from their side
+  this IS a misroute, the sentence says both true halves (nothing changed; say
+  it another way), and a sentence of its own would have to describe a tool
+  list, which rule 1 forbids — and the trail gets `assistant named a tool it
+  was not offered`, the only line that tells this apart from an echo. Cards
+  never pass through `think()`, so the tools only a card reaches (re-dating,
+  making room, backing up) keep working. A name that exists NOWHERE is left as
+  it was ("There is no tool by that name.", back to the model), because that
+  is documented behaviour the issue did not set out to change.
+- **The plan-mode structure tests walk all thirty-two tools**, and a new one,
+  `testEveryPlanToolIsSomeWritesTwin`, checks the other direction: every
+  `plan_` tool is exactly one write's twin, so a plan the gate can never show
+  is red by name. Pinned by
+  `AssistWindowBindingTests.testAToolTheModelWasNotOfferedIsRefusedAndNothingRuns`
+  (re-dating, the curriculum write and a plan twin named directly, plan mode
+  OFF) and `testANameThatExistsNowhereStillGoesBackToTheModel`.
+
+**Rejected:** refusing unknown names too (it changes behaviour this issue did
+not touch, and the readability section above documents it); a sentence of its
+own for the refusal (above); refusing only `mcpOnlyTools` rather than
+everything off the offered list (the local list also hides
+`remember_timetable`, `re_date_classes` and every `plan_` twin, none of which
+a model should reach either).
+
 ### Undo is not version control, and it should not pretend to be
 
 Worth stating because it is easy to assume otherwise: **courses are not git
@@ -3987,7 +4085,35 @@ and asserts every key is one the tool declares. It found a live defect on its
 first run — the eight `publish_class_on` phrasings sent `when` and the tool
 took `date`, so "publish tomorrow's class" failed in the app (issue #116, fixed
 2026-09-09; the argument is in "Publish tomorrow's class: where a relative day
-becomes a date" below). The mac has no equivalent check and may want one.
+becomes a date" below).
+
+**The mac's counterpart (#150) proves the same property a different way, and
+the difference is deliberate.** There is no binder on the mac: the runner
+reads keys straight out of `[String: Any]`, and the schema is only what the
+MODEL is shown. Measured while planning #150, **35 card arguments are not
+declared on their tool's schema, on purpose** — `when` on `publish_class_on`,
+`unit`/`days`/`duplicate` on `add_next_class`, `scope`, `revise`, `rollover`,
+`answer` — so a straight port of the declaration check would be red on 35
+correct things, and satisfying it would push code-only arguments onto the
+model's schema, which costs routing accuracy (one sentence on `publish_pages`
+took the promise-card score from 110/110 to 90/110) and still proves nothing
+about ARRIVAL. What can go wrong here is a tool that forgets to READ a key it
+is sent. `AssistCardArgumentsTests.testEveryArgumentACardSendsChangesWhatTheToolDoes`
+runs each card's arguments against the tool they reach first in the window
+(the twin, when the write has one) on two identically built worlds, once
+whole and once with one key taken out, and requires the answers to differ.
+**Per tool and key, not per card** — also measured: `howMany: 1` on "make room
+for a class" equals the tool's own default, and `rollover` beside `website`
+is redundant because `website` alone makes a rollover (`isARollover`), so
+neither can be seen by removal on that card in any world; each is proved by
+the other card that sends it ("two classes", "roll this section over to a new
+year"). No exemption list: a world too thin to show a key is fixed by a richer
+world (`AssistFixture.makeRichSection`, `makeBusyClub`,
+`makeSectionAlreadyReDated` — a rollover's own words change its PLAN only
+when the pages are already on their days), never by a list for a real
+non-arrival to hide in. The walk never runs a twin-less write: it asserts
+every target is read-only, and snapshots the section's pages around every
+call.
 
 **The three traps the mac's own write-up named were all present on Windows
 too**, which means they belong to the design rather than to the Swift: the
