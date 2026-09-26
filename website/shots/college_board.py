@@ -45,6 +45,11 @@ HERE = Path(__file__).resolve().parent
 CODES_FILE = HERE / "marketing" / "csp-codes.json"
 STATEMENTS_HELPER = HERE / "ced_statements.swift"
 
+# Inside the kept folder's .sources/: pages a person wrote, used as they are
+# (the objectives quoting drawn code), and the drafts made for them to start from.
+OVERRIDES_NAME = "College Board Curriculum"
+DRAFTS_NAME = "College Board Curriculum drafts"
+
 LEARNING_OBJECTIVE = re.compile(r"^[A-Z]{3}-\d+\.[A-Z]$")
 ESSENTIAL_KNOWLEDGE = re.compile(r"^([A-Z]{3}-\d+\.[A-Z])\.(\d+)$")
 # The skill badge printed after an objective ("… through collaboration. 1.C").
