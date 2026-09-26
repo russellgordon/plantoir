@@ -162,7 +162,10 @@ final class AssistToolRunner {
     /// list: the seven `plan_` twins, which plan mode calls in code, and two
     /// more — `remember_timetable`, whose dates must come from a teacher rather
     /// than from a model, and `re_date_classes`, whose phrasings are matched in
-    /// code. All of them still run when they are called.
+    /// code. All of them still run when they are called by CODE — plan mode,
+    /// a matched phrasing, or Claude Code over MCP. A model in a section
+    /// window that names one of them is refused (#327,
+    /// `AssistAgent.sayTheModelNamedAToolItWasNotOffered`).
     var definitions: [AssistToolDefinition] {
         return AssistToolRunner.localTools
     }

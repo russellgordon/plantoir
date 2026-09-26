@@ -700,10 +700,11 @@ enum AssistContract {
             if tool.needsApproval {
                 needsApproval.append(tool.name)
             }
-            // A twin's NAME is not a twin's existence: `add_curriculum_mentions`
-            // would name `plan_add_curriculum_mentions`, and the tool that
-            // actually exists is `plan_curriculum_mentions`. Plan mode asks the
-            // surface for exactly this reason, and so does this.
+            // A twin's NAME is not a twin's existence, so this asks the
+            // surface too, as plan mode does. It is how this list once left
+            // `add_curriculum_mentions` out without a word: its name derived
+            // to `plan_add_curriculum_mentions`, which does not exist, until
+            // #327 listed the pair in `AssistToolDefinition.irregularPlanTwins`.
             if let twin = tool.planTwinName, everyName.contains(twin) {
                 twins[tool.name] = twin
             }

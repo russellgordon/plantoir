@@ -420,6 +420,32 @@ final class AssistAgent {
             }
 
             if let calls = reply.toolCalls, let first = calls.first {
+                // A tool that EXISTS but was not on the list this model was
+                // shown (#327): refused before anything else looks at the
+                // call. The window offers the local model thirteen tools; the
+                // runner can run thirty-two, because the same runner answers
+                // Claude Code over MCP. Until this, a name from the other
+                // nineteen simply ran — `add_curriculum_mentions` with no plan
+                // at all, since its twin's name was derived wrong, and
+                // `re_date_classes`, kept off the local list precisely
+                // because re-dating two hundred pages is too large a change to
+                // reach through a router that is right four times in five.
+                // What the model was not offered is not an answer, whatever
+                // its arguments say, so this sits above the readability and
+                // course gates rather than letting them word the refusal.
+                //
+                // A name that exists NOWHERE is left alone, deliberately: it
+                // still reaches "There is no tool by that name." below, which
+                // is documented behaviour this issue did not set out to
+                // change. Cards never pass through here — a matched phrasing
+                // goes straight to `run(settledCall:)` — so the tools only a
+                // card reaches keep working.
+                if tools.definition(named: first.function.name) != nil,
+                   !wasOffered(toolNamed: first.function.name) {
+                    sayTheModelNamedAToolItWasNotOffered(first.function.name)
+                    return
+                }
+
                 // Arguments that cannot be read, with the turn finishing
                 // normally: a small model writing bad JSON of its own accord.
                 // Same answer — running a call whose arguments were lost means
@@ -716,13 +742,51 @@ final class AssistAgent {
         activity = .idle
     }
 
+    /// Whether this tool was on the list the model was shown in this window.
+    private func wasOffered(toolNamed name: String) -> Bool {
+        for definition in tools.definitions where definition.name == name {
+            return true
+        }
+        return false
+    }
+
+    /// The model reached past the list it was given (#327): refused, and the
+    /// turn wound back, as for an echo.
+    ///
+    /// **The sentence is `didNotFollowThat`, reused on purpose.** From the
+    /// teacher's side this is a misroute — they asked for something and the
+    /// assistant picked a tool that is not its to pick — and that sentence
+    /// already says both halves that are true: nothing was changed, and
+    /// saying it another way is the remedy. A sentence of its own would have
+    /// to explain a tool list to somebody who has never seen one, which rule
+    /// 1 forbids. The TRAIL line is where the two are told apart.
+    private func sayTheModelNamedAToolItWasNotOffered(_ tool: String) {
+        windTheTurnBack()
+        entries.append(Entry(speaker: .assistant, text: AssistWording.didNotFollowThat))
+        ActivityTrail.note(
+            .assistantNamedAToolItWasNotOffered,
+            AssistAgent.namedAToolItWasNotOfferedLine(tool: tool),
+            course: courseCode,
+            section: sectionNumber
+        )
+        activity = .idle
+    }
+
+    /// The trail's line for a tool the model was not offered. Named so a test
+    /// can assert it without retyping it.
+    static func namedAToolItWasNotOfferedLine(tool: String) -> String {
+        return "the assistant chose " + inWords(tool) + ", which it is not offered in this window — "
+            + "nothing was run from it, and the turn was taken back out of the conversation"
+    }
+
     /// Take the whole turn back out of the conversation, down to where it
     /// began.
     ///
-    /// Shared by the three places that abandon a turn — an answer that did
-    /// not finish, a request that named another course, and a reply that was
-    /// the request back again — because they make the same claim about the
-    /// history and the three must not drift. What the teacher can SEE is
+    /// Shared by the four places that abandon a turn — an answer that did
+    /// not finish, a request that named another course, a reply that was
+    /// the request back again, and a tool the model was not offered (#327) —
+    /// because they make the same claim about the history and the four must
+    /// not drift. What the teacher can SEE is
     /// untouched: `entries` keeps their sentence on every path.
     ///
     /// Two reasons it is the whole turn rather than the reply alone, and both

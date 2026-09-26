@@ -7,6 +7,18 @@ import XCTest
 @MainActor
 final class AssistPlanModeTests: XCTestCase {
 
+    // MARK: - Stored properties
+
+    /// The writes with nothing to plan, and why. Listed here so that adding
+    /// another is a decision somebody makes on purpose.
+    private let ownReversal: Set<String> = [
+        "rebuild_preview",         // changes no page
+        "undo_last_change",        // IS the undo
+        "deploy_section",          // waits on its own button already
+        "cancel_scheduled_deploy", // remedied by scheduling it again
+        "back_up_course",          // writes a zip beside the course, changes no page, and is its own safety net
+    ]
+
     // MARK: - Functions
 
     private func makeDefaults() -> UserDefaults {
@@ -165,8 +177,12 @@ final class AssistPlanModeTests: XCTestCase {
 
     /// Reads answer immediately; writes wait. Gating reads would make every
     /// question two clicks and train people to press Go without reading.
+    ///
+    /// Over the WHOLE surface — all thirty-two tools either client may call —
+    /// since #327. It used to walk the twenty-two in `tools`, and the one
+    /// write whose twin was named wrong lived in the other ten.
     func testOnlyWritesHaveAPlanTwin() {
-        for tool in AssistToolRunner.tools {
+        for tool in AssistToolRunner.mcpTools {
             if tool.readOnly {
                 XCTAssertNil(tool.planTwinName, "\(tool.name) changes nothing, so it must not be gated")
             } else {
@@ -175,29 +191,23 @@ final class AssistPlanModeTests: XCTestCase {
         }
     }
 
-    /// Every write is either showable first or is its own reversal — nothing
-    /// in between.
+    /// Every write on the whole surface is either showable first or has
+    /// nothing to plan — nothing in between.
     ///
-    /// This test found a real bug: `planTwinName` named a twin for every
-    /// write, including four that have none, so plan mode would have asked
-    /// the runner for `plan_rebuild_preview`, been told there is no such
-    /// tool, and shown the teacher an error where their plan should be.
+    /// This test found a real bug when it was first written: `planTwinName`
+    /// named a twin for every write, including four that have none, so plan
+    /// mode would have asked the runner for `plan_rebuild_preview`, been told
+    /// there is no such tool, and shown the teacher an error where their plan
+    /// should be. Walking all thirty-two found the second (#327):
+    /// `add_curriculum_mentions` named `plan_add_curriculum_mentions`, which
+    /// does not exist, so the gate ran the write with no plan at all.
     func testEveryWriteIsEitherShowableOrItsOwnReversal() {
-        // These four have nothing to plan. Listed here so that adding a
-        // fifth is a decision somebody makes on purpose.
-        let ownReversal: Set<String> = [
-            "rebuild_preview",        // changes no page
-            "undo_last_change",       // IS the undo
-            "deploy_section",         // waits on its own button already
-            "cancel_scheduled_deploy" // remedied by scheduling it again
-        ]
-
         var names: Set<String> = []
-        for tool in AssistToolRunner.tools {
+        for tool in AssistToolRunner.mcpTools {
             names.insert(tool.name)
         }
 
-        for tool in AssistToolRunner.tools where !tool.readOnly {
+        for tool in AssistToolRunner.mcpTools where !tool.readOnly {
             if ownReversal.contains(tool.name) {
                 continue
             }
@@ -205,36 +215,72 @@ final class AssistPlanModeTests: XCTestCase {
                 return XCTFail("\(tool.name) changes pages but cannot be shown first")
             }
             XCTAssertTrue(names.contains(twin),
-                          "\(tool.name) would be gated behind \(twin), which does not exist")
+                          "\(tool.name) would be gated behind \(twin), which does not exist — "
+                          + "if its twin is named irregularly, list the pair in "
+                          + "AssistToolDefinition.irregularPlanTwins")
         }
     }
 
-    /// And the four really are the only ones without a twin, so the list
-    /// above cannot quietly fall out of step with the surface.
+    /// And those really are the only writes without a twin, so the list above
+    /// cannot quietly fall out of step with the surface.
     func testNoOtherWriteIsMissingItsTwin() {
         var names: Set<String> = []
-        for tool in AssistToolRunner.tools {
+        for tool in AssistToolRunner.mcpTools {
             names.insert(tool.name)
         }
         var missing: [String] = []
-        for tool in AssistToolRunner.tools where !tool.readOnly {
+        for tool in AssistToolRunner.mcpTools where !tool.readOnly {
             guard let twin = tool.planTwinName, names.contains(twin) else {
                 missing.append(tool.name)
                 continue
             }
         }
         XCTAssertEqual(
-            Set(missing),
-            ["rebuild_preview", "undo_last_change", "deploy_section", "cancel_scheduled_deploy"],
+            Set(missing), ownReversal,
             "The set of writes with no plan twin changed — decide deliberately what plan mode does with the new one"
         )
     }
 
-    /// The one irregular pair, pinned so nobody "tidies" it.
-    func testScheduleDeployHasItsIrregularTwin() {
-        for tool in AssistToolRunner.tools where tool.name == "schedule_deploy" {
-            XCTAssertEqual(tool.planTwinName, "plan_scheduled_deploy")
+    /// The other direction: every `plan_` tool that exists is the twin of
+    /// exactly one write. A twin nobody's name reaches is a plan the gate can
+    /// never show — which is what `plan_curriculum_mentions` was until #327.
+    func testEveryPlanToolIsSomeWritesTwin() {
+        var twinOf: [String: [String]] = [:]
+        for tool in AssistToolRunner.mcpTools where !tool.readOnly {
+            if let twin = tool.planTwinName {
+                twinOf[twin, default: []].append(tool.name)
+            }
         }
+        var planTools: Int = 0
+        for tool in AssistToolRunner.mcpTools where tool.name.hasPrefix("plan_") {
+            planTools += 1
+            XCTAssertEqual(
+                (twinOf[tool.name] ?? []).count, 1,
+                "\(tool.name) is the twin of \(twinOf[tool.name] ?? []) — it must be exactly one write's, "
+                + "or plan mode can never show it"
+            )
+        }
+        XCTAssertGreaterThanOrEqual(planTools, 10)
+    }
+
+    /// The two irregular pairs, pinned so nobody "tidies" them.
+    func testTheIrregularTwinsArePinned() {
+        XCTAssertEqual(AssistToolDefinition.irregularPlanTwins, [
+            "schedule_deploy": "plan_scheduled_deploy",
+            "add_curriculum_mentions": "plan_curriculum_mentions",
+        ])
+        var checked: Int = 0
+        for tool in AssistToolRunner.mcpTools {
+            if tool.name == "schedule_deploy" {
+                XCTAssertEqual(tool.planTwinName, "plan_scheduled_deploy")
+                checked += 1
+            }
+            if tool.name == "add_curriculum_mentions" {
+                XCTAssertEqual(tool.planTwinName, "plan_curriculum_mentions")
+                checked += 1
+            }
+        }
+        XCTAssertEqual(checked, 2, "One of the irregular writes is no longer on the surface.")
     }
 
     // MARK: - Every plan can be accepted (#150)
