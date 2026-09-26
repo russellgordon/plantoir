@@ -218,6 +218,16 @@ final class SharedRulesContractTests: XCTestCase {
                 )
             )
             let expect: [String: Any] = try XCTUnwrap(testCase["expect"] as? [String: Any])
+            // Every key is one this runner reads (#322 review, L4): a misspelt
+            // key would otherwise assert nothing and pass. The note defines each.
+            let knownKeys: Set<String> = [
+                "outcome", "destination", "refusal", "destinationNamed", "cardNames", "cardDoesNotName",
+                "schedulable", "deployedTo", "found", "lists",
+            ]
+            for key in expect.keys {
+                XCTAssertTrue(knownKeys.contains(key), "\(name): unknown expect key \"\(key)\"")
+            }
+            var checked: Int = 0
             func filledIn(_ text: String) -> String {
                 return text.replacingOccurrences(of: "{savedFolder}", with: savedFolder.path)
             }
@@ -231,10 +241,14 @@ final class SharedRulesContractTests: XCTestCase {
                 }
                 continue
             }
+            if let wanted = expect["outcome"] as? String {
+                XCTAssertTrue(wanted == "scheduled" || wanted == "refused", "\(name): unknown outcome \(wanted)")
+            }
 
             let outcome: AssistToolOutcome = await runner.run(call: toolCall)
             if let wanted = expect["outcome"] as? String, wanted == "scheduled" {
                 XCTAssertTrue(outcome.summary.hasPrefix("Scheduled:"), "\(name): \(outcome.summary)")
+                checked += 1
                 if let destination = expect["destination"] as? String {
                     XCTAssertTrue(outcome.summary.contains(filledIn(destination)), "\(name): \(outcome.summary)")
                 }
@@ -247,6 +261,7 @@ final class SharedRulesContractTests: XCTestCase {
                     ["course": "ICS3U", "section": "1", "destination": destination]
                 )
                 XCTAssertEqual(outcome.summary, "Nothing was scheduled. " + sentence, "\(name)")
+                checked += 1
             }
             if let schedulable = expect["schedulable"] as? Bool {
                 XCTAssertEqual(
@@ -255,21 +270,26 @@ final class SharedRulesContractTests: XCTestCase {
                                 : "That deploy cannot be scheduled.",
                     "\(name): \(outcome.detail)"
                 )
+                checked += 1
             }
             if let deployedTo = expect["deployedTo"] as? [String] {
                 XCTAssertEqual(siteWork.destinationTypesSeen, [deployedTo], "\(name): \(outcome.summary)")
+                checked += 1
             }
             if let found = expect["found"] as? Bool, found {
                 let number: Int = arguments["section"] as? Int ?? 1
                 XCTAssertTrue(
                     outcome.summary.contains("ICS3U Section \(number)"), "\(name): \(outcome.summary)"
                 )
+                checked += 1
             }
             if let listed = expect["lists"] as? [String] {
                 for code in listed {
                     XCTAssertTrue(outcome.detail.contains(code), "\(name): \(code) not in \(outcome.detail)")
                 }
+                checked += 1
             }
+            XCTAssertGreaterThan(checked, 0, "\(name): no expectation was checked")
         }
     }
 

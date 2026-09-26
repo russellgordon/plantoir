@@ -2066,10 +2066,13 @@ keep in step.
 **The lateness window is the ONLY setting read when the job fires.** The
 DESTINATION is fixed when the deploy is scheduled: `ScheduledDeploy.scheduleDeploy`
 writes each destination's `deploy.sh` arguments into the one-shot command at
-that moment. Since #322 that moment reads the settings from disk, from the
-sheet and from either assistant (docs 10 → "Settings are read at the call, not
-when the window opened"), so a deploy is scheduled to where the course deploys
-NOW. But changing the destination AFTER scheduling does not move a job already
+that moment. Since #322 either assistant reads the SAVED file at that moment
+(docs 10 → "Settings are read at the call, not when the window opened"), so a
+deploy it schedules goes to where the course deploys now. The schedule SHEET
+does not: it uses the window's copy of the course, which follows a Save and
+also carries Course Settings edits not yet saved — so a destination changed and
+not saved is baked into a job scheduled from the sheet
+([issue #335](https://github.com/russellgordon/plantoir/issues/335)). But changing the destination AFTER scheduling does not move a job already
 set: it still deploys to the old one, and says nothing. That is
 [issue #323](https://github.com/russellgordon/plantoir/issues/323), not yet
 fixed; until it is, re-schedule after changing where a course deploys.
