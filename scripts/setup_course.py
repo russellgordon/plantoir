@@ -1559,7 +1559,11 @@ def first_use_dates(payload_dir: Path, reference,
                 class_date_by_stem[page.stem] = class_date
     class_pages.sort()
 
-    link_target_pattern = re.compile(r"!?\[\[([^\]#|]+)")
+    # The name stops before ], | or #, and before a backslash sitting right
+    # in front of one: [[Worksheet\|w]] (the escaped pipe Obsidian writes for
+    # an alias inside a table) names Worksheet, not "Worksheet\". Shared
+    # contract: contracts/shared-rules.json -> readingALink (#294, #314).
+    link_target_pattern = re.compile(r"!?\[\[([^\]#|]+?)(?=\\?[\]|#])")
     dates = {}
     for ordinal, text in class_pages:
         class_date = semester_class_timestamp(ordinal, reference, weekday_step,
@@ -1683,8 +1687,13 @@ def starting_point_intro(course_code: str, label: str, has_payload: bool) -> str
 SPECIFIC_EXPECTATION_STEM = re.compile(r"^([A-Z])(\d+)\.(\d+)$")
 
 # A wiki link or embed, up to the target's own name: "[[A1.1]]",
-# "![[A1.1]]", "[[A1.1|the first one]]", "[[Curriculum/A1.1#Examples]]".
-WIKI_LINK_TARGET = re.compile(r"(!?\[\[)([^\]\[|#]+)")
+# "![[A1.1]]", "[[A1.1|the first one]]", "[[Curriculum/A1.1#Examples]]",
+# "[[A1.1\|words]]". The last is the escaped pipe Obsidian writes for an
+# alias inside a table: the name stops before a backslash sitting right in
+# front of ], | or #, and the lookahead is not consumed, so a rename leaves
+# the backslash where it was (dropping it would split the table cell).
+# Shared contract: contracts/shared-rules.json -> readingALink (#294, #314).
+WIKI_LINK_TARGET = re.compile(r"(!?\[\[)([^\]\[|#]+?)(?=\\?[\]|#])")
 
 
 def specific_expectation_stems(curriculum_dir: Path) -> list:
@@ -1858,23 +1867,35 @@ def unlink_curriculum_references(text: str, page_names: set) -> str:
     transclusion line (`![[A1.1]]`) disappears entirely; an inline link
     becomes its visible words (`[[A1.1|the expectation]]` -> the words,
     `[[A1.1]]` -> A1.1).
+
+    The escaped pipe Obsidian writes for an alias inside a table,
+    `[[A1.1\\|the expectation]]`, is the same link (#314): the backslash goes
+    with it, so the cell keeps its words and stays one cell. A link is
+    compared by the page it NAMES, its last path component, so
+    `[[Curriculum/A1.1|words]]` is unlinked too (#326) and an unaliased one
+    reads as the page name, A1.1 — the folder is one the course does not have.
+    Shared contract: contracts/shared-rules.json -> readingALink.
     """
     if not page_names:
         return text
 
     def replace_link(match):
         is_transclusion = match.group(1) == "!"
-        target = match.group(2).strip()
+        page_name = match.group(2).strip().split("/")[-1].strip()
         alias = match.group(4)
-        if target not in page_names:
+        if page_name not in page_names:
             return match.group(0)
         if is_transclusion:
             return ""
         if alias is not None:
             return alias
-        return target
+        return page_name
 
-    link_pattern = re.compile(r"(!?)\[\[([^\]#|]+)(#[^\]|]*)?(?:\|([^\]]*))?\]\]")
+    # Name, then an optional heading, then an optional alias whose pipe may
+    # be escaped. The heading stops at "[" as Quartz's own pattern does, so
+    # a stray "[[" earlier on the line cannot swallow the link after it.
+    link_pattern = re.compile(
+        r"(!?)\[\[([^\]#|]+?)(?=\\?[\]|#])\\?(#[^\[\]|]*)?(?:\\?\|([^\]]*))?\]\]")
 
     result_lines = []
     for line in text.split("\n"):
