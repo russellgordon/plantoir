@@ -504,6 +504,36 @@ final class StartOfYearTests: XCTestCase {
         XCTAssertEqual(missed, ["Ohm's Law"])
     }
 
+    /// After the operation the audit's third group is empty — and it is the
+    /// ISSUE's definition, so a planner that leaks (step 2 deleted) turns it
+    /// red on this same fixture (plan review H2's independence).
+    func testAfterGettingReadyTheAuditFindsNothingMissed() async throws {
+        let made = try AssistFixture.makeRunner(surface: .mcp)
+        defer { try? FileManager.default.removeItem(at: made.root) }
+        try AssistFixture.write(page: "Unit 1, Day 1", publish: "true", body: "One.", in: made.course)
+        try AssistFixture.write(page: "Unit 2, Day 1", publish: "true", body: "See [[Ohm's Law]].", in: made.course)
+        try StartOfYearTests.writeCoursePage("Ohm's Law", links: [], in: made.course)
+        try StartOfYearTests.writeCoursePage("How Marks Work", links: ["Ohm's Law"], in: made.course)
+        try "---\ntitle: Key Links\npublish: true\n---\n\nSee [[How Marks Work]].".write(
+            to: made.course.sectionDirectoryURL(forSection: 1).appendingPathComponent("Key Links.md"),
+            atomically: true, encoding: .utf8
+        )
+        let planned: AssistToolOutcome = await made.runner.run(call: StartOfYearTests.call(
+            "plan_prepare_for_start_of_year", ["course": "ICS3U", "section": 1]
+        ))
+        let code: String = try XCTUnwrap(StartOfYearPlanner.planCode(in: planned.detail))
+        _ = await made.runner.run(call: StartOfYearTests.call(
+            "prepare_for_start_of_year", ["course": "ICS3U", "section": 1, "planCode": code]
+        ))
+        let graph: AssistSectionGraph = AssistSectionGraph.read(forSection: 1, in: made.course, workspaceURL: made.root)
+        let excluded: Set<String> = AssistSectionGraph.pagesNeverInTheAudit(of: graph, in: made.course)
+        var missed: [String] = []
+        for page in graph.visiblePagesLinkedButMissed(leavingOut: excluded) {
+            missed.append(page.title)
+        }
+        XCTAssertEqual(missed, [], "Getting ready left pages a hidden class uses")
+    }
+
     // MARK: - The app's act
 
     func testGoMakesTheTeachersBackupStopsAndStartsThePreviewAndHoldsTheUndo() async throws {
