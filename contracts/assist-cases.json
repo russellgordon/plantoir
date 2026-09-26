@@ -463,6 +463,16 @@
         "tool" : "publish_pages"
       },
       {
+        "becauseNotThis" : "The same frame as 'publish unit <number>', with two more openings and nothing else widened (#197): measured, 'Publish all the classes in Unit 2.' went to publish_class_on with TODAY's date 3 times in 3 on the smaller assistant. A matched card binds this window's course and section into the call, so a sentence naming a course or section must fall through to the model, where the guard against another course runs. Every accepted and refused spelling is in pagesNamingNoPage.everythingInAUnit.",
+        "example" : "publish all the classes in unit 2",
+        "fills" : {
+          "pages" : "Unit <number>"
+        },
+        "notThis" : "publish all the classes in unit 2 for ICS3U section 1",
+        "shape" : "publish all the classes in unit <number> | publish everything in unit <number>",
+        "tool" : "publish_pages"
+      },
+      {
         "becauseNotThis" : "A matched card binds THIS window's course and section into the call unconditionally, and the guard that refuses a request naming another course only runs on the model's answers. So a frame that swallowed a sentence naming another course would act on this one and report success. Any extra word falls through.",
         "example" : "hide unit 4, day 21",
         "fills" : {
@@ -1627,7 +1637,7 @@
       "tools",
       "toolSchemas"
     ],
-    "note" : "These top-level keys are written by `Plantoir --write-contracts` from the app's own types and will be overwritten: cardPhrasings, tools, toolSchemas. Every other top-level key — nearMisses, scenarios, promptHistory, deployAtATime, windowBinding, hideIsUnpublish, echoedRequest, linksQuestion — is hand-written intent and is PRESERVED by a regeneration, so a case may be proposed from either platform. Listing them rather than naming two: the list was already two short when this was noticed, and a key nobody mentions is a key somebody deletes believing it was generated."
+    "note" : "These top-level keys are written by `Plantoir --write-contracts` from the app's own types and will be overwritten: cardPhrasings, tools, toolSchemas. Every other top-level key — nearMisses, scenarios, promptHistory, deployAtATime, windowBinding, hideIsUnpublish, echoedRequest, linksQuestion, pagesNamingNoPage, toolDescriptions — is hand-written intent and is PRESERVED by a regeneration, so a case may be proposed from either platform. Listing them rather than naming two: the list was already two short when this was noticed, and a key nobody mentions is a key somebody deletes believing it was generated."
   },
   "hideIsUnpublish" : {
     "accepted" : [
@@ -2439,6 +2449,514 @@
     ]
   },
   "note" : "Generated from the macOS app by `Plantoir --assist-contract`. Do not hand-edit; see contracts/README.md.",
+  "pagesNamingNoPage" : {
+    "cases" : [
+      {
+        "arguments" : {
+          "pages" : "all"
+        },
+        "course" : "units",
+        "expect" : {
+          "fills" : {
+            "example" : "Publish Unit 3"
+          },
+          "isPlan" : false,
+          "outcome" : "refused",
+          "wording" : "everyPageIsNotAPageToPublish",
+          "writes" : [
+
+          ]
+        },
+        "name" : "every page, publishing",
+        "pages" : [
+          {
+            "date" : "2026-09-08",
+            "published" : false,
+            "title" : "Unit 3, Day 1"
+          },
+          {
+            "date" : "2026-09-09",
+            "published" : false,
+            "title" : "Unit 3, Day 2"
+          },
+          {
+            "date" : "2026-09-15",
+            "published" : false,
+            "title" : "Unit 4, Day 1"
+          }
+        ],
+        "tool" : "publish_pages",
+        "why" : "The measured shape (#197): after listing a section, 'Publish all of those.' came back as pages: all, 3 times in 3 on one real course. It used to be answered 'Nothing needed changing.' - success, about a request that did nothing. The example is the LOWEST unit that has class pages, and 'Publish Unit 3' is matched in code, so following the advice never reaches the model."
+      },
+      {
+        "arguments" : {
+          "pages" : "all"
+        },
+        "course" : "units",
+        "expect" : {
+          "fills" : {
+            "example" : "Publish Unit 3"
+          },
+          "isPlan" : false,
+          "outcome" : "couldNotRead",
+          "wording" : "everyPageIsNotAPageToPublish",
+          "writes" : [
+
+          ]
+        },
+        "name" : "every page, publishing, plan twin",
+        "pages" : [
+          {
+            "date" : "2026-09-08",
+            "published" : false,
+            "title" : "Unit 3, Day 1"
+          },
+          {
+            "date" : "2026-09-09",
+            "published" : false,
+            "title" : "Unit 3, Day 2"
+          },
+          {
+            "date" : "2026-09-15",
+            "published" : false,
+            "title" : "Unit 4, Day 1"
+          }
+        ],
+        "tool" : "plan_publish_pages",
+        "why" : "Plan mode runs the plan twin with the same arguments. It used to answer with a Go/Cancel card over a plan that changed nothing - a card must never offer to go ahead with nothing. A plan twin's refusal is a read that could not be answered (the model gets another lap), never a plan."
+      },
+      {
+        "arguments" : {
+          "pages" : "All"
+        },
+        "course" : "units",
+        "expect" : {
+          "fills" : {
+            "example" : "Hide Unit 3"
+          },
+          "isPlan" : false,
+          "outcome" : "refused",
+          "wording" : "everyPageIsNotAPageToHide",
+          "writes" : [
+
+          ]
+        },
+        "name" : "every page, hiding, capitalised",
+        "pages" : [
+          {
+            "date" : "2026-09-08",
+            "published" : true,
+            "title" : "Unit 3, Day 1"
+          },
+          {
+            "date" : "2026-09-09",
+            "published" : true,
+            "title" : "Unit 3, Day 2"
+          },
+          {
+            "date" : "2026-09-15",
+            "published" : true,
+            "title" : "Unit 4, Day 1"
+          }
+        ],
+        "tool" : "unpublish_pages",
+        "why" : "The words are compared case-folded and trimmed. 'Hidden' is the window's own word since #215, and 'Hide Unit 3' is matched in code too."
+      },
+      {
+        "arguments" : {
+          "before" : "2026-09-10",
+          "onOrAfter" : "2026-09-08",
+          "pages" : "all"
+        },
+        "course" : "units",
+        "expect" : {
+          "isPlan" : false,
+          "outcome" : "wrote",
+          "wording" : null,
+          "writes" : [
+            "Unit 3, Day 1",
+            "Unit 3, Day 2"
+          ]
+        },
+        "name" : "every page, with a date range",
+        "pages" : [
+          {
+            "date" : "2026-09-08",
+            "published" : false,
+            "title" : "Unit 3, Day 1"
+          },
+          {
+            "date" : "2026-09-09",
+            "published" : false,
+            "title" : "Unit 3, Day 2"
+          },
+          {
+            "date" : "2026-09-15",
+            "published" : false,
+            "title" : "Unit 4, Day 1"
+          }
+        ],
+        "tool" : "publish_pages",
+        "why" : "A list that is only an every-page word names no page, so the dates apply: the classes in the range are published. Before #197 a name was 'given', the dates were ignored, and the answer was 'Nothing needed changing.'"
+      },
+      {
+        "arguments" : {
+          "onOrAfter" : "2026-09-08",
+          "pages" : "all"
+        },
+        "course" : "units",
+        "expect" : {
+          "isPlan" : false,
+          "outcome" : "refused",
+          "refusal" : "openEndedPublish",
+          "wording" : null,
+          "writes" : [
+
+          ]
+        },
+        "name" : "every page, publishing from a date with no end",
+        "pages" : [
+          {
+            "date" : "2026-09-08",
+            "published" : false,
+            "title" : "Unit 3, Day 1"
+          },
+          {
+            "date" : "2026-09-09",
+            "published" : false,
+            "title" : "Unit 3, Day 2"
+          },
+          {
+            "date" : "2026-09-15",
+            "published" : false,
+            "title" : "Unit 4, Day 1"
+          }
+        ],
+        "tool" : "publish_pages",
+        "why" : "Pins that dropping the word hands over to the EXISTING rule: an open-ended publish - everything from a day to the end of the course - is refused, with or without 'all' in front of it."
+      },
+      {
+        "arguments" : {
+          "onOrAfter" : "2026-09-09",
+          "pages" : "everything"
+        },
+        "course" : "units",
+        "expect" : {
+          "isPlan" : false,
+          "outcome" : "wrote",
+          "wording" : null,
+          "writes" : [
+            "Unit 3, Day 2",
+            "Unit 4, Day 1"
+          ]
+        },
+        "name" : "every page, hiding from a date with no end",
+        "pages" : [
+          {
+            "date" : "2026-09-08",
+            "published" : true,
+            "title" : "Unit 3, Day 1"
+          },
+          {
+            "date" : "2026-09-09",
+            "published" : true,
+            "title" : "Unit 3, Day 2"
+          },
+          {
+            "date" : "2026-09-15",
+            "published" : true,
+            "title" : "Unit 4, Day 1"
+          }
+        ],
+        "tool" : "unpublish_pages",
+        "why" : "An open-ended UNPUBLISH is allowed today - it hides work rather than exposing it, and clearing a section down to a date is a real thing to want - and 'everything' in front of it does not change that."
+      },
+      {
+        "arguments" : {
+          "pages" : "Unit 9, Day 9"
+        },
+        "course" : "units",
+        "expect" : {
+          "fills" : {
+            "page" : "Unit 9, Day 9"
+          },
+          "isPlan" : false,
+          "outcome" : "refused",
+          "wording" : "noPageCalled",
+          "writes" : [
+
+          ]
+        },
+        "name" : "one name that is no page",
+        "pages" : [
+          {
+            "date" : "2026-09-08",
+            "published" : false,
+            "title" : "Unit 3, Day 1"
+          },
+          {
+            "date" : "2026-09-09",
+            "published" : false,
+            "title" : "Unit 3, Day 2"
+          },
+          {
+            "date" : "2026-09-15",
+            "published" : false,
+            "title" : "Unit 4, Day 1"
+          }
+        ],
+        "tool" : "publish_pages",
+        "why" : "Not specific to 'all': ANY publish or hide whose every name matches no page used to say 'Nothing needed changing.'. The teacher's sentence (#167's noPageCalled), not the model's 'use list_pages', because a write's refusal ends the turn and is read by the teacher."
+      },
+      {
+        "arguments" : {
+          "pages" : "Unit 9, Day 9; Unit 9, Day 10"
+        },
+        "course" : "units",
+        "expect" : {
+          "fills" : {
+            "pages" : "“Unit 9, Day 9” or “Unit 9, Day 10”"
+          },
+          "isPlan" : false,
+          "outcome" : "refused",
+          "wording" : "noPagesCalled",
+          "writes" : [
+
+          ]
+        },
+        "name" : "two names that are no page",
+        "pages" : [
+          {
+            "date" : "2026-09-08",
+            "published" : false,
+            "title" : "Unit 3, Day 1"
+          },
+          {
+            "date" : "2026-09-09",
+            "published" : false,
+            "title" : "Unit 3, Day 2"
+          },
+          {
+            "date" : "2026-09-15",
+            "published" : false,
+            "title" : "Unit 4, Day 1"
+          }
+        ],
+        "tool" : "publish_pages",
+        "why" : "Two or more are joined with 'or', not 'and' - 'is called “a” and “b”' would say one page has two names."
+      },
+      {
+        "arguments" : {
+          "pages" : "all; Unit 3, Day 1"
+        },
+        "course" : "units",
+        "expect" : {
+          "isPlan" : false,
+          "outcome" : "wrote",
+          "wording" : null,
+          "writes" : [
+            "Unit 3, Day 1"
+          ]
+        },
+        "name" : "an every-page word beside a real name",
+        "pages" : [
+          {
+            "date" : "2026-09-08",
+            "published" : false,
+            "title" : "Unit 3, Day 1"
+          },
+          {
+            "date" : "2026-09-09",
+            "published" : false,
+            "title" : "Unit 3, Day 2"
+          },
+          {
+            "date" : "2026-09-15",
+            "published" : false,
+            "title" : "Unit 4, Day 1"
+          }
+        ],
+        "tool" : "publish_pages",
+        "why" : "MIXED lists are left as they were: the page that was named is published, and 'all' is one more name that matches nothing. Refusing would throw away a right answer to punish a stray word. That a mixed list's summary does not mention the unknown name is a separate, pre-existing gap with its own issue."
+      },
+      {
+        "arguments" : {
+          "pages" : "all"
+        },
+        "course" : "units",
+        "expect" : {
+          "isPlan" : false,
+          "outcome" : "wrote",
+          "wording" : null,
+          "writes" : [
+            "All"
+          ]
+        },
+        "name" : "a section with a page really called All",
+        "pages" : [
+          {
+            "date" : "2026-09-08",
+            "published" : false,
+            "title" : "All"
+          },
+          {
+            "date" : "2026-09-08",
+            "published" : false,
+            "title" : "Unit 3, Day 1"
+          },
+          {
+            "date" : "2026-09-09",
+            "published" : false,
+            "title" : "Unit 3, Day 2"
+          },
+          {
+            "date" : "2026-09-15",
+            "published" : false,
+            "title" : "Unit 4, Day 1"
+          }
+        ],
+        "tool" : "publish_pages",
+        "why" : "The section is asked FIRST: an entry that is a page is a page, whatever it is called. Only a word that names no page is read as meaning every page."
+      },
+      {
+        "arguments" : {
+          "pages" : "all"
+        },
+        "course" : "numbered",
+        "expect" : {
+          "fills" : {
+            "example" : "Publish Week 1"
+          },
+          "isPlan" : false,
+          "outcome" : "refused",
+          "wording" : "everyPageIsNotAPageToPublish",
+          "writes" : [
+
+          ]
+        },
+        "name" : "every page in a numbered course",
+        "pages" : [
+          {
+            "date" : "2026-09-08",
+            "published" : false,
+            "title" : "Week 1"
+          },
+          {
+            "date" : "2026-09-09",
+            "published" : false,
+            "title" : "Week 2"
+          }
+        ],
+        "pageWord" : "Week",
+        "tool" : "publish_pages",
+        "why" : "A numbered course (#267) has no units, so the example names its first class page instead - built from the course's own page word, never typed as 'Unit'."
+      },
+      {
+        "arguments" : {
+          "pages" : "Unit 3"
+        },
+        "course" : "units",
+        "expect" : {
+          "isPlan" : false,
+          "outcome" : "wrote",
+          "wording" : null,
+          "writes" : [
+            "Unit 3, Day 1",
+            "Unit 3, Day 2"
+          ]
+        },
+        "name" : "a whole unit, unchanged",
+        "pages" : [
+          {
+            "date" : "2026-09-08",
+            "published" : false,
+            "title" : "Unit 3, Day 1"
+          },
+          {
+            "date" : "2026-09-09",
+            "published" : false,
+            "title" : "Unit 3, Day 2"
+          },
+          {
+            "date" : "2026-09-15",
+            "published" : false,
+            "title" : "Unit 4, Day 1"
+          }
+        ],
+        "tool" : "publish_pages",
+        "why" : "Regression guard on the path that runs BEFORE the page list is read: 'Unit 3' is still a whole unit, and is not a name that matches no page."
+      }
+    ],
+    "everyPageWords" : [
+      "all",
+      "everything",
+      "all pages",
+      "every page",
+      "all of them",
+      "all of those",
+      "*"
+    ],
+    "everythingInAUnit" : {
+      "accepted" : [
+        {
+          "expectPages" : "Unit 2",
+          "expectTool" : "publish_pages",
+          "input" : "Publish all the classes in Unit 2.",
+          "why" : "The measured sentence, word for word."
+        },
+        {
+          "expectPages" : "Unit 2",
+          "expectTool" : "publish_pages",
+          "input" : "publish all the classes in unit 2",
+          "why" : "Case-folded, and the full stop the shared tidier has always taken off is not needed."
+        },
+        {
+          "expectPages" : "Unit 3",
+          "expectTool" : "publish_pages",
+          "input" : "Publish everything in Unit 3",
+          "why" : "The second opening. 'Publish everything in Unit 3 for ICS3U section 1.' was answered correctly by the model (publish_pages, Unit 3, 3 in 3); without the course named, this frame answers it in code."
+        },
+        {
+          "expectPages" : "Unit 12",
+          "expectTool" : "publish_pages",
+          "input" : "Publish all the classes in Unit 12!",
+          "why" : "Any unit number, and the '!' the shared tidier strips."
+        }
+      ],
+      "note" : "'Publish all the classes in Unit 2.' went to publish_class_on with TODAY's date 3 times in 3 on the smaller assistant (Qwen2.5-1.5B Q4_K_M, llama.cpp b10435, the app's own flags, request body and system prompt, temperature 0; measured 2026-09-26) - on a teaching day that publishes today's class and reports success, about a request for a unit. The sentence is a fixed frame around a number, so since #197 it is answered in CODE, as a whole-unit publish, and the router never sees it. Only two openings are added to the 'publish unit <number>' frame, read by the same rule - a literal opening and a bare number, nothing before and nothing after - so the publish direction widens by exactly these sentences. Each accepted row must match publish_pages with the pages given and no course or section of its own; each refused row must match nothing.",
+      "refused" : [
+        {
+          "input" : "publish all the classes in unit 2 for ICS3U section 1",
+          "why" : "A course and section named. A matched card binds THIS window's course and section into the call, and the guard against another course runs only on the model's answers - so any extra word falls through."
+        },
+        {
+          "input" : "please publish all the classes in unit 2",
+          "why" : "The publish frame takes no courtesy words, for the reason hideIsUnpublish gives: the direction that reaches students is not widened beyond what was measured."
+        },
+        {
+          "input" : "publish all the classes in unit 2?",
+          "why" : "A question mark on a publish request is plausibly a teacher ASKING; the same rule as 'publish unit 4?'."
+        },
+        {
+          "input" : "publish everything in unit 2, day 3",
+          "why" : "A comma means a page was named, and that request goes to the model."
+        },
+        {
+          "input" : "publish all the classes in module 2",
+          "why" : "Term-blind, like every frame in this family: only the literal word 'unit' is matched. A Module course falls through to the model exactly as before."
+        },
+        {
+          "input" : "publish all classes in unit 2",
+          "why" : "Not one of the two openings. Only the measured phrasings are added; a near variant goes to the model, as every sentence did before #197."
+        },
+        {
+          "input" : "hide all the classes in unit 2",
+          "why" : "Hiding was not measured with these openings. The hide frame reads a fixed number of words and this is not one of its shapes."
+        }
+      ]
+    },
+    "note" : "A publish or an unpublish that names pages and finds none of them does nothing and SAYS so (#197, 2026-09-26). Until then it answered 'Nothing needed changing.' - success, about a request that did nothing - and in plan mode offered a Go/Cancel card over a plan that changed nothing. A word meaning every page (everyPageWords, compared trimmed and case-folded) is not a page name: when the list is NOTHING BUT such words, and none of them is a page in the section, it is read as 'no page named' and the ordinary rules decide - dates given are the range; onOrAfter alone on a publish is the existing open-ended refusal; nothing else is wording.everyPageIsNotAPageToPublish / everyPageIsNotAPageToHide, with an example the teacher can type next. Names that ALL match no page are refused by name (wording.noPageCalled for one, wording.noPagesCalled for more). A MIXED list is unchanged: what was found moves. The same rule on both the write and its plan twin; the twin's refusal is couldNotRead, never a plan. Nothing here moves a tool description, a schema or the prompt: it is steered with code. Each case builds a section 1 of the window's course from `pages` (a 'units' course names pages 'Unit N, Day N'; a 'numbered' one '<pageWord> N', #267), runs `tool` with `arguments` plus the window's course and section, and checks: outcome (refused = the turn ends and nothing was written; couldNotRead = handed back to the model; wrote = the turn ends after a write), isPlan, the teacher's sentence (the named wording key rendered with course, section and `fills`, or - for `refusal` - that platform's own existing refusal), and `writes`: exactly the pages whose files changed. Every refusal here also writes one trail line, 'assistant named no page it could find' (shared-rules.json -> activityTrail.mustRecord); openEndedPublish is not one of them."
+  },
   "promptHistory" : {
     "cases" : [
       {
@@ -2878,6 +3396,58 @@
       }
     ],
     "note" : "What must happen, and in what ORDER. The order is the assertion: every wrong ordering still passes a test that only checks all three events occurred. Event names are this contract's own; map them to whatever your app calls them. `given.saying` is a CONVERSATION — what the teacher types, in order, each turn settled before the next — because some behaviour exists only across turns; when it is absent a single turn is run, using whichever fixed phrasing reaches `given.pending`. `when` says what the teacher does on the LAST turn: \"approve\" presses Go on the card that is waiting (and fails if none is), \"decline\" presses Cancel, \"say\" means the last turn is ANSWERED rather than proposed, so nothing is waiting and a card there is the failure the case exists to catch; anything else is a tool name, called directly. `expectTranscriptContains` matches each named line by speaker PREFIX and sentence SUBSTRING, in order but not necessarily adjacent, and a line may satisfy more than one expectation — one reply often composes several named sentences into a single bubble. A literal line that is not a `wording.` name is matched as written, which is how a case anchors later expectations to a particular TURN. `expectModelRequests`, when present, is how many requests the engine must have received over the WHOLE conversation - 0 means the model was never asked. A transcript cannot show an absence, so a turn that must END in code (and not hand its answer back to the model for another lap) is proved by this count; the mac runs such a case against a stub engine that answers whatever it is sent, so a regression fails on the count rather than hanging."
+  },
+  "toolDescriptions" : {
+    "descriptions" : {
+      "add_classes" : "TEACHERS SAY: \"add five more days to Unit 4\". Add several class pages to a unit, dated to the days this section actually meets, continuing from the last day that unit already has. Call plan_add_classes first and show the teacher what it said.\n\nThe pages arrive UNPUBLISHED — empty skeletons for the teacher to write, which stay out of the site until they publish them. An existing page is never written over, the course is backed up first, and undo_last_change takes back what this created.",
+      "add_curriculum_mentions" : "Add transclusions of curriculum expectations to a page, inside the curriculum markers so a course installed without curriculum still builds. Call plan_curriculum_mentions FIRST and get the teacher's agreement to the specific codes. Changes nothing else on the page, and changes no page's visibility. The course is backed up first.",
+      "add_next_class" : "TEACHERS SAY: \"add an entry for the next class\", \"add tomorrow's class page\", \"start the next class\", \"add the next class\", \"make a page for our next class\", \"set up next day's lesson\". Create the next class page in a section: it continues the unit the last class was in, and takes its date from the section's remembered timetable. Work out no numbers and no dates yourself — this tool does both. It starts unpublished, so students see nothing until the teacher publishes it.",
+      "back_up_course" : "Make a full copy of one course, which the teacher can restore from inside Plantoir. Do this before any bulk editing of a course's files — INCLUDING edits you make directly rather than through these tools, which nothing else backs up. Course folders are not in version control, so a copy is the only way back.",
+      "cancel_scheduled_deploy" : "TEACHERS SAY: \"cancel that scheduled deploy\", \"don't send it in the morning after all\", \"call it off\". Call off a deploy that was scheduled for a section.",
+      "check_section" : "TEACHERS SAY: \"what do students see right now?\", \"is anything broken?\", \"what's live?\". Check a section's website as students would meet it, changing nothing.",
+      "deploy_section" : "TEACHERS SAY: \"deploy the site\", \"put it online\", \"push it live\", \"send it to the website\", \"make it live for students\", \"upload the site\". Put a section's website where students can actually reach it.",
+      "explain_publishing" : "Call this FIRST, before doing anything else with a section. It returns a short explanation of what publishing and deploying mean in Plantoir — say it to the teacher word for word. It answers once per section: after that it says so, and you should get straight on with what was asked rather than repeating it.",
+      "list_courses" : "TEACHERS SAY: \"what courses do I have?\", \"list my courses\". List the courses in this working folder: the code, the name, which sections each one has, and where each publishes to. Call this first when a teacher mentions a course and you are not certain of its exact code — guessing a code reaches the wrong course silently.",
+      "list_curriculum_expectations" : "List this course's curriculum expectations with their FULL WORDING, changing nothing. Call this when a teacher asks you to point a page at the expectations it covers. Read the page first, then read these, then decide which genuinely fit — that judgement is yours to make and the tools cannot make it. Propose the codes to the teacher with your reasons and let them choose; do not add expectations they have not agreed to.",
+      "list_pages" : "List the pages in one section of a course, as paths relative to the working folder.",
+      "make_room_for_classes" : "TEACHERS SAY: \"make room for a class at Unit 3, Day 4\". Insert one or more classes part-way through a unit: the later days of that unit are renumbered, every link that pointed at them is rewritten, the classes that follow move onto later class days, and the new pages arrive unpublished.\n\nCall plan_make_room_for_classes FIRST and show the teacher what it said. The course is backed up first. Once other classes have moved, \"undo that\" can no longer take this back and the backup is the way out — so tell the teacher to look the section over in Plantoir before publishing anything.",
+      "plan_add_classes" : "Work out what adding several class pages to a unit would do, and change nothing. Shows what each page would be called and the day it would land on. Call this first and show the teacher what it said.",
+      "plan_add_next_class" : "TEACHERS SAY: \"what would the next class page be?\", \"which day comes next?\", \"show me before you add it\". Work out which page adding the next class would create and which day it would fall on, WITHOUT changing anything.",
+      "plan_curriculum_mentions" : "Work out what adding curriculum transclusions to a page would do, changing nothing. Show the teacher what it says — it quotes each expectation's wording so they can tell whether it fits their lesson without looking it up — then wait for them to agree.",
+      "plan_make_room_for_classes" : "Work out what making room part-way through a unit would do, and change nothing. Names every page that would be renamed, every class that would move to a later day, and every link that would be rewritten. Call this first and show the teacher what it said, in full — this moves more pages than anything else here.",
+      "plan_publish_class_on" : "TEACHERS SAY: \"what would publishing tomorrow's class do?\", \"show me before you put Monday up\". Work out what publishing the class taught on a given day would do, WITHOUT changing anything.",
+      "plan_publish_pages" : "Work out exactly what publishing pages would do, WITHOUT changing anything.",
+      "plan_re_date_classes" : "Work out what re-dating a whole section onto its recorded class dates would do, and change nothing. Shows every page that would move and why.",
+      "plan_remember_timetable" : "Work out what recording these class dates would do, WITHOUT changing anything. Says how many days it would remember, the first and the last, and what it would replace.",
+      "plan_scheduled_deploy" : "TEACHERS SAY: \"what happens if I schedule it for 6:30?\", \"check before you set that up\". Work out what scheduling a deploy would mean, scheduling nothing.",
+      "plan_unpublish_pages" : "TEACHERS SAY: \"what happens if I take that down?\", \"check before you hide Unit 3, Day 2\". Work out exactly what unpublishing pages from students would do, WITHOUT changing anything.",
+      "publish_class_on" : "TEACHERS SAY: \"publish tomorrow's class\", \"put up Monday's lesson\", \"put Unit 2, Day 3 up\", \"make Friday's class visible\", \"post next class\", \"put the class live for students\". Publish the class taught on a given day, along with the pages it links to, then rebuild the section's preview.",
+      "publish_pages" : "Make pages visible to students, along with every page they link to, then rebuild the section preview. The linked pages come by themselves — there is nothing to ask for and no way to leave them out, because a published page whose links lead nowhere is the one thing this must never make.",
+      "re_date_classes" : "TEACHERS SAY: \"re-date my classes\", \"roll this section over to a new year\", \"put my classes on this year's dates\". Re-date every class in a section onto the class dates on file, by POSITION — the first class takes the first date — and move the pages each class uses onto that class's day with it. Pages this section's Key Links points at move to the first day of class. Curriculum pages are left alone, because Plantoir dates those itself on every build. Set `website` when the teacher is rolling a section over to a NEW YEAR and has said which website they want: \"new\" starts a fresh one, so publishing no longer replaces last year's site, and \"same\" keeps last year's address. Ask them first — never choose for them, and leave it out for an ordinary re-dating.",
+      "read_page" : "Read one page's Markdown, including its frontmatter.",
+      "read_remembered_timetable" : "TEACHERS SAY: \"when does this class meet?\", \"what dates do you have for us?\", \"do you know our timetable?\", \"how many class days are left?\". Read back the class dates recorded for a section, and where the teacher said they came from, changing nothing.",
+      "rebuild_preview" : "TEACHERS SAY: \"preview the site\", \"show me the preview\", \"start the preview\", \"open the preview\", \"rebuild the preview\", \"refresh what I'm looking at\", \"update the preview\", \"build it again\". Build a section's preview and put it on screen, without changing any page.",
+      "remember_timetable" : "TEACHERS SAY: \"here are the days we meet\", \"remember our timetable\", \"these are our class dates\", \"save these dates\". Write down the days a section meets, so nothing has to ask for them again. Changes no page.",
+      "schedule_deploy" : "TEACHERS SAY: \"deploy tomorrow's class at 6:30 AM\", \"put it live before school\", \"send it out at 7am\", \"schedule the deploy for Monday morning\". Ask this computer to deploy a section at a set time.",
+      "undo_last_change" : "TEACHERS SAY: \"undo that\", \"put it back\", \"that was wrong, revert it\", \"never mind, undo\". Take back the most recent change this conversation made — the fix for publishing the wrong class in a hurry.",
+      "unpublish_pages" : "TEACHERS SAY: \"take Unit 4, Day 5 back down\", \"students shouldn't see it yet\", \"hide that page\", \"I posted it by mistake\", \"make it a draft again\", \"pull that lesson\", \"un-publish it\". Unpublish pages, so students no longer see them, along with any page ONLY they link to; a page another class still links to stays put, and the result says which stayed and why."
+    },
+    "measuredDepartures" : [
+
+    ],
+    "measuredDeparturesNote" : "A platform that keeps its own text for a tool records it here: {tool, platform, description, measured, issue}. 'measured' carries the numbers - suite, trials, arms, the hardware and the tier - and may not be empty: a departure is kept only as a MEASURED one (#114, 2026-09-10), never as an argued sentence. A test on the mac refuses an entry without numbers or an issue.",
+    "note" : "One description per tool, pinned here and decided by Russell (#114: the mac's text wins, 2026-09-09; converge on one description per tool, 2026-09-26). HAND-WRITTEN on purpose, and the reason is the whole point of the key: toolSchemas beside it is a GENERATED readout of the Swift, and a readout cannot fail when the code changes - a mac edit to a measured description used to regenerate, go green here, and turn red only on Windows weeks later, which is how #114 was found. The mac suite now holds every served description equal to this text byte for byte (AssistToolDescriptionContractTests), so an edit fails HERE first. Do not 'simplify' this away as a duplicate of toolSchemas: deleting it deletes the protection. Descriptions are measured artifacts: a single clarifying sentence in publish_pages once took a routing suite from 110/110 to 90/110.",
+    "notShared" : {
+      "why" : "Tools only the Windows server has (#66, #108). Their descriptions are that server's own until one of them is shared.",
+      "windows" : [
+        "list_recent_changes",
+        "plan_sync_page_dates",
+        "read_timetable",
+        "roll_over_section",
+        "sync_page_dates"
+      ]
+    },
+    "rule" : "Both MCP servers serve each tool's description exactly as written here. The local model is shown the SAME text - only the example course is rewritten to the window's - never a shortened copy. A change to any of these is a routing change: measure it (documentation/10-local-ai-assistant.md, 'One description per tool') before it ships, on both platforms. Procedural instructions meant only for an MCP client such as Claude Code do not go in a description; they go in the server's MCP instructions field, which the local router never reads."
   },
   "tools" : {
     "all" : [

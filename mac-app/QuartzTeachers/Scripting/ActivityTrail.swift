@@ -818,6 +818,19 @@ nonisolated enum ActivityTrail {
         /// in the same breath, and this is the line that is still there next
         /// week, when "why is this page still showing?" arrives.
         case pageSettingsLeftAsTheyWere = "page settings left as they were"
+        /// The assistant asked to publish or hide pages and named none this
+        /// section has (#197): only a word meaning every page ("all"), or
+        /// names that match no page. Nothing was changed and the teacher was
+        /// told so. Carries the course and section, the act, and either the
+        /// word (one of the contract's closed list) or how MANY names matched
+        /// nothing — never the names, which are page titles the model wrote.
+        ///
+        /// Without it the trail shows only "assistant chose a tool:
+        /// publish_pages (course, section, pages)", and a teacher reporting
+        /// "it said it needed to know which pages" cannot be looked into: the
+        /// "all" was measured 3 in 3 on one course and 0 in 108 on six others,
+        /// and only the field can say how often it happens.
+        case assistantNamedNoPage = "assistant named no page it could find"
     }
 
     // MARK: - Stored properties
@@ -872,6 +885,16 @@ nonisolated enum ActivityTrail {
     static func pageSettingsLeftAsTheyWereLine(act: String, pages: Int) -> String {
         let counted: String = pages == 1 ? "1 page" : "\(pages) pages"
         return "left the settings of \(counted) as they were while \(act): no room at the top for a new setting"
+    }
+
+    /// The words for `assistantNamedNoPage`: what was being done, and which
+    /// of the two shapes — never a page's name.
+    static func namedNoPageLine(act: String, everyPageWord: String?, unknownCount: Int) -> String {
+        if let word = everyPageWord {
+            return "named no page while \(act): a word for every page (“\(word)”), so nothing was changed"
+        }
+        let counted: String = unknownCount == 1 ? "1 name" : "\(unknownCount) names"
+        return "named no page while \(act): \(counted) that match no page, so nothing was changed"
     }
 
     static func formatter(timeZone: TimeZone = TimeZone.current) -> DateFormatter {

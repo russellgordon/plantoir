@@ -18,10 +18,11 @@ import Foundation
 /// no longer matches, so a changed sentence fails HERE, in the same test run
 /// that changed it — not on a Windows machine three weeks later.
 ///
-/// **What it deliberately does NOT generate.** Eight top-level keys of the
+/// **What it deliberately does NOT generate.** Ten top-level keys of the
 /// cases file are hand-written and are preserved on every run: `nearMisses`,
 /// `scenarios`, `promptHistory`, `deployAtATime`, `windowBinding`,
-/// `hideIsUnpublish`, `echoedRequest` and `linksQuestion` (#167). Nothing
+/// `hideIsUnpublish`, `echoedRequest`, `linksQuestion` (#167),
+/// `pagesNamingNoPage` (#197) and `toolDescriptions` (#114). Nothing
 /// in the code says which near-miss phrasings are worth guarding, which ORDER
 /// events must happen in, which spellings of a time a teacher actually types,
 /// or which arguments a window takes back from the model and which it refuses
@@ -66,6 +67,13 @@ enum AssistContract {
 
     /// What the copy of that page is called.
     static let copyPlaceholder: String = "{copy}"
+
+    /// Something the teacher can type next, in the every-page refusals (#197).
+    static let examplePlaceholder: String = "{example}"
+
+    /// Two or more names, already quoted and joined with "or", in the
+    /// refusal for names that match no page (#197).
+    static let pagesPlaceholder: String = "{pages}"
 
     static let wordingFileName: String = "assist-wording.json"
     static let casesFileName: String = "assist-cases.json"
@@ -271,6 +279,16 @@ enum AssistContract {
             "noPageCalled": AssistWording.noPageCalled(
                 page: pagePlaceholder, course: course, section: section
             ),
+            // A publish or a hide that named no page (#197).
+            "noPagesCalled": AssistWording.noPagesCalled(
+                pages: pagesPlaceholder, course: course, section: section
+            ),
+            "everyPageIsNotAPageToPublish": AssistWording.everyPageIsNotAPageToPublish(
+                example: examplePlaceholder
+            ),
+            "everyPageIsNotAPageToHide": AssistWording.everyPageIsNotAPageToHide(
+                example: examplePlaceholder
+            ),
             "morePagesThanOneAreCalled": AssistWording.morePagesThanOneAreCalled(
                 page: pagePlaceholder, course: course, section: section
             ),
@@ -462,6 +480,14 @@ enum AssistContract {
                 "page": "a page's title, e.g. Unit 3, Day 2 — the page being copied, or one a "
                       + "re-date moves",
                 "copy": "what the copy is called, e.g. Unit 3, Day 3",
+                "example": "something a teacher can type next, built from the section's own pages: "
+                         + "Publish (or Hide) and the lowest unit that has class pages, named the "
+                         + "course's way (Publish Unit 3, Hide Module 2); in a numbered course its "
+                         + "first class page (Publish Week 1). See pagesNamingNoPage in "
+                         + "assist-cases.json",
+                "pages": "two or more names that match no page, each in curly quotes, joined "
+                       + "with commas and a final \"or\" — at most three named and the rest "
+                       + "counted: “Unit 9, Day 9” or “Unit 9, Day 10”; “a”, “b”, “c” or 2 others",
                 "moving": "how many later classes move, counted once each even when a page is "
                         + "both renamed and re-dated — here 2",
                 "renaming": "how many of those are also renamed, here 1 in the "
@@ -751,7 +777,8 @@ enum AssistContract {
             "note": "These top-level keys are written by `Plantoir --write-contracts` from the app's own "
                   + "types and will be overwritten: " + generatedCaseKeys.joined(separator: ", ")
                   + ". Every other top-level key — nearMisses, scenarios, promptHistory, "
-                  + "deployAtATime, windowBinding, hideIsUnpublish, echoedRequest, linksQuestion — "
+                  + "deployAtATime, windowBinding, hideIsUnpublish, echoedRequest, linksQuestion, "
+                  + "pagesNamingNoPage, toolDescriptions — "
                   + "is hand-written "
                   + "intent and is PRESERVED by a regeneration, so "
                   + "a case may be proposed from either platform. Listing them rather than naming "

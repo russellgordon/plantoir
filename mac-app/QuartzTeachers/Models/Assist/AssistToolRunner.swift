@@ -1289,7 +1289,29 @@ final class AssistToolRunner {
             return .failure(refusal(from: found))
         }
 
-        let titles: [String] = names("pages", in: arguments)
+        // The graph is read FIRST, because whether "all" is a word or a page
+        // is a fact about the section (#197): one that really has a page
+        // called "All" gets that page.
+        let graph: AssistSectionGraph = AssistSectionGraph.read(
+            forSection: located.sectionNumber, in: located.course,
+            workspaceURL: workspace.workspaceURL
+        )
+        let classPages: [ClassPageSummary] = ClassPages.list(
+            forSection: located.sectionNumber, in: located.course
+        )
+
+        let named: [String] = names("pages", in: arguments)
+        let everyPageWord: String? = AssistToolRunner.everyPageWordOnly(in: named, graph: graph)
+        // A list that is NOTHING BUT such words names no page, and the rules
+        // below for "no page named" decide what it means: dates given are the
+        // range, `onOrAfter` alone on a publish is the open-ended refusal, and
+        // nothing at all is `askedForEveryPage`. A word beside a real name is
+        // left as a name that matches nothing, so the page that WAS named
+        // still moves.
+        var titles: [String] = named
+        if everyPageWord != nil {
+            titles = []
+        }
         let onOrAfterText: String = text("onOrAfter", in: arguments)
         let beforeText: String = text("before", in: arguments)
 
@@ -1298,7 +1320,9 @@ final class AssistToolRunner {
 
         // Dates are only evaluated when no specific pages were named. If pages
         // were named, date boundaries are ignored so dateline leakage from the
-        // prompt cannot accidentally sweep other classes.
+        // prompt cannot accidentally sweep other classes. A list that was only
+        // an every-page word counts as none named (#197), so a range given
+        // with "all" is the range.
         if titles.isEmpty {
             if !onOrAfterText.isEmpty {
                 guard let day = CalendarDay(text: onOrAfterText) else {
@@ -1315,6 +1339,17 @@ final class AssistToolRunner {
         }
 
         if titles.isEmpty && onOrAfter == nil && before == nil {
+            if let word = everyPageWord,
+               let example = AssistToolRunner.exampleOfWhichPages(
+                publishing: publishing, graph: graph, classPages: classPages,
+                naming: located.course.configuration.classPageNaming
+               ) {
+                AssistToolRunner.noteNamedNoPage(
+                    publishing: publishing, everyPageWord: word, unknownCount: 0,
+                    course: located.course.code, section: located.sectionNumber
+                )
+                return .failure(.askedForEveryPage(publishing: publishing, example: example))
+            }
             return .failure(.nothingNamed)
         }
 
@@ -1342,14 +1377,6 @@ final class AssistToolRunner {
             return .failure(.openEndedPublish(from))
         }
 
-        let graph: AssistSectionGraph = AssistSectionGraph.read(
-            forSection: located.sectionNumber, in: located.course,
-            workspaceURL: workspace.workspaceURL
-        )
-        let classPages: [ClassPageSummary] = ClassPages.list(
-            forSection: located.sectionNumber, in: located.course
-        )
-
         // How far each verb reaches is the planner's rule, not an argument.
         // Publishing takes the pages it links to and stops where a link lands
         // on another class (#173); unpublishing takes only the pages nothing
@@ -1370,7 +1397,128 @@ final class AssistToolRunner {
                 forSection: located.sectionNumber, in: located.course
             )
         }
+
+        // Names were given and NONE of them is a page (#197). This used to be
+        // a plan that changes nothing: "Nothing needed changing." on a write,
+        // and a Go/Cancel card over nothing in plan mode — both reporting
+        // success about a request that found nothing at all. A list where
+        // SOME names were found is left alone: the found pages move.
+        if !titles.isEmpty && plan.namedPages.isEmpty && !plan.unknownNames.isEmpty {
+            AssistToolRunner.noteNamedNoPage(
+                publishing: publishing, everyPageWord: nil, unknownCount: plan.unknownNames.count,
+                course: located.course.code, section: located.sectionNumber
+            )
+            return .failure(.noPageByThatName(
+                names: plan.unknownNames, course: located.course.code, section: located.sectionNumber
+            ))
+        }
         return .success(PlannedPages(located: located, plan: plan))
+    }
+
+    // MARK: - A page list that names no page (#197)
+
+    /// The words that mean "every page" rather than naming one, as the
+    /// contract lists them (`assist-cases.json` → `pagesNamingNoPage` →
+    /// `everyPageWords`, and a test holds the two equal). Compared trimmed
+    /// and case-folded.
+    ///
+    /// A CLOSED list on purpose. Reading "all of those" as the pages the last
+    /// listing returned, or as the whole section, is a guess this app does not
+    /// make on the direction that reaches students; the word is read as "no
+    /// page named" and the ordinary rules decide.
+    static let everyPageWords: Set<String> = [
+        "all", "everything", "all pages", "every page", "all of them", "all of those", "*",
+    ]
+
+    /// The every-page word a page list consists of, or nil when the list
+    /// names anything else — or is empty.
+    ///
+    /// Asked AFTER the graph: an entry that is a page in this section is a
+    /// page, whatever it is called, so a section with a page titled "All"
+    /// publishes that page.
+    static func everyPageWordOnly(in names: [String], graph: AssistSectionGraph) -> String? {
+        if names.isEmpty {
+            return nil
+        }
+        var first: String? = nil
+        for name in names {
+            if graph.page(titled: name) != nil {
+                return nil
+            }
+            let folded: String = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if !AssistToolRunner.everyPageWords.contains(folded) {
+                return nil
+            }
+            if first == nil {
+                first = folded
+            }
+        }
+        return first
+    }
+
+    /// Something a teacher can type next when they have been told which
+    /// pages are needed — "Publish Unit 3", "Hide Week 1" — or nil for a
+    /// section with no pages at all.
+    ///
+    /// The lowest unit that has class pages, because "Publish Unit 3" and
+    /// "Hide Unit 3" are both read in CODE (the whole-unit frames), so
+    /// following the advice never reaches the model. A numbered course has no
+    /// units, so its first class page is named instead; a section with no
+    /// class pages names its first page. Built through `ClassPageNaming`,
+    /// never typed as "Unit", so a Module course says "Module 3" (#268).
+    static func exampleOfWhichPages(
+        publishing: Bool,
+        graph: AssistSectionGraph,
+        classPages: [ClassPageSummary],
+        naming: ClassPageNaming
+    ) -> String? {
+        let verb: String = publishing ? "Publish" : "Hide"
+        var lowestUnit: Int? = nil
+        var firstNumbered: (number: Int, title: String)? = nil
+        for summary in classPages {
+            guard let numbers = summary.unitAndDay else {
+                continue
+            }
+            if naming.isNumbered {
+                if firstNumbered == nil || numbers.day < (firstNumbered?.number ?? 0) {
+                    firstNumbered = (number: numbers.day, title: summary.title)
+                }
+                continue
+            }
+            if lowestUnit == nil || numbers.unit < (lowestUnit ?? 0) {
+                lowestUnit = numbers.unit
+            }
+        }
+        if let unit = lowestUnit, let unitName = naming.unitName(unit) {
+            return "\(verb) \(unitName)"
+        }
+        if let numbered = firstNumbered {
+            return "\(verb) \(numbered.title)"
+        }
+        if let firstClass = classPages.first {
+            return "\(verb) \(firstClass.title)"
+        }
+        for page in graph.pages where !page.isFolderIndex {
+            return "\(verb) \(page.displayTitle)"
+        }
+        return nil
+    }
+
+    /// The trail line for a publish or a hide that named no page (#197):
+    /// the act, and either the every-page word (one of the contract's closed
+    /// list, so no teacher content) or HOW MANY names matched nothing —
+    /// never the names, which are page titles the model wrote.
+    static func noteNamedNoPage(publishing: Bool, everyPageWord: String?, unknownCount: Int,
+                                course: String, section: Int) {
+        ActivityTrail.note(
+            .assistantNamedNoPage,
+            ActivityTrail.namedNoPageLine(
+                act: publishing ? "publishing pages" : "hiding pages",
+                everyPageWord: everyPageWord, unknownCount: unknownCount
+            ),
+            course: course,
+            section: section
+        )
     }
 
     // MARK: - Backing up, once per conversation

@@ -1253,6 +1253,37 @@ nonisolated enum AssistWording {
              + "Check the name as the sidebar shows it and ask again."
     }
 
+    /// Two or more names, none of which is a page in the section (#197).
+    ///
+    /// `pages` is already rendered, "“a” or “b”" — see
+    /// `AssistPublishPlan.listingEither`. Said to the teacher, so it names
+    /// nothing of the machinery, the same as `noPageCalled` beside it.
+    static func noPagesCalled(pages: String, course: String, section: String) -> String {
+        return "No page in \(course) Section \(section) is called \(pages). "
+             + "Check the names as the sidebar shows them and ask again."
+    }
+
+    /// A publish whose page list was only a word meaning every page — "all",
+    /// "everything" — and no dates (#197).
+    ///
+    /// Measured on the smaller assistant: after listing a section's pages,
+    /// "Publish all of those." came back as `"pages": "all"` three times in
+    /// three on one real course, and this app used to answer that with
+    /// "Nothing needed changing." — success, about a request that did
+    /// nothing. `example` is something they can type next, built from the
+    /// section's own pages ("Publish Unit 3"), and matched in code, so
+    /// following the advice never reaches the model.
+    static func everyPageIsNotAPageToPublish(example: String) -> String {
+        return "Nothing was published, because I need to know which pages. "
+             + "Say which ones — for example “\(example)”."
+    }
+
+    /// The same, for hiding. "Hidden", the window's own word since #215.
+    static func everyPageIsNotAPageToHide(example: String) -> String {
+        return "Nothing was hidden, because I need to know which pages. "
+             + "Say which ones — for example “\(example)”."
+    }
+
     /// More than one page goes by the name the teacher asked about — two
     /// folders' landing pages called the same thing, say. The pages follow,
     /// one to a line, by where they are; the app does not choose between them.
