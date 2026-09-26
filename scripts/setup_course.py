@@ -1893,7 +1893,9 @@ def unlink_curriculum_references(text: str, page_names: set) -> str:
 
     # Name, then an optional heading, then an optional alias whose pipe may
     # be escaped. The heading stops at "[" as Quartz's own pattern does, so
-    # a stray "[[" earlier on the line cannot swallow the link after it.
+    # a stray "[[" followed by a heading cannot swallow the link after it.
+    # (The name still crosses "[", so a stray "[[" with no "#" before the
+    # next link still can; not widened here, #314's review F1.)
     link_pattern = re.compile(
         r"(!?)\[\[([^\]#|]+?)(?=\\?[\]|#])\\?(#[^\[\]|]*)?(?:\\?\|([^\]]*))?\]\]")
 

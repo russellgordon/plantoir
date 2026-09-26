@@ -544,12 +544,16 @@ undated.
   moves; teacher-written ones will. No log line's wording changes and none
   becomes untrue.
 
-  **A stray `[[` cannot swallow the link after it** (since
+  **A stray `[[` followed by a heading cannot swallow the link after it** (since
   [#314](https://github.com/russellgordon/plantoir/issues/314)): the heading
   group stops at `[`, as Quartz's own `wikilinkRegex` does. This reader strips
   inline code, but a `[[` typed in a sentence, followed later by a `#` and a
   real `[[Page|words]]`, otherwise read as one link with a garbage name and
-  the real one was lost. Measured: 0 change on all 12,490 files in `support/`.
+  the real one was lost. Only the heading group stops at `[`; the name still
+  crosses it, so a stray `[[` with no `#` before the next link still swallows
+  it — left as it is, since no shipped page has that shape and widening the
+  name is a change to `readingALink.rule` itself. Measured: 0 change on all
+  12,490 files in `support/`.
 
   **The other readers of the same shapes, since #314.** The installer's three
   (`setup_course.py`: `first_use_dates`, `WIKI_LINK_TARGET` for retargeting a
