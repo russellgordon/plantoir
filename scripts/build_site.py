@@ -21,6 +21,7 @@ _sys.path.insert(0, str(Path(__file__).resolve().parent))
 import site_health
 import contracts
 import class_pages
+import how_i_teach
 import page_visibility
 import reference_course
 import stop_preview
@@ -4685,6 +4686,10 @@ def discover_shared_items(course_dir: Path) -> tuple[list[str], list[str]]:
             elif item.is_file():
                 if name in _IGNORED_SHARED_FILES or name.startswith("hidden_explorer_components") or name.startswith("expandable_explorer_components"):
                     continue
+                # The teacher's How I Teach page is never on the website
+                # (#209, shared-rules.json -> howITeachPage): never listed.
+                if how_i_teach.is_the_how_i_teach_page(name):
+                    continue
                 found_files.append(name)
     except Exception as e:
         print(f"⚠️ Could not scan course root for discovery: {e}")
@@ -4705,6 +4710,11 @@ def discover_section_items(section_dir: Path) -> tuple[list[str], list[str]]:
                 found_folders.append(name)
             elif item.is_file():
                 if name in {".DS_Store", "Thumbs.db", "index.md"}:
+                    continue
+                # A section's top-level files land at the top of the site
+                # exactly as the course's do, so the same name is kept off
+                # here too (#209).
+                if how_i_teach.is_the_how_i_teach_page(name):
                     continue
                 found_files.append(name)
     except Exception as e:
@@ -4758,6 +4768,12 @@ def _dropping_excluded_items(cfg: dict) -> dict:
                 if str(entry).lower() not in names:
                     kept.append(entry)
             corrected[key] = kept
+    # The How I Teach page is never copied, whatever the lists say (#209) —
+    # the same reconciliation preflight makes when it writes.
+    for key in ("shared_files", "per_section_files"):
+        current = corrected.get(key)
+        if isinstance(current, list):
+            corrected[key], _ = how_i_teach.keep_off_the_site(current)
     return corrected
 
 
@@ -4837,6 +4853,18 @@ def preflight_update_course_config(course_dir: Path, section_dir: Path, config_p
                     copy_list.remove(name)
                     reconciled_changed = True
                     print(f"🚫 Dropped excluded {scope_label} {kind} from the copy list: {name} (listed in excluded_items)")
+
+    # The teacher's How I Teach page is never on the website (#209). A course
+    # whose page predates the rule has it LISTED — discovery used to add every
+    # top-level file — so it is dropped here and the configuration written
+    # back without it, the way an excluded name is dropped above.
+    for scope_label, copy_list in (("shared", shared_files), ("per-section", per_section_files)):
+        for name in list(copy_list):
+            if how_i_teach.is_the_how_i_teach_page(str(name)):
+                copy_list.remove(name)
+                reconciled_changed = True
+                print(f"🔒 Took {scope_label} file {name} off the copy list: it is your How I Teach page, "
+                      f"which is never on the website.")
 
     # Discover
     disc_shared_folders, disc_shared_files = discover_shared_items(course_dir)
@@ -5924,6 +5952,20 @@ def build_section_site(
         return
 
     # === Preflight discovery → append into course_config.json =================
+    # Which How I Teach pages the course's settings LISTED before preflight
+    # reconciles them — the ones earlier builds published, and so the ones
+    # the trail is told about when they are kept off (#209,
+    # howITeachPage.keptOffMarker).
+    _, listed_shared_pages = how_i_teach.keep_off_the_site(config.get("shared_files", []))
+    _, listed_section_pages = how_i_teach.keep_off_the_site(config.get("per_section_files", []))
+    how_i_teach_dropped_places = []
+    for name in listed_shared_pages:
+        if (course_dir / str(name)).is_file():
+            how_i_teach_dropped_places.append(how_i_teach.place_in_the_course(str(name)))
+    for name in listed_section_pages:
+        if (section_dir / str(name)).is_file():
+            how_i_teach_dropped_places.append(how_i_teach.place_in_the_course(str(name), section_name))
+
     print("\n🔎 Preflight: discovering new shared and per-section items...")
     config = preflight_update_course_config(course_dir, section_dir, config_file) or config
     # ========================================================================
@@ -5941,9 +5983,12 @@ def build_section_site(
               f"“{chosen_unit_word} 2, Day 3”.")
 
     shared_folders = config.get("shared_folders", [])
-    shared_files = config.get("shared_files", [])
     per_section_folders = config.get("per_section_folders", [])
-    per_section_files = config.get("per_section_files", [])
+    # Filtered where they are READ rather than in each loop, so a copy loop
+    # added later inherits the rule (#209): the How I Teach page is never
+    # copied, even when a hand edit or an older app lists it.
+    shared_files, _ = how_i_teach.keep_off_the_site(config.get("shared_files", []))
+    per_section_files, _ = how_i_teach.keep_off_the_site(config.get("per_section_files", []))
     hidden_list = config.get("hidden", [])
     # teacher preference for reading-time
     show_reading_time = bool(config.get("show_reading_time", False))
@@ -6167,6 +6212,21 @@ def build_section_site(
             rewrite_section_wikilinks(dest)
             print(f"  📄 Copied per-section file: {file_name}")
 
+    # === The teacher's How I Teach page never reaches the site (#209) ========
+    # The final sweep: whatever put it into the merged content, it comes out
+    # here, before any check reads the tree and before Quartz builds it. Top
+    # level only — inside a folder it is an ordinary page.
+    swept = how_i_teach.remove_from_content_root(content_root)
+    for name in swept:
+        print(f"🔒 Removed {name} from the website's pages before building.")
+    how_i_teach.announce(
+        course_code, section_number,
+        found_here=bool(how_i_teach.pages_at_the_top(course_dir)
+                        or how_i_teach.pages_at_the_top(section_dir)),
+        look_alikes=(how_i_teach.look_alikes_at_the_top(course_dir)
+                     + how_i_teach.look_alikes_at_the_top(section_dir)),
+        dropped_places=how_i_teach_dropped_places,
+    )
 
     # === Health of the folders this course depends on =========================
     # Here, and not earlier, because every check is defined over the MERGED

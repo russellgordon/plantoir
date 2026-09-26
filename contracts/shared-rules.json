@@ -500,6 +500,24 @@
         "carries": "the course and the section, and which of: told with a notification; not sent because notifications are turned off; not sent because permission was never given; could not be sent; and, when a teacher first schedules from the app, that the permission question was put and what the answer was. Since #306 (2026-09-26), also what a CLICK on the notification did: the section shown - in a window already on its working folder, in the window that was choosing a folder, or in a new window; the window brought forward and left as it was because it was in the middle of something; the working folder shown without the section because the section is no longer in it; or Plantoir only brought forward because the working folder is gone, could not be opened here (out of the builder's reach, or refused when a window choosing a folder tried it), or the notification named no section. NEVER the notification's text, and never the working folder's path.",
         "event": "scheduled publish notification",
         "why": "Added with #212. 'I never got told' is answerable only if the trail says whether the notification went out, or that notifications were off for the app — from the teacher's side a notification that was blocked and one that was never sent look identical. The question's own line is written BEFORE the answer, because a question that is ignored, or arrives under a Focus, may never be answered. See scheduledPublishStopped.notification. 'I clicked it and nothing happened' (#306) is answered by the same line: each honest reason - the folder gone, the window busy, the section gone - has its own wording, and NO line at all means the click never reached this copy of the app (the launch line's bundle path says which copy a click started). See scheduledPublishStopped.notification.onClick."
+      },
+      {
+        "carries": "the course, whether a page was there, and when it was, how many words it had and whether the answer was cut short. Never the words.",
+        "event": "How I Teach page read",
+        "why": "GitHub #209 was filed because an outside assistant, asked 'how about my teaching style?', did not know how the course is taught. After 'started Claude Code for ICS4U' the trail says nothing about what a session read, so 'the assistant ignored my How I Teach page' is answerable only by this line. It is written when the page is read THROUGH PLANTOIR (read_how_i_teach). Stated honestly: its ABSENCE does not prove the page was never read - both doors start in the working folder, where the agent's own file tools can open the page, and that leaves no line. Present = read through Plantoir, and how long it was then.",
+        "line": "an outside assistant read the How I Teach page ({words} words) / an outside assistant found no How I Teach page yet"
+      },
+      {
+        "carries": "the course, whether the page was created or replaced, its word count before and after, and the name of the backup made first. Never the words.",
+        "event": "How I Teach page written",
+        "why": "The page is the teacher's own account, in their own voice, and the one question that must be answerable later is 'did I write this, or did an assistant?'. Written when an outside assistant saves it through write_how_i_teach. An agent that edits the file with its OWN file tools leaves no line - the tool is the recorded path, and the drafting brief tells it to use it.",
+        "line": "an outside assistant wrote a new How I Teach page ({after} words) / replaced the How I Teach page ({before} → {after} words), after backing up the course as {backup}"
+      },
+      {
+        "carries": "the course and section built, and the place in the course folder of each page with the reserved name that the build dropped from a copy list the course's settings had named it in. Never anything written on it.",
+        "event": "How I Teach page kept off the website",
+        "why": "#209's build rule can take a page OFF a site that used to publish it: a teacher who already had a page called How I Teach, meant for students, finds it gone after an update, and the build's console, which said why, is gone by the time they ask. Read from the build's own PLANTOIR_KEPT_OFF: line (howITeachPage.keptOffMarker) - by the app from the console of a run it started and from a scheduled publish's own log, as PLANTOIR_DATED: is. Printed only when the build dropped a listed page, so a course whose page was never on the site leaves no line on every build.",
+        "line": "howITeachPage.keptOffTrailLine"
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty.",
@@ -11415,6 +11433,192 @@
         "instead": "Forget a remembered folder that is out of reach, so the reason is said once (#290's plan).",
         "why": "Reversed when #290 was folded into #311: one remembering rule for every reason. The teacher cannot go on without choosing, so the repetition ends at one choice."
       }
+    ]
+  }
+,
+  "howITeachPage": {
+    "note": "GitHub #209, decided by Russell 2026-09-26: each course may have ONE page, in plain Markdown in the course folder, that says how the course is taught - written by the teacher, or drafted by an outside assistant from the course's own pages and saved only once the teacher agrees. Both outside doors (Claude, Codex; outsideAgents in app-rules.json) ask the session to read it and keep to it. It is NEVER on the website. Rejected by Russell: a Course Settings field in course_config.json. The build's half of this is shared Python (scripts/how_i_teach.py), so Windows inherits it; the rest is each app's.",
+    "fileName": "How I Teach.md",
+    "where": "At the top of the course folder, beside course_config.json - which is the top of the Obsidian vault, so the teacher sees and edits it there like any other page. The doors read the course's page only. The BUILD also keeps the same name off the site at the top of a section folder (section<N>/How I Teach.md), because the build copies a section's top-level files to the same place in the site as the course's own: the guarantee is stated about the SITE, not about one source.",
+    "matching": {
+      "rule": "The whole file name, compared after Unicode NFC, with ONLY the letters A-Z folded to a-z. Nothing is trimmed, and nothing else is folded, so 'how i teach.md' and 'HOW I TEACH.MD' are the page and a name with a non-ASCII look-alike letter, a leading space, a suffix or another extension is an ordinary page.",
+      "why": "Case-insensitive because APFS and NTFS are, and a teacher typing 'How I teach' in Obsidian must get the same guarantee. ASCII-only folding rather than each language's own case folding, because Python's casefold and Swift's lowercased disagree on a handful of letters (the Kelvin sign, a dotted capital I): with only A-Z folded, the two implementations cannot disagree about any name, and the name itself is ASCII. Exact rather than 'starts with', because a rule nobody can state is one nobody can rely on; the build SAYS so when a name looks like the page and is not (lookAlikeLine)."
+    },
+    "nameCases": [
+      {
+        "path": "How I Teach.md",
+        "reserved": true,
+        "listedAsAPage": false,
+        "why": "The page."
+      },
+      {
+        "path": "how i teach.md",
+        "reserved": true,
+        "listedAsAPage": false,
+        "why": "The file system is case-insensitive, so a teacher who typed it in lower case gets the same guarantee."
+      },
+      {
+        "path": "HOW I TEACH.MD",
+        "reserved": true,
+        "listedAsAPage": false,
+        "why": "The extension is folded too."
+      },
+      {
+        "path": "section1/How I Teach.md",
+        "reserved": true,
+        "listedAsAPage": false,
+        "why": "The build puts a section's top-level files at the top of the site exactly as it does the course's, so the build keeps it off too. The doors do not read this one."
+      },
+      {
+        "path": "section1/HOW I TEACH.md",
+        "reserved": true,
+        "listedAsAPage": false,
+        "why": "The same, in capitals - the spelling whose web address is HOW-I-TEACH, which a case-sensitive check of the site would miss."
+      },
+      {
+        "path": "How I Teach 1.md",
+        "reserved": false,
+        "listedAsAPage": true,
+        "why": "Obsidian's name for a duplicate is an ordinary page, and is published like one. The build says so (lookAlikeLine)."
+      },
+      {
+        "path": "How-I-Teach.md",
+        "reserved": false,
+        "listedAsAPage": true,
+        "why": "A near-miss spelling is an ordinary page."
+      },
+      {
+        "path": "How I Teach.txt",
+        "reserved": false,
+        "listedAsAPage": false,
+        "why": "Not a page at all."
+      },
+      {
+        "path": " How I Teach.md",
+        "reserved": false,
+        "listedAsAPage": true,
+        "why": "Exact name: stated so nobody trims."
+      },
+      {
+        "path": "How İ Teach.md",
+        "reserved": false,
+        "listedAsAPage": true,
+        "why": "A non-ASCII look-alike (a dotted capital I). Pinned so both implementations are held to 'not reserved' rather than to whatever their own case folding happens to do with it."
+      },
+      {
+        "path": "Ｈow I Teach.md",
+        "reserved": false,
+        "listedAsAPage": true,
+        "why": "A full-width H. The same reason."
+      },
+      {
+        "path": "Concepts/How I Teach.md",
+        "reserved": false,
+        "listedAsAPage": true,
+        "why": "Inside a folder it is an ordinary page, published unless it says publish: false."
+      },
+      {
+        "path": "section1/All Classes/How I Teach.md",
+        "reserved": false,
+        "listedAsAPage": true,
+        "why": "The same, inside a section's folder."
+      }
+    ],
+    "nameCasesRead": "Each path is relative to the course folder. `reserved` is what the build keeps off the website; `listedAsAPage` is whether an app's own page listing for section 1 (the assistant's list_pages, the pages it can publish by title, the pages it can add curriculum expectations to) shows it. An app's page walk that link rewriting uses is NOT narrowed - see notListedAsAPage.",
+    "neverOnTheWebsite": {
+      "rule": "The build keeps the page off the site by its LOCATION, at four points, all run on every build so no course needs a full rebuild: discovery never adds it to shared_files / per_section_files; a name ALREADY listed there (a course whose page predates this) is dropped from the list on the next build, and the configuration written back without it; the lists a build copies from are filtered where they are read, so a hand-added name is ignored; and a final sweep deletes any match from the top of the merged content before the site is built, so a copy path added later that forgets the rule still cannot ship it.",
+      "measured": "Before #209 (2026-09-26, build_site.discover_shared_items / discover_section_items on a scratch course): a page named 'How I Teach.md' at the top of a course AND at the top of section1 were both discovered, both copied to the top of the site's content, and both published - a page typed in Obsidian carries no frontmatter, and patches/publish.ts publishes any page that does not say publish: false.",
+      "whyNotTheFlag": "publish: false cannot be the guarantee. file-formats.json -> pageVisibility fixes the key order as publishForSection<N>, publish, draftSection<N>, draft, so a later publishForSection2: true beats it - and that is exactly what publish_pages and a teacher's publish toggle write on a course-level page. A page the teacher types by hand has no flag at all. So the location is the guarantee and the flag is not relied on anywhere.",
+      "appliesOn": [
+        "mac",
+        "windows"
+      ],
+      "appliesOnWhy": "The same Python runs on both (build_site.py + how_i_teach.py), so Windows has this the moment it has the scripts. scripts/test_how_i_teach.py is discovered by its PythonToolchainTests."
+    },
+    "keptOffTheWebsiteLine": "🔒 Kept your How I Teach page off the website — it is for you and your assistant. If you meant students to see it, give it another name.",
+    "keptOffTheWebsiteLineWhen": "Printed once per build when a page with the reserved name is at the top of the course or of the section being built, in any spelling, so a teacher who sees it in Obsidian can see it being kept back.",
+    "lookAlikeLine": "📝 “{name}” will be on the website like any other page. Only a page named exactly “How I Teach”, at the top of the course folder, is kept off it.",
+    "lookAlikeLineWhen": "Once per page, for a .md file at the top of the course or the section whose name, folded as `matching` folds it, STARTS with 'how i teach' and is not the page. The failure it catches is SILENT PUBLICATION: 'How I Teach 1.md' or 'How I teach ICS4U.md' is published with no frontmatter, and the teacher who meant it to be private is told nothing otherwise.",
+    "keptOffMarker": {
+      "prefix": "PLANTOIR_KEPT_OFF:",
+      "rule": "One line on stdout, printed only when the build DROPPED the page from a copy list the course's settings had named it in - the course's page predates this rule, or somebody added it by hand - so a page the earlier builds published is now kept off. The prefix, then a single-line JSON object carrying course (the course folder's name), section (a number) and pages (each dropped page's place in the course folder without .md, e.g. \"How I Teach\" or \"section1/How I Teach\"). Not printed for a page that was never listed: that one was never on the site, and a line on every build would bury the one that matters. The apps keep the marker line itself out of the console a teacher reads, as they do PLANTOIR_DATED: (pagesDatedByTheBuild.marker).",
+      "examples": [
+        "PLANTOIR_KEPT_OFF: {\"course\": \"ICS4U\", \"section\": 1, \"pages\": [\"How I Teach\"]}"
+      ],
+      "why": "The report this answers is real and arrives late: a teacher who already had a page called How I Teach, meant for students, finds it gone from the site after an update, and the console that said why is long gone - the same argument pagesDatedByTheBuild makes for itself. Read by the app the way PLANTOIR_DATED: is: from the console of a run it started, and from a scheduled publish's own log."
+    },
+    "keptOffTrailLine": "the build kept {count} page(s) named How I Teach off the website that the course's settings had listed for it: {names}",
+    "notListedAsAPage": {
+      "rule": "The assistant's own page listings leave the page out wherever the assistant LISTS pages for a teacher or a model: list_pages, the pages publish_pages / unpublish_pages (and their plans) can find by title, and the pages add_curriculum_mentions can write into. Asked to publish or hide it by title, the answer is wording.howITeachIsNeverPublished rather than 'no page is called that'.",
+      "notNarrowed": "The walk link rewriting uses when classes are renamed (make room, re-date, insert) is NOT narrowed: a How I Teach page that links to [[Unit 2, Day 3]] must follow that class when it is renamed, and Obsidian only rewrites links when Obsidian does the rename. So the skip is applied at each listing, never inside the shared page walk.",
+      "appliesOn": [
+        "mac",
+        "windows"
+      ]
+    },
+    "tools": {
+      "names": [
+        "read_how_i_teach",
+        "plan_write_how_i_teach",
+        "write_how_i_teach"
+      ],
+      "surface": "MCP only. The local assistant's thirteen tools are unchanged: a prompt change would owe a routing re-measurement, and a small local model drafting a teacher's pedagogy is the wrong job for it.",
+      "arguments": "course only (the page is per course, so there is no section). write takes `text` and, only when it replaces a page, `replacing`.",
+      "mostCharacters": 8000,
+      "readCutsAt": "A page longer than mostCharacters is read up to that length and the answer names the file (wording.howITeachCutShort), so an agent can read the rest with its own tools.",
+      "readOnAReferenceCourse": "works - reading last year's page is evidence; writing one is refused by the gate every write shares (referenceCourses).",
+      "newPageFrontmatter": "publish: false",
+      "newPageBytes": "---\\npublish: false\\n---\\n\\n<text>\\n",
+      "newPageWhy": "Not the guarantee (the location is). It is there so a page later MOVED into a folder in Obsidian, where it becomes an ordinary page, arrives hidden rather than published.",
+      "replacingKeepsTheirFrontmatter": "When a page is replaced, its frontmatter block - from an opening --- line to the next --- line, CRLF or LF - is kept byte for byte and only the body after it is replaced; no key is added. A page that opens with --- and never closes it has no frontmatter to keep, and is replaced whole. A leading byte-order mark is kept with the block.",
+      "refusals": [
+        "empty or whitespace-only text: wording.howITeachNeedsWords",
+        "text longer than mostCharacters: wording.howITeachTooLong",
+        "text whose first non-blank line (after a byte-order mark and blank lines) is a --- fence: wording.howITeachCarriesNoSettings - so an agent cannot write publish: true into it",
+        "a page is already there and `replacing` is empty: wording.howITeachAlreadyWritten - a teacher's own words are never overwritten by a call they did not see planned",
+        "a page is already there and `replacing` is not its current mark: wording.howITeachChangedSincePlanned"
+      ],
+      "replacingIsAMarkNotABoolean": "`replacing` is the page's MARK as plan_write_how_i_teach reports it - the first eight lowercase hexadecimal digits of the SHA-256 of the file's bytes - rather than a true/false. The tool surface carries no boolean anywhere (assist-cases.json -> toolSchemas.departures), because a boolean is an argument the model decides under pressure; a mark it cannot invent, only copy from the plan it showed the teacher. It also refuses a replace when the teacher has edited the page since the plan, which a boolean could not.",
+      "planAndWriteAgree": "plan_write_how_i_teach refuses exactly what write_how_i_teach refuses, so a plan cannot promise what the write will refuse.",
+      "oneUndoEntry": "The write records one change (the whole file, before and after), so 'undo that' takes back THIS write rather than the previous change, and taking it back never stops or rebuilds a preview: the page is never on the site.",
+      "backedUpFirst": "Once per conversation, as every write is. The backup is named for the course's lowest section, as the assistant's backups are - cosmetic; the zip holds the whole course.",
+      "appliesOn": [
+        "mac",
+        "windows"
+      ]
+    },
+    "briefingInInstructions": {
+      "rule": "The MCP server's initialize.instructions names, for each LIVE course in the folder whose page EXISTS, that it has one and that read_how_i_teach reads it. Nothing is added for a course without one, so a folder with no page and no reference course still sends no instructions at all.",
+      "why": "Covers what the greeting cannot: the greeting names ONE course (outsideAgents.courseIsNamedInTheGreetingOnly), and a teacher who says 'now let's do MPM2D' mid-session is otherwise never told MPM2D has a page. Third channel, not first: whether clients read instructions has never been measured.",
+      "appliesOn": [
+        "mac"
+      ],
+      "appliesOnWhy": "Windows' server sends no instructions today. Adopting it is optional and would be its own issue."
+    },
+    "listCoursesLine": {
+      "rule": "list_courses, answered to an MCP client, gives each course one more line: '  How I Teach page: yes' or '  How I Teach page: not written yet'. The LOCAL window's list_courses answer (reached by a phrase matched in code, and shown to the teacher) never carries it, because the local assistant neither reads nor drafts the page.",
+      "appliesOn": [
+        "mac",
+        "windows"
+      ]
+    },
+    "rejected": [
+      "publish: false as the guarantee - see neverOnTheWebsite.whyNotTheFlag.",
+      "A hidden location (.plantoir/how-i-teach.md, courses/.internal/...) - Obsidian does not show dot-folders, so the teacher could not write or read it, which is half the decision.",
+      "An excluded_items entry in course_config.json - it can be un-excluded from Course Settings, and it depends on a config write reaching the build; the location needs no config.",
+      "A Course Settings field - rejected by Russell: not prose-shaped, and not something the teacher can edit in Obsidian.",
+      "A CLAUDE.md / AGENTS.md in the folder - agent-specific, developer-looking in the vault, read at the WORKING folder's top rather than per course, and already rejected for the doors (documentation/10).",
+      "An MCP resource instead of a tool - neither agent reads resources by itself; the tool path is the one measured to work.",
+      "Putting the page's text in the greeting - it is a shell argument, shown in the terminal as the teacher's own typing, and unbounded in length.",
+      "The whole text in MCP instructions - per folder rather than per course, and Windows sends none.",
+      "A greeting that asks for the page only when one exists - the greeting is built when the menu item is clicked, a uniform sentence is one string both platforms pin, and 'if I have written one' invites the agent to skip the call.",
+      "Letting the agent write the file with its own tools only - no plan, no refusal to overwrite, no publish: false, no backup, no undo entry and no trail line, and 'undo that' would then take back the PREVIOUS change.",
+      "A boolean `replacing` - the plan's first form. The tool surface carries none (replacingIsAMarkNotABoolean).",
+      "The local assistant reading or drafting it - a routing and prompt change owing re-measurement, and the wrong job for a small model.",
+      "A starter page from the wizard or setup_course.py, or payloads shipping one - a template is text an agent would read as the teacher's own approach, and it would put words in the teacher's mouth.",
+      "Leaving the page out of the section's '- Edited' fingerprint - a wire format held byte for byte in three implementations; follow-up #330.",
+      "A button to open or create the page - a GUI surface on both platforms; follow-up #329.",
+      "read_page redirecting to read_how_i_teach - read_page answers as it does for any page not in the section, and the tool's own description is what an agent finds."
     ]
   }
 }
