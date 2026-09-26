@@ -140,8 +140,8 @@
           }
         }
       ],
-      "notShared" : "Three things are deliberately NOT cases. (1) A front page that is MISSING or cannot be READ: the apps rebuild (`rules` → 'the built index cannot be read'), while the launchers stop at the copy instead — a different rule, pinned where it lives. (2) Upper-case .HTML, and a public/ that is ITSELF a symbolic link (neither FileManager's enumerator nor grep -r descends into one; a link further up, such as the mac's .merged_output, is followed by both — measured): Quartz produces neither. deploy.ps1 still matches its old signature without regard to case (Select-String's default); once it adopts this rule it must match case-SENSITIVELY, which is owed on #272. (3) A page whose teacher typed the client verbatim as raw HTML (the tag and the client, unescaped): that page really does open a socket to the reader's machine, so calling it a preview's is not wrong, and no fixture would say anything cases 13 and 14 do not. (A page that is not valid UTF-8 used to be listed here, erring safe; with a whole-page read the miss erred UNSAFE, so it is case 15 since #291.)",
       "note" : "One rule for 'this built site is a preview's', read by every checker: BuildFreshness in each app, the mac's scheduled publish (its own shell check, because the app is closed when it runs), deploy.sh (three times), deploy.py and deploy.ps1. Serve mode bakes the live-reload client into EVERY page and the built tree is replaced file by file, so a clean front page in front of a preview's pages is a real state — deploy.sh found it on 2026-09-05 and has read the whole tree since, as has deploy.py. The apps read the front page alone until issue #136: they called that state deploy-fresh, skipped their build, and the LAUNCHER then rebuilt under the destination's leg — the build's milestones missing from the panel, and on the mac a question the build asked overnight reported as the destination's. A reader narrower than the launchers is the fault, whichever side it is on. Issue #291 then narrowed WHAT is looked for: the bare address matched any page that mentions it, and the rule is now the client's tag and first statement (`signature`). Each case is a tree under the section's public/ folder; `unreadable` names pages that exist but cannot be opened; `invalidUTF8Before` names pages that begin with the bytes FF 0A, which are not UTF-8.",
+      "notShared" : "Three things are deliberately NOT cases. (1) A front page that is MISSING or cannot be READ: the apps rebuild (`rules` → 'the built index cannot be read'), while the launchers stop at the copy instead — a different rule, pinned where it lives. (2) Upper-case .HTML, and a public/ that is ITSELF a symbolic link (neither FileManager's enumerator nor grep -r descends into one; a link further up, such as the mac's .merged_output, is followed by both — measured): Quartz produces neither. deploy.ps1 still matches its old signature without regard to case (Select-String's default); once it adopts this rule it must match case-SENSITIVELY, which is owed on #272. (3) A page whose teacher typed the client verbatim as raw HTML (the tag and the client, unescaped): that page really does open a socket to the reader's machine, so calling it a preview's is not wrong, and no fixture would say anything cases 13 and 14 do not. (A page that is not valid UTF-8 used to be listed here, erring safe; with a whole-page read the miss erred UNSAFE, so it is case 15 since #291.)",
       "signature" : {
         "asABasicRegex" : "<script type=\"application/javascript\">[[:space:]]*const socket = new WebSocket('ws://localhost:",
         "asQuartzWritesIt" : "<script type=\"application/javascript\">\n        const socket = new WebSocket('ws://localhost:9081')\n        // reload(true) ensures resources like images and scripts are fetched again in firefox\n        socket.addEventListener('message', () => document.location.reload(true))\n      </script>",
@@ -757,7 +757,9 @@
       {
         "flag" : "--diagnose",
         "meaning" : "Print what the deploy would do and why it thinks so.",
-        "usedFor" : [],
+        "usedFor" : [
+
+        ],
         "why" : "A support tool, run by hand when a teacher's deploy misbehaves."
       },
       {
@@ -885,13 +887,17 @@
       {
         "flag" : "--image <tag>",
         "meaning" : "Use this image instead of the one the recipe hash names.",
-        "usedFor" : [],
+        "usedFor" : [
+
+        ],
         "why" : "Testing a locally built image. `verify.sh` uses it; the apps never do."
       },
       {
         "flag" : "--context <name>",
         "meaning" : "Use this Docker context.",
-        "usedFor" : [],
+        "usedFor" : [
+
+        ],
         "why" : "For a machine with several (desktop-linux, colima, default)."
       },
       {
@@ -944,12 +950,13 @@
       "Cloudflare project" : "shared-python",
       "Copying shared folders" : "shared-python",
       "Delta deploy created" : "shared-python",
+      "delta deploy manifest" : "shared-python",
       "Deploy complete" : "shared-python",
       "Deploying from local build" : "shared-python",
       "Done processing" : "elsewhere",
-      "EXAMPLE_COURSE_CODE=" : "shared-python",
       "Ensuring container is running" : "launcher",
       "Example Course installed to" : "shared-python",
+      "EXAMPLE_COURSE_CODE=" : "shared-python",
       "Host timezone offset" : "launcher",
       "Installing dependencies" : "shared-python",
       "Launching Quartz preview" : "shared-python",
@@ -958,15 +965,14 @@
       "Quartz Locale" : "shared-python",
       "Quartz v4" : "elsewhere",
       "Select folders/files to HIDE" : "shared-python",
+      "set up successfully" : "shared-python",
       "Setting up this Mac" : "launcher",
       "Starting container if needed" : "launcher",
+      "timetable section numbers" : "shared-python",
+      "to a folder" : "launcher",
       "Updated pageTitle" : "shared-python",
       "Uploading the built site" : "shared-python",
-      "Welcome to the Course Setup Script" : "shared-python",
-      "delta deploy manifest" : "shared-python",
-      "set up successfully" : "shared-python",
-      "timetable section numbers" : "shared-python",
-      "to a folder" : "launcher"
+      "Welcome to the Course Setup Script" : "shared-python"
     }
   },
   "milestones" : {
@@ -1313,8 +1319,8 @@
               "pages",
               "section"
             ],
-            "readOnly" : false,
             "readable" : false,
+            "readOnly" : false,
             "required" : [
               "course",
               "section"
@@ -1331,8 +1337,8 @@
               "pages",
               "section"
             ],
-            "readOnly" : false,
             "readable" : false,
+            "readOnly" : false,
             "required" : [
               "course",
               "section"
@@ -1349,8 +1355,8 @@
               "pages",
               "section"
             ],
-            "readOnly" : false,
             "readable" : false,
+            "readOnly" : false,
             "required" : [
               "course",
               "section"
@@ -1365,8 +1371,8 @@
               "date",
               "section"
             ],
-            "readOnly" : false,
             "readable" : false,
+            "readOnly" : false,
             "required" : [
               "course",
               "section",
@@ -1382,8 +1388,8 @@
               "section",
               "when"
             ],
-            "readOnly" : false,
             "readable" : false,
+            "readOnly" : false,
             "required" : [
               "course",
               "section",
@@ -1399,8 +1405,8 @@
               "page",
               "section"
             ],
-            "readOnly" : true,
             "readable" : false,
+            "readOnly" : true,
             "required" : [
               "course",
               "section",
@@ -1415,8 +1421,8 @@
               "course",
               "section"
             ],
-            "readOnly" : false,
             "readable" : true,
+            "readOnly" : false,
             "required" : [
               "course",
               "section"
@@ -1430,8 +1436,8 @@
               "course",
               "section"
             ],
-            "readOnly" : false,
             "readable" : true,
+            "readOnly" : false,
             "required" : [
               "course",
               "section"
@@ -1446,8 +1452,8 @@
               "matching",
               "section"
             ],
-            "readOnly" : true,
             "readable" : true,
+            "readOnly" : true,
             "required" : [
               "course",
               "section"
@@ -1457,19 +1463,27 @@
           {
             "arguments" : "",
             "name" : "an empty string, for a tool whose schema declares nothing and requires nothing",
-            "properties" : [],
-            "readOnly" : false,
+            "properties" : [
+
+            ],
             "readable" : true,
-            "required" : [],
+            "readOnly" : false,
+            "required" : [
+
+            ],
             "tool" : "undo_last_change"
           },
           {
             "arguments" : "{}",
             "name" : "an object with nothing in it, for a tool whose schema declares nothing",
-            "properties" : [],
-            "readOnly" : false,
+            "properties" : [
+
+            ],
             "readable" : true,
-            "required" : [],
+            "readOnly" : false,
+            "required" : [
+
+            ],
             "tool" : "undo_last_change"
           },
           {
@@ -1482,8 +1496,8 @@
               "pages",
               "section"
             ],
-            "readOnly" : false,
             "readable" : true,
+            "readOnly" : false,
             "required" : [
               "course",
               "section"
@@ -1500,8 +1514,8 @@
               "pages",
               "section"
             ],
-            "readOnly" : false,
             "readable" : false,
+            "readOnly" : false,
             "required" : [
               "course",
               "section"
@@ -1511,10 +1525,14 @@
           {
             "arguments" : "{\"course\": \"ICS3U\", \"pages\": \"Unit 1, Day",
             "name" : "half-written, even for a tool that needs nothing",
-            "properties" : [],
-            "readOnly" : false,
+            "properties" : [
+
+            ],
             "readable" : false,
-            "required" : [],
+            "readOnly" : false,
+            "required" : [
+
+            ],
             "tool" : "undo_last_change"
           }
         ],
@@ -1575,7 +1593,9 @@
         "timeoutsAreOverriddenWhy" : "Codex's own defaults are version-dependent - 30s startup and 300s per tool in its current source, 10s and 60s in its published reference - and both tool figures are too short, because a publish is awaited and a first one builds the image and uploads, which takes minutes. 60s and 1800s are passed rather than trusted.",
         "trailLine" : "started Codex for {course}",
         "valuesAreEscapedTwice" : "Each value sits inside a TOML basic string inside a shell-single-quoted argument, so it is escaped for TOML first (backslash, double quote and control characters) and for the shell second. Getting the inner layer wrong fails QUIETLY: an unparseable value is not rejected, it is treated as a raw string, so args stops being a list and the door greets the teacher and then cannot start its server.",
-        "writesForTheConnection" : [],
+        "writesForTheConnection" : [
+
+        ],
         "writesNothingElse" : "No configuration file exists for this door: the server is described in the arguments. Nothing is written into the teacher's working folder, and nothing is added to or read from their own Codex configuration."
       }
     ],
@@ -2052,7 +2072,9 @@
               "own" : 1
             }
           ],
-          "markers" : [],
+          "markers" : [
+
+          ],
           "netstatAsked" : true,
           "outcome" : "announces",
           "reach" : 52,
@@ -2130,8 +2152,12 @@
         },
         {
           "context" : "colima",
-          "looks" : [],
-          "markers" : [],
+          "looks" : [
+
+          ],
+          "markers" : [
+
+          ],
           "netstatAsked" : false,
           "outcome" : "reachRefuses",
           "reach" : 7,
@@ -2147,7 +2173,9 @@
               "own" : "empty"
             }
           ],
-          "markers" : [],
+          "markers" : [
+
+          ],
           "netstatAsked" : true,
           "outcome" : "announces",
           "reach" : 52,
@@ -2163,7 +2191,9 @@
               "own" : "missing"
             }
           ],
-          "markers" : [],
+          "markers" : [
+
+          ],
           "netstatAsked" : true,
           "outcome" : "announces",
           "reach" : 52,
@@ -2179,7 +2209,9 @@
               "own" : 0
             }
           ],
-          "markers" : [],
+          "markers" : [
+
+          ],
           "netstatAsked" : true,
           "outcome" : "announces",
           "reach" : 52,
@@ -2195,7 +2227,9 @@
               "own" : 0
             }
           ],
-          "markers" : [],
+          "markers" : [
+
+          ],
           "netstatAsked" : false,
           "outcome" : "announces",
           "reach" : 52,
@@ -2248,8 +2282,12 @@
         {
           "buildOnly" : true,
           "context" : "colima",
-          "looks" : [],
-          "markers" : [],
+          "looks" : [
+
+          ],
+          "markers" : [
+
+          ],
           "netstatAsked" : false,
           "outcome" : "asksNothing",
           "reach" : 52,
@@ -2430,7 +2468,9 @@
         "cases" : [
           {
             "expect" : "nothing",
-            "launchers" : [],
+            "launchers" : [
+
+            ],
             "name" : "idle: only its own first process",
             "running" : true,
             "top" : [
@@ -2443,14 +2483,18 @@
           },
           {
             "expect" : "nothing",
-            "launchers" : [],
+            "launchers" : [
+
+            ],
             "name" : "stopped: not asked what runs in it",
             "running" : false,
             "top" : "not asked"
           },
           {
             "expect" : "nothing",
-            "launchers" : [],
+            "launchers" : [
+
+            ],
             "name" : "gone",
             "running" : "gone",
             "top" : "not asked"
@@ -2509,7 +2553,9 @@
           },
           {
             "expect" : "nothing",
-            "launchers" : [],
+            "launchers" : [
+
+            ],
             "name" : "a preview whose launcher has gone",
             "running" : true,
             "top" : [
@@ -2632,7 +2678,9 @@
           },
           {
             "expect" : "other work",
-            "launchers" : [],
+            "launchers" : [
+
+            ],
             "name" : "a publish",
             "running" : true,
             "top" : [
@@ -2655,7 +2703,9 @@
           },
           {
             "expect" : "other work",
-            "launchers" : [],
+            "launchers" : [
+
+            ],
             "name" : "another launcher checking the courses folder",
             "running" : true,
             "top" : [
@@ -2673,7 +2723,9 @@
           },
           {
             "expect" : "other work",
-            "launchers" : [],
+            "launchers" : [
+
+            ],
             "name" : "running, but could not be asked",
             "running" : true,
             "top" : "fails"

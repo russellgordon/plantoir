@@ -148,8 +148,9 @@ Deploys always go to **production** (no draft deploys), matching the
 
 A preview build embeds a live-reload WebSocket client (`ws://localhost:<port>`)
 into generated HTML pages. Deploying those directly would cause students'
-browsers to prompt for local network permissions. `deploy.py` detects this
-signature in any page under `public/` (every `*.html`, since 2026-09-05 — see
+browsers to prompt for local network permissions. `deploy.py` detects the
+client — its script TAG followed by its first statement, not the bare address,
+since #291 — in any page under `public/` (every `*.html`, since 2026-09-05 — see
 "One rule, six readers" below) and automatically re-executes a clean static
 build inside the container-internal workspace (`/tmp/quartz-builds/...`),
 mirroring the production assets back to `public/` before uploading.
@@ -198,14 +199,14 @@ the input is a pipeline.
 Whether a built site is a preview's is asked in six places, and until #136
 they did not agree:
 
-| Reader | Where | What it reads |
-|---|---|---|
-| `BuildFreshness.builtForPreview` (mac) | `mac-app/QuartzTeachers/Models/BuildFreshness.swift` | every `*.html` under `public/`, as bytes — the front page ALONE until #136 |
-| The scheduled publish's own check (mac) | `ScheduledDeploy.oneShotCommand` | `LC_ALL=C grep -rqs --include='*.html'` over `public/` — `index.html` alone until #136 |
-| `deploy.sh`, folder leg | three identical `grep -rq --include='*.html'` lines | the whole tree, since 2026-09-05 |
-| `deploy.py`, Netlify and Cloudflare | `public_dir.rglob("*.html")` | the whole tree, since 2026-09-05 |
-| `deploy.ps1`, folder leg | `Test-CarriesLiveReload` | the whole tree |
-| `BuildFreshness.BuiltForPreview` (Windows) | `Plantoir.Core/Models/BuildFreshness.cs` | the front page alone — owed, see the `windows` issue |
+| Reader | Where | What it reads | What it looks for (#291) |
+|---|---|---|---|
+| `BuildFreshness.builtForPreview` (mac) | `mac-app/QuartzTeachers/Models/BuildFreshness.swift` | every `*.html` under `public/`, as bytes — the front page ALONE until #136 | `carriesLiveReloadClient`: every occurrence of the client, whitespace stepped back over, then the tag |
+| The scheduled publish's own check (mac) | `ScheduledDeploy.oneShotCommand` | `LC_ALL=C grep -rzqs --include='*.html'` over `public/` — `index.html` alone until #136 | `BuildFreshness.liveReloadPattern`, the contract's `asABasicRegex` |
+| `deploy.sh`, folder leg | one `site_carries_preview_client`, called three times | the whole tree, since 2026-09-05 | `LIVE_RELOAD_CLIENT_PATTERN`, under `LC_ALL=C grep -rzqs` |
+| `deploy.py`, Netlify and Cloudflare | `public_dir.rglob("*.html")` | the whole tree, since 2026-09-05, as bytes | the contract's `scriptTag` and `client`, read from the contract |
+| `deploy.ps1`, folder leg | `Test-CarriesLiveReload` | the whole tree, line by line | still the bare address — **owed on [#272](https://github.com/russellgordon/plantoir/issues/272)** |
+| `BuildFreshness.BuiltForPreview` (Windows) | `Plantoir.Core/Models/BuildFreshness.cs` | the front page alone — owed on #272 | still the bare address — owed on #272 |
 
 (Windows' scheduled task builds unconditionally, so it has no check to get
 wrong.)
@@ -224,25 +225,43 @@ already has. `deploy.sh`'s own rerun is kept: it is what protects
 `./preview.sh` followed by `./deploy.sh --to-folder` typed at a command line.
 
 **The rule is data**: `contracts/app-rules.json` → `buildFreshness.previewBuild`
-— the `signature`, `where` it is looked for, and nine `cases`, each a tree of
-pages. The mac suite runs the app's check (`BuildFreshnessTests`) and the
+— the `signature`, `where` it is looked for, and fifteen `cases` (nine until
+#291), each a tree of pages. The mac suite runs the app's check (`BuildFreshnessTests`) and the
 overnight shell (`ScheduledPublishOutcomeTests`) against it;
-`scripts/test_preview_build_detection.py` cuts `deploy.sh`'s check out of the
-launcher and runs it, and runs the real `deploy.py`, against the same list —
+`scripts/test_preview_build_detection.py` cuts `deploy.sh`'s pattern and
+function out of the launcher and runs them under a UTF-8 locale, and runs the real `deploy.py`, against the same list —
 in `verify.sh` and in Windows' `PythonToolchainTests`. `deploy.ps1` is Windows'
 to run against it. Its `notShared` says what the cases deliberately leave out.
 
 **The details each reader has to get right, and why:**
 
-- **Bytes, not text.** A page that is not valid UTF-8 must not change the
+- **Bytes, not text — and so `LC_ALL=C` in every grep, `deploy.sh`'s
+  included (since #291).** A page that is not valid UTF-8 must not change the
   answer. Reading as a Swift `String` would make one such page force a rebuild
-  on every publish forever. **Measured** (macOS 26.6, `/usr/bin/grep`
-  2.6.0-FreeBSD): under a UTF-8 locale `grep` does NOT find the signature on a
-  line that also holds an invalid byte (exit 1); under `LC_ALL=C` it does
-  (exit 0). So the overnight check runs under `LC_ALL=C`; `deploy.sh` run from
-  a Terminal can call such a page clean while every other reader calls it a
-  preview's — the SAFE direction, since the app then rebuilds first, and Quartz
-  only writes UTF-8. `deploy.py` reads with `errors="ignore"` and matches.
+  on every publish forever; `deploy.py` reads `read_bytes()`. **Measured**
+  (macOS 26.6, `/usr/bin/grep` 2.6.0-FreeBSD): under a UTF-8 locale `grep`
+  does NOT find the signature on a line that also holds an invalid byte
+  (exit 1); under `LC_ALL=C` it does (exit 0). Until #291 that miss needed the
+  byte on the SAME line, and it erred safe (a Terminal's `deploy.sh` called
+  such a page clean while the app, reading bytes, rebuilt first), so #136 wrote
+  it down rather than touch the launcher. With `-z` (next bullet) a record is
+  the whole FILE: `LC_ALL=en_US.UTF-8 grep -zq` on a real preview page with
+  `\xff\n` prepended exits **1**, `LC_ALL=C` exits **0** — any invalid byte
+  anywhere in a preview's page would read it as clean, and a preview's page
+  read as clean is a preview PUBLISHED. So `deploy.sh` now carries `LC_ALL=C`
+  (`site_carries_preview_client`), and the case is pinned (case 15,
+  `invalidUTF8Before`). The Python test and the overnight test both run their
+  shell under `en_US.UTF-8`, so neither passes by borrowing a C locale from
+  launchd or CI.
+- **One record, not lines (#291).** Quartz writes the client's tag at the end
+  of one line and its first statement, after eight spaces, at the start of the
+  next (measured: lines 131 and 132 of a real preview's `index.html`). A
+  line-by-line reader cannot see the pair at all, so every reader reads a page
+  whole: `grep -z` in the shells, bytes in Swift and Python, and — owed on
+  #272 — `Get-Content -Raw` or `ReadAllBytes` in PowerShell, whose
+  `Select-String` is line-based and case-insensitive. The pattern is a BASIC
+  regex: under `-E` BSD grep refuses it (`parentheses not balanced`, exit 2),
+  because the client holds a literal `(`.
 - **Hidden folders included** — `grep -r` and `rglob` both look inside them, so
   the Swift enumerates without `.skipsHiddenFiles`.
 - **A page that cannot be opened is passed over; a front page that cannot be
@@ -257,7 +276,15 @@ to run against it. Its `notShared` says what the cases deliberately leave out.
 Swift scan run 20 times against real sections (read-only): a clean 244-file /
 230-page section 6.5–7.8 ms warm, 54 ms on the first run in a fresh process; an
 864-file / 353-page section about 12 ms warm, 72–82 ms first. A real preview's
-build answers in 0.1 ms. The front-page-only read it replaced took 0.02 ms. It
+build answers in 0.1 ms. The front-page-only read it replaced took 0.02 ms.
+**Re-measured for #291** (2026-09-26, same machine, `swiftc -O`, 20 runs each,
+old byte search against the new tag-and-client search on the same copy): the
+244-file / 230-page ADA1O section 8.0–9.3 ms median warm for the new rule
+against 9.4–12.7 ms for the old, 10–15 ms first; a 976-file / 920-page tree
+(that section four times over — every file a page, so heavier than the
+353-page section above) 29–36 ms median warm for both, 34–114 ms first. The
+new rule costs nothing measurable: the client is rare, so each page is still
+one `range(of:)` pass. It
 runs once per Publish press, on a path that then builds or uploads for seconds
 to minutes, so it stays synchronous on the main actor.
 
@@ -267,20 +294,104 @@ to minutes, so it stays synchronous on the main actor.
   build question from a destination's: a launcher contract change Windows
   shares, for a fault that was the app's check being narrower.
 - *Removing `deploy.sh`'s rerun*: it is the only guard on the command line.
-- *Adding `LC_ALL=C` and `-s` to `deploy.sh`*: correct, but a publishing-path
-  launcher change for a state Quartz cannot produce; written down instead.
+- ~~*Adding `LC_ALL=C` and `-s` to `deploy.sh`*: correct, but a publishing-path
+  launcher change for a state Quartz cannot produce; written down instead.~~
+  **Reversed by #291**: `-z` made the invalid-byte miss whole-file and in the
+  UNSAFE direction, so `deploy.sh` now carries both (see "Bytes, not text").
 - *Reading pages as `String`*, for the reason above.
 - *Sampling the front page and a few others*: cannot promise the answer, and
   the whole walk costs about 12 ms.
 - *Moving the scan off the main actor*: unnecessary at these numbers.
 - *A home in `shared-rules.json`*: `buildFreshness` already lives in
   `app-rules.json`, and one rule gets one home.
-- *A narrower signature* (`new WebSocket('ws://localhost:`), so a page that
-  merely MENTIONS the address — a networking lesson — is not read as a
-  preview's: it would change all six readers, two of them launchers. That limit
-  is older than #136 and is [issue #291](https://github.com/russellgordon/plantoir/issues/291);
-  what #136 adds to it is only that the app now rebuilds such a course on every
-  publish too, as the launchers already did.
+- *A narrower signature*, left for later at #136 — and taken up by
+  [issue #291](https://github.com/russellgordon/plantoir/issues/291); see
+  "What is looked for" below for what was chosen and which narrower strings
+  were measured and rejected.
+
+#### What is looked for: the client's tag and first statement (GitHub #291, 2026-09-26)
+
+**The fault.** Every reader looked for the bare `ws://localhost:`, and any page
+whose note MENTIONS the address carries that. Measured in a production build of
+stock Quartz v4.5.0: one networking lesson carried it **8 times** (title, four
+meta tags, breadcrumb, prose, code). So a folder publish of that course waited
+30 s for a clean tree it could never get and refused, every time; on Netlify
+and Cloudflare, and in the app and the overnight check, it rebuilt on every
+publish.
+
+**The rule** (`signature` in the contract): the client's script TAG,
+`<script type="application/javascript">`, then any run of `between` bytes
+(space, tab, LF, VT, FF, CR — POSIX `[[:space:]]` in the C locale, not a
+Unicode `\s`), then the client's first statement,
+`const socket = new WebSocket('ws://localhost:`. Source: Quartz v4.5.0
+`quartz/plugins/index.ts:26-38` (an inline `afterDOMReady` script, a template
+literal with a leading newline and eight spaces) rendered by
+`quartz/util/resources.tsx:26` (`type={moduleType ?? "application/javascript"}`,
+no other attribute). Plantoir passes no `--remoteDevHost`, so the `wss://`
+branch is never taken. `asQuartzWritesIt` holds the bytes verbatim, and every
+test fixture that needs a preview's page READS it rather than retyping one — a
+retyped fixture could pass against a wrong constant.
+
+**Why a page's words cannot produce it.** Quartz writes `<` as `&lt;` in text
+AND in attribute values (measured:
+`content="&lt;script type=&quot;application/javascript&quot;> const socket = …"`
+in a meta description), Shiki splits a `js` or `html` fence into spans, and
+smartypants turns `'` into `‘` in prose. A raw `<script` can only come from raw
+HTML the teacher typed — and a page that holds the client verbatim as raw HTML
+really does open a socket to the reader's machine (`notShared` (3)).
+
+**Narrower strings, measured and rejected** (production pages of the same
+build; "match" is a false positive):
+
+| Looked for | The networking lesson | A page with no description |
+|---|---|---|
+| `ws://localhost:` (until #291) | match | match |
+| `new WebSocket('ws://localhost:` | match — the meta description (`'` is not escaped in attributes), inline `<code>`, an un-languaged fence | match |
+| `const socket = new WebSocket('ws://localhost:` | match — inline `<code>`, the un-languaged fence | match |
+| the tag, whitespace, the client, read as one record | no match | no match |
+
+And *"the tag is present and the client is present"* is wrong too: a
+production page already holds `<script type="application/javascript">` once,
+for Quartz's own inline script, so the networking lesson has both (case 10).
+The Swift therefore tries EVERY occurrence of the client, not the first — a
+preview's networking lesson mentions the statement in its words before Quartz
+writes the real client at the end of the body (case 12).
+
+**Also rejected:**
+
+- *The tag alone at the end of a line*, which a line-based grep could keep:
+  Quartz's own inline script has the same tag, and any future inline resource
+  with a leading newline would match. It marks "an inline script", not the
+  client.
+- *A marker we add* (a Quartz patch writing `data-plantoir-preview`, or a file
+  beside `public/`): every preview build already on a teacher's disk predates
+  it, so the old text rule would have to stay as a fallback — the fault again —
+  and a marker file cannot see the file-by-file mixture #136 exists for.
+- *Detecting by `--serve` in a build record*: the same transition hole, and the
+  launchers keep no such record.
+- *A tag that allows other attributes* (`<script[^>]*>`): Quartz v4.5.0 writes
+  exactly one, and a looser tag only widens what raw teacher HTML can match.
+- *Editing `deploy.ps1` from the mac*: its last mac-written port was true for
+  every site of two or more pages ("A third detail", above), and there is no
+  `pwsh` on this Mac, so it would ship unrun PowerShell on the publishing path.
+  Windows owes it on #272 and keeps the old (safe-direction) fault until then.
+- *A new activity-trail event* ("rebuilt because the site was a preview's"):
+  the piece narrows WHEN an existing behaviour fires, and what a teacher sees
+  change — the folder publish succeeds, Publish skips a needless build — is
+  already recorded by the publish and build events. If it is wanted, it is its
+  own issue on both platforms.
+
+**Jobs already scheduled keep the old line.** The overnight check is written
+into each job's script when it is scheduled, so a job set before #291 still
+greps the bare address, line by line, until it is rescheduled. That errs SAFE —
+a page that mentions the address is rebuilt every morning, as it always was —
+so nothing migrates it.
+
+**Raising Quartz means re-measuring the client's bytes.** If they move, the
+rule matches nothing, every preview reads as production, and a preview is
+PUBLISHED. Two canaries fail on that day: `verify.sh` asks the image's Quartz
+for the three source lines that write the client (seconds, no serve cycle),
+and `verify-deploy.sh` reads a real serve-mode page against `asABasicRegex`.
 
 **Cancelling a publish ends it quietly (GitHub #259, 2026-09-25).** The
 progress view's Cancel types a `^C` (`ScriptRunner.cancelByUser`), which reaches
@@ -1629,7 +1740,7 @@ the shape a parser bug would hide.
 by [issue #136](https://github.com/russellgordon/plantoir/issues/136) on
 2026-09-25. **Publishing to a FOLDER, and only to a folder**, reruns the build
 itself: `deploy.sh` greps the section's whole `public/` tree for
-`ws://localhost:` and, finding it, runs `preview.sh --build-only` and passes its
+the live-reload client (`site_carries_preview_client`, #291) and, finding it, runs `preview.sh --build-only` and passes its
 exit 3 straight through (`deploy.sh:472` opens the `TO_FOLDER` branch the rerun
 sits in). The wrapper could only see that as the folder's own question, because
 the exit code is the only thing it gets. Netlify and Cloudflare do not reach it
