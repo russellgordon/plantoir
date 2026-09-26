@@ -36,6 +36,23 @@ nonisolated enum ActivityTrail {
         case machine = "machine described"
         case helpers = "helpers described"
         case workingFolderOpened = "working folder opened"
+        /// Plantoir reopened a working folder by itself at launch — the last
+        /// working folder, or a window's own (#311). Carries the redacted
+        /// path, which of the two it was, and the old path when the folder
+        /// was found where it had been moved. Distinct from "opened" so the
+        /// trail can tell the teacher's choice from the app's.
+        case workingFolderReopened = "working folder reopened"
+        /// A remembered working folder could not be reopened (#311): carries
+        /// the reason (gone, inTrash, driveNotConnected, unreadable,
+        /// privacyDenied, outsideHome, coursesOutsideHome) and the redacted path — the two
+        /// facts that cannot be looked for afterwards, once the drive is
+        /// plugged back in or the Trash emptied.
+        case workingFolderNotReopened = "working folder not reopened"
+        /// A folder chosen in the picker was refused because the website
+        /// builder cannot reach it (#290): carries the redacted path and
+        /// whether it was the folder or its courses that lead outside the
+        /// home folder. A refused folder leaves nothing else behind.
+        case workingFolderRefused = "working folder refused"
         case settingsSaved = "settings saved"
         case settingsCouldNotBeSaved = "settings could not be saved"
         /// A preview started while Course Settings held changes nobody had

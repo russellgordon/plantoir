@@ -1647,6 +1647,11 @@ final class AssistToolRunner {
             // model is whichever one appears in `windowModels` that was not
             // here before, not (yet) one we can find by folder path.
             let alreadyOpen: [ObjectIdentifier] = WorkspaceModel.windowModels.map { ObjectIdentifier($0) }
+            // Tell the new window which folder it is for BEFORE it decides:
+            // with no other window open it would otherwise reopen the last
+            // working folder, write a reopen the teacher never saw, and be
+            // moved a moment later (#311 review M1).
+            WorkspaceModel.folderForNextNewWindow = folder.path
             openMainWindow()
             var freshModel: WorkspaceModel?
             for _ in 0..<maxAttempts {
@@ -1676,6 +1681,9 @@ final class AssistToolRunner {
                 freshModel.adoptRestoredPath(folder.path)
                 target = freshModel
             }
+            // Served or not, the request is over: a window that never came
+            // must not hand this folder to the next one the teacher opens.
+            WorkspaceModel.folderForNextNewWindow = nil
         }
 
         guard let target else {

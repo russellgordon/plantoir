@@ -40,46 +40,85 @@ class WorkspaceModel {
     /// can open where the teacher just was.
     static var mostRecentKeyFolderPath: String?
 
-    /// Takes the folder a brand-new window should open in, right now — the
-    /// key window's. Only for MID-SESSION windows: the restoration claims
-    /// have closed, so there is nothing to wait for, and deciding before
-    /// the first frame renders is what keeps the picker from flashing. At
-    /// launch this does nothing; the folder waits for the window claims,
-    /// which need the window's settled frame.
-    func adoptFolderForNewWindow() {
-        guard workspaceURL == nil else {
+    /// A folder the NEXT new window must open on, set just before something
+    /// opens one for a reason of its own — the assistant revealing a
+    /// section. Taken by exactly one window; without it, a window opened
+    /// with none other on screen would reopen the last working folder, write
+    /// a reopen the teacher never saw, and then be moved (#311 review M1).
+    static var folderForNextNewWindow: String?
+
+    /// Decides the folder a window starts on, once, before its first frame
+    /// renders — see `WindowStartRule` for the rule and why. A window that
+    /// may yet claim a remembered window waits quietly instead, and settles
+    /// when its claim resolves (`WindowRootView.attemptClaim`).
+    ///
+    /// `models` is the open windows' models — a parameter only so a test can
+    /// play a lone window, since the hosted suite's own window is always open.
+    func adoptFolderForNewWindow(among models: [WorkspaceModel] = WorkspaceModel.windowModels) {
+        guard workspaceURL == nil, !hasSettledItsFolder else {
             return
         }
-        guard Date() > WindowFolderMemory.claimsOpenUntil else {
-            return
-        }
+        var otherWindowCount: Int = 0
         var otherOpenFolderPaths: [String] = []
-        for existing in WorkspaceModel.windowModels {
-            if existing !== self, let path = existing.workspaceURL?.path {
-                otherOpenFolderPaths.append(path)
+        for existing in models {
+            if existing !== self {
+                otherWindowCount += 1
+                if let path = existing.workspaceURL?.path {
+                    otherOpenFolderPaths.append(path)
+                }
             }
         }
-        if let path = WorkspaceModel.folderForNewWindow(
+        let requested: String? = WorkspaceModel.folderForNextNewWindow
+        WorkspaceModel.folderForNextNewWindow = nil
+        let lastFolder: RememberedFolder? = lastWorkingFolder()
+        let start: WindowStartRule.Start = WindowStartRule.start(
+            requestedFolder: requested,
+            aClaimMayStillArrive: WindowFolderMemory.aClaimMayStillArrive(),
+            isDuringLaunch: Date() <= WindowFolderMemory.claimsOpenUntil,
+            otherWindowCount: otherWindowCount,
             otherOpenFolderPaths: otherOpenFolderPaths,
-            mostRecentKeyPath: WorkspaceModel.mostRecentKeyFolderPath
-        ) {
+            mostRecentKeyPath: WorkspaceModel.mostRecentKeyFolderPath,
+            hasLastWorkingFolder: lastFolder != nil
+        )
+        switch start {
+        case .waitForRememberedWindow:
+            // A beat of quiet rather than the picker it is about to replace.
+            isResolvingRestoredFolder = true
+            return
+        case .requested(let path), .sameAsOpenWindow(let path):
             adoptRestoredPath(path)
+        case .lastWorkingFolder:
+            if let lastFolder {
+                reopen(lastFolder, occasion: .lastWorkingFolder)
+            }
+        case .picker:
+            break
         }
+        settleItsFolder()
     }
 
-    /// What a brand-new window should open to. With no other windows open,
-    /// nothing — the folder picker. Otherwise the folder of the window
-    /// that was key when the command ran, falling back to any open
-    /// window's folder if the remembered key folder is no longer among
-    /// them.
+    /// What a brand-new window beside open ones should open to: the folder
+    /// of the window that was key when the command ran, falling back to any
+    /// open window's folder. Nil with no other window's folder — which is
+    /// no longer "the picker" on its own: a LONE window reopens the last
+    /// working folder (#311), a separate branch of `WindowStartRule.start`.
     static func folderForNewWindow(otherOpenFolderPaths: [String], mostRecentKeyPath: String?) -> String? {
-        if otherOpenFolderPaths.isEmpty {
-            return nil
+        return WindowStartRule.folderBesideOpenWindows(
+            otherOpenFolderPaths: otherOpenFolderPaths,
+            mostRecentKeyPath: mostRecentKeyPath
+        )
+    }
+
+    /// This window's folder is final. Once per window, whichever way it got
+    /// there — the one-decision rule (#311 review B1) that keeps a late
+    /// backstop from deciding a second time, and #306's hook point.
+    func settleItsFolder() {
+        if hasSettledItsFolder {
+            return
         }
-        if let mostRecentKeyPath, otherOpenFolderPaths.contains(mostRecentKeyPath) {
-            return mostRecentKeyPath
-        }
-        return otherOpenFolderPaths[0]
+        hasSettledItsFolder = true
+        isResolvingRestoredFolder = false
+        WindowSettling.windowSettled(self)
     }
 
     static func registerWindowModel(_ model: WorkspaceModel) {
@@ -237,7 +276,8 @@ class WorkspaceModel {
                     backupsExpanded: model.isShowingBackups,
                     referenceExpanded: model.isShowingReferenceCourses,
                     expandedReferenceYears: Array(model.expandedReferenceYears),
-                    selection: model.selection?.storageValue ?? ""
+                    selection: model.selection?.storageValue ?? "",
+                    bookmark: model.rememberedBookmark
                 ))
             }
         }
@@ -252,6 +292,19 @@ class WorkspaceModel {
     /// resolving. While true, the window shows a quiet holding view
     /// instead of flashing the folder picker it is about to replace.
     var isResolvingRestoredFolder: Bool = false
+
+    /// True once this window's folder is decided (`settleItsFolder`).
+    @ObservationIgnored var hasSettledItsFolder: Bool = false
+
+    /// A plain bookmark of the folder, made when it was adopted, so the
+    /// window list written at quit does not bookmark every window again.
+    @ObservationIgnored var rememberedBookmark: Data?
+
+    /// Why the folder this window was about to open is not open — the ONE
+    /// slot for it (#311 and #290): a remembered folder that could not be
+    /// reopened, or a chosen one the website builder cannot reach. Shown
+    /// on the picker, or as an alert when the window keeps a folder.
+    var folderNotOpened: FolderNotOpened?
 
     /// Which courses' sidebar disclosure triangles are open, and whether
     /// the Archived group is — per window, remembered with the folder so
@@ -632,6 +685,14 @@ class WorkspaceModel {
         return nil
     }
 
+    /// True while the window shows the folder picker rather than courses —
+    /// the one definition, used by `MainWindowView` to choose the screen and
+    /// by the refusal of a chosen folder to choose between saying so on the
+    /// picker and saying so in an alert (#290 review M1).
+    var isShowingPicker: Bool {
+        return workspaceURL == nil || workspaceProblem != nil || workspaceCanBeInitialized || workspaceIsUnrecognized || needsCloudSyncDecision
+    }
+
     // MARK: - Initializer
 
     init(defaults: UserDefaults = UserDefaults.standard) {
@@ -645,13 +706,14 @@ class WorkspaceModel {
         } else {
             self.isUnderUITest = false
             WorkspaceModel.migratePreferencesFromOldName(into: defaults)
-            // No folder is adopted here. A RESTORED window's folder arrives
-            // through the window claims; a brand-new window inherits from
-            // the window that was key when it was opened, or — when it is
-            // the only window — starts with the picker. The last-chosen
-            // path stays recorded for migration, but a lone new window
-            // silently opening on whatever folder was used last proved
-            // surprising.
+            // No folder is adopted here: the window-group closure runs on
+            // every render, so the folder is decided in the window's
+            // onAppear (`adoptFolderForNewWindow`). A RESTORED window's
+            // folder arrives through the window claims; a window beside
+            // others inherits the key window's; a window on its own reopens
+            // the last working folder (#311 — row 84's "a lone new window
+            // starts with the picker" was reversed after the #204 rehearsal,
+            // where every launch in a fresh account met the picker).
         }
         reloadCourses()
     }
@@ -661,7 +723,7 @@ class WorkspaceModel {
     /// A test may exercise remembering with a store of its own, but nothing
     /// under test may write the REAL preference — that is how a test run
     /// used to leave the app pointing at a deleted fixture folder.
-    private var canRememberChoice: Bool {
+    var canRememberChoice: Bool {
         if isUnderUITest {
             return false
         }
@@ -701,8 +763,16 @@ class WorkspaceModel {
 
     // MARK: - Functions
 
-    /// Adopts a new working folder, validates it, and remembers it.
+    /// Adopts a new working folder, validates it, and remembers it — unless
+    /// the website builder cannot reach it (#290), in which case NOTHING is
+    /// done to it: not adopted, not remembered, nothing written into it, and
+    /// the folder this window had stays exactly as it was.
     func chooseWorkspace(at url: URL) {
+        if let refusal = WorkingFolderReach.refusal(forFolder: url) {
+            refuseChosenFolder(refusal)
+            return
+        }
+        folderNotOpened = nil
         let previousPath: String? = workspaceURL?.path
         ActivityTrail.note(.workingFolderOpened, "opened the working folder " + url.path)
         if canRememberChoice {
@@ -724,6 +794,110 @@ class WorkspaceModel {
         if let previousPath, !isTheSameFolder {
             WorkspaceModel.releaseFolderIfUnused(previousPath)
         }
+        rememberAsTheLastWorkingFolder()
+    }
+
+    /// A chosen folder the builder cannot reach: say so, write it down, and
+    /// change nothing else.
+    private func refuseChosenFolder(_ refusal: WorkingFolderReach.Refusal) {
+        folderNotOpened = FolderNotOpened(
+            how: .chosen,
+            reason: refusal.whichPath == .workingFolder ? .outsideHome : .coursesOutsideHome,
+            folderPath: refusal.folderPath,
+            folderName: refusal.folderName,
+            isShownAsAlert: !isShowingPicker
+        )
+        let why: String = refusal.whichPath == .workingFolder
+            ? "it is not inside the home folder"
+            : "its courses lead outside the home folder"
+        ActivityTrail.note(
+            .workingFolderRefused,
+            "refused the working folder " + LogRedactor.redacting(refusal.folderPath) + " — " + why + " (chosen in the picker)"
+        )
+    }
+
+    /// How a remembered folder came to be reopened, for the trail.
+    enum ReopenOccasion: String {
+        case rememberedWindow = "the window it was open in last time"
+        case lastWorkingFolder = "the last working folder"
+    }
+
+    /// Reopens a folder remembered from last time — THE route by which a
+    /// window gets a remembered folder back (#311 with #290 folded in), so
+    /// the Trash, a missing drive, a gone or unreadable folder and a folder
+    /// the builder cannot reach are each caught in one place.
+    ///
+    /// On success the folder is adopted and remembered as the last working
+    /// folder (its new place, when the bookmark found it moved). Otherwise
+    /// the window keeps no folder, `folderNotOpened` says why, and the
+    /// memory is KEPT — a drive plugged back in reopens next launch.
+    ///
+    /// Trail lines only for a model a window shows: the assistant and the
+    /// MCP server never come here, and must never be recorded as a reopen.
+    @discardableResult
+    func reopen(_ remembered: RememberedFolder, occasion: ReopenOccasion, trashRoots: [String]? = nil) -> Bool {
+        if isUnderUITest {
+            return false
+        }
+        let facts: RememberedFolder.Facts = RememberedFolder.observe(remembered, trashRoots: trashRoots)
+        let isWindow: Bool = WorkspaceModel.isShownInAWindow(self)
+        switch RememberedFolder.decide(facts) {
+        case .reopen(let path, let movedFrom):
+            folderNotOpened = nil
+            if let currentPath = workspaceURL?.path, FolderIdentity.isSameFolder(currentPath, path) {
+                return true
+            }
+            pointAtFolder(URL(fileURLWithPath: path))
+            noticeCloudSync(folderWasChosen: false)
+            if isWindow {
+                var line: String = "reopened the working folder " + LogRedactor.redacting(path) + " as " + occasion.rawValue
+                if let movedFrom {
+                    line += " — found where it had been moved, from " + LogRedactor.redacting(movedFrom)
+                }
+                ActivityTrail.note(.workingFolderReopened, line)
+            }
+            rememberAsTheLastWorkingFolder()
+            return true
+        case .cannotReopen(let reason, let folderName, let path):
+            folderNotOpened = FolderNotOpened(how: .remembered, reason: reason, folderPath: path, folderName: folderName)
+            if isWindow {
+                ActivityTrail.note(
+                    .workingFolderNotReopened,
+                    "did not reopen the working folder " + LogRedactor.redacting(path) + " as " + occasion.rawValue + " — " + reason.rawValue
+                )
+            }
+            return false
+        }
+    }
+
+    /// The last working folder, as this model's store remembers it.
+    func lastWorkingFolder() -> RememberedFolder? {
+        if isUnderUITest {
+            return nil
+        }
+        return WindowFolderMemory.lastWorkingFolder(defaults: defaults)
+    }
+
+    /// Writes this window's folder down as the last working folder — only
+    /// for a model a window shows, and only where remembering is allowed
+    /// (never the real preferences under a test). Called when a folder is
+    /// chosen or reopened, and whenever the window comes to the front.
+    func rememberAsTheLastWorkingFolder() {
+        // Once quitting has begun, windows close one by one and AppKit makes
+        // the next one key — which would record IT as last in front, not
+        // the window the teacher quit from (#311 review 1). The same
+        // protection the window list has.
+        if WorkspaceModel.isTerminating {
+            return
+        }
+        guard WorkspaceModel.isShownInAWindow(self), canRememberChoice, let url = workspaceURL else {
+            return
+        }
+        var bookmark: Data? = rememberedBookmark
+        if bookmark == nil {
+            bookmark = RememberedFolder.make(for: url).bookmark
+        }
+        WindowFolderMemory.recordLastWorkingFolder(RememberedFolder(path: url.path, bookmark: bookmark), defaults: defaults)
     }
 
     /// Points this window at a working folder and reads what is in it.
@@ -750,6 +924,8 @@ class WorkspaceModel {
             forgetWhatBelongedToTheOldFolder()
         }
         workspaceURL = url
+        folderNotOpened = nil
+        rememberedBookmark = RememberedFolder.make(for: url).bookmark
         reloadCourses()
         sweepScheduledDeploysThatAreTooLate(inWorkingFolder: url)
     }
@@ -924,10 +1100,15 @@ class WorkspaceModel {
         ActivityTrail.note(.syncedFolderAccepted, howTheyWentOn + ", kept in sync with \(syncedFolder.serviceName)")
     }
 
-    /// Adopts the folder a window remembered from its last session.
+    /// Adopts a folder that is ALREADY in use — silently, with no check, no
+    /// trail line and nothing remembered.
     ///
-    /// Windows are restored one by one, each with its own saved folder, so
-    /// this runs per window rather than once for the app.
+    /// For a window opened beside one already on the folder, and for the
+    /// assistant's and the MCP server's own models. **A window getting a
+    /// remembered folder back must NOT come here**: it goes through
+    /// `reopen(_:occasion:)`, which catches the Trash, a missing drive and a
+    /// folder the builder cannot reach. `AdoptRestoredPathCallersTests`
+    /// holds the callers to a named list, so a new one is a decision.
     func adoptRestoredPath(_ path: String) {
         if path.isEmpty || isUnderUITest {
             return
@@ -941,8 +1122,9 @@ class WorkspaceModel {
         // The same funnel the picker goes through, so the letting-go cannot
         // belong to one route and not the other. Here it is DEFENSIVE: every
         // caller in the product reaches this with no folder yet — a window
-        // being restored, a window opened mid-session, the assistant and the
-        // MCP server each on a model of their own — and the guard above
+        // opened beside another or for a requested folder, the assistant
+        // and the MCP server each on a model of their own (a RESTORED window
+        // goes through `reopen` since #311) — and the guard above
         // turns away the one path that would arrive with the same folder
         // already set. It stays because "no caller does that today" is a
         // fact about today.

@@ -1,12 +1,17 @@
 import Foundation
 
 /// Remembers each open window's folder and frame, for windows macOS
-/// reopens without their value.
+/// reopens without their value — and, separately, the LAST working folder,
+/// which comes back whatever macOS does with the windows (#311).
 ///
 /// macOS owns window restoration: it reopens the windows (when the system
 /// setting keeps them) with their frames, and usually their values. When a
 /// value comes back empty, the window finds its folder here — matched by
 /// frame, since the reopening order is macOS's own.
+///
+/// The system setting governs the window SET only. The folder does not
+/// depend on it: when no window is replayed, the first window reopens
+/// `lastWorkingFolder` (see `WindowStartRule`).
 @MainActor
 enum WindowFolderMemory {
 
@@ -15,6 +20,7 @@ enum WindowFolderMemory {
     struct Entry {
         let path: String
         let frame: String
+
 
         /// The sidebar as the teacher left it: which courses' disclosure
         /// triangles were open, and whether the Archived and Backups
@@ -37,12 +43,28 @@ enum WindowFolderMemory {
         /// The selected course, section, or archived item, in
         /// `SidebarSelection`'s storage form; empty for none.
         var selection: String = ""
+
+        /// A plain bookmark of the folder, so a window whose folder was
+        /// renamed or moved on the same disk finds it (#311). Nil in an entry
+        /// written by an older build, which then finds its folder by path.
+        var bookmark: Data? = nil
     }
 
     // MARK: - Stored properties
 
     /// Where the list is kept between launches.
     static let storageKey: String = "openWindowFolders"
+
+    /// Where the last working folder is kept: the folder of the window last
+    /// in front, as `["path": …, "bookmark": base64]` (#311).
+    static let lastFolderKey: String = "lastWorkingFolder"
+
+    /// True in the app a UI test launches. That app is NOT the hosted unit
+    /// suite (`WorkspaceModel.isRunningTests` is false in it) and writes the
+    /// real preferences — so before #311 every XCUITest run wrote its
+    /// fixture folders into the teacher's remembered windows. Nothing is
+    /// read or written from it now.
+    static let isUnderUITest: Bool = ProcessInfo.processInfo.environment["UITEST_WORKSPACE"] != nil
 
     /// Entries not yet taken by a window this launch.
     private static var unclaimed: [Entry] = []
@@ -86,7 +108,10 @@ enum WindowFolderMemory {
         }
         loadIfNeeded(defaults: defaults)
         for (index, entry) in unclaimed.enumerated() {
-            if entry.frame == frame && !entry.frame.isEmpty && WorkspaceModel.folderExists(atPath: entry.path) {
+            // A folder that has gone is still handed out (#311): the window
+            // that takes it says why it could not be reopened, where it used
+            // to be skipped and the teacher met a picker with no word.
+            if entry.frame == frame && !entry.frame.isEmpty {
                 unclaimed.remove(at: index)
                 return entry
             }
@@ -112,24 +137,22 @@ enum WindowFolderMemory {
         return hasEntriesToClaim(defaults: defaults)
     }
 
-    /// The next remembered window, skipping folders that no longer exist.
+    /// The next remembered window, in order — a gone folder included, so
+    /// its window can say what happened to it (#311).
     static func claimNextEntry(defaults: UserDefaults = UserDefaults.standard) -> Entry? {
         if Date() > claimsOpenUntil {
             return nil
         }
         loadIfNeeded(defaults: defaults)
-        while !unclaimed.isEmpty {
-            let entry: Entry = unclaimed.removeFirst()
-            if WorkspaceModel.folderExists(atPath: entry.path) {
-                return entry
-            }
+        if unclaimed.isEmpty {
+            return nil
         }
-        return nil
+        return unclaimed.removeFirst()
     }
 
     /// Records the open windows as folder-and-frame pairs, in order.
     static func record(_ entries: [Entry], defaults: UserDefaults = UserDefaults.standard) {
-        if WorkspaceModel.isRunningTests && defaults == UserDefaults.standard {
+        if WindowFolderMemory.mayNotTouch(defaults) {
             return
         }
         var stored: [[String: String]] = []
@@ -145,6 +168,7 @@ enum WindowFolderMemory {
                 "reference": entry.referenceExpanded ? "1" : "0",
                 "referenceYears": WindowFolderMemory.joined(entry.expandedReferenceYears),
                 "selection": entry.selection,
+                "bookmark": entry.bookmark?.base64EncodedString() ?? "",
             ])
         }
         defaults.set(stored, forKey: storageKey)
@@ -182,13 +206,15 @@ enum WindowFolderMemory {
         // The hosted test suite must never replay the teacher's own
         // windows: the app's real window would adopt a remembered folder
         // mid-test and stomp whatever fixture the test had chosen.
-        if WorkspaceModel.isRunningTests && defaults == UserDefaults.standard {
+        if WindowFolderMemory.mayNotTouch(defaults) {
             unclaimed = []
             return
         }
         // The teacher asked for windows NOT to come back: the list is
         // still recorded (so toggling the setting later restores the most
-        // recent session), but nothing is replayed from it.
+        // recent session), but no WINDOW is replayed from it. This governs
+        // the window set only: the folder comes back regardless, through
+        // `lastWorkingFolder` (#311, reversing row 62 for the folder).
         if !WindowFolderMemory.systemRestoresWindows {
             unclaimed = []
             return
@@ -209,7 +235,8 @@ enum WindowFolderMemory {
                         backupsExpanded: pair["backups"] == "1",
                         referenceExpanded: pair["reference"] == "1",
                         expandedReferenceYears: WindowFolderMemory.years(pair["referenceYears"]),
-                        selection: pair["selection"] ?? ""
+                        selection: pair["selection"] ?? "",
+                        bookmark: WindowFolderMemory.bookmark(fromStored: pair["bookmark"])
                     ))
                 }
                 // An entry from the earlier format: a bare path string.
@@ -219,6 +246,62 @@ enum WindowFolderMemory {
             }
         }
         unclaimed = loaded
+    }
+
+    /// True when this store must be neither read nor written: the REAL
+    /// preferences under the hosted unit suite, or anything in the app a UI
+    /// test drives.
+    static func mayNotTouch(_ defaults: UserDefaults) -> Bool {
+        if WindowFolderMemory.isUnderUITest {
+            return true
+        }
+        if WorkspaceModel.isRunningTests && defaults == UserDefaults.standard {
+            return true
+        }
+        return false
+    }
+
+    static func bookmark(fromStored stored: String?) -> Data? {
+        guard let stored, !stored.isEmpty else {
+            return nil
+        }
+        return Data(base64Encoded: stored)
+    }
+
+    /// Writes down the last working folder. Skips the write when the path
+    /// is the one already there with a bookmark — it is called every time a
+    /// window comes to the front, which is every app switch.
+    static func recordLastWorkingFolder(_ folder: RememberedFolder, defaults: UserDefaults) {
+        if WindowFolderMemory.mayNotTouch(defaults) {
+            return
+        }
+        if let stored = defaults.dictionary(forKey: lastFolderKey) as? [String: String],
+           stored["path"] == folder.path,
+           let storedBookmark = stored["bookmark"], !storedBookmark.isEmpty {
+            return
+        }
+        defaults.set([
+            "path": folder.path,
+            "bookmark": folder.bookmark?.base64EncodedString() ?? "",
+        ], forKey: lastFolderKey)
+    }
+
+    /// The last working folder, or nil when there is none. Falls back to the
+    /// folder last CHOSEN (`WorkspaceModel.storedPathKey`), which every
+    /// earlier build wrote, so a teacher upgrading is reopened on their
+    /// first launch rather than after it.
+    static func lastWorkingFolder(defaults: UserDefaults) -> RememberedFolder? {
+        if WindowFolderMemory.mayNotTouch(defaults) {
+            return nil
+        }
+        if let stored = defaults.dictionary(forKey: lastFolderKey) as? [String: String],
+           let path = stored["path"], !path.isEmpty {
+            return RememberedFolder(path: path, bookmark: WindowFolderMemory.bookmark(fromStored: stored["bookmark"]))
+        }
+        if let chosen = defaults.string(forKey: WorkspaceModel.storedPathKey), !chosen.isEmpty {
+            return RememberedFolder(path: chosen, bookmark: nil)
+        }
+        return nil
     }
 
     /// Starts again from a given list — for tests.

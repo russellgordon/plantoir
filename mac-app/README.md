@@ -15,9 +15,11 @@ runs the real scripts:
 A window without a folder asks for a **working folder** — one containing
 `setup.sh`, `preview.sh`, `deploy.sh`, and `courses/`, or an empty folder
 the app offers to initialize. Working folders are **per window**: each
-window restores its own folder across relaunches (frame-keyed), and a new
-window inherits the folder of the window that was key when it was opened —
-or shows the picker when it is the only window. What the sidebar has
+window restores its own folder across relaunches (frame-keyed) when macOS
+keeps windows, a new window beside others inherits the folder of the window
+that was key when it was opened, and a window on its own reopens the last
+working folder whatever the system setting says — or says in one sentence
+why it could not (#311). What the sidebar has
 selected belongs to that window's folder: pointing a window at a different
 one lets go of the selection and of everything else naming a course, an
 archive or a backup in the folder being left — see

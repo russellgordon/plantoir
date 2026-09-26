@@ -43,9 +43,12 @@ Beyond the actions, the app owns delivery and resources:
   CLI, BuildKit) self-install to `~/Library/Application Support/Plantoir/tools`
   when missing, so a fresh Mac needs no prerequisites.
 - **Windows are independent.** Each window has its own working folder,
-  restored precisely across relaunches (frame-keyed); a new window
-  inherits the folder of the window that was key when it was opened, or
-  shows the folder picker when it is the only window. **The selection
+  restored precisely across relaunches (frame-keyed) when macOS keeps
+  windows; a new window beside others inherits the folder of the window
+  that was key when it was opened, and a window on its own — the first
+  window at launch, or one opened after the last was closed — reopens the
+  **last working folder** whatever the system setting says (#311, see
+  "Reopening on the last working folder" below). **The selection
   belongs to the window's folder** and is let go of when the window is
   pointed at a different one — see "What a window lets go of when it
   changes working folder" below.
@@ -597,6 +600,265 @@ its built websites. A folder whose path was not in the disk's own spelling
 builds from nothing once more, and the second copy it had is cleared away by
 the launchers, not by the app — see [03](03-launcher-scripts.md) → "One
 folder, one spelling" for why the Swift sweeps nothing.
+
+## Reopening on the last working folder (#311)
+
+Found in the #204 rehearsal, in a fresh account: every launch met the folder
+picker. Russell: "You should NOT have to pick your working folder every time
+Plantoir opens." The contract is `contracts/shared-rules.json` →
+`reopeningTheLastWorkingFolder`; the code is `WindowStartRule` (which window
+gets what), `RememberedFolder` (can this folder be reopened) and
+`WorkspaceModel.reopen(_:occasion:)` (the one route that does it).
+
+### What was wrong — measured, not assumed
+
+- The mac already restored each window's folder (`WindowFolderMemory`,
+  frame-keyed), but `loadIfNeeded` replayed **nothing** when
+  `NSQuitAlwaysKeepsWindows` is false — System Settings ▸ Desktop & Dock ▸
+  "Close windows when quitting an application" ON, the **system default**
+  (GUI row 62). A fresh account, and every relaunch after an update, got
+  the picker.
+- A lone window never inherited a folder (row 84), so closing the last
+  window and quitting — or a Dock click after closing it — also met the
+  picker.
+- Russell's own account has `NSQuitAlwaysKeepsWindows = 1`, which is why it
+  never showed here. **Testing the default on this account is Russell's
+  list, done with a launch argument** (`-NSQuitAlwaysKeepsWindows NO`),
+  never by writing his preferences.
+- A remembered folder that had gone was skipped in silence (plain picker, no
+  word), and one that could not be read fell through to "unrecognised".
+
+### The rule
+
+**The folder always comes back; the window SET follows macOS.** With windows
+kept, each comes back on its own folder, exactly as before. Otherwise the
+first window reopens the **last working folder** — the folder of the window
+last in front, written whenever a window with a folder becomes key, when a
+folder is chosen and when one is reopened. A window opened with no other
+window open reopens it too (row 84 reversed; ⌘N beside an open window still
+inherits the key window's folder). This is the shape Windows already had:
+`RestoreWindowsOnLaunch` governs its window set, `WorkspacePath` always
+returns. Upgrading from a build that only kept the last CHOSEN folder
+(`workspacePath`) reads that, so the first launch after the update reopens.
+
+**The last folder is not rewritten once quitting has begun**
+(`WorkspaceModel.isTerminating`): windows close one by one and AppKit makes
+the next one key, which would otherwise record IT as last in front.
+
+**Bookmark first, even over a different folder now at the old path.** If the
+bookmark finds the original folder elsewhere ("Notes old") and another folder
+now sits at the remembered path, the bookmark wins — it follows the folder the
+teacher worked in, and the trail's "found where it had been moved, from …"
+says so. Only the Trash is special-cased.
+
+**One decision per window** (#311 review B1). `settleItsFolder()` runs once,
+whichever way the folder became final — claimed, reopened, refused,
+inherited or left to the picker — and after it nothing decides again:
+`attemptClaim` returns straight away for a settled window, and its give-up
+no longer calls `adoptFolderForNewWindow` as a "harmless backstop"; the
+claimant itself refuses to claim for a settled window
+(`WindowFolderClaimant.frameDidSettle(_:windowHasSettled:)`, pinned by
+`testASettledWindowNeverClaimsAnEntry`), leaving the entry for its own
+window. The launch cases play restored windows through the same `start`,
+which must make them WAIT; which entry each then takes by frame is
+`WindowRestorationScenarioTests`' proof, not theirs. That
+backstop would have become a second decision once a lone window could
+reopen: a window whose folder had gone would have become a second window on
+a sibling's folder, wiping the sentence that said why. `settleItsFolder()`
+also calls `WindowSettling.windowSettled` — an empty seam today, which #306
+(open the section a notification names) fills.
+
+**A second window at launch with no remembered folder shows the picker**
+(#311 review B2). "Close windows when quitting" governs ⌘Q; "Reopen windows
+when logging back in" may bring windows back whatever it says (unmeasured —
+Russell's list). Letting such a window inherit would put two windows on
+one folder nobody asked for, so only the first window reopens.
+
+**A window opened for a reason of its own takes that folder first.** The
+assistant revealing a section sets `WorkspaceModel.folderForNextNewWindow`
+before it opens a window; without it the new window would reopen the last
+folder, write a reopen the teacher never saw, and be moved a moment later.
+
+### How the folder is found: bookmark, then path
+
+Measured 2026-09-26 with a Swift probe on this Mac (unsandboxed binary, in
+`~/plantoir-311-bm-probe`):
+
+| Step | Result |
+|---|---|
+| plain bookmark of `…/Working A` | 964 bytes |
+| `.withSecurityScope` bookmark, unsandboxed | created (736 bytes), resolves, `startAccessingSecurityScopedResource()` → true (buys nothing there) |
+| folder renamed to `Working B` | plain bookmark resolves to `…/Working B`, `isStale = true` |
+| folder moved to the Trash | resolves to `~/.Trash/Working B`, **exists**, `isStale = true` |
+| trashed folder deleted | resolve throws, code 4 |
+
+So: a plain bookmark first (`.withoutUI, .withoutMounting`, so an absent
+network share never prompts or holds launch), then the path. A bookmark that
+leads into a Trash — any folder named `.Trash` or `.Trashes` along the path —
+is **refused**, unless the original place holds a folder again. The same
+folder in another spelling (`/var` against `/private/var`) is not a move
+(`FolderIdentity.isSameFolder`).
+
+**The security-scoped question is still open, and says so.** The app is not
+sandboxed (no `app-sandbox` entitlement), and outside the folders macOS
+protects a security-scoped bookmark grants nothing a plain one lacks. Whether
+it would carry a grant for a Desktop or Documents folder the teacher DENIED
+could not be measured on 2026-09-26: a probe app (own bundle id, launched with
+`open`) blocked on the Desktop permission question, and the Mac's screen was
+locked, so nobody could answer it — the probe was killed and its folder
+removed. It is on Russell's list (`~/Downloads/plantoir-v1.3.2-run/ready/311-290.md`).
+Meanwhile "can't be read" is two reasons, told apart by the error the disk
+gives (`RememberedFolder.presence`, `stat`'s errno — never `fileExists`, which
+answers false for "nothing there" and "you may not look" alike, and would
+have called a denied Desktop folder GONE): EPERM is taken to be macOS's
+privacy settings — **assumed** from Apple's documented behaviour ("Operation
+not permitted"), not measured here, since the permission probe could not run;
+Russell's list checks that a denied Desktop folder says `privacyDenied`
+(`privacyDenied`, pointing at System Settings ▸ Privacy & Security ▸ Files &
+Folders — the spelling read from System Settings' own strings on macOS 26.6,
+`FILE_ACCESS_COMBINED`, not from memory), and EACCES is the folder's own
+permissions (`unreadable`, measured with chmod 000 on the folder and on a
+parent; its sentence names no pane and no Finder, because no setting would
+help and Windows shares it). **Anything but EPERM or EACCES reads as gone** —
+not only "no such file", but also a mounted network share that has hung
+(a time-out or an input/output error), which is then told "can't be found".
+And `stat` on such a share can itself block: `.withoutMounting` covers a
+share that is not mounted, not one that is mounted and hung.
+One thing the probe DID show: reading a protected folder for the first time
+blocks the calling thread until the question is answered — at launch that is
+the main thread, behind the permission sheet. Whether that reads as a hang
+in a fresh account is on the same list.
+
+### When it cannot be reopened
+
+`RememberedFolder.decide`, in this order: in a Trash (a trashed folder
+EXISTS, so it goes first) → on a `/Volumes/<name>` that is not there (asked
+from the name alone, before touching anything under it) → gone (the disk said
+anything but EPERM or EACCES) → out of the website builder's reach (`outsideHome`,
+`coursesOutsideHome`, #290 below) → not allowed in (`privacyDenied`,
+`unreadable`) → reopen. Out of reach comes before a denial because it needs
+only the folder's name from the disk, and fixing a permission only to be
+refused at the next launch is going round twice. The window shows the picker with
+ONE sentence (`ReopenWording`, keyed like the contract's `wording`), in the
+same slot a refused choice uses (`WorkspaceModel.folderNotOpened`), with the
+path bar only for a folder that is there. The memory is **kept** until
+another folder is chosen or reopened, so a drive plugged back in reopens next
+launch. A stale, empty mount point left by an unclean eject reads as `gone` —
+honest, if less specific.
+
+A remembered WINDOW whose folder has gone is now handed out rather than
+skipped (`claimNextEntry`, `claimEntry`), so that window says why too.
+
+### Never touched by
+
+The MCP server, a scheduled run and `--write-contracts` (all exit in
+`QuartzTeachersApp.init` before any scene); the hosted suite
+(`WindowFolderMemory.mayNotTouch` refuses the real store); the app a UI test
+drives (`UITEST_WORKSPACE` — **new here**: before #311 every XCUITest run
+wrote its fixture folders into the real `openWindowFolders`, harmless while
+gone folders were skipped and a "can't be found" sentence after); and any
+model no window shows (`rememberAsTheLastWorkingFolder` and the trail lines
+need `isShownInAWindow`).
+
+### Trail
+
+`working folder reopened` (the path, which occasion, and "found where it had
+been moved, from …" when the bookmark followed a move) and `working folder
+not reopened` (the reason key and the path). `working folder opened` stays
+the teacher's choice only. A window opened beside another (⌘N) writes
+nothing — neither a choice nor a reopen.
+
+### Rejected
+
+In the contract's `rejected`: a security-scoped bookmark instead of a plain
+one (above); the path only; following the bookmark into the Trash;
+honouring the system setting for the folder; replaying every window even
+when macOS does not; a "Reopen last folder" preference; letting a second
+launch window inherit; forgetting a folder that could not be reopened;
+writing `working folder opened` for a reopen; and the path bar for every
+reason.
+
+### What a test cannot prove
+
+That `.withoutMounting` stops a mount prompt for a real unplugged network
+share; what a fresh account's permission question looks like at launch;
+and what a log-in restore does with the setting at its default. All three
+are on Russell's list.
+
+## A working folder the website builder cannot reach (#290)
+
+The builder runs in a virtual machine handed the home folder and nothing
+else. Since #221 the launchers refuse a folder outside it at the first
+preview; since #290 the app refuses it when a window takes it on — before
+anything is written into it. Contract: `shared-rules.json` →
+`workingFolderReach` (`appliesOn ["mac"]`, permanently: Windows builds
+natively). Code: `WorkingFolderReach`.
+
+**The rule.** `FolderIdentity.canonicalPath` of the folder (the disk's own
+spelling, what `/bin/pwd -P` gives the launchers) equals the canonical home
+or lies under it, compared name by name **as bytes** — `String.hasPrefix` is
+grapheme-based and answered false for a name beginning with a combining mark,
+and a plain prefix would call `/Users/ann2` inside `/Users/ann`. Applied also
+to `courses` when it is a LINK, read with the link's own attributes (a
+`fileExists` check follows links and would call a link to an unplugged drive
+absent). A path the disk cannot name — gone, dangling, behind a denied
+permission — is spelled through the nearest folder above it that it CAN name
+(`WorkingFolderReach.diskSpelling`): `canonicalPath` alone falls back to the
+text, where `/var/…` is outside a home of `/private/var/…` and a `..` climbing
+out of the home still reads as inside.
+
+**Measured 2026-09-26** (`plans/290-plan.md` §0, re-measured by its review):
+`/Volumes/Macintosh HD` is a link to `/`, so `/Volumes/Macintosh HD/Users/<me>/
+Desktop` is the teacher's own Desktop — the reason a "refuse `/Volumes`" rule
+was rejected. Case and the `/System/Volumes/Data` firmlink fold to `/Users/…`.
+iCloud Drive and `~/Library/CloudStorage/*` are inside. External drives,
+`/Users/Shared` and `/private/tmp` are outside. **Not measured**: a real
+preview from an iCloud Drive folder under Colima (it was stopped, and starting
+a shared VM was not this piece's to do); a home that is itself a link or on
+the network (a missed refusal at worst, with #221 behind it).
+
+**Where it applies.** When a folder is chosen (`chooseWorkspace`, checked
+FIRST: not adopted, not remembered, no "opened" line, the window's own folder
+untouched) and when one is reopened (`reopen`, reasons `outsideHome` and
+`coursesOutsideHome`). Not for the MCP server or the assistant's own models,
+and not for the source of Import Courses for Reference, which is copied in.
+`adoptRestoredPath` — the unchecked door those use — is held to a named list
+of callers by `AdoptRestoredPathCallersTests`, so a window route cannot slip
+back onto it.
+
+**How it is shown.** If the window shows the picker (`isShowingPicker`, the
+one predicate `MainWindowView` also uses — including the four picker screens
+with a folder half chosen, which stays below), on the picker: the refused
+folder's path bar, the headline in bold, then `whatToDo`. If the window goes
+on showing its courses, an alert over them with "Choose a Different Folder…"
+and "OK"; its folder stays exactly as it was. Which one is decided when the
+refusal happens, so the alert never appears later over a folder set up in
+the meantime. The `courses`-link case has its own headline, because telling a
+teacher their Desktop folder "is not inside your home folder" would be the
+one untrue sentence.
+
+**A hard refusal**, unlike a synced folder: the verdict is exact and the
+folder cannot build on the builder Plantoir installs. Known false refusal,
+accepted: a Mac whose Docker engine could mount the drive (Docker Desktop,
+OrbStack, Colima with extra mounts).
+
+**Under the suite** the home is the temporary directory — not a switch that
+lets everything through: every `chooseWorkspace` a test makes still runs the
+real comparison (the `WorkingFolderReachTests` point it at a throwaway
+`home/` beside a throwaway `outside/`). Toolchain mirroring cannot be
+observed under the suite (it returns early there), so "nothing is written
+into a refused folder" is measured by snapshotting a seeded working folder.
+
+**Known limits.** A link INSIDE `courses` (`courses/ICS3U` → a drive) is not
+caught — it mounts, and the builder sees an empty course. A refused folder's
+scheduled publishes are never swept (the sweep runs when a folder is
+adopted); any set from such a folder before #221 go on failing, and the
+failed-publish notices say so.
+
+**The remembering rule changed when #290 was folded into #311.** #290's plan
+forgot a refused remembered folder so the reason was said once; one rule now
+covers every reason — kept until another folder is chosen — because the
+teacher cannot go on without choosing, so the repetition ends at one choice.
 
 ## Quitting: what it frees, what it refuses to free, and why
 

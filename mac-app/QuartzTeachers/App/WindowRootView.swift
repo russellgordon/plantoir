@@ -33,18 +33,13 @@ struct WindowRootView: View {
             .focusedSceneValue(\.workspace, workspace)
             .onAppear {
                 WorkspaceModel.registerWindowModel(workspace)
-                // Before the first frame commits: a mid-session window
-                // takes the key window's folder here, so the picker never
-                // shows on the way in. At launch this is a no-op and the
-                // window claims below decide instead.
+                // Before the first frame commits, so the picker never shows
+                // on the way in: the window decides its folder here — the
+                // last working folder when it is on its own, the key
+                // window's beside others (`WindowStartRule`). A window that
+                // may yet claim a remembered one holds quietly instead, and
+                // decides when the claim below resolves.
                 workspace.adoptFolderForNewWindow()
-                // A restored window's folder arrives a moment after the
-                // window does. Until the claim resolves, hold quietly —
-                // flashing the folder picker for a folder-less instant
-                // reads as the wrong screen, not as loading.
-                if workspace.workspaceURL == nil && WindowFolderMemory.aClaimMayStillArrive() {
-                    workspace.isResolvingRestoredFolder = true
-                }
             }
             .onReceive(NotificationCenter.default.publisher(
                 for: NSApplication.didFinishRestoringWindowsNotification
@@ -56,7 +51,10 @@ struct WindowRootView: View {
                 // so this window cannot give up early and order-claim an
                 // entry that rightly belongs to a sibling's frame.
                 if let window = workspace.window,
-                   let entry = claimant.frameDidSettle(NSStringFromRect(window.frame)) {
+                   let entry = claimant.frameDidSettle(
+                       NSStringFromRect(window.frame),
+                       windowHasSettled: workspace.hasSettledItsFolder
+                   ) {
                     adopt(entry, how: "matched at restoration-complete")
                 }
             }
@@ -80,6 +78,7 @@ struct WindowRootView: View {
                 WorkspaceModel.rememberOpenFolders()
                 if workspace.window?.isKeyWindow == true, let path = workspace.workspaceURL?.path {
                     WorkspaceModel.mostRecentKeyFolderPath = path
+                    workspace.rememberAsTheLastWorkingFolder()
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { notification in
@@ -91,6 +90,9 @@ struct WindowRootView: View {
                 }
                 if let path = workspace.workspaceURL?.path {
                     WorkspaceModel.mostRecentKeyFolderPath = path
+                    // And for the next LAUNCH: the last working folder is
+                    // the one last in front, not the one last chosen (#311).
+                    workspace.rememberAsTheLastWorkingFolder()
                 }
             }
             .onDisappear {
@@ -104,8 +106,24 @@ struct WindowRootView: View {
     /// reopened window's frame settles a moment after the window exists.
     /// The claimant claims at most once, and claims close shortly after
     /// launch — a window opened mid-session inherits nothing.
+    ///
+    /// A window that has already settled its folder — decided in onAppear,
+    /// or claimed at restoration-complete — never claims, and never reaches
+    /// the give-up below: one decision per window (#311 review B1). Before
+    /// that rule the give-up's "harmless backstop" could have become a
+    /// second decision, putting a window whose folder had gone onto a
+    /// sibling's folder and wiping the sentence that said why.
     func attemptClaim(for window: NSWindow, attemptsLeft: Int) {
-        if let entry = claimant.frameDidSettle(NSStringFromRect(window.frame)) {
+        // The claimant refuses for a settled window and marks itself done,
+        // so the give-up below is never reached for one either.
+        if workspace.hasSettledItsFolder {
+            _ = claimant.giveUp(windowHasSettled: true)
+            return
+        }
+        if let entry = claimant.frameDidSettle(
+            NSStringFromRect(window.frame),
+            windowHasSettled: workspace.hasSettledItsFolder
+        ) {
             adopt(entry, how: "matched by frame")
             return
         }
@@ -114,37 +132,49 @@ struct WindowRootView: View {
         // (or its picker) right away rather than a second later.
         let claimsHaveClosed: Bool = Date() > WindowFolderMemory.claimsOpenUntil
         if attemptsLeft <= 0 || claimsHaveClosed {
-            if let entry = claimant.giveUp() {
+            if let entry = claimant.giveUp(windowHasSettled: workspace.hasSettledItsFolder) {
                 adopt(entry, how: "fell back to order")
             } else {
-                // Normally already handled in onAppear; harmless backstop.
-                workspace.adoptFolderForNewWindow()
+                // No remembered window for this one: macOS brought back a
+                // window whose folder was not recorded. The picker is the
+                // honest screen — it does NOT inherit a sibling's folder.
+                workspace.settleItsFolder()
             }
-            // The claim is settled either way; if no folder arrived, the
-            // picker is now the honest screen to show.
-            workspace.isResolvingRestoredFolder = false
             return
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+        // A bounded retry while the frame settles; the restoration-complete
+        // notification above is the real signal, and this the fallback.
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(150))
             attemptClaim(for: window, attemptsLeft: attemptsLeft - 1)
         }
     }
 
     /// Takes a remembered window as this window's own.
+    ///
+    /// Through `reopen`, the one route by which a window gets a remembered
+    /// folder back — so a folder gone, in the Trash, on a drive not plugged
+    /// in, unreadable or out of the builder's reach is said in one sentence
+    /// rather than silently skipped.
     func adopt(_ entry: WindowFolderMemory.Entry, how detail: String) {
-        workspace.adoptRestoredPath(entry.path)
-        // The sidebar as it was left: the same courses unfolded, the
-        // Archived group open if it was, and the same course or section
-        // selected.
-        workspace.expandedCourseCodes = Set(entry.expandedCourses)
-        workspace.isShowingArchived = entry.archivedExpanded
-        workspace.isShowingBackups = entry.backupsExpanded
-        workspace.isShowingReferenceCourses = entry.referenceExpanded
-        workspace.expandedReferenceYears = Set(entry.expandedReferenceYears)
-        if let selection = SidebarSelection.fromStorageValue(entry.selection) {
-            workspace.selection = selection
+        let reopened: Bool = workspace.reopen(
+            RememberedFolder(path: entry.path, bookmark: entry.bookmark),
+            occasion: .rememberedWindow
+        )
+        // The sidebar as it was left — only when the folder came back: the
+        // same courses unfolded, the Archived group open if it was, and the
+        // same course or section selected.
+        if reopened {
+            workspace.expandedCourseCodes = Set(entry.expandedCourses)
+            workspace.isShowingArchived = entry.archivedExpanded
+            workspace.isShowingBackups = entry.backupsExpanded
+            workspace.isShowingReferenceCourses = entry.referenceExpanded
+            workspace.expandedReferenceYears = Set(entry.expandedReferenceYears)
+            if let selection = SidebarSelection.fromStorageValue(entry.selection) {
+                workspace.selection = selection
+            }
         }
-        workspace.isResolvingRestoredFolder = false
+        workspace.settleItsFolder()
         let claimedPath: String = LogRedactor.redacting(entry.path)
         AppLog.interface.info("""
             window \(windowIdentity, privacy: .public) claimed \
