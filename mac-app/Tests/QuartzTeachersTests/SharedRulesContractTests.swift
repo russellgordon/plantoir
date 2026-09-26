@@ -236,6 +236,56 @@ final class SharedRulesContractTests: XCTestCase {
         XCTAssertTrue(all.contains("curriculum"))
     }
 
+    /// `readingALink.cases` (#294): what a wikilink NAMES, including the
+    /// escaped pipe Obsidian writes for an alias inside a table,
+    /// `[[Ohm's Law\|Ohm]]`. Walked through BOTH mac readers — the one the
+    /// links answer uses (names as written) and the one publishing, dating,
+    /// the site check and copying use (lowercased, last path component) —
+    /// because both read `WikiLinkRewriter.pattern`, and the second is the one
+    /// the issue was about.
+    @MainActor
+    func testEveryLinkShapeReadsAsTheContractSays() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("readingALink")
+        XCTAssertNotNil(section["rule"] as? String)
+        XCTAssertNotNil(section["whenRewritten"] as? String)
+        XCTAssertNotNil(section["why"] as? String)
+        let cases: [[String: Any]] = try XCTUnwrap(section["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 10, "readingALink lost cases")
+
+        for oneCase in cases {
+            let name: String = try XCTUnwrap(oneCase["name"] as? String)
+            let text: String = try XCTUnwrap(oneCase["text"] as? String, name)
+            let expected: [String] = try XCTUnwrap(oneCase["expect"] as? [String], name)
+
+            XCTAssertEqual(
+                AssistSectionGraph.linksAsWritten(in: text), expected,
+                "\(name): the names as written"
+            )
+
+            var expectedTargets: [String] = []
+            for written in expected {
+                expectedTargets.append(AssistSectionGraph.normalized(written))
+            }
+            XCTAssertEqual(
+                AssistSectionGraph.linkTargets(in: text), expectedTargets,
+                "\(name): the names publishing follows"
+            )
+        }
+    }
+
+    /// `followingLinks.publishing.casesNote` says what a case's `body` means,
+    /// so the other app can build the same harness without reading this one.
+    @MainActor
+    func testThePublishingCasesSayWhatABodyIs() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("followingLinks")
+        let publishing: [String: Any] = try XCTUnwrap(section["publishing"] as? [String: Any])
+        let note: String = try XCTUnwrap(publishing["casesNote"] as? String)
+        XCTAssertTrue(note.contains("`body`"))
+        XCTAssertTrue(note.contains("never both"))
+        let cases: [[String: Any]] = try XCTUnwrap(publishing["cases"] as? [[String: Any]])
+        XCTAssertFalse(cases.isEmpty)
+    }
+
     // MARK: - Asking before the assistant changes anything
 
     @MainActor
@@ -762,6 +812,143 @@ final class SharedRulesContractTests: XCTestCase {
             )
         }
         return store
+    }
+
+    // MARK: - Reading the trail back into a report (#301)
+
+    /// One unreadable byte used to empty the whole trail. Every case writes
+    /// the contract's bytes as they are, reads them back the way a report
+    /// does, and compares line by line — so the readable part of a damaged
+    /// line, its neighbours and the notes at the top are all held to it.
+    func testProblemReportTrailCasesReadBackAsTheContractSays() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("problemReportTrail")
+        let cases: [[String: Any]] = try XCTUnwrap(section["cases"] as? [[String: Any]])
+        XCTAssertFalse(cases.isEmpty)
+
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let input: String = try XCTUnwrap(testCase["input"] as? String)
+            let includingPrompts: Bool = try XCTUnwrap(testCase["includingPrompts"] as? Bool)
+            let expectedTokens: [String] = try XCTUnwrap(testCase["expectLines"] as? [String])
+            let expectSomething: Bool = try XCTUnwrap(testCase["expectSomethingToReport"] as? Bool)
+
+            let folderURL: URL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("trail-read-" + UUID().uuidString, isDirectory: true)
+            try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: folderURL) }
+            let bytes: [UInt8] = try SharedRulesContractTests.bytes(fromContractNotation: input)
+            try Data(bytes).write(
+                to: folderURL.appendingPathComponent(ProblemReportStore.activityFileName)
+            )
+            let store: ProblemReportStore = ProblemReportStore(folderURL: folderURL)
+
+            var expectedLines: [String] = []
+            for token in expectedTokens {
+                expectedLines.append(try SharedRulesContractTests.trailLine(forContractToken: token))
+            }
+            let text: String = store.activityText(includingPrompts: includingPrompts)
+            XCTAssertEqual(
+                text.components(separatedBy: "\n"), expectedLines,
+                "\(name): the trail read back differently"
+            )
+            XCTAssertEqual(store.hasAnythingToReport, expectSomething, "\(name)")
+        }
+    }
+
+    /// The two sentences are the app's own, and they come in the order the
+    /// contract fixes.
+    func testProblemReportTrailSentencesAreTheApps() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("problemReportTrail")
+        XCTAssertEqual(section["promptsLeftOutNote"] as? String, ProblemReportStore.promptsLeftOutNote)
+        let template: String = try XCTUnwrap(section["unreadableCharactersNote"] as? String)
+        for count in [1, 2, 17] {
+            XCTAssertEqual(
+                template.replacingOccurrences(of: "{count}", with: String(count)),
+                ProblemReportStore.unreadableCharactersNote(lineCount: count)
+            )
+        }
+
+        let order: [String] = try XCTUnwrap(section["noteOrder"] as? [String])
+        XCTAssertEqual(order, ["promptsLeftOutNote", "unreadableCharactersNote"])
+        let folderURL: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("trail-order-" + UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folderURL) }
+        let bytes: [UInt8] = try SharedRulesContractTests.bytes(
+            fromContractNotation: "chose\n" + AssistTurnRecord.promptMarker + "hi\nbad {C3}\n"
+        )
+        try Data(bytes).write(to: folderURL.appendingPathComponent(ProblemReportStore.activityFileName))
+        let lines: [String] = ProblemReportStore(folderURL: folderURL)
+            .activityText(includingPrompts: false)
+            .components(separatedBy: "\n")
+        var notesInOrder: [String] = []
+        for key in order {
+            if key == "promptsLeftOutNote" {
+                notesInOrder.append(ProblemReportStore.promptsLeftOutNote)
+            } else {
+                notesInOrder.append(ProblemReportStore.unreadableCharactersNote(lineCount: 1))
+            }
+        }
+        XCTAssertEqual(Array(lines.prefix(2)), notesInOrder)
+    }
+
+    /// Guards the parser the cases above lean on: were `{C3}` written as
+    /// four characters, every "damaged" case would be a readable file and
+    /// could only fail on its note.
+    func testTheByteNotationIsReadAsTheContractDefinesIt() throws {
+        XCTAssertEqual(
+            try SharedRulesContractTests.bytes(fromContractNotation: "a{C3}b"),
+            [0x61, 0xC3, 0x62]
+        )
+        XCTAssertEqual(
+            try SharedRulesContractTests.bytes(fromContractNotation: "{80}{80}"),
+            [0x80, 0x80]
+        )
+        XCTAssertEqual(
+            try SharedRulesContractTests.bytes(fromContractNotation: "caf\u{E9} · ok"),
+            Array("caf\u{E9} · ok".utf8)
+        )
+    }
+
+    /// `{XX}` is one raw byte; everything else is the UTF-8 of its text.
+    /// `problemReportTrail.byteNotation`.
+    private static func bytes(fromContractNotation notation: String) throws -> [UInt8] {
+        var result: [UInt8] = []
+        let characters: [Character] = Array(notation)
+        var index: Int = 0
+        while index < characters.count {
+            let character: Character = characters[index]
+            if character == "{" && index + 3 < characters.count && characters[index + 3] == "}" {
+                let hexDigits: String = String(characters[index + 1]) + String(characters[index + 2])
+                let value: UInt8 = try XCTUnwrap(
+                    UInt8(hexDigits, radix: 16), "not a byte in the contract's notation: {\(hexDigits)}"
+                )
+                result.append(value)
+                index += 4
+                continue
+            }
+            for byte in String(character).utf8 {
+                result.append(byte)
+            }
+            index += 1
+        }
+        return result
+    }
+
+    /// Turns an `expectLines` entry into the line the app should write:
+    /// `{promptsLeftOutNote}` and `{unreadableCharactersNote:N}` stand for the
+    /// app's sentences, anything else is the line itself.
+    private static func trailLine(forContractToken token: String) throws -> String {
+        if token == "{promptsLeftOutNote}" {
+            return ProblemReportStore.promptsLeftOutNote
+        }
+        let prefix: String = "{unreadableCharactersNote:"
+        if token.hasPrefix(prefix) && token.hasSuffix("}") {
+            let digits: String = String(token.dropFirst(prefix.count).dropLast())
+            let count: Int = try XCTUnwrap(Int(digits), "not a count: \(token)")
+            return ProblemReportStore.unreadableCharactersNote(lineCount: count)
+        }
+        return token
     }
 
     // MARK: - The New Course wizard's words

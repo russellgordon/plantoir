@@ -419,6 +419,68 @@ final class ClassPlanningTests: XCTestCase {
         )
     }
 
+    /// #294. Inside a table Obsidian escapes the alias pipe,
+    /// `[[Unit 2, Day 3\|Tuesday]]`, so the cell does not end there. The name
+    /// is what comes before the backslash — and a rename moves ONLY the name:
+    /// the backslash stays where the table needs it. A rewrite that dropped
+    /// it would write `[[Module 2, Day 3|Tuesday]]` and split the cell in two,
+    /// which every "does the link point at Module 2 now?" check would pass.
+    @MainActor
+    func testATableLinkIsRewrittenAndKeepsItsBackslash() {
+        let renamed: [String: String] = ["Unit 2, Day 3": "Module 2, Day 3"]
+        let table: String = "| [[Unit 2, Day 3\\|Tuesday]] | [[Unit 2, Day 3]] | ![[pic.png\\|300]] |"
+        XCTAssertEqual(
+            WikiLinkRewriter.rewriting(table, renamedPages: renamed),
+            "| [[Module 2, Day 3\\|Tuesday]] | [[Module 2, Day 3]] | ![[pic.png\\|300]] |"
+        )
+        XCTAssertEqual(WikiLinkRewriter.countLinks(to: ["Unit 2, Day 3"], in: table), 2)
+
+        // A backslash INSIDE a name is not the escape of a pipe, and stays
+        // part of the name.
+        XCTAssertEqual(
+            WikiLinkRewriter.rewriting("[[a\\b]]", renamedPages: ["a\\b": "c"]),
+            "[[c]]"
+        )
+    }
+
+    /// #294, the consequence worse than the one reported: inserting a class
+    /// renames every later class, and a link to one of them written in a
+    /// table has to move with it. Left on the old number, it would point at
+    /// the class just INSERTED — a different lesson, not a dead link.
+    @MainActor
+    func testInsertingAClassMovesALinkWrittenInATable() throws {
+        let (root, _, course) = try makeWorkspace()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        try writeClass("Unit 1, Day 1", on: "2026-09-08", body: "one", in: course)
+        try writeClass("Unit 1, Day 2", on: "2026-09-10", body: "two", in: course)
+
+        let concept: String = """
+        ---
+        title: Loops
+        ---
+
+        | When | Where |
+        |---|---|
+        | Thursday | [[Unit 1, Day 2\\|Thursday's class]] |
+        """
+        let conceptURL: URL = course.directoryURL.appendingPathComponent("Loops.md")
+        try concept.write(to: conceptURL, atomically: true, encoding: .utf8)
+
+        let plan: ClassInsertionPlan = try ClassInsertionPlanner.plan(
+            unit: 1, atDay: 2, count: 1, forSection: 1, in: course
+        )
+        XCTAssertEqual(plan.linksToRewrite, 1, "The table link points at the page being renamed")
+
+        try ClassInsertionPlanner.apply(plan, in: course)
+
+        let updated: String = try String(contentsOf: conceptURL, encoding: .utf8)
+        XCTAssertTrue(
+            updated.contains("| Thursday | [[Unit 1, Day 3\\|Thursday's class]] |"),
+            "The table link follows its class and keeps its backslash:\n\(updated)"
+        )
+    }
+
     @MainActor
     func testInsertionIsRefusedWhenTheTimetableRunsOut() throws {
         let (root, _, course) = try makeWorkspace(meetingDates: ["2026-09-08", "2026-09-10"])

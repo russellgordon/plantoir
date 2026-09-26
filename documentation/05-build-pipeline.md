@@ -502,6 +502,50 @@ undated.
   shared with the first pass's walk) — never onto another class page, a
   folder's index, Key Links or Curriculum Coverage. A page two links away is
   not dated by the class at all.
+
+  **Which shapes are links** (`_extract_wikilink_targets`, the one reader both
+  passes share; contract `shared-rules.json` → `readingALink`, run by
+  `scripts/test_dates_follow_the_class.py`): `[[Page]]`, `[[Page|words]]`,
+  `[[Page#Heading]]`, and the escaped pipe Obsidian writes for an alias inside
+  a table, `[[Page\|words]]` — whose backslash is never part of the name — and,
+  **since [#294](https://github.com/russellgordon/plantoir/issues/294),
+  `[[Page#Heading|words]]` and `[[Page#Heading\|words]]`**, the form
+  Obsidian's own autocomplete writes for a heading link with an alias. Until
+  then the pattern put its alias group BEFORE its heading group, so a heading
+  followed by an alias was not a link to either pass. **After #294 ships, three
+  groups of pages whose only link of that kind is this shape change on the next
+  build, in every existing folder** (measured with the real functions against
+  the old and new pattern):
+
+  - **Linked directly from a visible, dated class** — the second pass now dates
+    it. On the SITE it moves from the first class's date (the first pass's
+    stamp) to its class's; in the TEACHER'S FILE it moves from whatever date
+    the file held — its install-day stamp, or a date the teacher typed — to its
+    class's, as for any page a class links to (the file rules above), and the
+    page is named in the "Gave N of your page(s)…" line and on the trail
+    (`pagesDatedByTheBuild`).
+  - **Linked that way only from a HIDDEN or UNDATED class** — the first pass's
+    walk starts from every class page, so the page is now reached and no longer
+    reset: on the SITE it moves from the first class's date to its own date
+    (for a page copied from a template, the install-day stamp). The file is not
+    touched — the first pass writes the build's copy only.
+  - **Reached only THROUGH such a link** (a hub page carrying `[[P#h|a]]`, and
+    what it leads to) — likewise now reached, so it keeps its own date on the
+    site instead of the first class's; the file is not touched.
+
+  The last two are the rule stated above ("a page reached only THROUGH another
+  shared page … keeps its own date") applying to links it used to miss. It is
+  the right change, and not only because the link is a link: the mac app's
+  re-date already read `[[P#h|a]]` as a link to P (its name stops at `#`), so
+  until #294 the app and the build disagreed about those pages and the build
+  won by overwriting on every build. Measured: 0 such links in `support/`
+  (payloads, skeletons and the example course, code stripped — the old and new
+  readers give identical targets on all 12,490 files), so no shipped page
+  moves; teacher-written ones will. No log line's wording changes and none
+  becomes untrue. The install-time readers in `setup_course.py`, and the
+  curriculum-coverage patterns (which already read `\|` but share the old
+  group order), are
+  [#314](https://github.com/russellgordon/plantoir/issues/314).
 - **A class dated with a plain YAML date** (`created: 2026-09-24`, unquoted —
   what Obsidian's Date property writes) counts, as midnight in Toronto. Until
   the fix round `_parse_created_value` read it as no date at all, so such a

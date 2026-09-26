@@ -959,7 +959,9 @@ What replaces the old container concepts:
   websocket — six blocks, where the mac launchers walk forty since GitHub
   #280 and `preview.ps1` owes the same walk: `contracts/app-rules.json` →
   `previewPorts.hostBlockCases`, and 03 → "How a folder finds its ports, and
-  when it cannot") and prints the exact "Preview will be available at:" line the
+  when it cannot"; whether its probe sees ANOTHER signed-in account's
+  listeners is the open question the mac answered for itself in #310 — the
+  `windows` issue from #310 asks for the two-account measurement) and prints the exact "Preview will be available at:" line the
   app watches for. What changed is only what is listening on that port: a
   Node process running directly on the PC, bound to `127.0.0.1` (patched at
   runtime-build time in `fetch-runtime.ps1`, native-only — see the favicon

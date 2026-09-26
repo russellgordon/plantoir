@@ -74,6 +74,9 @@ struct TranscriptBuilder {
         if WorkspaceInUseReport.isMarkerLine(currentLine) {
             return ""
         }
+        if PreviewAddressHeldReport.isMarkerLine(currentLine) {
+            return ""
+        }
         return currentLine
     }
 
@@ -180,6 +183,9 @@ struct TranscriptBuilder {
             return
         }
         if WorkspaceInUseReport.isMarkerLine(line) {
+            return
+        }
+        if PreviewAddressHeldReport.isMarkerLine(line) {
             return
         }
         lines.append(line)

@@ -732,6 +732,9 @@ class ScriptRunner {
         // A launcher that waited for, or refused on, something running in
         // the folder's workspace before remaking it (#94).
         WorkspaceInUseReport.noteOnTheTrail(from: text)
+        // A preview whose address was held by something else on this Mac,
+        // or whose look could not be made (#310).
+        PreviewAddressHeldReport.noteOnTheTrail(from: text)
         for finding in SiteHealthFinding.findings(in: text) {
             if healthFindings.contains(finding) {
                 continue
@@ -893,6 +896,9 @@ class ScriptRunner {
             return false
         }
         if WorkspaceInUseReport.isMarkerLine(line) {
+            return false
+        }
+        if PreviewAddressHeldReport.isMarkerLine(line) {
             return false
         }
         if line.hasSuffix(":") || line.hasSuffix("?") || line.hasSuffix(">") {
