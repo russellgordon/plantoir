@@ -82,8 +82,13 @@ enum FolderPathRewriter {
     /// to the first `]`, `|` or `#`, so an alias, a heading and a block
     /// reference stay where they are. `WikiLinkRewriter`'s pattern, and the
     /// same one on purpose: two link finders that disagreed about what a link
-    /// is would rewrite different halves of the same vault.
-    nonisolated static let wikiLinkPattern: String = #"(!?\[\[)([^\]|#]+)"#
+    /// is would rewrite different halves of the same vault. A REFERENCE since
+    /// #294 rather than a copy of the string: when that pattern learned to
+    /// stop before the backslash of a table's `\|`, a copy here would have
+    /// kept the old reading. (A folder rewrite changes only the target's
+    /// prefix, so the old reading did no harm here — but the next reader to
+    /// copy the string from this file would have inherited it.)
+    nonisolated static let wikiLinkPattern: String = WikiLinkRewriter.pattern
 
     /// A Markdown link or embed's target: everything between `](` and the
     /// closing bracket. Titles (`](path "title")`) are left in place because
