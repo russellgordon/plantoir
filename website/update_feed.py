@@ -105,10 +105,19 @@ SECTIONS_NOT_SHOWN = ("downloads",)
 def inline(text: str) -> str:
     """Escape a line, then turn back on what the notes template uses inline:
     **bold**, `code` and [a link](https://…). Nothing else becomes markup."""
+    # Code first, set aside, so nothing inside backticks becomes bold or a link.
+    spans: list[str] = []
+
+    def keep_code(match: re.Match) -> str:
+        spans.append(f"<code>{html.escape(match.group(1), quote=True)}</code>")
+        return f"\x00{len(spans) - 1}\x00"
+
+    text = re.sub(r"`([^`]+)`", keep_code, text)
     escaped = html.escape(text, quote=True)
     escaped = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", escaped)
-    escaped = re.sub(r"`([^`]+)`", r"<code>\1</code>", escaped)
     escaped = re.sub(r"\[([^\]]+)\]\((https?://[^)\s]+)\)", r'<a href="\2">\1</a>', escaped)
+    for index, span in enumerate(spans):
+        escaped = escaped.replace(f"\x00{index}\x00", span)
     return escaped
 
 
@@ -150,40 +159,71 @@ def notes_for_the_mac(notes_markdown: str) -> list[str]:
     return kept
 
 
+def rendered_lines(kept: list[str]) -> list[str]:
+    """The kept lines as HTML: headings, bullets, `> ` quotes and paragraphs.
+
+    A heading with nothing under it — every item under "Fixed" was a Windows
+    one, say — is dropped rather than shown empty (the third review's L6).
+    """
+    blocks: list[tuple[str, list[str]]] = []   # (heading html or "", its body lines)
+    current_heading: str = ""
+    current_body: list[str] = []
+    in_list = False
+    for line in kept:
+        heading = heading_text(line) if line else None
+        if heading is not None:
+            if in_list:
+                current_body.append("</ul>")
+                in_list = False
+            blocks.append((current_heading, current_body))
+            current_heading = f"<h3>{inline(heading)}</h3>"
+            current_body = []
+            continue
+        if line.startswith("- ") or line.startswith("* "):
+            if not in_list:
+                current_body.append("<ul>")
+                in_list = True
+            current_body.append(f"<li>{inline(line[2:].strip())}</li>")
+            continue
+        if in_list:
+            current_body.append("</ul>")
+            in_list = False
+        if not line:
+            continue
+        if line.startswith(">"):
+            current_body.append(f"<blockquote><p>{inline(line.lstrip('>').strip())}</p></blockquote>")
+        else:
+            current_body.append(f"<p>{inline(line)}</p>")
+    if in_list:
+        current_body.append("</ul>")
+    blocks.append((current_heading, current_body))
+    lines: list[str] = []
+    for heading, body in blocks:
+        if heading and not body:
+            continue
+        if heading:
+            lines.append(heading)
+        lines.extend(body)
+    return lines
+
+
 def notes_section(version: str, build: str, notes_markdown: str, required_warning: bool) -> str:
     """One release's notes as the HTML section the updater shows.
 
     A small reading of the approved notes, covering what the cut-release
     template uses: headings (`#` or a line that is only **bold**), bullets,
-    **bold**, `code` and links. Every character is escaped first — the notes
-    are text, and only those four shapes become markup.
+    `> ` quotes, **bold**, `code` and links. Every character is escaped first —
+    the notes are text, and only those shapes become markup; a heading left
+    with nothing under it is dropped.
     """
+    body = rendered_lines(notes_for_the_mac(notes_markdown))
     lines: list[str] = []
     attributes = f'data-sparkle-version="{html.escape(build)}"'
     if required_warning:
         attributes += " data-required-warning"
     lines.append(f"<div {attributes}>")
     lines.append(f"<h2>Plantoir {html.escape(version)}</h2>")
-    in_list = False
-    for line in notes_for_the_mac(notes_markdown):
-        if line.startswith("- ") or line.startswith("* "):
-            if not in_list:
-                lines.append("<ul>")
-                in_list = True
-            lines.append(f"<li>{inline(line[2:].strip())}</li>")
-            continue
-        if in_list:
-            lines.append("</ul>")
-            in_list = False
-        if not line:
-            continue
-        heading = heading_text(line)
-        if heading is not None:
-            lines.append(f"<h3>{inline(heading)}</h3>")
-        else:
-            lines.append(f"<p>{inline(line)}</p>")
-    if in_list:
-        lines.append("</ul>")
+    lines.extend(body)
     lines.append("</div>")
     return "\n".join(lines)
 
