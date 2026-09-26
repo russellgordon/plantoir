@@ -918,8 +918,8 @@ or leaving the exclusion out — turns 3 and 4 red.
 [#183](https://github.com/russellgordon/plantoir/issues/183) (2026-09-26) the
 contract drives it.** Since #266 both folder lists' removal is one method,
 `CourseSettingsView.folderWasRemoved(_:scope:)` — `excluded_items`, then the
-pool (and, until #152, the trail line, which is now written when the file is:
-`excludedItems.recordedOnSave`) — called from the list editor's
+pool, then the trail line (written on the click, saved or not —
+`excludedItems.recordedOnClick`) — called from the list editor's
 `StringListEditorView.removeItem(named:)` after the editor has written the copy
 list. Until #183 the mac's contract runner (and three other tests) REPLAYED
 those steps by hand in the order they were believed to run, so a reorder inside
@@ -1063,9 +1063,9 @@ unasked. A mac reader who tries the stated mutation and sees the suite stay
 green must not conclude the guard is dead.
 
 Nothing new is written to the activity trail for any of this. The removal
-already leaves its own line (`item excluded` — written since #152 when the
-removal reaches `course_config.json`, whichever writer saves it, never on the
-click; `excludedItems.recordedOnSave`), and what changed is only which
+already leaves its own line (`item excluded`, written on the click, saved or
+not, with `exclusions reverted` beside it if a Revert takes it back —
+`excludedItems.recordedOnClick`), and what changed is only which
 folders are OFFERED — which is not something a teacher DOES, and a trail line
 for it would record a redraw.
 

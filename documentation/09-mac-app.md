@@ -25,7 +25,7 @@ interfaces automatically.
 | App action | Toolchain mechanism used |
 |---|---|
 | Save | Writes `course_config.json`; [`build_site.py`](05-build-pipeline.md) applies it on the next build |
-| Revert | Puts the form's values back to the last-saved file contents. Leaves nothing on the trail: a removal or an add-back is recorded only when a write puts it into the file (`excludedItems.recordedOnSave`, #152) |
+| Revert | Puts the form's values back to the last-saved file contents. When that takes back unsaved exclusion changes, writes `exclusions reverted` with how many — the click lines stay (`excludedItems.recordedOnClick`, #152) |
 | Preview | Runs [`preview.sh`](03-launcher-scripts.md) `--port N` (serve mode) and embeds the announced address in a web view once it responds — up to four sections per folder at once |
 | Deploy | Runs [`deploy.sh`](07-deployment.md) with output streamed into the app (prompts answered inline); if a preview is running or building, stops it and awaits container cleanup first; the finished live-site link wears the section's custom domain when one is set |
 | New Course | Writes the collected answers as `course_config.json`, then runs the real `./setup.sh`, accepting each prompt's default — the wizard re-reads the file as its saved answers, so scaffolding/backups/Quartz patches are all the wizard's own work |
@@ -2206,24 +2206,30 @@ eleven hides and took A's "All Classes" away. Reverting to the file is what
 unreadable file falls back to the old behaviour. Must-fail:
 `TwoWindowSettingsTests.testRevertShowsTheFileAndTheNextSaveDoesNotPutTheOldListBack`.
 
-**A Revert leaves no `item excluded` line** (issue
+**A Revert that takes back an exclusion says so** (issue
 [#152](https://github.com/russellgordon/plantoir/issues/152), from #85's third
-item). The line used to be written on the click, so a folder removed and then
-Reverted left the trail saying it had been excluded. Since #152
-`CourseConfiguration.write(to:)` compares `excluded_items` in the bytes its
-own merge used — the file just before the write — with what it wrote, and
-records one `item excluded` / `item re-included` per name that changed
-(`ExclusionTrail`; `excludedItems.recordedOnSave`). In the write rather than
-in Settings' Save, because every writer of the configuration (Add Section, Set
-School Year, archive, restore, rename) saves whatever is pending in it: remove
-`Labs` without saving, add a section from the sidebar, and the exclusion
-reaches the file through Add Section — a Save-only comparison would then find
-it already there and record nothing, ever. The lines now come BEFORE `settings
-saved`, not after it. A write that throws records nothing; a new file with no
-baseline (a Keep a Copy import staging its settings) records nothing, because
-its exclusions arrived with it. Must-fails: `GradedFolderChoicesTests` (revert
-→ 0 lines, save → 1, remove-and-add-back → 0, Add Section → 1, a read-only
-folder → 0).
+item). `item excluded` and `item re-included` are written on the CLICK, saved
+or not, so a folder removed and then Reverted used to leave a trail saying it
+had been excluded and nothing more. The Revert button now goes through
+`CourseSettingsView.revertToFile()`, which counts the names whose exclusion the
+Revert took back (both scopes, either direction) and writes ONE `exclusions
+reverted` line with the count — never the names, which the click lines beside it
+already carry — and nothing when it took back none.
+
+**Why on the click, and not at the write: Russell's decision of 2026-09-06**
+(`overnight/issues/09-item-excluded-trail-on-click.md`). The trail exists so a
+problem can be looked into next week without asking the teacher to reproduce
+it, so it must hold the ATTEMPT: a teacher who removes a folder and crashes
+before saving must still leave a trace, and the revert line makes the trail
+self-correcting — it shows a change of mind, which is worth knowing. REJECTED,
+with his reasons: recording at the write (a crash before Save leaves nothing),
+and leaving the quirk documented (a line saying something happened when it did
+not is what rule 5 forbids). #152 first built the write-time version, from a
+ruling made without knowing his decision; it was withdrawn the same day. One
+consequence worth knowing: a removal left unsaved and then saved by another
+writer — Add Section from the sidebar — has its line already, from the click.
+Pinned by `excludedItems.recordedOnClick` (9 cases, played through this page by
+`ExcludedItemsContractTests`).
 
 **When both windows changed the sidebar list, the last Save wins — and says
 so** (the review's M2; ruled by the director for Russell, 2026-09-24). The
