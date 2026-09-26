@@ -714,6 +714,38 @@ if [[ "$_BUILT_FOUND" != "true" ]]; then
   exit 1
 fi
 
+# -------------------- Is this site a preview's? ------------------------
+# Serve mode bakes a live-reload client into every page it builds, and a site
+# that carries it must never be published (the reasons are where it is used,
+# below). The rule is contracts/app-rules.json -> buildFreshness.previewBuild,
+# read by five other checkers too, and scripts/test_preview_build_detection.py
+# cuts THIS definition out of the launcher and runs it against every case.
+#
+# What is looked for is the client's script TAG followed by its first
+# statement, with only whitespace between (#291). The bare address
+# "ws://localhost:" was the rule until 2026-09-26, and any page whose note
+# MENTIONS it carries that too: one networking lesson, measured in a
+# production build, carried it 8 times, so a folder publish of that course
+# refused every time and every other publish rebuilt. A page's own words
+# cannot produce the tag, because Quartz writes "<" as "&lt;" in text and in
+# attributes alike.
+#
+# Two details are load-bearing:
+#   -z         Quartz puts the tag and the statement on DIFFERENT lines, so
+#              each page is read as one record rather than line by line.
+#   LC_ALL=C   Under a UTF-8 locale BSD grep -z misses the client in a file
+#              that holds ANY byte that is not UTF-8 (measured: exit 1, and
+#              0 under LC_ALL=C), and a preview's page read as clean is a
+#              preview PUBLISHED. #136 judged LC_ALL=C here "correct, but not
+#              worth a publishing-path change" when the miss needed the byte on
+#              the same line and erred safe; -z made it whole-file and unsafe,
+#              so that choice is reversed.
+# A basic regex, not -E: the pattern holds a literal "(".
+LIVE_RELOAD_CLIENT_PATTERN=$'<script type="application/javascript">[[:space:]]*const socket = new WebSocket(\'ws://localhost:'
+site_carries_preview_client() {
+  LC_ALL=C grep -rzqs --include='*.html' -- "$LIVE_RELOAD_CLIENT_PATTERN" "$1" 2>/dev/null
+}
+
 # -------------------- Publish to a local folder ------------------------
 # The built site already sits on the host (the working folder is
 # bind-mounted), so publishing to a folder is a host-side incremental
@@ -744,7 +776,8 @@ if [[ -n "$TO_FOLDER" ]]; then
   }
   # A PREVIEW build must never reach a published site. Serve mode bakes a
   # live-reload client — new WebSocket('ws://localhost:<port>') — into every
-  # page, and on a published site that script makes a student's browser ask
+  # page (how it is recognised: site_carries_preview_client, above), and on a
+  # published site that script makes a student's browser ask
   # permission to "access other apps and services on this device".
   #
   # `deploy.py` already refuses this, but ONLY for Netlify and Cloudflare:
@@ -765,7 +798,7 @@ if [[ -n "$TO_FOLDER" ]]; then
   # published. Found by review on 2026-09-05, after the mixture had been
   # written up as real in the documentation without anyone noticing the
   # trigger could not see it.
-  if grep -rq --include='*.html' "ws://localhost:" "${PUBLIC_DIR_HOST}" 2>/dev/null; then
+  if site_carries_preview_client "${PUBLIC_DIR_HOST}"; then
     echo "🔁 This site was built by a preview, which bakes in a live-reload script"
     echo "   that students' browsers would ask about. Rebuilding it for publishing…"
     # Forward the flag. Without it this rebuild is a SECOND way a scheduled
@@ -836,12 +869,12 @@ if [[ -n "$TO_FOLDER" ]]; then
     # guard below rather than hanging.
     for ((_w=0; _w<150; _w++)); do
       if [[ -f "${PUBLIC_DIR_HOST}/index.html" ]] \
-         && ! grep -rq --include='*.html' "ws://localhost:" "${PUBLIC_DIR_HOST}" 2>/dev/null; then
+         && ! site_carries_preview_client "${PUBLIC_DIR_HOST}"; then
         break
       fi
       sleep 0.2
     done
-    if grep -rq --include='*.html' "ws://localhost:" "${PUBLIC_DIR_HOST}" 2>/dev/null; then
+    if site_carries_preview_client "${PUBLIC_DIR_HOST}"; then
       echo "❌ The rebuilt site still carries the preview's live-reload script."
       echo "   Nothing was published, rather than publishing pages students'"
       echo "   browsers would ask about."

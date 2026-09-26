@@ -835,12 +835,21 @@ enum ScheduledDeploy {
         //     which grep alone cannot say (its exit 2 reads as "no" in an if);
         //   `-s` — any other page that cannot be read is passed over quietly:
         //     measured, BSD grep exits 0 on a match elsewhere and 2 otherwise;
-        //   `LC_ALL=C` — a byte match. Under a UTF-8 locale macOS's grep does
-        //     not find the signature on a line that also holds a byte that is
-        //     not valid UTF-8 (measured, grep 2.6.0-FreeBSD), and the Swift
-        //     compares bytes.
-        lines.append("  if ! [ -r \(shellQuoted(builtIndexPath)) ] || LC_ALL=C /usr/bin/grep -rqs"
-            + " --include='*.html' \(shellQuoted(BuildFreshness.liveReloadSignature))"
+        //   `-z` — each page read as ONE record: the rule is the client's
+        //     script tag followed by its first statement (issue #291,
+        //     `BuildFreshness.liveReloadPattern`), and Quartz writes those on
+        //     different lines;
+        //   `LC_ALL=C` — a byte match. Under a UTF-8 locale macOS's grep -z
+        //     does not find the client in a file that holds ANY byte that is
+        //     not valid UTF-8 (measured, grep 2.6.0-FreeBSD), which would call
+        //     a preview's page clean; the Swift compares bytes. launchd gives
+        //     the C locale anyway, but the line must not depend on that.
+        // A job scheduled before #291 keeps the old line (the bare address,
+        // line by line) in its written script until it is rescheduled. That
+        // errs SAFE: a page that merely mentions the address is rebuilt every
+        // morning, as it always was.
+        lines.append("  if ! [ -r \(shellQuoted(builtIndexPath)) ] || LC_ALL=C /usr/bin/grep -rzqs"
+            + " --include='*.html' -- \(shellQuoted(BuildFreshness.liveReloadPattern))"
             + " \(shellQuoted(builtPublicPath)); then")
         lines.append("    NEEDS_BUILD=1")
         lines.append("  elif [ -z \"$(/usr/bin/find \(shellQuoted(courseDirectoryPath))"

@@ -21,8 +21,8 @@
           "expectPreview" : true,
           "name" : "a preview's build",
           "pages" : {
-            "index.html" : "<script>new WebSocket('ws://localhost:9081')</script>",
-            "notes/day-1.html" : "<script>new WebSocket('ws://localhost:9081')</script>"
+            "index.html" : "<html><body><script type=\"application/javascript\">\n        const socket = new WebSocket('ws://localhost:9081')\n        // reload(true) ensures resources like images and scripts are fetched again in firefox\n        socket.addEventListener('message', () => document.location.reload(true))\n      </script></body></html>",
+            "notes/day-1.html" : "<html><body><script type=\"application/javascript\">\n        const socket = new WebSocket('ws://localhost:9081')\n        // reload(true) ensures resources like images and scripts are fetched again in firefox\n        socket.addEventListener('message', () => document.location.reload(true))\n      </script></body></html>"
           }
         },
         {
@@ -30,14 +30,14 @@
           "name" : "a clean front page in front of a preview's page (#136)",
           "pages" : {
             "index.html" : "<html><body>Welcome</body></html>",
-            "notes/day-1.html" : "<script>new WebSocket('ws://localhost:9081')</script>"
+            "notes/day-1.html" : "<html><body><script type=\"application/javascript\">\n        const socket = new WebSocket('ws://localhost:9081')\n        // reload(true) ensures resources like images and scripts are fetched again in firefox\n        socket.addEventListener('message', () => document.location.reload(true))\n      </script></body></html>"
           }
         },
         {
           "expectPreview" : true,
           "name" : "a preview's page deep in the tree",
           "pages" : {
-            "a/b/c/page.html" : "<script>new WebSocket('ws://localhost:9083')</script>",
+            "a/b/c/page.html" : "<html><body><script type=\"application/javascript\">\n        const socket = new WebSocket('ws://localhost:9083')\n        // reload(true) ensures resources like images and scripts are fetched again in firefox\n        socket.addEventListener('message', () => document.location.reload(true))\n      </script></body></html>",
             "index.html" : "<html><body>Welcome</body></html>"
           }
         },
@@ -45,7 +45,7 @@
           "expectPreview" : true,
           "name" : "a preview's page in a hidden folder",
           "pages" : {
-            ".cache/page.html" : "<script>new WebSocket('ws://localhost:9081')</script>",
+            ".cache/page.html" : "<html><body><script type=\"application/javascript\">\n        const socket = new WebSocket('ws://localhost:9081')\n        // reload(true) ensures resources like images and scripts are fetched again in firefox\n        socket.addEventListener('message', () => document.location.reload(true))\n      </script></body></html>",
             "index.html" : "<html><body>Welcome</body></html>"
           }
         },
@@ -54,7 +54,7 @@
           "name" : "the address only in files that are not pages",
           "pages" : {
             "index.html" : "<html><body>Welcome</body></html>",
-            "postscript.js" : "new WebSocket('ws://localhost:9081')",
+            "postscript.js" : "<script type=\"application/javascript\">\n        const socket = new WebSocket('ws://localhost:9081')\n        // reload(true) ensures resources like images and scripts are fetched again in firefox\n        socket.addEventListener('message', () => document.location.reload(true))\n      </script>",
             "static/contentIndex.json" : "{\"socket\": \"ws://localhost:9081\"}"
           }
         },
@@ -70,7 +70,7 @@
           "name" : "a page that cannot be read is passed over",
           "pages" : {
             "index.html" : "<html><body>Welcome</body></html>",
-            "locked.html" : "<script>new WebSocket('ws://localhost:9081')</script>"
+            "locked.html" : "<html><body><script type=\"application/javascript\">\n        const socket = new WebSocket('ws://localhost:9081')\n        // reload(true) ensures resources like images and scripts are fetched again in firefox\n        socket.addEventListener('message', () => document.location.reload(true))\n      </script></body></html>"
           },
           "unreadable" : [
             "locked.html"
@@ -82,17 +82,83 @@
           "pages" : {
             "index.html" : "<html><body>Welcome</body></html>",
             "locked.html" : "<html><body>Locked</body></html>",
-            "notes/day-1.html" : "<script>new WebSocket('ws://localhost:9081')</script>"
+            "notes/day-1.html" : "<html><body><script type=\"application/javascript\">\n        const socket = new WebSocket('ws://localhost:9081')\n        // reload(true) ensures resources like images and scripts are fetched again in firefox\n        socket.addEventListener('message', () => document.location.reload(true))\n      </script></body></html>"
           },
           "unreadable" : [
             "locked.html"
           ]
+        },
+        {
+          "expectPreview" : false,
+          "name" : "a page that mentions the address in its title, description, words and code (#291)",
+          "pages" : {
+            "index.html" : "<html><body>Welcome</body></html>",
+            "lessons/networking.html" : "<html><head><title>Networking ws://localhost:8080</title><meta name=\"description\" content=\"Connect to ws://localhost:9081 and new WebSocket('ws://localhost:9081')\"/><meta property=\"og:description\" content=\"Connect to ws://localhost:9081 and new WebSocket('ws://localhost:9081')\"/><script type=\"application/javascript\">function o(){}</script></head><body><nav class=\"breadcrumb\"><a href=\"./\">Networking ws://localhost:8080</a></nav><p>Connect to ws://localhost:8080.</p><p><code>const socket = new WebSocket('ws://localhost:9081')</code></p><pre><code>const socket = new WebSocket('ws://localhost:9081')\n</code></pre></body></html>"
+          }
+        },
+        {
+          "expectPreview" : false,
+          "name" : "the client's own tag, written into a page's words the way Quartz escapes it",
+          "pages" : {
+            "index.html" : "<html><body>Welcome</body></html>",
+            "lessons/the-client.html" : "<html><head><meta name=\"description\" content=\"&lt;script type=&quot;application/javascript&quot;> const socket = new WebSocket('ws://localhost:9081')\"/></head><body><pre><code>&lt;script type=&quot;application/javascript&quot;>\n        const socket = new WebSocket('ws://localhost:9081')\n&lt;/script></code></pre></body></html>"
+          }
+        },
+        {
+          "expectPreview" : true,
+          "name" : "a preview's page that also mentions the address in its words",
+          "pages" : {
+            "index.html" : "<html><body>Welcome</body></html>",
+            "lessons/networking.html" : "<html><head><title>Networking ws://localhost:8080</title><meta name=\"description\" content=\"Connect to ws://localhost:9081 and new WebSocket('ws://localhost:9081')\"/><meta property=\"og:description\" content=\"Connect to ws://localhost:9081 and new WebSocket('ws://localhost:9081')\"/><script type=\"application/javascript\">function o(){}</script></head><body><nav class=\"breadcrumb\"><a href=\"./\">Networking ws://localhost:8080</a></nav><p>Connect to ws://localhost:8080.</p><p><code>const socket = new WebSocket('ws://localhost:9081')</code></p><pre><code>const socket = new WebSocket('ws://localhost:9081')\n</code></pre><script type=\"application/javascript\">\n        const socket = new WebSocket('ws://localhost:9081')\n        // reload(true) ensures resources like images and scripts are fetched again in firefox\n        socket.addEventListener('message', () => document.location.reload(true))\n      </script></body></html>"
+          }
+        },
+        {
+          "expectPreview" : true,
+          "name" : "the tag and the client with nothing between",
+          "pages" : {
+            "index.html" : "<html><body>Welcome</body></html>",
+            "notes/day-1.html" : "<html><body><script type=\"application/javascript\">const socket = new WebSocket('ws://localhost:9081')</script></body></html>"
+          }
+        },
+        {
+          "expectPreview" : true,
+          "name" : "the tag and the client split by a carriage return, a line feed and a tab",
+          "pages" : {
+            "index.html" : "<html><body>Welcome</body></html>",
+            "notes/day-1.html" : "<html><body><script type=\"application/javascript\">\r\n\tconst socket = new WebSocket('ws://localhost:9081')\r\n</script></body></html>"
+          }
+        },
+        {
+          "expectPreview" : true,
+          "invalidUTF8Before" : [
+            "notes/day-1.html"
+          ],
+          "name" : "a preview's page that also holds a byte that is not UTF-8",
+          "pages" : {
+            "index.html" : "<html><body>Welcome</body></html>",
+            "notes/day-1.html" : "<html><body><script type=\"application/javascript\">\n        const socket = new WebSocket('ws://localhost:9081')\n        // reload(true) ensures resources like images and scripts are fetched again in firefox\n        socket.addEventListener('message', () => document.location.reload(true))\n      </script></body></html>"
+          }
         }
       ],
-      "note" : "One rule for 'this built site is a preview's', read by every checker: BuildFreshness in each app, the mac's scheduled publish (its own shell check, because the app is closed when it runs), deploy.sh (three times), deploy.py and deploy.ps1. Serve mode bakes the live-reload client into EVERY page and the built tree is replaced file by file, so a clean front page in front of a preview's pages is a real state — deploy.sh found it on 2026-09-05 and has read the whole tree since, as has deploy.py. The apps read the front page alone until issue #136: they called that state deploy-fresh, skipped their build, and the LAUNCHER then rebuilt under the destination's leg — the build's milestones missing from the panel, and on the mac a question the build asked overnight reported as the destination's. A reader narrower than the launchers is the fault, whichever side it is on. Each case is a tree under the section's public/ folder; `unreadable` names pages that exist but cannot be opened.",
-      "notShared" : "Three things are deliberately NOT cases. (1) A front page that is MISSING or cannot be READ: the apps rebuild (`rules` → 'the built index cannot be read'), while the launchers stop at the copy instead — a different rule, pinned where it lives. (2) A page that is not valid UTF-8: measured 2026-09-25 on macOS 26.6, /usr/bin/grep 2.6.0-FreeBSD under a UTF-8 locale does NOT find the signature on a line that also holds an invalid byte (exit 1), and under LC_ALL=C it does (exit 0), so deploy.sh run from a Terminal can call such a page clean while the apps (bytes), the scheduled check (LC_ALL=C) and deploy.py (errors='ignore') call it a preview's. The error is in the SAFE direction — the app rebuilds first — and Quartz only writes UTF-8, so it is written down rather than pinned. (3) Upper-case .HTML, and a public/ that is ITSELF a symbolic link (neither FileManager's enumerator nor grep -r descends into one; a link further up, such as the mac's .merged_output, is followed by both — measured): Quartz produces neither. deploy.ps1 also matches the signature without regard to case (Select-String's default), which no case here can tell apart.",
-      "signature" : "ws://localhost:",
-      "where" : "Every file whose name ends .html anywhere under the section's built public/ folder, hidden folders included, compared as bytes; the front page first, so a real preview's build answers from one file. A page that cannot be opened is passed over, as every launcher does."
+      "notShared" : "Three things are deliberately NOT cases. (1) A front page that is MISSING or cannot be READ: the apps rebuild (`rules` → 'the built index cannot be read'), while the launchers stop at the copy instead — a different rule, pinned where it lives. (2) Upper-case .HTML, and a public/ that is ITSELF a symbolic link (neither FileManager's enumerator nor grep -r descends into one; a link further up, such as the mac's .merged_output, is followed by both — measured): Quartz produces neither. deploy.ps1 still matches its old signature without regard to case (Select-String's default); once it adopts this rule it must match case-SENSITIVELY, which is owed on #272. (3) A page whose teacher typed the client verbatim as raw HTML (the tag and the client, unescaped): that page really does open a socket to the reader's machine, so calling it a preview's is not wrong, and no fixture would say anything cases 13 and 14 do not. (A page that is not valid UTF-8 used to be listed here, erring safe; with a whole-page read the miss erred UNSAFE, so it is case 15 since #291.)",
+      "note" : "One rule for 'this built site is a preview's', read by every checker: BuildFreshness in each app, the mac's scheduled publish (its own shell check, because the app is closed when it runs), deploy.sh (three times), deploy.py and deploy.ps1. Serve mode bakes the live-reload client into EVERY page and the built tree is replaced file by file, so a clean front page in front of a preview's pages is a real state — deploy.sh found it on 2026-09-05 and has read the whole tree since, as has deploy.py. The apps read the front page alone until issue #136: they called that state deploy-fresh, skipped their build, and the LAUNCHER then rebuilt under the destination's leg — the build's milestones missing from the panel, and on the mac a question the build asked overnight reported as the destination's. A reader narrower than the launchers is the fault, whichever side it is on. Issue #291 then narrowed WHAT is looked for: the bare address matched any page that mentions it, and the rule is now the client's tag and first statement (`signature`). Each case is a tree under the section's public/ folder; `unreadable` names pages that exist but cannot be opened; `invalidUTF8Before` names pages that begin with the bytes FF 0A, which are not UTF-8.",
+      "signature" : {
+        "asABasicRegex" : "<script type=\"application/javascript\">[[:space:]]*const socket = new WebSocket('ws://localhost:",
+        "asQuartzWritesIt" : "<script type=\"application/javascript\">\n        const socket = new WebSocket('ws://localhost:9081')\n        // reload(true) ensures resources like images and scripts are fetched again in firefox\n        socket.addEventListener('message', () => document.location.reload(true))\n      </script>",
+        "between" : [
+          " ",
+          "\t",
+          "\n",
+          "\u000b",
+          "\f",
+          "\r"
+        ],
+        "betweenNote" : "Any run of these bytes, including none, and nothing else: POSIX [[:space:]] in the C locale. Not a Unicode \\s, which in .NET and in Python's str patterns also takes non-breaking and other spaces.",
+        "client" : "const socket = new WebSocket('ws://localhost:",
+        "scriptTag" : "<script type=\"application/javascript\">",
+        "why" : "(#291) The bare address ws://localhost: was the rule until 2026-09-26, and it is in ANY page whose note mentions it: measured in a production build of stock Quartz v4.5.0, one networking lesson carried it 8 times (title, four meta tags, breadcrumb, prose, code), so a folder publish refused after 30 s every time and every other publish rebuilt. The rule is now the client's script TAG followed by its first statement with only `between` bytes in between. A page's words cannot produce that: Quartz writes < as &lt; in text AND in attribute values (measured: content=\"&lt;script type=&quot;…\"), so a raw <script can only come from raw HTML a teacher typed. Narrower strings were measured and rejected: new WebSocket('ws://localhost: matches a meta description (' is not escaped in attributes), inline code and an un-languaged fence; const socket = new WebSocket('ws://localhost: matches inline code and the fence; 'the tag and the client both appear somewhere' is wrong because a production page already holds the same tag for Quartz's own inline script (case 10). Quartz writes the tag and the client on DIFFERENT lines, so a line reader must read each page as ONE record (grep -z, PowerShell -Raw), and grep -z needs LC_ALL=C: under a UTF-8 locale BSD grep -z misses the client in a file holding ANY invalid byte (case 15), which is the unsafe direction. Source: Quartz v4.5.0 quartz/plugins/index.ts:26-38 and quartz/util/resources.tsx:26; raising Quartz means re-measuring this, and verify.sh and verify-deploy.sh fail when those bytes move."
+      },
+      "where" : "Every file whose name ends .html anywhere under the section's built public/ folder, hidden folders included, compared as bytes and read as ONE record, not line by line: the tag and the client are on different lines. The front page first, so a real preview's build answers from one file. A page that cannot be opened is passed over, as every launcher does."
     },
     "rules" : [
       {
@@ -691,9 +757,7 @@
       {
         "flag" : "--diagnose",
         "meaning" : "Print what the deploy would do and why it thinks so.",
-        "usedFor" : [
-
-        ],
+        "usedFor" : [],
         "why" : "A support tool, run by hand when a teacher's deploy misbehaves."
       },
       {
@@ -821,17 +885,13 @@
       {
         "flag" : "--image <tag>",
         "meaning" : "Use this image instead of the one the recipe hash names.",
-        "usedFor" : [
-
-        ],
+        "usedFor" : [],
         "why" : "Testing a locally built image. `verify.sh` uses it; the apps never do."
       },
       {
         "flag" : "--context <name>",
         "meaning" : "Use this Docker context.",
-        "usedFor" : [
-
-        ],
+        "usedFor" : [],
         "why" : "For a machine with several (desktop-linux, colima, default)."
       },
       {
@@ -884,13 +944,12 @@
       "Cloudflare project" : "shared-python",
       "Copying shared folders" : "shared-python",
       "Delta deploy created" : "shared-python",
-      "delta deploy manifest" : "shared-python",
       "Deploy complete" : "shared-python",
       "Deploying from local build" : "shared-python",
       "Done processing" : "elsewhere",
+      "EXAMPLE_COURSE_CODE=" : "shared-python",
       "Ensuring container is running" : "launcher",
       "Example Course installed to" : "shared-python",
-      "EXAMPLE_COURSE_CODE=" : "shared-python",
       "Host timezone offset" : "launcher",
       "Installing dependencies" : "shared-python",
       "Launching Quartz preview" : "shared-python",
@@ -899,14 +958,15 @@
       "Quartz Locale" : "shared-python",
       "Quartz v4" : "elsewhere",
       "Select folders/files to HIDE" : "shared-python",
-      "set up successfully" : "shared-python",
       "Setting up this Mac" : "launcher",
       "Starting container if needed" : "launcher",
-      "timetable section numbers" : "shared-python",
-      "to a folder" : "launcher",
       "Updated pageTitle" : "shared-python",
       "Uploading the built site" : "shared-python",
-      "Welcome to the Course Setup Script" : "shared-python"
+      "Welcome to the Course Setup Script" : "shared-python",
+      "delta deploy manifest" : "shared-python",
+      "set up successfully" : "shared-python",
+      "timetable section numbers" : "shared-python",
+      "to a folder" : "launcher"
     }
   },
   "milestones" : {
@@ -1253,8 +1313,8 @@
               "pages",
               "section"
             ],
-            "readable" : false,
             "readOnly" : false,
+            "readable" : false,
             "required" : [
               "course",
               "section"
@@ -1271,8 +1331,8 @@
               "pages",
               "section"
             ],
-            "readable" : false,
             "readOnly" : false,
+            "readable" : false,
             "required" : [
               "course",
               "section"
@@ -1289,8 +1349,8 @@
               "pages",
               "section"
             ],
-            "readable" : false,
             "readOnly" : false,
+            "readable" : false,
             "required" : [
               "course",
               "section"
@@ -1305,8 +1365,8 @@
               "date",
               "section"
             ],
-            "readable" : false,
             "readOnly" : false,
+            "readable" : false,
             "required" : [
               "course",
               "section",
@@ -1322,8 +1382,8 @@
               "section",
               "when"
             ],
-            "readable" : false,
             "readOnly" : false,
+            "readable" : false,
             "required" : [
               "course",
               "section",
@@ -1339,8 +1399,8 @@
               "page",
               "section"
             ],
-            "readable" : false,
             "readOnly" : true,
+            "readable" : false,
             "required" : [
               "course",
               "section",
@@ -1355,8 +1415,8 @@
               "course",
               "section"
             ],
-            "readable" : true,
             "readOnly" : false,
+            "readable" : true,
             "required" : [
               "course",
               "section"
@@ -1370,8 +1430,8 @@
               "course",
               "section"
             ],
-            "readable" : true,
             "readOnly" : false,
+            "readable" : true,
             "required" : [
               "course",
               "section"
@@ -1386,8 +1446,8 @@
               "matching",
               "section"
             ],
-            "readable" : true,
             "readOnly" : true,
+            "readable" : true,
             "required" : [
               "course",
               "section"
@@ -1397,27 +1457,19 @@
           {
             "arguments" : "",
             "name" : "an empty string, for a tool whose schema declares nothing and requires nothing",
-            "properties" : [
-
-            ],
-            "readable" : true,
+            "properties" : [],
             "readOnly" : false,
-            "required" : [
-
-            ],
+            "readable" : true,
+            "required" : [],
             "tool" : "undo_last_change"
           },
           {
             "arguments" : "{}",
             "name" : "an object with nothing in it, for a tool whose schema declares nothing",
-            "properties" : [
-
-            ],
-            "readable" : true,
+            "properties" : [],
             "readOnly" : false,
-            "required" : [
-
-            ],
+            "readable" : true,
+            "required" : [],
             "tool" : "undo_last_change"
           },
           {
@@ -1430,8 +1482,8 @@
               "pages",
               "section"
             ],
-            "readable" : true,
             "readOnly" : false,
+            "readable" : true,
             "required" : [
               "course",
               "section"
@@ -1448,8 +1500,8 @@
               "pages",
               "section"
             ],
-            "readable" : false,
             "readOnly" : false,
+            "readable" : false,
             "required" : [
               "course",
               "section"
@@ -1459,14 +1511,10 @@
           {
             "arguments" : "{\"course\": \"ICS3U\", \"pages\": \"Unit 1, Day",
             "name" : "half-written, even for a tool that needs nothing",
-            "properties" : [
-
-            ],
-            "readable" : false,
+            "properties" : [],
             "readOnly" : false,
-            "required" : [
-
-            ],
+            "readable" : false,
+            "required" : [],
             "tool" : "undo_last_change"
           }
         ],
@@ -1527,9 +1575,7 @@
         "timeoutsAreOverriddenWhy" : "Codex's own defaults are version-dependent - 30s startup and 300s per tool in its current source, 10s and 60s in its published reference - and both tool figures are too short, because a publish is awaited and a first one builds the image and uploads, which takes minutes. 60s and 1800s are passed rather than trusted.",
         "trailLine" : "started Codex for {course}",
         "valuesAreEscapedTwice" : "Each value sits inside a TOML basic string inside a shell-single-quoted argument, so it is escaped for TOML first (backslash, double quote and control characters) and for the shell second. Getting the inner layer wrong fails QUIETLY: an unparseable value is not rejected, it is treated as a raw string, so args stops being a list and the door greets the teacher and then cannot start its server.",
-        "writesForTheConnection" : [
-
-        ],
+        "writesForTheConnection" : [],
         "writesNothingElse" : "No configuration file exists for this door: the server is described in the arguments. Nothing is written into the teacher's working folder, and nothing is added to or read from their own Codex configuration."
       }
     ],
@@ -2006,9 +2052,7 @@
               "own" : 1
             }
           ],
-          "markers" : [
-
-          ],
+          "markers" : [],
           "netstatAsked" : true,
           "outcome" : "announces",
           "reach" : 52,
@@ -2086,12 +2130,8 @@
         },
         {
           "context" : "colima",
-          "looks" : [
-
-          ],
-          "markers" : [
-
-          ],
+          "looks" : [],
+          "markers" : [],
           "netstatAsked" : false,
           "outcome" : "reachRefuses",
           "reach" : 7,
@@ -2107,9 +2147,7 @@
               "own" : "empty"
             }
           ],
-          "markers" : [
-
-          ],
+          "markers" : [],
           "netstatAsked" : true,
           "outcome" : "announces",
           "reach" : 52,
@@ -2125,9 +2163,7 @@
               "own" : "missing"
             }
           ],
-          "markers" : [
-
-          ],
+          "markers" : [],
           "netstatAsked" : true,
           "outcome" : "announces",
           "reach" : 52,
@@ -2143,9 +2179,7 @@
               "own" : 0
             }
           ],
-          "markers" : [
-
-          ],
+          "markers" : [],
           "netstatAsked" : true,
           "outcome" : "announces",
           "reach" : 52,
@@ -2161,9 +2195,7 @@
               "own" : 0
             }
           ],
-          "markers" : [
-
-          ],
+          "markers" : [],
           "netstatAsked" : false,
           "outcome" : "announces",
           "reach" : 52,
@@ -2216,12 +2248,8 @@
         {
           "buildOnly" : true,
           "context" : "colima",
-          "looks" : [
-
-          ],
-          "markers" : [
-
-          ],
+          "looks" : [],
+          "markers" : [],
           "netstatAsked" : false,
           "outcome" : "asksNothing",
           "reach" : 52,
@@ -2402,9 +2430,7 @@
         "cases" : [
           {
             "expect" : "nothing",
-            "launchers" : [
-
-            ],
+            "launchers" : [],
             "name" : "idle: only its own first process",
             "running" : true,
             "top" : [
@@ -2417,18 +2443,14 @@
           },
           {
             "expect" : "nothing",
-            "launchers" : [
-
-            ],
+            "launchers" : [],
             "name" : "stopped: not asked what runs in it",
             "running" : false,
             "top" : "not asked"
           },
           {
             "expect" : "nothing",
-            "launchers" : [
-
-            ],
+            "launchers" : [],
             "name" : "gone",
             "running" : "gone",
             "top" : "not asked"
@@ -2487,9 +2509,7 @@
           },
           {
             "expect" : "nothing",
-            "launchers" : [
-
-            ],
+            "launchers" : [],
             "name" : "a preview whose launcher has gone",
             "running" : true,
             "top" : [
@@ -2612,9 +2632,7 @@
           },
           {
             "expect" : "other work",
-            "launchers" : [
-
-            ],
+            "launchers" : [],
             "name" : "a publish",
             "running" : true,
             "top" : [
@@ -2637,9 +2655,7 @@
           },
           {
             "expect" : "other work",
-            "launchers" : [
-
-            ],
+            "launchers" : [],
             "name" : "another launcher checking the courses folder",
             "running" : true,
             "top" : [
@@ -2657,9 +2673,7 @@
           },
           {
             "expect" : "other work",
-            "launchers" : [
-
-            ],
+            "launchers" : [],
             "name" : "running, but could not be asked",
             "running" : true,
             "top" : "fails"

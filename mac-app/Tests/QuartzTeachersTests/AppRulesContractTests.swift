@@ -408,7 +408,7 @@ final class AppRulesContractTests: XCTestCase {
 
         // A preview-built page carries the live-reload client; a deploy-built
         // one does not. That is the whole of the distinction, and it is the
-        // string the contract names.
+        // rule the contract names (the client as Quartz writes it, #291).
         let root: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("freshness-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -419,7 +419,7 @@ final class AppRulesContractTests: XCTestCase {
         // first.
         let previewBuilt: URL = root.appendingPathComponent("preview/public")
         try FileManager.default.createDirectory(at: previewBuilt, withIntermediateDirectories: true)
-        try "<script>new WebSocket('ws://localhost:9081')</script>".write(
+        try BuildFreshnessTests.clientAsQuartzWritesIt().write(
             to: previewBuilt.appendingPathComponent("index.html"), atomically: true, encoding: .utf8
         )
         let deployBuilt: URL = root.appendingPathComponent("deploy/public")
