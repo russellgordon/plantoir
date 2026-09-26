@@ -391,6 +391,21 @@ else
   cat /tmp/verify_preflight_exclusions_test.log
 fi
 
+# Issue #128: one coverage map per curriculum folder, and what setup records.
+if (cd scripts && python3 test_coverage_maps.py) >/tmp/verify_coverage_maps_test.log 2>&1; then
+  pass "build_site.py: one curriculum coverage map per curriculum folder, the code rule, and single-map output unchanged (scripts/test_coverage_maps.py)"
+else
+  fail "build_site.py: one curriculum coverage map per curriculum folder, the code rule, and single-map output unchanged (scripts/test_coverage_maps.py)"
+  sed 's/^/     /' /tmp/verify_coverage_maps_test.log | tail -40
+fi
+
+if (cd scripts && python3 test_setup_curriculum_folders.py) >/tmp/verify_setup_curriculum_folders_test.log 2>&1; then
+  pass "setup_course.py: curriculum_folders written for a new course, and a re-run keeps a recorded folder (scripts/test_setup_curriculum_folders.py)"
+else
+  fail "setup_course.py: curriculum_folders written for a new course, and a re-run keeps a recorded folder (scripts/test_setup_curriculum_folders.py)"
+  sed 's/^/     /' /tmp/verify_setup_curriculum_folders_test.log | tail -40
+fi
+
 # Issue #265: the build never changes `hidden`, the sidebar filter keeps the
 # stored names, and an older section's filter is repaired.
 if (cd scripts && python3 test_sidebar_hiding.py) >/tmp/verify_sidebar_hiding_test.log 2>&1; then

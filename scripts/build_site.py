@@ -1692,7 +1692,7 @@ def _is_class_page(path: Path, title: str | None = None, word: str | None = None
     course teaches nothing at all: the coverage map would fall back to counting
     every published page, which is a wrong map that reports success.
     """
-    if path.name.lower() in ("index.md", "key links.md", "curriculum coverage.md"):
+    if path.name.lower() in ("index.md", "key links.md") or _is_coverage_page_name(path.name):
         return False
     pattern = class_page_pattern(word)
     stem = path.stem.strip()
@@ -1779,7 +1779,7 @@ def _extract_wikilink_targets(text: str) -> set[str]:
         if stem.lower().endswith(".md"):
             stem = stem[:-3].strip()
         stem_lower = stem.lower()
-        if stem_lower in ("index", "key links", "curriculum coverage"):
+        if stem_lower in ("index", "key links") or _is_coverage_page_name(stem_lower):
             continue
         if stem:
             targets.add(stem_lower)
@@ -1790,9 +1790,16 @@ def _extract_wikilink_targets(text: str) -> set[str]:
             targets.add(norm_path)
     return targets
 
-# Pages a link can never land on: a folder's own index, and the two pages
-# every section carries. A class does not "bring" them, whatever it links to.
-_STRUCTURAL_PAGE_NAMES = ("index.md", "key links.md", "curriculum coverage.md")
+# Pages a link can never land on: a folder's own index, Key Links, and every
+# curriculum coverage map this build writes (#128: one per curriculum folder,
+# so the names are the build's own titles rather than one literal). A class
+# does not "bring" them, whatever it links to.
+_STRUCTURAL_PAGE_NAMES = ("index.md", "key links.md")
+
+
+def _is_structural_page_name(file_name: str) -> bool:
+    """A folder's index, Key Links, or one of this build's coverage maps."""
+    return file_name.lower() in _STRUCTURAL_PAGE_NAMES or _is_coverage_page_name(file_name)
 
 
 def _read_pages_for_linking(content_root: Path):
@@ -1823,7 +1830,7 @@ def _read_pages_for_linking(content_root: Path):
                 continue
 
             stem_lower = fp.stem.lower()
-            if name.lower() not in _STRUCTURAL_PAGE_NAMES:
+            if not _is_structural_page_name(name):
                 pages_by_stem.setdefault(stem_lower, []).append(fp)
             try:
                 rel = fp.relative_to(content_root).as_posix().lower()
@@ -1851,7 +1858,7 @@ def _pages_a_page_links_to(post, pages_by_stem, pages_by_rel) -> list[Path]:
             matched_paths.extend(pages_by_stem[target])
 
         for target_fp in matched_paths:
-            if target_fp.name.lower() in _STRUCTURAL_PAGE_NAMES or _is_class_page(target_fp):
+            if _is_structural_page_name(target_fp.name) or _is_class_page(target_fp):
                 continue
             if target_fp not in linked:
                 linked.append(target_fp)
@@ -4082,10 +4089,14 @@ def _same_stored_name(first: str, second: str) -> bool:
             == unicodedata.normalize("NFC", str(second)).lower())
 
 
-def names_the_sidebar_hides(hidden_list: list) -> list:
+def names_the_sidebar_hides(hidden_list: list, coverage_titles: list = None) -> list:
     """The teacher's `hidden` list plus what the build always hides from the
     sidebar, as STORED names (issue #265). Nothing here is written back to
-    course_config.json."""
+    course_config.json.
+
+    `coverage_titles` are the maps this build wrote (#128: one per curriculum
+    folder). `Curriculum Coverage` is hidden whatever they are, so a map
+    switched off — or a teacher's leftover page by that name — never shows."""
     names = list(hidden_list)
     # 'Media' is always hidden — checked in any spelling, or a config that
     # already says "media" would gain a SECOND entry for the same directory
@@ -4099,9 +4110,14 @@ def names_the_sidebar_hides(hidden_list: list) -> list:
     # site, for the page that needs it least. By its FILE name: the filter
     # matches a top-level file on its path, `.md` included, and the page's
     # file is named after its title.
-    coverage_file_name = COVERAGE_PAGE_TITLE + ".md"
-    if not any(_same_stored_name(name, coverage_file_name) for name in names):
-        names.append(coverage_file_name)
+    titles = [COVERAGE_PAGE_TITLE]
+    for title in coverage_titles or []:
+        if title not in titles:
+            titles.append(title)
+    for title in titles:
+        coverage_file_name = title + ".md"
+        if not any(_same_stored_name(name, coverage_file_name) for name in names):
+            names.append(coverage_file_name)
     return names
 
 
@@ -5122,11 +5138,79 @@ cited by code. If that is the case here, it is worth citing a few of them
 where they genuinely apply rather than leaving the record silent.
 """
 
-SPECIFIC_CODE = re.compile(r"^([A-Z])(\d+)\.(\d+)$")
-OVERALL_FILE = re.compile(r"^([A-Z]\d+)\.\s")
+# The part of the notes about the chips, and what a map with no overall
+# expectations (the College Board's skills, #128) says in its place.
+COVERAGE_NOTES_CHIPS = """Ontario asks that every overall expectation be
+evaluated for marks at least once; the chips under each strand letter
+answer that, and the ring on a cell shows which specific expectations carry
+assessed work."""
+COVERAGE_NOTES_NO_CHIPS = """The ring on a cell shows which expectations
+carry assessed work."""
+
+# What names a specific expectation's page: its code, the WHOLE name (#128).
+# Two shapes. Ontario's (and BC's) letter-first `A1.1`, `b2.3` — a letter,
+# digits, a dot, digits — and the College Board's digit-first `1.A` — digits, a
+# dot, ONE letter. Measured before widening: none of the 2,842 curriculum pages
+# shipped under support/ changes classification. Still refused: `12.3` (a
+# numbered or versioned page), `B2` and `A1. Heading` (strand and overall
+# pages), `1.A.1` and `CRD-1.A` (AP codes not measured on a real course).
+# `contracts/shared-rules.json` -> `curriculumRules.isExpectationCode` is the
+# list both apps run too; `fullmatch`, not `^...$`, because `$` also matches
+# before a trailing newline.
+EXPECTATION_CODE = re.compile(r"[A-Za-z]\d+\.\d+|\d+\.[A-Za-z]")
+OVERALL_FILE = re.compile(r"^([A-Za-z]\d+)\.\s")
 CURRICULUM_BLOCK = re.compile(r"%%curriculum-start%%(.*?)%%curriculum-end%%", re.S)
 BLOCK_LINK = re.compile(r"!?\[\[([^\]|#]+?)(?:\\?\|[^\]]*)?(?:#[^\]|]*)?\]\]")
 TRANSCLUSION = re.compile(r"!\[\[([^\]|#]+?)(?:\\?\|[^\]]*)?(?:#[^\]|]*)?\]\]")
+
+
+def is_expectation_code(stem: str) -> bool:
+    """Whether a page name is an expectation's code, the whole name."""
+    return EXPECTATION_CODE.fullmatch(str(stem)) is not None
+
+
+def _is_letter_first(code: str) -> bool:
+    return code[:1].isalpha()
+
+
+def strand_of(code: str) -> str:
+    """
+    The column a code sits in. Letter-first codes group by their letter,
+    UPPER-CASED so a lower-case `b2.3` joins strand B rather than opening a
+    column of its own; digit-first codes (`1.A`) by their number — a College
+    Board skill category.
+    """
+    if _is_letter_first(code):
+        return code[0].upper()
+    return code.split(".")[0]
+
+
+def overall_of(code: str):
+    """The overall expectation a letter-first code belongs to (`B2` for
+    `b2.3`, upper-cased like its strand), or None for a digit-first code,
+    which has no overall expectation to be evaluated."""
+    if not _is_letter_first(code):
+        return None
+    return code.split(".")[0].upper()
+
+
+def code_sort_key(code: str):
+    """
+    Order within and across strands. Letter-first before digit-first, then by
+    number — so `A2.1` before `A10.1`, and `2.A` before `12.A`. The old key
+    read `int(code.split(".")[0][1:])`, which is `int("")` for `1.A`: widening
+    the rule without this would have stopped the build.
+    """
+    head, tail = code.split(".", 1)
+    if _is_letter_first(code):
+        return (0, head[0].upper(), int(head[1:]), int(tail), "")
+    return (1, "", int(head), 0, tail.upper())
+
+
+def _strand_sort_key(strand: str):
+    if strand.isdigit():
+        return (1, int(strand), "")
+    return (0, 0, strand)
 
 
 def _quartz_slug(relative: Path) -> str:
@@ -5140,12 +5224,12 @@ def _is_single_folder_name(name: str) -> bool:
     """
     Whether a configured folder name is just that — a name, not a path.
 
-    `curriculum_folder` comes from `course_config.json`, and the value is used
-    to build a path. "../Other Course/Curriculum" or an absolute path would
-    quietly build somebody else's expectations into this site, and a value like
-    "shared/Curriculum" would work here while disagreeing with every other
-    reader. A name with a separator in it is a mistake either way, so it is
-    refused and the scan takes over.
+    `curriculum_folders` (and the legacy `curriculum_folder`) come from
+    `course_config.json`, and each value is used to build a path. "../Other
+    Course/Curriculum" or an absolute path would quietly build somebody else's
+    expectations into this site, and a value like "shared/Curriculum" would
+    work here while disagreeing with every other reader. A name with a
+    separator in it is a mistake either way, so it is refused.
     """
     text = str(name)
     if not text or text in (".", ".."):
@@ -5155,47 +5239,206 @@ def _is_single_folder_name(name: str) -> bool:
     return True
 
 
-def _find_curriculum_folder(content_root: Path, named: str = None):
+def configured_curriculum_folders(config: dict) -> list:
     """
-    The folder holding expectation pages, whatever the course calls it.
+    The curriculum folders a course DECLARES, in its own order (#128).
 
-    `named` is the course's own `curriculum_folder` — declared by every payload
-    and skeleton manifest and carried into `course_config.json`. It is tried
-    FIRST, which matters for a course whose folder does not contain the word
-    "curriculum" at all: the scan below would never find one, and the map would
-    quietly not be built.
-
-    The scan remains the fallback, and remains the real path for the majority:
-    a course made from scratch has no manifest to declare anything.
+    `curriculum_folders` (a list) first, then the legacy `curriculum_folder`
+    (one name) if it is not already there — read and unioned forever, because
+    that is what makes a folder written down by an older Plantoir still count.
+    The FIRST name is the course's primary curriculum folder: its map keeps the
+    title `Curriculum Coverage` whatever else is declared, so no site that has
+    one map today ever has it renamed. Non-strings, empty names, path-like
+    names and repeats (in any letter case) are dropped.
+    `contracts/shared-rules.json` -> `specialNames.curriculumFoldersResolution`.
     """
-    if named and _is_single_folder_name(named):
-        candidate = content_root / named
-        if candidate.is_dir():
-            for page in candidate.glob("*.md"):
-                if SPECIFIC_CODE.match(page.stem):
-                    return candidate
-    for candidate in sorted(content_root.iterdir()):
-        if not candidate.is_dir():
+    candidates = []
+    plural = config.get("curriculum_folders") if isinstance(config, dict) else None
+    if isinstance(plural, list):
+        candidates.extend(plural)
+    legacy = config.get("curriculum_folder") if isinstance(config, dict) else None
+    if legacy is not None:
+        candidates.append(legacy)
+    names, seen = [], set()
+    for name in candidates:
+        if not isinstance(name, str) or not name or not _is_single_folder_name(name):
             continue
+        if name.lower() in seen:
+            continue
+        seen.add(name.lower())
+        names.append(name)
+    return names
+
+
+def _curriculum_pages_in_order(curriculum_dir: Path) -> list:
+    """
+    Every page in a curriculum folder, SHALLOWEST first, then by path.
+
+    Recursive (#128): a College Board folder can keep its skills in unit
+    subfolders. Depth first because a plain path sort puts `(old)/A1.1` and
+    `2019 version/A1.1` ahead of the top-level `A1.1` — digits and brackets
+    sort before letters — and the map would point at the archive (measured).
+    """
+    pages = [page for page in curriculum_dir.rglob("*.md") if page.is_file()]
+    return sorted(pages, key=lambda page: (len(page.relative_to(curriculum_dir).parts),
+                                           page.relative_to(curriculum_dir).as_posix()))
+
+
+def _holds_expectation_pages(folder: Path) -> bool:
+    for page in folder.rglob("*.md"):
+        if is_expectation_code(page.stem):
+            return True
+    return False
+
+
+def _find_curriculum_folders(content_root: Path, configured: list) -> list:
+    """
+    The folders this build draws a coverage map from, primary first (#128).
+
+    Every DECLARED folder (`configured_curriculum_folders`) that holds at least
+    one expectation page, in the course's own order. A declared name finds its
+    folder in any letter case, and the ON-DISK spelling is what the map is
+    titled by.
+
+    Only when no declared folder holds a page does the old scan run — the
+    alphabetically first top-level folder whose name mentions "curriculum"
+    and holds a page — and it gives ONE folder, exactly as before. A course
+    made from scratch declares nothing, so this is still the real path for
+    many courses; it is deliberately NOT additive (Russell's ruling on #128): a
+    second "…Curriculum…" folder, an archived copy of a revised curriculum
+    say, gets a map only when the teacher declares it, which both apps offer.
+    """
+    if not content_root.is_dir():
+        return []
+    on_disk = sorted(entry for entry in content_root.iterdir() if entry.is_dir())
+    found = []
+    for name in configured:
+        match = None
+        for candidate in on_disk:
+            if candidate.name == name:
+                match = candidate
+                break
+        if match is None:
+            for candidate in on_disk:
+                if candidate.name.lower() == name.lower():
+                    match = candidate
+                    break
+        if match is None or match in found:
+            continue
+        if _holds_expectation_pages(match):
+            found.append(match)
+    if found:
+        return found
+    for candidate in on_disk:
         if "curriculum" not in candidate.name.lower():
             continue
-        for page in candidate.glob("*.md"):
-            if SPECIFIC_CODE.match(page.stem):
-                return candidate
+        if _holds_expectation_pages(candidate):
+            return [candidate]
+    return []
+
+
+def coverage_page_titles(folder_names: list, primary: str = None) -> list:
+    """
+    The title of each map, in the order given (#128).
+
+    The PRIMARY folder's map is `Curriculum Coverage` — so a course with one
+    map keeps the page, the URL and every link to it exactly as they were, and
+    a course that later declares a second folder does not have its first map
+    renamed under it. Every other map is `<Folder> Coverage`. Two titles that
+    would read the same (a second folder literally called "Curriculum") get
+    " (2)", " (3)"… rather than one page overwriting the other.
+    `contracts/shared-rules.json` -> `curriculumRules.coveragePageTitles`.
+    """
+    titles, taken = [], set()
+    for name in folder_names:
+        if primary is not None and name.lower() == str(primary).lower():
+            title = COVERAGE_PAGE_TITLE
+        else:
+            title = f"{name} Coverage"
+        base, number = title, 2
+        while title.lower() in taken:
+            title = f"{base} ({number})"
+            number += 1
+        taken.add(title.lower())
+        titles.append(title)
+    return titles
+
+
+def _first_existing_page(content_root: Path, titles: list):
+    """The first of these titles already a page at the top of content_root,
+    or None."""
+    for title in titles:
+        if (content_root / f"{title}.md").exists():
+            return title
     return None
 
 
-def _collect_expectations(curriculum_dir: Path):
-    """Specific expectations by code, and overall expectations by code."""
-    specific, overall = {}, {}
-    for page in sorted(curriculum_dir.glob("*.md")):
-        match = SPECIFIC_CODE.match(page.stem)
-        if match:
-            specific[page.stem] = page
+def plan_coverage_maps(content_root: Path, configured: list) -> list:
+    """
+    [(folder, title)] for every map this build would write, primary first —
+    worked out whether or not the map is switched on, because the sidebar,
+    the Backlinks panel and the health check all need the names either way.
+    The fallback folder, found by the scan, is the primary one.
+    """
+    folders = _find_curriculum_folders(content_root, configured)
+    if not folders:
+        return []
+    names = [folder.name for folder in folders]
+    declared_with_pages = [name for name in configured
+                           if any(name.lower() == found.lower() for found in names)]
+    primary = configured[0] if declared_with_pages else names[0]
+    return list(zip(folders, coverage_page_titles(names, primary)))
+
+
+# The titles of this build's coverage maps, lower-cased: every place that
+# must never treat a map as a lesson (class-page detection, the date passes)
+# asks `_is_coverage_page_name` rather than comparing against one literal.
+# Before a build sets them, the one title every course has always had.
+_coverage_titles_lower = {COVERAGE_PAGE_TITLE.lower()}
+
+
+def set_coverage_titles(titles: list) -> None:
+    """This build's map titles (the `set_unit_word` pattern: one build is one
+    process, so module state is per build). `Curriculum Coverage` is always
+    included — a teacher's leftover page by that name is not a lesson either."""
+    global _coverage_titles_lower
+    _coverage_titles_lower = {COVERAGE_PAGE_TITLE.lower()} | {str(title).lower() for title in titles}
+
+
+def _is_coverage_page_name(name: str) -> bool:
+    """A page name or file name (with or without .md) that is one of this
+    build's coverage maps."""
+    text = str(name).lower()
+    if text.endswith(".md"):
+        text = text[:-3]
+    return text in _coverage_titles_lower
+
+
+def _collect_expectations(curriculum_dir: Path, printer=print):
+    """
+    Specific expectations by code, and overall expectations by code.
+
+    Recursive, shallowest page first (`_curriculum_pages_in_order`). A code met
+    twice in one folder — `Unit 1/1.A` and `Unit 2/1.A`, or `b2.3` beside
+    `B2.3` — is ONE cell, the first page kept, and one console line says which,
+    so a run record can answer "why does my map point there?".
+    """
+    specific, overall, seen = {}, {}, {}
+    for page in _curriculum_pages_in_order(curriculum_dir):
+        stem = page.stem
+        if is_expectation_code(stem):
+            key = stem.upper()
+            if key in seen:
+                kept = seen[key].relative_to(curriculum_dir).with_suffix("").as_posix()
+                printer(f"⚠️  {curriculum_dir.name} has two pages called {stem} — "
+                        f"the map uses {kept}")
+                continue
+            seen[key] = page
+            specific[stem] = page
             continue
-        heading = OVERALL_FILE.match(page.stem)
+        heading = OVERALL_FILE.match(stem)
         if heading:
-            overall[heading.group(1)] = page
+            overall.setdefault(heading.group(1).upper(), page)
     return specific, overall
 
 
@@ -5521,9 +5764,14 @@ def _pages_the_course_teaches(content_root: Path, class_folders: list) -> set | 
     return set(class_pages) | first_hop | second_hop
 
 
-def _coverage_counts(content_root: Path, curriculum_dir: Path, specific: dict,
+# "Not passed" for `taught`, whose own None means "the course has no class
+# pages, count every published page".
+_NOT_GIVEN = object()
+
+
+def _coverage_counts(content_root: Path, curriculum_dirs, specific: dict,
                      class_folders: list, graded_folders: list,
-                     graded_was_configured: bool):
+                     graded_was_configured: bool, taught=_NOT_GIVEN):
     """
     How many pages address each expectation, and which of those are assessed.
 
@@ -5548,20 +5796,30 @@ def _coverage_counts(content_root: Path, curriculum_dir: Path, specific: dict,
 
     A page counts once per expectation however many times it names it.
 
+    A page in ANY mapped curriculum folder never counts (#128): with two maps,
+    a College Board page that cross-references `![[A1.1]]` is curriculum
+    material, not a lesson that addressed Ontario's A1.1. `curriculum_dirs` is
+    that list (one folder is accepted too). A link finds its expectation in
+    any letter case, as Obsidian and Quartz resolve it.
+
     And the page must be one the course actually TEACHES — reachable from
     a class page, directly or through one page a class page links to. A
     concept page written in August and never put in a class has not
     addressed anything yet, and the map should say so.
     """
+    if isinstance(curriculum_dirs, Path):
+        curriculum_dirs = [curriculum_dirs]
     covered_by = {code: set() for code in specific}
     assessed_by = {code: set() for code in specific}
-    taught = _pages_the_course_teaches(content_root, class_folders)
+    code_by_lower = {code.lower(): code for code in specific}
+    if taught is _NOT_GIVEN:
+        taught = _pages_the_course_teaches(content_root, class_folders)
     for page in sorted(content_root.rglob("*.md")):
         if taught is not None and page.stem not in taught:
             continue
-        if page.parent == curriculum_dir or curriculum_dir in page.parents:
+        if any(page.parent == folder or folder in page.parents for folder in curriculum_dirs):
             continue
-        if page.name == f"{COVERAGE_PAGE_TITLE}.md":
+        if _is_coverage_page_name(page.name):
             continue
         try:
             text = page.read_text(encoding="utf-8")
@@ -5582,10 +5840,11 @@ def _coverage_counts(content_root: Path, curriculum_dir: Path, specific: dict,
                 targets.add(link.group(1).strip().rstrip("\\").split("/")[-1])
 
         for target in targets:
-            if target in covered_by:
-                covered_by[target].add(relative.as_posix())
+            code = code_by_lower.get(target.lower())
+            if code is not None:
+                covered_by[code].add(relative.as_posix())
                 if is_assessed:
-                    assessed_by[target].add(relative.as_posix())
+                    assessed_by[code].add(relative.as_posix())
     return covered_by, assessed_by
 
 
@@ -5626,22 +5885,30 @@ def build_curriculum_coverage(content_root: Path, course_code: str,
                              graded_folders: list = None,
                              curriculum_folder_name: str = None,
                              graded_was_configured: bool = False,
-                             first_class_stamp: str | None = None) -> bool:
+                             first_class_stamp: str | None = None,
+                             configured_folders: list = None,
+                             taught=_NOT_GIVEN,
+                             printer=print) -> list:
     """
-    Write the Curriculum Coverage page. Returns True when one was written.
+    Write one coverage map per curriculum folder (#128). Returns what was
+    written — [{"title", "folder", "expectations"}], primary first — which is
+    empty (and so false) when nothing was.
+
+    `configured_folders` is `configured_curriculum_folders(config)`;
+    `curriculum_folder_name`, the one name this took before #128, is still
+    accepted and means the same as a list of one.
 
     `include_notes` controls the two explanatory sections at the foot of
-    the page — "What counts" and "Reading it honestly". They exist for a
+    each page — "What counts" and "Reading it honestly". They exist for a
     teacher meeting the map for the first time; a department that has
     already had that conversation can switch them off and keep the map,
-    the legend, and the standings table.
+    the legend, and the standings table. One switch covers every map.
     """
-    curriculum_dir = _find_curriculum_folder(content_root, curriculum_folder_name)
-    if not curriculum_dir:
-        return False
-    specific, overall = _collect_expectations(curriculum_dir)
-    if not specific:
-        return False
+    if configured_folders is None:
+        configured_folders = [curriculum_folder_name] if curriculum_folder_name else []
+    plan = plan_coverage_maps(content_root, configured_folders)
+    if not plan:
+        return []
 
     if not class_folders:
         # Not a defaultable argument. An empty list matches no page, so
@@ -5655,27 +5922,67 @@ def build_curriculum_coverage(content_root: Path, course_code: str,
             "pass class_folder_names(config). There is no safe default: the "
             "name is the teacher's to choose."
         )
-    covered_by, assessed_by = _coverage_counts(content_root, curriculum_dir, specific,
-                                               class_folders, graded_folders or [],
-                                               graded_was_configured)
-    folder = curriculum_dir.name
+    set_coverage_titles([title for _, title in plan])
+    if taught is _NOT_GIVEN:
+        taught = _pages_the_course_teaches(content_root, class_folders)
+    mapped_dirs = [folder for folder, _ in plan]
+    several = len(plan) > 1
+    written = []
+    for curriculum_dir, title in plan:
+        specific, overall = _collect_expectations(curriculum_dir, printer=printer)
+        if not specific:
+            continue
+        covered_by, assessed_by = _coverage_counts(content_root, mapped_dirs, specific,
+                                                   class_folders, graded_folders or [],
+                                                   graded_was_configured, taught=taught)
+        body, counts = _coverage_page(content_root, course_code, title, curriculum_dir.name,
+                                      specific, overall, covered_by, assessed_by,
+                                      include_notes=include_notes,
+                                      graded_folders=graded_folders,
+                                      graded_was_configured=graded_was_configured,
+                                      first_class_stamp=first_class_stamp,
+                                      names_the_folder=several or title != COVERAGE_PAGE_TITLE)
+        (content_root / f"{title}.md").write_text(body, encoding="utf-8")
+        printer(f"🗺️  {title} ({curriculum_dir.name}): {counts['total']} expectations, "
+                f"{counts['uncovered']} not yet addressed, "
+                f"{counts['unevaluated']} overall expectation(s) without assessed work.")
+        written.append({"title": title, "folder": curriculum_dir.name,
+                        "expectations": counts["total"]})
+    return written
 
+
+def _coverage_page(content_root: Path, course_code: str, title: str, folder: str,
+                   specific: dict, overall: dict, covered_by: dict, assessed_by: dict,
+                   include_notes: bool, graded_folders, graded_was_configured: bool,
+                   first_class_stamp, names_the_folder: bool):
+    """
+    One map page's text, and its counts.
+
+    A course with ONE map named `Curriculum Coverage` gets exactly the page it
+    always had — byte for byte, pinned by `test_coverage_maps.py`'s goldens.
+    Otherwise the intro names the folder, so two maps side by side say which
+    is which. A map with no overall expectations (the College Board's skills
+    have none to be evaluated) leaves out everything about the chips: the
+    sentence under the legend, the standings row, and the chips' part of the
+    notes — a page that explains chips it does not show reads as broken.
+    """
     strands = {}
     for code in specific:
-        strands.setdefault(code[0], []).append(code)
-    for letter in strands:
-        strands[letter].sort(key=lambda code: (int(code.split(".")[0][1:]), int(code.split(".")[1])))
+        strands.setdefault(strand_of(code), []).append(code)
+    for strand in strands:
+        strands[strand].sort(key=code_sort_key)
 
     columns = []
-    for letter in sorted(strands):
+    has_chips = False
+    for strand in sorted(strands, key=_strand_sort_key):
         cells = []
         # The overall expectations of this strand, and whether an assessed
         # page addresses each one — through its own specifics or directly.
         chips = []
-        for overall_code in sorted({code.split(".")[0] for code in strands[letter]},
-                                   key=lambda code: int(code[1:])):
-            evaluated = any(assessed_by.get(code) for code in strands[letter]
-                            if code.startswith(overall_code + "."))
+        overall_codes = {overall_of(code) for code in strands[strand]} - {None}
+        for overall_code in sorted(overall_codes, key=lambda code: int(code[1:])):
+            evaluated = any(assessed_by.get(code) for code in strands[strand]
+                            if overall_of(code) == overall_code)
             page = overall.get(overall_code)
             state = "yes" if evaluated else "no"
             if page:
@@ -5684,14 +5991,16 @@ def build_curriculum_coverage(content_root: Path, course_code: str,
                              f'href="{href}">{overall_code}</a>')
             else:
                 chips.append(f'<span class="coverage-chip coverage-chip-{state}">{overall_code}</span>')
-        for code in strands[letter]:
+        for code in strands[strand]:
             count = len(covered_by[code])
             cells.append(_coverage_cell(code, specific[code], content_root, count,
                                         bool(assessed_by[code])))
+        chips_html = f'<div class="coverage-chips">{"".join(chips)}</div>' if chips else ""
+        has_chips = has_chips or bool(chips)
         columns.append(
             '<div class="coverage-strand">'
-            f'<div class="coverage-letter">{letter}</div>'
-            f'<div class="coverage-chips">{"".join(chips)}</div>'
+            f'<div class="coverage-letter">{strand}</div>'
+            f'{chips_html}'
             f'{"".join(cells)}'
             "</div>")
 
@@ -5700,7 +6009,7 @@ def build_curriculum_coverage(content_root: Path, course_code: str,
     once = [code for code in specific if len(covered_by[code]) == 1]
     unevaluated = []
     for overall_code in sorted(overall, key=lambda code: (code[0], int(code[1:]))):
-        related = [code for code in specific if code.startswith(overall_code + ".")]
+        related = [code for code in specific if overall_of(code) == overall_code]
         if related and not any(assessed_by[code] for code in related):
             unevaluated.append(overall_code)
 
@@ -5712,14 +6021,30 @@ def build_curriculum_coverage(content_root: Path, course_code: str,
     notes = COVERAGE_NOTES.replace(
         "{graded_folders}", _graded_folders_in_words(graded_folders, graded_was_configured)
     ) if include_notes else ""
+    if notes and not has_chips:
+        notes = notes.replace(COVERAGE_NOTES_CHIPS, COVERAGE_NOTES_NO_CHIPS)
     created_line = f"created: {first_class_stamp}\n" if first_class_stamp else ""
+    # Quoted only when it is not the one title every course has always had,
+    # so a single-map page is byte for byte what it was; a folder's name can
+    # carry a colon, which unquoted YAML would misread.
+    title_line = title if title == COVERAGE_PAGE_TITLE else json.dumps(title, ensure_ascii=False)
+    if names_the_folder:
+        intro = f"Every expectation in {folder} for {course_code}, coloured by how many pages address it."
+    else:
+        intro = f"Every expectation in {course_code}, coloured by how many pages address it."
+    chip_sentence = ("""Hover any cell to preview the expectation. The row of small chips under
+each strand letter is that strand's overall expectations: green when
+assessed work addresses them, red when nothing marked does.""" if has_chips
+                     else "Hover any cell to preview the expectation.")
+    unevaluated_row = (f"| Overall expectations with no assessed work | {len(unevaluated)} |\n"
+                       if has_chips else "")
 
     body = f"""---
-title: Curriculum Coverage
+title: {title_line}
 publish: true
 {created_line}enableToc: true
 ---
-Every expectation in {course_code}, coloured by how many pages address it.
+{intro}
 The map is built from this site's own links each time the site is built, so
 it cannot drift from the course.
 
@@ -5736,9 +6061,7 @@ it cannot drift from the course.
 </div>
 </div>
 
-Hover any cell to preview the expectation. The row of small chips under
-each strand letter is that strand's overall expectations: green when
-assessed work addresses them, red when nothing marked does.
+{chip_sentence}
 
 ## Where this course stands
 
@@ -5747,39 +6070,63 @@ assessed work addresses them, red when nothing marked does.
 | Specific expectations | {total} |
 | Not yet addressed | {len(uncovered)} |
 | Addressed by exactly one page | {len(once)} |
-| Overall expectations with no assessed work | {len(unevaluated)} |
-
+{unevaluated_row}
 {notes}"""
-    (content_root / f"{COVERAGE_PAGE_TITLE}.md").write_text(body, encoding="utf-8")
-    print(f"🗺️  Curriculum Coverage: {total} expectations, {len(uncovered)} not yet addressed, "
-          f"{len(unevaluated)} overall expectation(s) without assessed work.")
-    return True
+    return body, {"total": total, "uncovered": len(uncovered), "unevaluated": len(unevaluated)}
+
+
+def announce_coverage_maps(maps: list, course: str, section_number: int, printer=print) -> None:
+    """
+    One machine-readable line naming the maps this build wrote, for the app's
+    activity trail (`contracts/shared-rules.json` -> `coverageMapsBuilt`) —
+    printed on every build that wants a map, INCLUDING when there are none,
+    because "my College Board map is missing" is the question the line exists
+    to answer. Titles, folder names and counts only: course structure, never
+    anything written on a page. The plain sentences are the 🗺️ lines above it.
+    """
+    try:
+        prefix = contracts.section("shared-rules", "coverageMapsBuilt", "marker", "prefix")
+    except Exception:
+        return
+    payload = {"course": course, "section": section_number,
+               "maps": [{"title": item["title"], "folder": item["folder"],
+                         "expectations": item["expectations"]} for item in maps]}
+    printer(f"{prefix} {json.dumps(payload, ensure_ascii=False)}")
 
 
 def set_backlinks_structural_pages(backlinks_tsx_path: Path, content_root: Path,
-                                   curriculum_folder_name: str = None):
+                                   plan: list = None):
     """
     Tell the backlinks panel which pages reference everything by design.
 
     "When did we do this?" is meant to answer which lessons touched a
-    page. The curriculum folder's index transcludes every expectation and
-    the generated coverage map links every expectation, so both appear as
+    page. A curriculum folder's index transcludes every expectation and
+    a generated coverage map links every expectation, so both appear as
     a backlink on every single expectation page — noise that hides the
     lessons underneath. This writes their names into Backlinks.tsx, the
     same way the Explorer's omit set is written, so the component filters
     them out without hard-coding a folder name that teachers rename.
+
+    `plan` is `plan_coverage_maps(...)`: every map's title and every mapped
+    folder (#128). `Curriculum Coverage` is always there, map or no map.
     """
     if not backlinks_tsx_path.exists():
         return
-    curriculum_dir = _find_curriculum_folder(content_root, curriculum_folder_name)
+    plan = plan or []
     # Both forms: the folder is matched by name, but a page is matched by
     # its SLUG, and Quartz slugs replace spaces with hyphens. Writing only
     # the title left the coverage map in the panel it was meant to leave.
-    names = [COVERAGE_PAGE_TITLE, COVERAGE_PAGE_TITLE.replace(" ", "-")]
-    if curriculum_dir:
-        names.append(curriculum_dir.name)
-        names.append(curriculum_dir.name.replace(" ", "-"))
-    formatted = ", ".join(f'"{name}"' for name in names)
+    titles = [title for _, title in plan] or [COVERAGE_PAGE_TITLE]
+    if COVERAGE_PAGE_TITLE not in titles:
+        titles.append(COVERAGE_PAGE_TITLE)
+    names = []
+    for title in titles:
+        names.append(title)
+        names.append(title.replace(" ", "-"))
+    for folder, _ in plan:
+        names.append(folder.name)
+        names.append(folder.name.replace(" ", "-"))
+    formatted = ", ".join(json.dumps(name, ensure_ascii=False) for name in names)
     text = backlinks_tsx_path.read_text(encoding="utf-8")
     pattern = re.compile(
         r'(?P<anchor>^[ \t]*//[ \t]*CQ4T-STRUCTURAL-ANCHOR:.*?\n)?'
@@ -5798,45 +6145,51 @@ def set_backlinks_structural_pages(backlinks_tsx_path: Path, content_root: Path,
         print(f"✅ Backlinks panel will skip: {', '.join(names)}")
 
 
-def link_coverage_from_key_links(content_root: Path, curriculum_folder_name: str = None):
+def link_coverage_from_key_links(content_root: Path, maps: list):
     """
-    Put the coverage page in Key Links, directly under the curriculum entry.
+    Put each coverage map in Key Links, directly under its folder's entry.
 
     Written into the BUILT copy only: the teacher's own Key Links page is
     theirs, and a line that reappears every build would be infuriating.
 
-    The curriculum entry is found by where it POINTS — a link into the
-    curriculum folder — rather than by its wording. Teachers rename these
-    links ("Curriculum expectations", "Ontario Curriculum", "The
-    expectations"), and matching on text meant the example course, whose
-    link differed by one lower-case letter, silently never got the map in
-    its Key Links. Falls back to appending at the end.
+    `maps` is what `build_curriculum_coverage` returned, primary first. Each
+    entry is found by where it POINTS — a link into that map's folder —
+    rather than by its wording. Teachers rename these links ("Curriculum
+    expectations", "Ontario Curriculum", "The expectations"), and matching on
+    text meant the example course, whose link differed by one lower-case
+    letter, silently never got the map in its Key Links. With ONE map the old
+    wording fallback ("…curriculum expectations]]") still applies; with
+    several it would put every map under one entry. Otherwise a map goes after
+    the last bullet. Idempotent per title.
     """
     key_links = content_root / "Key Links.md"
     if not key_links.exists():
         return
     text = key_links.read_text(encoding="utf-8")
-    if f"[[{COVERAGE_PAGE_TITLE}]]" in text:
-        return
-
-    curriculum_dir = _find_curriculum_folder(content_root, curriculum_folder_name)
-    folder = curriculum_dir.name if curriculum_dir else None
     lines = text.split("\n")
-    target_index = None
-    for index, line in enumerate(lines):
-        if not line.lstrip().startswith("- "):
+    changed = False
+    for item in maps:
+        title, folder = item["title"], item["folder"]
+        if f"[[{title}]]" in "\n".join(lines):
             continue
-        points_at_curriculum = folder and f"[[{folder}/" in line
-        if points_at_curriculum or "curriculum expectations]]" in line.lower():
-            target_index = index
-    if target_index is None:
-        # No curriculum entry to sit under: put it after the last bullet.
-        bullets = [i for i, line in enumerate(lines) if line.lstrip().startswith("- ")]
-        if not bullets:
-            return
-        target_index = bullets[-1]
-    lines.insert(target_index + 1, f"- [[{COVERAGE_PAGE_TITLE}]]")
-    key_links.write_text("\n".join(lines), encoding="utf-8")
+        target_index = None
+        for index, line in enumerate(lines):
+            if not line.lstrip().startswith("- "):
+                continue
+            points_at_curriculum = folder and f"[[{folder}/" in line
+            by_wording = len(maps) == 1 and "curriculum expectations]]" in line.lower()
+            if points_at_curriculum or by_wording:
+                target_index = index
+        if target_index is None:
+            # No entry for this folder to sit under: put it after the last bullet.
+            bullets = [i for i, line in enumerate(lines) if line.lstrip().startswith("- ")]
+            if not bullets:
+                continue
+            target_index = bullets[-1]
+        lines.insert(target_index + 1, f"- [[{title}]]")
+        changed = True
+    if changed:
+        key_links.write_text("\n".join(lines), encoding="utf-8")
 
 
 def build_section_site(
@@ -6183,8 +6536,12 @@ def build_section_site(
     class_folders_here = class_folder_names(config)
     graded_folders_here, graded_was_configured_here = graded_folder_names(config)
     coverage_wanted = resolve_include_curriculum_coverage(config, section_number)
-    curriculum_folder_name_here = config.get("curriculum_folder") or None
-    curriculum_dir_here = _find_curriculum_folder(content_root, curriculum_folder_name_here)
+    # Every curriculum folder this build maps, primary first, and each map's
+    # title (#128) — known before anything else asks whether a page is a map.
+    curriculum_folders_here = configured_curriculum_folders(config)
+    coverage_plan = plan_coverage_maps(content_root, curriculum_folders_here)
+    coverage_titles_here = [title for _, title in coverage_plan]
+    set_coverage_titles(coverage_titles_here)
 
     # Worked out once and reused by the coverage builder below: this crawl
     # rglobs every page and reads every class page and every first-hop page,
@@ -6193,7 +6550,7 @@ def build_section_site(
 
     health_facts = {
         "coverage_wanted": coverage_wanted,
-        "curriculum_found": curriculum_dir_here is not None,
+        "curriculum_found": bool(coverage_plan),
         "class_pages_found": taught_here is not None,
         "graded_folders_found": _has_graded_folders(
             content_root, graded_folders_here, graded_was_configured_here
@@ -6208,11 +6565,13 @@ def build_section_site(
         # it, even in the one case where its copy had to be removed to hide it.
         "section_index_exists": ((content_root / "index.md").exists()
                                  or _front_page_cannot_be_published(content_root)),
-        # Anything by this name at this moment came from the teacher's own
+        # Anything by a map's name at this moment came from the teacher's own
         # notes: the build writes its own copy further down, so a page here now
-        # is one that is about to be overwritten.
-        "hand_written_coverage_page": (
-            content_root / f"{COVERAGE_PAGE_TITLE}.md").exists(),
+        # is one that is about to be overwritten. The FIRST such title (primary
+        # map first), or None — one finding names one page, which is enough
+        # to send a teacher looking (#128).
+        "hand_written_coverage_page": _first_existing_page(
+            content_root, coverage_titles_here or [COVERAGE_PAGE_TITLE]),
         # Pages hidden because their settings could not be read (#246), by
         # their names in the course folder, and whether the front page is one.
         "unreadable_pages": _unreadable_page_facts(),
@@ -6236,23 +6595,27 @@ def build_section_site(
     first_class_dt = _find_first_class_created(content_root)
     first_class_stamp = _format_created_timestamp_from_dt(first_class_dt) if first_class_dt else None
 
+    maps_written = []
     if coverage_wanted:
         # The explanatory sections are a separate choice, and one that only
-        # exists while the map does.
-        if build_curriculum_coverage(
+        # exists while the map does. One switch covers every map (#128).
+        maps_written = build_curriculum_coverage(
                 content_root, displayed_course_code(config, course_code),
                 class_folders=class_folders_here,
                 graded_folders=graded_folders_here,
                 graded_was_configured=graded_was_configured_here,
-                curriculum_folder_name=curriculum_folder_name_here,
+                configured_folders=curriculum_folders_here,
                 include_notes=bool(config.get("include_coverage_notes", True)),
-                first_class_stamp=first_class_stamp):
-            link_coverage_from_key_links(content_root, curriculum_folder_name_here)
+                first_class_stamp=first_class_stamp,
+                taught=taught_here)
+        if maps_written:
+            link_coverage_from_key_links(content_root, maps_written)
+        announce_coverage_maps(maps_written, course_code, section_number)
     else:
         print("ℹ️ Curriculum Coverage page is switched off for this course.")
     set_backlinks_structural_pages(
         output_dir / "quartz" / "components" / "Backlinks.tsx", content_root,
-        curriculum_folder_name_here)
+        coverage_plan)
     # ==========================================================================
 
     # === Post-pass — sync 'created' timestamps for non-class pages =============
@@ -6304,7 +6667,8 @@ def build_section_site(
         print("   Run setup.sh for this course to restore it.")
         sys.exit(1)
 
-    update_quartz_layout(quartz_layout_ts, names_the_sidebar_hides(hidden_list))  # ensure omit is present and updated
+    update_quartz_layout(quartz_layout_ts, names_the_sidebar_hides(
+        hidden_list, [item["title"] for item in maps_written]))  # ensure omit is present and updated
     
     # honor expandOnFolderClick from course_config.json
     expand_on_name = bool(config.get("expandOnFolderClick", False))

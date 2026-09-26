@@ -289,24 +289,24 @@
         "why": "The failure that left NOTHING behind, which is exactly the report that arrived on 2026-09-19 (GitHub issue #225). A teacher pressed Preview three times in four minutes on a Mac that had stopped passing new addresses through from the builder; the website was built and served every time and never appeared; and the trail recorded only that a task started and was stopped on purpose - so an evening of a broken Mac reads, months later, as somebody changing their mind three times. WHICH of them it was is the whole value of the line, because the first two are one sentence apart when a teacher describes it (\"the preview never came up\") and a world apart in what to do: one is their pages, one is their Mac. The seconds are recorded rather than the total run because the run is not the fault - a first preview legitimately takes minutes, and what cannot be explained is a run that announced its server and then said nothing. DELIBERATELY WITHOUT `appliesOn`, and the red Windows suite that follows is the request rather than damage: Windows has its own wait for a preview to appear and owes the same line, so this is an obligation and not a permanent platform difference - the two cases appliesOn exists for. The `windows` issue opened with this work says so, and the choice on that side is theirs: record it, or hold it open by name in NamedGapLedger with the issue and milestone that own it. What Windows is NOT exposed to is the CAUSE - there is no container in their preview path, so the question this line's second half answers (can the builder see its own site?) has no counterpart there and they should not build one. What they owe is the bounded quiet time and the line."
       },
       {
-        "carries": "the course code, the section number, and \u2014 when there was a website to move away from \u2014 where last year's details were kept",
+        "carries": "the course code, the section number, and — when there was a website to move away from — where last year's details were kept",
         "event": "section started a new website",
-        "why": "A rollover that cuts a section loose is the moment its published address changes, and nothing else on the trail records it. The same act turns off any publish that was set to happen on its own \u2014 a section with no agreed website and a scheduled run with nobody to ask would otherwise create a website nobody named \u2014 so a teacher whose overnight publish stops happening has one line explaining both."
+        "why": "A rollover that cuts a section loose is the moment its published address changes, and nothing else on the trail records it. The same act turns off any publish that was set to happen on its own — a section with no agreed website and a scheduled run with nobody to ask would otherwise create a website nobody named — so a teacher whose overnight publish stops happening has one line explaining both."
       },
       {
         "carries": "the course code, the section number, and where it published",
         "event": "scheduled publish finished",
-        "why": "The positive case, and it is here for the same reason the two failures are, read the other way round: a scheduled publish that leaves NO trace cannot be told from one that never happened. Without this line the trail can answer \u201cwhy did my site not update?\u201d and cannot answer \u201cdid it?\u201d \u2014 and a teacher wondering whether last night's publish went out has nowhere to look. Added 2026-09-09 on Russell's instruction, after a real scheduled run showed the failures recorded and the successes silent.",
+        "why": "The positive case, and it is here for the same reason the two failures are, read the other way round: a scheduled publish that leaves NO trace cannot be told from one that never happened. Without this line the trail can answer “why did my site not update?” and cannot answer “did it?” — and a teacher wondering whether last night's publish went out has nowhere to look. Added 2026-09-09 on Russell's instruction, after a real scheduled run showed the failures recorded and the successes silent.",
         "appliesOnWhy": "Owed on both platforms for the same reason as the other two, and RECORDED on both as of 2026-09-09: the mac when Russell asked for it, Windows the same day (GitHub issue #130). This said \"Windows records neither today\" until that landed; nothing reads appliesOnWhy, so only a reader would have been misled, which is the quiet way a contract stops being true. scheduledPublishStopped.platformDifferences is where the two are compared."
       },
       {
-        "carries": "the course code, the section number, and which destination stopped \u2014 or, when the BUILD failed before any destination was reached, that the pages could not be built, because no destination was (widened 2026-09-25, #137)",
+        "carries": "the course code, the section number, and which destination stopped — or, when the BUILD failed before any destination was reached, that the pages could not be built, because no destination was (widened 2026-09-25, #137)",
         "event": "scheduled publish did not finish",
-        "why": "The same silence as \u201cneeded an answer\u201d, from a different cause \u2014 a revoked token, a network that was down, a build that failed. It is a SEPARATE event because the other one's own wording says a question went unasked, and filing a revoked token under it would make the trail say something untrue about the one run a teacher is trying to understand. Both matter for the same reason: a scheduled publish that did not happen is invisible unless something writes it down.",
+        "why": "The same silence as “needed an answer”, from a different cause — a revoked token, a network that was down, a build that failed. It is a SEPARATE event because the other one's own wording says a question went unasked, and filing a revoked token under it would make the trail say something untrue about the one run a teacher is trying to understand. Both matter for the same reason: a scheduled publish that did not happen is invisible unless something writes it down.",
         "appliesOnWhy": "Added on the mac 2026-09-09, when Russell widened the readout to ANY failed scheduled publish rather than only an unanswered question, and adopted by Windows the same day (GitHub issue #130) — so nothing is owed and neither suite is red on this list. The earlier wording said Windows records only the question case and that its suite was red until it caught up; that was true for about six hours and is kept here only as the reason this sentence changed."
       },
       {
-        "carries": "the course code, the section number, and which destination stopped \u2014 or, when the BUILD stopped for a question, that it stopped before any destination was reached, because none was",
+        "carries": "the course code, the section number, and which destination stopped — or, when the BUILD stopped for a question, that it stopped before any destination was reached, because none was",
         "event": "scheduled publish needed an answer",
         "why": "The one thing that can happen to a scheduled publish that a teacher will otherwise never find out about. It runs at half six with the app closed, so a question it could not ask is asked of nobody and seen by nobody; before --non-interactive it either waited for ever (measured at 45 minutes) or took a default and published the site to an address nobody chose. The trail is where \"my site did not update on Tuesday and I do not know why\" gets answered, and without this line the run is indistinguishable from one that was never scheduled. The DESTINATION is carried because a course can publish to several and only one of them may have needed anything — \"it published to the folder and not to Netlify\" is the shape of the report. Dated to when the RUN wrote its record, never to when the app read it, or an overnight problem is filed under the wrong night. Never the question's TEXT: that comes from a launcher's console, and a line naming a credential prompt would put a teacher's own words on the trail.",
         "appliesOnWhy": "DELIBERATELY not scoped to one platform. The mac's launchd wrapper has the identical problem and the identical fix available — deploy.sh takes --non-interactive as of the same change — so this is owed on both. Proposed from Windows 2026-09-08; GitHub issue #126 carries what the mac owes and why."
@@ -500,6 +500,11 @@
         "carries": "the course and the section, and which of: told with a notification; not sent because notifications are turned off; not sent because permission was never given; could not be sent; and, when a teacher first schedules from the app, that the permission question was put and what the answer was. Since #306 (2026-09-26), also what a CLICK on the notification did: the section shown - in a window already on its working folder, in the window that was choosing a folder, or in a new window; the window brought forward and left as it was because it was in the middle of something; the working folder shown without the section because the section is no longer in it; or Plantoir only brought forward because the working folder is gone, could not be opened here (out of the builder's reach, or refused when a window choosing a folder tried it), or the notification named no section. NEVER the notification's text, and never the working folder's path.",
         "event": "scheduled publish notification",
         "why": "Added with #212. 'I never got told' is answerable only if the trail says whether the notification went out, or that notifications were off for the app — from the teacher's side a notification that was blocked and one that was never sent look identical. The question's own line is written BEFORE the answer, because a question that is ignored, or arrives under a Focus, may never be answered. See scheduledPublishStopped.notification. 'I clicked it and nothing happened' (#306) is answered by the same line: each honest reason - the folder gone, the window busy, the section gone - has its own wording, and NO line at all means the click never reached this copy of the app (the launch line's bundle path says which copy a click started). See scheduledPublishStopped.notification.onClick."
+      },
+      {
+        "carries": "the course and section, and for each coverage map the build wrote its title, the folder it was built from and how many expectations it shows - or that it wrote none. NEVER anything written on a page.",
+        "event": "curriculum maps built",
+        "why": "#128: a course can have a map per curriculum folder, and 'my second map is missing' or 'the map shows the wrong folder' is answerable only if the trail says which maps each build made. Read from the build's PLANTOIR_MAPS: line - coverageMapsBuilt - by the console reader for a run the app starts and by the scheduled publish's log reader, so the build nobody watches leaves it too."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty.",
@@ -666,7 +671,7 @@
           "path": "All Classes/Unit 1, Day 1.md"
         }
       ],
-      "note": "Matches `build_site.py`'s own rule exactly, and that is the point — the Python decides what ships, so an app that disagreed would report coverage for pages the site does not treat as curriculum. Any FOLDER segment containing 'curriculum', case-insensitive; the FILE name is ignored."
+      "note": "Which pages the ASSISTANT offers as a course's expectations: any page under a FOLDER segment containing 'curriculum', case-insensitive; the FILE name is ignored. It used to say it matched build_site.py's own rule exactly. Since #128 it does not quite: the build maps the curriculum folders a course DECLARES (curriculum_folders), and a declared folder need not say 'curriculum' - a College Board folder renamed 'AP CSP' still has its map, while this rule stops offering its pages. That gap is the assistant's, is known, and is left for its own issue rather than widened here."
     },
     "isExpectationCode": {
       "cases": [
@@ -708,12 +713,139 @@
           "why": "Whole-name match: anything after the code makes it not a code."
         },
         {
+          "code": "1.A",
+          "expect": true,
+          "why": "A College Board skill (AP Computer Science Principles): digits, a dot, ONE letter (#128)."
+        },
+        {
+          "code": "1.B",
+          "expect": true
+        },
+        {
+          "code": "5.D",
+          "expect": true
+        },
+        {
+          "code": "1.a",
+          "expect": true,
+          "why": "Either case, as for b2.3."
+        },
+        {
+          "code": "12.A",
+          "expect": true,
+          "why": "A two-digit number before the dot."
+        },
+        {
           "code": "12.3",
           "expect": false,
-          "why": "Must start with a letter."
+          "why": "Digit-first is admitted only when ONE LETTER follows the dot. Digit, dot, digit stays refused: a numbered or versioned page is not an expectation."
+        },
+        {
+          "code": "1.AB",
+          "expect": false,
+          "why": "One letter after the dot, not two."
+        },
+        {
+          "code": "1.",
+          "expect": false
+        },
+        {
+          "code": "A.1",
+          "expect": false,
+          "why": "Letter, dot, digit: a shape no curriculum measured here uses."
+        },
+        {
+          "code": "1.A.1",
+          "expect": false,
+          "why": "An AP Essential Knowledge code. Not measured on a real course, so refused until one is: admitting it is a deliberate change to this case, not an accident of a wider pattern."
+        },
+        {
+          "code": "CRD-1.A",
+          "expect": false,
+          "why": "An AP Learning Objective code - refused for the same reason as 1.A.1."
+        },
+        {
+          "code": "1.A Investigate the situation",
+          "expect": false,
+          "why": "Whole-name match, in this shape as in the other."
         }
       ],
-      "note": "A leaf expectation is coded like A1.1 or B2.3: one letter, digits, a dot, digits — the WHOLE name, not a prefix. Index and strand-heading pages sit in the same folder and must not be counted."
+      "note": "An expectation page is named by its code, the WHOLE name, not a prefix, in one of two shapes: a letter, digits, a dot, digits (Ontario's and BC's A1.1, B2.3), or digits, a dot, one letter (the College Board's 1.A, #128). Index and strand-heading pages sit in the same folder and must not be counted. Measured before the second shape was admitted (2026-09-26): none of the 2,842 curriculum pages shipped under support/ (39 payloads, 50 skeleton families) changes classification. Three readers run these cases: build_site.is_expectation_code (scripts/test_coverage_maps.py - the build had disagreed with this list about b2.3 until then, because nothing ran it), the mac's AssistCurriculumMentions.isExpectationCode, and Windows' CurriculumRules.IsExpectationCode. The build and the mac do not trim the name; Windows does, and no case here depends on it."
+    },
+    "coveragePageTitles": {
+      "rule": "One map per mapped curriculum folder, in the order given (primary first). The PRIMARY folder's map is titled 'Curriculum Coverage'; every other map is '<Folder> Coverage'. A title that would repeat an earlier one, ignoring letter case, gets ' (2)', ' (3)'... The primary is the first folder the course declares (curriculum_folders, then the legacy curriculum_folder) - or, when no declared folder holds an expectation page, the one folder the old scan finds.",
+      "why": "Russell's ruling on #128: no existing site ever has its map renamed. A course with one map keeps the page, its address and every link to it; a course that declares a second folder later gets a second page beside the first rather than two renamed ones. Rejected: '<Folder> Coverage' for every map (the default scratch folder is 'Ontario Curriculum', so every scratch course's page would be renamed for nothing), and giving 'Curriculum Coverage' to whichever map happens to come first alphabetically (two peers named asymmetrically, and a rename the day an earlier-sorting folder gains a page).",
+      "cases": [
+        {
+          "folders": [],
+          "primary": null,
+          "titles": []
+        },
+        {
+          "folders": [
+            "Curriculum"
+          ],
+          "primary": "Curriculum",
+          "titles": [
+            "Curriculum Coverage"
+          ]
+        },
+        {
+          "folders": [
+            "Ontario Curriculum"
+          ],
+          "primary": "Ontario Curriculum",
+          "titles": [
+            "Curriculum Coverage"
+          ],
+          "why": "One map keeps the name every existing course's links and the sidebar rule already know."
+        },
+        {
+          "folders": [
+            "Ontario Curriculum",
+            "College Board Curriculum"
+          ],
+          "primary": "Ontario Curriculum",
+          "titles": [
+            "Curriculum Coverage",
+            "College Board Curriculum Coverage"
+          ]
+        },
+        {
+          "folders": [
+            "College Board Curriculum"
+          ],
+          "primary": "Ontario Curriculum",
+          "titles": [
+            "College Board Curriculum Coverage"
+          ],
+          "why": "The primary folder holds no expectation page yet, so it has no map - and the map that exists keeps the name it will still have when the primary's arrives."
+        },
+        {
+          "folders": [
+            "Expectations",
+            "AP CSP"
+          ],
+          "primary": "expectations",
+          "titles": [
+            "Curriculum Coverage",
+            "AP CSP Coverage"
+          ],
+          "why": "The primary is found ignoring letter case; the folder's own spelling names the others."
+        },
+        {
+          "folders": [
+            "Ontario Curriculum",
+            "Curriculum"
+          ],
+          "primary": "Ontario Curriculum",
+          "titles": [
+            "Curriculum Coverage",
+            "Curriculum Coverage (2)"
+          ],
+          "why": "A second folder literally called Curriculum would otherwise overwrite the first map."
+        }
+      ]
     },
     "note": "What counts as a curriculum expectation. Written after checking the code rather than from memory: an expectation is not a code found in a page's TEXT, it is a PAGE named by a code inside a curriculum folder. A first draft of this contract asserted text-scanning and was wrong before it was ever run."
   },
@@ -2681,6 +2813,24 @@
       "readFrom": "The console, as each line arrives, for a preview or a publish the app runs; the run's own log, from the size it had before the run, for a scheduled publish (the mac: ScheduledDeploy.recordFolderProblems, which reads that log for PLANTOIR_HEALTH: lines already). Both, or the scheduled build — the one likeliest to rewrite files — leaves no trace."
     }
   },
+  "coverageMapsBuilt": {
+    "note": "How the build tells the app which curriculum coverage maps it wrote (#128), so the app can put one line on the activity trail per build. Which maps there are is curriculumRules.coveragePageTitles and specialNames.curriculumFoldersResolution; this is only the line that reports them.",
+    "marker": {
+      "prefix": "PLANTOIR_MAPS:",
+      "rule": "One line on stdout on EVERY build whose section wants the map, including a build that wrote none: the prefix followed by a single-line JSON object carrying course (the course code), section (a number) and maps - one {title, folder, expectations} per map written, primary first; an empty list when none was. Nothing is printed when the map is switched off for the section: the console already says so, and the trail would only repeat the setting. Plain sentences for a person reading the console are printed before it (one per map). The apps keep the marker line out of the console a teacher reads, as they do every PLANTOIR_ line (transcriptStripping.machineLines).",
+      "examples": [
+        "PLANTOIR_MAPS: {\"course\": \"ICS3U\", \"section\": 1, \"maps\": [{\"title\": \"Curriculum Coverage\", \"folder\": \"Ontario Curriculum\", \"expectations\": 42}, {\"title\": \"College Board Curriculum Coverage\", \"folder\": \"College Board Curriculum\", \"expectations\": 18}]}",
+        "PLANTOIR_MAPS: {\"course\": \"ICS3U\", \"section\": 2, \"maps\": []}"
+      ],
+      "why": "Russell's ruling on #128: a build that produced two maps is a feature a teacher can see, so it leaves a line (rule 5), and 'my College Board map is missing' is the report it has to answer - which is why an empty list is printed too. Titles, folder names and counts are course structure, never anything written on a page. Rejected: relying on the run record alone (the plan's first proposal) - a scheduled publish is exactly the build nobody watches, and the trail is what a report reads first."
+    },
+    "trailLine": {
+      "event": "curriculum maps built",
+      "shape": "the build made N curriculum map(s): <title> from <folder> (<E> expectations), ... — or, with none: the build made no curriculum map: no curriculum folder holds an expectation page",
+      "why": "The count first, then each map as a teacher would say it; the folder is named because two maps' titles alone do not say which folder a missing one should have come from.",
+      "readFrom": "The console, as each line arrives, for a preview or a publish the app runs; the run's own log, from the size it had before the run, for a scheduled publish (the mac: ScheduledDeploy.recordFolderProblems, beside PLANTOIR_DATED:)."
+    }
+  },
   "siteHealth": {
     "note": "What the toolchain checks about a course's folders before it builds, and the WORDS a teacher reads when one of them is wrong. Certain folder and file names carry behaviour — the curriculum folder, the folder holding class pages, Media, a section's index — and nothing stopped a teacher deleting or renaming one in Obsidian. The features then failed SILENTLY: the Curriculum Coverage map in particular still rendered, still looked healthy, and was wrong.",
     "whereItRuns": "Inside build_site.py, after the shared and per-section folders have been merged into content/ and BEFORE Quartz builds or anything is uploaded. It has to run there rather than in the apps: every check is defined over the MERGED tree, which does not exist until the build makes it, and a check that only guarded the GUI button would be bypassed by the assistant, by `Plantoir --mcp-stdio`, by the launchers, and by the scheduled deploy — which runs from launchd or Task Scheduler with the app CLOSED, and is the case that matters most.",
@@ -2819,10 +2969,11 @@
       },
       {
         "name": "handWrittenCoveragePage",
-        "sentence": "A page called Curriculum Coverage will be overwritten each time you build.",
-        "detail": "Plantoir writes the Curriculum Coverage page itself, every build. There is a page by that name in your own notes, and it is not the one being published — rename yours to keep it.",
+        "sentence": "A page called {page} will be overwritten each time you build.",
+        "detail": "Plantoir writes the {page} page itself, every build. There is a page by that name in your own notes, and it is not the one being published — rename yours to keep it.",
         "fixable": false,
-        "why": "The inverse of the other checks: not something missing, something PRESENT that gets clobbered. A name refusal in Settings cannot see this, because a teacher makes this page in Obsidian."
+        "why": "The inverse of the other checks: not something missing, something PRESENT that gets clobbered. A name refusal in Settings cannot see this, because a teacher makes this page in Obsidian.",
+        "fill": "{page} is the title of the coverage map the teacher's page shares a name with - 'Curriculum Coverage' on a course with one map. When several collide, the first by the maps' order is named: one finding per section build, enough to send a teacher looking (#128)."
       },
       {
         "name": "noGradedFolders",
@@ -3053,7 +3204,43 @@
         "input": "plain text"
       }
     ],
-    "note": "The launchers' output is written for a terminal: colour codes, cursor moves, window-title sequences. Both apps show that output to a teacher, so both must strip the same things - and KEEP the same things. Newlines, carriage returns and tabs survive; every other control character does not. Inputs below use \\u001b for ESC and \\u0007 for BEL."
+    "note": "The launchers' output is written for a terminal: colour codes, cursor moves, window-title sequences. Both apps show that output to a teacher, so both must strip the same things - and KEEP the same things. Newlines, carriage returns and tabs survive; every other control character does not. Inputs below use \\u001b for ESC and \\u0007 for BEL.",
+    "machineLines": {
+      "rule": "A line carrying PLANTOIR_ followed by capital letters or underscores and a colon - anywhere in it - is machinery, and is kept out of the console a teacher reads WHOLE, including while it is still arriving, whatever its name. Each marker's own reader still parses it (siteHealth.marker, pagesDatedByTheBuild, coverageMapsBuilt, ...); hiding does not wait for a reader to exist.",
+      "why": "#128, from the plan review: each marker used to be hidden by name, so a NEW marker printed by the shared Python reached every teacher's console as raw JSON on the day the toolchain mirrored, until each app learned its name - which is exactly what PLANTOIR_DATED: still does on Windows (#279). One rule for every marker closes that for the next one.",
+      "cases": [
+        {
+          "line": "PLANTOIR_MAPS: {\"course\": \"ICS3U\", \"section\": 1, \"maps\": []}",
+          "hidden": true
+        },
+        {
+          "line": "PLANTOIR_DATED: {\"course\": \"ICS4U\", \"section\": 1, \"pages\": [\"section1/index\"]}",
+          "hidden": true
+        },
+        {
+          "line": "🔨 Building…PLANTOIR_HEALTH: {\"name\": \"mediaFolderMissing\"}",
+          "hidden": true,
+          "why": "Glued to the tail of somebody else's half line: hidden whole, as siteHealth.marker says."
+        },
+        {
+          "line": "PLANTOIR_SOMETHING_NEW: 1",
+          "hidden": true,
+          "why": "A marker no app knows yet."
+        },
+        {
+          "line": "🗺️  Curriculum Coverage (Ontario Curriculum): 42 expectations, 3 not yet addressed",
+          "hidden": false
+        },
+        {
+          "line": "Plantoir_maps: lower case is a teacher's own words",
+          "hidden": false
+        },
+        {
+          "line": "PLANTOIR_ without a name",
+          "hidden": false
+        }
+      ]
+    }
   },
   "wizard": {
     "note": "What the New Course wizard says. AUTHORED rather than generated, and that is the whole point of the entry: a generated readout cannot fail when the code it reads changes, so a button label written by the generator would simply be rewritten to match whatever the button now says. Written by hand, each platform asserts its own constant against it and a drift goes red. Same reasoning as app-rules.json's split between milestones (a readout) and deployArguments (an expectation).",
@@ -3953,7 +4140,7 @@
       {
         "key": "curriculum",
         "namedFrom": "course",
-        "source": "the curriculum folder the build resolves BY NAME for this course - the same first-the-recorded-name-then-the-scan order the build uses. Only the name half, and only among the SHARED folders: the build also wants an expectation page inside the folder, which neither app can see from configuration, so the sheet can name a folder the build passes over in favour of another - when the named folder holds no expectation page the build does not give up, it falls through to the same scan. The build's own scan walks the merged tree, so it would also find a per-section folder whose name mentions the curriculum, where both apps look at shared_folders alone - unreachable in practice, because every manifest declares this folder as shared, and named here rather than left to be rediscovered. Naming it is still righter than naming one that is not there.",
+        "source": "every curriculum folder the course resolves to (specialNames.curriculumFoldersResolution's `resolved`), listed the way a person says them: the folders a coverage map is built from, which both apps find by looking in the course's SHARED folders on disk for an expectation page, as the build does; or, while no such folder holds a page yet, the one folder the old by-name rule gives. Only SHARED folders: the build walks the merged tree and would also find a per-section folder - unreachable in practice, because every manifest declares this folder as shared, and named here rather than left to be rediscovered.",
         "placeholderWhenNone": "Your curriculum folder",
         "what": "Your curriculum expectations",
         "why": "One page per expectation. The curriculum map is built from these — without them there is nothing to measure your lessons against, and the map is left out.",
@@ -3989,10 +4176,12 @@
       },
       {
         "key": "coverage",
-        "namedFrom": "fixed",
-        "name": "Curriculum Coverage",
+        "namedFrom": "course",
         "what": "Written for you, every time you build",
-        "why": "Do not write your own page with this name — it is replaced each time, so anything you put there would be lost."
+        "why": "Do not write your own page with this name — it is replaced each time, so anything you put there would be lost.",
+        "source": "the title of every coverage map the course has (curriculumRules.coveragePageTitles over the `mapped` folders), listed the way a person says them; 'Curriculum Coverage' while it has none.",
+        "placeholderWhenNone": "Curriculum Coverage",
+        "whyForSeveral": "Do not write your own pages with these names — they are replaced each time, so anything you put there would be lost."
       }
     ],
     "rowsAreOrdered": {
@@ -4176,6 +4365,60 @@
           "lessons": "All Classes and Class Notes"
         },
         "why": "The build counts every class folder when working out what a course teaches, so the sheet names every one."
+      },
+      {
+        "name": "an LCS course whose two curriculum folders both have maps",
+        "perSectionFolders": [
+          "All Classes"
+        ],
+        "sharedFolders": [
+          "College Board Curriculum",
+          "Ontario Curriculum",
+          "Tasks"
+        ],
+        "gradedFolders": [
+          "Tasks"
+        ],
+        "curriculumFolder": null,
+        "curriculumFolders": [
+          "Ontario Curriculum",
+          "College Board Curriculum"
+        ],
+        "withPages": [
+          "College Board Curriculum",
+          "Ontario Curriculum"
+        ],
+        "expectNames": {
+          "curriculum": "Ontario Curriculum and College Board Curriculum",
+          "coverage": "Curriculum Coverage and College Board Curriculum Coverage"
+        },
+        "why": "#128. Every map page is named, the primary's first, so a teacher knows every page name they must not write."
+      },
+      {
+        "name": "the LCS default: the folder named is the one holding the map",
+        "perSectionFolders": [
+          "All Classes"
+        ],
+        "sharedFolders": [
+          "College Board Curriculum",
+          "Ontario Curriculum",
+          "Tasks"
+        ],
+        "gradedFolders": [
+          "Tasks"
+        ],
+        "curriculumFolder": null,
+        "withPages": [
+          "Ontario Curriculum"
+        ],
+        "expectNames": {
+          "curriculum": "Ontario Curriculum",
+          "coverage": "Curriculum Coverage"
+        },
+        "mustNotAppear": [
+          "College Board Curriculum"
+        ],
+        "why": "The #90 tie, closed: this sheet used to name College Board (alphabetically first) while the map was built from Ontario."
       }
     ]
   },
@@ -4240,6 +4483,604 @@
       "message": "This folder holds your curriculum expectations. Removing it means expectations will not be available if you later enable curriculum coverage.",
       "why": "Prompts for confirmation when removing a curriculum folder when curriculum coverage is off."
     },
+    "removeCurriculumFolderWithItsMapConfirmation": {
+      "title": "Remove “{name}”?",
+      "message": "This folder holds curriculum expectations with a coverage map of their own. Removing it takes that map off your website.",
+      "why": "Asked, rather than refused, when the coverage map is on and the course has ANOTHER curriculum folder with a map (#128): the course keeps a map, so removing this one is allowed, but it is not a small thing. It does not promise that another map stays - the plan's first draft did, and on the default LCS course (College Board empty) that sentence was false in both directions."
+    },
+    "curriculumFoldersResolution": {
+      "note": "Which curriculum folders a course has, for the build's maps and for what both apps protect and name (#128). DECLARED names come first: curriculum_folders, in order, then the legacy curriculum_folder if it is not already there (null, empty, non-string and path-like entries dropped; repeats compared ignoring letter case). `mapped` is the build's answer: every declared folder among `folders` that holds an expectation page (`withPages`, found in any letter case, the LIST's spelling kept), in declared order - or, when none does, the ONE folder the old scan finds: the alphabetically first whose name mentions 'curriculum' and holds a page. `resolved` is what the apps protect and name: `mapped` when it is not empty, otherwise the single folder the old by-name rule gives - the first declared name in the list, else the alphabetically first name mentioning 'curriculum' - so a course whose folders are still empty is protected exactly as before. `titles` is curriculumRules.coveragePageTitles over `mapped`. The build reads the merged tree on disk; the apps read the course folder's SHARED folders on disk (withPages); the wizard, which has no disk yet, treats the payload's declared folder as holding pages when curriculum pages are being installed.",
+      "why": "Replaces curriculumFolderResolution, deleted rather than kept beside this: its Ontario/College Board case asserted the tie #90 described - the apps protecting College Board while the build mapped Ontario - and a case kept alive describes a rule that no longer exists while passing. Deciding from pages on disk is the plan review's finding 1: on the default LCS course College Board is empty, and a by-name rule protected it and told a teacher removing Ontario that another map would remain. Maps only for DECLARED folders, not every folder whose name mentions 'curriculum' (Russell's ruling on #128): an archived copy of a revised curriculum kept beside the current one would otherwise gain a second, overlapping map. Both apps OFFER to declare such a folder (curriculumFoldersOffer); neither declares one silently.",
+      "cases": [
+        {
+          "name": "legacy key only",
+          "curriculumFolder": "Curriculum",
+          "curriculumFolders": null,
+          "folders": [
+            "Concepts",
+            "Curriculum",
+            "Tasks"
+          ],
+          "withPages": [
+            "Curriculum"
+          ],
+          "mapped": [
+            "Curriculum"
+          ],
+          "resolved": [
+            "Curriculum"
+          ],
+          "titles": [
+            "Curriculum Coverage"
+          ]
+        },
+        {
+          "name": "list only",
+          "curriculumFolder": null,
+          "curriculumFolders": [
+            "Ontario Curriculum"
+          ],
+          "folders": [
+            "Ontario Curriculum",
+            "Tasks"
+          ],
+          "withPages": [
+            "Ontario Curriculum"
+          ],
+          "mapped": [
+            "Ontario Curriculum"
+          ],
+          "resolved": [
+            "Ontario Curriculum"
+          ],
+          "titles": [
+            "Curriculum Coverage"
+          ]
+        },
+        {
+          "name": "both keys, unioned, the list first",
+          "curriculumFolder": "Curriculum",
+          "curriculumFolders": [
+            "College Board Curriculum"
+          ],
+          "folders": [
+            "College Board Curriculum",
+            "Curriculum"
+          ],
+          "withPages": [
+            "College Board Curriculum",
+            "Curriculum"
+          ],
+          "mapped": [
+            "College Board Curriculum",
+            "Curriculum"
+          ],
+          "resolved": [
+            "College Board Curriculum",
+            "Curriculum"
+          ],
+          "titles": [
+            "Curriculum Coverage",
+            "Curriculum Coverage (2)"
+          ]
+        },
+        {
+          "name": "two declared folders with pages, the course's order kept",
+          "curriculumFolder": null,
+          "curriculumFolders": [
+            "Ontario Curriculum",
+            "College Board Curriculum"
+          ],
+          "folders": [
+            "College Board Curriculum",
+            "Ontario Curriculum",
+            "Tasks"
+          ],
+          "withPages": [
+            "College Board Curriculum",
+            "Ontario Curriculum"
+          ],
+          "mapped": [
+            "Ontario Curriculum",
+            "College Board Curriculum"
+          ],
+          "resolved": [
+            "Ontario Curriculum",
+            "College Board Curriculum"
+          ],
+          "titles": [
+            "Curriculum Coverage",
+            "College Board Curriculum Coverage"
+          ]
+        },
+        {
+          "name": "the LCS default: nothing declared, only Ontario holds pages",
+          "curriculumFolder": null,
+          "curriculumFolders": null,
+          "folders": [
+            "College Board Curriculum",
+            "Ontario Curriculum",
+            "Tasks"
+          ],
+          "withPages": [
+            "Ontario Curriculum"
+          ],
+          "mapped": [
+            "Ontario Curriculum"
+          ],
+          "resolved": [
+            "Ontario Curriculum"
+          ],
+          "titles": [
+            "Curriculum Coverage"
+          ],
+          "why": "The by-name rule named College Board here (the #90 tie). The map is Ontario's, so Ontario is the folder named and protected."
+        },
+        {
+          "name": "nothing declared, both hold pages: still ONE map",
+          "curriculumFolder": null,
+          "curriculumFolders": null,
+          "folders": [
+            "College Board Curriculum",
+            "Ontario Curriculum"
+          ],
+          "withPages": [
+            "College Board Curriculum",
+            "Ontario Curriculum"
+          ],
+          "mapped": [
+            "College Board Curriculum"
+          ],
+          "resolved": [
+            "College Board Curriculum"
+          ],
+          "titles": [
+            "Curriculum Coverage"
+          ],
+          "why": "The scan is a fallback, not additive: a second map comes from declaring the folder. What the build did before #128 for this course, unchanged."
+        },
+        {
+          "name": "declared, but no page yet anywhere",
+          "curriculumFolder": null,
+          "curriculumFolders": [
+            "Ontario Curriculum",
+            "College Board Curriculum"
+          ],
+          "folders": [
+            "College Board Curriculum",
+            "Ontario Curriculum"
+          ],
+          "withPages": [],
+          "mapped": [],
+          "resolved": [
+            "Ontario Curriculum"
+          ],
+          "titles": [],
+          "why": "No map yet. The apps protect the primary declared folder by name, as they protected the one folder before #128."
+        },
+        {
+          "name": "nothing declared, nothing with pages",
+          "curriculumFolder": null,
+          "curriculumFolders": null,
+          "folders": [
+            "College Board Curriculum",
+            "Ontario Curriculum"
+          ],
+          "withPages": [],
+          "mapped": [],
+          "resolved": [
+            "College Board Curriculum"
+          ],
+          "titles": []
+        },
+        {
+          "name": "a declared name matches in any letter case, the list's spelling wins",
+          "curriculumFolder": "curriculum",
+          "curriculumFolders": null,
+          "folders": [
+            "Curriculum",
+            "Tasks"
+          ],
+          "withPages": [
+            "Curriculum"
+          ],
+          "mapped": [
+            "Curriculum"
+          ],
+          "resolved": [
+            "Curriculum"
+          ],
+          "titles": [
+            "Curriculum Coverage"
+          ]
+        },
+        {
+          "name": "a declared name the course no longer has is ignored",
+          "curriculumFolder": "Expectations",
+          "curriculumFolders": null,
+          "folders": [
+            "Ontario Curriculum"
+          ],
+          "withPages": [
+            "Ontario Curriculum"
+          ],
+          "mapped": [
+            "Ontario Curriculum"
+          ],
+          "resolved": [
+            "Ontario Curriculum"
+          ],
+          "titles": [
+            "Curriculum Coverage"
+          ]
+        },
+        {
+          "name": "a declared folder need not mention the curriculum",
+          "curriculumFolder": null,
+          "curriculumFolders": [
+            "Expectations",
+            "AP CSP"
+          ],
+          "folders": [
+            "AP CSP",
+            "Expectations"
+          ],
+          "withPages": [
+            "AP CSP",
+            "Expectations"
+          ],
+          "mapped": [
+            "Expectations",
+            "AP CSP"
+          ],
+          "resolved": [
+            "Expectations",
+            "AP CSP"
+          ],
+          "titles": [
+            "Curriculum Coverage",
+            "AP CSP Coverage"
+          ]
+        },
+        {
+          "name": "a declared folder with pages beats an undeclared one",
+          "curriculumFolder": null,
+          "curriculumFolders": [
+            "Expectations"
+          ],
+          "folders": [
+            "Expectations",
+            "Ontario Curriculum"
+          ],
+          "withPages": [
+            "Expectations",
+            "Ontario Curriculum"
+          ],
+          "mapped": [
+            "Expectations"
+          ],
+          "resolved": [
+            "Expectations"
+          ],
+          "titles": [
+            "Curriculum Coverage"
+          ]
+        },
+        {
+          "name": "entries that name no folder are dropped",
+          "curriculumFolder": "",
+          "curriculumFolders": [
+            "",
+            7,
+            null,
+            "../Other/Curriculum",
+            "Curriculum"
+          ],
+          "folders": [
+            "Curriculum"
+          ],
+          "withPages": [
+            "Curriculum"
+          ],
+          "mapped": [
+            "Curriculum"
+          ],
+          "resolved": [
+            "Curriculum"
+          ],
+          "titles": [
+            "Curriculum Coverage"
+          ]
+        },
+        {
+          "name": "no curriculum folder at all",
+          "curriculumFolder": null,
+          "curriculumFolders": null,
+          "folders": [
+            "Concepts",
+            "Tasks"
+          ],
+          "withPages": [],
+          "mapped": [],
+          "resolved": [],
+          "titles": []
+        }
+      ]
+    },
+    "curriculumFolderProtection": {
+      "rule": "For a shared folder in curriculumFoldersResolution's `resolved` list: (1) while the coverage map is on and it is the ONLY resolved folder, it is blocked - curriculumFolderBlockedByCoverageSetting in Course Settings, curriculumFolderBlockedByCoverageMap in the wizard; (2) in the wizard, while curriculum pages are being installed, the payload's declared folder is blocked by curriculumFolderBlockedByCurriculumPages; (3) while the map is on and another resolved folder remains, removing it asks first, with removeCurriculumFolderWithItsMapConfirmation; (4) with the map off it asks with removeCurriculumFolderConfirmation. A folder not in `resolved` is not a curriculum folder here, and the other rules (the marks pool) decide.",
+      "why": "Only the LAST folder with a map is refused, because only removing that one takes the course's last map away. Before #128 exactly one folder was ever protected, chosen by name - on an LCS course, College Board, while Ontario, whose pages the map was built from, could be removed without a word.",
+      "cases": [
+        {
+          "name": "the only folder, map on (settings)",
+          "surface": "settings",
+          "resolved": [
+            "Ontario Curriculum"
+          ],
+          "folder": "Ontario Curriculum",
+          "coverageOn": true,
+          "pagesOn": false,
+          "declaredPayloadFolder": null,
+          "kind": "blocked",
+          "sentence": "curriculumFolderBlockedByCoverageSetting"
+        },
+        {
+          "name": "the only folder, map on (wizard)",
+          "surface": "wizard",
+          "resolved": [
+            "Curriculum"
+          ],
+          "folder": "Curriculum",
+          "coverageOn": true,
+          "pagesOn": true,
+          "declaredPayloadFolder": "Curriculum",
+          "kind": "blocked",
+          "sentence": "curriculumFolderBlockedByCoverageMap"
+        },
+        {
+          "name": "the LCS default: Ontario holds the map, so Ontario is the one refused",
+          "surface": "settings",
+          "resolved": [
+            "Ontario Curriculum"
+          ],
+          "folder": "Ontario Curriculum",
+          "coverageOn": true,
+          "pagesOn": false,
+          "declaredPayloadFolder": null,
+          "kind": "blocked",
+          "sentence": "curriculumFolderBlockedByCoverageSetting"
+        },
+        {
+          "name": "the LCS default: College Board, empty, is an ordinary folder",
+          "surface": "settings",
+          "resolved": [
+            "Ontario Curriculum"
+          ],
+          "folder": "College Board Curriculum",
+          "coverageOn": true,
+          "pagesOn": false,
+          "declaredPayloadFolder": null,
+          "kind": "notACurriculumFolder",
+          "sentence": null
+        },
+        {
+          "name": "one of two maps, map on",
+          "surface": "settings",
+          "resolved": [
+            "Ontario Curriculum",
+            "College Board Curriculum"
+          ],
+          "folder": "College Board Curriculum",
+          "coverageOn": true,
+          "pagesOn": false,
+          "declaredPayloadFolder": null,
+          "kind": "consequential",
+          "sentence": "removeCurriculumFolderWithItsMapConfirmation"
+        },
+        {
+          "name": "the other of two maps, map on",
+          "surface": "settings",
+          "resolved": [
+            "Ontario Curriculum",
+            "College Board Curriculum"
+          ],
+          "folder": "Ontario Curriculum",
+          "coverageOn": true,
+          "pagesOn": false,
+          "declaredPayloadFolder": null,
+          "kind": "consequential",
+          "sentence": "removeCurriculumFolderWithItsMapConfirmation"
+        },
+        {
+          "name": "one of two, map off",
+          "surface": "settings",
+          "resolved": [
+            "Ontario Curriculum",
+            "College Board Curriculum"
+          ],
+          "folder": "Ontario Curriculum",
+          "coverageOn": false,
+          "pagesOn": false,
+          "declaredPayloadFolder": null,
+          "kind": "consequential",
+          "sentence": "removeCurriculumFolderConfirmation"
+        },
+        {
+          "name": "the only folder, map off",
+          "surface": "settings",
+          "resolved": [
+            "Curriculum"
+          ],
+          "folder": "Curriculum",
+          "coverageOn": false,
+          "pagesOn": false,
+          "declaredPayloadFolder": null,
+          "kind": "consequential",
+          "sentence": "removeCurriculumFolderConfirmation"
+        },
+        {
+          "name": "wizard, pages on, map off: the declared folder",
+          "surface": "wizard",
+          "resolved": [
+            "Curriculum"
+          ],
+          "folder": "Curriculum",
+          "coverageOn": false,
+          "pagesOn": true,
+          "declaredPayloadFolder": "Curriculum",
+          "kind": "blocked",
+          "sentence": "curriculumFolderBlockedByCurriculumPages"
+        },
+        {
+          "name": "wizard, pages off, map off",
+          "surface": "wizard",
+          "resolved": [
+            "Curriculum"
+          ],
+          "folder": "Curriculum",
+          "coverageOn": false,
+          "pagesOn": false,
+          "declaredPayloadFolder": "Curriculum",
+          "kind": "consequential",
+          "sentence": "removeCurriculumFolderConfirmation"
+        },
+        {
+          "name": "a folder that is not a curriculum folder",
+          "surface": "settings",
+          "resolved": [
+            "Curriculum"
+          ],
+          "folder": "Tasks",
+          "coverageOn": true,
+          "pagesOn": false,
+          "declaredPayloadFolder": null,
+          "kind": "notACurriculumFolder",
+          "sentence": null
+        }
+      ]
+    },
+    "curriculumFoldersOffer": {
+      "label": "Curriculum folders",
+      "caption": "Tick each folder that holds curriculum expectations. Each one gets its own coverage map on your website.",
+      "rule": "Course Settings and the new-course wizard list, as checkboxes, every shared folder whose name mentions 'curriculum' plus every declared folder the course has - but only when there are at least TWO such folders, because with one there is nothing to choose. A folder is ticked when it is in curriculumFoldersResolution's `resolved` list (the wizard: when it is declared, or is the payload's folder). Ticking writes curriculum_folders as the ticked folders in the order the list shows them, with the ones already resolved first, so the primary folder - whose map is 'Curriculum Coverage' - stays primary. The last ticked folder cannot be unticked. Nothing is ever ticked for the teacher.",
+      "why": "Russell's ruling on #128: maps only for DECLARED folders, and the apps OFFER to declare one rather than deciding for the teacher. Showing the folder the build maps today as ticked, even on a course that declared nothing, is what stops the first tick from quietly dropping that map: declaring only College Board would otherwise end the fallback that found Ontario.",
+      "cases": [
+        {
+          "name": "LCS default, nothing declared",
+          "folders": [
+            "Concepts",
+            "Ontario Curriculum",
+            "College Board Curriculum",
+            "Tasks"
+          ],
+          "declared": [],
+          "resolved": [
+            "Ontario Curriculum"
+          ],
+          "offered": [
+            "Ontario Curriculum",
+            "College Board Curriculum"
+          ],
+          "ticked": [
+            "Ontario Curriculum"
+          ]
+        },
+        {
+          "name": "ticking College Board keeps Ontario first",
+          "folders": [
+            "Concepts",
+            "Ontario Curriculum",
+            "College Board Curriculum",
+            "Tasks"
+          ],
+          "declared": [],
+          "resolved": [
+            "Ontario Curriculum"
+          ],
+          "tick": "College Board Curriculum",
+          "writes": [
+            "Ontario Curriculum",
+            "College Board Curriculum"
+          ]
+        },
+        {
+          "name": "the list's order after the resolved ones",
+          "folders": [
+            "College Board Curriculum",
+            "Ontario Curriculum"
+          ],
+          "declared": [
+            "Ontario Curriculum"
+          ],
+          "resolved": [
+            "Ontario Curriculum"
+          ],
+          "tick": "College Board Curriculum",
+          "writes": [
+            "Ontario Curriculum",
+            "College Board Curriculum"
+          ]
+        },
+        {
+          "name": "unticking one of two",
+          "folders": [
+            "Ontario Curriculum",
+            "College Board Curriculum"
+          ],
+          "declared": [
+            "Ontario Curriculum",
+            "College Board Curriculum"
+          ],
+          "resolved": [
+            "Ontario Curriculum",
+            "College Board Curriculum"
+          ],
+          "untick": "College Board Curriculum",
+          "writes": [
+            "Ontario Curriculum"
+          ]
+        },
+        {
+          "name": "one curriculum folder: nothing offered",
+          "folders": [
+            "Concepts",
+            "Curriculum",
+            "Tasks"
+          ],
+          "declared": [
+            "Curriculum"
+          ],
+          "resolved": [
+            "Curriculum"
+          ],
+          "offered": [],
+          "ticked": []
+        },
+        {
+          "name": "a declared folder that does not say curriculum is offered too",
+          "folders": [
+            "AP CSP",
+            "Ontario Curriculum"
+          ],
+          "declared": [
+            "Ontario Curriculum",
+            "AP CSP"
+          ],
+          "resolved": [
+            "Ontario Curriculum",
+            "AP CSP"
+          ],
+          "offered": [
+            "Ontario Curriculum",
+            "AP CSP"
+          ],
+          "ticked": [
+            "Ontario Curriculum",
+            "AP CSP"
+          ]
+        }
+      ]
+    },
     "renameFolder": {
       "sheetTitle": "Rename “{name}”",
       "explanation": "This renames the folder on your Mac — in every section that has one — and points your pages’ links at the new name. It happens straight away, so Cancel in Settings will not undo it.",
@@ -4267,6 +5108,7 @@
         "per_section_folders",
         "graded_folders",
         "curriculum_folder",
+        "curriculum_folders",
         "class_folder",
         "hidden",
         "expandable",
@@ -4274,9 +5116,132 @@
       ],
       "hiddenIsTheDangerousOne": "`hidden` holds the folders and files kept OUT of the built site. A rename that does not carry it across silently UN-HIDES the folder, and the next publish puts pages the teacher deliberately hid in front of students. Missed until the real app was driven on 2026-09-04, on a course whose `hidden` list named its Curriculum folder. `expandable` beside it is only cosmetic — the sidebar's expansion state — but is carried for the same reason: a key that names a folder and is not rewritten leaves the configuration describing a folder that no longer exists.",
       "materialisesOnRename": {
-        "keys": ["class_folder", "curriculum_folder"],
-        "rule": "Renaming the folder a course currently RESOLVES to as its class folder or its curriculum folder writes that key, even on a course that never had one.",
-        "why": "Both are found by guessing at the name when the key is absent — 'class' in it, or 'curriculum' in it — and a course made from scratch has `curriculum_folder: null` and no `class_folder` at all. Rename `Curriculum` to `Expectations` without writing the key and the guess stops finding it: the map is built from nothing, and NOBODY IS TOLD, because from the coverage check's point of view the folder was never there. Carrying an existing key across is not enough; the key has to be created. A rename is the one moment Plantoir witnesses the change, which is the whole reason renaming belongs in the app rather than in Obsidian."
+        "keys": [
+          "class_folder",
+          "curriculum_folders"
+        ],
+        "rule": "Renaming a folder the course currently RESOLVES to as its class folder, or as ONE OF its curriculum folders (specialNames.curriculumFoldersResolution's `resolved`), writes that key, even on a course that never had one: class_folder, and curriculum_folders - the course's declared list (or, when it declared nothing, the folders it resolves to) with the old name replaced by the new, in the same place. The legacy curriculum_folder is rewritten only when it named the renamed folder, and is never created.",
+        "why": "Both are found by guessing at the name when the key is absent — 'class' in it, or 'curriculum' in it — and a course made from scratch has `curriculum_folder: null` and no `class_folder` at all. Rename `Curriculum` to `Expectations` without writing the key and the guess stops finding it: the map is built from nothing, and NOBODY IS TOLD, because from the coverage check's point of view the folder was never there. Carrying an existing key across is not enough; the key has to be created. A rename is the one moment Plantoir witnesses the change, which is the whole reason renaming belongs in the app rather than in Obsidian.",
+        "curriculumFoldersCases": [
+          {
+            "name": "a scratch course renames the folder its map comes from",
+            "before": {
+              "curriculum_folders": null,
+              "curriculum_folder": null,
+              "shared_folders": [
+                "College Board Curriculum",
+                "Ontario Curriculum"
+              ]
+            },
+            "withPages": [
+              "Ontario Curriculum"
+            ],
+            "scope": "shared",
+            "old": "Ontario Curriculum",
+            "new": "Ontario Expectations",
+            "after": {
+              "curriculum_folders": [
+                "Ontario Expectations"
+              ],
+              "curriculum_folder": null
+            },
+            "why": "The by-name rule would have taken College Board here and written nothing for Ontario; after the rename the scan finds no page in any folder mentioning the curriculum and the map is gone, with nobody told."
+          },
+          {
+            "name": "renaming one of two declared folders keeps its place",
+            "before": {
+              "curriculum_folders": [
+                "Ontario Curriculum",
+                "College Board Curriculum"
+              ],
+              "curriculum_folder": null,
+              "shared_folders": [
+                "College Board Curriculum",
+                "Ontario Curriculum"
+              ]
+            },
+            "withPages": [
+              "College Board Curriculum",
+              "Ontario Curriculum"
+            ],
+            "scope": "shared",
+            "old": "College Board Curriculum",
+            "new": "AP CSP",
+            "after": {
+              "curriculum_folders": [
+                "Ontario Curriculum",
+                "AP CSP"
+              ],
+              "curriculum_folder": null
+            }
+          },
+          {
+            "name": "the legacy key is rewritten AND the list written",
+            "before": {
+              "curriculum_folders": null,
+              "curriculum_folder": "Curriculum",
+              "shared_folders": [
+                "Concepts",
+                "Curriculum"
+              ]
+            },
+            "withPages": [
+              "Curriculum"
+            ],
+            "scope": "shared",
+            "old": "Curriculum",
+            "new": "Expectations",
+            "after": {
+              "curriculum_folders": [
+                "Expectations"
+              ],
+              "curriculum_folder": "Expectations"
+            }
+          },
+          {
+            "name": "a folder that is not a curriculum folder touches neither key",
+            "before": {
+              "curriculum_folders": [
+                "Curriculum"
+              ],
+              "curriculum_folder": null,
+              "shared_folders": [
+                "Concepts",
+                "Curriculum"
+              ]
+            },
+            "withPages": [
+              "Curriculum"
+            ],
+            "scope": "shared",
+            "old": "Concepts",
+            "new": "Ideas",
+            "after": {
+              "curriculum_folders": [
+                "Curriculum"
+              ],
+              "curriculum_folder": null
+            }
+          },
+          {
+            "name": "a per-section folder is never a curriculum folder here",
+            "before": {
+              "curriculum_folders": null,
+              "curriculum_folder": null,
+              "shared_folders": [
+                "Concepts"
+              ]
+            },
+            "withPages": [],
+            "scope": "perSection",
+            "old": "Curriculum Notes",
+            "new": "Notes",
+            "after": {
+              "curriculum_folders": null,
+              "curriculum_folder": null
+            }
+          }
+        ]
       },
       "linkRewriting": {
         "note": "How a folder’s new name is SPELLED inside the links a rename repoints. The rename itself is above; this is the half that decides whether the repointed link still resolves. The reference implementation is `FolderPathRewriter` on both sides.",
@@ -4480,60 +5445,6 @@
     "settingsPreviewAgainNothingOpen": {
       "message": "That preview has stopped since, so there is nothing to preview again. Open the section and press Preview to see what you saved.",
       "why": "Shown in place of an enabled Preview Again (the button stays, disabled) when every preview the after-Save notice offered has since stopped: its lease released, its section window gone, or the window still there with its preview no longer running. The notice is worked out at the Save and stays up until the next Save or leaving the course, so this is an ordinary sequence — save, then close the other window, then look back — and before the review's L2 the button stayed enabled and did nothing, with no trail line. Measured from the code rather than driven: an in-app preview lease is taken only in the section view's startPreview and released in the same synchronous onDisappear that unregisters its window, so a lease with no window does not persist; what does is the notice outliving its preview. Re-evaluated whenever PreviewLeases changes, which is observable. A caption: `message`, never `reason`."
-    },
-    "curriculumFolderResolution": {
-      "cases": [
-        {
-          "configured": "Ontario Curriculum",
-          "folders": [
-            "Concepts",
-            "Ontario Curriculum",
-            "Tasks"
-          ],
-          "resolved": "Ontario Curriculum",
-          "why": "Configured name wins."
-        },
-        {
-          "configured": "Expectations",
-          "folders": [
-            "Concepts",
-            "Expectations",
-            "Tasks"
-          ],
-          "resolved": "Expectations",
-          "why": "Configured name wins even when it does not mention the word curriculum."
-        },
-        {
-          "configured": null,
-          "folders": [
-            "College Board Curriculum",
-            "Ontario Curriculum",
-            "Tasks"
-          ],
-          "resolved": "College Board Curriculum",
-          "why": "Unconfigured: alphabetically first folder containing 'curriculum' wins."
-        },
-        {
-          "configured": null,
-          "folders": [
-            "Concepts",
-            "Curriculum",
-            "Tasks"
-          ],
-          "resolved": "Curriculum",
-          "why": "Unconfigured single curriculum folder."
-        },
-        {
-          "configured": null,
-          "folders": [
-            "Concepts",
-            "Tasks"
-          ],
-          "resolved": null,
-          "why": "No curriculum folder present."
-        }
-      ],
-      "note": "Which folder the GUI protects as the curriculum folder, computed from the config's shared_folders list: if `curriculum_folder` is configured and in the list, it is used; otherwise the alphabetically first name containing 'curriculum' (case-insensitive). This is the NAME half of build_site.py:_find_curriculum_folder, which additionally scans the vault on disk and accepts a folder only if it holds a page whose title is an expectation code — a check the apps cannot make from the config alone. So the GUI may protect a folder the build would skip (one with no expectation pages yet). It may ALSO name a DIFFERENT folder than the build picks, which this note used to deny: when a course has two folders mentioning the curriculum and only the second holds expectation pages, this rule takes the alphabetically first and the build takes the other. Measured on a real machine 2026-09-06 - two courses keeping both an \"Ontario Curriculum\" and a \"College Board Curriculum\" folder, the latter’s pages named \"1.A\" rather than in expectation-code form. Both apps agree with each other, so this is a shared limit rather than drift; whether to break the tie by reading the vault is an open question in TODO.md."
     }
   },
   "stopPreview": {
