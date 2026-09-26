@@ -361,4 +361,156 @@ final class SettingsSaveNoticeTests: XCTestCase {
             )
         }
     }
+
+    // MARK: - A Save speaks about a scheduled deploy (#323)
+
+    /// A course on disk in a scratch working folder, with LaunchAgents
+    /// pointed into it.
+    @MainActor
+    private func scheduledFixture() throws -> (root: URL, workspace: URL, course: URL, folder: URL) {
+        let root: URL = FileManager.default.temporaryDirectory.appendingPathComponent("save-scheduled-\(UUID().uuidString)")
+        let workspace: URL = root.appendingPathComponent("workspace")
+        let courseURL: URL = workspace.appendingPathComponent("courses/ICS3U")
+        let folder: URL = root.appendingPathComponent("published-here")
+        try FileManager.default.createDirectory(at: courseURL.appendingPathComponent("section1"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: root.appendingPathComponent("LaunchAgents"), withIntermediateDirectories: true)
+        ScheduledDeploy.launchAgentsDirectoryOverride = root.appendingPathComponent("LaunchAgents")
+        ScheduledDeploy.scheduledScriptsDirectoryOverride = root.appendingPathComponent("scheduled")
+        return (root, workspace, courseURL, folder)
+    }
+
+    @MainActor
+    private func configuration(_ given: [String: Any], courseURL: URL, folder: URL) throws -> CourseConfiguration {
+        var values: [String: Any] = ["course_code": "ICS3U", "section_numbers": [1], "num_sections": 1]
+        if let target = given["target"] as? String {
+            values["deploy_target"] = target
+            if target == "local_folder" {
+                values["deploy_folder_path"] = folder.path
+            }
+        }
+        let url: URL = courseURL.appendingPathComponent("course_config.json")
+        try JSONSerialization.data(withJSONObject: values).write(to: url, options: [.atomic])
+        return try CourseConfiguration(contentsOf: url)
+    }
+
+    /// `savingSettings.scheduledDeploys.cases`, through the same two calls
+    /// Course Settings' Save makes.
+    @MainActor
+    func testEveryScheduledDeployCaseSaysWhatTheContractSays() throws {
+        let section: [String: Any] = try sharedRulesSection("savingSettings")
+        let rule: [String: Any] = try XCTUnwrap(section["scheduledDeploys"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
+        XCTAssertEqual(cases.count, 4)
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let fixture = try scheduledFixture()
+            defer {
+                ScheduledDeploy.launchAgentsDirectoryOverride = nil
+                ScheduledDeploy.scheduledScriptsDirectoryOverride = nil
+                try? FileManager.default.removeItem(at: fixture.root)
+            }
+            let beforeGiven: [String: Any] = try XCTUnwrap(testCase["before"] as? [String: Any])
+            let before: CourseConfiguration = try configuration(beforeGiven, courseURL: fixture.course, folder: fixture.folder)
+            if beforeGiven["hasDeployedBefore"] as? Bool == true {
+                let marker: URL = fixture.course.appendingPathComponent(".netlify_sites")
+                try FileManager.default.createDirectory(at: marker, withIntermediateDirectories: true)
+                try "{}".write(to: marker.appendingPathComponent("section1.json"), atomically: true, encoding: .utf8)
+            }
+            // The deploy, set in this folder — or in another one.
+            let when: Date = Date().addingTimeInterval(86_400)
+            var scheduledIn: URL = fixture.workspace
+            var sections: [Int] = testCase["scheduled"] as? [Int] ?? []
+            if let elsewhere = testCase["scheduledElsewhere"] as? [Int] {
+                scheduledIn = fixture.root.appendingPathComponent("last-year")
+                sections = elsewhere
+            }
+            for number in sections {
+                let plist: [String: Any] = ScheduledDeploy.propertyList(
+                    courseCode: "ICS3U", sectionNumber: number, when: when, workspaceURL: scheduledIn
+                )
+                let label: String = try XCTUnwrap(plist["Label"] as? String)
+                try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
+                    .write(to: ScheduledDeploy.plistURL(label: label))
+            }
+
+            let savedGiven: [String: Any] = try XCTUnwrap(testCase["saved"] as? [String: Any])
+            let saved: Course = Course(
+                code: "ICS3U", directoryURL: fixture.course,
+                configuration: try configuration(savedGiven, courseURL: fixture.course, folder: fixture.folder)
+            )
+            let facts: [SettingsSaveNotice.ScheduledDeployAtSave] = SettingsSaveNotice.scheduledDeploysAtSave(
+                before: before,
+                saved: saved,
+                scheduled: SettingsSaveNotice.scheduledDeploysStillToCome(courseCode: "ICS3U", workingFolder: fixture.workspace),
+                cloudflareAccountID: savedGiven["cloudflareAccountID"] as? String ?? ""
+            )
+            var said: [String] = []
+            for fact in facts {
+                said.append(fact.refusal == nil ? "goesWhereTheCourseDeploysNow" : "cannotGoAheadAsSetNow")
+            }
+            XCTAssertEqual(said, try XCTUnwrap(testCase["expect"] as? [String]), name)
+
+            // Said even while a publish of the course runs: the sentences come
+            // before that early return.
+            let notice: SettingsSaveNotice? = SettingsSaveNotice.afterSave(
+                folderPath: fixture.workspace.path, courseCode: "ICS3U", previewLeases: [],
+                publishes: [CourseActivity.PublishRecord(folderPath: fixture.workspace.path, courseCode: "ICS3U", sectionNumber: 1)],
+                replacedChangesFromElsewhere: [], scheduledDeploys: facts
+            )
+            XCTAssertEqual(notice?.sentences.count, facts.count + 1, name)
+        }
+    }
+
+    /// The two templates are the contract's, and name no machinery.
+    @MainActor
+    func testTheScheduledDeploySentencesAreTheContractsOwn() throws {
+        let section: [String: Any] = try sharedRulesSection("specialNames")
+        let goes: String = try XCTUnwrap(
+            (section["settingsSaveScheduledDeployGoesWhereTheCourseDeploysNow"] as? [String: Any])?["message"] as? String
+        )
+        let cannot: String = try XCTUnwrap(
+            (section["settingsSaveScheduledDeployCannotGoAheadAsSetNow"] as? [String: Any])?["message"] as? String
+        )
+        XCTAssertEqual(
+            SpecialNames.settingsSaveScheduledDeployGoesWhereTheCourseDeploysNow(section: 2, moment: "M", destinations: "D"),
+            goes.replacingOccurrences(of: "{section}", with: "2").replacingOccurrences(of: "{moment}", with: "M")
+                .replacingOccurrences(of: "{destinations}", with: "D")
+        )
+        XCTAssertEqual(
+            SpecialNames.settingsSaveScheduledDeployCannotGoAheadAsSetNow(section: 2, moment: "M", reason: "R"),
+            cannot.replacingOccurrences(of: "{section}", with: "2").replacingOccurrences(of: "{moment}", with: "M")
+                .replacingOccurrences(of: "{reason}", with: "R")
+        )
+        for sentence in [goes, cannot] {
+            for word in ["script", "plist", "launchd", "agent", "job", "task", "scheduler", "wrapper"] {
+                XCTAssertFalse(sentence.lowercased().contains(word), "“\(sentence)” names “\(word)”")
+            }
+        }
+    }
+
+    /// The trail line carries the facts, not the sentences.
+    @MainActor
+    func testTheSaveTrailLineSaysWhatHappensToAScheduledDeploy() {
+        let notice: SettingsSaveNotice = SettingsSaveNotice(
+            sentences: ["x"], sectionsToPreviewAgain: [],
+            scheduledDeploys: [
+                SettingsSaveNotice.ScheduledDeployAtSave(
+                    section: 1, moment: Date(), destinationsNow: ["Netlify"], refusal: nil
+                ),
+                SettingsSaveNotice.ScheduledDeployAtSave(
+                    section: 2, moment: Date(), destinationsNow: ["Cloudflare Pages"],
+                    refusal: .neverDeployed(destination: "Cloudflare Pages")
+                ),
+            ]
+        )
+        let line: String = SettingsSaveNotice.trailLine(
+            courseCode: "ICS3U", hiddenBefore: [], hiddenAfter: [],
+            result: CourseConfiguration.WriteResult(keptFromElsewhere: [], replacedChangesFromElsewhere: []),
+            notice: notice
+        )
+        XCTAssertTrue(line.contains("; Section 1’s scheduled deploy now goes to Netlify"), line)
+        XCTAssertTrue(line.contains("; Section 2’s scheduled deploy could not go ahead as set now (it has never been deployed to Cloudflare Pages"), line)
+    }
 }
+

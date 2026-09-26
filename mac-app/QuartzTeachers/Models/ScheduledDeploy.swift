@@ -3,10 +3,11 @@ import Foundation
 /// "Deploy tomorrow's class at 6:30 AM."
 ///
 /// A launchd user agent runs `deploy.sh <CODE> <N>` at a set time with
-/// nothing of ours running — that is the whole point, so the plist must be
-/// self-sufficient: the working folder, the arguments, and the PATH the
-/// launcher needs are all written into it. Plantoir can be closed, and
-/// usually is at half six in the morning.
+/// Plantoir closed, as it usually is at half six in the morning. The plist
+/// names the job, the moment and the working folder, and the PATH the
+/// launcher needs; WHERE it deploys is read from the course's settings when
+/// it runs (GitHub #323), because a destination written into the job when it
+/// was set went to the old place after the teacher changed it.
 ///
 /// The decision of WHETHER to schedule, and every word the teacher reads,
 /// lives here in the app. The launchd layer below only runs the thing.
@@ -736,6 +737,11 @@ enum ScheduledDeploy {
 
     /// What the agent actually runs: the deploy, once, and then itself out
     /// of existence.
+    ///
+    /// Written when the deploy is scheduled, so the job on disk runs on its
+    /// own — and written AGAIN, from the course's settings as they are then,
+    /// when it runs (#323, `readAtTheRun`), so it deploys where the course
+    /// deploys at that moment.
     ///
     /// `StartCalendarInterval` has no "just this once" — a month and day
     /// come round again every year — so a fired agent that did not clear
@@ -2308,7 +2314,8 @@ enum ScheduledDeploy {
     ///
     /// From the course's own settings in the working folder the job named, so
     /// a teacher who changed the setting after scheduling changes what the
-    /// job already on disk does. A pre-v1.2.0 plist names no section and no
+    /// job already on disk does. The destination follows the same rule since
+    /// #323 (`readAtTheRun`). A pre-v1.2.0 plist names no section and no
     /// folder, so it gets the default.
     nonisolated static func allowedLatenessDays(
         forSection section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)?

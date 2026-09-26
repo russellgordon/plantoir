@@ -491,7 +491,9 @@ struct CourseSettingsView: View {
                 scheduledDeploys: SettingsSaveNotice.scheduledDeploysAtSave(
                     before: onDisk,
                     saved: course,
-                    scheduled: scheduledDeploysStillToCome(),
+                    scheduled: SettingsSaveNotice.scheduledDeploysStillToCome(
+                        courseCode: course.code, workingFolder: URL(fileURLWithPath: workingFolderPath)
+                    ),
                     cloudflareAccountID: AppSettings.shared.cloudflareAccountID
                 )
             )
@@ -512,22 +514,6 @@ struct CourseSettingsView: View {
             saveProblem = "Could not save: \(error.localizedDescription)"
             ActivityTrail.note(.settingsCouldNotBeSaved, "could not save the settings for " + course.code + " — " + error.localizedDescription)
         }
-    }
-
-    /// This course's deploys set to happen on its own IN THIS WORKING FOLDER
-    /// that are still to come (#323, scoped by #237).
-    func scheduledDeploysStillToCome() -> [(section: Int, when: Date)] {
-        let now: Date = Date()
-        var result: [(section: Int, when: Date)] = []
-        let agents: [ScheduledDeploy.Agent] = ScheduledDeploy.agents(
-            inWorkingFolder: URL(fileURLWithPath: workingFolderPath), courseCode: course.code, sectionNumber: nil
-        )
-        for agent in agents {
-            if let when = agent.scheduledFor, when > now {
-                result.append((section: agent.sectionNumber, when: when))
-            }
-        }
-        return result
     }
 
     /// The working folder this course lives in — the folder a preview's

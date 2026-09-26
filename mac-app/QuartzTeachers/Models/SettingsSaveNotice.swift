@@ -124,6 +124,27 @@ struct SettingsSaveNotice: Equatable {
         )
     }
 
+    /// This course's deploys set to happen on its own IN THIS WORKING FOLDER
+    /// that are still to come (#323) — found by the folder scan, so another
+    /// working folder's deploy of the same section is never spoken about
+    /// (#237).
+    static func scheduledDeploysStillToCome(
+        courseCode: String,
+        workingFolder: URL,
+        now: Date = Date()
+    ) -> [(section: Int, when: Date)] {
+        var result: [(section: Int, when: Date)] = []
+        let agents: [ScheduledDeploy.Agent] = ScheduledDeploy.agents(
+            inWorkingFolder: workingFolder, courseCode: courseCode, sectionNumber: nil
+        )
+        for agent in agents {
+            if let when = agent.scheduledFor, when > now {
+                result.append((section: agent.sectionNumber, when: when))
+            }
+        }
+        return result
+    }
+
     /// Which of this course's scheduled deploys a Save should speak about
     /// (GitHub #323), and what to say.
     ///

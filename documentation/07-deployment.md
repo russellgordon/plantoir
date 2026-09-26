@@ -2063,19 +2063,20 @@ do. The folder-open sweep asks the same question through the same function; two
 answers to "how late is too late for this course" is one more than anybody can
 keep in step.
 
-**The lateness window is the ONLY setting read when the job fires.** The
-DESTINATION is fixed when the deploy is scheduled: `ScheduledDeploy.scheduleDeploy`
-writes each destination's `deploy.sh` arguments into the one-shot command at
-that moment. Since #322 either assistant reads the SAVED file at that moment
-(docs 10 → "Settings are read at the call, not when the window opened"), so a
-deploy it schedules goes to where the course deploys now. The schedule SHEET
-does not: it uses the window's copy of the course, which follows a Save and
-also carries Course Settings edits not yet saved — so a destination changed and
-not saved is baked into a job scheduled from the sheet
-([issue #335](https://github.com/russellgordon/plantoir/issues/335)). But changing the destination AFTER scheduling does not move a job already
-set: it still deploys to the old one, and says nothing. That is
-[issue #323](https://github.com/russellgordon/plantoir/issues/323), not yet
-fixed; until it is, re-schedule after changing where a course deploys.
+**The destination is read the same way, since #323.** Until then it was fixed
+when the deploy was scheduled — `scheduleDeploy` wrote each destination's
+`deploy.sh` arguments into the wrapper — so changing where a course deploys
+after scheduling sent the deploy to the OLD place, and it reported success.
+Now the run reads the course's settings when it fires and writes the wrapper
+afresh; see "Where it deploys is read when it runs (#323)" at the end of this
+page. What is read AT SCHEDULING still matters for the refusals the sheet and
+the assistants give then: since #322 either assistant reads the SAVED file
+(docs 10 → "Settings are read at the call, not when the window opened"), while
+the schedule SHEET uses the window's copy of the course, which follows a Save
+and also carries Course Settings edits not yet saved
+([issue #335](https://github.com/russellgordon/plantoir/issues/335)). Since #323
+that copy decides only what the sheet says and what `PLANTOIR_SCHEDULED_TO`
+records — the run reads the file.
 
 **Finding the course folder is not `fileExists` on a built path, and that is
 measured.** A job written before the course code went into the plist carries it
@@ -2354,7 +2355,9 @@ not in the scan and is left standing — that is the fix.
    the boot-out-then-write sequence whose failure #195 found loses the job; it
    needs the course's CURRENT destinations and Cloudflare account to regenerate
    the wrapper, so it would change what an already-promised deploy does, not
-   only its name; and a pre-v1.2.0 plist carries no `PLANTOIR_SCHEDULED_FOR`,
+   only its name (since #323 every run reads the destinations as they are when
+   it fires, so THIS reason no longer applies; the first and third still do);
+   and a pre-v1.2.0 plist carries no `PLANTOIR_SCHEDULED_FOR`,
    so "the moment kept" would mean inventing a year. All to rename a file that
    expires by itself.
 2. *Rename in place* (rewrite `Label`, move plist/script/log, edit the
@@ -2397,3 +2400,142 @@ February: `plutil -lint` OK, `launchctl bootstrap` exit 0, `launchctl print`
 listed it, `bootout` exit 0, plist deleted, `print` afterwards exit 113 (gone).
 No teacher's job was touched. Every test uses `FakeLaunchControl` and throwaway
 agents folders.
+
+### Where it deploys is read when it runs (#323)
+
+**What was wrong, measured.** Found while planning #322. A throwaway test
+scheduled ICS3U section 1 to Netlify through the real `scheduleDeploy`, then
+rewrote `course_config.json` to a folder as Course Settings' Save does, then
+read back what launchd would run. The PLIST never carried the destination (its
+`ProgramArguments` are the app, the run flag, the wrapper path, the section flag,
+the working folder, the code and the section — which corrects the issue); the
+WRAPPER did. After the Save it still read
+`/bin/bash '…/deploy.sh' 'ICS3U' '1' '--non-interactive'`: a publish to the old
+place at half six, reported as `succeeded`.
+
+**Reading the destination is not enough on its own, and this is the trap.** A
+course switched to a Cloudflare Pages destination never deployed to would, if
+the run only re-read the destination, publish successfully to a project named by
+guesswork: `publish_to_cloudflare` (`scripts/deploy.py`) contains no
+`refuse_to_ask`, discovers a missing account from the token, suggests the name
+deterministically and creates the project. So the run re-applies everything the
+schedule sheet refuses except a time already passed — one function,
+`ScheduledDeploy.destinationRefusal`, asked at scheduling (`problem()`), at the
+run and after a Save.
+
+**What the run does now** (`runScheduled`, in this order):
+
+1. The lateness window (unchanged) — a job too late stands down `tooLateToRun`
+   whatever its settings say.
+2. The wait for the course (#156) — so a Save made while it waited counts.
+3. **The settings** (`readAtTheRun`): the course folder is found the way the
+   lateness window finds it, `course_config.json` is read, `destinationRefusal`
+   asked, and the wrapper built from `deployPlan` — the SAME function scheduling
+   uses, so an unchanged course gets a byte-identical wrapper
+   (`testAnUnchangedCourseGetsTheSameWrapperItWasScheduledWith`).
+4. **Does the job still stand?** (`jobStillStands`, the plan review's M1). Its
+   plist must still exist and still carry this run's `PLANTOIR_SCHEDULED_FOR`.
+   Before #323 a cancelled job's deleted wrapper was what stopped a run that
+   outlived its cancellation; a run that writes its wrapper afresh would bring
+   the cancelled deploy back. If the job no longer stands the run releases its
+   leases and leaves — no record, no notification, and no boot-out (a job
+   scheduled again under the same name must not be booted out).
+5. **The write** (`writeTheRunsWrapper`): over the job's OWN wrapper, and only
+   if it is still there (a cancel deletes the wrapper before the plist). The
+   permissions are not a condition — the run starts `/bin/bash <wrapper>`.
+6. **The decision** (`whatTheRunDoes`, pure and tested): the ONLY way to run is
+   a wrapper just written from the settings; a failed write stands down with
+   its own true reason, never "could not read the settings" (review M2).
+7. For a job set before #237, the record under the old folder-less name is
+   removed before the run (`clearTheOldNamedRecord`, review H1): that job's own
+   wrapper used to clear it first, and without it `fileUnderTheFolder` would
+   move LAST week's record over tonight's — a failed run announced as last
+   week's success. Must-fail: `testAnOldJobsRunIsNotReportedAsLastWeeksSuccess`.
+
+**Standing down.** A refusal releases the leases FIRST (`standDown` never
+returns, and until #323 it was only reached holding none), then records the new
+kind `couldNotRunAsSetNow` with the REASON as the record's second line — a
+clause true at the run (`ScheduledDeployRefusal.reasonClause`), which the
+sentence shows as `{reason}`. The sheet's own sentences stay for the sheet: their
+remedies ("then schedule this again", "it would wait") are false at the run and
+at a Save (review M3). Settings that cannot be read stand down too — the
+opposite of the lateness window's default, because a destination has no safe
+default.
+
+**What the job keeps.** The plist is unchanged but for ONE note,
+`PLANTOIR_SCHEDULED_TO`: the destinations' descriptions the teacher was told,
+as a JSON array. It is never read to decide
+(`testWhereItWasScheduledIsNeverUsedToDecide`); it lets the trail say when the
+run went somewhere else. (`propertyList`'s unused `deployArguments:` parameter
+went.) The wrapper is still written complete at scheduling, so the job on disk
+runs on its own under an older copy of the app.
+
+**Jobs already on disk.** Every plist since v1.2.0 runs the app, so they follow
+the rule at their next run. One set before #323 recorded nothing to compare
+with, so no "went somewhere else" line; one set before #237 keeps its old name
+for its plist, log and success note, and files its record under the folder's
+id; a plist from before v1.2.0 names no section and runs its wrapper as
+written — the one stale path left, effectively extinct. A regenerated wrapper
+also carries any fix made to the wrapper since the job was set, which is
+intended.
+
+**The trail.** New event `scheduled publish read the course's settings`
+(mustRecord), written ONLY when something differs from what the teacher was
+told: shape A, "a scheduled publish was set to deploy to Netlify; the course
+deploys to /Users/…/Sites now, so it is deploying there"; shape B, "a scheduled
+publish could not deploy the way the course is set now (…reason…)", plus where
+it was set to go and where the course deploys now when those differ. The
+stand-down's generic `scheduled deploy turned off` line follows it, the
+`courseWasBusy` precedent. Named "read" rather than "followed" because it also
+carries the runs that stood down (review L3). **Known, accepted (review L2):**
+the `scheduled publish waited … then went ahead` line is written when the wait
+ends, before the settings are read, so a run that waited and then stood down
+over its settings shows "went ahead" followed by the stand-down line.
+
+**Said at Save, while somebody is awake** (Chunk B). After a Save in Course
+Settings, for each section with a deploy set to happen on its own in THIS working
+folder and still to come: `specialNames.settingsSaveScheduledDeployCannotGoAheadAsSetNow`
+when it could not go ahead as set now (changed or not), else
+`…GoesWhereTheCourseDeploysNow` when the Save changed where the course deploys
+(the file before the Save against what it wrote — never against
+`PLANTOIR_SCHEDULED_TO`, which would repeat the sentence on every later Save).
+Nothing is refused or undone. Appended before the "saved while publishing" early
+return; the `settings saved` trail line carries the same facts
+(`SettingsSaveNotice.scheduledDeploys`, not parsed back out of the sentences).
+Contract: `savingSettings.scheduledDeploys`.
+
+**The one claim no unit test reaches, measured (review M6).** The run reads the
+Cloudflare Account ID from the app's own settings. That a launchd-started run
+reads the same defaults domain as the app was measured on 2026-09-26, Apple M4
+Pro, macOS 26.6: a scratch build of this branch, signed by the same team
+(`ca.russellgordon.Plantoir`, C7DL9Y9A7R), with a TEMPORARY flag that printed
+presence only — never a value — was run once from Terminal and once as a launchd
+job labelled `ca.russellgordon.probe323.<uuid>` (outside the deploy prefix, so no
+sweep or badge could see it), bootstrapped from a plist in the session's scratch
+folder, then booted out and confirmed gone (`launchctl print` exit 113). Both
+printed `bundle=ca.russellgordon.Plantoir accountIDPresent=true domainKeys=75`.
+The app is not sandboxed, and `--mcp-stdio` already read the same setting when
+launched by another program.
+
+**Known, not covered (review L1).** A changed Cloudflare Account ID is not
+refused at the run: "deployed before" is kept per destination TYPE, not per
+account, so a swap to another valid ID deploys to a new project in the new
+account and reports success. Attended deploys behave the same; before #323 the
+baked ID kept the old account.
+
+**Rejected** (with reasons in `scheduledDeployCancellation.theDestination.rejected`):
+re-registering the job at Save (reaches only the app's Save, puts #195's
+boot-out-then-write behind a settings button); reading the destination without
+the refusals (the Cloudflare fail-open); teaching the launchers to read the
+destination (a launcher-contract change Windows shares, and a second reader of
+the rules); the arguments in the plist (the same staleness elsewhere); parsing
+the old wrapper; falling back to the scheduled wrapper when settings cannot be
+read (the fault itself); a temporary wrapper file (everything finds the job by
+its wrapper's path); warning at Save alone.
+
+**Windows** has the same fault — `TaskScheduling.WriteWrapperScript` bakes the
+destinations and the Account ID into the `.ps1`, and Task Scheduler runs
+PowerShell with no app alive — and owes `theDestination`, the kind, the event and
+the two Save sentences. How is theirs; the mac's shape (the task launches
+`Plantoir.exe --run-scheduled-deploy`) is the likely best.
+
