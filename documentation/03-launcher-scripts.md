@@ -705,10 +705,14 @@ the built bundle — which, because the tracked `QuartzTeachers/Info.plist` is
 the build's input, also catches a `project.yml` edit made without re-running
 `xcodegen generate`. It proves **plist content only**.
 
-**Removable and network volumes were considered and rejected.** Nothing in the
-Swift refuses a working folder outside `$HOME`, so
-`NSRemovableVolumesUsageDescription` and `NSNetworkVolumesUsageDescription` are
-genuinely reachable. They are still wrong: the sentence promises a class
+**Removable and network volumes were considered and rejected.** Since #290 the
+app refuses a working folder outside `$HOME` when it is chosen or reopened,
+before writing a byte into it ([09](09-mac-app.md) → "A working folder the
+website builder cannot reach"), so `NSRemovableVolumesUsageDescription` and
+`NSNetworkVolumesUsageDescription` are reached now only while such a folder is
+being CHECKED — a remembered one being looked at on launch, a chosen one being
+asked its spelling — and whether either look raises the prompt is unmeasured.
+They are still wrong, for two reasons now rather than one: the sentence promises a class
 website, and a folder on an external drive is the one place that cannot produce
 one — the virtual machine is given only the home folder, so the workspace is
 refused outright with the sentence in `contracts/app-rules.json` →
@@ -1111,7 +1115,11 @@ that said so have been corrected.
 
 So this is not a regression to be apologised for. A teacher in that state was
 already building nothing; they now find out, in one sentence, on the first
-run. It is also why the refusal branch says something DIFFERENT from the
+run. **Since #290 this refusal is the BACKSTOP, not the first
+word**: the app refuses such a folder when it is chosen or reopened
+([09](09-mac-app.md) → "A working folder the website builder cannot reach"),
+so the launcher's sentence is what a command-line user meets, and what a folder
+moved onto a drive while it was open would meet. It is also why the refusal branch says something DIFFERENT from the
 missing-folder branch — see below.
 
 **Two situations, two sentences.** The launchers hold both, side by side in

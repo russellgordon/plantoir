@@ -223,10 +223,12 @@ final class WindowRestorationScenarioTests: XCTestCase {
         XCTAssertNil(workspace.selection)
     }
 
-    /// THE SYSTEM SETTING: "Close windows when quitting" on means nothing
-    /// comes back — the list loads empty, though it is still recorded.
+    /// THE SYSTEM SETTING: "Close windows when quitting" on means no WINDOW
+    /// is replayed — the list loads empty, though it is still recorded. The
+    /// FOLDER still comes back since #311; that half is
+    /// `ReopeningTheLastWorkingFolderTests.testTheCloseWindowsSettingStillReopensTheLastFolder`.
     @MainActor
-    func testTheCloseWindowsSettingMeansNothingComesBack() throws {
+    func testTheCloseWindowsSettingMeansNoWindowIsReplayed() throws {
         let folders: [String] = try makeFolders(1)
         defer { removeAll(folders) }
         let defaults: UserDefaults = TestDefaults.make()
@@ -236,7 +238,7 @@ final class WindowRestorationScenarioTests: XCTestCase {
         defer { WindowFolderMemory.systemRestoresWindowsOverride = nil }
         WindowFolderMemory.resetForLoading()
         XCTAssertNil(WindowFolderMemory.claimNextEntry(defaults: defaults),
-                     "The teacher asked for windows not to come back")
+                     "The teacher asked for windows not to come back — the window set follows the setting")
 
         // And with the setting the other way, the same store restores.
         WindowFolderMemory.systemRestoresWindowsOverride = true
