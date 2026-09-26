@@ -117,4 +117,52 @@ final class ExcludedItemsContractTests: XCTestCase {
             "excluded per-section file Notes.md in ICS3U"
         )
     }
+
+    /// An exclusion ANOTHER copy of the configuration already saved is not
+    /// this write's to record — the comparison is with the file as it was
+    /// before this write, not with what this copy last read. Two windows on
+    /// one working folder hold two copies (#265): A removes `Labs` and saves
+    /// (one line); B, which read the file before that, saves an unrelated
+    /// change, and the per-key merge keeps A's `excluded_items`. Compared
+    /// with B's own last read, `Labs` would be recorded a second time.
+    func testAnExclusionAnotherCopyAlreadySavedIsNotThisWritesToRecord() throws {
+        let root: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("exclusion-two-copies-\(UUID().uuidString)")
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: root.appendingPathComponent(".trail"))
+        defer {
+            ActivityTrail.store = previousStore
+            try? FileManager.default.removeItem(at: root)
+        }
+        let courseURL: URL = root.appendingPathComponent("ICS3U")
+        try FileManager.default.createDirectory(
+            at: courseURL.appendingPathComponent("section1/Labs"), withIntermediateDirectories: true
+        )
+        let fileURL: URL = courseURL.appendingPathComponent("course_config.json")
+        let values: [String: Any] = [
+            "course_code": "ICS3U", "course_name": "Two copies", "section_numbers": [1],
+            "shared_folders": ["Concepts"], "per_section_folders": ["All Classes", "Labs"],
+        ]
+        try JSONSerialization.data(withJSONObject: values, options: [.prettyPrinted, .sortedKeys]).write(to: fileURL)
+        let windowA: CourseConfiguration = try CourseConfiguration(contentsOf: fileURL)
+        let windowB: CourseConfiguration = try CourseConfiguration(contentsOf: fileURL)
+
+        windowA.perSectionFolders = ["All Classes"]
+        windowA.exclude("Labs", inScope: "per_section")
+        let first: CourseConfiguration.WriteResult = try windowA.write(to: fileURL)
+        XCTAssertEqual(first.exclusionChanges.count, 1)
+
+        windowB.courseName = "Renamed in the other window"
+        let second: CourseConfiguration.WriteResult = try windowB.write(to: fileURL)
+        XCTAssertEqual(second.exclusionChanges, [], "B's write did not exclude anything")
+        XCTAssertEqual(windowB.excludedItems(forScope: "per_section"), ["Labs"], "the merge kept A's exclusion")
+
+        var lines: Int = 0
+        for line in ActivityTrail.store.activityText(includingPrompts: true).components(separatedBy: "\n") {
+            if line.hasSuffix("excluded per-section folder Labs in ICS3U") {
+                lines += 1
+            }
+        }
+        XCTAssertEqual(lines, 1)
+    }
 }
