@@ -8,6 +8,83 @@
   "version": "1.3.1",
   "released": "September 2026",
   "netlify_site_id": "67a69720-5e21-49ed-a354-adce4a75b279",
+  "downloads_note": "The download cards on the home page. A card with no 'pinned' version links GitHub's evergreen releases/latest/download/<asset>, which 404s for a platform whose installer is missing from the newest release; such a card is pinned to the last release that has it, and says so. Windows is pinned to 1.1.0 because v1.2.0 onward carried the macOS DMG only: unpin it in the release that ships the Windows installer again. Asset names are frozen (RELEASING.md).",
+  "downloads": [
+    {
+      "platform": "macOS",
+      "asset": "Plantoir-macOS.dmg",
+      "meta": "macOS 15 or later, Apple silicon",
+      "pinned": null
+    },
+    {
+      "platform": "Windows",
+      "asset": "PlantoirSetup.exe",
+      "meta": "Windows 10 or 11, 64-bit",
+      "pinned": "1.1.0"
+    }
+  ],
+  "availability": {
+    "note": "On the Mac. The Windows version gets this in a later release.",
+    "why": "A section describing something the Windows download (see downloads: pinned to 1.1.0) does not have carries {{availability:<key>}}, which prints the note while 'windows' is false and nothing once it is true. Flip the boolean in the release whose Windows installer has the feature.",
+    "features": {
+      "reference-courses": {
+        "windows": false
+      },
+      "start-of-year": {
+        "windows": false
+      },
+      "two-curricula": {
+        "windows": false
+      },
+      "outside-assistants": {
+        "windows": false
+      },
+      "clubs": {
+        "windows": false
+      },
+      "scheduled-notification": {
+        "windows": false
+      }
+    }
+  },
+  "new_in": {
+    "version": "1.4",
+    "why": "The home page's 'New this year' list. --deploy warns when this version is not the major.minor of 'version', so a 1.5 release is reminded to rewrite it; a 1.4.x is not.",
+    "items": [
+      {
+        "text": "A ready-made course for {{ready_made_ontario}} Ontario courses, and a starting outline for about {{skeleton_codes}} more.",
+        "href": "features/#ready-made"
+      },
+      {
+        "text": "Publish on a schedule, and hear how it went.",
+        "href": "day-to-day/#sunday-evening"
+      },
+      {
+        "text": "Last year's courses beside this year's, to read and borrow from.",
+        "href": "features/#last-year"
+      },
+      {
+        "text": "One step to get a section ready for the first day.",
+        "href": "day-to-day/#before-school"
+      },
+      {
+        "text": "A second curriculum — AP, say — with its own coverage map.",
+        "href": "features/#two-curricula"
+      },
+      {
+        "text": "Work on a course with Claude or Codex, after telling them how you teach.",
+        "href": "features/#bring-your-own"
+      },
+      {
+        "text": "Plantoir keeps itself up to date on a Mac.",
+        "href": "support/#updates"
+      },
+      {
+        "text": "Clubs, not only courses.",
+        "href": "features/#clubs"
+      }
+    ]
+  },
   "nav": [
     "index",
     "features",
