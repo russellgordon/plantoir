@@ -163,6 +163,7 @@ class UpdateFeedTests(unittest.TestCase):
             download_prefix="https://github.com/russellgordon/plantoir/releases/download/v1.3.3-rehearsal-204/")
         self.assertEqual(written, rehearsal)
         self.assertTrue(self.verifies(rehearsal))
+        self.assertTrue(update_feeds.newest_item(rehearsal)["url"].endswith("/Plantoir-macOS-REHEARSAL.dmg"))
         self.assertEqual(real.read_bytes(), before)
         self.assertEqual((self.updates / "macos-notes.html").read_bytes(), notes_before)
         with self.assertRaises(update_feed.Refusal):

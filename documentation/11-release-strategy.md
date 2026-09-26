@@ -49,13 +49,15 @@ An adversarial architecture review uncovered five potential failure points that 
 
 ### Packaging & Signing Chain (`mac-app/publish.sh`)
 The automated script executes the following sequence:
-1. Fetches native `llama.cpp` (`mac-app/Vendor/fetch-llama.sh`) and Sparkle, the updater (`mac-app/Vendor/fetch-sparkle.sh`, #204 — signing its helpers item by item is #204's second slice and is not in the list below yet).
-2. Generates Xcode project (`xcodegen generate`) and builds Release (`xcodebuild`).
+1. Fetches native `llama.cpp` (`mac-app/Vendor/fetch-llama.sh`) and Sparkle, the updater (`mac-app/Vendor/fetch-sparkle.sh`, #204).
+2. Generates Xcode project (`xcodegen generate`) and builds Release (`xcodebuild`), then refuses a built bundle whose update feed, public key or ask-first key is wrong (`mac-app/release/check-update-keys.sh`).
 3. Relocates `.dylib` files into `Contents/Frameworks/` and `llama-server` into `Contents/Helpers/`.
 4. Bottom-up codesigning:
+   - Signs the updater's own code first, item by item — Autoupdate, Updater.app, the framework last; never `--deep`, never the app's entitlements (`mac-app/release/sign-updater.sh`, #204).
    - Signs all real `.dylib` files (preserving symlinks) with Developer ID + `--timestamp` + `--options runtime`.
    - Signs `Contents/Helpers/llama-server` with Developer ID + `--timestamp` + `--options runtime`.
    - Signs `Plantoir.app` with Developer ID + `--timestamp` + `--options runtime` + entitlements.
+   - Refuses unless every updater item and the app are on the app's own team with the hardened runtime (`mac-app/release/check-signatures.sh`) — `codesign --verify --deep --strict` cannot see a helper left ad-hoc.
 5. Creates APFS-formatted `dist/Plantoir-macOS.dmg` with `/Applications` symlink.
 6. Signs `dist/Plantoir-macOS.dmg` with Developer ID.
 7. Submits DMG to Apple Notarization (`xcrun notarytool submit ... --wait`).
@@ -128,12 +130,11 @@ still holds, with the names it finally took:
 - **The feed is built at the cut, from the exact bytes uploaded, and goes live
   only after the release is published** — a feed deployed before its download
   exists offers an update that 404s. A release that publishes a DMG without
-  updating the feed ships an update nobody is offered. Building and signing the
-  feed, `website/build.py` copying it byte-for-byte (a re-serialised feed breaks
-  its signature), and the `RELEASING.md` and `cut-release` steps are #204's
-  second slice; until it lands, **no release is offered to anyone**, and
-  teachers on v1.3.1 or earlier install one more version by hand either way —
-  they have no updater.
+  updating the feed ships an update nobody is offered. `website/update_feed.py`
+  builds and signs it at the cut, `website/build.py` copies it byte-for-byte (a
+  re-serialised feed breaks its signature) and checks it before and after a
+  deploy — `RELEASING.md` → "The update feed (macOS)". Teachers on v1.3.1 or
+  earlier have no updater, and install the first release that carries one by hand.
 
 The rules a teacher is promised are `contracts/shared-rules.json` →
 `appUpdates`; the mac's mechanism, what was measured and what was rejected are

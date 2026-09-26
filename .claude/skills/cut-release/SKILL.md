@@ -46,7 +46,16 @@ this skill automates its steps 5–6 and the note-writing.
    Asset names are LOAD-BEARING: `Plantoir-macOS.dmg` and `PlantoirSetup.exe`
    (and `Plantoir-win-x64.zip`), exactly — plantoir.app's download links resolve
    `releases/latest/download/<asset-name>`, so a renamed asset silently
-   breaks the site. Refuse to attach an asset under any other name.
+   breaks the site. Refuse to attach an asset under any other name — in
+   particular `Plantoir-macOS-REHEARSAL.dmg`, which `publish.sh
+   --rehearsal-feed` writes for the #204 dress rehearsal and which must never
+   reach a real release.
+3a. **When a mac DMG is attached, run the release test files first** —
+   `python3 mac-app/release/test_release_signing.py` and
+   `python3 website/test_update_feed.py` (macOS only, ad-hoc and throwaway
+   keys only; no suite runs them). Red is a stop. And decide
+   `--required-warning` for the update feed now: pass it when "Warnings the
+   release notes MUST carry" has a row for this release.
 
    The same evergreen URL is why a one-platform cut has to touch the site:
    the moment the new release becomes "latest", the missing platform's
@@ -166,6 +175,22 @@ gh release edit v<version> --draft=false -R <owner/repo>
    the git tag; if the other machine needs a real tag to build or verify
    against, push an annotated one yourself and target the draft at it.
 
+1a. **Build the mac's update feed — only when this cut attached a mac DMG,
+   and only NOW, after the release is published** (a feed deployed before its
+   download exists offers every teacher an update that 404s):
+
+```bash
+python3 website/update_feed.py macos --version <version> \
+  --dmg mac-app/dist/Plantoir-macOS.dmg --notes <approved-notes.md> [--required-warning]
+```
+
+   It must be the EXACT file you uploaded — hash it and compare with the
+   Downloads table first. The Keychain asks once to let Sparkle's tools use the
+   `plantoir-macos` key; that is expected, and nothing prints the key. It writes
+   `website/updates/macos.xml` and `website/updates/macos-notes.html`; commit
+   both with the version line in step 2 (stage them by path). A cut with no mac
+   DMG leaves both alone. See `RELEASING.md` → "The update feed (macOS)".
+
 2. **Update and deploy plantoir.app**:
    Set `version` and `released` in `website/site.json`, redraw brand images,
    rebuild, and push.
@@ -196,6 +221,7 @@ python3 website/build.py --check
 # Commit and push, then deploy — the Netlify site is NOT Git-connected,
 # so pushing publishes nothing; the deploy is its own explicit step
 git add website/site.json site/ brand/
+git add website/updates/macos.xml website/updates/macos-notes.html   # only when step 1a ran
 git commit -m "Update website for v<version> release"
 git push origin main
 python3 website/build.py --deploy
@@ -207,7 +233,10 @@ the live version-note line matches `site.json` — watch its output for the
 new version. A ❌ means the site did not pick up the deploy after several
 retries; tell the user, point them at `https://app.netlify.com`, and do not
 report the release as complete until `python3 website/build.py
---verify-deploy` comes back ✅. A ⚠️ (network problem reaching the site, not
+--verify-deploy` comes back ✅ — which, since #204, also means every update feed
+is live as committed and its newest download answers (a mac cut is not
+complete while the feed line is ❌: teachers are either offered nothing or
+offered a download that is not there). A ⚠️ (network problem reaching the site, not
 a confirmed mismatch) is worth one retry of `--verify-deploy` before treating
 it as a real problem.
 
