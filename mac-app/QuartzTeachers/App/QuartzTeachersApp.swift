@@ -100,6 +100,11 @@ struct QuartzTeachersApp: App {
                     openWindow(id: "about")
                 }
             }
+            // Where every Mac application puts it (#204). Drawn only when the
+            // app has an updater, which a development build never does.
+            CommandGroup(after: .appInfo) {
+                CheckForUpdatesButton()
+            }
             PreviewCommands()
             CommandGroup(after: .newItem) {
                 WorkspaceCommands()

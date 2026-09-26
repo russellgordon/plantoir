@@ -833,6 +833,34 @@ nonisolated enum ActivityTrail {
         /// LISTED for the website (#209) — one earlier builds published.
         /// Read from the build's `PLANTOIR_KEPT_OFF:` line.
         case howITeachPageKeptOff = "How I Teach page kept off the website"
+        /// Plantoir found a new version of itself (#204) — once per version
+        /// per launch, and "found" rather than "offered", because the updater
+        /// may hold its window back until the app is next in front. Carries
+        /// both versions, whether the teacher asked, and whether it is marked
+        /// important.
+        case updateFound = "update found"
+        /// The teacher checked and nothing was newer (#204). Only when the
+        /// TEACHER asked: the daily check is not an action of theirs.
+        case updateCheckFoundNothingNew = "update check found nothing new"
+        /// What the teacher answered in the update window (#204): what tells
+        /// "never offered" from "offered and skipped".
+        case updateAnswered = "update answered"
+        /// The teacher pressed Install while work was under way, and the
+        /// install waits (#204) — the same words they were shown.
+        case updateHeldWhileWorkIsUnderWay = "update held while work is under way"
+        /// The last line the OLD version writes (#204): from and to, and
+        /// whether it opens again.
+        case updateInstalling = "update installing"
+        /// A quit with an update ready and work still going cancelled the
+        /// install rather than letting it happen on the way out (#204).
+        case updateSetAside = "update set aside"
+        /// The updater could not go on (#204), in a plain category with its
+        /// number. It says nothing to the teacher about a failed daily check
+        /// or a refused administrator password, so this is the only record.
+        case updateStopped = "update stopped"
+        /// The first launch of a version different from the last (#204), by
+        /// its own updater or by hand.
+        case appUpdated = "app updated"
     }
 
     // MARK: - Stored properties

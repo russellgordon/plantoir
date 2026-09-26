@@ -189,14 +189,6 @@ nonisolated enum ClaudeCodeLauncher {
         return "started Claude Code for \(courseCode)"
     }
 
-    /// The opening message. It names the course and points at the plan tools,
-    /// because the safety of every write here depends on a plan being shown to
-    /// the teacher first — and an assistant that starts by reading is far more
-    /// useful than one that starts by asking what to do.
-    /// - Parameter referenceCourses: courses kept for reference that show the
-    ///   SAME code as this one, each as "ICS3U-2025 (2025–26)". Empty for the
-    ///   overwhelming majority of courses, and then the greeting is exactly
-    ///   the paragraph it has always been.
     /// The sentence that asks the session to read the teacher's How I Teach
     /// page (#209), verbatim from `contracts/app-rules.json` →
     /// `outsideAgents.greetingHowITeachSentence`.
@@ -210,6 +202,14 @@ nonisolated enum ClaudeCodeLauncher {
     static let howITeachGreetingSentence: String =
         "Then read my How I Teach page for this course, and keep to it in anything you write for me."
 
+    /// The opening message. It names the course and points at the plan tools,
+    /// because the safety of every write here depends on a plan being shown to
+    /// the teacher first — and an assistant that starts by reading is far more
+    /// useful than one that starts by asking what to do.
+    /// - Parameter referenceCourses: courses kept for reference that show the
+    ///   SAME code as this one, each as "ICS3U-2025 (2025–26)". Empty for the
+    ///   overwhelming majority of courses, and then the greeting is the same
+    ///   paragraph for every course, with no sentence about them.
     static func greeting(
         courseCode: String,
         courseName: String,

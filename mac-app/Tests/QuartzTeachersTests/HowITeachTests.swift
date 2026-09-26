@@ -208,6 +208,19 @@ final class HowITeachTests: XCTestCase {
         XCTAssertTrue(after.contains("[[Unit 1, Day 3]]"), "the How I Teach page's link did not follow: \(after)")
     }
 
+    /// The mark's recipe, from the contract: the bytes AS ON DISK, a
+    /// byte-order mark included.
+    func testTheMarkIsTheContractsRecipe() throws {
+        let tools: [String: Any] = try XCTUnwrap(try HowITeachTests.contractRule()["tools"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(tools["markCases"] as? [[String: Any]])
+        XCTAssertEqual(cases.count, 2)
+        for one in cases {
+            let text: String = try XCTUnwrap(one["text"] as? String)
+            let mark: String = try XCTUnwrap(one["mark"] as? String)
+            XCTAssertEqual(HowITeachPage.mark(of: Data(text.utf8)), mark, text.debugDescription)
+        }
+    }
+
     // MARK: - Reading it
 
     func testReadingAPageGivesItsWordsAndLeavesACountOnTheTrail() async throws {

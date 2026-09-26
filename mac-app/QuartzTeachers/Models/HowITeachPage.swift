@@ -173,9 +173,10 @@ enum HowITeachPage {
     /// SHA-256 of the file's bytes (`howITeachPage.tools.replacingIsAMarkNotABoolean`).
     ///
     /// What `write_how_i_teach` must be handed to replace a page. A boolean
-    /// would be an argument the model decides; this it can only copy from the
-    /// plan it showed the teacher — and it stops a replace when the teacher
-    /// has edited the page since that plan.
+    /// would be an argument the model decides; this is a value tied to the
+    /// exact bytes the plan described, so it stops a replace when the teacher
+    /// has edited the page since that plan. Detection, not enforcement: an
+    /// agent with a shell could hash the file itself.
     static func mark(of data: Data) -> String {
         let digest: SHA256.Digest = SHA256.hash(data: data)
         var hex: String = ""
