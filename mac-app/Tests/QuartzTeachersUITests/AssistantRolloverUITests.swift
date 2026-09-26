@@ -1,5 +1,4 @@
 import XCTest
-import Darwin
 
 /// The assistant driven through the REAL window, against a REAL model.
 ///
@@ -30,14 +29,12 @@ final class AssistantRolloverUITests: XCTestCase {
     /// Skips unless asked for, and says what is missing rather than failing
     /// mysteriously.
     private func requireUITestsAreWanted() throws {
-        // **This writes into the teacher's OWN state, deliberately.** A
-        // UI-driven app does not know it is under test: `isRunningTests` asks
-        // whether `XCTestCase` is loaded, and it is loaded in the RUNNER, not
-        // in the app. So settings persist to the real preferences domain and
-        // lines land in the real breadcrumb trail. Russell chose that on
-        // 2026-09-08 — "I'd rather know that it works" — and the test-state
-        // redirect is still owed (TODO.md). Until it lands, run these knowing
-        // the trail will carry their launches.
+        // **The app keeps its state in a folder of its own** (#154): it is
+        // launched through `IsolatedLaunch`, so its trail, preferences and
+        // prompt history land in a `--state-dir`, not in the teacher's. Before
+        // that, these runs wrote the real trail and the real preferences
+        // domain, by Russell's choice on 2026-09-08 — "I'd rather know that it
+        // works" — until the redirect existed.
         let environment: [String: String] = ProcessInfo.processInfo.environment
         guard environment["PLANTOIR_UI_TESTS"] == "1" else {
             throw XCTSkip(
@@ -45,22 +42,13 @@ final class AssistantRolloverUITests: XCTestCase {
                 + "take minutes, and need the foreground."
             )
         }
-        // The REAL home, via the password database. A UI test runner is
-        // sandboxed, so `homeDirectoryForCurrentUser` and `HOME` both give it a
-        // container path — and this check then reports "no weights" about a
-        // folder the app never uses, which reads as a missing download rather
-        // than as the test looking in the wrong place.
-        let realHome: String = String(cString: getpwuid(getuid()).pointee.pw_dir)
-        let models: URL = URL(fileURLWithPath: realHome)
-            .appendingPathComponent("Library/Application Support/Plantoir/models")
-        let weights: [String] = (try? FileManager.default.contentsOfDirectory(atPath: models.path)) ?? []
-        var hasWeights: Bool = false
-        for name in weights where name.hasSuffix(".gguf") {
-            hasWeights = true
-        }
-        guard hasWeights else {
+        // The REAL weights, found through the real home (`IsolatedLaunch`
+        // asks the password database: the runner is sandboxed, so `HOME`
+        // would name its container and this would report "no weights" about
+        // a folder the app never uses).
+        guard !IsolatedLaunch.realWeightNames().isEmpty else {
             throw XCTSkip(
-                "No assistant weights in \(models.path). "
+                "No assistant weights in \(IsolatedLaunch.modelsFolder(inHome: IsolatedLaunch.realHome()).path). "
                 + "Open Plantoir and let it download one, or these cannot run against a real model."
             )
         }
@@ -127,6 +115,7 @@ final class AssistantRolloverUITests: XCTestCase {
             return
         }
         approve.click()
+        let approvedAt: Date = Date()
 
         // 2 — and the question reaches the teacher.
         XCTAssertTrue(
@@ -135,6 +124,9 @@ final class AssistantRolloverUITests: XCTestCase {
             ),
             "The website question never appeared in the window."
         )
+        // Printed, not asserted: #88's "main thread busy ~30 s" after the
+        // approval is measured from here (doc 09 → "#154").
+        print("ROLLOVER-TIMING question after approval: \(Date().timeIntervalSince(approvedAt)) s")
 
         let marker: URL = try XCTUnwrap(liveMarkerURL)
         XCTAssertTrue(
@@ -149,6 +141,7 @@ final class AssistantRolloverUITests: XCTestCase {
             "The answer is a write too, so it must offer its own plan."
         )
         approve.click()
+        let answerApprovedAt: Date = Date()
 
         // 4 — and this time the website really changes.
         XCTAssertTrue(
@@ -157,6 +150,7 @@ final class AssistantRolloverUITests: XCTestCase {
             ),
             "The confirmation never appeared in the window."
         )
+        print("ROLLOVER-TIMING confirmation after approval: \(Date().timeIntervalSince(answerApprovedAt)) s")
         XCTAssertFalse(
             FileManager.default.fileExists(atPath: marker.path),
             "The section is still pinned to last year's website — the answer did nothing on disk."
@@ -237,16 +231,48 @@ final class AssistantRolloverUITests: XCTestCase {
             atomically: true, encoding: .utf8
         )
 
-        let application: XCUIApplication = XCUIApplication()
-        application.launchEnvironment["UITEST_WORKSPACE"] = workspaceURL.path
-        // Plan mode follows the real preference, so "with plan mode ON, the
-        // default" would really mean "with whatever was last chosen on this
-        // Mac". Pinned through the argument domain, the way the marketing
-        // tests pin window frames.
-        application.launchArguments += ["-assistantAsksBeforeChanging", "YES"]
-        application.launch()
+        // A stub preview: a rollover brings the section's preview up to date
+        // (`AssistToolRunner.bringThePreviewUpToDate`), and the fixture's REAL
+        // `preview.sh` would reach for a container this fixture does not have
+        // — and, under a state folder, would still resolve the REAL home,
+        // because a launcher takes `HOME` from its environment. This test is
+        // about the conversation's seams, not the build.
+        stubPreviewPIDFileURL = try StubLaunchers.writeStubPreviewScript(
+            in: workspaceURL,
+            buildingInto: workspaceURL.appendingPathComponent("courses/EXC2O/.merged_output/section1/public")
+        )
+
+        // Plan mode is pinned through the argument domain rather than left to
+        // whatever the state folder's (empty) preferences say — the default is
+        // ON, and pinning it says so. The weights are linked in one file at a
+        // time (`IsolatedLaunch`), so the real model is used and nothing in
+        // the real models folder can be removed or added to from here.
+        let launch: IsolatedLaunch = try IsolatedLaunch.launch(
+            workspace: workspaceURL,
+            extraArguments: ["-assistantAsksBeforeChanging", "YES"],
+            linkRealAssistantWeights: true
+        )
         liveMarkerURL = markerURL.appendingPathComponent("section1.json")
-        return application
+        return launch.application
+    }
+
+    /// Where the stub preview recorded its server's process id, so
+    /// `tearDown` can reap a server the app left running.
+    private var stubPreviewPIDFileURL: URL?
+
+    /// Stops at the first failure: every step waits minutes for the one
+    /// before it, so a red step would otherwise bury itself in timeouts.
+    override func setUp() {
+        super.setUp()
+        continueAfterFailure = false
+    }
+
+    override func tearDown() {
+        if let stubPreviewPIDFileURL {
+            StubLaunchers.reap(pidFileURL: stubPreviewPIDFileURL, expectingNamePrefix: "python")
+        }
+        stubPreviewPIDFileURL = nil
+        super.tearDown()
     }
 
     /// The marker the test asserts against on disk, kept so a test can check
