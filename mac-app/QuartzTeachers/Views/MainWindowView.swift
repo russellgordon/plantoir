@@ -30,7 +30,7 @@ struct MainWindowView: View {
                     .controlSize(.small)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .accessibilityIdentifier("restoringFolderPlaceholder")
-            } else if workspace.workspaceURL == nil || workspace.workspaceProblem != nil || workspace.workspaceCanBeInitialized || workspace.workspaceIsUnrecognized || workspace.needsCloudSyncDecision {
+            } else if workspace.isShowingPicker {
                 WorkspacePickerView()
             } else {
                 NavigationSplitView {
@@ -57,6 +57,10 @@ struct MainWindowView: View {
         .sheet(isPresented: $workspace.isShowingNewCourseWizard) {
             NewCourseWizardView()
         }
+        // A chosen folder the website builder cannot reach, refused while
+        // this window goes on showing its own folder (#290): said over the
+        // folder the teacher is still in, which stays exactly as it was.
+        .modifier(RefusedFolderAlert())
         .fileImporter(
             isPresented: $workspace.isChoosingWorkspace,
             allowedContentTypes: [.folder]
@@ -237,5 +241,50 @@ struct MainWindowView: View {
             }
         }
         return nil
+    }
+}
+
+/// The alert for a chosen folder that was refused while the window kept its
+/// own folder (#290). A modifier of its own to keep `body` within what the
+/// type-checker takes in one go.
+struct RefusedFolderAlert: ViewModifier {
+
+    // MARK: - Stored properties
+
+    @Environment(WorkspaceModel.self) var workspace
+
+    // MARK: - Computed properties
+
+    var isPresented: Binding<Bool> {
+        return Binding<Bool>(
+            get: {
+                return workspace.folderNotOpened?.isShownAsAlert == true
+            },
+            set: { newValue in
+                if !newValue && workspace.folderNotOpened?.isShownAsAlert == true {
+                    workspace.folderNotOpened = nil
+                }
+            }
+        )
+    }
+
+    // MARK: - Functions
+
+    func body(content: Content) -> some View {
+        content
+            .alert(
+                workspace.folderNotOpened?.headline ?? "",
+                isPresented: isPresented
+            ) {
+                Button(CloudSyncWording.chooseDifferentFolderButton) {
+                    workspace.folderNotOpened = nil
+                    workspace.isChoosingWorkspace = true
+                }
+                Button(WorkingFolderReachWording.alertOKButton, role: .cancel) {
+                    workspace.folderNotOpened = nil
+                }
+            } message: {
+                Text(workspace.folderNotOpened?.detail ?? "")
+            }
     }
 }
