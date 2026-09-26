@@ -72,6 +72,12 @@ preflight() {
         failed=1
     fi
 
+    if [ ! -d "$REPO/mac-app/Vendor/Sparkle/Sparkle.framework" ]; then
+        say "REFUSING: mac-app/Vendor/Sparkle is absent — xcodegen will fail (#204)."
+        say "  Run: cd mac-app && ./Vendor/fetch-sparkle.sh"
+        failed=1
+    fi
+
     if ! git ls-remote --exit-code origin >/dev/null 2>&1; then
         say "REFUSING: cannot reach origin. Check the network and credentials."
         failed=1
