@@ -39,10 +39,12 @@ This toolchain lets a teacher:
   folder carries (tagged `teaching-quartz:src-<hash8>`), so a teacher never
   touches npm or pip — and no registry account is involved. Docker Desktop is deliberately **not** used: the launchers provision a
   free, open-source runtime themselves — [Colima](https://github.com/abiosoft/colima)
-  on macOS, the Docker Engine inside WSL2 on Windows — and start it
-  automatically on every run, removing the "open Docker Desktop and wait"
-  manual step entirely
+  on macOS — and start it automatically on every run, removing the "open
+  Docker Desktop and wait" manual step entirely
   (see [Launcher Scripts](03-launcher-scripts.md#container-runtime-bootstrap)).
+  Windows needs none: since 2026-08-19 it runs the same scripts on a runtime
+  the app carries
+  ([12 → Nothing here runs in a container](12-windows-app.md#nothing-here-runs-in-a-container)).
   Distribution is **the Plantoir app**: it bundles the full build recipe
   (Dockerfile, patches, scripts, support files, contracts, launchers) and mirrors it
   into each working folder's `.toolchain/`, refreshing stale copies — so
