@@ -84,6 +84,11 @@ struct StringListEditorView: View {
 
     let title: String
 
+    /// Says which course, screen and list a blocked removal happened in, for
+    /// the trail line (#171). REQUIRED, with no default, so a new call site
+    /// cannot leave the course out of that line.
+    let removalTrail: RemovalTrail
+
     /// True for Markdown file lists: hide ".md" in the UI, append it in
     /// the stored value.
     var hidesMarkdownExtension: Bool = false
@@ -355,8 +360,7 @@ struct StringListEditorView: View {
             }
             if case .blocked(let reason) = itemProtection {
                 Button("Why \(displayName) can’t be removed", systemImage: "info.circle") {
-                    activeExplanation = ActiveExplanation(item: item, reason: reason)
-                    ActivityTrail.note(.removalBlocked, "was told " + item + " cannot be removed from " + title + " — " + reason)
+                    explainWhyBlocked(item, reason: reason)
                 }
                 .labelStyle(.iconOnly)
                 .foregroundStyle(.secondary)
@@ -553,13 +557,21 @@ struct StringListEditorView: View {
     /// is removed, the reason is shown from the − button, and the trail
     /// records that the teacher was told — the same sentence and the same
     /// line as the row's info button.
+    /// What a blocked row's info button does: shows the reason, and leaves the
+    /// SAME trail line as a blocked `requestRemoval(of:)` — one sentence for
+    /// one refusal, however the teacher asked (#171 holds the two together).
+    func explainWhyBlocked(_ item: String, reason: String) {
+        activeExplanation = ActiveExplanation(item: item, reason: reason)
+        ActivityTrail.note(.removalBlocked, removalTrail.line(item: item, reason: reason))
+    }
+
     @discardableResult
     func requestRemoval(of item: String) -> PendingRemoval? {
         let state: ItemProtection = protection?(item) ?? .ordinary
         switch state {
         case .blocked(let reason):
             removalExplanation = ActiveExplanation(item: item, reason: reason)
-            ActivityTrail.note(.removalBlocked, "was told " + item + " cannot be removed from " + title + " — " + reason)
+            ActivityTrail.note(.removalBlocked, removalTrail.line(item: item, reason: reason))
             return nil
         case .consequential(let alertTitle, let message):
             let removal: PendingRemoval = PendingRemoval(item: item, title: alertTitle, message: message)

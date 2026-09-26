@@ -16,6 +16,11 @@ struct MembershipToggleListView: View {
 
     let title: String
 
+    /// Says which course and screen a blocked untick happened in, for the
+    /// trail line (#171). REQUIRED, with no default, so a new call site
+    /// cannot leave the course out of that line.
+    let removalTrail: RemovalTrail
+
     /// Everything that can be toggled.
     let allItems: [String]
 
@@ -187,7 +192,7 @@ struct MembershipToggleListView: View {
                     }
                 } else if case .blocked(let reason) = protection {
                     activeExplanation = ActiveExplanation(item: item, reason: reason)
-                    ActivityTrail.note(.removalBlocked, "was told " + item + " cannot be unticked under " + title + " — " + reason)
+                    ActivityTrail.note(.removalBlocked, removalTrail.line(item: item, reason: reason))
                     return
                 }
                 members = MembershipToggleListView.updatedMembers(members, item: item, isMember: isMember)

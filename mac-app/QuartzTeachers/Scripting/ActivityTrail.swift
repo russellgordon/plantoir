@@ -422,7 +422,9 @@ nonisolated enum ActivityTrail {
         /// feature depends on, and was shown why it cannot go and which
         /// switch to turn off first. Recorded because "I could not remove
         /// the folder" is a report support will receive, and the line says
-        /// which rule refused and what the teacher was told.
+        /// which rule refused and what the teacher was told — and, since
+        /// #171, which course and which screen: "new course SNC4M: …" in the
+        /// New Course wizard, "SNC4M: …" in Course Settings (`RemovalTrail`).
         case removalBlocked = "removal blocked"
         /// A folder was renamed from inside Plantoir — on disk, in every
         /// section that had one, with the config keys that named it carried
