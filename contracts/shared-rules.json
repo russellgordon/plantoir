@@ -746,14 +746,70 @@
     "unpublishing": {
       "takesALinkedPageOnlyWhenNothingElseNeedsIt": true,
       "aReferrerCountsOnlyWhenVisible": true,
-      "why": "'X still links to it' is a reason to keep a page published only when students can SEE X. Counting hidden referrers left pages visible and reachable from nothing, held up by drafts nobody had published - kept alive by a page that is not there. Safe in one direction because of the other: publishing is transitive, so a page taken down here comes back the moment anything visible needs it again. That safety argument has ONE exception since 2026-09-19 (issue #173): publishing now stops at a class page, so a CLASS this sweep takes down does not come back by republishing the page that referred to it. The exception exists because the two reaches were decided apart - publishing and date-moving stop at a class, unpublishing does not yet - and closing issue #201 removes it rather than adding a rule."
+      "why": "'X still links to it' is a reason to keep a page published only when students can SEE X. Counting hidden referrers left pages visible and reachable from nothing, held up by drafts nobody had published - kept alive by a page that is not there. Safe in one direction because of the other: publishing is transitive, so a page taken down here comes back the moment anything visible needs it again. That argument had ONE exception from 2026-09-19 (issue #173), when publishing began to stop at a class page: a CLASS this sweep took down did not come back by republishing the page that referred to it. Issue #201 closed it on 2026-09-26 by making this sweep stop at a class too (stopsAtAClassPage.appliesTo), so the argument now holds without an exception.",
+      "casesNote": "Run through a REAL unpublish on a course laid out from `pages`, the same layout as publishing.casesNote (`links` or `body`, never both - a harness given both must fail the case rather than choose). Ask for the plan first (the plan twin, or the plan the tool shows before it acts), then carry out the unpublish of the pages named in `unpublish`. `expectPlanSays` / `expectPlanDoesNotSay` name assist-wording.json keys whose rendered sentence must or must not appear in that plan - looked up in the wording file, never retyped; every key named renders a page title, and a harness must FAIL a case that has no page of that title, or a renamed case would pass by never matching. Every `expectHidden` page must read hidden for section 1 afterwards, and every `expectUntouched` page must be BYTE-IDENTICAL to what was written: a page that stayed visible but was re-written is not untouched. Added by #201.",
+      "cases": [
+        {
+          "name": "a visible class linked from the class being hidden stays, and the plan says why",
+          "pages": [
+            {"title": "Unit 2, Day 3", "isClassPage": true, "visible": true, "links": ["Unit 2, Day 4"]},
+            {"title": "Unit 2, Day 4", "isClassPage": true, "visible": true, "links": ["Worksheet"]},
+            {"title": "Worksheet", "isClassPage": false, "visible": true, "links": []}
+          ],
+          "unpublish": ["Unit 2, Day 3"],
+          "expectHidden": ["Unit 2, Day 3"],
+          "expectUntouched": ["Unit 2, Day 4", "Worksheet"],
+          "expectPlanSays": ["linkedClassStaysVisible"],
+          "why": "The issue itself: hiding today's class hid tomorrow's. Worksheet proves the walk does not ENTER the class - it is Day 4's material, and nothing but Day 4 links to it."
+        },
+        {
+          "name": "reached through a page that is not a class, the walk still stops at the class",
+          "pages": [
+            {"title": "Unit 2, Day 3", "isClassPage": true, "visible": true, "links": ["Ohm's Law"]},
+            {"title": "Ohm's Law", "isClassPage": false, "visible": true, "links": ["Unit 2, Day 4"]},
+            {"title": "Unit 2, Day 4", "isClassPage": true, "visible": true, "links": ["Worksheet"]},
+            {"title": "Worksheet", "isClassPage": false, "visible": true, "links": []}
+          ],
+          "unpublish": ["Unit 2, Day 3"],
+          "expectHidden": ["Unit 2, Day 3", "Ohm's Law"],
+          "expectUntouched": ["Unit 2, Day 4", "Worksheet"],
+          "expectPlanSays": ["linkedClassStaysVisible"],
+          "why": "The sweep is still transitive - Ohm's Law, which only Day 3 links to, comes down with it - and the stop holds mid-chain."
+        },
+        {
+          "name": "both classes named means both come down, with what only they link to",
+          "pages": [
+            {"title": "Unit 2, Day 3", "isClassPage": true, "visible": true, "links": ["Unit 2, Day 4"]},
+            {"title": "Unit 2, Day 4", "isClassPage": true, "visible": true, "links": ["Worksheet"]},
+            {"title": "Worksheet", "isClassPage": false, "visible": true, "links": []}
+          ],
+          "unpublish": ["Unit 2, Day 3", "Unit 2, Day 4"],
+          "expectHidden": ["Unit 2, Day 3", "Unit 2, Day 4", "Worksheet"],
+          "expectUntouched": [],
+          "expectPlanDoesNotSay": ["linkedClassStaysVisible"],
+          "why": "The named pages are never stopped: naming two classes makes both of them starting points. A regression guard, green before #201 and after."
+        },
+        {
+          "name": "a linked class that is already hidden is not entered, and not mentioned",
+          "pages": [
+            {"title": "Unit 2, Day 3", "isClassPage": true, "visible": true, "links": ["Unit 2, Day 4"]},
+            {"title": "Unit 2, Day 4", "isClassPage": true, "visible": false, "links": ["Worksheet"]},
+            {"title": "Worksheet", "isClassPage": false, "visible": true, "links": []}
+          ],
+          "unpublish": ["Unit 2, Day 3"],
+          "expectHidden": ["Unit 2, Day 3"],
+          "expectUntouched": ["Unit 2, Day 4", "Worksheet"],
+          "expectPlanDoesNotSay": ["linkedClassStaysVisible"],
+          "why": "Worksheet is Day 4's material, and whether students see it is Day 4's business: taking it down because the class in front of it was hidden is the old behaviour through a hidden door. And a hidden class is not 'staying visible', so the plan does not say it is."
+        }
+      ]
     },
     "stopsAtAClassPage": {
       "value": true,
-      "appliesTo": ["publishing", "the dates a class brings", "copying a page into another course"],
-      "why": "A class goes up when the teacher names that class. A link that lands on another class publishes nothing and is not followed through, so material reachable only THROUGH another class belongs to that class and goes up with it. Publishing Day 4's worksheet because Day 3 links to Day 4 puts it in front of students a day early and dates it to the wrong lesson. Decided 2026-09-19 (issue #173), after the two apps were found to disagree: Windows stopped, the mac walked through. REJECTED: the middle position - do not publish the linked class, but walk past it to the material beyond - for the same two reasons. UNPUBLISHING is deliberately NOT in this list: its reach is the sibling decision, held as issue #201, and until that lands an unpublish still walks through a class page on both platforms.",
+      "appliesTo": ["publishing", "the dates a class brings", "copying a page into another course", "unpublishing"],
+      "why": "A class goes up when the teacher names that class. A link that lands on another class publishes nothing and is not followed through, so material reachable only THROUGH another class belongs to that class and goes up with it. Publishing Day 4's worksheet because Day 3 links to Day 4 puts it in front of students a day early and dates it to the wrong lesson. Decided 2026-09-19 (issue #173), after the two apps were found to disagree: Windows stopped, the mac walked through. REJECTED: the middle position - do not publish the linked class, but walk past it to the material beyond - for the same two reasons. Unpublishing joined 2026-09-26 (issue #201): a class is hidden when the teacher names it, and a link from the class being hidden does not take another class down or reach through it. Decided by Russell to mirror #173, after it was found that NEITHER platform stopped. It is a stop in the walk, not a fourth entry in neverTakenDownByFollowingLinks: those are pages reached from somewhere other than a lesson, and a class is the thing a lesson IS.",
       "theNamedPagesAreNeverStopped": "The rule is about pages REACHED. Naming two classes makes both of them starting points, and publishing a whole unit names every class in it, so nothing is lost by asking for more.",
-      "saidToTheTeacher": "The plan and the reply name the linked classes that were left alone, so a teacher is not surprised by a link students cannot follow yet - but only the ones students cannot already see, since 'publish it when you get to that class' is false about a class that is already published.",
+      "saidToTheTeacher": "The plan and the reply name the linked classes that were left alone, so a teacher is not surprised by a link students cannot follow yet - but only the ones students cannot already see, since 'publish it when you get to that class' is false about a class that is already published. When unpublishing, a linked class students can see is named among the pages that stay, with the reason wording.linkedClassStaysVisible gives; a linked class already hidden is not mentioned. The publishing sentence is not reused, since 'publish it when you get to that class' is false about a class an unpublish left up.",
       "cases": [
         {
           "name": "a class linked from a class is neither published nor walked through",

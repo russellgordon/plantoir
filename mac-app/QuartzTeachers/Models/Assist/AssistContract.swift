@@ -174,6 +174,13 @@ enum AssistContract {
             "linkedClassesWereLeftAlone": AssistWording.linkedClassesWereLeftAlone(
                 AssistPublishPlan.listing(["Unit 2, Day 4", "Unit 2, Day 5"]), count: 2
             ),
+            // A linked class an unpublish stopped at and left visible (#201),
+            // rendered through the plan's own line so what Windows matches is
+            // the frame, the curly quotes and the page name as well as the
+            // reason — literal names, for the reason given just above.
+            "linkedClassStaysVisible": AssistPublishPlan.stayingVisibleLine(
+                title: "Unit 2, Day 4", reason: .aClassOfItsOwn, noun: .class
+            ),
             "backedUpCourse": AssistWording.backedUpCourse(
                 course: course, to: "{course}_backup_2026-09-08_190000.zip"
             ),
@@ -330,6 +337,9 @@ enum AssistContract {
             ),
             "linkedClassesWereLeftAloneForAMeeting": AssistWording.linkedClassesWereLeftAlone(
                 AssistPublishPlan.listing(["Week 4", "Week 5"]), count: 2, noun: .meeting
+            ),
+            "linkedClassStaysVisibleForAMeeting": AssistPublishPlan.stayingVisibleLine(
+                title: "Week 4", reason: .aClassOfItsOwn, noun: .meeting
             ),
             "mayIAskForYourDates": AssistWording.mayIAskForYourDates(for: .class),
             "mayIAskForYourDatesForAMeeting": AssistWording.mayIAskForYourDates(for: .meeting),
