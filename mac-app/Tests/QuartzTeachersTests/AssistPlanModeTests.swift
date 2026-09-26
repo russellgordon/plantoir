@@ -236,4 +236,174 @@ final class AssistPlanModeTests: XCTestCase {
             XCTAssertEqual(tool.planTwinName, "plan_scheduled_deploy")
         }
     }
+
+    // MARK: - Every plan can be accepted (#150)
+
+    /// Every `plan_` tool on the surface, run on a happy path, says it IS a
+    /// plan — which is the only thing that puts a Go button under it.
+    ///
+    /// The mark is `AssistToolOutcome.isPlan`, and only `.planned` sets it.
+    /// Swift's type cannot be wrong the way Windows' `string` return was
+    /// (#70), but the CONSTRUCTOR can: `isPlan` defaults to false, so a twin
+    /// whose happy path is built with `.read`, `.wrote` or a bare initializer
+    /// compiles, reads correctly in every text assertion, and makes its write
+    /// unrunnable from the window — `AssistAgent.showPlan` prints an unmarked
+    /// outcome as an answer and offers nothing to press.
+    ///
+    /// Walks every tool whose name begins `plan_` on the MCP surface — what
+    /// EXISTS — rather than deriving twins through `planTwinName`, which is
+    /// the map this test is guarding and so cannot also be its list: the
+    /// derivation once missed `plan_curriculum_mentions` entirely (#327). A
+    /// `plan_` tool with no case below FAILS, so a new twin cannot be skipped
+    /// by forgetting it.
+    func testEveryPlanToolOnTheSurfaceCanSayItIsAPlan() async throws {
+        // A moment two days ahead of the REAL clock: `plan_scheduled_deploy`
+        // reads `Date()`, and a fixed date in the past is answered "That
+        // deploy cannot be scheduled." — which is ALSO marked as a plan, so a
+        // fixed date would pass this test for the wrong reason.
+        let formatter: DateFormatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        let later: Date = Date().addingTimeInterval(2 * 24 * 60 * 60)
+        let whenAhead: String = formatter.string(from: later)
+
+        let happyArguments: [String: [String: Any]] = [
+            "plan_publish_class_on": ["date": "2026-09-09"],
+            "plan_publish_pages": ["pages": "Unit 1, Day 2"],
+            "plan_unpublish_pages": ["pages": "Unit 1, Day 1"],
+            "plan_scheduled_deploy": ["when": whenAhead],
+            "plan_remember_timetable": ["dates": "2026-11-02, 2026-11-03"],
+            "plan_add_next_class": [:],
+            "plan_re_date_classes": [:],
+            "plan_add_classes": ["unit": 6, "howMany": 2],
+            "plan_make_room_for_classes": ["unit": 3, "atDay": 2],
+            "plan_curriculum_mentions": ["page": "Loops", "codes": "A1.1"],
+        ]
+
+        var ranCount: Int = 0
+        for tool in AssistToolRunner.mcpTools where tool.name.hasPrefix("plan_") {
+            guard let arguments = happyArguments[tool.name] else {
+                XCTFail("No happy-path case for \(tool.name) — add one; a plan nobody has proved "
+                        + "can be ACCEPTED is the #70 defect.")
+                continue
+            }
+            let made: AssistFixture.Made = try AssistFixture.makeRichSection(for: self)
+            defer { try? FileManager.default.removeItem(at: made.root) }
+
+            let outcome: AssistToolOutcome = await AssistFixture.run(
+                tool.name, with: arguments, on: made.runner
+            )
+            ranCount += 1
+            XCTAssertTrue(
+                outcome.isPlan,
+                "\(tool.name) answered its happy path without marking it a plan, so the window would "
+                + "print it as an answer and offer no Go: \(outcome.summary)"
+            )
+            // The one twin whose REFUSAL is also marked a plan (#150 §6.2):
+            // prove this case really is the happy path.
+            if tool.name == "plan_scheduled_deploy" {
+                XCTAssertNotEqual(
+                    outcome.summary, "That deploy cannot be scheduled.",
+                    "The scheduled-deploy case reached the refusal, which is marked a plan too — "
+                    + "so this passed without proving anything: \(outcome.detail)"
+                )
+            }
+        }
+        XCTAssertEqual(ranCount, happyArguments.count,
+                       "A case names a plan tool the surface no longer has, or one was skipped.")
+        XCTAssertGreaterThanOrEqual(ranCount, 10, "The walk ran fewer plan tools than exist today.")
+    }
+
+    /// Every card that reaches a write with a twin stops at Go in plan mode —
+    /// the part a teacher actually meets.
+    ///
+    /// Derived from the card tables themselves (`everyFixedShape` and
+    /// `everyParsedShape`), taking every command whose tool changes pages,
+    /// does not wait on a button of its own, and has a twin on the surface.
+    /// Each goes through `AssistAgent.say` with plan mode ON, which is what a
+    /// teacher has. A phrasing in a club's own noun, and a family matched only
+    /// in a numbered course, is said in a club; everything else in the rich
+    /// Unit/Day section.
+    func testEveryCardThatReachesAPlannedWriteStopsAtGo() async throws {
+        var sentences: [(phrasing: String, tool: String, inAClub: Bool)] = []
+        for shape in AssistCardCommand.everyFixedShape {
+            sentences.append((shape.phrasing, shape.command.toolName,
+                              shape.phrasing.contains("meeting")))
+        }
+        for family in AssistCardCommand.everyParsedShape {
+            sentences.append((family.example, family.tool,
+                              family.numberedPageWord != nil || family.example.contains("meeting")))
+        }
+
+        var surfaceNames: Set<String> = []
+        for tool in AssistToolRunner.mcpTools {
+            surfaceNames.insert(tool.name)
+        }
+
+        var checked: Int = 0
+        for sentence in sentences {
+            var definition: AssistToolDefinition? = nil
+            for tool in AssistToolRunner.mcpTools where tool.name == sentence.tool {
+                definition = tool
+            }
+            guard let write = definition, !write.readOnly, !write.needsApproval,
+                  let twin = write.planTwinName, surfaceNames.contains(twin) else {
+                continue
+            }
+
+            let made: AssistFixture.Made = sentence.inAClub
+                ? try AssistFixture.makeBusyClub()
+                : try AssistFixture.makeRichSection(for: self)
+            defer { try? FileManager.default.removeItem(at: made.root) }
+
+            let agent: AssistAgent = AssistFixture.makeAgent(tools: made.runner)
+            await agent.say(sentence.phrasing)
+            checked += 1
+
+            XCTAssertEqual(
+                agent.pendingApproval?.call.function.name, sentence.tool,
+                "“\(sentence.phrasing)” reaches \(sentence.tool) and did not stop at Go: "
+                + (agent.entries.last?.text ?? "nothing said")
+            )
+            XCTAssertEqual(toolResults(in: agent), [],
+                           "“\(sentence.phrasing)” ran something before the teacher said Go.")
+            XCTAssertEqual(agent.entries.last?.text, AssistWording.planQuestion,
+                           "“\(sentence.phrasing)” did not end with the plan question.")
+        }
+        XCTAssertGreaterThanOrEqual(checked, 20, "The walk found fewer gated cards than exist today.")
+    }
+
+    /// The headline case end to end: "make room for a class at Unit 3, Day 4"
+    /// is a plan a teacher can read AND accept — the sentence #70 is about,
+    /// declared in the contract since #150.
+    func testTheArticleFormOfMakeRoomIsAPlanThatCanBeAccepted() async throws {
+        let made: AssistFixture.Made = try AssistFixture.makeRichSection(for: self)
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        let agent: AssistAgent = AssistFixture.makeAgent(tools: made.runner)
+        await agent.say("make room for a class at Unit 3, Day 4")
+        XCTAssertEqual(agent.pendingApproval?.call.function.name, "make_room_for_classes")
+        XCTAssertEqual(agent.entries.last?.text, AssistWording.planQuestion)
+
+        await agent.approvePending()
+        XCTAssertEqual(toolResults(in: agent), ["make_room_for_classes"], "Go did not run the write.")
+        let movedOn: String = try String(
+            contentsOf: AssistFixture.pageURL(of: "Unit 3, Day 5", in: made.course), encoding: .utf8
+        )
+        XCTAssertTrue(movedOn.contains("Three four."),
+                      "Unit 3, Day 4 was not moved on to Day 5 to make room:\n\(movedOn)")
+    }
+
+    // MARK: - Helpers
+
+    /// The names of the tools whose results reached the transcript.
+    private func toolResults(in agent: AssistAgent) -> [String] {
+        var names: [String] = []
+        for entry in agent.entries {
+            if case .toolResult(let name) = entry.speaker {
+                names.append(name)
+            }
+        }
+        return names
+    }
 }

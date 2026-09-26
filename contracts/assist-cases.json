@@ -453,6 +453,18 @@
         "tool" : "make_room_for_classes"
       },
       {
+        "becauseNotThis" : "The article is singular and the noun is plural, which is the same disagreement as “two class” — and this tool renames pages the teacher's links point at, so guessing which half they meant is what a fixed shape exists to avoid.",
+        "example" : "make room for a class at Unit 3, Day 4",
+        "fills" : {
+          "atDay" : "<day>",
+          "howMany" : "1 — the article is a count of one",
+          "unit" : "<unit>"
+        },
+        "notThis" : "make room for a classes at Unit 3, Day 4",
+        "shape" : "make room for a class at unit <unit>, day <day>",
+        "tool" : "make_room_for_classes"
+      },
+      {
         "becauseNotThis" : "Publishing is the direction that reaches students, so this verb is read by a frame of its own that has not moved: the literal opening 'publish unit ' and a bare number. A comma means one PAGE was named, and that request goes to the model — and so does every spelling the hide and unpublish family beside it tolerates, so 'publish unit 4?', 'please publish unit 4' and 'publish  unit 5' are refused too, each pinned in hideIsUnpublish.refused. The asymmetry is the decision: unpublishing errs safe, a question mark on a publish request is plausibly a teacher ASKING, and this phrasing is answered correctly by the model anyway, so there is nothing to buy by widening it.",
         "example" : "publish unit 5",
         "fills" : {
