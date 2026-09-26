@@ -4207,7 +4207,7 @@ final class AssistToolRunnerTests: XCTestCase {
         let otherFolder: URL = made.root.appendingPathComponent("last-years-folder")
         let theirs: [String: Any] = ScheduledDeploy.propertyList(
             courseCode: "ICS3U", sectionNumber: 1, when: alreadySet,
-            workspaceURL: otherFolder, deployArguments: []
+            workspaceURL: otherFolder, scheduledTo: []
         )
         try PropertyListSerialization.data(fromPropertyList: theirs, format: .xml, options: 0)
             .write(to: ScheduledDeploy.plistURL(courseCode: "ICS3U", sectionNumber: 1, inWorkingFolder: otherFolder))
@@ -4219,7 +4219,7 @@ final class AssistToolRunnerTests: XCTestCase {
         // One set from THIS folder, at a moment still ahead.
         let ours: [String: Any] = ScheduledDeploy.propertyList(
             courseCode: "ICS3U", sectionNumber: 1, when: alreadySet,
-            workspaceURL: made.root, deployArguments: []
+            workspaceURL: made.root, scheduledTo: []
         )
         try PropertyListSerialization.data(fromPropertyList: ours, format: .xml, options: 0)
             .write(to: ScheduledDeploy.plistURL(courseCode: "ICS3U", sectionNumber: 1, inWorkingFolder: made.root))
@@ -4234,7 +4234,7 @@ final class AssistToolRunnerTests: XCTestCase {
         // One already gone by is not a promise being broken.
         let gone: [String: Any] = ScheduledDeploy.propertyList(
             courseCode: "ICS3U", sectionNumber: 1, when: Date().addingTimeInterval(-60 * 60),
-            workspaceURL: made.root, deployArguments: []
+            workspaceURL: made.root, scheduledTo: []
         )
         try PropertyListSerialization.data(fromPropertyList: gone, format: .xml, options: 0)
             .write(to: ScheduledDeploy.plistURL(courseCode: "ICS3U", sectionNumber: 1, inWorkingFolder: made.root))
@@ -4263,7 +4263,7 @@ final class AssistToolRunnerTests: XCTestCase {
         let old: [String: Any] = ScheduledDeploy.propertyList(
             courseCode: "ICS3U", sectionNumber: 1, when: alreadySet,
             workspaceURL: made.root,
-            deployArguments: []
+            scheduledTo: []
         )
         try PropertyListSerialization.data(fromPropertyList: old, format: .xml, options: 0)
             .write(to: ScheduledDeploy.plistURL(courseCode: "ICS3U", sectionNumber: 1, inWorkingFolder: made.root))

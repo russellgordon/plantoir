@@ -477,7 +477,8 @@ struct CourseSettingsView: View {
             // the file, not this copy, because the file is what the site was
             // built from.
             var hiddenBefore: [String] = []
-            if let onDisk = try? CourseConfiguration(contentsOf: course.configFileURL) {
+            let onDisk: CourseConfiguration? = try? CourseConfiguration(contentsOf: course.configFileURL)
+            if let onDisk {
                 hiddenBefore = onDisk.hiddenItems
             }
             let result: CourseConfiguration.WriteResult = try course.configuration.write(to: course.configFileURL)
@@ -486,7 +487,13 @@ struct CourseSettingsView: View {
                 courseCode: course.code,
                 previewLeases: PreviewLeases.active,
                 publishes: CourseActivity.activePublishes,
-                replacedChangesFromElsewhere: result.replacedChangesFromElsewhere
+                replacedChangesFromElsewhere: result.replacedChangesFromElsewhere,
+                scheduledDeploys: SettingsSaveNotice.scheduledDeploysAtSave(
+                    before: onDisk,
+                    saved: course,
+                    scheduled: scheduledDeploysStillToCome(),
+                    cloudflareAccountID: AppSettings.shared.cloudflareAccountID
+                )
             )
             saveNotice = notice
             ActivityTrail.note(.settingsSaved, SettingsSaveNotice.trailLine(
@@ -505,6 +512,22 @@ struct CourseSettingsView: View {
             saveProblem = "Could not save: \(error.localizedDescription)"
             ActivityTrail.note(.settingsCouldNotBeSaved, "could not save the settings for " + course.code + " — " + error.localizedDescription)
         }
+    }
+
+    /// This course's deploys set to happen on its own IN THIS WORKING FOLDER
+    /// that are still to come (#323, scoped by #237).
+    func scheduledDeploysStillToCome() -> [(section: Int, when: Date)] {
+        let now: Date = Date()
+        var result: [(section: Int, when: Date)] = []
+        let agents: [ScheduledDeploy.Agent] = ScheduledDeploy.agents(
+            inWorkingFolder: URL(fileURLWithPath: workingFolderPath), courseCode: course.code, sectionNumber: nil
+        )
+        for agent in agents {
+            if let when = agent.scheduledFor, when > now {
+                result.append((section: agent.sectionNumber, when: when))
+            }
+        }
+        return result
     }
 
     /// The working folder this course lives in — the folder a preview's

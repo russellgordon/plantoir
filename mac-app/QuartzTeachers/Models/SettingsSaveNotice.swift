@@ -21,6 +21,43 @@ struct SettingsSaveNotice: Equatable {
     /// builds afresh. Empty when the button is not offered.
     let sectionsToPreviewAgain: [Int]
 
+    /// What this Save means for the course's scheduled deploys in this
+    /// working folder (#323), kept as FACTS rather than parsed back out of
+    /// the sentences, for the trail line.
+    var scheduledDeploys: [ScheduledDeployAtSave] = []
+
+    // MARK: - Types
+
+    /// One section's scheduled deploy, as a Save leaves it (GitHub #323).
+    struct ScheduledDeployAtSave: Equatable {
+
+        // MARK: - Stored properties
+
+        let section: Int
+        let moment: Date
+
+        /// Where the course deploys after the Save, in the teacher's words.
+        let destinationsNow: [String]
+
+        /// Why it could not go ahead as set now, or nil when it would.
+        let refusal: ScheduledDeployRefusal?
+
+        // MARK: - Functions
+
+        /// The sentence shown under the Save button.
+        func sentence(locale: Locale = Locale.current) -> String {
+            let moment: String = ScheduledDeploy.dayAndTimeText(self.moment, locale: locale)
+            if let refusal {
+                return SpecialNames.settingsSaveScheduledDeployCannotGoAheadAsSetNow(
+                    section: section, moment: moment, reason: refusal.reasonClause
+                )
+            }
+            return SpecialNames.settingsSaveScheduledDeployGoesWhereTheCourseDeploysNow(
+                section: section, moment: moment, destinations: destinationsNow.joined(separator: ", ")
+            )
+        }
+    }
+
     // MARK: - Functions
 
     /// What to say after a Save of `courseCode`'s settings, or nil when
@@ -40,12 +77,19 @@ struct SettingsSaveNotice: Equatable {
     /// (`rebuildAfterRepair`), so a button that could only be refused would
     /// be worse than none. Once the publish finishes, the teacher previews
     /// from the section as usual.
+    ///
+    /// Then, since #323, one sentence per section whose scheduled deploy this
+    /// Save affects (`scheduledDeploys`, from `scheduledDeploysAtSave`) —
+    /// BEFORE the early return for a running publish, so a Save made while
+    /// publishing still says it.
     static func afterSave(
         folderPath: String,
         courseCode: String,
         previewLeases: [PreviewLeases.Lease],
         publishes: [CourseActivity.PublishRecord],
-        replacedChangesFromElsewhere: [String]
+        replacedChangesFromElsewhere: [String],
+        scheduledDeploys: [ScheduledDeployAtSave] = [],
+        locale: Locale = Locale.current
     ) -> SettingsSaveNotice? {
         let folder: String = standardised(folderPath)
 
@@ -53,11 +97,16 @@ struct SettingsSaveNotice: Equatable {
         if replacedChangesFromElsewhere.contains("hidden") {
             sentences.append(SpecialNames.settingsSaveReplacedSidebarChange)
         }
+        for scheduled in scheduledDeploys {
+            sentences.append(scheduled.sentence(locale: locale))
+        }
 
         for publish in publishes {
             if standardised(publish.folderPath) == folder && publish.courseCode == courseCode {
                 sentences.append(SpecialNames.settingsSavedWhilePublishing)
-                return SettingsSaveNotice(sentences: sentences, sectionsToPreviewAgain: [])
+                return SettingsSaveNotice(
+                    sentences: sentences, sectionsToPreviewAgain: [], scheduledDeploys: scheduledDeploys
+                )
             }
         }
 
@@ -70,7 +119,52 @@ struct SettingsSaveNotice: Equatable {
         if sentences.isEmpty {
             return nil
         }
-        return SettingsSaveNotice(sentences: sentences, sectionsToPreviewAgain: previewedSections)
+        return SettingsSaveNotice(
+            sentences: sentences, sectionsToPreviewAgain: previewedSections, scheduledDeploys: scheduledDeploys
+        )
+    }
+
+    /// Which of this course's scheduled deploys a Save should speak about
+    /// (GitHub #323), and what to say.
+    ///
+    /// `scheduled` is this WORKING FOLDER's deploys of the course that are
+    /// still to come (#237: another folder's deploy of the same section is
+    /// another alarm, and nothing this Save does reaches it). A deploy is
+    /// spoken about when it could not go ahead as the course is set NOW
+    /// (changed or not), or when the Save CHANGED where the course deploys —
+    /// "changed" meaning the file as it was before this Save (`before`) and
+    /// as it was written (`saved`), never what the deploy was set to go to,
+    /// which would repeat the sentence on every later Save (plan review M4).
+    static func scheduledDeploysAtSave(
+        before: CourseConfiguration?,
+        saved: Course,
+        scheduled: [(section: Int, when: Date)],
+        cloudflareAccountID: String
+    ) -> [ScheduledDeployAtSave] {
+        var destinationsBefore: [CourseConfiguration.DeployDestination] = []
+        if let before {
+            destinationsBefore = before.allDeployDestinations
+        }
+        let destinationsAfter: [CourseConfiguration.DeployDestination] = saved.configuration.allDeployDestinations
+        let changed: Bool = before != nil && destinationsBefore != destinationsAfter
+        var descriptions: [String] = []
+        for destination in destinationsAfter {
+            descriptions.append(DeployCommand.destinationDescription(for: destination))
+        }
+
+        var result: [ScheduledDeployAtSave] = []
+        for entry in scheduled {
+            let refusal: ScheduledDeployRefusal? = ScheduledDeploy.destinationRefusal(
+                course: saved, sectionNumber: entry.section, cloudflareAccountID: cloudflareAccountID
+            )
+            if refusal == nil && !changed {
+                continue
+            }
+            result.append(ScheduledDeployAtSave(
+                section: entry.section, moment: entry.when, destinationsNow: descriptions, refusal: refusal
+            ))
+        }
+        return result
     }
 
     /// This notice once Preview Again has been pressed: the preview sentence
@@ -86,7 +180,9 @@ struct SettingsSaveNotice: Equatable {
         if remaining.isEmpty {
             return nil
         }
-        return SettingsSaveNotice(sentences: remaining, sectionsToPreviewAgain: [])
+        return SettingsSaveNotice(
+            sentences: remaining, sectionsToPreviewAgain: [], scheduledDeploys: scheduledDeploys
+        )
     }
 
     /// The sections of `courseCode` with a preview leased in this folder,
@@ -196,6 +292,17 @@ struct SettingsSaveNotice: Equatable {
         }
 
         if let notice {
+            // What this Save means for a scheduled deploy (#323) — from the
+            // notice's facts, not from its sentences, which are templated.
+            for scheduled in notice.scheduledDeploys {
+                if let refusal = scheduled.refusal {
+                    line += "; Section \(scheduled.section)’s scheduled deploy could not go ahead as set now ("
+                        + refusal.reasonClause + ")"
+                } else {
+                    line += "; Section \(scheduled.section)’s scheduled deploy now goes to "
+                        + scheduled.destinationsNow.joined(separator: ", ")
+                }
+            }
             if notice.sentences.contains(SpecialNames.settingsSaveReplacedSidebarChange) {
                 line += "; told the teacher this save replaced a sidebar change made elsewhere"
             }

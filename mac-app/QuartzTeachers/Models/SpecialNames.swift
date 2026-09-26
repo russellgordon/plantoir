@@ -123,6 +123,32 @@ enum SpecialNames {
     nonisolated static let settingsSaveReplacedSidebarChange: String =
         "Which items the sidebar hides had also been changed somewhere else since this window read them — most likely in another Plantoir window. This save replaced that change with the switches shown here."
 
+    /// After a Save that changed where the course deploys, for each section
+    /// with a deploy set to happen on its own IN THIS WORKING FOLDER that
+    /// would still go ahead (GitHub #323): the run reads the settings when it
+    /// fires, so it goes where the course deploys now, and the teacher is told
+    /// while somebody is awake. `specialNames.settingsSaveScheduledDeployGoesWhereTheCourseDeploysNow`.
+    nonisolated static func settingsSaveScheduledDeployGoesWhereTheCourseDeploysNow(
+        section: Int, moment: String, destinations: String
+    ) -> String {
+        return "Section \(section)’s deploy set for \(moment) will go to \(destinations) now."
+    }
+
+    /// After ANY Save that leaves a section's scheduled deploy unable to go
+    /// ahead the way the course is set now (#323) — changed or not, since the
+    /// run re-checks everything the schedule sheet refuses. Nothing is refused
+    /// or undone: the Save stands, the deploy stays set, and the run checks
+    /// again. `{reason}` is `ScheduledDeployRefusal.reasonClause`, true at
+    /// any moment; the remedy is this sentence's own, and it is not "schedule
+    /// this again", which would replace a deploy for no reason (plan review
+    /// M3). `specialNames.settingsSaveScheduledDeployCannotGoAheadAsSetNow`.
+    nonisolated static func settingsSaveScheduledDeployCannotGoAheadAsSetNow(
+        section: Int, moment: String, reason: String
+    ) -> String {
+        return "Section \(section) is set to deploy on its own on \(moment), but it could not go ahead "
+            + "the way this course is set now: \(reason). Put that right and it will go ahead as set."
+    }
+
     /// In place of Preview Again when the preview that was open at the Save
     /// has stopped since, or its window has closed — the button would do
     /// nothing (issue #265, the review's L2).
