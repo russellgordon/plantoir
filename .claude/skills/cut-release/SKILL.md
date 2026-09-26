@@ -200,6 +200,22 @@ python3 website/update_feed.py macos --version <version> \
    both with the version line in step 2 (stage them by path). A cut with no mac
    DMG leaves both alone. See `RELEASING.md` → "The update feed (macOS)".
 
+   **Deltas (#312).** When the feed already holds earlier builds, the run
+   downloads their DMGs (up to three, ~430 MB each, from their own releases),
+   makes a delta from each, puts every earlier item back as it was and signs
+   the feed once more — so the Keychain asks a THIRD time (`sign_update`);
+   answer **Allow** again. It prints each `.delta` it wrote beside the DMG.
+   **Upload every one of them to THIS release now, before step 2 deploys the
+   feed**:
+
+```bash
+gh release upload v<version> mac-app/dist/*.delta -R <owner/repo>
+```
+
+   A delta the feed names and the release lacks makes Sparkle fall back to the
+   full download silently; `build.py --deploy` refuses it. The first release
+   with Sparkle (v1.4.0) has none — nothing before it is in the feed.
+
 2. **Update and deploy plantoir.app**:
    Set `version` and `released` in `website/site.json`, redraw brand images,
    rebuild, and push.

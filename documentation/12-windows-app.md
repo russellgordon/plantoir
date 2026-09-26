@@ -1085,6 +1085,32 @@ as history, not as what Windows does today.
   mac-only facts now** — Colima still needs them; native Windows has no
   image and no builder of any kind.
 
+### What each platform downloads and carries, like for like (mac #312)
+
+Since #312 the Mac app carries its own helper programs and the Linux
+virtual machine's starting disk, as Windows has always carried its runtime.
+Windows has nothing to DO about it (the contract key
+`app-rules.json → helperBootstrap` and the trail events "helper programs
+installed" and "website builder created" are `appliesOn: ["mac"]`); these are
+the two things it should KNOW. Mac figures measured 2026-09-26 on an M4 Pro;
+Windows figures are the v1.1.0 release assets.
+
+| | macOS v1.3.1 | macOS after #312 | Windows (v1.1.0, latest with an installer) |
+|---|---|---|---|
+| Installer | DMG 58.8 MB | DMG ~432 MB (LZMA; 466 MB zlib) | PlantoirSetup.exe 235 MB; zip 398 MB |
+| Carried inside | app, llama.cpp (25 MB), the build recipe | + Colima, Lima, Docker CLI, buildx, the Ubuntu disk (Apple silicon) | app, llama.cpp, `plantoir-mcp.exe`, the native runtime (Node 20, Python 3.11 and packages, patched Quartz and its node_modules, wrangler, the emoji font) |
+| Downloaded on a first run, for building | ~857 MB | ~390 MB (the website builder's image build) | none |
+| Update delivery | download the DMG by hand | Sparkle, a ~3.7 MB delta for a Swift-only release from the release after v1.4.0 | installer by hand |
+| Downloads checked against a pinned SHA-256 | none | every helper, both kinds of Mac, and the disk | none in `fetch-runtime.ps1` (a build-time fetch, not on a teacher's machine) |
+
+1. **The mac installer is now almost twice Windows'**, because the mac still
+   needs a Linux virtual machine and Windows does not.
+2. **The mac now checks every helper download against a pinned SHA-256**
+   (the launchers' shared first-run block). `fetch-runtime.ps1` fetches Node,
+   Python, get-pip.py and the emoji font without checksums. It runs when the
+   Windows app is BUILT, not on a teacher's PC, so this is a judgement call
+   rather than a defect — the Windows issue from #312 asks for it.
+
 ## Behaviours with platform-specific mechanics
 
 - **Obsidian integration** (entry 80): `obsidian://open?path=…` only works

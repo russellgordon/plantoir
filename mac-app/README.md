@@ -62,7 +62,15 @@ The assistant's engine is not committed — 25 MB of llama.cpp build output
 ```bash
 ./Vendor/fetch-llama.sh
 ./Vendor/fetch-sparkle.sh
+./Vendor/fetch-helpers.sh
 ```
+
+The third (#312) fetches the website builder's helper programs and its
+starting disk for Apple silicon, about 470 MB, into `Vendor/helpers`, which the
+app carries as `Contents/Resources/helpers`; its versions and checksums come
+from `../setup.sh`, and its downloads are cached outside the repository
+(`PLANTOIR_HELPERS_CACHE`, default `~/Library/Caches/Plantoir-dev/helpers`).
+Run `xcodegen generate` again whenever it replaces the folder.
 
 The second fetches Sparkle 2.9.6 (#204), which a released Plantoir finds and
 installs its own updates with — pinned by version and SHA-256, never committed,

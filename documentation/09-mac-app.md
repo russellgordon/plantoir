@@ -5256,6 +5256,99 @@ this is the app-side wiring.
   installed copy share the bundle identifier, so the answer given to one is the
   answer for both.
 
+## What the app carries for the website builder (#312)
+
+**The payload.** `Contents/Resources/helpers`: Colima, limactl with its `lima`
+wrapper, the Docker CLI and buildx, Lima's Linux guest agent and templates,
+and the Ubuntu disk Colima creates its virtual machine from — Apple silicon
+only, about 470 MB (135 MB of programs, 332 MB of disk) — with a `MANIFEST`.
+The launchers install the programs into
+`~/Library/Application Support/Plantoir/tools` and create the virtual machine
+from the disk; how, and every rule about when, is in
+`documentation/03-launcher-scripts.md` → "Where the helper programs come
+from", and the cases are `contracts/app-rules.json` → `helperBootstrap`. The
+app itself does ONE thing: `HelperPrograms.environment` sets
+`PLANTOIR_BUNDLED_HELPERS` to the folder when the app carries it, and removes
+an inherited value when it does not, so every launcher the app starts — from
+the window, the MCP server, and the publishes launchd starts through Plantoir
+— can install from it. No installer in Swift: neither app carries toolchain
+logic of its own.
+
+**Measured, 2026-09-26, M4 Pro.** A first run used to download ~857 MB (the
+launcher said 600): 135 MB of programs, the 332 MB disk, ~390 MB building the
+website builder. Now only the build is downloaded. The disk-seeded start of
+the virtual machine takes 22–27 s. Estimated for an 8 GB M1 at 25 Mbit/s:
+about 4.5 minutes rather than 7; at 10 Mbit/s about 7.5 rather than 14. The
+app bundle grows from ~125 MB to ~600 MB; the DMG from 58.8 MB to 466 MB with
+create-dmg's zlib, **432 MB with LZMA (ULMO)**, which publish.sh now uses
+(101 s to make rather than 29; macOS 15 reads it).
+
+**Why Apple silicon only.** A universal payload would add ~135 MB of Intel
+programs and the 358 MB Intel disk to every Apple-silicon teacher's download.
+An Intel Mac downloads as before — each download is now checked against its
+own pinned SHA-256 — and the app's MANIFEST says `arch arm64`, which the
+launcher compares with `uname -m`.
+
+**Fetched, never committed.** `mac-app/Vendor/fetch-helpers.sh` (required
+before `xcodegen generate`, like fetch-llama.sh and fetch-sparkle.sh) reads
+every version and checksum from `setup.sh` rather than carrying its own —
+`HelperVersionsTests` fails if one is written into it — refuses any file that
+does not hash to its pin, and refuses a Colima that does not carry the disk's
+SHA-512 (Colima refuses any other disk, so a Colima bump without a disk bump
+would otherwise surface as a slow download at a teacher's first start). Its
+cache is outside the repository, under
+`${PLANTOIR_HELPERS_CACHE:-~/Library/Caches/Plantoir-dev/helpers}`, keyed by
+SHA-256, and the folder is made with clones, so a second worktree costs
+seconds and no disk. **Trap 1 applies**: run `xcodegen generate` after a
+re-fetch. `HelperVersionsTests.testTheAppsCopiesCarryTheLaunchersPins` asks
+the fetched folder AND the app the suite runs in whether their MANIFEST's pins
+are setup.sh's; the launcher refuses a copy whose are not.
+
+**Signing.** `publish.sh -Sign` runs `release/sign-helpers.sh` after the
+updater, the dylibs and llama-server and before the app: each program with
+`--options runtime --timestamp` under a fixed identifier
+(`ca.russellgordon.Plantoir.helper.<name>`; the Docker CLI's upstream one is
+`a.out`), limactl with `release/limactl.entitlements` — upstream's own set,
+`com.apple.security.virtualization` plus `network.client` and
+`network.server`, never the app's — and the others with none. Signing changes
+the bytes, so it then writes the `MANIFEST` again, and the app's signature
+seals it. `release/check-signatures.sh` refuses, before notarization, a helper
+off the team, without the runtime or a timestamp, carrying the app's
+`disable-library-validation`, carrying any entitlement it does not need, a
+limactl without the virtualization entitlement (a hardened limactl cannot
+start a vz machine without it — found otherwise only at a teacher's first
+start), a `MANIFEST` that no longer matches the signed programs (every
+teacher's Mac would refuse the copy and download instead), and an app with no
+helpers at all. `codesign --verify --deep --strict` sees none of this: it does
+not look inside `Resources`.
+
+**Nothing writes inside the app.** A Sparkle delta requires the installed
+bundle to be byte-for-byte what was shipped; a chmod or a quarantine strip
+inside it would silently turn every update into a full download. The
+launchers copy OUT and strip quarantine from the copies only, and
+`scripts/test_helper_bootstrap.py` checks the app's copy is unchanged after
+every case.
+
+**Updates stay small.** Measured with Sparkle 2.9.6's `BinaryDelta` between
+two real signed apps: 3,658,602 bytes without the payload, 3,658,626 with an
+identical payload in both, 3,733,870 with the four programs' signatures
+changed. A version bump of one program costs roughly that file's binary
+difference; a new disk (rare: colima-core ships one with Colima releases)
+costs close to its 332 MB. `website/update_feed.py` therefore makes deltas
+from the three newest builds in the feed — reversing #204's decision, see
+"Updating itself" below.
+
+**What a teacher who already has Plantoir gains: nothing on the first run,**
+which they have had. They pay ~430 MB once, for v1.4.0, by hand (it is the
+first release with the updater); at their next start of the website builder
+the app's signed copies replace the downloaded ones ("replacing copies set up
+before Plantoir kept a record of them" on the trail) and the existing virtual
+machine starts with them.
+
+**Rejected, beyond what 03 lists:** a universal payload (above); carrying the
+website builder's image too — Russell's decision was to keep building it on
+the Mac; and running the programs from inside the app (03).
+
 ## Updating itself: what is held, what is not, and why (#204)
 
 From v1.4.0 a released Plantoir finds and installs its own new versions, with
@@ -5629,9 +5722,17 @@ R1 repeats it on Plantoir's own signed build, with must-fail (b).
 
 **The feed** is built by `website/update_feed.py` at the cut, checked and
 copied by `website/update_feeds.py` — `website/README.md` → "The update feeds"
-and `RELEASING.md` → "The update feed (macOS)". *Rejected:* deltas (each is
-another asset on the GitHub release under a name that would have to stay
-stable, to save part of a ~59 MB download once a release); generating the feed
+and `RELEASING.md` → "The update feed (macOS)". **Deltas were rejected here
+by #204 and turned on by #312**, and the reversal is the point of the note: the
+rejection (each is another asset on the GitHub release under a name that would
+have to stay stable, to save part of a ~59 MB download once a release) was
+sound for a 59 MB DMG. Since #312 the DMG carries the website builder's helper
+programs and starting disk and is ~430 MB, and a Swift-only update measured
+~3.7 MB as a delta with or without that payload — so every update without
+deltas would be a 430 MB download. How they are made, and the rewrite of
+earlier items `generate_appcast` does that `update_feed.py` has to undo, is in
+"What the app carries for the website builder (#312)" below and in
+`RELEASING.md` → "The update feed (macOS)". Still rejected: generating the feed
 in `publish.sh` (the feed needs the APPROVED notes, which do not exist until the
 cut, and must follow the release being published); a feed parsed and rewritten
 by `build.py` (breaks its signature).
