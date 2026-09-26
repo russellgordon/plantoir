@@ -23,7 +23,26 @@
       {
         "carries": "the folder path, redacted",
         "event": "working folder opened",
-        "why": "Almost every question about a course begins with which folder it is in - and a folder outside the home directory bind-mounts as an EMPTY folder inside the container, which is a whole class of report explained by this line alone."
+        "why": "Almost every question about a course begins with which folder it is in. On the mac, a folder outside the home folder used to bind-mount as an EMPTY folder inside the container, and a container made that old way still does until it is recreated; the launchers refuse such a folder since #221, and since #290 the app refuses it when a window chooses or reopens it, writing \"working folder refused\" or \"working folder not reopened\" instead of this line. This line is the teacher's CHOICE only: a folder the app reopened by itself writes \"working folder reopened\" (#311)."
+      },
+      {
+        "event": "working folder reopened",
+        "carries": "the working folder's path (redacted), which it was — the window's own folder, the last working folder, or (since #306, on the mac) the folder a clicked scheduled publish notification named, taken by a window that was choosing one — and, when a bookmark found it moved, the path it had been at",
+        "why": "\"Plantoir opened the wrong folder\" and \"my courses are gone\" are both answered by knowing the APP reopened a folder rather than the teacher choosing one. Until #311 (2026-09-26) a restore left nothing on the mac trail, and on Windows it wrote \"working folder opened\", indistinguishable from a choice. The moved clause answers \"it's opening my old copy\". Written only by a window's model, once per window that reopens. A window opened BESIDE another (⌘N) inherits the key window's folder and writes nothing on either platform — it is neither a choice nor a reopen."
+      },
+      {
+        "event": "working folder not reopened",
+        "carries": "the reason (gone, inTrash, driveNotConnected, unreadable, privacyDenied, outsideHome, coursesOutsideHome — reopeningTheLastWorkingFolder.wording's keys), which folder it was (the window's own or the last working folder) and the remembered path (redacted)",
+        "why": "\"Plantoir forgot my folder\" is the report #311 exists to prevent; when it happens anyway, the reason and the path are what can no longer be looked for afterwards — the drive gets plugged back in, the Trash emptied, the permission granted."
+      },
+      {
+        "event": "working folder refused",
+        "carries": "the chosen folder's path (redacted), and whether the folder itself or its courses lead outside the home folder",
+        "why": "A refused folder leaves nothing else behind — not adopted, not remembered, no \"opened\" line — so without this the trail shows a teacher who never chose anything. Only the picker writes it; a remembered folder out of reach writes \"working folder not reopened\" with its reason instead, so one fact is one line (#290 folded into #311).",
+        "appliesOn": [
+          "mac"
+        ],
+        "appliesOnWhy": "PERMANENT: Windows builds natively, so no folder it can read is out of the builder's reach (shared-rules.json → workingFolderReach)."
       },
       {
         "carries": "the course code; which sidebar items this save hid or showed (names only, compared with the file as it was before the save); which settings it kept or replaced because another window or a build had changed the file since this window read it, and — when the sidebar list was one it replaced — that the teacher was told so (specialNames.settingsSaveReplacedSidebarChange); and whether a preview or a publish of the course was running, so it could not see the save",
@@ -454,7 +473,31 @@
         "appliesOnWhy": "PERMANENT, the same case as 'website builder stopped': Windows builds natively and has no workspace to remake (app-rules.json -> previewPorts.whenTheWorkspaceIsInUse.appliesOnWhy)."
       },
       {
-        "carries": "the course and the section, and which of: told with a notification; not sent because notifications are turned off; not sent because permission was never given; could not be sent; and, when a teacher first schedules from the app, that the permission question was put and what the answer was. NEVER the notification's text.",
+        "carries": "where the preview was for (course and section), the preview address in question (a number on this Mac, never a path or a name), and which of four happened: a STOPPED workspace's address was being used by something else, so the workspace was set up again on free addresses BEFORE it started; the address a running workspace was about to announce was held by another account on this Mac or by macOS itself, so the workspace was set up again once; the address was STILL held after that, so the preview stopped before building; or the check was NOT made, because the run was pointed at an engine other than the one Plantoir sets up",
+        "event": "preview address held by another account",
+        "marker": {
+          "prefix": "PLANTOIR_PREVIEW_ADDRESS_HELD:",
+          "shape": "PLANTOIR_PREVIEW_ADDRESS_HELD: <before-start|remade|refused|unchecked> <the preview address, a number> <course>/<section>",
+          "examples": [
+            "PLANTOIR_PREVIEW_ADDRESS_HELD: before-start 8081 ICS4U/1",
+            "PLANTOIR_PREVIEW_ADDRESS_HELD: remade 8081 ICS4U/2",
+            "PLANTOIR_PREVIEW_ADDRESS_HELD: refused 8101 ICS4U/2",
+            "PLANTOIR_PREVIEW_ADDRESS_HELD: unchecked 8091 ICS4U/2"
+          ],
+          "why": "Printed by preview.sh (the look before a start is in the shared PREVIEW PORT BLOCK, switched on by WORKSPACE_WILL_SERVE, which only preview.sh sets; the look before the announcement is preview.sh's own - app-rules.json -> previewPorts.whenAnotherAccountHasTheAddress) and read by the APP, which writes the line: ScriptRunner from the console of a run it started. Written the way 'workspace was in use' is, and for the same reason: one writer for the event's words and a real call site (ActivityTrailWiringTests). A scheduled publish never prints it - deploy.sh never serves - so ScheduledDeploy does not read it. The console a teacher reads leaves it out (rule 1: it is machinery). The cost, stated: a preview run typed at the command line leaves the console sentence and no trail line."
+        },
+        "lineWhenRemadeBeforeStarting": "{place} · something else on this Mac was using preview address {address} while this working folder's workspace was stopped, so it was set up again on free addresses before starting",
+        "lineWhenRemade": "{place} · another account on this Mac, or macOS itself, was using preview address {address}, so this working folder's workspace was set up again on free addresses",
+        "lineWhenRefused": "{place} · the preview stopped before building — another account on this Mac, or macOS itself, was still using its address {address} after this working folder's workspace was set up again on free addresses",
+        "lineWhenUnchecked": "{place} · did not check whether another account on this Mac was using preview address {address}: this run was pointed at a website builder Plantoir did not set up",
+        "why": "GitHub #310, found in the #204 rehearsal. Two macOS accounts on one Mac each ran Plantoir; the second was handed an address the first held, its builder's forward failed without a word, and its Preview opened the other person's site. Every one of the four outcomes arrives later as a report that reads like something else: a two-minute preview for no reason ('Plantoir got slow'), a preview that would not start ('Preview doesn't work' - #225's story again), or a wrong site. Its OWN event rather than a launcher line under 'workspace was in use' (the plan's first proposal): that event is written by the app from its own marker and says 'a remake with nothing running writes nothing', so a launcher-written line there would have given one event two writers and falsified a sentence nobody was told to change; nor under 'preview did not appear', because three of the four outcomes are previews that DID appear. The address is carried because it is the one thing that tells two accounts' reports apart when both reach support. before-start covers any listener, this account's own programs included, since a stopped workspace listens on nothing itself; the other three are proven to be another account's or the system's (the kernel shows more listeners on the address than this account owns). remade and before-start are printed only AFTER the rebuild succeeded: when #94 refuses the remake, or the remove is refused, the existing refusal line is what the trail gets - never a claim of a rebuild that did not happen (the #310 implementation review). unchecked is written once per preview, and only when DOCKER_HOST names an engine other than Colima - a developer's setting the app never makes - so a check that silently stopped happening cannot pass for one that found nothing. {place} is course/section.",
+        "appliesOn": [
+          "mac"
+        ],
+        "appliesOnWhy": "PERMANENT, the same case as 'workspace was in use': Windows' preview.ps1 serves on the PC itself, with no workspace and no forward to lose (app-rules.json -> previewPorts.whenAnotherAccountHasTheAddress.appliesOnWhy). Whether the Windows WALK sees another account's listeners is a separate question, asked in the windows issue from #310."
+      },
+      {
+        "carries": "the course and the section, and which of: told with a notification; not sent because notifications are turned off; not sent because permission was never given; could not be sent; and, when a teacher first schedules from the app, that the permission question was put and what the answer was. Since #306 (2026-09-26), also what a CLICK on the notification did: the section shown - in a window already on its working folder, in the window that was choosing a folder, or in a new window; the window brought forward and left as it was because it was in the middle of something; the working folder shown without the section because the section is no longer in it; or Plantoir only brought forward because the working folder is gone, could not be opened here (out of the builder's reach, or refused when a window choosing a folder tried it), or the notification named no section. NEVER the notification's text, and never the working folder's path.",
         "event": "scheduled publish notification",
         "why": "Added with #212. 'I never got told' is answerable only if the trail says whether the notification went out, or that notifications were off for the app — from the teacher's side a notification that was blocked and one that was never sent look identical. The question's own line is written BEFORE the answer, because a question that is ignored, or arrives under a Focus, may never be answered. See scheduledPublishStopped.notification."
       },
@@ -720,7 +763,25 @@
       "takesLinkedPages": true,
       "transitive": true,
       "disclosedInThePlan": true,
-      "why": "Publishing a page whose links lead somewhere students cannot see is the one thing publishing must never do, so it always takes what it links to, and what those link to in turn. The plan names every page that will become visible, so a teacher agreeing to publish one class can see the four pages going with it. These three stay TRUE alongside stopsAtAClassPage below: the walk is still transitive and still takes what a page links to, it has ONE stop, and the plan names the classes it stopped at as well as the pages it took."
+      "why": "Publishing a page whose links lead somewhere students cannot see is the one thing publishing must never do, so it always takes what it links to, and what those link to in turn. The plan names every page that will become visible, so a teacher agreeing to publish one class can see the four pages going with it. These three stay TRUE alongside stopsAtAClassPage below: the walk is still transitive and still takes what a page links to, it has ONE stop, and the plan names the classes it stopped at as well as the pages it took.",
+      "casesNote": "Run through a REAL publish on a course laid out from `pages`, the same harness as stopsAtAClassPage.cases. A page is written with frontmatter (a title and whether students see it) and then a BODY: a page carrying `links` gets a one-sentence body and then one `See [[name]].` paragraph per link (an empty list: the sentence alone); a page carrying `body` gets that text EXACTLY as written instead, byte for byte, so a link can sit in a table with its pipe escaped. A page carries one or the other, never both - a harness given both must fail the case rather than choose. After the publish, each page's body - the text after its frontmatter - must be byte-identical to what was written: a publish changes whether students see a page, never what the page says, and a publish that 'tidied' a table's `\\|` would split the cell. Added by #294; what counts as a link is readingALink.",
+      "cases": [
+        {
+          "name": "links in a table, with aliases, are followed - and still stop at a class",
+          "pages": [
+            {"title": "Unit 2, Day 3", "isClassPage": true, "visible": false, "body": "| Today | Next |\n|---|---|\n| [[Ohm's Law\\|Ohm]], [[Watt\\|W]] | [[Unit 2, Day 4\\|tomorrow]] |\n"},
+            {"title": "Ohm's Law", "isClassPage": false, "visible": false, "body": "| Read next |\n|---|\n| [[Worked Example\\|example]] |\n"},
+            {"title": "Watt", "isClassPage": false, "visible": false, "links": []},
+            {"title": "Worked Example", "isClassPage": false, "visible": false, "links": []},
+            {"title": "Unit 2, Day 4", "isClassPage": true, "visible": false, "links": ["Worksheet"]},
+            {"title": "Worksheet", "isClassPage": false, "visible": false, "links": []}
+          ],
+          "publish": ["Unit 2, Day 3"],
+          "expectVisible": ["Unit 2, Day 3", "Ohm's Law", "Watt", "Worked Example"],
+          "expectUntouched": ["Unit 2, Day 4", "Worksheet"],
+          "why": "Three of the four pages that go up are reachable ONLY through a table link, so the case cannot pass on a reader that drops them. Ohm's Law -> Worked Example proves the walk is still transitive through a table; Unit 2, Day 4 proves the #173 stop still holds when the class is linked from one."
+        }
+      ]
     },
     "unpublishing": {
       "takesALinkedPageOnlyWhenNothingElseNeedsIt": true,
@@ -787,6 +848,43 @@
       "value": true,
       "why": "The exclusions are checked BEFORE the referrer test, so narrowing what counts as a referrer cannot reach them. Narrowing a sweep rule makes every exclusion above it matter more than it did the day before, which is why the exclusions are the thing to re-test after any change to what gets swept."
     }
+  },
+  "readingALink": {
+    "note": "What counts as a wikilink, and what it NAMES. One definition for every reader: publishing's walk, the dates a class brings, the site check, the answer to what a page links to, copying a page with the pages it links to, and renaming a page, a unit word or a folder. Pure: text in, the names it links to out.",
+    "rule": "The name runs from [[ (or ![[) up to the first ], | or #, and a backslash immediately before that character is not part of it. An escaped pipe, [[Ohm's Law\\|Ohm]], is the same link as [[Ohm's Law|Ohm]] wherever it is written. It is most often inside a Markdown table, where Obsidian escapes the alias pipe so that the cell does not end there, but it turns up in ordinary sentences too and is a link there as well. A backslash anywhere else in a name is left alone.",
+    "whenRewritten": "A rename changes only the name. The backslash, the alias, the heading and the ! stay exactly where they were: dropping the backslash would split a table cell in two.",
+    "expectIs": "Each distinct name once, in the order it first appears, as written: spaces inside the brackets trimmed, a trailing .md dropped, capitals and any folder in front kept. A reader that compares names without regard to case or folder (the mac's section graph, the build's dating walk) compares against these the same way it compares against a page's title.",
+    "why": "Found by #167 and filed as #294. The example payloads and skeletons (12,128 files) carry 229 links with an escaped pipe - 142 in tables, 87 in sentences and in code examples; 230 over all of support/, the example course included - and neither app followed one: every reader took the name up to the pipe, so it ended in a backslash and matched no page. By an emulation of the section graph (an estimate, not a measurement), publishing a class with what it links to left about 137 pages behind across about 104 of 3,258 payload classes. Quartz v4.5.0, which draws the site, reads every one of them as a link (quartz/plugins/transformers/ofm.ts lines 117-119 at the tag the image clones, wikilinkRegex: the name excludes a backslash, the alias is \\\\?\\|).",
+    "rejected": [
+      {
+        "option": "strip the backslash only where publishing reads links",
+        "why": "Publishing would follow the link, and a rename or a class insertion would still leave it on the old name. After a class is inserted the old name is a DIFFERENT lesson, so the link would point at the wrong class rather than at nothing. Every reader shares one definition, so one change fixes all of them."
+      },
+      {
+        "option": "treat a backslash as never part of a name",
+        "why": "Closer to Quartz's own pattern, but [[a\\b]] would then name a, and a rename of a page called a would rewrite it. Stopping only at a backslash right before ], | or # changes nothing else: measured over 12,128 shipped pages, the same 38,659 links matched at the same places, and the 229 that read differently are exactly the escaped pipes."
+      },
+      {
+        "option": "leave out links written inside code in the same change",
+        "why": "A real difference between the apps (Windows and the mac's answer to what a page links to skip them; the mac's publishing does not), but it changes what publishing takes by a different rule and needs its own measurement. Issue #313. No case here puts a link inside code, so this list does not decide it."
+      },
+      {
+        "option": "a case for a backslash inside a name, [[a\\b]]",
+        "why": "Quartz does not draw it as a link at all, and nobody has chosen what it should mean; a case would assert an answer nobody decided."
+      }
+    ],
+    "cases": [
+      {"name": "an aliased link in a table cell", "text": "| Topic | Notes |\n|---|---|\n| Circuits | [[Ohm's Law\\|Ohm]] |\n", "expect": ["Ohm's Law"]},
+      {"name": "links in the header row", "text": "| [[Unit 2, Day 3\\|Tuesday]] | [[Unit 2, Day 4\\|Wednesday]] |\n|---|---|\n| a | b |\n", "expect": ["Unit 2, Day 3", "Unit 2, Day 4"]},
+      {"name": "several links in one cell, escaped and not", "text": "| [[Watt\\|W]], [[Volt\\|V]] and [[Ampere]] |\n", "expect": ["Watt", "Volt", "Ampere"]},
+      {"name": "a heading and an escaped alias", "text": "| [[Ohm's Law#Worked example\\|example]] |\n", "expect": ["Ohm's Law"]},
+      {"name": "a heading and a plain alias", "text": "See [[Ohm's Law#Worked example|the example]].\n", "expect": ["Ohm's Law"]},
+      {"name": "a folder in front, escaped alias", "text": "| [[Concepts/Ohm's Law\\|Ohm]] |\n", "expect": ["Concepts/Ohm's Law"]},
+      {"name": "spaces inside the brackets", "text": "| [[ Ohm's Law \\|Ohm]] |\n", "expect": ["Ohm's Law"]},
+      {"name": "a picture with a size, in a table", "text": "| ![[circuit.png\\|300]] |\n", "expect": ["circuit.png"]},
+      {"name": "an escaped pipe outside a table is the same link", "text": "That is the lesson of [[Yes Lets\\|Yes, Let's]].\n", "expect": ["Yes Lets"]},
+      {"name": "an unescaped link reads as it always did", "text": "[[Ohm's Law|Ohm]] and [[Ohm's Law#Example]] and [[Watt]]\n", "expect": ["Ohm's Law", "Watt"]}
+    ]
   },
   "note": "The rule sets both apps need and neither platform owns. The MECHANISMS behind several of them differ completely - launchd against Task Scheduler, AppKit against WinUI, ~/Library/Logs against %LOCALAPPDATA% - which is exactly why the rules are written here instead: what must be refused, matched, stripped, or taken out of a problem report does not change with the machinery that does it.",
   "pageNaming": {
@@ -1012,8 +1110,8 @@
       ]
     },
     "rerunningSetup": {
-      "rule": "A run of course setup that finds a saved `graded_folders` writes it back AS IT WAS: a list keeps the same names, in the same spelling and the same order, whatever the folder lists the run ends with and whatever is on disk. A saved null is written as an empty list, and a course that never had the key still has none. Entries that cannot name a folder — null, a blank string, a non-string, an exact repeat — are still removed from a saved list; nothing else is. Only a NEW course — no saved configuration at all — has its pool worked out from the payload or skeleton and reconciled against its folder lists. Each case is a saved `course_config.json` fragment (`saved`; `{}` means the key is absent), the folder lists the run ENDS with, what is on disk, and the `graded_folders` fragment written back (`expect`; `{}` means absent), with every prompt accepted as it stood.",
-      "why": "GitHub issue #192. A re-run of `./setup.sh` / `setup.ps1` on an existing course used to pass a saved pool back through the new-course reconciliation, which keeps only names on the TOP-LEVEL copy lists. That rule dates from 2026-08-24, two weeks before the Marks checklist began offering folders found INSIDE other folders (`gradedFolders.choices`, 2026-09-09), and nobody changed the re-run. MEASURED by driving the real wizard with every prompt accepted and no folder removed: a pool of [\"Tasks\"] for `Portfolios/Tasks` or `section1/Tasks` — exactly what the checklist writes when a teacher ticks those rows — came back `[]`: asked, nothing counts, and the historical rule never applies again. The re-run does not ask the marks question and has no way to remove a folder, so it does not own the answer.\n\nNothing was lost by dropping the reconciliation. Counting pages with the build's own `_is_graded_path` over the same shapes, the reconciled pool counted the same pages or FEWER in every one, never more: a name that names no folder counts no page whether it is written or not, and a respelling counts the same because the build lowercases both sides. A name taken off a copy list at a prompt is not a removal either: `build_site.preflight_update_course_config` finds the folder on disk and puts it straight back on the list (measured: shared_folders ['Concepts'] became ['Concepts', 'Tasks'] in one call), so dropping it from the pool stopped counting a folder that was still published.\n\nA name that names no folder is not invisible, though, and the 'a name that names nothing is kept' case says so rather than hiding it: the published Curriculum Coverage page lists every pooled name in its sentence about which folders count, and Course Settings' last-folder guard counts it, so the last LIVE folder can be unticked without the block. Both could already happen through the apps' own exact-match removal (`removingAFolder`'s 'DELIBERATELY NOT PINNED' paragraph), and a clean-up by existence here would make the command line disagree with both apps about the same file.\n\nREJECTED: reconciling against the checklist's own walk (a THIRD implementation of depth, skip list, hidden folders, links and section scope, to drop only names that count nothing); reconciling against every folder at any depth (a new walk rule of its own, the same payoff); keeping the respelling while dropping unmatched names (marks-neutral, and a pool one tool rewrites and the others do not is a file two apps can disagree about); and telling an app's new-course run from a command-line re-run so the old check stayed on the app path (both apps already narrow their own pool before they write, so the check there caught only names that count nothing). The apps run no case: neither ever re-runs setup on an existing course. `scripts/test_graded_folders_rerun.py` drives the real wizard in-process for every case, on the mac host in verify.sh's first step and on Windows through PythonToolchainTests.",
+      "rule": "A run of course setup that finds a saved `graded_folders` writes it back AS IT WAS: a list keeps the same names, in the same spelling and the same order, whatever the folder lists the run ends with and whatever is on disk. A saved null is written as an empty list, and a course that never had the key still has none. Entries that cannot name a folder — null, a blank string, a non-string, an exact repeat — are still removed from a saved list; nothing else is. Only a NEW course made on the command line — no saved configuration at all — has its pool worked out here from the payload or skeleton and reconciled against its folder lists; each app writes a new course's pool into the file it creates before setup runs, so setup reads it as saved (`newCourse`, #292). Each case is a saved `course_config.json` fragment (`saved`; `{}` means the key is absent), the folder lists the run ENDS with, what is on disk, and the `graded_folders` fragment written back (`expect`; `{}` means absent), with every prompt accepted as it stood.",
+      "why": "GitHub issue #192. A re-run of `./setup.sh` / `setup.ps1` on an existing course used to pass a saved pool back through the new-course reconciliation, which keeps only names on the TOP-LEVEL copy lists. That rule dates from 2026-08-24, two weeks before the Marks checklist began offering folders found INSIDE other folders (`gradedFolders.choices`, 2026-09-09), and nobody changed the re-run. MEASURED by driving the real wizard with every prompt accepted and no folder removed: a pool of [\"Tasks\"] for `Portfolios/Tasks` or `section1/Tasks` — exactly what the checklist writes when a teacher ticks those rows — came back `[]`: asked, nothing counts, and the historical rule never applies again. The re-run does not ask the marks question and has no way to remove a folder, so it does not own the answer.\n\nNothing was lost by dropping the reconciliation. Counting pages with the build's own `_is_graded_path` over the same shapes, the reconciled pool counted the same pages or FEWER in every one, never more: a name that names no folder counts no page whether it is written or not, and a respelling counts the same because the build lowercases both sides. A name taken off a copy list at a prompt is not a removal either: `build_site.preflight_update_course_config` finds the folder on disk and puts it straight back on the list (measured: shared_folders ['Concepts'] became ['Concepts', 'Tasks'] in one call), so dropping it from the pool stopped counting a folder that was still published.\n\nA name that names no folder is not invisible, though, and the 'a name that names nothing is kept' case says so rather than hiding it: the published Curriculum Coverage page lists every pooled name in its sentence about which folders count, and Course Settings' last-folder guard counts it, so the last LIVE folder can be unticked without the block. Both could already happen through the apps' own exact-match removal (`removingAFolder`'s 'DELIBERATELY NOT PINNED' paragraph), and a clean-up by existence here would make the command line disagree with both apps about the same file.\n\nREJECTED: reconciling against the checklist's own walk (a THIRD implementation of depth, skip list, hidden folders, links and section scope, to drop only names that count nothing); reconciling against every folder at any depth (a new walk rule of its own, the same payoff); keeping the respelling while dropping unmatched names (marks-neutral, and a pool one tool rewrites and the others do not is a file two apps can disagree about); and telling an app's new-course run from a command-line re-run so the old check stayed on the app path (both apps already narrow their own pool before they write, so the check there caught only names that count nothing). The apps run no case: neither ever re-runs setup on an existing course. (Each does run setup once over a file it has just written, for a NEW course — which is why a saved file without the key stays absent there too, and why the apps write the pool themselves: `newCourse`.) `scripts/test_graded_folders_rerun.py` drives the real wizard in-process for every case, on the mac host in verify.sh's first step and on Windows through PythonToolchainTests.",
       "cases": [
         { "name": "a folder ticked inside another survives a re-run",
           "saved": { "graded_folders": ["Tasks"] },
@@ -1088,6 +1186,60 @@
           "directories": ["Concepts", "Tasks", "Tests", "section1/All Classes"],
           "expect": { "graded_folders": ["Tests", "Tasks", "Unit Tasks"] },
           "why": "Only a hand edit writes these. The old re-run cleaned them on its way through the new-course reconciliation, and 'written back as it was' is about the teacher's NAMES, not about keeping junk: null, a blank string, a non-string and an exact repeat are dropped, while the first spelling of each real name, its order, and a name with no folder (Unit Tasks) all stay." }
+      ]
+    },
+    "newCourse": {
+      "rule": "A NEW course's `course_config.json` carries a `graded_folders` list whichever tool made it. When the course takes ready-made example content, the list is the payload manifest's own pool, reconciled against the payload's folders exactly as the command line does it (`setup_course.graded_folders_for`: shared folders without `Media`, then the per-section folders; a declared name kept as written when it matches a folder exactly, otherwise respelled to the folder's own spelling when it matches ignoring case, otherwise dropped; blanks, nulls and repeats dropped; a declared null or [] gives []; and, only when the manifest has no key at all, every folder whose name contains \"task\", once each, in list order). Only well-formed pools are pinned — a list of strings, null or [] — which is all `lint_payload.py` lets a payload declare; a pool that is a string or an object, or an entry that is a number, is outside the contract (the command line's Python iterates or stringifies such shapes, and the apps need not follow it). It is never the wizard's hidden list and never the subject skeleton's. The apps write it into the file they create BEFORE setup runs, because setup keeps a saved answer and reads a saved file without the key as a course that was never asked (`rerunningSetup`). A club is never given a payload's pool: it takes no ready-made pages (#267).",
+      "why": "GitHub issue #292. Each app writes `course_config.json` first and then runs setup with no arguments, and `setup_course.py` decides the pool by whether a saved configuration EXISTS, not by whether the course is new: with a saved file it writes back a saved `graded_folders` and leaves the key absent when the file had none, and it calls `graded_folders_for` on the manifest only when there is no saved file at all — which only a command-line run has. Both apps deliberately left the key out for a pre-populated course, on the belief that setup would take the pool from the manifest. So since 2026-08-24 every course either app made from ready-made pages has had no `graded_folders`: 'never asked', with the build applying the historical substring rule. Two commits crossed that morning: at 10:39 `11a70b7e` stopped a saved-config run deriving the pool (before it, `392bf357` wrote the manifest's pool on every run, the app's included), and at 11:41 `e9d71d8d` made the wizard write the pool on every path EXCEPT a payload, on the old assumption.\n\nMEASURED 2026-09-26 by driving the real `setup_course.setup_course` in-process: a command-line TAS2O or ADA1O with every prompt accepted is written [\"Tasks\"]; the same run over the file the mac wizard writes for ADA1O leaves the key ABSENT; that file with [\"Tasks\"] added keeps it. What a teacher saw: the published Curriculum Coverage page said \"any folder with “task” in its name\" where a command-line course said \"Tasks\", and the course stayed in the never-asked state, so a later rename of Tasks to a name without \"task\" silently stopped counting it and removing Tasks left the key absent rather than writing []. No mark was ever missing: all 39 payloads declare [\"Tasks\"] and the historical rule infers the same from their lists, and the only \"task\" folder in any payload is `shared/Tasks`. That is also why this contract carries a case with a HIDDEN wizard list (MCV4U, [\"Tests\"]) and synthetic manifests: every shipped payload and the wizard's default say [\"Tasks\"], so any wrong source passes the literal cases.\n\nREJECTED: teaching `setup_course.py` to treat 'the saved file is the only thing in the folder' as a new course and derive the pool (free for Windows, but it infers newness from disk state — wrong for a teacher who deletes a course's pages and re-runs setup — carves an exception into `rerunningSetup` the day after it landed, and makes two writers of one answer, since the apps already write the pool on every other path); dropping the wizard's guard and writing its own list (the structure editors are collapsed for a payload course, so that list is the wizard's default reconciled against the wizard's default folders, not the payload's — the MCV4U case exists to catch it); reusing the apps' exact-match reconciliation of a teacher's ticks (the command line matches ignoring case, respells, and infers when the key is absent, and the app must write what the command line writes); and reading the subject skeleton's pool (the wrong source, and it reads a declared [] as 'infer'). No repair of existing courses: a migration cannot tell such a course from a legacy course that was never asked, or from one where the teacher has since added \"Performance Tasks\", which is `absentIsNotEmpty`'s argument again — and measured, no mark changes.",
+      "whoRunsIt": "mac: `WizardStructureTests.testANewCourseIsWrittenTheContractsMarksPool` plays `cases` through `NewCourseWizardView(...).buildConfigurationDictionary`, the call the Create button makes; `ExampleContentContractTests.testTheMarksPoolIsReadFromAManifestAsTheCommandLineReadsIt` plays `manifestCases` against `ExampleContentCatalog.marksPool(fromManifest:)`. The command line: `scripts/test_graded_folders_new_course.py`, which drives the real `setup_course.setup_course` with no saved file for every `cases` entry that applies to it and plays `manifestCases` through `graded_folders_for` — on the mac host in verify.sh's first step, and on Windows through PythonToolchainTests, which discovers it. Windows owes the app half: a Core function mirroring `graded_folders_for`, written by `NewCourseDialog.BuildConfiguration` for a payload course, and a Core-level runner for `cases` and `manifestCases`.",
+      "howToRunACase": "`courseCode` is what the teacher types; `everyPayload: true` means run the case once for every folder in `support/example_content/` instead. `exampleContent` is `taken` (say yes to the ready-made pages) or `declined` (say no). `startsFromSkeleton` is the answer to the skeleton question for a declined payload (default true). `wizardGradedFolders` is the app wizard's own marks list — hidden from the teacher when the structure comes from example content — and means nothing on the command line, which has no such list and ignores it; when a case gives none, it is the wizard's own default (`[\"Tasks\"]` on the mac), never []. `club: true` is a course made as a club (numbered pages); the command line has no club toggle at a new course, hence `appliesOn`, which names the APPS a case is for — the command-line runner skips any case that carries it. `expect` is the `graded_folders` written; the symbol \"manifest\" means the `graded_folders` the payload's own `support/example_content/<CODE>/manifest.json` declares, read by each runner from that file and never copied here, and a runner fails if the manifest declares none. `manifestCases` are made-up manifest fragments (`shared_folders`, `per_section_folders`, and `graded_folders` or its absence) with the pool the command line's `graded_folders_for` gives for them, called the way setup calls it: shared folders without `Media`, then the per-section folders.",
+      "cases": [
+        { "name": "the issue's own course takes its manifest's pool",
+          "courseCode": "TAS2O", "exampleContent": "taken", "expect": ["Tasks"] },
+        { "name": "the template payload takes its manifest's pool",
+          "courseCode": "ADA1O", "exampleContent": "taken", "expect": ["Tasks"] },
+        { "name": "the wizard's hidden list and the subject's skeleton are not the source",
+          "courseCode": "MCV4U", "exampleContent": "taken", "wizardGradedFolders": ["Tests"], "expect": ["Tasks"],
+          "why": "The discriminating case. The structure editors are collapsed for a payload course, so the wizard's own list is one the teacher never saw — here [\"Tests\"], which must not leak (reconciled against the wizard's default folders it would give [] instead). And MCV4U's mathematics skeleton declares [\"Thinking Tasks\", \"Tasks\"], which must not be read in place of the payload's. Every other literal case gives [\"Tasks\"] from any of those wrong sources." },
+        { "name": "a declined payload keeping its skeleton takes the SKELETON's pool",
+          "courseCode": "MCV4U", "exampleContent": "declined", "startsFromSkeleton": true, "expect": ["Thinking Tasks", "Tasks"],
+          "why": "#248's rule, pinned here too so the command line and Windows run it: the payload's pool belongs to the payload's pages, and a teacher who declined them gets the subject's structure and its pool." },
+        { "name": "every payload takes its own manifest's pool",
+          "everyPayload": true, "exampleContent": "taken", "expect": "manifest",
+          "why": "The sweep. A payload's pool reaches a course by two routes — the command line and the apps reading the manifest — and this is what keeps them identical for every code that ships, including one added later with a pool that is not [\"Tasks\"]." },
+        { "name": "a club typed with a payload code is not given the payload's pool",
+          "courseCode": "ADA1O", "exampleContent": "taken", "club": true, "wizardGradedFolders": ["Exercises"], "expect": ["Exercises"],
+          "appliesOn": ["mac", "windows"], "appliesOnWhy": "the command line has no club toggle at a new course",
+          "why": "Captured from the mac's code BEFORE #292 changed it, the way #248 captured its goldens: a club takes no ready-made pages (#267), so it keeps the wizard's own reconciled list. It proves the club gate holds and asserts no new behaviour. The club's own list is [\"Exercises\"] — for a club the structure editors are open, so it is a list the teacher chose — because with the default [\"Tasks\"] a runner reading 'prepopulate example content' rather than 'takes example content' would give ADA1O's [\"Tasks\"] and pass anyway." }
+      ],
+      "manifestCases": [
+        { "name": "a declared pool naming its folders exactly is kept, in its own order",
+          "manifest": { "shared_folders": ["Concepts", "Tasks", "Tests"], "per_section_folders": ["All Classes"], "graded_folders": ["Tests", "Tasks"] },
+          "expect": ["Tests", "Tasks"] },
+        { "name": "a name matching a folder only ignoring case is respelled to the folder's spelling",
+          "manifest": { "shared_folders": ["Concepts", "Thinking Tasks"], "per_section_folders": ["All Classes"], "graded_folders": ["thinking tasks"] },
+          "expect": ["Thinking Tasks"],
+          "why": "The command line matches ignoring case; the apps' own reconciliation of a teacher's ticks is exact. A mirror built on the exact one turns this red on the mac while the command line stays green." },
+        { "name": "a declared name that is no folder is dropped",
+          "manifest": { "shared_folders": ["Concepts", "Tasks"], "per_section_folders": ["All Classes"], "graded_folders": ["Tasks", "Quizzes"] },
+          "expect": ["Tasks"] },
+        { "name": "a repeat, a blank, a null and a non-name are dropped",
+          "manifest": { "shared_folders": ["Concepts", "Tasks"], "per_section_folders": ["All Classes"], "graded_folders": ["Tasks", null, "", 7, "tasks", "Tasks"] },
+          "expect": ["Tasks"] },
+        { "name": "Media in the pool is dropped, because setup never makes it a shared folder",
+          "manifest": { "shared_folders": ["Media", "Tasks"], "per_section_folders": ["All Classes"], "graded_folders": ["Media", "Tasks"] },
+          "expect": ["Tasks"] },
+        { "name": "a declared empty pool stays empty",
+          "manifest": { "shared_folders": ["Concepts", "Tasks"], "per_section_folders": ["All Classes"], "graded_folders": [] },
+          "expect": [],
+          "why": "Present-and-empty means asked, and nothing counts; it is not a signal to infer." },
+        { "name": "a declared null pool is empty",
+          "manifest": { "shared_folders": ["Concepts", "Tasks"], "per_section_folders": ["All Classes"], "graded_folders": null },
+          "expect": [] },
+        { "name": "a manifest with no pool gets the historical rule applied to its folders",
+          "manifest": { "shared_folders": ["Concepts", "Thinking Tasks", "Tasks"], "per_section_folders": ["All Classes"] },
+          "expect": ["Thinking Tasks", "Tasks"],
+          "why": "Only an ABSENT key infers, and it infers every folder whose name contains \"task\" — two here, which a hard-coded [\"Tasks\"] cannot give." }
       ]
     },
     "cases": [
@@ -1230,6 +1382,169 @@
     },
     "secretLength": 40
   },
+  "problemReportTrail": {
+    "byteNotation": "In `input`, {XX} (two uppercase hex digits in braces) is one raw byte; everything else is UTF-8. No case uses a literal brace otherwise. In `expectLines`, {promptsLeftOutNote} and {unreadableCharactersNote:N} stand for the sentences below, with {count} filled by N. The result is compared split on line breaks, so a final empty entry means the text ended with one.",
+    "cases": [
+      {
+        "expectLines": [
+          "2026-09-26 08:31:39 · ICS3U/1 · started building the preview é",
+          "2026-09-26 08:31:39 · ICS3U/1 · built",
+          ""
+        ],
+        "expectSomethingToReport": true,
+        "includingPrompts": true,
+        "input": "2026-09-26 08:31:39 · ICS3U/1 · started building the preview é\n2026-09-26 08:31:39 · ICS3U/1 · built\n",
+        "name": "a clear trail comes back exactly",
+        "why": "The lenient read must not change a file that was already readable: no note, no line added or lost, the final empty piece after the last line break kept."
+      },
+      {
+        "expectLines": [
+          "{unreadableCharactersNote:1}",
+          "2026-09-26 08:31:39 · ICS3U/1 · truncated �",
+          "2026-09-26 08:31:39 · ICS3U/1 · after",
+          ""
+        ],
+        "expectSomethingToReport": true,
+        "includingPrompts": true,
+        "input": "2026-09-26 08:31:39 · ICS3U/1 · truncated {C3}\n2026-09-26 08:31:39 · ICS3U/1 · after\n",
+        "name": "a launcher line cut inside a two-byte character",
+        "why": "The issue's own shape. The neighbouring lines are intact, and the readable part of the damaged line - its time, course and section - is kept."
+      },
+      {
+        "expectLines": [
+          "{unreadableCharactersNote:1}",
+          "2026-09-26 08:31:39 · ICS3U/1 · a �",
+          ""
+        ],
+        "expectSomethingToReport": true,
+        "includingPrompts": true,
+        "input": "2026-09-26 08:31:39 · ICS3U/1 · a {E2}{80}\n",
+        "name": "cut inside a three-byte character",
+        "why": "One replacement per broken character, not one per byte."
+      },
+      {
+        "expectLines": [
+          "{unreadableCharactersNote:1}",
+          "2026-09-26 08:31:39 · ICS3U/1 · b �� c",
+          ""
+        ],
+        "expectSomethingToReport": true,
+        "includingPrompts": true,
+        "input": "2026-09-26 08:31:39 · ICS3U/1 · b {80}{80} c\n",
+        "name": "stray continuation bytes",
+        "why": "Each stray byte is its own replacement."
+      },
+      {
+        "expectLines": [
+          "{unreadableCharactersNote:2}",
+          "2026-09-26 08:31:39 · ICS3U/1 · one �",
+          "2026-09-26 08:31:39 · ICS3U/1 · two �",
+          ""
+        ],
+        "expectSomethingToReport": true,
+        "includingPrompts": true,
+        "input": "2026-09-26 08:31:39 · ICS3U/1 · one {C3}\n2026-09-26 08:31:39 · ICS3U/1 · two {C3}\n",
+        "name": "two damaged lines are counted as two",
+        "why": "The count is of LINES, and the sentence reads naturally with any number, so it has no plural branch."
+      },
+      {
+        "expectLines": [
+          "{unreadableCharactersNote:1}",
+          "2026-09-26 08:31:39 · ICS3U/1 · x � y",
+          ""
+        ],
+        "expectSomethingToReport": true,
+        "includingPrompts": true,
+        "input": "2026-09-26 08:31:39 · ICS3U/1 · x � y\n",
+        "name": "a character the trim already replaced",
+        "why": "The trim writes U+FFFD in place of what it could not read, so after a trim the file is valid UTF-8 and still carries the mark. It is still something that could not be read, and a report made just after a trim must explain it too."
+      },
+      {
+        "expectLines": [
+          "{unreadableCharactersNote:1}",
+          "2026-09-26 08:31:39 · ICS3U/1 · d �́",
+          ""
+        ],
+        "expectSomethingToReport": true,
+        "includingPrompts": true,
+        "input": "2026-09-26 08:31:39 · ICS3U/1 · d {C3}{CC}{81}\n",
+        "name": "a replacement followed by a combining mark",
+        "why": "U+FFFD followed by a combining acute is ONE grapheme, and a grapheme-based contains misses the U+FFFD inside it (measured on the mac). Count scalar by scalar."
+      },
+      {
+        "expectLines": [
+          "{promptsLeftOutNote}",
+          "2026-09-26 08:31:39 · ICS3U/1 · chose publish_pages(course, section)",
+          ""
+        ],
+        "expectSomethingToReport": true,
+        "includingPrompts": false,
+        "input": "2026-09-26 08:31:39 · ICS3U/1 · chose publish_pages(course, section)\n  asked: publish tomorrow{E2}{80}\n",
+        "name": "damage on a prompt line left out of the report",
+        "why": "The line is still recognised by its prefix and still withheld. The note counts only the lines SHOWN, so it is absent."
+      },
+      {
+        "expectLines": [
+          "{unreadableCharactersNote:1}",
+          "2026-09-26 08:31:39 · ICS3U/1 · chose publish_pages(course, section)",
+          "  asked: publish tomorrow�",
+          ""
+        ],
+        "expectSomethingToReport": true,
+        "includingPrompts": true,
+        "input": "2026-09-26 08:31:39 · ICS3U/1 · chose publish_pages(course, section)\n  asked: publish tomorrow{E2}{80}\n",
+        "name": "the same prompt line, included",
+        "why": "Shown, so counted."
+      },
+      {
+        "expectLines": [
+          "{unreadableCharactersNote:1}",
+          "2026-09-26 08:31:39 · ICS3U/1 · stopped �"
+        ],
+        "expectSomethingToReport": true,
+        "includingPrompts": true,
+        "input": "2026-09-26 08:31:39 · ICS3U/1 · stopped {F0}{9F}",
+        "name": "the whole trail is one torn line",
+        "why": "No final line break. Before #301 this whole file read back as nothing, and a teacher with no task records was told there was nothing to send - the answer the issue is about."
+      },
+      {
+        "expectLines": [
+          "{unreadableCharactersNote:1}",
+          "2026-09-26 08:31:39 · ICS3U/1 · caf�",
+          "2026-09-26 08:31:39 · ICS3U/1 · next",
+          ""
+        ],
+        "expectSomethingToReport": true,
+        "includingPrompts": true,
+        "input": "2026-09-26 08:31:39 · ICS3U/1 · caf{E9}\n2026-09-26 08:31:39 · ICS3U/1 · next\n",
+        "name": "a line saved in another encoding",
+        "why": "A Latin-1 é. A teacher who opens the file in an editor and saves it in another encoding is a writer the app does not control."
+      },
+      {
+        "expectLines": [
+          "{promptsLeftOutNote}",
+          "{unreadableCharactersNote:1}",
+          "2026-09-26 08:31:39 · ICS3U/1 · chose publish_pages(course, section)",
+          "2026-09-26 08:31:39 · ICS3U/1 · x �",
+          ""
+        ],
+        "expectSomethingToReport": true,
+        "includingPrompts": false,
+        "input": "2026-09-26 08:31:39 · ICS3U/1 · chose publish_pages(course, section)\n  asked: publish tomorrow{E2}{80}\n2026-09-26 08:31:39 · ICS3U/1 · x {C3}\n",
+        "name": "both notes, in order",
+        "why": "The order is fixed - the note about what was left out first, then the note about what could not be read - so the two apps' reports read the same."
+      }
+    ],
+    "counting": "Count the lines SHOWN that contain U+FFFD anywhere, scalar by scalar - not grapheme by grapheme, and not only those this read replaced. A prompt line left out of the report is not counted.",
+    "note": "How the breadcrumb trail is READ BACK into a problem report. The file has writers that are not the app (every launcher appends with printf, which passes any byte), and a teacher can open it in any editor, so the reader must not depend on every byte being readable. One unreadable byte used to empty the whole report on the mac (#301). Read leniently, replace what cannot be read with U+FFFD (one per maximal ill-formed sequence), never drop or merge a line, and say so at the top of the trail. A readable file with the prompts included comes back exactly as it is on disk.",
+    "noteOrder": [
+      "promptsLeftOutNote",
+      "unreadableCharactersNote"
+    ],
+    "promptsLeftOutNote": "(What the teacher typed was left out of this report.)",
+    "unreadableCharactersNote": "(Some characters on {count} of these lines could not be read, and are shown as �.)",
+    "wordingWhy": "A teacher reads this, so it names characters and lines - words they have - and nothing about bytes, encodings, decoding, files or the trail (rule 1). 'on 1 of these lines' and 'on 3 of these lines' both read naturally, so there is no plural branch. It carries the count rather than 'a few characters' because the number tells whoever helps how much of the trail to distrust."
+  },
   "scheduledPublishStopped": {
     "note": "What a teacher is told when a publish that was set to happen on its own did not get through. It usually runs at half six with the app closed, so the LAUNCHER writes a record and the APP reads it \u2014 that handover is the feature. Without it the run is indistinguishable from one that was never scheduled, which is exactly the shape of \"my site did not update on Tuesday and I do not know why\". (This said the app reads the record \"the next time it opens\" until 2026-09-19; see whenItIsShown, which is what made that false.)",
     "whenItIsShown": "On the section that is SHOWING, without the teacher navigating anywhere, as soon as the run writes its record \u2014 and the section's sentence and the sidebar's warning appear at the same moment, because both follow one counter. Waiting for the section to be reopened is the fault GitHub issue #216 closed on the mac on 2026-09-19: a teacher who stayed on the section while the run finished was told nothing until they clicked away and back. Two things make it work and both matter to whoever implements it elsewhere. The app watches the RECORD FOLDER, one watch for the whole app rather than one per view, since the folder is per user rather than per working folder. And the wrapper must land its record in ONE step: a folder watch sees an entry arrive but not a second line appended to a file already there, so a record written with two echoes arrived as one event carrying an empty file \u2014 measured on the mac, 0 of 40 \u2014 and the line that completed it produced no event at all. The mac assembles the record in a temporary file BESIDE the folder and moves it in (40 of 40), and separately watches any record that is there but cannot be read yet, which is what covers a job whose wrapper was written by an older build. And since #212 (2026-09-25), as a system notification sent by the run itself when it finishes, so a teacher who has not opened the app at all is told too — see `notification`.",
@@ -1309,7 +1624,7 @@
     "clearedBy": "A scheduled run that got ALL the way through \u2014 every destination, exit zero \u2014 OR the teacher dismissing it. Both, and the second is a decision rather than a convenience: clearing only on a successful run leaves the message standing after somebody has already fixed the problem by hand, and the next scheduled run that would clear it could be a week away.",
     "trail": "One line per RUN, dated to when the RUN wrote its record rather than to when the app read it — or an overnight problem is filed under the morning somebody noticed it. There are FOUR events, and not one per kind: the three outcomes of a run that HAPPENED share three of them (activityTrail.mustRecord: scheduled publish needed an answer, did not finish, finished), and a build that stopped for a question files under the first, because a question going unasked is what happened and an event of its own would put a distinction on the trail that means nothing to the person reading it. A build that failed outright (buildDidNotFinish) files under the second, `scheduled publish did not finish`, for the same reason, with a line that names no destination because none was reached (added 2026-09-25, #137). The fourth belongs to the kind where the run did not happen at all: tooLateToRun writes `scheduled deploy turned off`, the same event and the same words a REMOVAL writes, because the same thing happened to the teacher's alarm and the reason is what differs. (This said THREE events until 2026-09-20.) The line carries the course, the section, and which destination stopped — or, for a run that got through, where it WENT. NEVER the question's own text: that comes from a launcher's console, and a line naming a credential prompt would put a teacher's own words on the trail. An earlier draft had the app note the line when a teacher opened the section and mark the record as noted; rewriting the record changed its modification date, which is what the notice shows, so the teacher saw the morning they looked rather than the half six the run stopped at — and a teacher who never opened that section, who is exactly the one who reports that their site did not update, got no line at all. WHO writes it is platform-local and cannot be otherwise: see platformDifferences.",
     "notification": {
-      "note": "Added 2026-09-25 with GitHub issue #212. A publish set for half six runs with nobody looking, and until this the only places it said how it went were the section's band and the sidebar's warning — both inside an app the teacher may not open before class. So when a run finishes, WHATEVER happened, the teacher is sent ONE system notification (a macOS notification; a toast on Windows) that waits for them in the system's own list. Its text is the section's own sentence (`sentences.<kind>`, filled in exactly as the band fills it) with nothing added — no title of the app's own, since the system heads it with the app's name and every sentence already begins with the course and the section, which is also what survives a banner cut short. A SUCCESS is announced too, every time: Russell's decision, 2026-09-25 — the band carries it and `attention` gives it no badge, so without the notification a success reaches nobody who has not opened that section. One notification per SECTION (per section PER WORKING FOLDER since #237 - scheduledDeployCancellation.oneAlarmPerWorkingFolder - so one folder's run never replaces, and its Dismiss never withdraws, another folder's), keyed so that a later run of the same section REPLACES it (a teacher is not handed last week's news beside this week's), and dismissing the section's band WITHDRAWS it, so the two never disagree about whether it is still news. The RUN never asks for permission — a question at half six is a question to nobody — and a run that may not post writes why on the trail instead. The question is put the first time a teacher schedules a publish from the app's own window or its own assistant, never from an outside assistant (which has no window to explain it) and never at launch (most teachers never schedule anything). How a runner plays the cases: with a stand-in for the system's notifications that records what it was asked, keeps what is on show by identifier (a post replaces, a withdraw removes), and never reaches the real system. A platform whose notifications need no prompt (Windows toasts) plays only the rows whose `permission` is `allowed` or `notAllowed`; the `notAskedYet` rows carry `onlyWhereThereIsAPrompt` and exist only where there is a question to ask. `trailSays` is the line after the course/section prefix the trail already puts on every line of this kind.",
+      "note": "Added 2026-09-25 with GitHub issue #212. A publish set for half six runs with nobody looking, and until this the only places it said how it went were the section's band and the sidebar's warning — both inside an app the teacher may not open before class. So when a run finishes, WHATEVER happened, the teacher is sent ONE system notification (a macOS notification; a toast on Windows) that waits for them in the system's own list. Its text is the section's own sentence (`sentences.<kind>`, filled in exactly as the band fills it) with nothing added — no title of the app's own, since the system heads it with the app's name and every sentence already begins with the course and the section, which is also what survives a banner cut short. A SUCCESS is announced too, every time: Russell's decision, 2026-09-25 — the band carries it and `attention` gives it no badge, so without the notification a success reaches nobody who has not opened that section. One notification per SECTION (per section PER WORKING FOLDER since #237 - scheduledDeployCancellation.oneAlarmPerWorkingFolder - so one folder's run never replaces, and its Dismiss never withdraws, another folder's), keyed so that a later run of the same section REPLACES it (a teacher is not handed last week's news beside this week's), and dismissing the section's band WITHDRAWS it, so the two never disagree about whether it is still news. The RUN never asks for permission — a question at half six is a question to nobody — and a run that may not post writes why on the trail instead. The question is put the first time a teacher schedules a publish from the app's own window or its own assistant, never from an outside assistant (which has no window to explain it) and never at launch (most teachers never schedule anything). How a runner plays the cases: with a stand-in for the system's notifications that records what it was asked, keeps what is on show by identifier (a post replaces, a withdraw removes), and never reaches the real system. A platform whose notifications need no prompt (Windows toasts) plays only the rows whose `permission` is `allowed` or `notAllowed`; the `notAskedYet` rows carry `onlyWhereThereIsAPrompt` and exist only where there is a question to ask. `trailSays` is the line after the course/section prefix the trail already puts on every line of this kind. What a CLICK on it does is `onClick` (#306).",
       "announcing": {
         "note": "Play each row once for EVERY key of `kinds` when `record` is `everyKind` (so a kind added later is covered without touching this list), and once with no record when it is `none`. Write the record, set the stand-in's permission, run the announcement, and check: whether a notification was posted, that its text is exactly the kind's sentence, whether permission was asked (never, from a run), and the trail line.",
         "cases": [
@@ -1560,13 +1875,390 @@
             ]
           }
         ]
+      },
+      "onClick": {
+        "note": "Added 2026-09-26 with GitHub #306. What a click on a scheduled publish's notification does. Until then a click only brought Plantoir forward on whatever it last showed. The notification now carries the working folder's path, the course and the section - how is each platform's own (the notification's userInfo on the mac, the toast's launch arguments on Windows); the identifier's folder id is a hash, so the path has to travel beside it. The path is never shown and never written on the trail.",
+        "rule": "Show THAT section, in a window on the working folder the run was for. Use a window already on that folder (the one nearest the front); else let a window with no folder take it; else open a NEW window on it. Never point a window that is on another working folder somewhere else. A window in the middle of something (a dialog in front of it, a course being renamed in place) is brought forward with its selection left alone. A folder that is gone, or a notification that names nothing, only brings the app forward. A section that is no longer in the folder is not guessed at. Clicking changes nothing else: the record and the band stay until the teacher dismisses the band.",
+        "howToRunACase": "Build the windows the case lists, FRONT TO BACK (`folder` is `this` = the notification's working folder, `other` = another working folder, `none` = the folder chooser; `busy` = a dialog is in front of it or a course is being renamed in place; `settled: false` = still finding its folder at launch). `launching: true` = the app has not shown its first window yet. `carries: false` = the notification names no section. `folderExists` and `sectionInFolder` describe the disk; `reachable: false` = a new window may not open on the folder (mac: outside the home folder, #290). Then decide, and check `expect.action` and `expect.window` (an index into `windows`, the one used or brought forward). Then play the same case through the real click-handling with real folders and check the rest: `selectsTheSection`, `opensAWindow`, `otherWindowsUnchanged` (every listed window keeps its folder and its selection), `recordStillThere`, and `trailSays` - the line after the course/section prefix the trail puts on this event (the no-section case has no prefix). A `wait` case is decided again when each window's folder becomes final, and has no line until then.",
+        "cases": [
+          {
+            "name": "a window is already on that folder",
+            "carries": true,
+            "folderExists": true,
+            "sectionInFolder": true,
+            "windows": [
+              {
+                "folder": "this"
+              }
+            ],
+            "expect": {
+              "action": "useWindow",
+              "window": 0,
+              "selectsTheSection": true,
+              "opensAWindow": false
+            },
+            "trailSays": "opened the section from its scheduled publish notification"
+          },
+          {
+            "name": "two windows on that folder: the one nearer the front is used",
+            "carries": true,
+            "folderExists": true,
+            "sectionInFolder": true,
+            "windows": [
+              {
+                "folder": "other"
+              },
+              {
+                "folder": "this"
+              },
+              {
+                "folder": "this"
+              }
+            ],
+            "expect": {
+              "action": "useWindow",
+              "window": 1,
+              "selectsTheSection": true,
+              "opensAWindow": false,
+              "otherWindowsUnchanged": true
+            },
+            "trailSays": "opened the section from its scheduled publish notification",
+            "why": "Windows are listed front to back, the order the teacher sees them in. Not 'the key window': when a notification is clicked Plantoir is not the active app, so no window of it is key."
+          },
+          {
+            "name": "the front window on that folder is busy, the next one is not",
+            "carries": true,
+            "folderExists": true,
+            "sectionInFolder": true,
+            "windows": [
+              {
+                "folder": "this",
+                "busy": true
+              },
+              {
+                "folder": "this"
+              }
+            ],
+            "expect": {
+              "action": "useWindow",
+              "window": 1,
+              "selectsTheSection": true,
+              "opensAWindow": false,
+              "otherWindowsUnchanged": true
+            },
+            "trailSays": "opened the section from its scheduled publish notification"
+          },
+          {
+            "name": "every window on that folder is busy",
+            "carries": true,
+            "folderExists": true,
+            "sectionInFolder": true,
+            "windows": [
+              {
+                "folder": "this",
+                "busy": true
+              }
+            ],
+            "expect": {
+              "action": "bringForwardOnly",
+              "window": 0,
+              "selectsTheSection": false,
+              "opensAWindow": false
+            },
+            "trailSays": "brought the working folder's window forward from a scheduled publish notification, and left it as it was because it was in the middle of something",
+            "why": "A selection change moves the keyboard, and a course being renamed in place commits whatever was typed when it loses focus (#293). A dialog in front of the window is the teacher's work too."
+          },
+          {
+            "name": "only windows on other folders: a new window, the others untouched",
+            "carries": true,
+            "folderExists": true,
+            "sectionInFolder": true,
+            "windows": [
+              {
+                "folder": "other"
+              }
+            ],
+            "expect": {
+              "action": "openNewWindow",
+              "selectsTheSection": true,
+              "opensAWindow": true,
+              "otherWindowsUnchanged": true
+            },
+            "trailSays": "opened the section from its scheduled publish notification, in a new window",
+            "why": "Pointing the teacher's window at another folder would let go of everything it shows (workingFolderSelection) for a click about something else."
+          },
+          {
+            "name": "the only window is choosing a folder",
+            "carries": true,
+            "folderExists": true,
+            "sectionInFolder": true,
+            "windows": [
+              {
+                "folder": "none"
+              }
+            ],
+            "expect": {
+              "action": "adoptInto",
+              "window": 0,
+              "selectsTheSection": true,
+              "opensAWindow": false
+            },
+            "trailSays": "opened the section from its scheduled publish notification, in the window that was choosing a working folder",
+            "why": "A window showing the folder chooser holds nobody's work. This is a launch with nothing to reopen."
+          },
+          {
+            "name": "the window choosing a folder has a dialog up",
+            "carries": true,
+            "folderExists": true,
+            "sectionInFolder": true,
+            "windows": [
+              {
+                "folder": "none",
+                "busy": true
+              }
+            ],
+            "expect": {
+              "action": "openNewWindow",
+              "selectsTheSection": true,
+              "opensAWindow": true,
+              "otherWindowsUnchanged": true
+            },
+            "trailSays": "opened the section from its scheduled publish notification, in a new window",
+            "why": "The new-course wizard is a dialog on a window with no folder yet; the folder is not changed underneath it."
+          },
+          {
+            "name": "no windows open",
+            "carries": true,
+            "folderExists": true,
+            "sectionInFolder": true,
+            "windows": [],
+            "expect": {
+              "action": "openNewWindow",
+              "selectsTheSection": true,
+              "opensAWindow": true
+            },
+            "trailSays": "opened the section from its scheduled publish notification, in a new window"
+          },
+          {
+            "name": "the app is still opening its first window",
+            "appliesOn": [
+              "mac"
+            ],
+            "carries": true,
+            "folderExists": true,
+            "sectionInFolder": true,
+            "launching": true,
+            "windows": [],
+            "expect": {
+              "action": "wait"
+            },
+            "why": "A click that launches Plantoir can arrive before its first window exists. Deciding then would open a second window beside the one launch is about to show."
+          },
+          {
+            "name": "a window is still finding its folder at launch",
+            "appliesOn": [
+              "mac"
+            ],
+            "carries": true,
+            "folderExists": true,
+            "sectionInFolder": true,
+            "windows": [
+              {
+                "folder": "none",
+                "settled": false
+              }
+            ],
+            "expect": {
+              "action": "wait"
+            },
+            "why": "A restored window takes its remembered folder a moment after it appears; deciding before then would put the section's folder in a window about to be given another. Decided again the moment each window's folder is final - an event, never a timer."
+          },
+          {
+            "name": "one window is on that folder, another is still finding its own",
+            "appliesOn": [
+              "mac"
+            ],
+            "carries": true,
+            "folderExists": true,
+            "sectionInFolder": true,
+            "windows": [
+              {
+                "folder": "this"
+              },
+              {
+                "folder": "none",
+                "settled": false
+              }
+            ],
+            "expect": {
+              "action": "wait"
+            },
+            "why": "The window still deciding may be the one in front once it has decided; nothing is chosen until every window has."
+          },
+          {
+            "name": "the working folder is gone",
+            "carries": true,
+            "folderExists": false,
+            "windows": [
+              {
+                "folder": "other"
+              }
+            ],
+            "expect": {
+              "action": "bringForwardOnly",
+              "selectsTheSection": false,
+              "opensAWindow": false,
+              "otherWindowsUnchanged": true
+            },
+            "trailSays": "a scheduled publish notification was clicked, but its working folder is no longer where it was, so Plantoir was only brought forward",
+            "why": "The notification already said how the publish went; a window on a folder that is not there would say nothing more. Nothing is said on screen."
+          },
+          {
+            "name": "the working folder is out of reach, and no window is on it",
+            "appliesOn": [
+              "mac"
+            ],
+            "carries": true,
+            "folderExists": true,
+            "sectionInFolder": true,
+            "reachable": false,
+            "windows": [
+              {
+                "folder": "other"
+              }
+            ],
+            "expect": {
+              "action": "bringForwardOnly",
+              "selectsTheSection": false,
+              "opensAWindow": false,
+              "otherWindowsUnchanged": true
+            },
+            "trailSays": "a scheduled publish notification was clicked, but its working folder could not be opened here, so Plantoir was only brought forward",
+            "why": "A folder outside the home folder is refused by workingFolderReach when chosen or reopened; a new window must not open it by a side door. It is also the likeliest folder to have a failed run to click on (#221). A window already on it is used as it is. The same line is written when a window choosing a folder is refused it, whose picker then says why."
+          },
+          {
+            "name": "the section is no longer in that folder",
+            "carries": true,
+            "folderExists": true,
+            "sectionInFolder": false,
+            "windows": [
+              {
+                "folder": "this"
+              }
+            ],
+            "expect": {
+              "action": "useWindow",
+              "window": 0,
+              "selectsTheSection": false,
+              "opensAWindow": false
+            },
+            "trailSays": "showed the working folder from a scheduled publish notification; that section is no longer in it",
+            "why": "The course was renamed, or the section archived or removed. Not guessed at: selecting the course instead would be a guess (workingFolderSelection)."
+          },
+          {
+            "name": "the section is no longer in that folder, and no window is on it",
+            "carries": true,
+            "folderExists": true,
+            "sectionInFolder": false,
+            "windows": [
+              {
+                "folder": "other"
+              }
+            ],
+            "expect": {
+              "action": "openNewWindow",
+              "selectsTheSection": false,
+              "opensAWindow": true,
+              "otherWindowsUnchanged": true
+            },
+            "trailSays": "showed the working folder from a scheduled publish notification; that section is no longer in it"
+          },
+          {
+            "name": "the notification names no section",
+            "carries": false,
+            "windows": [
+              {
+                "folder": "this"
+              }
+            ],
+            "expect": {
+              "action": "bringForwardOnly",
+              "selectsTheSection": false,
+              "opensAWindow": false
+            },
+            "trailSays": "a scheduled publish notification was clicked, but it did not say which section it was about",
+            "why": "Posted by a build from before #306 - only ever a development build, since #212 had not shipped. The only line with no course and section in front of it."
+          },
+          {
+            "name": "clicking leaves the record and the band",
+            "carries": true,
+            "folderExists": true,
+            "sectionInFolder": true,
+            "windows": [
+              {
+                "folder": "this"
+              }
+            ],
+            "expect": {
+              "action": "useWindow",
+              "window": 0,
+              "selectsTheSection": true,
+              "opensAWindow": false,
+              "recordStillThere": true
+            },
+            "trailSays": "opened the section from its scheduled publish notification",
+            "why": "Dismiss is the teacher's act on the band; the click is how they get there."
+          }
+        ],
+        "rejected": [
+          {
+            "instead": "Point the window in front at the notification's working folder.",
+            "why": "It lets go of everything that window shows (workingFolderSelection) - a preview being watched, a question waiting for an answer - for a click the teacher made about something else. A window on another working folder is never pointed elsewhere."
+          },
+          {
+            "instead": "Always open a new window.",
+            "why": "With the folder already open it makes a second window on one folder for no reason - the shape #265 had to make safe, not one to manufacture."
+          },
+          {
+            "instead": "Reuse the assistant's way of showing a section (revealSectionOnScreen on the mac).",
+            "why": "It waits for the window and for the section by polling on a timer. The router answers at the event where a window's folder is final instead."
+          },
+          {
+            "instead": "Wait for the launch windows with a fixed delay.",
+            "why": "A delay long enough today is too short on a slower machine. Each window's folder becoming final is already an event (#311's one decision per window); the click is decided there."
+          },
+          {
+            "instead": "Say something on screen when the working folder is gone.",
+            "why": "The notification already said how the publish went, and a gone folder at launch is already said by reopeningTheLastWorkingFolder's own sentence. A second sentence for the same fact is a second thing to keep in step."
+          },
+          {
+            "instead": "Clear the record, or withdraw the notification, on the click.",
+            "why": "Dismiss is the teacher's act on the band, and the record is what the band and the sidebar's warning read. The system taking the clicked notification out of its list is the system's own doing."
+          },
+          {
+            "instead": "Buttons on the notification ('Open section', 'Dismiss').",
+            "why": "They need a category registered by the run, hide behind Options on a banner, and a Dismiss there would clear a record the teacher has not read in the app. The plain click is what teachers do."
+          },
+          {
+            "instead": "A link the notification opens (a plantoir:// address).",
+            "why": "A notification opens no address on its own without the app's code anyway, and an address scheme is a door any web page can knock on."
+          },
+          {
+            "instead": "Select the course when the section is gone, or recover the section from the notification's identifier.",
+            "why": "The first is a guess. The second cannot work: the identifier ends with the working folder's id, which is a hash and names no path."
+          },
+          {
+            "instead": "A new trail event for the click.",
+            "why": "It is the same notification and the same story; `scheduled publish notification` carries it, and a second name would split one story across two events."
+          }
+        ]
       }
     },
     "platformDifferences": {
       "asOf": "2026-09-25",
       "windows": "Records every outcome of a run that HAPPENED \u2014 neededAnAnswer, buildNeededAnAnswer, didNotFinish and succeeded \u2014 and lets the teacher dismiss it, both since 2026-09-09 (GitHub issue #130); ScheduledPublishOutcome, plus the readout in SectionDetailView. It has NOT got the three kinds added on the mac since: tooLateToRun (2026-09-20, owed only if their task runs a missed start late \u2014 see that kind), courseWasBusy (2026-09-25, #156, owed once their scheduled publish reads leases) and buildDidNotFinish (2026-09-25, #137). A build that fails outright there is recorded as didNotFinish with every configured destination joined, which is the shape #137 replaced.",
       "mac": "Every kind above, and dismissible. Russell decided on 2026-09-09 that a teacher should learn their overnight publish did not happen whatever the reason, because the SILENCE is the complaint rather than the cause, and that landed on both platforms the same day. buildDidNotFinish landed here 2026-09-25 (#137). A section scheduled BEFORE that keeps the wrapper it was given, so its one remaining run still records a failed build as didNotFinish and shows the old sentence once; that was accepted, as it was for #132.",
-      "owed": "By Windows: buildDidNotFinish, and whichKind.cases run against its own wrapper (#137); tooLateToRun and courseWasBusy on the conditions their kinds give. Nothing is owed by the mac. ONE difference remains and it is deliberate, because it cannot be otherwise: WHO writes the trail line. The mac's launchd agent runs Plantoir, so the RUN writes it as the trail key describes, while Windows' Task Scheduler runs plain PowerShell with no app process alive \u2014 so that side sweeps every record when the app next opens, dating each line from the record rather than from the reading. Writing it from the wrapper's own shell was REJECTED there: it would put the trail's line format in a second home, in generated PowerShell, where nothing tests it and the redaction rules do not reach. The property the contract actually asks for is kept either way \u2014 a teacher who never opens the failed section still gets the line, and that teacher is precisely the one who writes in to say their site did not update. ALSO owed by Windows since #212 (2026-09-25): the `notification` rules — every kind announced with its own sentence, one per section replaced by the next, withdrawn on dismissal, the run never asking, and `scheduled publish notification` on the trail. The rule is theirs to MATCH; the delivery is theirs to design, because their run is PowerShell under Task Scheduler with no app process, so a toast has to be attributed to Plantoir's own application identity, and a toast needs no permission prompt (so only the `allowed` and `notAllowed` rows apply there). Their trail lines for it are written the way their other scheduled-publish lines are, by the sweep when the app next opens."
+      "owed": "By Windows: buildDidNotFinish, and whichKind.cases run against its own wrapper (#137); tooLateToRun and courseWasBusy on the conditions their kinds give. Nothing is owed by the mac. ONE difference remains and it is deliberate, because it cannot be otherwise: WHO writes the trail line. The mac's launchd agent runs Plantoir, so the RUN writes it as the trail key describes, while Windows' Task Scheduler runs plain PowerShell with no app process alive \u2014 so that side sweeps every record when the app next opens, dating each line from the record rather than from the reading. Writing it from the wrapper's own shell was REJECTED there: it would put the trail's line format in a second home, in generated PowerShell, where nothing tests it and the redaction rules do not reach. The property the contract actually asks for is kept either way \u2014 a teacher who never opens the failed section still gets the line, and that teacher is precisely the one who writes in to say their site did not update. ALSO owed by Windows since #212 (2026-09-25): the `notification` rules — every kind announced with its own sentence, one per section replaced by the next, withdrawn on dismissal, the run never asking, and `scheduled publish notification` on the trail. The rule is theirs to MATCH; the delivery is theirs to design, because their run is PowerShell under Task Scheduler with no app process, so a toast has to be attributed to Plantoir's own application identity, and a toast needs no permission prompt (so only the `allowed` and `notAllowed` rows apply there). Their trail lines for it are written the way their other scheduled-publish lines are, by the sweep when the app next opens. ALSO owed by Windows since #306 (2026-09-26): `notification.onClick` - a click on the toast shows THAT section by the same rule, every case but the ones marked `appliesOn: [\"mac\"]`. Prerequisite: the toast itself (the #212 obligation above). The toast's launch arguments carry the working folder's path, the course and the section; a click on a toast of an unpackaged app can start a SECOND process, which must hand the arguments to the first."
     },
     "whereTheRecordLives": "Platform-local and deliberately NOT shared: %LOCALAPPDATA%\\Plantoir\\scheduled\\unanswered on Windows, ~/Library/Application Support/Plantoir/scheduled/stopped on the mac. What is shared is the BEHAVIOUR above; a path is not a rule. The mac's folder says `stopped` rather than `unanswered` because that side records more than unanswered questions; Windows records more than that too and KEPT the old name deliberately, because a task scheduled before 2026-09-09 points at a wrapper script already on disk that writes the old path, and nothing rewrites that wrapper until the section is scheduled again — so renaming buys a better name and costs a second directory read for ever, on pain of the first overnight run after an update going silent. The record says what it is on its own first line."
   },
@@ -3716,7 +4408,7 @@
             "oldName": "All Tasks",
             "newName": "Q&A",
             "expect": "[q](Q&A/Quiz.md)",
-            "why": "The OTHER branch of the same rule, and the only case that reaches it. A segment that ARRIVED percent-encoded goes back percent-encoded even when the new name needs nothing — and it goes back through the SAME encoder, so an ampersand is left as it stands here too. Every other case that escapes at all is triggered by a space or a bracket, and the two that escape nothing (`Assignments`, `Café`) reach no encoder — so a `Uri.EscapeDataString` left behind in this branch alone would spell `Q%26A` and still pass all eleven of them. Proposed from Windows 2026-09-07 while replacing that encoder; both apps already behave this way — `spelled(_:likeThe:in:)` calls `percentEncoded` in both branches — so it should be green on the mac the day it is read."
+            "why": "The OTHER branch of the same rule, and the only case that reaches it. A segment that ARRIVED percent-encoded goes back percent-encoded even when the new name needs nothing — and it goes back through the SAME encoder, so an ampersand is left as it stands here too. Every other case that escapes at all is triggered by a space or a bracket, and the two that escape nothing (`Assignments`, `Café`) reach no encoder — so a `Uri.EscapeDataString` left behind in this branch alone would spell `Q%26A` and still pass every other case in this list. Proposed from Windows 2026-09-07 while replacing that encoder; both apps already behave this way — `spelled(_:likeThe:in:)` calls `percentEncoded` in both branches — so it should be green on the mac the day it is read."
           },
           {
             "given": "[q](Tasks/Quiz.md)",
@@ -3724,6 +4416,13 @@
             "newName": "Top 10%",
             "expect": "[q](Top%2010%25/Quiz.md)",
             "why": "Once escaping runs — here because of the space — a `%` is encoded with everything else outside `leaveUnescaped`. Half-escaping it to `Top%20100%` would be the failure this prevents. The `%` is NOT what triggers escaping; see needsEscapingInAMarkdownLink."
+          },
+          {
+            "given": "| [[Tasks/Quiz 1\\|quiz]] |",
+            "oldName": "Tasks",
+            "newName": "All Tasks",
+            "expect": "| [[All Tasks/Quiz 1\\|quiz]] |",
+            "why": "A GUARD, green before and after #294 on both apps: a folder rewrite changes only the folder at the front of the name, so the backslash of a table's escaped alias pipe was never at risk here. It is here because the pattern this rewriter finds links with changed in #294 (shared-rules.json -> readingALink), and a rewrite that dropped the backslash would split the table cell in two."
           }
         ]
       },
@@ -10010,6 +10709,61 @@
         }
       },
       {
+        "name": "a picture and a link written in a table, with escaped pipes, are carried",
+        "why": "Inside a table Obsidian escapes the alias pipe, so the picture reads ![[one.png\\|300]] and the link [[Ohm's Law\\|Ohm]]. Both name what is before the backslash (#294; readingALink): the picture is carried, the linked page comes along, and nothing is reported as leading nowhere. Before #294 the mac read both names with a trailing backslash, so neither was found.",
+        "source": {
+          "folder": "ICS4U-2025",
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [
+            {
+              "path": "Concepts/Circuits.md",
+              "text": "| Picture | Read |\n|---|---|\n| ![[one.png\\|300]] | [[Ohm's Law\\|Ohm]] |\n"
+            },
+            {
+              "path": "Concepts/Ohm's Law.md",
+              "text": "Body\n"
+            }
+          ],
+          "media": [
+            {
+              "name": "one.png",
+              "bytes": "aaa"
+            }
+          ]
+        },
+        "destination": {
+          "folder": "ICS4U",
+          "sections": [
+            1
+          ],
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [],
+          "media": []
+        },
+        "copy": {
+          "page": "Concepts/Circuits.md",
+          "intoFolder": "Concepts",
+          "alsoCopiesLinkedPages": "yes"
+        },
+        "expect": {
+          "pages": [
+            "Concepts/Circuits.md",
+            "Concepts/Ohm's Law.md"
+          ],
+          "mediaCreated": [
+            "one.png"
+          ],
+          "mediaReused": [],
+          "mediaRenamed": {},
+          "skipped": [],
+          "linksLeadingNowhere": []
+        }
+      },
+      {
         "name": "a linked page lands in the folder CHOSEN when the destination has no folder of its own name",
         "why": "Plantoir never creates a top-level folder.",
         "source": {
@@ -10261,6 +11015,447 @@
       "expectNoLineStartingWith": ["PUBLISHED_FOLDER=", "✅ Published"],
       "why": "Before: the copy's own exit status (23, 'finished in part') went into a pipe whose status was thrown away, so the launcher said Published and named the folder. A partial copy is a failure deliberately: the page left behind may be one the teacher took down. Not measured: network shares and iCloud Drive, where a copy can fail to set a file's attributes and report the same 'finished in part' - see documentation/07-deployment.md."
     }
+  },
+  "reopeningTheLastWorkingFolder": {
+    "note": "Issue #311, found in the #204 rehearsal in a fresh account: \"You should NOT have to pick your working folder every time Plantoir opens.\" The folder is the teacher's library, not a document window — Photos and Music reopen their library whatever the window setting says. Merged with #290 into ONE restore route (director's ruling, 2026-09-26): a remembered folder the website builder cannot reach is one more reason on this list, not a second route.",
+    "rule": "When Plantoir opens, the first window opens on the last working folder the teacher worked in. That folder is not forgotten because windows are set not to come back, nor because the last window was closed first. A window opened with no other window open reopens it too. When it cannot be reopened, the window shows the folder picker with ONE sentence naming the folder and why, and the folder stays remembered until another is chosen or reopened. Whether every window comes back is a separate question, answered by the platform's own switch (mac: System Settings ▸ Desktop & Dock ▸ \"Close windows when quitting an application\"; Windows: RestoreWindowsOnLaunch).",
+    "why": "Measured 2026-09-26: the mac already restored each window's folder, but only when macOS keeps windows (NSQuitAlwaysKeepsWindows, GUI row 62). The system default is the opposite, so every fresh account — and every relaunch after an update — met the picker; and closing the last window before quitting emptied the list (row 84). Russell's own account keeps windows (NSQuitAlwaysKeepsWindows = 1), which is why it never showed there. Windows already had this shape: RestoreWindowsOnLaunch governs the window set, WorkspacePath always comes back.",
+    "whichFolderIsLast": "The folder of the window most recently in front — not the one most recently chosen. Written when a folder is chosen or reopened and whenever a window with a folder comes to the front. A window with no folder never writes it.",
+    "howItIsFound": "Mac: a plain bookmark first, then the path, so a folder renamed or moved on the same disk reopens where it now is. A bookmark that leads into a Trash is REFUSED (measured: it resolves to ~/.Trash/<name>, where the folder still exists) unless the original place holds a folder again. Windows: the path; a moved folder reads as gone, which is honest.",
+    "oneDecisionPerWindow": "Each window decides its folder ONCE — claimed, reopened, refused, inherited or left to the picker — and nothing later decides again. A second window that appears at launch without a remembered folder of its own (macOS brought back a window that was a picker, or a log-in restored windows the setting said not to keep) shows the picker; it never inherits the first window's folder.",
+    "neverTouchedBy": "The MCP server, a scheduled publish run, writing the contracts, the test suites (hosted and UI), and any model no window shows (the assistant's own). They neither read the memory nor write it, and never write the trail lines below.",
+    "wording": {
+      "gone": "“{folder}”, the working folder you had open last time, can’t be found — if you moved it, choose it again from its new place.",
+      "inTrash": "“{folder}”, the working folder you had open last time, is in the Trash — put it back and choose it again, or choose another folder.",
+      "driveNotConnected": "“{folder}”, the working folder you had open last time, is on a drive that isn’t connected — connect it and open Plantoir again, or choose another folder.",
+      "unreadable": "“{folder}”, the working folder you had open last time, can’t be opened because you don’t have permission to read it — check who is allowed to open it, then choose it again.",
+      "privacyDenied": "Plantoir isn’t allowed to open “{folder}”, the working folder you had open last time — turn Plantoir on in System Settings ▸ Privacy & Security ▸ Files & Folders, or choose the folder again.",
+      "outsideHome": "The working folder Plantoir had open last time, “{folder}”, is not inside your home folder, so Plantoir cannot build websites from it. Keep your working folder inside your home folder — on your Desktop or in Documents, for example — and not on an external drive or in a shared location, then choose it again.",
+      "coursesOutsideHome": "The working folder Plantoir had open last time, “{folder}”, keeps its courses outside your home folder, so Plantoir cannot build websites from it. Keep your working folder and the courses in it inside your home folder — on your Desktop or in Documents, for example — and not on an external drive or in a shared location, then choose it again.",
+      "unreadableWhy": "Two reasons, told apart by the error the disk gives rather than by whether the folder seems to exist (a denied folder must never be called gone): the folder's own permissions (EACCES on the mac — measured, chmod 000 on the folder and on a parent) say so in words true on both platforms (no Finder, no pane, since no setting would help and Windows shares the sentence); macOS's privacy settings (EPERM on the mac — ASSUMED from Apple's documented 'Operation not permitted', NOT measured here: the permission probe could not run on 2026-09-26) point at the pane, whose name was read from System Settings' own strings on macOS 26.6 (\"Files & Folders\" under \"Privacy & Security\"), not written from memory. Whether choosing a denied Desktop folder again in the picker lasts past the next launch was NOT measured (2026-09-26: the Mac's screen was locked, so the permission question could not be answered); it is on Russell's list. Any other error from the disk — not only 'no such file', but also a hung network share's time-out or an input/output error — reads as gone; that is broader than it sounds and is said so in documentation/09-mac-app.md. On Windows an ACL denial reads as the folder not existing unless it probes differently — say unreadable only when that can be told apart."
+    },
+    "launchCases": [
+      {
+        "name": "one window left open, windows do not come back",
+        "windowsComeBack": false,
+        "windowsLeftOpen": [
+          "A"
+        ],
+        "lastWorkedIn": "A",
+        "windowsMacOSOpens": 1,
+        "expectWindows": [
+          "A"
+        ],
+        "why": "The rehearsal's report. The system default must still bring the folder back."
+      },
+      {
+        "name": "one window left open, windows come back",
+        "windowsComeBack": true,
+        "windowsLeftOpen": [
+          "A"
+        ],
+        "lastWorkedIn": "A",
+        "windowsMacOSOpens": 1,
+        "expectWindows": [
+          "A"
+        ],
+        "why": "What already worked, pinned."
+      },
+      {
+        "name": "two windows, windows do not come back",
+        "windowsComeBack": false,
+        "windowsLeftOpen": [
+          "A",
+          "B"
+        ],
+        "lastWorkedIn": "B",
+        "windowsMacOSOpens": 1,
+        "expectWindows": [
+          "B"
+        ],
+        "why": "ONE window, on the folder last in front (Russell's Q1, recommended and accepted): the setting governs the window set, the folder still comes back."
+      },
+      {
+        "name": "two windows, windows come back",
+        "windowsComeBack": true,
+        "windowsLeftOpen": [
+          "A",
+          "B"
+        ],
+        "lastWorkedIn": "B",
+        "windowsMacOSOpens": 2,
+        "expectWindows": [
+          "A",
+          "B"
+        ],
+        "why": "Each window on its own folder, as before."
+      },
+      {
+        "name": "the teacher closed the last window, then quit",
+        "windowsComeBack": true,
+        "windowsLeftOpen": [],
+        "lastWorkedIn": "A",
+        "windowsMacOSOpens": 1,
+        "expectWindows": [
+          "A"
+        ],
+        "why": "Closing the last window empties the window list, not the last folder (row 84 reversed)."
+      },
+      {
+        "name": "nothing ever chosen",
+        "windowsComeBack": false,
+        "windowsLeftOpen": [],
+        "lastWorkedIn": null,
+        "windowsMacOSOpens": 1,
+        "expectWindows": [
+          null
+        ],
+        "why": "A first launch: the picker, with no sentence."
+      },
+      {
+        "name": "windows do not come back, but a log-in brought two back",
+        "windowsComeBack": false,
+        "windowsLeftOpen": [
+          "A",
+          "B"
+        ],
+        "lastWorkedIn": "B",
+        "windowsMacOSOpens": 2,
+        "expectWindows": [
+          "B",
+          null
+        ],
+        "appliesOn": [
+          "mac"
+        ],
+        "why": "#311 review B2: \"Reopen windows when logging back in\" may restore windows whatever the Desktop & Dock setting says (unmeasured; on Russell's list). The first window takes the last folder; the second shows the picker rather than becoming a second window on B. Mac-only: Windows restores its own windows by its own switch."
+      }
+    ],
+    "folderCases": [
+      {
+        "name": "the folder is there",
+        "make": "there",
+        "expect": "reopen"
+      },
+      {
+        "name": "the folder was deleted",
+        "make": "deleted",
+        "expect": "gone"
+      },
+      {
+        "name": "the folder is in the Trash",
+        "make": "inTrash",
+        "trashIs": "a real folder named .Trash inside the throwaway home — the rule that ships (any folder named .Trash or .Trashes along the path), not an injected location",
+        "expect": "inTrash",
+        "appliesOn": [
+          "mac"
+        ],
+        "why": "A path cannot reach a Windows Recycle Bin entry; there it reads as gone."
+      },
+      {
+        "name": "the folder was renamed on the same disk",
+        "make": "renamed",
+        "expect": "reopen",
+        "expectFoundAt": "renamed",
+        "appliesOn": [
+          "mac"
+        ],
+        "why": "The bookmark follows a rename. No bookmark on Windows: there it reads as gone, which is honest."
+      },
+      {
+        "name": "the bookmark leads into the Trash but the original place has a folder again",
+        "make": "trashedButOriginalBack",
+        "expect": "reopen",
+        "expectFoundAt": "original",
+        "appliesOn": [
+          "mac"
+        ],
+        "why": "Put back from a backup or a copy: that is the folder the teacher means (#311 review, minor)."
+      },
+      {
+        "name": "the folder is on a drive that is not connected",
+        "make": "driveNotConnected",
+        "expect": "driveNotConnected",
+        "why": "Asked from the drive's name alone, before anything under it is touched, so an absent network share never holds launch. Windows reads this as a missing drive root."
+      },
+      {
+        "name": "the folder cannot be read",
+        "make": "unreadable",
+        "expect": "unreadable",
+        "why": "Its own permissions (chmod 000 in the test). The sentence says permissions and names no System Settings pane, because none would help."
+      },
+      {
+        "name": "macOS's privacy settings keep Plantoir out",
+        "make": "privacyDenied",
+        "expect": "privacyDenied",
+        "appliesOn": ["mac"],
+        "why": "EPERM from the disk. A test cannot make macOS deny, so this case is played through the pure decision with the denial the disk reports (howToRunACase). Windows has no such layer."
+      },
+      {
+        "name": "the folder is outside the home folder AND cannot be read",
+        "make": "outsideHomeAndUnreadable",
+        "expect": "outsideHome",
+        "appliesOn": ["mac"],
+        "why": "Out of reach is said first (#311 implementation review): fixing a permission only to be refused at the next launch is going round twice. The reach needs only the folder's name from the disk, which a denied folder still gives."
+      },
+      {
+        "name": "the folder is outside the home folder",
+        "make": "outsideHome",
+        "expect": "outsideHome",
+        "appliesOn": [
+          "mac"
+        ],
+        "why": "#290 folded in: the website builder on a Mac sees only the home folder. A bookmark can carry a folder out of it (moved to /Users/Shared)."
+      },
+      {
+        "name": "the folder's courses are a link outside the home folder",
+        "make": "coursesLinkedOutside",
+        "expect": "coursesOutsideHome",
+        "appliesOn": [
+          "mac"
+        ]
+      },
+      {
+        "name": "the folder was emptied out",
+        "make": "emptied",
+        "expect": "reopen",
+        "why": "Reopens, and the window offers to set it up (workspaceCanBeInitialized), as for any empty folder."
+      },
+      {
+        "name": "the folder is no longer a working folder",
+        "make": "notAWorkingFolder",
+        "expect": "reopen",
+        "why": "Reopens, and the picker's existing guidance for a folder it does not recognise follows — chosen, not accidental (#311 review, minor). The trail says reopened, which is true."
+      }
+    ],
+    "memoryCases": [
+      {
+        "name": "a folder that could not be reopened stays remembered",
+        "expect": "stillRemembered",
+        "why": "Forgetting it would make a teacher who plugs the drive back in pick it again — the complaint itself."
+      },
+      {
+        "name": "choosing another folder replaces it and takes the sentence away",
+        "expect": "replacedAndSentenceGone"
+      },
+      {
+        "name": "a model no window shows never writes it",
+        "expect": "notWritten",
+        "why": "The assistant and the MCP server adopt folders on models of their own."
+      }
+    ],
+    "rejected": [
+      {
+        "instead": "A security-scoped bookmark, as the issue asked.",
+        "why": "The app is not sandboxed. Measured 2026-09-26 in a folder macOS does not protect: one is created, 'starts', and grants nothing a plain bookmark lacks. Whether it would carry a grant for a Desktop or Documents folder the teacher denied could not be measured that day (the screen was locked) — Russell's list; if it does, it is added beside the plain bookmark rather than instead of it."
+      },
+      {
+        "instead": "The path only.",
+        "why": "Loses a renamed folder, which is the case the issue names."
+      },
+      {
+        "instead": "Following the bookmark wherever it leads.",
+        "why": "Measured: it leads into ~/.Trash. Reopening, building and syncing out of a trashed folder is the success that is wrong."
+      },
+      {
+        "instead": "Honouring \"Close windows when quitting an application\" for the folder (row 62 as written).",
+        "why": "It is the cause of the report, and the default in every fresh account."
+      },
+      {
+        "instead": "Replaying EVERY remembered window even when macOS will not.",
+        "why": "Overrides the setting for the window set too, needs Plantoir to open windows itself at launch (duplicates when macOS is also restoring), and goes further than Windows."
+      },
+      {
+        "instead": "A Plantoir preference \"Reopen last folder\".",
+        "why": "Russell's words are unconditional, and File ▸ Open Working Folder… is one keystroke away."
+      },
+      {
+        "instead": "Letting a second launch-time window inherit the first one's folder.",
+        "why": "Two windows on one folder nobody asked for (#311 review B1/B2)."
+      },
+      {
+        "instead": "Forgetting a folder that could not be reopened.",
+        "why": "A reconnected drive would then need picking again."
+      },
+      {
+        "instead": "Writing \"working folder opened\" for a reopen, as Windows did.",
+        "why": "The trail could not then tell the teacher's choice from the app's."
+      },
+      {
+        "instead": "Preferring the remembered PATH when a different folder now sits there and the bookmark found the original elsewhere.",
+        "why": "The bookmark follows the folder the teacher worked in; a different folder that has since appeared at the old path is not it. Chosen, and diagnosable: the trail line says \"found where it had been moved, from …\". The one exception is the Trash, where the bookmark is refused and a folder put back at the old path is taken."
+      },
+      {
+        "instead": "Showing the path bar under the sentence for every reason.",
+        "why": "For a gone, trashed or unplugged folder its crumbs would be wrong or dead. Shown only for a folder that is there (out of the builder's reach)."
+      }
+    ],
+    "howToRunACase": "launchCases: play through the launch rule window by window (mac: WindowStartRule.playLaunch) with the letters as folder names; expectWindows lists each window's folder in order, null for the picker. windowsMacOSOpens counts every window shown, restored ones included. A restored window goes through the same rule, which must make it WAIT for its own remembered folder; which entry it then takes (by frame) is not what these cases prove — on the mac that is WindowRestorationScenarioTests. folderCases: build a real throwaway folder shaped by `make` and ask the platform's reopen decision; `expect` is 'reopen' or a wording key. The Trash is a real folder named .Trash inside the throwaway home (never the account's own Trash); 'privacyDenied' is the pure decision given the denial the disk reports; 'driveNotConnected' is /Volumes/<a fresh uuid>/…; 'unreadable' is chmod 000 (restored afterwards); 'outsideHome' needs the home folder pointed at a throwaway 'home/' beside a throwaway 'outside/'."
+  },
+  "workingFolderReach": {
+    "note": "Issue #290, folded into #311's restore route. The website builder on a Mac runs in a virtual machine that is handed the home folder and nothing else, so a working folder outside it cannot produce a website. Since #221 the launchers refuse one at the first preview; since #290 the app refuses it when a window takes it on — chosen in the picker, or reopened (reopeningTheLastWorkingFolder, reasons outsideHome and coursesOutsideHome) — before anything is written into it.",
+    "appliesOn": [
+      "mac"
+    ],
+    "appliesOnWhy": "PERMANENT: Windows builds natively (no WSL2, no Docker since 2026-08-20), so any folder it can read it can build. Nothing to mirror. If Windows ever builds in a virtual machine or container again, drop this appliesOn rather than adding a windows twin — and copy the rule as 'inside what the VM mounts, by the disk's own spelling', not 'not on another drive letter'.",
+    "rule": "A folder is inside when its canonical path (FolderIdentity.canonicalPath, the disk's own spelling, which is what /bin/pwd -P gives the launchers) equals the canonical home or lies under it, compared name by name as bytes. Applied to the working folder, and to <folder>/courses when that is a LINK (read with the link's own attributes, so a link to an unplugged drive is caught). Refused when chosen in the picker and when reopened; never for the MCP server's or the assistant's own models, and never for the SOURCE of Import Courses for Reference, which is copied in. A hard refusal: there is no 'use it anyway'.",
+    "why": "Measured 2026-09-26: /Volumes/Macintosh HD is a link to /, so /Volumes/Macintosh HD/Users/<me>/Desktop is the teacher's own Desktop — a 'refuse anything under /Volumes' rule would refuse it. Case and the /System/Volumes/Data firmlink fold to /Users/… through F_GETPATH. iCloud Drive (~/Library/Mobile Documents) and ~/Library/CloudStorage/* are inside. External drives, /Users/Shared and /private/tmp are outside (the last two measured refused by the launcher in #221). String.hasPrefix is grapheme-based and answered false for a name beginning with a combining mark, which is why the comparison is by bytes. Unlike a cloud-synced folder, the verdict is exact and the folder is guaranteed not to build on the builder Plantoir installs, so a 'use it anyway' would lead to a certain refusal minutes later. Known false refusal, accepted: a Mac whose Docker engine could mount the drive (Docker Desktop, OrbStack, Colima with extra mounts).",
+    "whereItIsShown": "On the picker, when the window shows the picker — including the four picker screens that already have a folder half-chosen (empty folder to set up, unrecognised folder, a folder with a problem, a synced folder awaiting a decision), where the half-chosen folder and its own offer stay below the refusal. As an alert, when the window goes on showing its own folder (File ▸ Choose Working Folder…), whose folder stays exactly as it was; its buttons are cloudSyncedFolders' 'Choose a Different Folder…' (named, not repeated) and alertOKButton.",
+    "wording": {
+      "headline": "Plantoir cannot build websites from “{folderName}”, because it is not inside your home folder.",
+      "coursesHeadline": "Plantoir cannot build websites from “{folderName}”, because the courses in it are not inside your home folder.",
+      "whatToDo": "Keep your working folder inside your home folder — on your Desktop or in Documents, for example — and not on an external drive or in a shared location, then choose it again.",
+      "whatToDoForCourses": "Keep your working folder and the courses in it inside your home folder — on your Desktop or in Documents, for example — and not on an external drive or in a shared location, then choose it again.",
+      "alertOKButton": "OK",
+      "chooseDifferentFolderButtonIs": "CloudSyncWording.chooseDifferentFolderButton — named, not repeated",
+      "sharedClauseWithFailureExplanations": "inside your home folder — on your Desktop or in Documents, for example — and not on an external drive or in a shared location"
+    },
+    "pathCases": [
+      {
+        "name": "a folder on the Desktop",
+        "home": "/Users/ann",
+        "folder": "/Users/ann/Desktop/Notes",
+        "expect": "inside"
+      },
+      {
+        "name": "the home folder itself",
+        "home": "/Users/ann",
+        "folder": "/Users/ann",
+        "expect": "inside"
+      },
+      {
+        "name": "iCloud Drive",
+        "home": "/Users/ann",
+        "folder": "/Users/ann/Library/Mobile Documents/com~apple~CloudDocs/Notes",
+        "expect": "inside"
+      },
+      {
+        "name": "Dropbox",
+        "home": "/Users/ann",
+        "folder": "/Users/ann/Library/CloudStorage/Dropbox/Notes",
+        "expect": "inside"
+      },
+      {
+        "name": "an external drive",
+        "home": "/Users/ann",
+        "folder": "/Volumes/School Drive/Notes",
+        "expect": "refused"
+      },
+      {
+        "name": "the shared folder",
+        "home": "/Users/ann",
+        "folder": "/Users/Shared/Notes",
+        "expect": "refused"
+      },
+      {
+        "name": "a temporary folder",
+        "home": "/Users/ann",
+        "folder": "/private/tmp/Notes",
+        "expect": "refused"
+      },
+      {
+        "name": "a neighbour whose name starts the same",
+        "home": "/Users/ann",
+        "folder": "/Users/ann2/Notes",
+        "expect": "refused"
+      },
+      {
+        "name": "a home with a trailing slash",
+        "home": "/Users/ann/",
+        "folder": "/Users/ann/Notes",
+        "expect": "inside"
+      },
+      {
+        "name": "a folder whose name begins with a combining mark",
+        "home": "/Users/ann",
+        "folder": "/Users/ann/́Notes",
+        "expect": "inside",
+        "why": "String.hasPrefix answers false here (measured): the mark fuses with the slash. Compared as bytes it is inside."
+      }
+    ],
+    "diskCases": [
+      {
+        "name": "a folder that is simply inside",
+        "make": "plainInside",
+        "expect": "inside"
+      },
+      {
+        "name": "a folder that is simply outside",
+        "make": "plainOutside",
+        "expect": "refused"
+      },
+      {
+        "name": "a link outside that leads into home",
+        "make": "linkOutsideToInside",
+        "expect": "inside"
+      },
+      {
+        "name": "a link in home that leads outside",
+        "make": "linkInsideToOutside",
+        "expect": "refused"
+      },
+      {
+        "name": "home spelled in the wrong case",
+        "make": "wrongCaseSpelling",
+        "expect": "inside"
+      },
+      {
+        "name": "courses is a link to outside",
+        "make": "coursesLinkedOutside",
+        "expect": "refusedForCourses"
+      },
+      {
+        "name": "courses is a relative link that climbs out to a drive that is not connected",
+        "make": "coursesRelativeLinkClimbingOut",
+        "expect": "refusedForCourses",
+        "why": "The disk cannot be asked about a dangling target, so its text is compared — with the '..' names taken away first, or they would compare as folders inside the home folder."
+      },
+      {
+        "name": "courses is a link to a drive that is not connected",
+        "make": "coursesLinkDangling",
+        "expect": "refusedForCourses",
+        "why": "fileExists follows links and would call this absent; the link's own attributes catch it."
+      }
+    ],
+    "notCaught": "A link INSIDE courses (courses/ICS3U → a drive) mounts, then shows an empty course to the builder; it is not caught here, and the launcher's refusal does not see it either. A home folder that is itself a link, or a network home, is not measured: the rule may call it inside and the launcher still refuse — a missed refusal, with #221 as the backstop, not a false one.",
+    "rejected": [
+      {
+        "instead": "\"Use This Folder Anyway\", as for synced folders.",
+        "why": "The cloud rule never refuses because detection is uncertain and the folder still works. Here the detection is exact and the folder is guaranteed not to build."
+      },
+      {
+        "instead": "Refuse any path under /Volumes.",
+        "why": "Measured wrong: /Volumes/Macintosh HD is a link to /. It would also miss /Users/Shared and /private/tmp."
+      },
+      {
+        "instead": "Compare raw paths, realpath or resolvingSymlinksInPath.",
+        "why": "#189's reasons: case, firmlink and /private spellings would disagree with what the launcher's /bin/pwd -P mounts."
+      },
+      {
+        "instead": "Check in adoptRestoredPath, every route.",
+        "why": "Shared by the MCP server and the assistant, which are not a teacher choosing; their building tools already get #221's explanation. A source-scan test (AdoptRestoredPathCallersTests) holds its callers to a named list instead, so a window route cannot slip back onto it."
+      },
+      {
+        "instead": "Check at course creation as well.",
+        "why": "It happens only inside a folder already adopted, so the check would find nothing."
+      },
+      {
+        "instead": "Refuse the SOURCE of Import Courses for Reference.",
+        "why": "It is copied into the working folder, so an external source is harmless."
+      },
+      {
+        "instead": "Ask the engine what it mounts at pick time.",
+        "why": "Spawns processes on the main actor, only meaningful once the virtual machine is up, and a second source of truth beside the launcher's."
+      },
+      {
+        "instead": "Reuse #221's sentence unchanged.",
+        "why": "Its first half describes an attempted build; nothing has been attempted at pick time. Its guidance clause IS reused word for word and pinned."
+      },
+      {
+        "instead": "Forget a remembered folder that is out of reach, so the reason is said once (#290's plan).",
+        "why": "Reversed when #290 was folded into #311: one remembering rule for every reason. The teacher cannot go on without choosing, so the repetition ends at one choice."
+      }
+    ]
   },
   "appUpdates": {
     "note": "GitHub issue #204: Plantoir finds and installs its own new versions. Written on the mac with #204 (Sparkle 2.9.6); Windows adopts the same rules and sentences with NetSparkleUpdater (the windows issue drafted with #204, milestone v1.4.0), and until then nothing on Windows reads this block - its cases are UNRUN there, not red. The mechanism on each side is platform code; what is shared is what a teacher is promised. The reasoning, what was measured and what was rejected: documentation/09-mac-app.md -> 'Updating itself'.",

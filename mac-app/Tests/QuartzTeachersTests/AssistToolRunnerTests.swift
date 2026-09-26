@@ -3268,9 +3268,29 @@ final class AssistToolRunnerTests: XCTestCase {
     /// pass a visibility check and is exactly half of what this rule is about.
     @MainActor
     func testPublishingStopsAtALinkedClassAsTheContractSays() async throws {
+        try await runPublishingCases(key: "stopsAtAClassPage")
+    }
+
+    /// `shared-rules.json` → `followingLinks.publishing.cases` (#294): links
+    /// written in a TABLE, with the alias pipe escaped as `\|`, are followed
+    /// — transitively, and still stopping at a class. Three of the pages the
+    /// case expects to go up are reachable only through a table link, so it
+    /// cannot pass on a reader that drops them.
+    @MainActor
+    func testPublishingFollowsLinksAsTheContractSays() async throws {
+        try await runPublishingCases(key: "publishing")
+    }
+
+    /// One `followingLinks` case list, each case laid out as a real course and
+    /// published through `publish_pages`. A page carries `links` (written as
+    /// `See [[x]].` paragraphs) or `body` (written exactly as given), never
+    /// both — the contract's `publishing.casesNote`. Every page's BODY must
+    /// come through the publish byte for byte: a publish changes whether
+    /// students see a page, never what it says.
+    @MainActor
+    private func runPublishingCases(key: String) async throws {
         for testCase in try AssistToolRunnerTests.cases(
-            in: "contracts/shared-rules.json", section: "followingLinks",
-            key: "stopsAtAClassPage"
+            in: "contracts/shared-rules.json", section: "followingLinks", key: key
         ) {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
             let pages: [[String: Any]] = try XCTUnwrap(testCase["pages"] as? [[String: Any]])
@@ -3283,10 +3303,15 @@ final class AssistToolRunnerTests: XCTestCase {
                 let title: String = try XCTUnwrap(page["title"] as? String)
                 let classPage: Bool = page["isClassPage"] as? Bool ?? false
                 let visible: Bool = page["visible"] as? Bool ?? false
+                let written: String? = page["body"] as? String
+                if written != nil && page["links"] != nil {
+                    XCTFail("\(name): “\(title)” carries both `links` and `body`")
+                    continue
+                }
                 isAClass[title] = classPage
                 try writeContractPage(
                     title: title, isClassPage: classPage, visible: visible,
-                    links: page["links"] as? [String] ?? [], in: made.course
+                    links: page["links"] as? [String] ?? [], body: written, in: made.course
                 )
             }
 
@@ -3324,7 +3349,30 @@ final class AssistToolRunnerTests: XCTestCase {
                     "\(name): “\(title)” was written to, and this publish never reached it"
                 )
             }
+            for (title, classPage) in isAClass {
+                let after: String = contractPageText(
+                    title: title, isClassPage: classPage, in: made.course
+                )
+                XCTAssertEqual(
+                    AssistToolRunnerTests.bodyAfterFrontmatter(after),
+                    AssistToolRunnerTests.bodyAfterFrontmatter(before[title] ?? ""),
+                    "\(name): the publish changed what “\(title)” says"
+                )
+            }
         }
+    }
+
+    /// A page's text after its closing `---`, or the whole text when it has
+    /// no frontmatter block.
+    private static func bodyAfterFrontmatter(_ text: String) -> String {
+        if !text.hasPrefix("---\n") {
+            return text
+        }
+        let rest: Substring = text.dropFirst(4)
+        guard let closing = rest.range(of: "\n---\n") else {
+            return text
+        }
+        return String(rest[closing.upperBound...])
     }
 
     /// `class-planning.json` → `datingPagesAClassBrings.reachStopsAtAClassPage`,
@@ -3660,11 +3708,15 @@ final class AssistToolRunnerTests: XCTestCase {
                                    isClassPage: Bool,
                                    visible: Bool,
                                    links: [String],
+                                   body written: String? = nil,
                                    dated: String = "2026-09-08",
                                    in course: Course) throws {
         var body: String = "About \(title)."
         for target in links {
             body += "\n\nSee [[\(target)]]."
+        }
+        if let written {
+            body = written
         }
         if isClassPage {
             try write(page: title, publish: visible ? "true" : "false", date: dated,

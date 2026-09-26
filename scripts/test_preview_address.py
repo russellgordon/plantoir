@@ -91,6 +91,12 @@ def announce(answers: list, build_only: str = "", trail_home: Path = None) -> su
             'curl() { return 52; }',
             'sleep() { :; }',
             function_named("say_the_preview_address_is_unknown"),
+            # Since #310 the address is also asked whose it is
+            # (scripts/test_preview_reach.py -> WhoseAddressItIs). Here it is
+            # always this account's own, so this file tests the address alone.
+            'held_by_someone_else() { return 1; }',
+            'a_different_engine_was_named_by_hand() { return 1; }',
+            function_named("the_preview_s_host_port"),
             function_named("announce_the_preview_address"),
             "_answers=(" + " ".join("'" + answer + "'" for answer in answers) + ")",
             '_counter="$1"',

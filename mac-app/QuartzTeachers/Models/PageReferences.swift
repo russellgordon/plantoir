@@ -182,7 +182,9 @@ nonisolated enum PageReferences {
     }
 
     /// The wikilink shape, `WikiLinkRewriter`'s own, so a target this reads is
-    /// exactly a target a rename would rewrite.
+    /// exactly a target a rename would rewrite. A picture sized inside a table,
+    /// `![[circuit.png\|300]]`, reads as `circuit.png` and a rename writes
+    /// only that range, leaving the backslash the table needs (#294).
     private static let wikilinkExpression: NSRegularExpression? =
         try? NSRegularExpression(pattern: WikiLinkRewriter.pattern)
 

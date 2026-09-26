@@ -19,7 +19,36 @@ import Foundation
 /// * `![[Unit 2, Day 3]]` — a transclusion
 /// * `[[Unit 2, Day 3#Agenda]]`
 /// * `[[Unit 2, Day 3#^a1b2c3]]`
+/// * `[[Unit 2, Day 3\|Tuesday]]` — the alias pipe ESCAPED, which is how
+///   Obsidian writes an alias inside a Markdown table, so that the cell does
+///   not end at the pipe (#294). The same form turns up in prose too, and
+///   Quartz reads it as a link wherever it is. The backslash is not part of
+///   the name, and a rename leaves it exactly where it was: dropping it would
+///   split the table cell in two
 /// * and the combinations of those
+///
+/// ### Why the target stops BEFORE a backslash, and only there
+///
+/// The target is taken lazily up to — not including — an optional backslash
+/// that sits immediately before `]`, `|` or `#`. The lookahead is zero-width,
+/// so the backslash falls outside the match and every rewriter that replaces
+/// the match (or group 2) carries it through untouched. Measured over the
+/// 12,128 payload and skeleton pages: the same 38,659 links matched at the same offsets as
+/// the old `([^\]|#]+)`, and 229 captures changed, every one a name that used
+/// to end in the backslash of a `\|` (142 in tables, 87 in prose and in code
+/// examples; 39,570 and 230 over all of `support/`).
+///
+/// Rejected:
+/// * stripping the backslash in `AssistSectionGraph.linkTargets` alone —
+///   publishing would follow the link, and a rename or a class insertion
+///   would still leave it on the old name, which after an insertion is a
+///   DIFFERENT lesson. Eight readers share this pattern; one fix covers them.
+/// * excluding the backslash from names altogether (`[^\]|#\\]+`, closer to
+///   Quartz's own `wikilinkRegex`) — `[[a\b]]` would then capture `a`, and a
+///   rename of a page called `a` would rewrite it. The lookahead differs from
+///   the old pattern only at a backslash right before `]`, `|` or `#`.
+/// * skipping links inside code in the same change — a real difference from
+///   `linksAsWritten` and from Windows, with its own measurement: #313.
 ///
 /// ## What is NOT handled
 ///
@@ -39,8 +68,12 @@ nonisolated enum WikiLinkRewriter {
 
     /// An optional `!`, the opening brackets, then the target — which runs up
     /// to the first `]`, `|` or `#`, so an alias, a heading and a block
-    /// reference are all left where they are.
-    static let pattern: String = #"(!?\[\[)([^\]|#]+)"#
+    /// reference are all left where they are. A backslash immediately before
+    /// that character (the `\|` of an alias in a table) is not part of the
+    /// target, and is not part of the match either. THE one definition of a
+    /// link on the mac: `FolderPathRewriter`, `PageReferences` and
+    /// `AssistSectionGraph` read this, not copies of it (#294).
+    static let pattern: String = #"(!?\[\[)([^\]|#]+?)(?=\\?[\]|#])"#
 
     // MARK: - Functions
 

@@ -145,6 +145,7 @@ nonisolated enum ScheduledPublishNotice {
         course: String,
         section: Int,
         folderID: String,
+        workingFolderPath: String,
         poster: any NotificationPosting = ScheduledPublishNotice.poster,
         ceiling: Duration = ScheduledPublishNotice.ceiling
     ) async -> Announcement {
@@ -155,8 +156,14 @@ nonisolated enum ScheduledPublishNotice {
         }
         let identifier: String = identifier(course: course, section: section, folderID: folderID)
         let text: String = body(for: stopped, course: course, section: section)
+        // What a click on it opens (#306): the section, in the working folder
+        // this run was for. The identifier's folder id is a hash and cannot
+        // name the folder, so the path travels beside it.
+        let target: NotificationClickTarget = NotificationClickTarget(
+            workingFolderPath: workingFolderPath, course: course, section: section
+        )
         let announcement: Announcement = await askAndPost(
-            identifier: identifier, body: text, poster: poster, ceiling: ceiling
+            identifier: identifier, body: text, target: target, poster: poster, ceiling: ceiling
         )
 
         // One visible `ActivityTrail.note(.event, …)` per branch, as
@@ -210,6 +217,7 @@ nonisolated enum ScheduledPublishNotice {
     static func askAndPost(
         identifier: String,
         body: String,
+        target: NotificationClickTarget?,
         poster: any NotificationPosting,
         ceiling: Duration
     ) async -> Announcement {
@@ -220,7 +228,7 @@ nonisolated enum ScheduledPublishNotice {
                 switch permission {
                 case .allowed:
                     do {
-                        try await poster.post(identifier: identifier, body: body)
+                        try await poster.post(identifier: identifier, body: body, target: target)
                         once.resume(returning: .posted)
                     } catch {
                         once.resume(returning: .couldNotBeSent)
@@ -335,7 +343,8 @@ nonisolated protocol NotificationPosting: Sendable {
     func askPermission() async -> Bool
 
     /// Post one notification, replacing any with the same identifier.
-    func post(identifier: String, body: String) async throws
+    /// `target` is what a click on it opens (#306); nil names nothing.
+    func post(identifier: String, body: String, target: NotificationClickTarget?) async throws
 
     /// Take a delivered notification away.
     func withdraw(identifier: String)
@@ -380,16 +389,31 @@ nonisolated struct SystemNotifications: NotificationPosting {
         }
     }
 
-    func post(identifier: String, body: String) async throws {
+    func post(identifier: String, body: String, target: NotificationClickTarget?) async throws {
         if RealHome.isInsideTestBundle {
             throw Refusal.insideTheTestSuite
         }
-        let content: UNMutableNotificationContent = UNMutableNotificationContent()
-        content.body = body
+        let content: UNMutableNotificationContent = SystemNotifications.content(body: body, target: target)
         let request: UNNotificationRequest = UNNotificationRequest(
             identifier: identifier, content: content, trigger: nil
         )
         try await UNUserNotificationCenter.current().add(request)
+    }
+
+    /// What is handed to macOS: the section's sentence, and — so a click
+    /// can open the section (#306) — the working folder, course and section
+    /// in `userInfo`. Pure, so the suite can check the one line a real click
+    /// depends on without reaching the notification centre.
+    ///
+    /// The path goes into the user's own notification database with the
+    /// notification; it is never shown, and never written on the trail.
+    static func content(body: String, target: NotificationClickTarget?) -> UNMutableNotificationContent {
+        let content: UNMutableNotificationContent = UNMutableNotificationContent()
+        content.body = body
+        if let target {
+            content.userInfo = target.userInfo
+        }
+        return content
     }
 
     func withdraw(identifier: String) {
@@ -414,7 +438,7 @@ nonisolated struct QuietNotifications: NotificationPosting {
         return false
     }
 
-    func post(identifier: String, body: String) async throws {
+    func post(identifier: String, body: String, target: NotificationClickTarget?) async throws {
     }
 
     func withdraw(identifier: String) {
@@ -473,5 +497,102 @@ nonisolated final class ResumeOnce: Sendable {
         if alreadyFinished {
             task.cancel()
         }
+    }
+}
+
+/// What a click on a scheduled publish's notification opens (#306): the
+/// section, in the working folder the run was for.
+///
+/// Carried in the notification's `userInfo`, as plist values only (a value
+/// that is not one makes macOS refuse the whole notification). Versioned, so
+/// a later build that changes the shape can tell an older notification from
+/// a broken one; anything missing, mistyped or of another version reads as
+/// naming nothing, and a click on it only brings Plantoir forward.
+///
+/// `nonisolated` because the notification centre's delegate reads it off the
+/// main actor, and the app's default isolation is the main actor.
+nonisolated struct NotificationClickTarget: Equatable, Sendable {
+
+    // MARK: - Types
+
+    /// What the delegate hands on.
+    enum Request: Equatable, Sendable {
+        /// Not a plain click on a scheduled publish's notification: nothing to do.
+        case notAClick
+        /// A click; nil when the notification names no section.
+        case click(NotificationClickTarget?)
+    }
+
+    // MARK: - Stored properties
+
+    /// The shape of `userInfo` this build writes and reads.
+    static let version: Int = 1
+
+    /// The `userInfo` keys, in one place.
+    static let versionKey: String = "v"
+    static let workingFolderKey: String = "workingFolder"
+    static let courseKey: String = "course"
+    static let sectionKey: String = "section"
+
+    /// The working folder's path, as the run spelled it.
+    let workingFolderPath: String
+
+    /// The course's code.
+    let course: String
+
+    /// The section's number.
+    let section: Int
+
+    // MARK: - Computed properties
+
+    /// The notification's `userInfo`: strings and an integer only.
+    var userInfo: [String: Any] {
+        return [
+            NotificationClickTarget.versionKey: NotificationClickTarget.version,
+            NotificationClickTarget.workingFolderKey: workingFolderPath,
+            NotificationClickTarget.courseKey: course,
+            NotificationClickTarget.sectionKey: section,
+        ]
+    }
+
+    // MARK: - Functions
+
+    /// Reads a target back, or nil when the notification names nothing this
+    /// build understands.
+    static func from(userInfo: [AnyHashable: Any]) -> NotificationClickTarget? {
+        guard let version = userInfo[versionKey] as? Int, version == NotificationClickTarget.version else {
+            return nil
+        }
+        guard let folder = userInfo[workingFolderKey] as? String, !folder.isEmpty else {
+            return nil
+        }
+        guard let course = userInfo[courseKey] as? String, !course.isEmpty else {
+            return nil
+        }
+        guard let section = userInfo[sectionKey] as? Int, section >= 1 else {
+            return nil
+        }
+        return NotificationClickTarget(workingFolderPath: folder, course: course, section: section)
+    }
+
+    /// What a response from the notification centre asks for: the target of
+    /// a PLAIN click on one of Plantoir's scheduled-publish notifications.
+    ///
+    /// `isAClick` is false for anything but the default action (a dismissal
+    /// the system reports, a button). A notification whose identifier is not
+    /// a scheduled publish's is not ours to route. Both filters live here,
+    /// not in the delegate, so they are tested.
+    static func requested(
+        identifier: String,
+        isAClick: Bool,
+        userInfo: [AnyHashable: Any]
+    ) -> Request {
+        if !isAClick {
+            return .notAClick
+        }
+        if !identifier.hasPrefix("scheduled-publish.") {
+            return .notAClick
+        }
+        return .click(NotificationClickTarget.from(userInfo: userInfo))
     }
 }

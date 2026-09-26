@@ -24,6 +24,15 @@ connected to, and nothing waits: the only files written are in a scratch
 folder, deleted afterwards. `HOME` is always that scratch folder, so the
 launcher's trail helper can never add a line to the real trail.
 
+**Whose address it is (GitHub #310).** After the reach check, under Colima,
+`preview.sh` also asks whether the address is this account's own: another
+account on the same Mac can hold it, and then the reach check is answered by
+THEIR forwarder and the teacher is shown their site. Every case of
+`previewPorts.whenAnotherAccountHasTheAddress` runs here too, with `netstat`,
+`lsof`, `docker` and `remake_the_workspace` replaced by shell functions that
+answer look by look — so the real `netstat` and `lsof` on this PATH can never
+leak in. The remake itself is real in `test_port_blocks.py`.
+
 **Windows.** The bash half is skipped where there is no bash that can run a
 program, the same rule as the launcher tests beside it; the text half runs
 everywhere. `preview.ps1` serves on the PC itself — there is no forward to
@@ -64,6 +73,19 @@ def the_launcher_text() -> str:
 def the_rule() -> dict:
     rules = json.loads((REPOSITORY_ROOT / "contracts" / "app-rules.json").read_text(encoding="utf-8"))
     return rules["previewPorts"]["whenThisMacCannotReachTheBuilder"]
+
+
+def the_ownership_rule() -> dict:
+    rules = json.loads((REPOSITORY_ROOT / "contracts" / "app-rules.json").read_text(encoding="utf-8"))
+    return rules["previewPorts"]["whenAnotherAccountHasTheAddress"]
+
+
+def the_address_held_entry() -> dict:
+    rules = json.loads((REPOSITORY_ROOT / "contracts" / "shared-rules.json").read_text(encoding="utf-8"))
+    for entry in rules["activityTrail"]["mustRecord"]:
+        if entry["event"] == "preview address held by another account":
+            return entry
+    raise AssertionError("the contract no longer has the 'preview address held by another account' event")
 
 
 def the_trail_line() -> str:
@@ -108,33 +130,102 @@ def the_setting(name: str) -> str:
 class Run:
     """What one run of the announcement did."""
 
-    def __init__(self, result: subprocess.CompletedProcess, curl_calls: list, sleeps: list, trail: str):
+    def __init__(self, result: subprocess.CompletedProcess, curl_calls: list, sleeps: list, trail: str,
+                 calls: list):
         self.returncode = result.returncode
         self.output = result.stdout.decode("utf-8", "replace")
         self.errors = result.stderr.decode("utf-8", "replace")
         self.curl_calls = curl_calls
         self.sleeps = sleeps
         self.trail = trail
+        self.calls = calls
+
+    def asked(self, program: str) -> int:
+        count = 0
+        for call in self.calls:
+            if call.split(" ")[0] == program:
+                count += 1
+        return count
+
+    def markers(self) -> list:
+        prefix = the_address_held_entry()["marker"]["prefix"]
+        found = []
+        for line in self.output.splitlines():
+            if line.startswith(prefix):
+                found.append(line)
+        return found
 
     def describe(self) -> str:
         return (f"exit {self.returncode}\n--- output\n{self.output}\n--- errors\n{self.errors}"
-                f"\n--- curl calls {len(self.curl_calls)}, sleeps {self.sleeps}")
+                f"\n--- curl calls {len(self.curl_calls)}, sleeps {self.sleeps}, calls {self.calls}")
+
+
+# This account's own listener besides the preview's: limactl's, which under
+# Colima is always there (measured), so a working lsof is never empty.
+LIMACTL_PORT = "53"
+
+
+def look_bodies(looks: list) -> tuple:
+    """The shell `case` arms answering each ownership look: netstat's rows
+    and lsof's, for the port the workspace publishes at that moment."""
+    kernel_arms = []
+    own_arms = []
+    number = 1
+    for look in looks:
+        kernel = look["kernel"]
+        if kernel == "fails":
+            kernel_arms.append(f'    {number}) echo "netstat: something went wrong" >&2; return 1 ;;')
+        else:
+            rows = ['echo "tcp4 0 0 *.' + LIMACTL_PORT + ' *.* LISTEN"']
+            for _ in range(int(kernel)):
+                rows.append('echo "tcp4 0 0 *.$(_port_now) *.* LISTEN"')
+            kernel_arms.append(f"    {number}) " + "; ".join(rows) + " ;;")
+        own = look["own"]
+        if own == "missing":
+            own_arms.append(f'    {number}) echo "lsof: command not found" >&2; return 127 ;;')
+        elif own == "empty":
+            own_arms.append(f"    {number}) return 0 ;;")
+        else:
+            rows = ['echo "p90"', 'echo "n*:' + LIMACTL_PORT + '"']
+            for _ in range(int(own)):
+                rows.append('echo "n*:$(_port_now)"')
+            own_arms.append(f"    {number}) " + "; ".join(rows) + " ;;")
+        number += 1
+    return kernel_arms, own_arms
+
+
+HEALTHY = [{"kernel": 1, "own": 1}]
 
 
 def announce(refused_first: int, then_curl_exits, started_this_run: bool = False,
-             build_only: bool = False, stub_curl: bool = True, extra_bash: str = "") -> Run:
+             build_only: bool = False, stub_curl: bool = True, extra_bash: str = "",
+             looks: list = None, context: str = "colima", docker_host: str = None,
+             port_after_remake=None) -> Run:
     """Runs the launcher's own announcement. `docker port` answers with the
     published port; `curl` exits 7 (connection refused) `refused_first` times
     and then `then_curl_exits` for ever (None: 7 for ever). With
-    `stub_curl=False` there is no curl at all on the PATH."""
+    `stub_curl=False` there is no curl at all on the PATH.
+
+    `looks` answers the ownership looks (#310) one by one, in the contract's
+    shape; a look nobody expected fails the run. `remake_the_workspace` is a
+    stub that records itself and makes `docker port` answer
+    `port_after_remake` from then on."""
+    if looks is None:
+        looks = HEALTHY * 3
     with tempfile.TemporaryDirectory() as scratch:
         scratch_path = Path(scratch)
         home = scratch_path / "home"
         home.mkdir()
         curl_log = scratch_path / "curl-calls"
         sleep_log = scratch_path / "sleeps"
-        curl_log.write_text("", encoding="utf-8")
-        sleep_log.write_text("", encoding="utf-8")
+        calls_log = scratch_path / "calls"
+        look_file = scratch_path / "look"
+        remade_file = scratch_path / "remade"
+        for log in (curl_log, sleep_log, calls_log):
+            log.write_text("", encoding="utf-8")
+        look_file.write_text("0", encoding="utf-8")
+        kernel_arms, own_arms = look_bodies(looks)
+        after = HOST_PORT if port_after_remake is None else str(port_after_remake)
 
         then_code = 7 if then_curl_exits is None else int(then_curl_exits)
         program_lines = [
@@ -143,13 +234,49 @@ def announce(refused_first: int, then_curl_exits, started_this_run: bool = False
             function_named("this_mac_can_reach_the_builder"),
             function_named("say_this_mac_cannot_reach_the_builder"),
             function_named("say_the_preview_address_is_unknown"),
+            function_named("ports_listening_in_every_account"),
+            function_named("ports_listening_in_this_account"),
+            function_named("the_docker_host_is_colimas"),
+            function_named("the_engine_forwards_from_this_account"),
+            function_named("a_different_engine_was_named_by_hand"),
+            function_named("tell_the_app_the_address_was_held"),
+            function_named("say_this_folder_is_set_up_again_on_free_addresses"),
+            function_named("held_by_someone_else"),
+            function_named("say_another_account_has_this_preview_s_address"),
+            function_named("the_preview_s_host_port"),
             function_named("announce_the_preview_address"),
             '_curl_log="$1"',
             '_sleep_log="$2"',
+            '_calls="$3"',
+            '_look="$4"',
+            '_remade="$5"',
+            '_port_now() { if [ -f "$_remade" ]; then echo "' + after + '"; else echo "' + HOST_PORT + '"; fi; }',
             'docker() {',
-            '  if [[ "$1" != "port" ]]; then echo "unexpected docker $*" >&2; return 99; fi',
-            '  echo "0.0.0.0:' + HOST_PORT + '"',
+            '  echo "docker $*" >> "$_calls"',
+            '  case "$1" in',
+            '    port) echo "0.0.0.0:$(_port_now)" ;;',
+            '    context) echo "' + context + '" ;;',
+            '    *) echo "unexpected docker $*" >&2; return 99 ;;',
+            '  esac',
             '}',
+            'netstat() {',
+            '  echo "netstat $*" >> "$_calls"',
+            '  local n; n=$(( $(cat "$_look") + 1 )); echo "$n" > "$_look"',
+            '  echo "Proto Recv-Q Send-Q  Local Address          Foreign Address        (state)"',
+            '  case "$n" in',
+        ] + kernel_arms + [
+            '    *) echo "a look nobody expected" >&2; exit 98 ;;',
+            '  esac',
+            '}',
+            'lsof() {',
+            '  echo "lsof $*" >> "$_calls"',
+            '  local n; n=$(cat "$_look")',
+            '  case "$n" in',
+        ] + own_arms + [
+            '    *) echo "a look nobody expected" >&2; exit 98 ;;',
+            '  esac',
+            '}',
+            'remake_the_workspace() { echo "remake_the_workspace" >> "$_calls"; : > "$_remade"; }',
             'sleep() { printf "%s\\n" "$*" >> "$_sleep_log"; }',
         ]
         if stub_curl:
@@ -168,6 +295,8 @@ def announce(refused_first: int, then_curl_exits, started_this_run: bool = False
             'CONTAINER_NAME="teaching-quartz-test"',
             'COURSE="ICS4U"',
             'SECTION="2"',
+            # The launcher's own line, so the marker is filed where a real run files it.
+            re.search(r'^WORKSPACE_TRAIL_PLACE=.*$', the_launcher_text(), flags=re.MULTILINE).group(0),
             'PREVIEW_PORT=' + INSIDE_PORT,
             'BUILD_ONLY="' + ("--build-only" if build_only else "") + '"',
             'THIS_RUN_STARTED_THE_BUILDER="' + ("1" if started_this_run else "") + '"',
@@ -180,18 +309,22 @@ def announce(refused_first: int, then_curl_exits, started_this_run: bool = False
             # A PATH with the few programs the functions use, and no curl.
             tools = scratch_path / "bin"
             tools.mkdir()
-            for tool in ["date", "mkdir", "head", "sed", "cat", "wc", "tr"]:
+            for tool in ["date", "mkdir", "head", "sed", "cat", "wc", "tr", "grep", "awk"]:
                 found = shutil.which(tool)
                 if found:
                     (tools / tool).symlink_to(found)
             path = str(tools)
 
         bash = shutil.which("bash") or "/bin/bash"
+        environment = {"HOME": str(home), "PATH": path}
+        if docker_host is not None:
+            environment["DOCKER_HOST"] = docker_host
         result = subprocess.run(
-            [bash, "-c", program, "announce", str(curl_log), str(sleep_log)],
+            [bash, "-c", program, "announce", str(curl_log), str(sleep_log), str(calls_log),
+             str(look_file), str(remade_file)],
             capture_output=True,
             timeout=60,
-            env={"HOME": str(home), "PATH": path},
+            env=environment,
         )
         curl_calls = []
         for line in curl_log.read_text(encoding="utf-8").splitlines():
@@ -199,7 +332,8 @@ def announce(refused_first: int, then_curl_exits, started_this_run: bool = False
         sleeps = sleep_log.read_text(encoding="utf-8").splitlines()
         trail_file = home / "Library" / "Logs" / "Plantoir" / "activity.txt"
         trail = trail_file.read_text(encoding="utf-8") if trail_file.exists() else ""
-        return Run(result, curl_calls, sleeps, trail)
+        calls = calls_log.read_text(encoding="utf-8").splitlines()
+        return Run(result, curl_calls, sleeps, trail, calls)
 
 
 def tries_line(tries: int) -> str:
@@ -316,6 +450,101 @@ class TheQuestionIsPutTheRightWay(unittest.TestCase):
         self.assertIn("http://127.0.0.1:" + HOST_PORT + "/", arguments)
         for argument in arguments:
             self.assertNotIn(":" + INSIDE_PORT, argument)
+
+
+@unittest.skipUnless(HAS_BASH, "no bash here that can run a program")
+class WhoseAddressItIs(unittest.TestCase):
+    """previewPorts.whenAnotherAccountHasTheAddress, every case (#310)."""
+
+    def run_case(self, case: dict) -> Run:
+        reach = case["reach"]
+        refused_first = 1000 if reach == 7 else 0
+        then = None if reach == 7 else reach
+        return announce(refused_first, then, build_only=case.get("buildOnly", False),
+                        looks=case["looks"] or [], context=case["context"],
+                        docker_host=case.get("dockerHost"), port_after_remake=case.get("portAfterRemake"))
+
+    def test_every_case(self):
+        rule = the_ownership_rule()
+        prefix = the_address_held_entry()["marker"]["prefix"]
+        self.assertGreaterEqual(len(rule["cases"]), 12)
+        for case in rule["cases"]:
+            with self.subTest(case=case["why"]):
+                run = self.run_case(case)
+                self.assertEqual(run.asked("remake_the_workspace"), case["remakes"], run.describe())
+                self.assertLessEqual(run.asked("remake_the_workspace"), rule["remakesAtMost"])
+                if case["netstatAsked"]:
+                    self.assertEqual(run.asked("netstat"), len(case["looks"]), run.describe())
+                else:
+                    self.assertEqual(run.asked("netstat") + run.asked("lsof"), 0, run.describe())
+                expected_markers = []
+                port = HOST_PORT
+                for outcome in case["markers"]:
+                    if outcome == "refused":
+                        port = str(case["portAfterRemake"])
+                    expected_markers.append(f"{prefix} {outcome} {port} ICS4U/2")
+                self.assertEqual(run.markers(), expected_markers, run.describe())
+                outcome = case["outcome"]
+                if outcome == "announces":
+                    self.assertEqual(run.returncode, 0, run.describe())
+                    self.assertIn(f"{ANNOUNCEMENT}http://localhost:{case['announces']}/\n", run.output)
+                    self.assertEqual(run.output.count(ANNOUNCEMENT), 1, run.describe())
+                elif outcome == "refuses":
+                    self.assertEqual(run.returncode, rule["exitCode"], run.describe())
+                    self.assertNotIn(ANNOUNCEMENT, run.output)
+                    for line in rule["sentence"]:
+                        self.assertIn(line, run.output)
+                elif outcome == "reachRefuses":
+                    self.assertEqual(run.returncode, the_rule()["exitCode"], run.describe())
+                    self.assertNotIn(ANNOUNCEMENT, run.output)
+                    for line in the_rule()["sentence"]:
+                        self.assertIn(line, run.output)
+                elif outcome == "asksNothing":
+                    self.assertEqual(run.returncode, 0, run.describe())
+                    self.assertEqual(run.output, "", run.describe())
+                    self.assertEqual(run.calls, [], run.describe())
+                else:
+                    self.fail("unknown outcome " + outcome)
+                if case["remakes"]:
+                    for line in the_hostblock_remade_lines():
+                        self.assertIn(line, run.output)
+
+    def test_the_ownership_look_comes_after_the_reach_check(self):
+        body = function_named("announce_the_preview_address")
+        reach = body.find('this_mac_can_reach_the_builder "$host_port"')
+        owner = body.find('held_by_someone_else "$host_port"')
+        self.assertGreater(reach, 0)
+        self.assertGreater(owner, reach)
+        self.assertLess(owner, body.find(ANNOUNCEMENT))
+
+    def test_the_sentence_names_no_machinery(self):
+        rule = the_ownership_rule()
+        entry = the_address_held_entry()
+        lines = list(rule["sentence"])
+        for key in ["lineWhenRemadeBeforeStarting", "lineWhenRemade", "lineWhenRefused", "lineWhenUnchecked"]:
+            lines.append(entry[key])
+        for line in lines:
+            words = set(re.findall(r"[a-z]+", line.lower()))
+            for forbidden in MACHINERY_WORDS + ["lsof", "netstat", "ssh", "uid", "root"]:
+                self.assertNotIn(forbidden, words, line)
+
+    def test_the_launcher_prints_the_contract_words(self):
+        text = the_launcher_text()
+        for line in the_ownership_rule()["sentence"]:
+            self.assertIn(line, text)
+        self.assertIn('tell_the_app_the_address_was_held remade "$held_port"', text)
+        for outcome in ["refused", "unchecked"]:
+            self.assertIn(f"tell_the_app_the_address_was_held {outcome} \"$host_port\"", text)
+        # The remade line only after the remake returned (#310 review): a
+        # remake #94 refused must never be recorded as done.
+        body = function_named("announce_the_preview_address")
+        self.assertLess(body.find("    remake_the_workspace\n"),
+                        body.find('tell_the_app_the_address_was_held remade'))
+
+
+def the_hostblock_remade_lines() -> list:
+    rules = json.loads((REPOSITORY_ROOT / "contracts" / "app-rules.json").read_text(encoding="utf-8"))
+    return rules["previewPorts"]["hostBlockClash"]["saysWhenAStoppedWorkspaceIsRemade"]
 
 
 # Deliberately NOT gated on bash: these read the files as text.

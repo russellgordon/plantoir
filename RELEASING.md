@@ -341,7 +341,7 @@ the release side.
   compare its SHA-256 with `site/`, and follow its newest download to a 200 of
   the right length. **Do not report a mac release complete until that line is ✅.**
 - **A release that publishes a DMG without updating the feed ships an update
-  nobody is offered.** Teachers on v1.3.1 or earlier have no updater at all and
+  nobody is offered.** Teachers on v1.3.2 or earlier have no updater at all and
   install the first release that carries one by hand.
 
 ## The dress rehearsal (#204 — once, before the first release with an updater)

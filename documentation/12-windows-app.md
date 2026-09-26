@@ -959,7 +959,9 @@ What replaces the old container concepts:
   websocket — six blocks, where the mac launchers walk forty since GitHub
   #280 and `preview.ps1` owes the same walk: `contracts/app-rules.json` →
   `previewPorts.hostBlockCases`, and 03 → "How a folder finds its ports, and
-  when it cannot") and prints the exact "Preview will be available at:" line the
+  when it cannot"; whether its probe sees ANOTHER signed-in account's
+  listeners is the open question the mac answered for itself in #310 — the
+  `windows` issue from #310 asks for the two-account measurement) and prints the exact "Preview will be available at:" line the
   app watches for. What changed is only what is listening on that port: a
   Node process running directly on the PC, bound to `127.0.0.1` (patched at
   runtime-build time in `fetch-runtime.ps1`, native-only — see the favicon
@@ -1109,7 +1111,14 @@ as history, not as what Windows does today.
   way: resolve claims on the platform's restoration-complete signal
   rather than polling, and while a claim may still arrive show a quiet
   loading state, never the folder picker the claim is about to replace.
-  The scenario test suite in the macOS app is the porting spec. **The
+  The scenario test suite in the macOS app is the porting spec. **Since #311
+  the FOLDER comes back whatever happens to the window set** — the first
+  window reopens the last working folder (the one last in FRONT, not last
+  chosen), and a failed reopen says why in one sentence and is kept:
+  `contracts/shared-rules.json` → `reopeningTheLastWorkingFolder`, whose
+  `launchCases` and `folderCases` are the acceptance list; the reasoning is
+  in [`09-mac-app.md`](09-mac-app.md) → "Reopening on the last working
+  folder (#311)". **The
   other half of that — what a window lets GO of when it is pointed at a
   different folder** — is `contracts/shared-rules.json` →
   `workingFolderSelection`, and since 2026-09-19 all four of its cases run

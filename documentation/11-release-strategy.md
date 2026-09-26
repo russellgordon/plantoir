@@ -105,7 +105,7 @@ also published, as a portable alternative nothing links to by that URL.
 
 ### Updating itself: one feed per platform, on plantoir.app (#204)
 
-**The mac updates itself from v1.3.2**, with Sparkle 2.9.6 (#204); **Windows
+**The mac updates itself from v1.4.0**, with Sparkle 2.9.6 (#204); **Windows
 will adopt NetSparkleUpdater**, not WinSparkle as this section expected
 when it was written on 2026-08-12 — NetSparkle reads the same feed format and
 can run the existing per-user Inno installer silently (the `windows` issue
@@ -133,7 +133,7 @@ still holds, with the names it finally took:
   updating the feed ships an update nobody is offered. `website/update_feed.py`
   builds and signs it at the cut, `website/build.py` copies it byte-for-byte (a
   re-serialised feed breaks its signature) and checks it before and after a
-  deploy — `RELEASING.md` → "The update feed (macOS)". Teachers on v1.3.1 or
+  deploy — `RELEASING.md` → "The update feed (macOS)". Teachers on v1.3.2 or
   earlier have no updater, and install the first release that carries one by hand.
 
 The rules a teacher is promised are `contracts/shared-rules.json` →

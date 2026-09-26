@@ -33,6 +33,12 @@ final class FolderPathRewriterTests: XCTestCase {
         )
     }
 
+    /// #294: ONE definition of a wikilink on the mac. A copy of the pattern
+    /// here would keep whatever reading the string had the day it was copied.
+    func testTheWikiLinkPatternIsTheRewritersOwn() {
+        XCTAssertEqual(FolderPathRewriter.wikiLinkPattern, WikiLinkRewriter.pattern)
+    }
+
     /// Obsidian writes a full vault path when a name is ambiguous, so the
     /// folder is not always the first segment.
     func testAFolderDeepInAPathIsFound() {
