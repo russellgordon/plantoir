@@ -5243,7 +5243,10 @@ end of the cycle instead.
 "offered": Sparkle may hold its window back until the app is in front — the
 review's L2), `update check found nothing new` (only when the teacher asked),
 `update answered` (install, skip, or not now — "Remind Me Later" and closing
-the window are one answer to Sparkle), `update held while work is under way`,
+the window are one answer to Sparkle — or "install on quit" from the resumed
+window, which never reaches Sparkle and so is written by the app; never for
+the stand-down a quit sends, which is `update set aside`), `update held while
+work is under way`,
 `update installing` (straight away, after the held work, or as Plantoir quits),
 `update set aside`, `update stopped` (a plain category and Sparkle's number,
 at most once per launch for the daily check — a Mac offline all week must not
