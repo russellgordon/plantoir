@@ -44,7 +44,7 @@ nonisolated enum ActivityTrail {
         case workingFolderReopened = "working folder reopened"
         /// A remembered working folder could not be reopened (#311): carries
         /// the reason (gone, inTrash, driveNotConnected, unreadable,
-        /// outsideHome, coursesOutsideHome) and the redacted path — the two
+        /// privacyDenied, outsideHome, coursesOutsideHome) and the redacted path — the two
         /// facts that cannot be looked for afterwards, once the drive is
         /// plugged back in or the Trash emptied.
         case workingFolderNotReopened = "working folder not reopened"

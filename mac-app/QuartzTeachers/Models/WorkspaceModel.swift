@@ -883,6 +883,13 @@ class WorkspaceModel {
     /// (never the real preferences under a test). Called when a folder is
     /// chosen or reopened, and whenever the window comes to the front.
     func rememberAsTheLastWorkingFolder() {
+        // Once quitting has begun, windows close one by one and AppKit makes
+        // the next one key — which would record IT as last in front, not
+        // the window the teacher quit from (#311 review 1). The same
+        // protection the window list has.
+        if WorkspaceModel.isTerminating {
+            return
+        }
         guard WorkspaceModel.isShownInAWindow(self), canRememberChoice, let url = workspaceURL else {
             return
         }
@@ -1115,8 +1122,9 @@ class WorkspaceModel {
         // The same funnel the picker goes through, so the letting-go cannot
         // belong to one route and not the other. Here it is DEFENSIVE: every
         // caller in the product reaches this with no folder yet — a window
-        // being restored, a window opened mid-session, the assistant and the
-        // MCP server each on a model of their own — and the guard above
+        // opened beside another or for a requested folder, the assistant
+        // and the MCP server each on a model of their own (a RESTORED window
+        // goes through `reopen` since #311) — and the guard above
         // turns away the one path that would arrive with the same folder
         // already set. It stays because "no caller does that today" is a
         // fact about today.

@@ -81,7 +81,7 @@ final class WorkingFolderReachTests: XCTestCase {
     @MainActor
     func testEveryDiskCase() throws {
         let cases: [[String: Any]] = try XCTUnwrap(WorkingFolderReachTests.section()["diskCases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 7)
+        XCTAssertGreaterThanOrEqual(cases.count, 8)
         for diskCase in cases {
             let name: String = diskCase["name"] as? String ?? "?"
             let make: String = try XCTUnwrap(diskCase["make"] as? String)
@@ -114,6 +114,17 @@ final class WorkingFolderReachTests: XCTestCase {
                 let courses: URL = outside.appendingPathComponent(slug + "-courses")
                 try FileManager.default.createDirectory(at: courses, withIntermediateDirectories: true)
                 try FileManager.default.createSymbolicLink(at: folder.appendingPathComponent("courses"), withDestinationURL: courses)
+            case "coursesRelativeLinkClimbingOut":
+                folder = home.appendingPathComponent(slug)
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                var climb: String = ""
+                for _ in 0..<(folder.pathComponents.count + 2) {
+                    climb += "../"
+                }
+                try FileManager.default.createSymbolicLink(
+                    atPath: folder.appendingPathComponent("courses").path,
+                    withDestinationPath: climb + "Volumes/\(slug)/courses"
+                )
             case "coursesLinkDangling":
                 folder = home.appendingPathComponent(slug)
                 try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

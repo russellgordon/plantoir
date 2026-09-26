@@ -32,7 +32,7 @@
       },
       {
         "event": "working folder not reopened",
-        "carries": "the reason (gone, inTrash, driveNotConnected, unreadable, outsideHome, coursesOutsideHome — reopeningTheLastWorkingFolder.wording's keys), which folder it was (the window's own or the last working folder) and the remembered path (redacted)",
+        "carries": "the reason (gone, inTrash, driveNotConnected, unreadable, privacyDenied, outsideHome, coursesOutsideHome — reopeningTheLastWorkingFolder.wording's keys), which folder it was (the window's own or the last working folder) and the remembered path (redacted)",
         "why": "\"Plantoir forgot my folder\" is the report #311 exists to prevent; when it happens anyway, the reason and the path are what can no longer be looked for afterwards — the drive gets plugged back in, the Trash emptied, the permission granted."
       },
       {
@@ -10253,10 +10253,11 @@
       "gone": "“{folder}”, the working folder you had open last time, can’t be found — if you moved it, choose it again from its new place.",
       "inTrash": "“{folder}”, the working folder you had open last time, is in the Trash — put it back and choose it again, or choose another folder.",
       "driveNotConnected": "“{folder}”, the working folder you had open last time, is on a drive that isn’t connected — connect it and open Plantoir again, or choose another folder.",
-      "unreadable": "Plantoir isn’t allowed to open “{folder}”, the working folder you had open last time — turn Plantoir on in System Settings ▸ Privacy & Security ▸ Files and Folders, or choose the folder again.",
+      "unreadable": "“{folder}”, the working folder you had open last time, can’t be opened because its permissions don’t let you read it — check Sharing & Permissions in Finder’s Get Info, or choose another folder.",
+      "privacyDenied": "Plantoir isn’t allowed to open “{folder}”, the working folder you had open last time — turn Plantoir on in System Settings ▸ Privacy & Security ▸ Files & Folders, or choose the folder again.",
       "outsideHome": "The working folder Plantoir had open last time, “{folder}”, is not inside your home folder, so Plantoir cannot build websites from it. Keep your working folder inside your home folder — on your Desktop or in Documents, for example — and not on an external drive or in a shared location, then choose it again.",
       "coursesOutsideHome": "The working folder Plantoir had open last time, “{folder}”, keeps its courses outside your home folder, so Plantoir cannot build websites from it. Keep your working folder and the courses in it inside your home folder — on your Desktop or in Documents, for example — and not on an external drive or in a shared location, then choose it again.",
-      "unreadableWhy": "Points at System Settings because that is the fix that lasts for a folder macOS protects (Desktop, Documents, a removable drive) that Plantoir was not allowed into. Whether choosing it again in the picker lasts past the next launch was NOT measured (2026-09-26: the Mac's screen was locked, so the permission prompt could not be answered); it is on Russell's list. Windows reads an access denial as the folder not existing unless it probes differently — say unreadable only when that can be told apart."
+      "unreadableWhy": "Two reasons, told apart by the error the disk gives rather than by whether the folder seems to exist (a denied folder must never be called gone): the folder's own permissions (EACCES on the mac) say so and point at Finder's Get Info, where no System Settings pane would help; macOS's privacy settings (EPERM on the mac) point at the pane, whose name was read from System Settings' own strings on macOS 26.6 (\"Files & Folders\" under \"Privacy & Security\"), not written from memory. Whether choosing a denied Desktop folder again in the picker lasts past the next launch was NOT measured (2026-09-26: the Mac's screen was locked, so the permission question could not be answered); it is on Russell's list. On Windows an ACL denial reads as the folder not existing unless it probes differently — say unreadable only when that can be told apart."
     },
     "launchCases": [
       {
@@ -10369,6 +10370,7 @@
       {
         "name": "the folder is in the Trash",
         "make": "inTrash",
+        "trashIs": "a real folder named .Trash inside the throwaway home — the rule that ships (any folder named .Trash or .Trashes along the path), not an injected location",
         "expect": "inTrash",
         "appliesOn": [
           "mac"
@@ -10404,7 +10406,22 @@
       {
         "name": "the folder cannot be read",
         "make": "unreadable",
-        "expect": "unreadable"
+        "expect": "unreadable",
+        "why": "Its own permissions (chmod 000 in the test). The sentence says permissions and names no System Settings pane, because none would help."
+      },
+      {
+        "name": "macOS's privacy settings keep Plantoir out",
+        "make": "privacyDenied",
+        "expect": "privacyDenied",
+        "appliesOn": ["mac"],
+        "why": "EPERM from the disk. A test cannot make macOS deny, so this case is played through the pure decision with the denial the disk reports (howToRunACase). Windows has no such layer."
+      },
+      {
+        "name": "the folder is outside the home folder AND cannot be read",
+        "make": "outsideHomeAndUnreadable",
+        "expect": "outsideHome",
+        "appliesOn": ["mac"],
+        "why": "Out of reach is said first (#311 implementation review): fixing a permission only to be refused at the next launch is going round twice. The reach needs only the folder's name from the disk, which a denied folder still gives."
       },
       {
         "name": "the folder is outside the home folder",
@@ -10490,11 +10507,15 @@
         "why": "The trail could not then tell the teacher's choice from the app's."
       },
       {
+        "instead": "Preferring the remembered PATH when a different folder now sits there and the bookmark found the original elsewhere.",
+        "why": "The bookmark follows the folder the teacher worked in; a different folder that has since appeared at the old path is not it. Chosen, and diagnosable: the trail line says \"found where it had been moved, from …\". The one exception is the Trash, where the bookmark is refused and a folder put back at the old path is taken."
+      },
+      {
         "instead": "Showing the path bar under the sentence for every reason.",
         "why": "For a gone, trashed or unplugged folder its crumbs would be wrong or dead. Shown only for a folder that is there (out of the builder's reach)."
       }
     ],
-    "howToRunACase": "launchCases: play through the launch rule window by window (mac: WindowStartRule.playLaunch) with the letters as folder names; expectWindows lists each window's folder in order, null for the picker. folderCases: build a real throwaway folder shaped by `make` and ask the platform's reopen decision; `expect` is 'reopen' or a wording key. The Trash is an INJECTED trash root, never the real Trash; 'driveNotConnected' is /Volumes/<a fresh uuid>/…; 'unreadable' is chmod 000 (restored afterwards); 'outsideHome' needs the home folder pointed at a throwaway 'home/' beside a throwaway 'outside/'."
+    "howToRunACase": "launchCases: play through the launch rule window by window (mac: WindowStartRule.playLaunch) with the letters as folder names; expectWindows lists each window's folder in order, null for the picker. windowsMacOSOpens counts every window shown, restored ones included. A restored window goes through the same rule, which must make it WAIT for its own remembered folder; which entry it then takes (by frame) is not what these cases prove — on the mac that is WindowRestorationScenarioTests. folderCases: build a real throwaway folder shaped by `make` and ask the platform's reopen decision; `expect` is 'reopen' or a wording key. The Trash is a real folder named .Trash inside the throwaway home (never the account's own Trash); 'privacyDenied' is the pure decision given the denial the disk reports; 'driveNotConnected' is /Volumes/<a fresh uuid>/…; 'unreadable' is chmod 000 (restored afterwards); 'outsideHome' needs the home folder pointed at a throwaway 'home/' beside a throwaway 'outside/'."
   },
   "workingFolderReach": {
     "note": "Issue #290, folded into #311's restore route. The website builder on a Mac runs in a virtual machine that is handed the home folder and nothing else, so a working folder outside it cannot produce a website. Since #221 the launchers refuse one at the first preview; since #290 the app refuses it when a window takes it on — chosen in the picker, or reopened (reopeningTheLastWorkingFolder, reasons outsideHome and coursesOutsideHome) — before anything is written into it.",
@@ -10607,6 +10628,12 @@
         "name": "courses is a link to outside",
         "make": "coursesLinkedOutside",
         "expect": "refusedForCourses"
+      },
+      {
+        "name": "courses is a relative link that climbs out to a drive that is not connected",
+        "make": "coursesRelativeLinkClimbingOut",
+        "expect": "refusedForCourses",
+        "why": "The disk cannot be asked about a dangling target, so its text is compared — with the '..' names taken away first, or they would compare as folders inside the home folder."
       },
       {
         "name": "courses is a link to a drive that is not connected",
