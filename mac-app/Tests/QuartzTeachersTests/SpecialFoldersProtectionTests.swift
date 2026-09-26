@@ -13,7 +13,7 @@ final class SpecialFoldersProtectionTests: XCTestCase {
     var trailFolderURL: URL?
     var previousTrailStore: ProblemReportStore?
 
-    // MARK: - Set up
+    // MARK: - Functions
 
     override func setUp() async throws {
         let folderURL: URL = FileManager.default.temporaryDirectory
@@ -31,8 +31,6 @@ final class SpecialFoldersProtectionTests: XCTestCase {
             try? FileManager.default.removeItem(at: trailFolderURL)
         }
     }
-
-    // MARK: - Helper methods
 
     /// Removes a shared folder the way the teacher does, through the list
     /// editor Course Settings builds: `removeItem(named:)` takes the name out

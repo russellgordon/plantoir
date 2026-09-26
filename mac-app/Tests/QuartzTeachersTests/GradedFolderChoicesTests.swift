@@ -38,7 +38,7 @@ final class GradedFolderChoicesTests: XCTestCase {
             .appendingPathComponent("graded-choices-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         previousTrailStore = ActivityTrail.store
-        ActivityTrail.store = ProblemReportStore(folderURL: root.appendingPathComponent("trail"))
+        ActivityTrail.store = ProblemReportStore(folderURL: root.appendingPathComponent(".trail"))
     }
 
     override func tearDownWithError() throws {

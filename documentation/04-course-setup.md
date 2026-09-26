@@ -931,11 +931,13 @@ rule exists for. REJECTED on the mac: moving the removal into a model function
 to mirror Windows' Core method (`folderWasRemoved` is already the single owner
 and reachable from a test, so it would buy symmetry no test needs), an authored
 `sequence` field in the contract (neither runner could assert it without
-instrumenting internal calls, and every edit under `contracts/` changes the
-toolchain hash), and relying on the #266 golden. **One seam stays unpinned**:
+instrumenting internal calls, which tests how the code is built rather than
+what it does, and Windows would owe a runner change for no gain), and relying
+on the #266 golden. **One seam stays unpinned**:
 `CourseSettingsGestureScript.editor(for:of:)` is a hand copy of `body`'s wiring,
-so if `body` ever called something other than `folderWasRemoved` from a folder
-list, these tests would stay green. Closing it means extracting the editors into
+so if `body` ever wired a folder list differently — another method than
+`folderWasRemoved`, the other scope, a binding to another list, or different
+protection or notice closures — these tests would stay green. Closing it means extracting the editors into
 a function both the view and the tests call — a view refactor with its own
 reviews, not part of #183.
 
