@@ -445,6 +445,9 @@ final class GradedFolderChoicesTests: XCTestCase {
             "return sharedFolderProtection(for: folder, marks: marksSnapshot())",
             "return perSectionFolderProtection(for: folder, marks: marksSnapshot())",
             "return gradedFolderProtection(for: folder, marks: marksSnapshot())",
+            // The Revert button goes through the method that writes
+            // `exclusions reverted` (excludedItems.recordedOnClick).
+            "Button(\"Revert\") {\n                    revertToFile()",
         ]
         for expected in mustAppear {
             XCTAssertTrue(source.contains(expected), "CourseSettingsView no longer says: " + expected)
@@ -455,113 +458,12 @@ final class GradedFolderChoicesTests: XCTestCase {
         )
     }
 
-    // MARK: - The trail, written when the file is
+    // MARK: - The trail
 
-    /// How many trail lines record `Labs` leaving the per-section folders.
-    private func linesExcludingLabs() -> Int {
-        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
-        var matchingLines: Int = 0
-        for line in trail.components(separatedBy: "\n") {
-            if line.hasSuffix("excluded per-section folder Labs in ICS3U") {
-                matchingLines += 1
-            }
-        }
-        return matchingLines
-    }
-
-    /// A course with a real `course_config.json` and a `Labs` folder in its
-    /// only section — the course the trail tests remove `Labs` from.
-    private func makeCourseWithLabs(named name: String) throws -> Course {
-        return try makeCourse(
-            named: name,
-            sharedFolders: ["Concepts"],
-            perSectionFolders: ["All Classes", "Labs"],
-            directories: ["Concepts", "section1/All Classes", "section1/Labs"],
-            writesTheFile: true
-        )
-    }
-
-    /// (i) A removal the teacher takes back with Revert leaves NO line: the
-    /// file never changed, so the site never lost the folder (#152, from
-    /// #85's third item). Until #152 the line was written on the click and
-    /// outlived the Revert.
-    func testARemovalRevertedBeforeSavingLeavesNoLineOnTheTrail() throws {
-        let course: Course = try makeCourseWithLabs(named: "reverted")
-        let view: CourseSettingsView = CourseSettingsView(course: course)
-
-        removeThroughTheListEditor("Labs", scope: .perSection, in: view)
-        try course.configuration.revertToFile(at: course.configFileURL)
-
-        XCTAssertEqual(linesExcludingLabs(), 0)
-        XCTAssertEqual(course.configuration.perSectionFolders, ["All Classes", "Labs"])
-    }
-
-    /// (ii) A removal that is saved leaves exactly ONE line (rule 5) — the
-    /// point the old on-click test made, kept.
-    func testARemovalSavedLeavesExactlyOneLineOnTheTrail() throws {
-        let course: Course = try makeCourseWithLabs(named: "saved")
-        let view: CourseSettingsView = CourseSettingsView(course: course)
-
-        removeThroughTheListEditor("Labs", scope: .perSection, in: view)
-        view.save()
-
-        XCTAssertEqual(linesExcludingLabs(), 1, ActivityTrail.store.activityText(includingPrompts: true))
-        let onDisk: CourseConfiguration = try CourseConfiguration(contentsOf: course.configFileURL)
-        XCTAssertEqual(onDisk.excludedItems(forScope: "per_section"), ["Labs"])
-    }
-
-    /// (iii) Removed and added back before Save: the file's exclusions did
-    /// not change, so there is nothing to record — not an "excluded" and a
-    /// "re-included" for a folder that never left the site.
-    func testARemovalAddedBackBeforeSavingLeavesNoLineOnTheTrail() throws {
-        let course: Course = try makeCourseWithLabs(named: "added-back")
-        let view: CourseSettingsView = CourseSettingsView(course: course)
-
-        removeThroughTheListEditor("Labs", scope: .perSection, in: view)
-        CourseSettingsGestureScript.editor(for: .perSectionFolders, of: view).add(typedName: "Labs")
-        course.configuration.courseName = "Something to save"
-        view.save()
-
-        XCTAssertEqual(linesExcludingLabs(), 0)
-        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
-        XCTAssertFalse(trail.contains("re-included per-section folder Labs"), trail)
-    }
-
-    /// (iv) A removal saved by ANOTHER writer of the same configuration
-    /// leaves its line too. Remove `Labs` in Settings without saving, add a
-    /// section from the sidebar: `excluded_items` reaches the file through
-    /// Add Section, and a comparison made only at Settings' Save would find it
-    /// already there and record nothing, ever (#152's plan review, finding 1).
-    func testARemovalSavedByAddingASectionLeavesItsLineOnTheTrail() throws {
-        let course: Course = try makeCourseWithLabs(named: "add-section")
-        let view: CourseSettingsView = CourseSettingsView(course: course)
-
-        removeThroughTheListEditor("Labs", scope: .perSection, in: view)
-        try SectionAdder.addSection(2, to: course)
-
-        XCTAssertEqual(linesExcludingLabs(), 1, ActivityTrail.store.activityText(includingPrompts: true))
-        view.save()
-        XCTAssertEqual(linesExcludingLabs(), 1, "a later Save must not record it a second time")
-    }
-
-    /// (v) A write that fails records nothing: the removal did not reach the
-    /// file, so a line would be false. The course folder is made read-only,
-    /// so the atomic write cannot place its file.
-    func testARemovalWhoseSaveFailsLeavesNoLineOnTheTrail() throws {
-        let course: Course = try makeCourseWithLabs(named: "read-only")
-        let view: CourseSettingsView = CourseSettingsView(course: course)
-        removeThroughTheListEditor("Labs", scope: .perSection, in: view)
-
-        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: course.directoryURL.path)
-        defer {
-            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: course.directoryURL.path)
-        }
-        view.save()
-
-        XCTAssertEqual(linesExcludingLabs(), 0)
-        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
-        XCTAssertTrue(trail.contains("could not save the settings for ICS3U"), trail)
-    }
+    /// When `item excluded`, `item re-included` and `exclusions reverted` are
+    /// written — on the click, and at a Revert — is
+    /// `contracts/shared-rules.json` → `excludedItems.recordedOnClick`, played
+    /// through this same page by `ExcludedItemsContractTests`.
 
     /// The still-offered question itself, asked the way the BUILD asks it.
     ///

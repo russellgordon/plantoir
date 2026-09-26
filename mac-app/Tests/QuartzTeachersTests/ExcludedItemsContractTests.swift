@@ -57,112 +57,142 @@ final class ExcludedItemsContractTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(casesAsked, 4)
     }
 
-    /// `excludedItems.recordedOnSave`, played through `ExclusionTrail.changes`
-    /// — the comparison `CourseConfiguration.write(to:)` makes of the file
-    /// before a write with what it wrote. No case has anything on disk, so
-    /// no course folder is given.
-    func testWhatAWriteRecordsMatchesTheContract() throws {
-        let cases: [[String: Any]] = try XCTUnwrap(try ExcludedItemsContractTests.rule("recordedOnSave")["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 8, "the contract lost recorded-on-save cases")
+    /// `excludedItems.recordedOnClick`, every case played through Course
+    /// Settings itself: each list's own editor (`CourseSettingsGestureScript`),
+    /// the Revert button's `revertToFile()`, `save()`, and `SectionAdder` for
+    /// a section added from the sidebar. The trail is read back and every
+    /// exclusion line turned into the contract's event, scope, kind, name or
+    /// count — the words are this app's own (Russell's decision of 2026-09-06,
+    /// overnight/issues/09-item-excluded-trail-on-click.md; #152).
+    func testWhenAnExclusionIsWrittenOnTheTrailMatchesTheContract() throws {
+        let cases: [[String: Any]] = try XCTUnwrap(try ExcludedItemsContractTests.rule("recordedOnClick")["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 9, "the contract lost recorded-on-click cases")
+
+        var index: Int = 0
         for testCase in cases {
             let caseName: String = testCase["name"] as? String ?? "unnamed"
-            let before: [String: Any] = try XCTUnwrap(testCase["before"] as? [String: Any], caseName)
-            let written: [String: Any] = try XCTUnwrap(testCase["written"] as? [String: Any], caseName)
-            let expected: [[String: String]] = try XCTUnwrap(testCase["expect"] as? [[String: String]], caseName)
+            let root: URL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("recorded-on-click-\(index)-\(UUID().uuidString)")
+            index += 1
+            let previousStore: ProblemReportStore = ActivityTrail.store
+            ActivityTrail.store = ProblemReportStore(folderURL: root.appendingPathComponent(".trail"))
+            defer {
+                ActivityTrail.store = previousStore
+                try? FileManager.default.removeItem(at: root)
+            }
 
-            var described: [[String: String]] = []
-            for change in ExclusionTrail.changes(before: before, written: written) {
-                var scope: String = "shared"
-                if change.scope == FolderScope.perSection {
-                    scope = "per_section"
+            let course: Course = try ExcludedItemsContractTests.makeCourse(in: root, from: testCase)
+            let view: CourseSettingsView = CourseSettingsView(course: course)
+            let steps: [[String: Any]] = try XCTUnwrap(testCase["steps"] as? [[String: Any]], caseName)
+            for step in steps {
+                if let removal = step["remove"] as? [String: String] {
+                    let editor: StringListEditorView = CourseSettingsGestureScript.editor(
+                        for: try ExcludedItemsContractTests.gestureList(removal["list"]), of: view
+                    )
+                    editor.removeItem(named: try XCTUnwrap(removal["name"], caseName))
+                } else if let addition = step["add"] as? [String: String] {
+                    let editor: StringListEditorView = CourseSettingsGestureScript.editor(
+                        for: try ExcludedItemsContractTests.gestureList(addition["list"]), of: view
+                    )
+                    editor.add(typedName: try XCTUnwrap(addition["name"], caseName))
+                } else if step["revert"] != nil {
+                    view.revertToFile()
+                } else if step["save"] != nil {
+                    view.save()
+                } else if let section = step["addSection"] as? Int {
+                    try SectionAdder.addSection(section, to: course)
+                } else {
+                    XCTFail(caseName + ": an unknown step " + String(describing: step))
                 }
-                described.append([
-                    "event": change.event.rawValue, "scope": scope,
-                    "kind": change.kind.rawValue, "name": change.name,
-                ])
             }
-            XCTAssertEqual(described, expected, caseName)
+
+            let expected: [[String: AnyHashable]] = try XCTUnwrap(testCase["expect"] as? [[String: AnyHashable]], caseName)
+            XCTAssertEqual(ExcludedItemsContractTests.exclusionEventsOnTheTrail(), expected, caseName)
         }
     }
 
-    /// The kind of a name in neither list comes from the disk: a folder added
-    /// and then removed before saving was made by Course Settings
-    /// (`createFoldersOnDisk`), so the line still says "folder" (the plan
-    /// review's finding 10).
-    func testANameInNeitherListTakesItsKindFromTheDisk() throws {
-        let courseURL: URL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("exclusion-kind-\(UUID().uuidString)")
-        defer { try? FileManager.default.removeItem(at: courseURL) }
-        try FileManager.default.createDirectory(
-            at: courseURL.appendingPathComponent("Field Trips"), withIntermediateDirectories: true
-        )
-        try FileManager.default.createDirectory(
-            at: courseURL.appendingPathComponent("section1/Labs"), withIntermediateDirectories: true
-        )
-        try Data("# notes".utf8).write(to: courseURL.appendingPathComponent("section1/Notes.md"))
+    // MARK: - Helpers
 
-        let written: [String: Any] = [
-            "excluded_items": ["shared": ["Field Trips", "Drafts"], "per_section": ["Labs", "Notes.md"]],
-        ]
-        let changes: [ExclusionTrail.Change] = ExclusionTrail.changes(
-            before: [:], written: written, courseDirectory: courseURL
-        )
-        var kinds: [String] = []
-        for change in changes {
-            kinds.append(change.name + "=" + change.kind.rawValue)
+    private static func gestureList(_ key: String?) throws -> GestureList {
+        switch key {
+        case "shared_folders":
+            return .sharedFolders
+        case "per_section_folders":
+            return .perSectionFolders
+        case "shared_files":
+            return .sharedFiles
+        case "per_section_files":
+            return .perSectionFiles
+        default:
+            throw NSError(domain: "ExcludedItemsContractTests", code: 1)
         }
-        XCTAssertEqual(kinds, ["Field Trips=folder", "Drafts=item", "Labs=folder", "Notes.md=file"])
-        XCTAssertEqual(
-            ExclusionTrail.line(for: changes[3], courseCode: "ICS3U"),
-            "excluded per-section file Notes.md in ICS3U"
-        )
     }
 
-    /// An exclusion ANOTHER copy of the configuration already saved is not
-    /// this write's to record — the comparison is with the file as it was
-    /// before this write, not with what this copy last read. Two windows on
-    /// one working folder hold two copies (#265): A removes `Labs` and saves
-    /// (one line); B, which read the file before that, saves an unrelated
-    /// change, and the per-key merge keeps A's `excluded_items`. Compared
-    /// with B's own last read, `Labs` would be recorded a second time.
-    func testAnExclusionAnotherCopyAlreadySavedIsNotThisWritesToRecord() throws {
-        let root: URL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("exclusion-two-copies-\(UUID().uuidString)")
-        let previousStore: ProblemReportStore = ActivityTrail.store
-        ActivityTrail.store = ProblemReportStore(folderURL: root.appendingPathComponent(".trail"))
-        defer {
-            ActivityTrail.store = previousStore
-            try? FileManager.default.removeItem(at: root)
-        }
+    /// A one-section course with a real course_config.json, its folder
+    /// lists' folders on disk and its file lists' pages there too.
+    private static func makeCourse(in root: URL, from testCase: [String: Any]) throws -> Course {
         let courseURL: URL = root.appendingPathComponent("ICS3U")
-        try FileManager.default.createDirectory(
-            at: courseURL.appendingPathComponent("section1/Labs"), withIntermediateDirectories: true
-        )
-        let fileURL: URL = courseURL.appendingPathComponent("course_config.json")
-        let values: [String: Any] = [
-            "course_code": "ICS3U", "course_name": "Two copies", "section_numbers": [1],
-            "shared_folders": ["Concepts"], "per_section_folders": ["All Classes", "Labs"],
-        ]
-        try JSONSerialization.data(withJSONObject: values, options: [.prettyPrinted, .sortedKeys]).write(to: fileURL)
-        let windowA: CourseConfiguration = try CourseConfiguration(contentsOf: fileURL)
-        let windowB: CourseConfiguration = try CourseConfiguration(contentsOf: fileURL)
-
-        windowA.perSectionFolders = ["All Classes"]
-        windowA.exclude("Labs", inScope: "per_section")
-        let first: CourseConfiguration.WriteResult = try windowA.write(to: fileURL)
-        XCTAssertEqual(first.exclusionChanges.count, 1)
-
-        windowB.courseName = "Renamed in the other window"
-        let second: CourseConfiguration.WriteResult = try windowB.write(to: fileURL)
-        XCTAssertEqual(second.exclusionChanges, [], "B's write did not exclude anything")
-        XCTAssertEqual(windowB.excludedItems(forScope: "per_section"), ["Labs"], "the merge kept A's exclusion")
-
-        var lines: Int = 0
-        for line in ActivityTrail.store.activityText(includingPrompts: true).components(separatedBy: "\n") {
-            if line.hasSuffix("excluded per-section folder Labs in ICS3U") {
-                lines += 1
-            }
+        let sharedFolders: [String] = testCase["sharedFolders"] as? [String] ?? []
+        let perSectionFolders: [String] = testCase["perSectionFolders"] as? [String] ?? []
+        let sharedFiles: [String] = testCase["sharedFiles"] as? [String] ?? []
+        let perSectionFiles: [String] = testCase["perSectionFiles"] as? [String] ?? []
+        for folder in sharedFolders {
+            try FileManager.default.createDirectory(at: courseURL.appendingPathComponent(folder), withIntermediateDirectories: true)
         }
-        XCTAssertEqual(lines, 1)
+        for folder in perSectionFolders {
+            try FileManager.default.createDirectory(
+                at: courseURL.appendingPathComponent("section1").appendingPathComponent(folder), withIntermediateDirectories: true
+            )
+        }
+        for file in sharedFiles {
+            try Data("# page".utf8).write(to: courseURL.appendingPathComponent(file))
+        }
+        for file in perSectionFiles {
+            try Data("---\ntitle: page\n---\n".utf8).write(to: courseURL.appendingPathComponent("section1").appendingPathComponent(file))
+        }
+        let values: [String: Any] = [
+            "course_code": "ICS3U", "course_name": "Recorded on click", "section_numbers": [1], "num_sections": 1,
+            "shared_folders": sharedFolders, "per_section_folders": perSectionFolders,
+            "shared_files": sharedFiles, "per_section_files": perSectionFiles,
+        ]
+        let fileURL: URL = courseURL.appendingPathComponent("course_config.json")
+        try JSONSerialization.data(withJSONObject: values, options: [.prettyPrinted, .sortedKeys]).write(to: fileURL)
+        return Course(code: "ICS3U", directoryURL: courseURL, configuration: try CourseConfiguration(contentsOf: fileURL))
+    }
+
+    /// The trail's exclusion lines as the contract describes them.
+    private static func exclusionEventsOnTheTrail() -> [[String: AnyHashable]] {
+        var events: [[String: AnyHashable]] = []
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        for line in trail.components(separatedBy: "\n") {
+            guard let separator = line.range(of: " · ") else {
+                continue
+            }
+            let text: String = String(line[separator.upperBound...])
+            let words: [String] = text.components(separatedBy: " ")
+            if text.hasPrefix("reverted ") && text.contains("unsaved exclusion change") && words.count > 1 {
+                events.append(["event": "exclusions reverted", "count": Int(words[1]) ?? -1])
+                continue
+            }
+            var event: String = ""
+            if text.hasPrefix("excluded ") {
+                event = "item excluded"
+            } else if text.hasPrefix("re-included ") {
+                event = "item re-included"
+            } else {
+                continue
+            }
+            // "<verb> <scope> <kind> <name…> in <code>"
+            guard words.count >= 6, let inIndex = words.lastIndex(of: "in") else {
+                continue
+            }
+            var scope: String = "shared"
+            if words[1] == "per-section" {
+                scope = "per_section"
+            }
+            let name: String = words[3..<inIndex].joined(separator: " ")
+            events.append(["event": event, "scope": scope, "kind": words[2], "name": name])
+        }
+        return events
     }
 }
