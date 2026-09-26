@@ -483,13 +483,20 @@ fi
 # behavioural — a real preview-then-publish cycle would add minutes to every
 # run of this script — but it catches the guard being deleted, which is how it
 # came to be missing in the first place.
+#
+# deploy.sh is asked for its ONE reader of the rule (#291), which
+# scripts/test_preview_build_detection.py then runs against every case in
+# contracts/app-rules.json; deploy.ps1 still carries the bare address until
+# Windows adopts the same rule (GitHub #272).
 _folder_guard_ok=true
-for _launcher in deploy.sh deploy.ps1; do
-  if ! grep -q "ws://localhost:" "$_launcher"; then
-    _folder_guard_ok=false
-    echo "   $_launcher does not check for a preview build before publishing to a folder"
-  fi
-done
+if ! grep -q 'site_carries_preview_client "${PUBLIC_DIR_HOST}"' deploy.sh; then
+  _folder_guard_ok=false
+  echo "   deploy.sh does not check for a preview build before publishing to a folder"
+fi
+if ! grep -q "ws://localhost:" deploy.ps1; then
+  _folder_guard_ok=false
+  echo "   deploy.ps1 does not check for a preview build before publishing to a folder"
+fi
 if [ "$_folder_guard_ok" = true ]; then
   pass "publishing to a folder refuses a preview build (deploy.sh and deploy.ps1)"
 else
@@ -1028,6 +1035,31 @@ check_baked support/favicon/icon.svg      /opt/support/favicon/icon.svg
 check_baked support/favicon/apple-touch-icon.png /opt/support/favicon/apple-touch-icon.png
 check_baked support/favicon/icon.png      /opt/support/favicon/icon.png
 [[ "$BAKED_OK" == "true" ]] && pass "Baked scripts, patches, and support files match the working tree"
+
+# -------------------- 4a. The live-reload client is still the one the rule names --------------------
+# Every check for "this site is a preview's" looks for the client's script tag
+# followed by its first statement (contracts/app-rules.json ->
+# buildFreshness.previewBuild.signature, #291). Those bytes are Quartz's, not
+# ours: if a Quartz raise or a patch changes them, the rule matches NOTHING,
+# every preview reads as a production build, and a preview is published — the
+# one catastrophic direction. So the three source lines that produce them are
+# asked for here, in the image, which takes seconds rather than a serve cycle
+# and fails the day Quartz is raised. verify-deploy.sh checks a real
+# serve-mode page against the rule as well.
+echo ""
+echo "🔎 Checking the image's Quartz still writes the live-reload client the preview rule looks for…"
+CLIENT_OK="true"
+check_client_source() {
+  local image_path="$1" expected="$2"
+  if ! docker run --rm "$DEV_TEST_IMAGE" grep -Fq -- "$expected" "$image_path" 2>/dev/null; then
+    CLIENT_OK="false"
+    fail "$image_path no longer holds: $expected — re-measure the preview rule in contracts/app-rules.json (#291)"
+  fi
+}
+check_client_source /opt/quartz/quartz/plugins/index.ts "const socket = new WebSocket('\${wsUrl}')"
+check_client_source /opt/quartz/quartz/plugins/index.ts 'ws://localhost:${ctx.argv.wsPort}'
+check_client_source /opt/quartz/quartz/util/resources.tsx 'moduleType ?? "application/javascript"'
+[[ "$CLIENT_OK" == "true" ]] && pass "The image's Quartz writes the live-reload client the preview rule looks for (#291)"
 
 # -------------------- 4b. The hide filter must be IN THE IMAGE --------------------
 # The Explorer's filterFn is what makes a teacher's hidden pages hidden, and
