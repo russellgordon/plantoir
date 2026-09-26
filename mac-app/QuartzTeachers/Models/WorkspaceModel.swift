@@ -51,13 +51,16 @@ class WorkspaceModel {
     /// renders — see `WindowStartRule` for the rule and why. A window that
     /// may yet claim a remembered window waits quietly instead, and settles
     /// when its claim resolves (`WindowRootView.attemptClaim`).
-    func adoptFolderForNewWindow() {
+    ///
+    /// `models` is the open windows' models — a parameter only so a test can
+    /// play a lone window, since the hosted suite's own window is always open.
+    func adoptFolderForNewWindow(among models: [WorkspaceModel] = WorkspaceModel.windowModels) {
         guard workspaceURL == nil, !hasSettledItsFolder else {
             return
         }
         var otherWindowCount: Int = 0
         var otherOpenFolderPaths: [String] = []
-        for existing in WorkspaceModel.windowModels {
+        for existing in models {
             if existing !== self {
                 otherWindowCount += 1
                 if let path = existing.workspaceURL?.path {

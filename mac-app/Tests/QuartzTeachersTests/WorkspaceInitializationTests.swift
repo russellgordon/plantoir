@@ -111,10 +111,11 @@ final class WorkspacePersistenceTests: XCTestCase {
     // MARK: - Functions
 
     @MainActor
-    /// A brand-new model adopts nothing on its own: a lone new window
-    /// shows the picker, and restored or inherited folders arrive through
-    /// the window claims and the new-window policy — never silently from
-    /// the last-used preference.
+    /// A brand-new model adopts nothing in its INITIALIZER: the window-group
+    /// closure runs on every render, so the folder is decided in the
+    /// window's onAppear (`adoptFolderForNewWindow` — a lone window reopens
+    /// the last working folder since #311, see
+    /// `ReopeningTheLastWorkingFolderTests`).
     func testAFreshModelStartsWithoutAFolder() throws {
         let defaults: UserDefaults = TestDefaults.make()
         let folderURL: URL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("ws-\(UUID().uuidString)")
@@ -125,7 +126,7 @@ final class WorkspacePersistenceTests: XCTestCase {
         workspace.chooseWorkspace(at: folderURL)
 
         let reopened: WorkspaceModel = WorkspaceModel(defaults: defaults)
-        XCTAssertNil(reopened.workspaceURL, "A fresh window opens without a folder, even after one was chosen before")
+        XCTAssertNil(reopened.workspaceURL, "A model decides nothing until its window appears")
         XCTAssertEqual(defaults.string(forKey: WorkspaceModel.storedPathKey), folderURL.path,
                        "The choice is still recorded, for preference migration")
     }
@@ -159,12 +160,14 @@ final class WorkspacePersistenceTests: XCTestCase {
                        "The folder must be known before anything renders")
     }
 
-    /// What a brand-new window opens to, by policy: nothing when it is
-    /// the only window; the key window's folder otherwise.
+    /// What a brand-new window BESIDE open ones opens to: the key window's
+    /// folder. With none open this answers nil — a lone window is a separate
+    /// branch (`WindowStartRule.start`), which reopens the last working
+    /// folder since #311.
     @MainActor
     func testANewWindowFollowsTheKeyWindow() {
         XCTAssertNil(WorkspaceModel.folderForNewWindow(otherOpenFolderPaths: [], mostRecentKeyPath: "/a"),
-                     "With no other windows open, a new window has no folder — even if one was key earlier")
+                     "With no other window's folder there is nothing to inherit — even if one was key earlier")
         XCTAssertEqual(WorkspaceModel.folderForNewWindow(otherOpenFolderPaths: ["/a", "/b"], mostRecentKeyPath: "/b"), "/b",
                        "The key window's folder wins")
         XCTAssertEqual(WorkspaceModel.folderForNewWindow(otherOpenFolderPaths: ["/a", "/b"], mostRecentKeyPath: "/gone"), "/a",
