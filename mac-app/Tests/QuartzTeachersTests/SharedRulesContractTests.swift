@@ -25,6 +25,8 @@ final class SharedRulesContractTests: XCTestCase {
     func testScheduledDeploysRefuseWhatTheContractSays() throws {
         let section: [String: Any] = try SharedRulesContractTests.section("scheduledDeployRefusals")
         let now: Date = Date(timeIntervalSince1970: 1_786_000_000)
+        var wording: [String: String] = try XCTUnwrap(section["wording"] as? [String: String])
+        wording["note"] = nil
 
         for testCase in try XCTUnwrap(section["cases"] as? [[String: Any]]) {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
@@ -69,7 +71,218 @@ final class SharedRulesContractTests: XCTestCase {
                 SharedRulesContractTests.name(ofRefusal: said), expected,
                 "\(name): refused, but not for the reason the contract names — it said \"\(said)\""
             )
+            // The two never-deployed refusals are compared WHOLE, rendered
+            // from the contract's template (#322): both contain "has never
+            // been deployed to", so a phrase cannot tell them apart, and the
+            // destination the sentence names is the point of it.
+            if let template = wording[expected] {
+                let destination: String = try XCTUnwrap(
+                    testCase["destinationNamed"] as? String, "\(name): names no destination"
+                )
+                XCTAssertEqual(
+                    said,
+                    SharedRulesContractTests.render(
+                        template, ["course": "ICS3U", "section": "1", "destination": destination]
+                    ),
+                    "\(name): not the contract's sentence"
+                )
+            }
         }
+    }
+
+    /// The Swift renders the contract's two never-deployed templates exactly.
+    func testTheNeverDeployedSentencesAreTheContractsTemplates() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("scheduledDeployRefusals")
+        let wording: [String: String] = try XCTUnwrap(section["wording"] as? [String: String])
+        let values: [String: String] = ["course": "SPH4U", "section": "3", "destination": "Cloudflare Pages"]
+        XCTAssertEqual(
+            ScheduledDeployWording.neverDeployed(course: "SPH4U", section: 3, destination: "Cloudflare Pages"),
+            SharedRulesContractTests.render(try XCTUnwrap(wording["neverDeployed"]), values)
+        )
+        XCTAssertEqual(
+            ScheduledDeployWording.additionalDestinationNeverDeployed(
+                course: "SPH4U", section: 3, destination: "Cloudflare Pages"
+            ),
+            SharedRulesContractTests.render(try XCTUnwrap(wording["additionalDestinationNeverDeployed"]), values)
+        )
+    }
+
+    /// A contract template with each `{name}` filled in.
+    static func render(_ template: String, _ values: [String: String]) -> String {
+        var rendered: String = template
+        for (name, value) in values {
+            rendered = rendered.replacingOccurrences(of: "{\(name)}", with: value)
+        }
+        return rendered
+    }
+
+    // MARK: - The assistant reads a course's settings at the call (#322)
+
+    /// Each case opens the assistant on a folder, THEN changes the files on
+    /// disk as Course Settings in another window (or another program) would,
+    /// then makes one call — and the call must act on the files as they are.
+    func testTheAssistantReadsSettingsAtTheCall() async throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("assistantReadsSettingsAtTheCall")
+        let refusals: [String: Any] = try SharedRulesContractTests.section("scheduledDeployRefusals")
+        let refusalWording: [String: String] = try XCTUnwrap(refusals["wording"] as? [String: String])
+        let cases: [[String: Any]] = try XCTUnwrap(section["cases"] as? [[String: Any]])
+        XCTAssertFalse(cases.isEmpty)
+
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let opened: [String: Any] = testCase["opened"] as? [String: Any] ?? [:]
+            let surface: AssistToolRunner.Surface
+            switch try XCTUnwrap(testCase["surface"] as? String) {
+            case "window":
+                surface = .local
+            case "outsideAssistant":
+                surface = .mcp
+            default:
+                XCTFail("\(name): unknown surface")
+                continue
+            }
+
+            // The folder as it was when the assistant opened.
+            let made: AssistFixture.Made = try AssistFixture.makeRunner(
+                hasDeployedBefore: opened["hasDeployedBefore"] as? Bool ?? false, surface: surface
+            )
+            let root: URL = made.root
+            defer { try? FileManager.default.removeItem(at: root) }
+            let agents: URL = root.appendingPathComponent("LaunchAgents")
+            try FileManager.default.createDirectory(at: agents, withIntermediateDirectories: true)
+            ScheduledDeploy.launchAgentsDirectoryOverride = agents
+            ScheduledDeploy.scheduledScriptsDirectoryOverride = root.appendingPathComponent("scheduled")
+            defer {
+                ScheduledDeploy.launchAgentsDirectoryOverride = nil
+                ScheduledDeploy.scheduledScriptsDirectoryOverride = nil
+            }
+            let savedFolder: URL = root.appendingPathComponent("published-here")
+            try FileManager.default.createDirectory(at: savedFolder, withIntermediateDirectories: true)
+            let configURL: URL = root.appendingPathComponent("courses/ICS3U/course_config.json")
+            if let target = opened["target"] as? String {
+                try SharedRulesContractTests.change(
+                    configURL, ["deploy_target": target, "deploy_folder_path": savedFolder.path]
+                )
+            }
+            let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
+            workspace.chooseWorkspace(at: root)
+            let siteWork: AssistSettingsFreshnessTests.RecordingSiteWork = AssistSettingsFreshnessTests.RecordingSiteWork()
+            let runner: AssistToolRunner = AssistToolRunner(
+                workspace: workspace, siteWork: siteWork,
+                today: { return CalendarDay(year: 2026, month: 9, day: 8)! },
+                launchControl: SilentLaunchControl(), surface: surface
+            )
+            SectionWindowControllers.shared.forgetAll()
+
+            // Then the files change underneath it.
+            if let saved = testCase["thenSaved"] as? [String: Any] {
+                var changes: [String: Any] = [:]
+                if let target = saved["target"] as? String {
+                    changes["deploy_target"] = target
+                    changes["deploy_folder_path"] = target == "local_folder" ? savedFolder.path : ""
+                }
+                if let sections = saved["sections"] as? [Int] {
+                    changes["section_numbers"] = sections
+                    changes["num_sections"] = sections.count
+                    for number in sections {
+                        try FileManager.default.createDirectory(
+                            at: root.appendingPathComponent("courses/ICS3U/section\(number)/All Classes"),
+                            withIntermediateDirectories: true
+                        )
+                    }
+                }
+                try SharedRulesContractTests.change(configURL, changes)
+            }
+            if let created = testCase["thenCreated"] as? [String: Any] {
+                let code: String = try XCTUnwrap(created["code"] as? String)
+                let courseURL: URL = root.appendingPathComponent("courses").appendingPathComponent(code)
+                try FileManager.default.createDirectory(
+                    at: courseURL.appendingPathComponent("section1/All Classes"), withIntermediateDirectories: true
+                )
+                let configuration: [String: Any] = [
+                    "course_code": code, "course_name": "Made after the assistant opened",
+                    "section_numbers": [1], "num_sections": 1,
+                ]
+                try JSONSerialization.data(withJSONObject: configuration)
+                    .write(to: courseURL.appendingPathComponent("course_config.json"))
+            }
+
+            let asked: [String: Any] = try XCTUnwrap(testCase["call"] as? [String: Any])
+            let arguments: [String: Any] = asked["arguments"] as? [String: Any] ?? [:]
+            let encoded: Data = try JSONSerialization.data(withJSONObject: arguments)
+            let toolCall: AssistToolCall = AssistToolCall(
+                id: UUID().uuidString, type: "function",
+                function: AssistToolCall.Function(
+                    name: try XCTUnwrap(asked["tool"] as? String),
+                    arguments: String(decoding: encoded, as: UTF8.self)
+                )
+            )
+            let expect: [String: Any] = try XCTUnwrap(testCase["expect"] as? [String: Any])
+            func filledIn(_ text: String) -> String {
+                return text.replacingOccurrences(of: "{savedFolder}", with: savedFolder.path)
+            }
+
+            // The card is read without running anything.
+            if let named = expect["cardNames"] as? String {
+                let card: String = runner.explain(call: toolCall)
+                XCTAssertTrue(card.contains(filledIn(named)), "\(name): the card says \"\(card)\"")
+                if let notNamed = expect["cardDoesNotName"] as? String {
+                    XCTAssertFalse(card.contains(notNamed), "\(name): the card says \"\(card)\"")
+                }
+                continue
+            }
+
+            let outcome: AssistToolOutcome = await runner.run(call: toolCall)
+            if let wanted = expect["outcome"] as? String, wanted == "scheduled" {
+                XCTAssertTrue(outcome.summary.hasPrefix("Scheduled:"), "\(name): \(outcome.summary)")
+                if let destination = expect["destination"] as? String {
+                    XCTAssertTrue(outcome.summary.contains(filledIn(destination)), "\(name): \(outcome.summary)")
+                }
+            }
+            if let wanted = expect["outcome"] as? String, wanted == "refused" {
+                let key: String = try XCTUnwrap(expect["refusal"] as? String)
+                let destination: String = try XCTUnwrap(expect["destinationNamed"] as? String)
+                let sentence: String = SharedRulesContractTests.render(
+                    try XCTUnwrap(refusalWording[key]),
+                    ["course": "ICS3U", "section": "1", "destination": destination]
+                )
+                XCTAssertEqual(outcome.summary, "Nothing was scheduled. " + sentence, "\(name)")
+            }
+            if let schedulable = expect["schedulable"] as? Bool {
+                XCTAssertEqual(
+                    outcome.summary,
+                    schedulable ? "Worked out what scheduling that deploy would mean."
+                                : "That deploy cannot be scheduled.",
+                    "\(name): \(outcome.detail)"
+                )
+            }
+            if let deployedTo = expect["deployedTo"] as? [String] {
+                XCTAssertEqual(siteWork.destinationTypesSeen, [deployedTo], "\(name): \(outcome.summary)")
+            }
+            if let found = expect["found"] as? Bool, found {
+                let number: Int = arguments["section"] as? Int ?? 1
+                XCTAssertTrue(
+                    outcome.summary.contains("ICS3U Section \(number)"), "\(name): \(outcome.summary)"
+                )
+            }
+            if let listed = expect["lists"] as? [String] {
+                for code in listed {
+                    XCTAssertTrue(outcome.detail.contains(code), "\(name): \(code) not in \(outcome.detail)")
+                }
+            }
+        }
+    }
+
+    /// Another program saves these keys into a settings file.
+    private static func change(_ configURL: URL, _ changes: [String: Any]) throws {
+        var values: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: try Data(contentsOf: configURL)) as? [String: Any]
+        )
+        for (key, value) in changes {
+            values[key] = value
+        }
+        try JSONSerialization.data(withJSONObject: values, options: [.prettyPrinted])
+            .write(to: configURL, options: [.atomic])
     }
 
     // MARK: - What the sidebar's filter shows
@@ -2168,7 +2381,10 @@ final class SharedRulesContractTests: XCTestCase {
         if said.contains("Account ID") {
             return "cloudflareAccountMissing"
         }
-        if said.contains("never been deployed to") {
+        // Since #322 both never-deployed sentences say "never been deployed
+        // to"; only the additional one asks what to call "that site". The
+        // whole sentence is compared in the test itself.
+        if said.contains("asks what to call that site") {
             return "additionalDestinationNeverDeployed"
         }
         if said.contains("never been deployed") {

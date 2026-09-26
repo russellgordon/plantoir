@@ -502,7 +502,14 @@ enum ScheduledDeploy {
         }
 
         if !DeployCommand.hasDeployedBefore(section: sectionNumber, in: course) {
-            return "\(course.code) Section \(sectionNumber) has never been deployed, so deploying it asks what to call the website. Nobody would be there to answer that at the scheduled time, and it would wait. Deploy it once from Plantoir, and after that it can be scheduled."
+            // Names the destination (#322): the refusal only fires for a
+            // Netlify or Cloudflare primary — a folder keeps no marker and
+            // `hasDeployedBefore` calls it always ready.
+            return ScheduledDeployWording.neverDeployed(
+                course: course.code,
+                section: sectionNumber,
+                destination: DeployCommand.destinationDescription(for: configuration)
+            )
         }
 
         // Same reasoning, for any additional destination that has never
@@ -514,7 +521,9 @@ enum ScheduledDeploy {
                 let destinationName: String = DeployCommand.destinationDescription(
                     for: CourseConfiguration.DeployDestination(type: target.type, path: target.path)
                 )
-                return "\(course.code) Section \(sectionNumber) has never been deployed to \(destinationName), so deploying it there asks what to call that site. Nobody would be there to answer that at the scheduled time, and it would wait. Deploy it there once from Plantoir, and after that it can be scheduled."
+                return ScheduledDeployWording.additionalDestinationNeverDeployed(
+                    course: course.code, section: sectionNumber, destination: destinationName
+                )
             }
         }
 
@@ -1382,6 +1391,51 @@ enum ScheduledDeploy {
             }
         }
         return anyRestored && allRestored
+    }
+
+    /// A scheduled deploy was ASKED FOR and refused before anything was
+    /// written — by the schedule sheet's button, or by `schedule_deploy`
+    /// from either assistant (GitHub #322). Not by the approval card or
+    /// `plan_scheduled_deploy`: those are advisory and repeat.
+    ///
+    /// Names the destination the refusal was reached for, because that is
+    /// what #322 needed and nothing on the trail said: the teacher had saved
+    /// the course as deploying to a folder, and the assistant refused it as
+    /// "never deployed" from a copy that still said Netlify. With this line
+    /// the contradiction sits two lines under "saved the settings", readable
+    /// without the code. The destination is named by KIND — a folder's path
+    /// is not written here — and only the refusal's first sentence is kept.
+    static func noteRefusedBeforeAnythingWasWritten(
+        course: Course,
+        sectionNumber: Int,
+        when: Date,
+        refusal: String
+    ) {
+        ActivityTrail.note(
+            .scheduledDeployCouldNotBeSet,
+            "could not set a scheduled deploy for \(dayAndTimeText(when)): refused before anything was written, "
+                + "deploying to \(destinationKind(of: course.configuration)): \(firstSentence(of: refusal))",
+            course: course.code,
+            section: sectionNumber
+        )
+    }
+
+    /// Where the course's primary destination is, by kind rather than by
+    /// path: "Netlify", "Cloudflare Pages" or "a folder".
+    static func destinationKind(of configuration: CourseConfiguration) -> String {
+        if configuration.deployTarget == "local_folder" {
+            return "a folder"
+        }
+        return DeployCommand.destinationDescription(for: configuration)
+    }
+
+    /// The text up to and including its first full stop followed by a
+    /// space, or all of it when there is none.
+    static func firstSentence(of text: String) -> String {
+        guard let end = text.range(of: ". ") else {
+            return text
+        }
+        return String(text[text.startIndex..<end.lowerBound]) + "."
     }
 
     /// The new deploy's files could not be written. The old ones' plists are
