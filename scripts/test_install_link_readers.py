@@ -32,6 +32,7 @@ from pathlib import Path
 
 import build_site
 import contracts
+import markdown_code
 import setup_course
 import toolchain_paths
 
@@ -45,7 +46,7 @@ def link_cases():
         toolchain_paths.CONTRACTS_DIR = repo_contracts
     contracts.reset_cache()
     cases = contracts.load("shared-rules")["readingALink"]["cases"]
-    assert len(cases) >= 10, "readingALink lost cases"
+    assert len(cases) >= 32, "readingALink lost cases"
     return cases
 
 
@@ -153,15 +154,26 @@ class UnlinkTests(unittest.TestCase):
 
     def test_every_link_shape_reads_as_the_contract_says(self):
         # With every name the case expects declared a curriculum page, no
-        # link is left; with none of them, the text is untouched.
+        # link is left outside code, and every stretch of code is left
+        # exactly as written (#313: an example of a link is not a link);
+        # with none of them, the text is untouched.
+        link = re.compile(r"!?\[\[")
         for case in link_cases():
             with self.subTest(case=case["name"]):
                 names = set()
                 for name in case["expect"]:
                     names.add(page_name(name))
                 unlinked = self.unlink(case["text"], names)
-                self.assertNotIn("[[", unlinked)
-                self.assertNotIn("\\", unlinked, "an escaped pipe's backslash was left behind")
+                self.assertEqual(markdown_code.matches_outside_code(link, unlinked), [])
+                outside = ""
+                carried_to = 0
+                for start, end in markdown_code.code_ranges(unlinked):
+                    outside += unlinked[carried_to:start]
+                    carried_to = end
+                outside += unlinked[carried_to:]
+                self.assertNotIn("\\|", outside, "an escaped pipe's backslash was left behind")
+                for start, end in markdown_code.code_ranges(case["text"]):
+                    self.assertIn(case["text"][start:end], unlinked, "code was rewritten")
                 self.assertEqual(self.unlink(case["text"], {"Nothing Here"}), case["text"])
 
     def test_mcmpr11s_assessment_matrix_keeps_its_words_and_loses_its_dead_links(self):
@@ -240,8 +252,8 @@ class DatingWalkStrayBracketTests(unittest.TestCase):
     """#294's reader (build_site._extract_wikilink_targets), same heading stop."""
 
     def test_a_stray_double_bracket_in_prose_does_not_swallow_the_next_link(self):
-        # This reader strips inline code, so the Scavenger Hunt shape cannot
-        # reach it, but a "[[" typed in a sentence can. The heading stops at
+        # This reader skips inline code (#313), so the Scavenger Hunt shape
+        # cannot reach it, but a "[[" typed in a sentence can. The heading stops at
         # '[' here too (#314), as Quartz's own wikilinkRegex does.
         text = "I typed [[ by mistake.\n\n## Next\n\nSee [[Worksheet|the worksheet]].\n"
         self.assertIn("worksheet", build_site._extract_wikilink_targets(text))

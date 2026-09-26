@@ -949,6 +949,20 @@ the linter.
    from boilerplate, and boilerplate is the failure mode this block has —
    which only shows up when you compare two of them. Check the days named
    are days that task actually runs on.
+
+   **Two things the linter reads the way the site does (#313).** A link
+   written inside code — a fence of either character, a fence inside a
+   callout, an inline span — is an example of the syntax, not a link: it
+   reaches nothing and dates nothing, because Quartz draws none. The linter
+   finds code with the toolchain's own `scripts/markdown_code.py`, so a page
+   reachable only through a link shown in code is reported as unreached.
+   And it REFUSES a fence opened inside a list item (`   ```python` under
+   "4.") whose lines fall back to column 0 before the closer: Markdown ends
+   the fence with the list item there, the closer then opens a new fence,
+   and the site shows the rest of the page as code, links and curriculum
+   block included. Indent every line up to the closing fence as far as the
+   opening one. TEJ2O's "Control Something with Code" shipped that way and
+   was fixed in #313.
 2. Installer E2E without Docker: import `scripts/setup_course.py` via
    importlib, call `install_example_content` into a temp dir for both
    curriculum states; assert no curriculum folder/links remain when

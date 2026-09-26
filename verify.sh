@@ -245,6 +245,13 @@ else
   cat /tmp/verify_install_link_readers_test.log
 fi
 
+if (cd scripts && python3 test_markdown_code.py) >/tmp/verify_markdown_code_test.log 2>&1; then
+  pass "markdown_code.py: a link written inside code is not a link, for the build's and the installer's readers and the coverage map (scripts/test_markdown_code.py, #313)"
+else
+  fail "markdown_code.py: a link written inside code is not a link, for the build's and the installer's readers and the coverage map (scripts/test_markdown_code.py, #313)"
+  cat /tmp/verify_markdown_code_test.log
+fi
+
 if (cd scripts && python3 test_graded_folders_rerun.py) >/tmp/verify_graded_rerun_test.log 2>&1; then
   pass "setup_course.py: a re-run writes a saved marks pool back as it was (scripts/test_graded_folders_rerun.py)"
 else
@@ -1018,6 +1025,7 @@ check_baked scripts/site_health.py        /opt/scripts/site_health.py
 # stands for the directory — the Dockerfile copies it wholesale.
 check_baked contracts/class-planning.json /opt/contracts/class-planning.json
 check_baked scripts/page_visibility.py    /opt/scripts/page_visibility.py
+check_baked scripts/markdown_code.py      /opt/scripts/markdown_code.py
 check_baked scripts/setup_course.py       /opt/scripts/setup_course.py
 check_baked scripts/build_site.py         /opt/scripts/build_site.py
 check_baked scripts/deploy.py             /opt/scripts/deploy.py
