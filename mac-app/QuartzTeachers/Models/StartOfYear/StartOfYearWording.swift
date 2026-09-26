@@ -117,8 +117,8 @@ nonisolated enum StartOfYearWording {
     // MARK: - Warnings
 
     static func alreadyTaught(classes: String) -> String {
-        return "\(classes) going into draft are dated before today. If you have already taught them, "
-             + "students will lose them when you next deploy."
+        return "Dated before today, and going into draft: \(classes). If you have already taught "
+             + "them, students will lose them when you next deploy."
     }
 
     static func scheduledDeploy(moment: String) -> String {
@@ -140,7 +140,7 @@ nonisolated enum StartOfYearWording {
     }
 
     static func done(pages: String) -> String {
-        return "\(pages) went into draft. Nothing has changed for students yet — that happens when "
+        return "Put into draft: \(pages). Nothing has changed for students yet — that happens when "
              + "you deploy."
     }
 
@@ -175,23 +175,23 @@ nonisolated enum StartOfYearWording {
     }
 
     static func undoIntro(pages: String) -> String {
-        return "\(pages) go back to how they were before you got this section ready for the start of "
-             + "the year. Nothing changes for students until you deploy."
+        return "Going back to how they were before you got this section ready for the start of the "
+             + "year: \(pages). Nothing changes for students until you deploy."
     }
 
     static func undoSkipped(pages: String) -> String {
-        return "\(pages) changed after that, so they stay as they are:"
+        return "Changed after that, so staying as they are: \(pages)."
     }
 
     static let undoButton: String = "Put Them Back"
 
     static func undone(pages: String) -> String {
-        return "\(pages) are back as they were."
+        return "Put back as they were: \(pages)."
     }
 
     static func undoLeftSome(pages: String, backup: String) -> String {
-        return "\(pages) were left as they are, because they changed after the section was got "
-             + "ready. The backup “\(backup)” holds them as they were."
+        return "Left as they are, because they changed after the section was got ready: \(pages). "
+             + "The backup “\(backup)” holds them as they were."
     }
 
     static let undoButtonAfterward: String = "Undo…"

@@ -5710,6 +5710,55 @@ the reasoning and a Windows-porting note per entry — is
 instructions (XcodeGen + Xcode), and the test suite are documented in
 [`mac-app/README.md`](../mac-app/README.md).
 
+## Get Ready for the Start of the Year (#96)
+
+A section's context menu carries **"Get Ready for the Start of the Year…"**
+(`StartOfYearWording.menuItem`), after Schedule/Cancel Deploy. It is not drawn
+on a course kept for reference, and it is disabled — with "Available once
+deploy completed" under it, the shape "Add Section…" uses — while this app is
+deploying the course. A running PREVIEW does not disable it: Go stops the
+preview and starts it again. The rule itself, the plan code and the
+measurements are `documentation/10-local-ai-assistant.md` → "Getting a section
+ready for the start of the year"; the contract is `shared-rules.json` →
+`startOfYear`.
+
+**The sheet** (`Views/Section/StartOfYearSheet.swift`, logic in the
+`@Observable` `StartOfYearSheetModel`, tested without a window) shows, before
+anything is written: the intro; the warnings (classes dated before today that
+are going into draft; this folder's scheduled deploy for the section, which
+would put the change in front of students; a first class that is itself in
+draft); every class and every other page going into draft, each with its
+reason, in disclosure groups; what stays; the links left on pages students will
+see that will lead to hidden pages, grouped by page with a count; the sentence
+that publishing a class by hand after this leaves it with dead links (issue
+#333); and that the undo ends when Plantoir quits. Go is disabled when there is
+nothing to do.
+
+**Go** (`StartOfYearPreparation.carryOut`), in order: re-plan from disk and,
+if the plan differs from the one on screen, write nothing and show the new one
+with `changedSinceShown`; back the course up as the TEACHER's
+(`CourseArchiver.backUpCourse(madeBy: .teacher)`, file name unchanged) and
+refuse if that fails; stop the preview if one is running and no other program
+holds the course (#156 — then the preview is left up and the result says it
+was not rebuilt); write; hold the undo; write the trail line; start the preview
+again. **Why the app refuses without a backup when the assistant's ordinary
+writes do not:** this is the largest single write the app makes, on one press,
+usually weeks before anyone looks at the site, and the undo does not survive a
+quit — the backup is the only way back that does.
+
+**The undo** is offered BESIDE the menu item ("Undo Getting Ready for the
+Start of the Year…"), never in its place, and from the result's own Undo…
+button. It is always a sheet listing what would go back and what changed since
+and will be left. `StartOfYearUndoRegistry` is process-wide, keyed by folder
+(`FolderIdentity`), course and section like `SectionWindowControllers`, so any
+window on the folder offers it. It ends at the section's next deploy
+(`CourseActivity.beginPublish` tells it), when the scheduled deploy that was set
+at the time reaches its moment, at the next visibility change in the section
+from anywhere (checked when the undo sheet opens), and when Plantoir quits. It
+is offered once: a partial undo is not offered again, and names the backup.
+This undo, the assistant window's "undo that" and an outside assistant's
+`undo_last_change` are three separate stores.
+
 ## Testing: the real-home tripwire (#264)
 
 **One place asks where the home folder is, and a test fails if anything else

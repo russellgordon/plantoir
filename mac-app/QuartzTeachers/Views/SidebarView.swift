@@ -1101,10 +1101,7 @@ struct SidebarView: View {
     /// held (#96).
     @ViewBuilder
     func startOfYearItems(course: Course, sectionNumber: Int) -> some View {
-        var deploying: Bool = false
-        if let folder = workspace.workspaceURL {
-            deploying = CourseActivity.coursePublishIsRunning(folderPath: folder.path, courseCode: course.code)
-        }
+        let deploying: Bool = isBeingDeployed(course)
         Button(StartOfYearWording.menuItem, systemImage: "moon.zzz") {
             startOfYearRequest = StartOfYearRequest(course: course, sectionNumber: sectionNumber, mode: .getReady)
         }
@@ -1123,6 +1120,14 @@ struct SidebarView: View {
         if deploying {
             Text("Available once deploy completed")
         }
+    }
+
+    /// Whether a deploy of this course is running from this app.
+    func isBeingDeployed(_ course: Course) -> Bool {
+        guard let folder = workspace.workspaceURL else {
+            return false
+        }
+        return CourseActivity.coursePublishIsRunning(folderPath: folder.path, courseCode: course.code)
     }
 
     func busyReason(for course: Course) -> String? {

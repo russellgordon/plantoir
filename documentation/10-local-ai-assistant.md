@@ -2029,8 +2029,10 @@ configuration is updated in memory as it is written to disk. Windows'
 deliberately: a server that silently swapped its courses under a conversation
 would be worse than one that has to be restarted.
 
-Claude Code is offered a **longer** list than the local model: 32 tools
-against 13 — the twenty-two that exist, plus ten served only over MCP.
+Claude Code is offered a **longer** list than the local model: 34 tools
+against 13 — the twenty-two that exist, plus twelve served only over MCP (ten
+until #96 added the start-of-year pair on 2026-09-26; see "Getting a section
+ready for the start of the year" below).
 (Windows' separate `plantoir-mcp.exe` serves 37; the gap is recorded in
 [issue #66](https://github.com/russellgordon/plantoir/issues/66).) Three of the extra ones ask for judgement about meaning — reading the
 curriculum and deciding which expectations a page addresses — which a large
@@ -4977,6 +4979,156 @@ which is its shipped behaviour widened to the course's heading. REJECTED:
 making them match by breaking one — neither behaviour has cost a teacher
 anything; REJECTED: having the pointer re-assert the heading (a one-off choice
 turned into a fight with the teacher's own edits).
+
+## Getting a section ready for the start of the year (#96)
+
+**The decision** (Russell, 2026-09-26): an explicit, previewed, undoable
+operation — a named action in the app ("Get Ready for the Start of the Year…"
+on a section's context menu, `documentation/09-mac-app.md`) AND an MCP pair
+that shows its plan first and can be undone. **Never part of a rollover**: the
+2026-09-08 decision that rolling a section over leaves visibility alone stands,
+and this is the separate deliberate act it left room for. The rollover reply
+does not even suggest it. The rule, the cases and every sentence are
+`contracts/shared-rules.json` → `startOfYear`; the code is
+`Models/StartOfYear/`.
+
+### The rule
+
+For one section, and it only ever HIDES:
+
+- **The first class** is the first NUMBERED class by position
+  (`ClassInsertionPlanner.numberedClasses`), the one a rollover gives the first
+  date to. Left exactly as it is. No numbered class: refused, nothing written.
+- **Never touched:** the first class; the pages it links to directly; Key Links
+  and every page it lists; every folder's own page; every curriculum page. A
+  CLASS page is never in that set except the first — step 1 wins (a Day 1 that
+  says "Next: [[Unit 1, Day 2]]" does not keep Day 2 up).
+- **Step 1:** every other class page goes into draft, numbered or not.
+- **Step 2, first used later:** every other page that ANY class links to
+  directly goes into draft. The first class's links are already never touched,
+  so this is "the earliest class that links it directly is not the first
+  class". **Decided from links, never from stored dates.**
+- **Step 3, leftovers, to a fixed point:** every visible page outside the never
+  set that no page students will still see links to goes. A folder's own page
+  listing it is a listing, not a use; a self-link does not count; the
+  section's front page (its own `index.md`) does count, since students land on
+  it and it embeds pages like Help Sessions.
+- Per section, through the existing writer (`AssistPublishPlanner.planHiding`,
+  which builds from PAGES rather than titles — two files named "Notes" in two
+  folders are decided as themselves). A class carrying a stray
+  `publishForSection<N>: true` has that key set to false too, since the build
+  reads it first; the test asserts the BUILT SITE's reading.
+
+**What was measured, and rejected.** By emulation over the payloads (the
+planner's scripts, reproduced by the reviewer): today's unpublish sweep over
+the later classes leaves ~150 SNC1W pages published, 35 of 37 Concepts, held up
+by `Concepts/index` (GUI row 220, and the issue's own 32 pages). "Keep what the
+first class and Key Links reach" leaves 16–25 Concepts, because concepts link
+to each other. The first draft of this rule read STORED DATES for step 2; the
+plan review measured that straight after a rollover with no completed build in
+between — the rollover dates by a transitive walk, so Day 1's hubs claim
+everything they reach — **53 (SNC1W) and 79 (ICS3U) concepts stayed
+published**, and with no dates on file 68–97. The link rule needs no dates, no
+build and no rollover, and it is what the emulation's 13–16 leftovers (all Key
+Links pages or pages Day 1 uses) actually measured. Also rejected: "everything
+past Unit 1" (Russell said past Day 1), a new "not yet taught" flag, options
+and toggles (two operations, and a boolean on a surface that has none), a local
+tool or fixed phrasing in this piece (a routing change), and a persistent undo.
+
+### The plan code, and its honest limit
+
+`plan_prepare_for_start_of_year` returns the whole plan — every page with its
+reason, not truncated — and a line `Plan code: <8 hex>`
+(`startOfYear.planCode.line`), always in that shape, so a client or a harness
+finds it in one place. `prepare_for_start_of_year` re-plans from disk and
+writes only when the code given is the current plan's; with no code
+(`AssistWording.startOfYearNeedsItsPlan`) or a stale one
+(`startOfYearPlanHasChanged`) it writes nothing and hands back the current plan
+and code. `planCode` is deliberately NOT required in the schema, or the
+no-code call would be unreachable through a real client. The code is a SHA-256
+over the course, section, first class and every change's path and new
+visibility; each platform issues and checks its own. **It proves a plan was
+MADE, not that a person READ it** — Claude Code can call both in one breath;
+the description asks it to show the teacher and wait.
+
+The write takes a **fresh** backup for this act (`.assistant`'s over MCP) and
+refuses without one (`startOfYearNeedsABackup`) — unlike `carryOut`, whose
+once-per-conversation backup may predate earlier changes and whose failure it
+tolerates. This is the largest single write the app makes. Then it stops the
+preview, writes, records `AssistChange(kind: .startOfYear)`, and brings the
+preview up to date.
+
+### Surfaces: MCP-only, and the local hash did not move
+
+The pair is appended to `mcpOnlyTools`, never to `tools`: the local model is
+shown the same 13 tools, byte for byte — local `46b96562…2cd96cb6` before and
+after (the recipe: sha256 of `json.dumps(toolSchemas[k], sort_keys=True,
+ensure_ascii=False)` over `contracts/assist-cases.json`). MCP goes from 32
+(`9bcc7eb7…9cef36f7`) to **34** (`4196ec20…3870bc32`). Should a fixed phrasing
+ever reach the write from the assistant window, the card must carry the twin's
+plan code, or every attempt is refused.
+
+### Undo: three stores, none reaches another
+
+- **Over MCP**, `undo_last_change`, for as long as that `--mcp-stdio` process
+  lives, with the usual skip rule.
+- **In the app**, `StartOfYearUndoRegistry`: one per section, shared by every
+  window on the folder, offered BESIDE the menu item and always as a sheet that
+  lists what would go back. It **ends** at the section's next deploy (from any
+  window of this app, or the scheduled deploy set at the time reaching its
+  moment), at the next visibility change in the section from anywhere
+  (Obsidian, the assistant, an outside assistant — found by comparing every
+  page's visibility with how the change left it), and **when Plantoir quits**
+  — the sheet says so. After that, the backup is the way back. Not seen: a
+  deploy run by an outside assistant in another process; the skip rule and the
+  sheet's listing still hold.
+- **The assistant window's** "undo that" (`AssistChangeHistory`) never holds
+  this change and cannot take it back.
+
+Each undo writes `start of the year change undone` with the counts put back and
+left.
+
+### Afterwards: publishing a class needs its pages with it
+
+Only the assistant's publish is transitive. A teacher who publishes Day 2 by
+changing its page in Obsidian after this ran gets Day 2 live with links to the
+concepts that went into draft — before, those concepts were visible, so the one
+flag was enough. The plan and the sheet say so (`publishingFromNowOn`), and
+[issue #333](https://github.com/russellgordon/plantoir/issues/333) is the fix
+(a build warning, or the app's publish following the assistant's rule).
+
+### check_section's third group, "linked but missed"
+
+`check_section` now reports three groups, and `shared-rules.json` →
+`sectionCheck` pins all three as data for the first time:
+
+1. links on visible pages that lead to hidden ones (unchanged);
+2. visible pages linked from nowhere — **now leaving out curriculum pages and
+   the Key Links page**, which is what Windows' `LinkGraph.Unreferenced` has
+   always done; the mac reported them for no reason anyone chose;
+3. **linked but missed** (`visiblePagesLinkedButMissed`): a visible page that a
+   class students cannot see links to directly, and no class they can see does.
+   A visible non-class page linking it does NOT rescue it.
+
+**Group 3 is the ISSUE's definition, not the planner's step 3** (plan review
+H2, ruled 2026-09-26, reversing the plan's first reading). Defined as step 3
+it would be empty by construction after the operation — an audit that agrees
+with the planner by definition. The issue's definition flagged 55 (SNC1W) and
+81 (ICS3U) pages in the states where the date-based rule leaked, and 0 when the
+job was done; a must-fail deletes the planner's step 2 and the audit goes red
+on the same fixture. A page only a folder lists and no class links is in
+NEITHER group — that is step 3's fact, not the audit's. The paragraph is
+silent when empty, like group 2. No schema byte changed; the local model reads
+one more paragraph back, which needs no routing re-run.
+
+### Trail
+
+Three events (`activityTrail.mustRecord`): `section made ready for the start of
+the year` (from where; classes and other pages by reason; left as they were;
+the backup's FILE NAME; whether the preview was rebuilt — never a page name),
+`start of the year change undone`, and `start of the year not done`
+(changedSinceShown, backupFailed, writeFailed, noFirstClass, missingPlanCode,
+nothingToDo).
 
 ## Further reading in this repository
 

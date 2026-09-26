@@ -749,6 +749,17 @@ is often the first build after a class goes visible, so the likeliest to rewrite
 files. The sentence the build prints is "Gave N of your page(s) the date of the
 first class that links to them".
 
+
+**"Get Ready for the Start of the Year" (#96) deliberately does NOT read these
+dates.** Its rule decides which pages go into draft from LINKS — which classes
+link a page directly, by position — because straight after a rollover a page's
+stored date comes from a transitive walk and says the first day about pages
+first used in Unit 3 (measured: 53 SNC1W and 79 ICS3U concepts left published
+by a date-based rule). So a change to how pages are dated here changes nothing
+it hides; the only date it reads is a CLASS page's own, for the "already
+taught" warning. `documentation/10-local-ai-assistant.md` → "Getting a section
+ready for the start of the year".
+
 ### Which pages are class pages: the word AND the scheme (#267)
 
 What the build counts as a class page — for the curriculum coverage map's
