@@ -499,7 +499,47 @@
       {
         "carries": "the course and the section, and which of: told with a notification; not sent because notifications are turned off; not sent because permission was never given; could not be sent; and, when a teacher first schedules from the app, that the permission question was put and what the answer was. Since #306 (2026-09-26), also what a CLICK on the notification did: the section shown - in a window already on its working folder, in the window that was choosing a folder, or in a new window; the window brought forward and left as it was because it was in the middle of something; the working folder shown without the section because the section is no longer in it; or Plantoir only brought forward because the working folder is gone, could not be opened here (out of the builder's reach, or refused when a window choosing a folder tried it), or the notification named no section. NEVER the notification's text, and never the working folder's path.",
         "event": "scheduled publish notification",
-        "why": "Added with #212. 'I never got told' is answerable only if the trail says whether the notification went out, or that notifications were off for the app — from the teacher's side a notification that was blocked and one that was never sent look identical. The question's own line is written BEFORE the answer, because a question that is ignored, or arrives under a Focus, may never be answered. See scheduledPublishStopped.notification. 'I clicked it and nothing happened' (#306) is answered by the same line: each honest reason - the folder gone, the window busy, the section gone - has its own wording, and NO line at all means the click never reached this copy of the app (the launch line's bundle path says which copy a click started). See scheduledPublishStopped.notification.onClick."
+        "why": "Added with #212. 'I never got told' is answerable only if the trail says whether the notification went out, or that notifications were off for the app — from the teacher's side a notification that was blocked and one that was never sent look identical. The question's own line is written BEFORE the answer, because a question that is ignored, or arrives under a Focus, may never be answered. See scheduledPublishStopped.notification."
+      },
+      {
+        "carries": "the version found and the version running, each as version and build ('1.3.2 (3120)'); whether the teacher asked or it was the daily check; whether the release is marked important",
+        "event": "update found",
+        "why": "Added with #204. 'Did Plantoir ever tell me there was a new version?' cannot be answered without it. Written ONCE per version per launch, and worded 'found' rather than 'offered': a check that re-finds a version the teacher answered 'Remind Me Later' to would otherwise add a line a day, and the updater may hold its window back until the app is next in front, so 'offered' could claim a window nobody saw."
+      },
+      {
+        "carries": "the version running",
+        "event": "update check found nothing new",
+        "why": "Added with #204. Written only when the TEACHER asked (Check for Updates...): the daily check is not something a teacher did, and would add a line a day. 'I checked and it said I was up to date' is a report worth being able to confirm."
+      },
+      {
+        "carries": "the version and which answer: install, skip this version, not now (Remind Me Later and closing the window are one answer to the updater, so the line does not pretend to tell them apart), or install on quit (the resumed window). Never written for the stand-down a quit sends on the teacher's behalf - that is update set aside",
+        "event": "update answered",
+        "why": "Added with #204. Separates 'never offered' from 'offered and skipped' - the two answers to the same report."
+      },
+      {
+        "carries": "what was under way, in the same words the teacher was shown (appUpdates.wording), and the version waiting",
+        "event": "update held while work is under way",
+        "why": "Added with #204. The one line that explains an update that 'did not happen' when the teacher clicked, and the proof that the install gate ran. See appUpdates.mayNotInstallWhile."
+      },
+      {
+        "carries": "from which version to which, and when: straight away and opening again; once the work it was held for had finished, and opening again (appUpdates.whenHeldWorkEnds); or as Plantoir quits, without opening again - naming the work still going on, in the one case the app cannot prevent (appUpdates.atQuit, postponedAtInstall)",
+        "event": "update installing",
+        "why": "Added with #204. The last thing the OLD version can write. If the new one never starts, this is where the story ends."
+      },
+      {
+        "carries": "the version set aside and what was under way when Plantoir quit",
+        "event": "update set aside",
+        "why": "Added with #204. Quitting is never refused (decision 7), and an update may not install while work is under way, so a quit with a prepared update and work going on CANCELS the install instead of letting it happen on the way out. Without this line the trail would show an update the teacher agreed to and then nothing - or, worse, a line claiming an install that never happened. The update is offered again at the next check."
+      },
+      {
+        "carries": "the version, and a plain category: could not reach plantoir.app; the download failed; the download was not signed as expected; Plantoir is running from a place it cannot be updated (a disk image, or not moved to Applications); an administrator's name and password was needed and not given; or something else - with the updater's error number in brackets for whoever reads it. Written at most once per launch for a failure of the daily check.",
+        "event": "update stopped",
+        "why": "Added with #204. The updater tells a teacher NOTHING when the daily check finds it cannot update, and nothing when the administrator's password was asked for and not given (error 4007) - this line is the only record of either. At most once per launch for the daily check, so a Mac offline all week does not write seven lines."
+      },
+      {
+        "carries": "from which version to which, and how: by its own updater, or by hand (a new copy installed some other way)",
+        "event": "app updated",
+        "why": "Added with #204. 'It broke after the update' needs to know WHEN the update was. Written at the first launch whose version differs from the last launch's, so it covers an install by hand too - which is why it is owed on Windows from the day it is read, updater or not."
       },
       {
         "carries": "the course and section; where it was asked from (the app, the assistant, an outside assistant); how many classes and how many other pages went into draft, the other pages split into those first used by a later class and those nothing students can see links to; how many pages were left as they were; the backup's FILE NAME; whether the preview was rebuilt. Never a page's name - the backup is how anyone finds the pages.",
@@ -11433,6 +11473,97 @@
         "instead": "Forget a remembered folder that is out of reach, so the reason is said once (#290's plan).",
         "why": "Reversed when #290 was folded into #311: one remembering rule for every reason. The teacher cannot go on without choosing, so the repetition ends at one choice."
       }
+    ]
+  },
+  "appUpdates": {
+    "note": "GitHub issue #204: Plantoir finds and installs its own new versions. Written on the mac with #204 (Sparkle 2.9.6); Windows adopts the same rules and sentences with NetSparkleUpdater (the windows issue drafted with #204, milestone v1.4.0), and until then nothing on Windows reads this block - its cases are UNRUN there, not red. The mechanism on each side is platform code; what is shared is what a teacher is promised. The reasoning, what was measured and what was rejected: documentation/09-mac-app.md -> 'Updating itself'.",
+    "rule": "Plantoir checks for a new version once a day and never downloads or installs one without the teacher choosing to. It never installs while it is publishing or building a preview, or while a scheduled publish or another program is building one of the courses it has open: it waits, and restarts by itself as soon as that work is done. Quitting is never refused - a quit with an update ready and work still going sets the update aside, and it is offered again later - except in one rare case: when work begins in the instant after the teacher's Install has already reached the installer, a quit then finishes the install as Plantoir goes, and the teacher is told so (atQuit, postponedAtInstall; wording.heldExplanationOnceInstalling).",
+    "checkEverySeconds": 86400,
+    "installsWithoutAsking": false,
+    "installsWithoutAskingWhy": "Decision 1 on #204. RELEASING.md carries warnings a teacher MUST read before updating ('update both Macs'), and an update that installs on quit shows nobody anything. The notes, warnings included, travel in the signed feed and are shown in the update window.",
+    "developmentBuildsNeverUpdate": true,
+    "developmentBuildsWhy": "Decision 5 on #204: no separate feed for development builds. A development build carries no feed address at all, so it has no updater and no Check for Updates... item - rather than a feed it is told not to use, which a copied bundle would still carry.",
+    "feed": {
+      "mac": "https://plantoir.app/updates/macos.xml",
+      "windows": "https://plantoir.app/updates/windows.xml",
+      "onePerPlatform": true,
+      "neverAReleaseAsset": "releases/latest/download/<name> answers 404 whenever the newest release lacks that asset, and RELEASING.md lets one platform ship a version the other is not ready for - so a feed kept on a GitHub release would vanish for the platform that lags.",
+      "signedWith": "One key per platform (decision 8). The mac's public key is SUPublicEDKey in mac-app/project.yml; the feed itself is signed as well as the download."
+    },
+    "notes": {
+      "cumulative": true,
+      "requiredWarningMarksTheUpdateImportant": true,
+      "why": "The update window shows the notes of the version offered. A teacher who skipped a release must still see the warning written for it, so the notes carry every release newer than theirs, and a release with a REQUIRED warning is marked important (no Skip, no Remind Me Later). The mechanism is platform code - on the mac one section per release in the feed's own notes, hidden once installed; NetSparkleUpdater gathers the notes of every newer release itself - the promise is shared."
+    },
+    "mayNotInstallWhile": {
+      "counts": [
+        "a publish this app is running, in any window or by its own assistant",
+        "a preview this app is BUILDING (not one that is merely open - the quit question's line, quittingWhileWorkIsUnderWay.whatDoesNotCount)",
+        "a scheduled publish of this installed app, from the moment it starts - including while it is still waiting for the course to come free, before it has taken a lease",
+        "a build or publish that another program holds a lease for (workLeases), in a working folder this app has open or that a scheduled publish or an assistant working from another app names"
+      ],
+      "doesNotCount": [
+        "an open preview, here or elsewhere - a preview lease is held for as long as a preview is open, so it cannot tell a build from a page being read (Russell, #204 Q2)",
+        "an assistant working from another app that is not building or publishing: it can stay connected for days, and only its leases say when it is working",
+        "a lease of any other kind (assist, import)",
+        "a scheduled publish or an assistant of a copy of Plantoir installed somewhere else, by the scan: installing this copy does not touch it - though a build or publish it holds a lease for, in a folder named here, counts like any other program's"
+      ],
+      "howAnotherProcessIsSeen": "Leases first (#156): they say exactly what another process is building or publishing, and are read in every folder named. A process scan of THIS app's own executable fills the one gap they leave: a scheduled publish waits up to ten minutes for a busy course BEFORE it takes its leases, and one set before v1.2.0 names no course and takes none. The scheduled job's own file is NOT a signal: the run deletes it in its first line, so a publish in progress has none, and one on disk means only 'set for later'."
+    },
+    "whenHeldWorkEnds": "restartStraightAway",
+    "whenHeldWorkEndsWhy": "Russell, #204 Q3 (2026-09-24): the teacher already said yes to installing, so Plantoir does not ask again - it asks the gate once more (new work may have started) and, if nothing is under way, installs and opens again. The trail says so (update installing).",
+    "atQuit": {
+      "rule": "A quit is never refused (decision 7). With an update prepared and ready to install, a quit while anything in mayNotInstallWhile is under way sets the update aside; with nothing under way it lets the update install as Plantoir quits, without opening again.",
+      "why": "Once the update is prepared the installer is waiting for Plantoir to quit and installs the moment it does - on ANY quit. Until the teacher's 'Install' reaches the installer it can still be told to stand down; after that it cannot. So Plantoir keeps that answer back while it holds the update, and gives the installer the stand-down answer instead if the teacher quits first.",
+      "cases": [
+        {"name": "no update prepared", "given": {"preparedUpdate": "none", "workUnderWay": true}, "expect": "nothingToDo"},
+        {"name": "ready to install, nothing under way", "given": {"preparedUpdate": "readyToInstall", "workUnderWay": false}, "expect": "installsAsItQuits", "why": "The teacher already chose Install Update; installing on the way out is the updater's own behaviour and harms nothing."},
+        {"name": "ready to install, work under way", "given": {"preparedUpdate": "readyToInstall", "workUnderWay": true}, "expect": "setAside"},
+        {"name": "held for work, still under way", "given": {"preparedUpdate": "heldForWork", "workUnderWay": true}, "expect": "setAside", "why": "The #204 ruling on the plan review's H1: before it, the held sentence promised nothing changed until the work was done, and a quit installed anyway."},
+        {"name": "held for work that has just finished", "given": {"preparedUpdate": "heldForWork", "workUnderWay": false}, "expect": "installsAsItQuits"},
+        {"name": "held by the updater's own last look, work under way", "given": {"preparedUpdate": "postponedAtInstall", "workUnderWay": true}, "expect": "installsAsItQuits", "why": "The one case that cannot be prevented: work began in the instant between the teacher's Install and the installer's last question, so the answer has already gone. It is said on the trail, naming the work."}
+      ]
+    },
+    "cases": [
+      {"name": "nothing is happening", "given": {}, "expectHeld": false},
+      {"name": "one section is publishing here", "given": {"publishes": [["ADA1O", 2]]}, "expectHeld": true, "expectNamedAs": "theQuitQuestionsWords"},
+      {"name": "two sections are publishing here", "given": {"publishes": [["ADA1O", 1], ["ICS3U", 2]]}, "expectHeld": true, "expectNamedAs": "theQuitQuestionsWords"},
+      {"name": "a preview is being built here", "given": {"previewBuilds": [["ENG2D", 1]]}, "expectHeld": true, "expectNamedAs": "theQuitQuestionsWords"},
+      {"name": "a preview is only open here", "given": {"previewsOpen": 1}, "expectHeld": false, "why": "Russell, #204 Q2 - the quit question's line."},
+      {"name": "a scheduled publish is waiting for its course, no lease yet", "given": {"otherCopies": [{"pid": 501, "kind": "scheduledPublish", "course": "ICS3U", "section": 2}]}, "expectHeld": true, "expectNamedAs": "scheduledWork", "course": "ICS3U", "section": 2, "why": "The gap the leases leave, and the reason the scan exists."},
+      {"name": "a scheduled publish is building, holding its leases", "given": {"otherCopies": [{"pid": 501, "kind": "scheduledPublish", "course": "ICS3U", "section": 2}], "leases": [{"pid": 501, "kind": "build", "course": "ICS3U"}, {"pid": 501, "kind": "publish", "course": "ICS3U"}]}, "expectHeld": true, "expectNamedAs": "scheduledWork", "course": "ICS3U", "section": 2},
+      {"name": "a scheduled publish from a job set before v1.2.0 names no section", "given": {"otherCopies": [{"pid": 502, "kind": "scheduledPublish"}]}, "expectHeld": true, "expectNamedAs": "scheduledWorkUnnamed"},
+      {"name": "an assistant working from another app, doing nothing", "given": {"otherCopies": [{"pid": 601, "kind": "assistantFromAnotherApp"}]}, "expectHeld": false, "why": "It can stay connected for days; only a lease says it is working."},
+      {"name": "an assistant working from another app is building a course", "given": {"otherCopies": [{"pid": 601, "kind": "assistantFromAnotherApp"}], "leases": [{"pid": 601, "kind": "build", "course": "ENG2D"}]}, "expectHeld": true, "expectNamedAs": "elsewhereWork", "course": "ENG2D"},
+      {"name": "another program holds only a preview lease", "given": {"leases": [{"pid": 701, "kind": "preview", "course": "ENG2D"}]}, "expectHeld": false},
+      {"name": "another program holds an assist or import lease", "given": {"leases": [{"pid": 702, "kind": "assist", "course": "ENG2D"}, {"pid": 703, "kind": "import", "course": "ENG2D"}]}, "expectHeld": false},
+      {"name": "a publish here and a scheduled publish: the publish here is named", "given": {"publishes": [["ADA1O", 2]], "otherCopies": [{"pid": 501, "kind": "scheduledPublish", "course": "ICS3U", "section": 2}]}, "expectHeld": true, "expectNamedAs": "theQuitQuestionsWords"},
+      {"name": "a preview built here and a scheduled publish: the publish is named", "given": {"previewBuilds": [["ENG2D", 1]], "otherCopies": [{"pid": 501, "kind": "scheduledPublish", "course": "ICS3U", "section": 2}]}, "expectHeld": true, "expectNamedAs": "scheduledWork", "course": "ICS3U", "section": 2, "why": "A publish is named before a preview, as in the quit question: it is the one that reaches the class website."}
+    ],
+    "casesWhy": "Run by AppUpdatesContractTests on the mac against UpdateGate.workUnderWay. 'theQuitQuestionsWords' means the phrase quittingWhileWorkIsUnderWay's question uses for the same facts - one description of this app's own work, not two. A scheduled publish of a DIFFERENT copy of Plantoir cannot be written as a case here, because the scan only ever returns processes of this app's own executable; SameExecutableProcessesTests pins that instead.",
+    "wording": {
+      "rule": "Plain words, and the teacher's own: a new version, updating, installing. Never the updater's name, and never a word about how it is done.",
+      "machineryCheck": "No sentence here may contain: Sparkle, feed, appcast, script, container, toolchain, docker, launchd, lease, process.",
+      "menuItem": "Check for Updates…",
+      "heldTitle": "Plantoir will finish updating once it is done {work}.",
+      "scheduledWork": "publishing Section {section} of {course} on its schedule",
+      "scheduledWorkUnnamed": "publishing on its schedule",
+      "elsewhereWork": "waiting for {course} to finish building somewhere else on this Mac",
+      "heldExplanation": "The new version is ready. Plantoir will close and open again by itself as soon as that is finished. If you quit Plantoir before then, the update is set aside and offered again later.",
+      "heldExplanationOnceInstalling": "The new version is ready. Plantoir will close and open again by itself as soon as that is finished. If you quit Plantoir before then, it finishes updating as it quits.",
+      "okButton": "OK",
+      "needsAdministratorTitle": "Plantoir could not install the new version.",
+      "needsAdministratorExplanation": "Installing it on this Mac needs an administrator’s name and password, and none was given. To try again, choose Check for Updates… in the Plantoir menu. If you do not have an administrator’s password, whoever looks after this Mac can install it for you."
+    },
+    "updatersOwnWords": "Everything else a teacher reads while updating - the update window, its buttons, the progress and error windows - is the updater's own, localized by it into 35 languages, and cannot be changed without keeping a fork of it. Ours never use a word on the machinery list; the updater's own error windows can say \"update feed\" (\"An error occurred while parsing the update feed.\", \"The update feed is improperly signed...\") and a few others lean technical, all only when something has failed, and the trail's 'update stopped' line is what makes each of them answerable. The list is in documentation/09-mac-app.md -> 'Updating itself'.",
+    "whatWasRejected": [
+      "Letting a user default name the feed (the updater honours one by default) - a development feed by another name. The app clears any such value when the updater starts.",
+      "A separate feed, or a working updater, for development builds (decision 5).",
+      "Holding the update with the updater's check-time hooks: they run when checking, not when installing, so work that begins after the check would not be seen.",
+      "Asking again when held work ends (Russell, #204 Q3): the teacher already said yes.",
+      "Accepting that a quit installs during a scheduled publish, or keeping Plantoir running out of sight until it ends (the plan's Q1 options A and B): the stand-down answer cancels it and the quit still goes ahead.",
+      "The scheduled job's own file as the sign a scheduled publish is running: the run deletes it in its first line.",
+      "A Settings switch for the daily check: the teacher decides at every offer, and a school's IT turns the check off with a managed setting (the support page says how)."
     ]
   },
   "startOfYear": {

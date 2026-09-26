@@ -532,6 +532,7 @@ truth, and generated project files churn and merge badly.
 brew install xcodegen
 cd mac-app
 ./Vendor/fetch-llama.sh     # REQUIRED before generating — see below
+./Vendor/fetch-sparkle.sh   # REQUIRED too, since #204 — see below
 xcodegen generate
 open Plantoir.xcodeproj
 ```
@@ -547,6 +548,13 @@ declares `Vendor/llama` as a resource folder, so `xcodegen generate` fails with
 again; nothing in the repo or the bundle carries them, and the app downloads
 them to `~/Library/Application Support/Plantoir/models` on a teacher's explicit
 yes.
+
+`fetch-sparkle.sh` fetches Sparkle 2.9.6, the framework a released Plantoir
+finds and installs its own updates with (#204), pinned by version AND SHA-256
+and refusing a mismatch. Also **not optional**: `project.yml` embeds
+`Vendor/Sparkle/Sparkle.framework`, so generating without it fails. A Debug
+build carries no update feed and never checks for anything —
+`documentation/09-mac-app.md` → "Updating itself".
 
 Debug builds are signed with a real "Apple Development" identity
 (`DEVELOPMENT_TEAM` in `project.yml`) rather than ad-hoc — an ad-hoc signature
@@ -660,7 +668,9 @@ each working folder's `.toolchain/`. The launchers:
 
 - tag the image `teaching-quartz:src-<hash>`, where the hash covers every file
   in the build context — a changed recipe means a new tag, a rebuild and a
-  recreated container, with no update checks anywhere;
+  recreated container, with no update checks anywhere (this is about the
+  IMAGE: the released app itself does check plantoir.app for a new version of
+  the app once a day, #204);
 - build with BuildKit (`docker buildx build --load`) — the legacy builder
   corrupts a layer, so don't remove that;
 - name containers `teaching-quartz-<hash of /bin/pwd -P>`, one per working
@@ -856,6 +866,7 @@ mistake there is a mistake in nineteen hundred courses.
 | Windows app | `cd windows-app && dotnet test Plantoir.Tests/Plantoir.Tests.csproj` — which since 2026-09-07 also runs every shared `scripts/test_*.py` through `PythonToolchainTests`, so a change to the shared Python is gated on Windows too. Needs a `python` on PATH and FAILS rather than skips without one. **Judge it by the TOTALS line, never the exit code** — `dotnet test` exits 1 for a failing test, for a test host that DIED underneath the run, and for a project that did not compile, and only the output tells the three apart. `.\run-tests.ps1` (repo root) runs the same command and says which happened; a convenience, not a gate. What each looks like, measured, is in `documentation/12-windows-app.md` → "Reading a test run". **A green totals line may carry NAMED GAPS** — contract keys this app does not implement yet, held open by name rather than left red; `windows-app/Plantoir.Tests/NamedGapLedger.cs` lists them with the issue and milestone that own each, and `contracts/README.md` → "Named gaps" says when one is allowed (and `RELEASING.md` step 2 says to read the ledger before cutting). |
 | Windows app, **through the real interface** | `.\run-ui-tests.ps1`, **run from the repository root** (every other command in this table starts `cd windows-app`; this one does not), — launches the x64 Debug `Plantoir.exe` with `--state-dir` and drives it with UI Automation, for what a unit test cannot see: that a control can be REACHED, that clicking it opens something, that the RENDERED text is what the model said in the order the contract fixes, that a scrolling list is not cut off at the bottom, that a panel follows the course a teacher selected rather than going stale, and that a sentence the contract pins is actually RENDERED where a teacher can see it rather than merely held in a constant. **Opt-in and part of no gate**: every test carries `[UiFact]` and skips unless `PLANTOIR_UI_TESTS=1`, so a plain `dotnet test` builds them and runs none. It is in the solution, so a SOLUTION build compiles it — the per-project commands this table names do not, which is the honest limit of the compile-rot protection. Needs a desktop session and the foreground, takes minutes, and CLOSES a running Plantoir (saying so, and not reopening it). Nothing of the teacher's is touched: `--state-dir` moves the whole state folder for the run — but that redirects only what the APP resolves, and one test now presses the wizard's Create button and so runs `setup.ps1`, which computes the builds root from the real environment itself. That one is safe because `setup_course.py` never resolves `merged_output_root`; **a test that drove Preview or a scheduled deploy would NOT be**, and `documentation/12-windows-app.md` is where to read why before writing one. |
 | Assistant routing | **Nothing.** Measured by hand — see below. |
+| Signing the updater into a release, and the mac's update feed (`mac-app/release/`, `publish.sh`, `website/update_feed.py`, `website/update_feeds.py`) | `python3 mac-app/release/test_release_signing.py` and `python3 website/test_update_feed.py` — macOS only, ad-hoc signatures and a throwaway key only, in NO suite. Run them when that path changes and before any `publish.sh -Sign` (RELEASING.md step 4). |
 | Publishing (any destination, `deploy.sh`/`deploy.py`, the preview→publish path) | `./verify-deploy.sh` — publishes to a folder, Netlify and Cloudflare, and every primary+secondary pairing, then FETCHES EACH SITE BACK and reads it. Deliberately NOT part of `verify.sh`: it needs three credentials, the network, and it creates real sites. Run it when the publishing path changes. |
 
 `verify.sh` **does not run on Windows** (bash, and it expects `docker` on PATH;
@@ -922,7 +933,7 @@ it rather than restating it:
 | How is a teacher's list of class dates read? | [`contracts/schedule-rules.json`](contracts/schedule-rules.json). |
 | Which page titles carry numbers, what is the next class called, what happens when room is made for one? | [`contracts/class-planning.json`](contracts/class-planning.json). |
 | What are the backup and archive files called, and what section number is offered next? | [`contracts/course-management.json`](contracts/course-management.json). |
-| What does a scheduled deploy refuse, what does the sidebar filter show, what is stripped from console output, what counts as a curriculum expectation, what is taken out of (and kept in) a problem report, **which events every feature must record on the trail**, when the report asks about the local AI assistant, **which local assistant a teacher may choose (and when one may be removed)**, **where a section's built website is kept — and what happens to a folder that already has one in the old place**, and **when quitting asks the teacher first (and when it must never ask)**? | [`contracts/shared-rules.json`](contracts/shared-rules.json). |
+| What does a scheduled deploy refuse, what does the sidebar filter show, what is stripped from console output, what counts as a curriculum expectation, what is taken out of (and kept in) a problem report, **which events every feature must record on the trail**, when the report asks about the local AI assistant, **which local assistant a teacher may choose (and when one may be removed)**, **where a section's built website is kept — and what happens to a folder that already has one in the old place**, **when quitting asks the teacher first (and when it must never ask)**, and **when the app may install a new version of itself, and what a quit does to one that is ready (#204)**? | [`contracts/shared-rules.json`](contracts/shared-rules.json). |
 | What keys does `course_config.json` carry, and what decides whether students see a page? | [`contracts/file-formats.json`](contracts/file-formats.json) — a FORMAT rather than a behaviour, and the one both apps write and the Python reads. |
 | WHY is it that way, and what was rejected? | The [`documentation/`](documentation/README.md) page that owns the subject, for anything an implementer needs; a code comment for anything a reader of the code needs. |
 | WHAT changed, WHEN, and what it cost | [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md) — a dated log. **Append-only history, not a specification**: a row records what was true that day, and is not edited when the behaviour changes again. Never quote a row as the current wording. |
@@ -1007,11 +1018,11 @@ implemented and passing on both platforms; see `GUI-IMPROVEMENTS.md` rows
 | [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md) | The dated log of every GUI change, with a required "Notes for Windows port" column. Append here for any GUI change — and read it as HISTORY: it used to be described as "the spec", and `contracts/` is what a test should be written against now. |
 | [`MAC-BOOTSTRAP.md`](MAC-BOOTSTRAP.md) | **The brief for a macOS session**: adding a feature responsibly here, and taking work that arrived from Windows. |
 | [`WINDOWS-BOOTSTRAP.md`](WINDOWS-BOOTSTRAP.md) | **The brief for a Windows session**: what to read, the order of work, the rules while working, and the plan-first rule. Point a Windows agent at this file. |
-| [`WINDOWS-PARITY.md`](WINDOWS-PARITY.md) | **Temporary.** The ordered strategy for the milestone "Windows: parity with mac v1.3.2": every issue in a phase, what the shared Python gives free, the traps. `WINDOWS-BOOTSTRAP.md` points at it. The issues stay the source of truth, and the file is deleted when that milestone closes. |
+| [`WINDOWS-PARITY.md`](WINDOWS-PARITY.md) | **Temporary.** The ordered strategy for the milestone "Windows: parity with mac v1.4.0": every issue in a phase, what the shared Python gives free, the traps. `WINDOWS-BOOTSTRAP.md` points at it. The issues stay the source of truth, and the file is deleted when that milestone closes. |
 | [GitHub issues](https://github.com/russellgordon/plantoir/issues) | **Everything still to do**, on either platform. Labelled `mac`, `windows`, `toolchain`, `assistant`, `decision`; milestones pin an issue to a release. |
 | [`documentation/13-windows-port-archive.md`](documentation/13-windows-port-archive.md) | Write-ups for Windows-port work verified shipped as of 2026-08-22, kept for the reasoning. **History, not a specification** — where it and a contract disagree, the contract is true. Closed to new entries. |
 | [`contracts/`](contracts/README.md) | **The Plantoir contract**: what the two apps must agree on, as data both test suites run — the assistant's sentences and behaviour, launcher arguments, validation wording, failure explanations, date reading, class naming, file names, progress markers, preview ports. Three of the ten files are generated from the macOS app by `Plantoir --write-contracts` and must never be hand-edited; the other seven — `shared-rules.json` among them — are AUTHORED, and can be proposed or corrected from either platform. `contracts/README.md` says which is which, and this line used to say "never hand-edited" of all ten, which sent a Windows session on 2026-09-08 to ask the mac for an edit it could make itself. Its coverage table says what is deliberately NOT shared, and why. |
-| [`RELEASING.md`](RELEASING.md) | Cutting a release: signing, bundling, and the frozen asset names both platforms depend on. |
+| [`RELEASING.md`](RELEASING.md) | Cutting a release: signing, bundling, the frozen asset names both platforms depend on, and — since #204 — the mac's update feed, built and signed at the cut, and the one-time dress rehearsal of the updater. |
 | [`website/`](website/README.md) | **plantoir.app.** The marketing site's SOURCES — a layout, a stylesheet, one file per page, and the screenshot harness. `python3 website/build.py` writes `site/`, and `--deploy` publishes it to Netlify — the site is not Git-connected, so nothing deploys on push. `site/` is a build output and hand-edits to it are overwritten. The release version line lives in `website/site.json`. Screenshots are captured from the real app and the real class sites by `website/shots/capture.py`, in both colour schemes. |
 | [`TODO.md`](TODO.md) | **Closed to new entries** since 2026-09-08 — deferred work is a GitHub issue now. What is left is append-only history like a `GUI-IMPROVEMENTS.md` row: an entry records what was true on its day and what the entry itself got wrong, and is not rewritten when the behaviour changes again. |
 | [`AGENTS.md`](AGENTS.md) | How this file reaches an agent that looks for `AGENTS.md` rather than `CLAUDE.md`. It is a POINTER, four sentences long, and deliberately carries no rules of its own — a second copy of the rules is a second copy to keep in step, and the one that used to live beside it went stale exactly that way. |
