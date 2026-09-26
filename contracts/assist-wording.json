@@ -58,6 +58,8 @@
     "everyDateIsSpokenForForAMeeting" : "Every recorded date is spoken for, so another meeting cannot be dated until more dates are recorded.",
     "linkedClassesWereLeftAlone" : "“Unit 2, Day 4” and “Unit 2, Day 5” are classes of their own, so they stay as they are — publish each one when you get to it.",
     "linkedClassesWereLeftAloneForAMeeting" : "“Week 4” and “Week 5” are meetings of their own, so they stay as they are — publish each one when you get to it.",
+    "linkedClassStaysVisible" : "“Unit 2, Day 4” stays visible, because it is a class of its own.",
+    "linkedClassStaysVisibleForAMeeting" : "“Week 4” stays visible, because it is a meeting of its own.",
     "linkedClassWasLeftAlone" : "“Unit 2, Day 4” is a class of its own, so it stays as it is — publish it when you get to that class.",
     "linkedClassWasLeftAloneForAMeeting" : "“Week 4” is a meeting of its own, so it stays as it is — publish it when you get to that meeting.",
     "linkedPageIsADraft" : "a draft, so students can’t open it yet",

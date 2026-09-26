@@ -778,6 +778,27 @@ nonisolated enum AssistWording {
              + "when you get to it."
     }
 
+    /// Why a linked class stays visible when an unpublish reached it (#201):
+    /// the clause that finishes "“Unit 2, Day 4” stays visible, because …".
+    ///
+    /// Said in the plan's "N linked pages stay visible:" list rather than
+    /// counted, beside the other pages that stay, because each of those is
+    /// named with its reason and a class is one more page a student can still
+    /// reach. **Only about a class students can SEE**: one already hidden is
+    /// not "staying visible", and saying so would be false — the same
+    /// visible-only rule every kept page follows.
+    ///
+    /// Not `linkedClassesWereLeftAlone`, the publishing sentence, because
+    /// "publish it when you get to that class" is false about a class an
+    /// unpublish left up. The contract renders it through
+    /// `AssistPublishPlan.stayingVisibleLine` as `linkedClassStaysVisible`.
+    ///
+    /// - Parameter noun: what the course calls one of them (#267). The model
+    ///   is always given `.class`; only a club's card says "meeting".
+    static func aLinkedClassStaysBecause(noun: ClassNoun = .class) -> String {
+        return "it is a \(noun.singular) of its own."
+    }
+
     /// Pages nothing could be written to, NAMED rather than counted (#186).
     ///
     /// The settings at the top of a page can be written in a way that leaves
