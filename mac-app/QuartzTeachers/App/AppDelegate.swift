@@ -27,6 +27,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Opens the trail for this launch.
     func applicationDidFinishLaunching(_ notification: Notification) {
         ActivityTrail.noteLaunch()
+        // A launch started by a click on a notification may show no window of
+        // its own; a click still waiting for one is decided now (#306).
+        let launchedByANotification: Bool =
+            notification.userInfo?[NSApplication.launchUserNotificationUserInfoKey] != nil
+        SectionFromNotification.launchFinished(launchedByANotification: launchedByANotification)
         // Built websites are kept outside the working folder, so a folder the
         // teacher has thrown away leaves its builds behind with nothing left
         // to name them. Once a launch, off the main thread — it is a few

@@ -497,7 +497,7 @@
         "appliesOnWhy": "PERMANENT, the same case as 'workspace was in use': Windows' preview.ps1 serves on the PC itself, with no workspace and no forward to lose (app-rules.json -> previewPorts.whenAnotherAccountHasTheAddress.appliesOnWhy). Whether the Windows WALK sees another account's listeners is a separate question, asked in the windows issue from #310."
       },
       {
-        "carries": "the course and the section, and which of: told with a notification; not sent because notifications are turned off; not sent because permission was never given; could not be sent; and, when a teacher first schedules from the app, that the permission question was put and what the answer was. Since #306 (2026-09-26), also what a CLICK on the notification did: the section shown - in a window already on its working folder, in the window that was choosing a folder, or in a new window; the window brought forward and left as it was because it was in the middle of something; the working folder shown without the section because the section is no longer in it; or Plantoir only brought forward because the working folder is gone or the notification named no section. NEVER the notification's text, and never the working folder's path.",
+        "carries": "the course and the section, and which of: told with a notification; not sent because notifications are turned off; not sent because permission was never given; could not be sent; and, when a teacher first schedules from the app, that the permission question was put and what the answer was. Since #306 (2026-09-26), also what a CLICK on the notification did: the section shown - in a window already on its working folder, in the window that was choosing a folder, or in a new window; the window brought forward and left as it was because it was in the middle of something; the working folder shown without the section because the section is no longer in it; or Plantoir only brought forward because the working folder is gone, could not be opened here (out of the builder's reach, or refused when a window choosing a folder tried it), or the notification named no section. NEVER the notification's text, and never the working folder's path.",
         "event": "scheduled publish notification",
         "why": "Added with #212. 'I never got told' is answerable only if the trail says whether the notification went out, or that notifications were off for the app — from the teacher's side a notification that was blocked and one that was never sent look identical. The question's own line is written BEFORE the answer, because a question that is ignored, or arrives under a Focus, may never be answered. See scheduledPublishStopped.notification. 'I clicked it and nothing happened' (#306) is answered by the same line: each honest reason - the folder gone, the window busy, the section gone - has its own wording, and NO line at all means the click never reached this copy of the app (the launch line's bundle path says which copy a click started). See scheduledPublishStopped.notification.onClick."
       }
@@ -1839,7 +1839,7 @@
       "onClick": {
         "note": "Added 2026-09-26 with GitHub #306. What a click on a scheduled publish's notification does. Until then a click only brought Plantoir forward on whatever it last showed. The notification now carries the working folder's path, the course and the section - how is each platform's own (the notification's userInfo on the mac, the toast's launch arguments on Windows); the identifier's folder id is a hash, so the path has to travel beside it. The path is never shown and never written on the trail.",
         "rule": "Show THAT section, in a window on the working folder the run was for. Use a window already on that folder (the one nearest the front); else let a window with no folder take it; else open a NEW window on it. Never point a window that is on another working folder somewhere else. A window in the middle of something (a dialog in front of it, a course being renamed in place) is brought forward with its selection left alone. A folder that is gone, or a notification that names nothing, only brings the app forward. A section that is no longer in the folder is not guessed at. Clicking changes nothing else: the record and the band stay until the teacher dismisses the band.",
-        "howToRunACase": "Build the windows the case lists, FRONT TO BACK (`folder` is `this` = the notification's working folder, `other` = another working folder, `none` = the folder chooser; `busy` = a dialog is in front of it or a course is being renamed in place; `settled: false` = still finding its folder at launch). `launching: true` = the app has not shown its first window yet. `carries: false` = the notification names no section. `folderExists` and `sectionInFolder` describe the disk. Then decide, and check `expect.action` and `expect.window` (an index into `windows`, the one used or brought forward). Then play the same case through the real click-handling with real folders and check the rest: `selectsTheSection`, `opensAWindow`, `otherWindowsUnchanged` (every listed window keeps its folder and its selection), `recordStillThere`, and `trailSays` - the line after the course/section prefix the trail puts on this event (the no-section case has no prefix). A `wait` case is decided again when each window's folder becomes final, and has no line until then.",
+        "howToRunACase": "Build the windows the case lists, FRONT TO BACK (`folder` is `this` = the notification's working folder, `other` = another working folder, `none` = the folder chooser; `busy` = a dialog is in front of it or a course is being renamed in place; `settled: false` = still finding its folder at launch). `launching: true` = the app has not shown its first window yet. `carries: false` = the notification names no section. `folderExists` and `sectionInFolder` describe the disk; `reachable: false` = a new window may not open on the folder (mac: outside the home folder, #290). Then decide, and check `expect.action` and `expect.window` (an index into `windows`, the one used or brought forward). Then play the same case through the real click-handling with real folders and check the rest: `selectsTheSection`, `opensAWindow`, `otherWindowsUnchanged` (every listed window keeps its folder and its selection), `recordStillThere`, and `trailSays` - the line after the course/section prefix the trail puts on this event (the no-section case has no prefix). A `wait` case is decided again when each window's folder becomes final, and has no line until then.",
         "cases": [
           {
             "name": "a window is already on that folder",
@@ -2074,6 +2074,29 @@
             "why": "The notification already said how the publish went; a window on a folder that is not there would say nothing more. Nothing is said on screen."
           },
           {
+            "name": "the working folder is out of reach, and no window is on it",
+            "appliesOn": [
+              "mac"
+            ],
+            "carries": true,
+            "folderExists": true,
+            "sectionInFolder": true,
+            "reachable": false,
+            "windows": [
+              {
+                "folder": "other"
+              }
+            ],
+            "expect": {
+              "action": "bringForwardOnly",
+              "selectsTheSection": false,
+              "opensAWindow": false,
+              "otherWindowsUnchanged": true
+            },
+            "trailSays": "a scheduled publish notification was clicked, but its working folder could not be opened here, so Plantoir was only brought forward",
+            "why": "A folder outside the home folder is refused by workingFolderReach when chosen or reopened; a new window must not open it by a side door. It is also the likeliest folder to have a failed run to click on (#221). A window already on it is used as it is. The same line is written when a window choosing a folder is refused it, whose picker then says why."
+          },
+          {
             "name": "the section is no longer in that folder",
             "carries": true,
             "folderExists": true,
@@ -2158,7 +2181,7 @@
           },
           {
             "instead": "Reuse the assistant's way of showing a section (revealSectionOnScreen on the mac).",
-            "why": "It waits for the window and the section by polling on a timer, and a window it opens first shows the key window's folder and then switches. The router answers at the event where a window's folder is final instead."
+            "why": "It waits for the window and for the section by polling on a timer. The router answers at the event where a window's folder is final instead."
           },
           {
             "instead": "Wait for the launch windows with a fixed delay.",
