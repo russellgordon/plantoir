@@ -1505,10 +1505,13 @@ each pinned by tests in `Plantoir.Tests/ClassFolderMembershipTests.cs`:
   reaches rather than only the publish one. **Both are closed as of
   2026-09-19**: the mac's date walk goes through `reachFollowingLinks(from:)`
   now and stops where Windows stops, pinned by `class-planning.json` →
-  `datingPagesAClassBrings.reachStopsAtAClassPage`. Unpublish reach is the one
-  half still open —
-  [#201](https://github.com/russellgordon/plantoir/issues/201), v1.3.0 — and
-  neither platform stops there today.
+  `datingPagesAClassBrings.reachStopsAtAClassPage`. Unpublish reach, the one
+  half left open then, closed on the mac on 2026-09-26
+  ([#201](https://github.com/russellgordon/plantoir/issues/201)): an unpublish
+  stops at a class page too (`followingLinks.stopsAtAClassPage.appliesTo`,
+  `followingLinks.unpublishing.cases`). Windows' unpublish sweep did not stop
+  either, and owes the same clause; see
+  [the assistant's page](10-local-ai-assistant.md#unpublishing-stops-there-too-201).
 
 **Rejected: keeping Windows' wider membership.** It is the more generous
 reading — everything the teacher put in a per-section folder is a class — and
