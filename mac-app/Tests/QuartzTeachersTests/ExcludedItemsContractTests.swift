@@ -56,4 +56,65 @@ final class ExcludedItemsContractTests: XCTestCase {
         }
         XCTAssertGreaterThanOrEqual(casesAsked, 4)
     }
+
+    /// `excludedItems.recordedOnSave`, played through `ExclusionTrail.changes`
+    /// — the comparison `CourseConfiguration.write(to:)` makes of the file
+    /// before a write with what it wrote. No case has anything on disk, so
+    /// no course folder is given.
+    func testWhatAWriteRecordsMatchesTheContract() throws {
+        let cases: [[String: Any]] = try XCTUnwrap(try ExcludedItemsContractTests.rule("recordedOnSave")["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 8, "the contract lost recorded-on-save cases")
+        for testCase in cases {
+            let caseName: String = testCase["name"] as? String ?? "unnamed"
+            let before: [String: Any] = try XCTUnwrap(testCase["before"] as? [String: Any], caseName)
+            let written: [String: Any] = try XCTUnwrap(testCase["written"] as? [String: Any], caseName)
+            let expected: [[String: String]] = try XCTUnwrap(testCase["expect"] as? [[String: String]], caseName)
+
+            var described: [[String: String]] = []
+            for change in ExclusionTrail.changes(before: before, written: written) {
+                var scope: String = "shared"
+                if change.scope == FolderScope.perSection {
+                    scope = "per_section"
+                }
+                described.append([
+                    "event": change.event.rawValue, "scope": scope,
+                    "kind": change.kind.rawValue, "name": change.name,
+                ])
+            }
+            XCTAssertEqual(described, expected, caseName)
+        }
+    }
+
+    /// The kind of a name in neither list comes from the disk: a folder added
+    /// and then removed before saving was made by Course Settings
+    /// (`createFoldersOnDisk`), so the line still says "folder" (the plan
+    /// review's finding 10).
+    func testANameInNeitherListTakesItsKindFromTheDisk() throws {
+        let courseURL: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("exclusion-kind-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: courseURL) }
+        try FileManager.default.createDirectory(
+            at: courseURL.appendingPathComponent("Field Trips"), withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: courseURL.appendingPathComponent("section1/Labs"), withIntermediateDirectories: true
+        )
+        try Data("# notes".utf8).write(to: courseURL.appendingPathComponent("section1/Notes.md"))
+
+        let written: [String: Any] = [
+            "excluded_items": ["shared": ["Field Trips", "Drafts"], "per_section": ["Labs", "Notes.md"]],
+        ]
+        let changes: [ExclusionTrail.Change] = ExclusionTrail.changes(
+            before: [:], written: written, courseDirectory: courseURL
+        )
+        var kinds: [String] = []
+        for change in changes {
+            kinds.append(change.name + "=" + change.kind.rawValue)
+        }
+        XCTAssertEqual(kinds, ["Field Trips=folder", "Drafts=item", "Labs=folder", "Notes.md=file"])
+        XCTAssertEqual(
+            ExclusionTrail.line(for: changes[3], courseCode: "ICS3U"),
+            "excluded per-section file Notes.md in ICS3U"
+        )
+    }
 }

@@ -413,10 +413,19 @@ nonisolated enum ActivityTrail {
         /// would still fire — which is why they are told apart.
         case scheduledDeployCouldNotBeSet = "scheduled deploy could not be set"
         /// A folder or file was removed in Course Settings, excluding it
-        /// from previews and deploys.
+        /// from previews and deploys. Written when a write of the course's
+        /// configuration puts it into `course_config.json` — compared with
+        /// the file as it was before that write, by whichever writer saved it
+        /// — never on the click: a Revert, or a name added back before
+        /// saving, leaves no line (issue #152, `ExclusionTrail`). Carries the
+        /// scope and the kind: folder, file, or item when neither a list nor
+        /// the disk names it.
         case itemExcluded = "item excluded"
         /// A previously excluded folder or file was added back in Course
-        /// Settings, returning it to previews and deploys.
+        /// Settings, returning it to previews and deploys. Written at the
+        /// write, like `itemExcluded`; a write that replaces an exclusion
+        /// list another window changed can record a re-inclusion this teacher
+        /// did not click, which is true — the write did put it back.
         case itemReincluded = "item re-included"
         /// A teacher tried to remove or untick a folder or file that a
         /// feature depends on, and was shown why it cannot go and which
