@@ -900,6 +900,47 @@ the pre-fix body back turns cases 1, 2, 5 and 6 red, the old pool semantics over
 a CORRECT walk turn 5 and 6 red, and reordering the walk before the exclusion —
 or leaving the exclusion out — turns 3 and 4 red.
 
+**On the mac the order has one owner too, and since
+[#183](https://github.com/russellgordon/plantoir/issues/183) (2026-09-26) the
+contract drives it.** Since #266 both folder lists' removal is one method,
+`CourseSettingsView.folderWasRemoved(_:scope:)` — `excluded_items`, then the
+pool, then the trail line — called from the list editor's
+`StringListEditorView.removeItem(named:)` after the editor has written the copy
+list. Until #183 the mac's contract runner (and three other tests) REPLAYED
+those steps by hand in the order they were believed to run, so a reorder inside
+`folderWasRemoved` left every case green. Measured before the change: moving the
+pool above the exclusion, or leaving the exclusion out, kept all seven cases and
+every `SpecialFoldersProtectionTests` case green. The only red was the #266 byte
+golden (`ListTableGoldenTests`), by accident, and that is not a pin: its message
+says the tables changed the saved bytes rather than that the order broke, a
+golden is re-captured whenever a legitimate change moves the file (a re-capture
+on a mutated tree takes the regression in silently), and it covers one removal
+in one scope. Now the runner removes through the editor
+(`CourseSettingsGestureScript.editor(for:of:).removeItem(named:)`), and each of
+four mutations — pool above exclusion, exclusion left out, pool left out, or
+`onRemove` called before the editor writes the list — turns cases 3 and 4 red:
+the same pair as on Windows. Cases 1, 2, 5, 6 and 7 stay green under a reorder,
+correctly: there the name is still offered or the course was never asked, so
+the pool is left alone whatever the order.
+
+**Windows owes nothing for this**: its order was already pinned through
+`FolderRemoval.RemoveFolderFromCourse`, and no case changed. The trap it records
+applies to both sides on any later refactor: a runner that replays the steps
+instead of calling the gesture's owner stays green through exactly the bug the
+rule exists for. REJECTED on the mac: moving the removal into a model function
+to mirror Windows' Core method (`folderWasRemoved` is already the single owner
+and reachable from a test, so it would buy symmetry no test needs), an authored
+`sequence` field in the contract (neither runner could assert it without
+instrumenting internal calls, which tests how the code is built rather than
+what it does, and Windows would owe a runner change for no gain), and relying
+on the #266 golden. **One seam stays unpinned**:
+`CourseSettingsGestureScript.editor(for:of:)` is a hand copy of `body`'s wiring,
+so if `body` ever wired a folder list differently — another method than
+`folderWasRemoved`, the other scope, a binding to another list, or different
+protection or notice closures — these tests would stay green. Closing it means extracting the editors into
+a function both the view and the tests call — a view refactor with its own
+reviews, not part of #183.
+
 **A course damaged by the old behaviour is NOT repaired, decided 2026-09-18.**
 It keeps its frozen pool until the teacher ticks or unticks something, and
 neither app goes looking. The reason is that nobody can have been damaged by a
