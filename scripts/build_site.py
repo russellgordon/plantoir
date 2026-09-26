@@ -21,6 +21,7 @@ _sys.path.insert(0, str(Path(__file__).resolve().parent))
 import site_health
 import contracts
 import class_pages
+import markdown_code
 import page_visibility
 import reference_course
 import stop_preview
@@ -1751,9 +1752,14 @@ def _find_first_class_created(content_root: Path) -> datetime | None:
     return earliest_any_dt
 
 def _extract_wikilink_targets(text: str) -> set[str]:
-    """Extract all normalized wikilink target names from markdown text, excluding code fences and index/meta links."""
-    outside_fences = re.sub(r"```[\s\S]*?```", "", text)
-    outside_fences = re.sub(r"`[^`\n]*`", "", outside_fences)
+    """Extract all normalized wikilink target names from markdown text, excluding links inside code and index/meta links."""
+    # A link whose [[ starts inside code - a fence of either character, a
+    # fence inside a callout, an inline span of any length, across the lines
+    # of a paragraph - is an example, not a link (#313). The mask comes from
+    # markdown_code, the one definition every reader here shares:
+    # contracts/shared-rules.json -> readingALink.whatIsCode. Until #313 this
+    # stripped ``` fences and one-line spans with two regexes, which missed
+    # ~~~ fences, multi-line spans and a ``` held inside ````.
     # Heading BEFORE alias, the order Quartz and Obsidian write them in:
     # [[Page#Heading|words]] and [[Page#Heading\|words]] (the backslash is how
     # an alias pipe is escaped inside a table) are links to Page. Until #294
@@ -1776,7 +1782,7 @@ def _extract_wikilink_targets(text: str) -> set[str]:
     # Measured 0 change over all of support/.
     link_pattern = re.compile(r"!?\[\[([^\]|#]+?)(?:#[^\[\]|]*)?(?:\\?\|[^\]]*)?\]\]")
     targets = set()
-    for match in link_pattern.finditer(outside_fences):
+    for match in markdown_code.matches_outside_code(link_pattern, text):
         target = match.group(1).strip().rstrip("\\")
         if not target:
             continue
@@ -5129,7 +5135,8 @@ where they genuinely apply rather than leaving the record silent.
 
 SPECIFIC_CODE = re.compile(r"^([A-Z])(\d+)\.(\d+)$")
 OVERALL_FILE = re.compile(r"^([A-Z]\d+)\.\s")
-CURRICULUM_BLOCK = re.compile(r"%%curriculum-start%%(.*?)%%curriculum-end%%", re.S)
+# A curriculum block is found by _curriculum_blocks_outside_code (#313), not
+# by a regex over the raw text: a marker shown inside code is not one.
 # What a link names, for "pages the course teaches" and the coverage count.
 # Heading BEFORE alias, the order Quartz and Obsidian write them in, so
 # [[Page#Heading|words]] and ![[A1.1#Examples\|see]] are links to Page and
@@ -5522,9 +5529,9 @@ def _pages_the_course_teaches(content_root: Path, class_folders: list) -> set | 
             text = page.read_text(encoding="utf-8")
         except Exception:
             return set()
-        outside_fences = re.sub(r"```[\s\S]*?```", "", text)
+        # Nothing inside code is a link (#313, readingALink.whatIsCode).
         return {match.group(1).strip().rstrip("\\").split("/")[-1]
-                for match in BLOCK_LINK.finditer(outside_fences)}
+                for match in markdown_code.matches_outside_code(BLOCK_LINK, text)}
 
     first_hop = set()
     for page in class_pages.values():
@@ -5534,6 +5541,34 @@ def _pages_the_course_teaches(content_root: Path, class_folders: list) -> set | 
         if stem in by_stem:
             second_hop |= links_from(by_stem[stem])
     return set(class_pages) | first_hop | second_hop
+
+
+def _curriculum_blocks_outside_code(text: str, code: list) -> list:
+    """
+    The (start, end) of what each `%%curriculum-start%%` ... `%%curriculum-end%%`
+    block holds, for the blocks whose markers are both outside code (#313). A
+    marker shown inside a fence is an example of the syntax: it neither opens
+    a block nor closes one, so a fenced example cannot swallow the real block
+    after it.
+    """
+    start_marker = "%%curriculum-start%%"
+    end_marker = "%%curriculum-end%%"
+    blocks = []
+    position = 0
+    while True:
+        start = text.find(start_marker, position)
+        if start < 0:
+            return blocks
+        position = start + len(start_marker)
+        if markdown_code.is_in_code(code, start):
+            continue
+        end = text.find(end_marker, position)
+        while end >= 0 and markdown_code.is_in_code(code, end):
+            end = text.find(end_marker, end + len(end_marker))
+        if end < 0:
+            return blocks
+        blocks.append((position, end))
+        position = end + len(end_marker)
 
 
 def _coverage_counts(content_root: Path, curriculum_dir: Path, specific: dict,
@@ -5589,11 +5624,19 @@ def _coverage_counts(content_root: Path, curriculum_dir: Path, specific: dict,
         # overall expectation "evaluated" rather than merely "addressed".
         is_assessed = _is_graded_path(relative, graded_folders, graded_was_configured)
 
+        # Nothing inside code counts (#313, readingALink.whatIsCode): a
+        # fenced example of `![[A1.1]]`, or of a whole curriculum block, on a
+        # page that teaches how to write one is not a claim to have covered
+        # anything. A block counts only where its opening marker is outside
+        # code, and a link inside it only where the link is.
+        code = markdown_code.code_ranges(text)
         targets = set()
-        for link in TRANSCLUSION.finditer(text):
+        for link in markdown_code.matches_outside_code(TRANSCLUSION, text, code):
             targets.add(link.group(1).strip().rstrip("\\").split("/")[-1])
-        for block in CURRICULUM_BLOCK.findall(text):
-            for link in BLOCK_LINK.finditer(block):
+        for block_start, block_end in _curriculum_blocks_outside_code(text, code):
+            for link in BLOCK_LINK.finditer(text, block_start, block_end):
+                if markdown_code.is_in_code(code, link.start()):
+                    continue
                 targets.add(link.group(1).strip().rstrip("\\").split("/")[-1])
 
         for target in targets:

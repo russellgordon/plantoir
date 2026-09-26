@@ -70,6 +70,10 @@ COPY scripts/site_health.py /opt/scripts/site_health.py
 # toolchain change is gated on it: the unit tests were green and the image
 # could not be built at all.
 COPY scripts/class_pages.py /opt/scripts/class_pages.py
+# Where a page's CODE is, so a link written inside code is not read as one
+# (#313) — imported by build_site.py and setup_course.py; the rule is
+# contracts/shared-rules.json → readingALink.whatIsCode.
+COPY scripts/markdown_code.py /opt/scripts/markdown_code.py
 # One home for "does the built site show this page?" — read by build_site.py
 # and setup_course.py, and pinned by contracts/file-formats.json.
 COPY scripts/page_visibility.py /opt/scripts/page_visibility.py
