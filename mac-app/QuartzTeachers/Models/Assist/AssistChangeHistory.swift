@@ -32,6 +32,18 @@ struct AssistSavedFile: Equatable {
     let after: String?
 }
 
+/// What kind of change an `AssistChange` was, so an undo from either surface
+/// can say which event it was undoing (#96). An enum rather than a Bool, so a
+/// third kind is a case rather than a second flag.
+nonisolated enum AssistChangeKind: Equatable {
+
+    /// Everything the assistant has always recorded.
+    case ordinary
+
+    /// A section got ready for the start of the year, in one act.
+    case startOfYear
+}
+
 /// One thing the assistant did, in a form that can be taken straight back.
 struct AssistChange: Equatable {
 
@@ -70,6 +82,9 @@ struct AssistChange: Equatable {
 
     let files: [AssistSavedFile]
 
+    /// Which kind of change this was. `.ordinary` unless said otherwise.
+    let kind: AssistChangeKind
+
     // MARK: - Computed properties
 
     /// The same clause with the section on the end, for anywhere that has not
@@ -77,6 +92,22 @@ struct AssistChange: Equatable {
     /// Day 23 in ADA1O Section 1".
     var description: String {
         return "\(whatHappened) in \(courseCode) Section \(sectionNumber)"
+    }
+
+    // MARK: - Initializer
+
+    init(whatHappened: String,
+         courseCode: String,
+         sectionNumber: Int,
+         rebuildsThePreview: Bool,
+         files: [AssistSavedFile],
+         kind: AssistChangeKind = .ordinary) {
+        self.whatHappened = whatHappened
+        self.courseCode = courseCode
+        self.sectionNumber = sectionNumber
+        self.rebuildsThePreview = rebuildsThePreview
+        self.files = files
+        self.kind = kind
     }
 }
 

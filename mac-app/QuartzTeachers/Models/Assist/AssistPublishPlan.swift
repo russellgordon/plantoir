@@ -577,6 +577,48 @@ enum AssistPublishPlanner {
         )
     }
 
+    /// What hiding EXACTLY these pages would do — no sweep, no link
+    /// following, nothing named by title (#96).
+    ///
+    /// For a caller that has already decided every page, which is what
+    /// "Get Ready for the Start of the Year" does: its own rule chooses the
+    /// pages, and a sweep on top would be a second rule deciding the same
+    /// thing. Built from PAGES rather than titles on purpose (the plan's M9):
+    /// `graph.page(titled:)` keys on the file name, so two pages with the same
+    /// name in two folders would resolve to whichever came first and the
+    /// wrong one would be written.
+    ///
+    /// The change-building half is `appendChanges`, the same one every other
+    /// plan uses, so "already hidden", the certainty rule and the #186
+    /// decline all mean here what they mean everywhere else.
+    static func planHiding(
+        exactly pages: [AssistSectionPage],
+        forSection sectionNumber: Int,
+        in course: Course
+    ) -> AssistPublishPlan {
+        var changes: [AssistPublishChange] = []
+        var alreadyRight: [AssistSectionPage] = []
+        var noRoomForAKey: [AssistSectionPage] = []
+        appendChanges(
+            for: pages, becauseLinked: false, publishes: false,
+            forSection: sectionNumber, into: &changes, alreadyRight: &alreadyRight,
+            noRoomForAKey: &noRoomForAKey
+        )
+        return AssistPublishPlan(
+            courseCode: course.code,
+            sectionNumber: sectionNumber,
+            publishes: false,
+            unknownNames: [],
+            namedPages: pages,
+            changes: changes,
+            alreadyRight: alreadyRight,
+            noRoomForAKey: noRoomForAKey,
+            kept: [],
+            linkedClassesLeftAlone: [],
+            dateMoves: []
+        )
+    }
+
     /// Of the classes the walk stopped at, the ones worth a sentence.
     ///
     /// **Only the ones students cannot already see, and certainly cannot.** The

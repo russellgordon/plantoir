@@ -818,6 +818,34 @@ nonisolated enum ActivityTrail {
         /// in the same breath, and this is the line that is still there next
         /// week, when "why is this page still showing?" arrives.
         case pageSettingsLeftAsTheyWere = "page settings left as they were"
+        /// A section was got ready for the start of the year (#96): every
+        /// class after the first, and the pages only later classes use, put
+        /// into draft in one act. Carries the course and section, where it
+        /// was asked from (the app, the assistant, an outside assistant),
+        /// how many classes and how many other pages went into draft — the
+        /// other pages counted by reason — how many were left as they were,
+        /// the backup's FILE NAME, and whether the preview was rebuilt.
+        /// Never a page's name: the backup is how anyone finds the pages.
+        ///
+        /// The single largest change the app makes to a teacher's files on
+        /// one press, usually weeks before anybody looks at the site. "Why is
+        /// everything after Day 1 gone?" arrives in September, and without
+        /// this line the trail shows a teacher who never pressed anything.
+        case sectionMadeReadyForTheStartOfTheYear = "section made ready for the start of the year"
+        /// That change taken back (#96), from the app's own undo or an
+        /// outside assistant's. Carries where from, how many pages were put
+        /// back, and how many were left as they are because they had changed
+        /// since — an undo that skips files is a partial undo, and "some came
+        /// back and some did not" needs the count on record.
+        case startOfTheYearChangeUndone = "start of the year change undone"
+        /// Getting a section ready was asked for and NOTHING was written
+        /// (#96). Carries where from and the reason: changedSinceShown,
+        /// backupFailed, writeFailed, noFirstClass, missingPlanCode, or
+        /// nothingToDo — the last only from an outside assistant, since the
+        /// app's button is not offered when there is nothing to do. "I
+        /// pressed the button and nothing happened" leaves no changed file,
+        /// so without this line nothing records that it was pressed.
+        case startOfTheYearNotDone = "start of the year not done"
     }
 
     // MARK: - Stored properties
@@ -872,6 +900,57 @@ nonisolated enum ActivityTrail {
     static func pageSettingsLeftAsTheyWereLine(act: String, pages: Int) -> String {
         let counted: String = pages == 1 ? "1 page" : "\(pages) pages"
         return "left the settings of \(counted) as they were while \(act): no room at the top for a new setting"
+    }
+
+    /// Where a start-of-the-year act was asked from, in the trail's words.
+    static func startOfYearSource(_ source: String) -> String {
+        switch source {
+        case "app":
+            return "from the app"
+        case "mcp":
+            return "from an outside assistant"
+        default:
+            return "from the assistant"
+        }
+    }
+
+    /// The words for `sectionMadeReadyForTheStartOfTheYear` (#96): counts and
+    /// the backup's file name, never a page.
+    static func sectionMadeReadyLine(
+        source: String,
+        classes: Int,
+        otherPagesByReason: [String: Int],
+        leftAsTheyWere: Int,
+        backupFileName: String,
+        previewRebuilt: Bool
+    ) -> String {
+        var other: Int = 0
+        for (_, count) in otherPagesByReason {
+            other += count
+        }
+        let firstUsedLater: Int = otherPagesByReason["firstUsedLater"] ?? 0
+        let unseen: Int = (otherPagesByReason["onlyHiddenPagesLinkToIt"] ?? 0)
+            + (otherPagesByReason["onlyAFolderListsIt"] ?? 0)
+            + (otherPagesByReason["nothingLinksToIt"] ?? 0)
+        let classWord: String = classes == 1 ? "1 class" : "\(classes) classes"
+        let otherWord: String = other == 1 ? "1 other page" : "\(other) other pages"
+        return "made ready for the start of the year \(startOfYearSource(source)) — \(classWord) and "
+             + "\(otherWord) put into draft (\(firstUsedLater) first used later, \(unseen) that nothing "
+             + "students can see links to), \(leftAsTheyWere) left as they were; backup \(backupFileName); "
+             + (previewRebuilt ? "preview rebuilt" : "preview not rebuilt")
+    }
+
+    /// The words for `startOfTheYearChangeUndone` (#96).
+    static func startOfYearUndoneLine(source: String, putBack: Int, leftAsTheyAre: Int) -> String {
+        let pages: String = putBack == 1 ? "1 page" : "\(putBack) pages"
+        return "undid getting ready for the start of the year \(startOfYearSource(source)) — \(pages) put "
+             + "back, \(leftAsTheyAre) left as they are because they had changed since"
+    }
+
+    /// The words for `startOfTheYearNotDone` (#96).
+    static func startOfYearNotDoneLine(source: String, reason: String) -> String {
+        return "did not get ready for the start of the year \(startOfYearSource(source)) — nothing was "
+             + "changed (\(reason))"
     }
 
     static func formatter(timeZone: TimeZone = TimeZone.current) -> DateFormatter {

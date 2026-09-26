@@ -478,6 +478,10 @@ final class AssistToolRunner {
             return planCurriculumMentions(arguments)
         case "add_curriculum_mentions":
             return addCurriculumMentions(arguments)
+        case "plan_prepare_for_start_of_year":
+            return planPrepareForStartOfYear(arguments)
+        case "prepare_for_start_of_year":
+            return await prepareForStartOfYear(arguments)
         default:
             return AssistToolOutcome.couldNotRead(
                 "There is no tool called “\(call.function.name)”."
@@ -728,7 +732,14 @@ final class AssistToolRunner {
             workspaceURL: workspace.workspaceURL
         )
         let dangling: [AssistSectionLink] = graph.linksIntoHiddenPages()
-        let orphans: [AssistSectionPage] = graph.visiblePagesNothingLinksTo()
+        // Curriculum pages and Key Links (with what it lists) are left out of
+        // groups 2 and 3, as Windows has always left them out of group 2
+        // (`shared-rules.json` → `sectionCheck`, #96).
+        let neverInTheAudit: Set<String> = AssistSectionGraph.pagesNeverInTheAudit(
+            of: graph, in: located.course
+        )
+        let orphans: [AssistSectionPage] = graph.visiblePagesNothingLinksTo(leavingOut: neverInTheAudit)
+        let missed: [AssistSectionPage] = graph.visiblePagesLinkedButMissed(leavingOut: neverInTheAudit)
 
         let visible: Int = graph.visiblePageCount
         let pageWord: String = visible == 1 ? "page" : "pages"
@@ -775,6 +786,31 @@ final class AssistToolRunner {
                 lines.append("• " + page.relativePath)
                 listed += 1
             }
+            paragraphs.append(lines.joined(separator: "\n"))
+        }
+
+        // The third group (#96), silent when empty for the same reason: a
+        // page a class students cannot see links to, and no class they CAN
+        // see links to, is a page a bulk change should have taken down with
+        // those classes and did not. Its being empty is what proves "Get
+        // Ready for the Start of the Year" — or anything else — finished.
+        if !missed.isEmpty {
+            var lines: [String] = []
+            let word: String = missed.count == 1 ? "page is" : "pages are"
+            lines.append("\(missed.count) visible \(word) linked only from classes students cannot see "
+                         + "yet, and from no class they can. Students can still open these through the "
+                         + "site's explorer:")
+            var listed: Int = 0
+            for page in missed {
+                if listed == AssistToolRunner.mostListed {
+                    lines.append("…and \(missed.count - listed) more.")
+                    break
+                }
+                lines.append("• " + page.relativePath)
+                listed += 1
+            }
+            lines.append("Put each one into draft until the class that uses it is published, or link "
+                         + "it from a class students can already see.")
             paragraphs.append(lines.joined(separator: "\n"))
         }
 
@@ -1865,6 +1901,20 @@ final class AssistToolRunner {
         // (b) Put the files back.
         let result: AssistUndoResult = history.undo()
 
+        // Getting a section ready for the start of the year is one act with
+        // its own line, and so is taking it back (#96).
+        if pending.kind == .startOfYear {
+            ActivityTrail.note(
+                .startOfTheYearChangeUndone,
+                ActivityTrail.startOfYearUndoneLine(
+                    source: startOfYearSource,
+                    putBack: result.restored.count,
+                    leftAsTheyAre: result.skipped.count
+                ),
+                course: pending.courseCode, section: pending.sectionNumber
+            )
+        }
+
         if result.restored.isEmpty && result.skipped.isEmpty {
             return AssistToolOutcome.refused(result.description)
         }
@@ -1905,6 +1955,196 @@ final class AssistToolRunner {
         detail += "\n\n" + AssistWording.undoDoesNotReachTheLiveSite
 
         return AssistToolOutcome.wrote(summary, detail: detail)
+    }
+
+    // MARK: - Getting a section ready for the start of the year (#96)
+
+    /// Why the plan could not be made: the sentence, and the trail's reason.
+    private struct StartOfYearRefusal: Error {
+        let message: String
+        let reason: String
+    }
+
+    /// Where this runner's start-of-year acts are recorded as coming from.
+    private var startOfYearSource: String {
+        switch surface {
+        case .mcp:
+            return "mcp"
+        case .local:
+            return "assistant"
+        }
+    }
+
+    /// The plan, worked out afresh from disk.
+    private func startOfYearPlan(
+        _ arguments: [String: Any]
+    ) -> Result<(located: Located, plan: StartOfYearPlan), StartOfYearRefusal> {
+        let found: Result<Located, AssistToolRefusal> = locate(arguments)
+        guard case .success(let located) = found else {
+            return .failure(StartOfYearRefusal(message: refusal(from: found).message, reason: "noSuchSection"))
+        }
+        var scheduled: Date? = nil
+        if let folder = workspace.workspaceURL {
+            scheduled = ScheduledDeploy.nextRun(
+                courseCode: located.course.code, sectionNumber: located.sectionNumber,
+                inWorkingFolder: folder
+            )
+        }
+        let planned: Result<StartOfYearPlan, StartOfYearProblem> = StartOfYearPlanner.plan(
+            forSection: located.sectionNumber, in: located.course,
+            workspaceURL: workspace.workspaceURL, today: today, scheduledDeploy: scheduled
+        )
+        switch planned {
+        case .failure(let problem):
+            return .failure(StartOfYearRefusal(message: problem.sentence, reason: problem.trailReason))
+        case .success(let plan):
+            return .success((located, plan))
+        }
+    }
+
+    /// What getting the section ready would do. Changes nothing.
+    private func planPrepareForStartOfYear(_ arguments: [String: Any]) -> AssistToolOutcome {
+        switch startOfYearPlan(arguments) {
+        case .failure(let problem):
+            return AssistToolOutcome.couldNotRead(problem.message)
+        case .success(let found):
+            if found.plan.changesNothing {
+                let nothing: String = StartOfYearWording.nothingToDo(
+                    first: found.plan.firstClass.displayTitle, nouns: found.plan.noun.plural
+                )
+                return AssistToolOutcome.wrote(nothing, detail: found.plan.describe())
+            }
+            return AssistToolOutcome.planned(
+                "Worked out what getting \(found.located.course.code) Section "
+                    + "\(found.located.sectionNumber) ready for the start of the year would do.",
+                plan: found.plan.describe()
+            )
+        }
+    }
+
+    /// Carry the plan out — only when the code given is the code of the plan
+    /// as it stands NOW, and only with a fresh backup of the course.
+    ///
+    /// **A fresh backup for this act, and a refusal without one** (the plan
+    /// review's M2). `carryOut` goes ahead when its once-per-conversation
+    /// backup fails, and that backup may predate earlier changes in the
+    /// conversation; this is the largest single write the app makes, and the
+    /// app's own button refuses without one, so this refuses too. It is
+    /// `.assistant`'s — the file-name form is unchanged.
+    private func prepareForStartOfYear(_ arguments: [String: Any]) async -> AssistToolOutcome {
+        let source: String = startOfYearSource
+        let found: (located: Located, plan: StartOfYearPlan)
+        switch startOfYearPlan(arguments) {
+        case .failure(let problem):
+            if problem.reason == "noFirstClass", case .success(let located) = locate(arguments) {
+                ActivityTrail.note(
+                    .startOfTheYearNotDone,
+                    ActivityTrail.startOfYearNotDoneLine(source: source, reason: problem.reason),
+                    course: located.course.code, section: located.sectionNumber
+                )
+            }
+            return AssistToolOutcome.refused(problem.message)
+        case .success(let planned):
+            found = planned
+        }
+        let course: Course = found.located.course
+        let sectionNumber: Int = found.located.sectionNumber
+        let plan: StartOfYearPlan = found.plan
+        let code: String = text("planCode", in: arguments).trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if code.isEmpty || code.lowercased() != plan.fingerprint {
+            let reason: String = code.isEmpty ? "missingPlanCode" : "changedSinceShown"
+            ActivityTrail.note(
+                .startOfTheYearNotDone,
+                ActivityTrail.startOfYearNotDoneLine(source: source, reason: reason),
+                course: course.code, section: sectionNumber
+            )
+            let said: String = code.isEmpty
+                ? AssistWording.startOfYearNeedsItsPlan(course: course.code, section: String(sectionNumber))
+                : AssistWording.startOfYearPlanHasChanged(course: course.code, section: String(sectionNumber))
+            return AssistToolOutcome(
+                summary: said, detail: said + "\n\n" + plan.describe(), shouldContinue: false
+            )
+        }
+
+        if plan.changesNothing {
+            ActivityTrail.note(
+                .startOfTheYearNotDone,
+                ActivityTrail.startOfYearNotDoneLine(source: source, reason: "nothingToDo"),
+                course: course.code, section: sectionNumber
+            )
+            let nothing: String = StartOfYearWording.nothingToDo(
+                first: plan.firstClass.displayTitle, nouns: plan.noun.plural
+            )
+            return AssistToolOutcome.wrote(nothing, detail: nothing)
+        }
+
+        guard let coursesDirectoryURL = workspace.coursesDirectoryURL,
+              let backupURL = try? CourseArchiver.backUpCourse(
+                  course, coursesDirectoryURL: coursesDirectoryURL,
+                  madeBy: .assistant(sectionNumber: sectionNumber)
+              ) else {
+            ActivityTrail.note(
+                .startOfTheYearNotDone,
+                ActivityTrail.startOfYearNotDoneLine(source: source, reason: "backupFailed"),
+                course: course.code, section: sectionNumber
+            )
+            return AssistToolOutcome.refused(AssistWording.startOfYearNeedsABackup(course: course.code))
+        }
+        // The conversation's way back, if it had none yet: the Restore banner
+        // offers the copy from before this conversation changed anything.
+        if conversationBackups[course.code] == nil {
+            conversationBackups[course.code] = backupURL
+            conversationBackupURL = backupURL
+        }
+
+        let previewCanBeRebuilt: Bool = whatBlocksABuild(of: course) == nil
+        _ = await stopThePreviewBeforeWriting(for: course, sectionNumber: sectionNumber)
+
+        let change: AssistChange
+        var leftAlone: [String] = []
+        do {
+            let applied: (change: AssistChange, leftAlone: [String]) = try StartOfYearPlanner.apply(
+                plan, in: course
+            )
+            change = applied.change
+            leftAlone = applied.leftAlone
+        } catch {
+            ActivityTrail.note(
+                .startOfTheYearNotDone,
+                ActivityTrail.startOfYearNotDoneLine(source: source, reason: "writeFailed"),
+                course: course.code, section: sectionNumber
+            )
+            return AssistToolOutcome.refused(
+                StartOfYearWording.writeFailed(backup: backupURL.lastPathComponent)
+            )
+        }
+        history.record(change)
+
+        let written: Int = max(0, plan.changeCount - leftAlone.count)
+        ActivityTrail.note(
+            .sectionMadeReadyForTheStartOfTheYear,
+            ActivityTrail.sectionMadeReadyLine(
+                source: source,
+                classes: plan.classChangeCount,
+                otherPagesByReason: plan.otherChangesByReason,
+                leftAsTheyWere: plan.publishPlan.noRoomForAKey.count + leftAlone.count,
+                backupFileName: backupURL.lastPathComponent,
+                previewRebuilt: previewCanBeRebuilt
+            ),
+            course: course.code, section: sectionNumber
+        )
+
+        var said: String = StartOfYearWording.done(pages: StartOfYearWording.pages(written))
+        if !leftAlone.isEmpty {
+            said += " " + AssistPublishPlan.sayingPagesWithNoRoomForAKey(named: leftAlone)
+        }
+        var detail: String = said
+        detail += "\n\n" + StartOfYearWording.publishingFromNowOn(noun: plan.noun.singular)
+        detail += "\n\nundo_last_change takes this back while this session lasts. The course was backed up "
+                + "first, as “\(backupURL.lastPathComponent)”, which is the way back after that."
+        detail += "\n\n" + (await bringThePreviewUpToDate(for: course, sectionNumber: sectionNumber))
+        return AssistToolOutcome.wrote(said, detail: detail)
     }
 
     /// What to call the pages a class-page add created, for the sentence an
