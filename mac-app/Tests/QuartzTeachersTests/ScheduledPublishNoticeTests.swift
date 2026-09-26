@@ -20,6 +20,10 @@ final class ScheduledPublishNoticeTests: XCTestCase {
     /// (#237). One fixed id: these cases are about sections and runs, and
     /// the per-folder key is pinned in `ScheduledDeployTests`.
     private static let folderID: String = "0a1b2c3d"
+
+    /// The working folder the notification names, for a click (#306). Never
+    /// opened: announcing only carries it.
+    private static let workingFolderPath: String = "/Users/teacher/Plantoir"
     private var trailFolder: URL = URL(fileURLWithPath: "/nonexistent")
     private var previousStore: ProblemReportStore = ActivityTrail.store
 
@@ -60,7 +64,7 @@ final class ScheduledPublishNoticeTests: XCTestCase {
         let allowed: Bool = await real.askPermission()
         XCTAssertFalse(allowed)
         do {
-            try await real.post(identifier: "never", body: "never")
+            try await real.post(identifier: "never", body: "never", target: nil)
             XCTFail("The real poster posted from inside the suite")
         } catch {
             // Refused, as it must be.
@@ -126,7 +130,7 @@ final class ScheduledPublishNoticeTests: XCTestCase {
                 inHomeFolder: home, course: "ICS3U", section: 1, folderID: folder
             ))
             let announcement: ScheduledPublishNotice.Announcement = await ScheduledPublishNotice.announce(
-                inHomeFolder: home, course: "ICS3U", section: 1, folderID: folder, poster: fake
+                inHomeFolder: home, course: "ICS3U", section: 1, folderID: folder, workingFolderPath: Self.workingFolderPath, poster: fake
             )
             XCTAssertEqual(announcement, .posted)
         }
@@ -162,7 +166,7 @@ final class ScheduledPublishNoticeTests: XCTestCase {
                     let kind: ScheduledPublishOutcome.Kind = try Self.kind(named: try XCTUnwrap(post["kind"] as? String))
                     try writeRecord(kind: kind, course: course, section: section)
                     let announcement: ScheduledPublishNotice.Announcement = await ScheduledPublishNotice.announce(
-                        inHomeFolder: home, course: course, section: section, folderID: Self.folderID, poster: fake
+                        inHomeFolder: home, course: course, section: section, folderID: Self.folderID, workingFolderPath: Self.workingFolderPath, poster: fake
                     )
                     XCTAssertEqual(announcement, .posted, name)
                 } else {
@@ -222,7 +226,7 @@ final class ScheduledPublishNoticeTests: XCTestCase {
         let result: ResultBox = ResultBox()
         Task {
             let announcement: ScheduledPublishNotice.Announcement = await ScheduledPublishNotice.announce(
-                inHomeFolder: home, course: "ICS4U", section: 1, folderID: Self.folderID, poster: fake, ceiling: .milliseconds(50)
+                inHomeFolder: home, course: "ICS4U", section: 1, folderID: Self.folderID, workingFolderPath: Self.workingFolderPath, poster: fake, ceiling: .milliseconds(50)
             )
             result.announcement = announcement
             finished.fulfill()
@@ -243,7 +247,7 @@ final class ScheduledPublishNoticeTests: XCTestCase {
         let home: URL = self.home
         Task {
             _ = await ScheduledPublishNotice.announce(
-                inHomeFolder: home, course: "ICS4U", section: 1, folderID: Self.folderID, poster: fake, ceiling: .milliseconds(50)
+                inHomeFolder: home, course: "ICS4U", section: 1, folderID: Self.folderID, workingFolderPath: Self.workingFolderPath, poster: fake, ceiling: .milliseconds(50)
             )
             finished.fulfill()
         }
@@ -279,7 +283,7 @@ final class ScheduledPublishNoticeTests: XCTestCase {
                 await ScheduledPublishNotice.askPermissionIfNotAskedYet(course: "ICS3U", section: 1)
             case "scheduledRun":
                 try writeRecord(kind: .succeeded, course: "ICS3U", section: 1)
-                _ = await ScheduledPublishNotice.announce(inHomeFolder: home, course: "ICS3U", section: 1, folderID: Self.folderID)
+                _ = await ScheduledPublishNotice.announce(inHomeFolder: home, course: "ICS3U", section: 1, folderID: Self.folderID, workingFolderPath: Self.workingFolderPath)
             case "appAssistant", "outsideAssistant":
                 try await schedule(from: from == "appAssistant" ? .local : .mcp, fake: fake, expectAsking: asks)
             default:
@@ -318,7 +322,126 @@ final class ScheduledPublishNoticeTests: XCTestCase {
         XCTAssertEqual(spellings, known)
     }
 
+    // MARK: - What a click opens (#306)
+
+    /// The notification carries the working folder, course and section, so a
+    /// click can open that section.
+    func testTheNotificationCarriesItsSection() async throws {
+        try writeRecord(kind: .succeeded, course: "ICS4U", section: 2)
+        let fake: RecordingNotifications = RecordingNotifications(permission: .allowed)
+        let announcement: ScheduledPublishNotice.Announcement = await ScheduledPublishNotice.announce(
+            inHomeFolder: home, course: "ICS4U", section: 2, folderID: Self.folderID,
+            workingFolderPath: Self.workingFolderPath, poster: fake
+        )
+        XCTAssertEqual(announcement, .posted)
+        let identifier: String = ScheduledPublishNotice.identifier(course: "ICS4U", section: 2, folderID: Self.folderID)
+        let expected: NotificationClickTarget = NotificationClickTarget(
+            workingFolderPath: Self.workingFolderPath, course: "ICS4U", section: 2
+        )
+        let recorded: NotificationClickTarget?? = fake.targets[identifier]
+        XCTAssertEqual(recorded, .some(.some(expected)))
+    }
+
+    /// What is handed to macOS carries the target in `userInfo`, readable back
+    /// — the one line a real click depends on, checked without the real
+    /// notification centre. The round trip through property-list types is
+    /// what macOS's own database would do to it.
+    func testTheContentMacOSIsHandedCarriesTheTarget() throws {
+        let target: NotificationClickTarget = NotificationClickTarget(
+            workingFolderPath: "/Users/teacher/Élèves Plantoir", course: "ICS4U", section: 11
+        )
+        let content = SystemNotifications.content(body: "ICS4U Section 11 was published.", target: target)
+        XCTAssertEqual(content.body, "ICS4U Section 11 was published.")
+        XCTAssertEqual(NotificationClickTarget.from(userInfo: content.userInfo), target)
+
+        let stored: Data = try PropertyListSerialization.data(
+            fromPropertyList: content.userInfo, format: .binary, options: 0
+        )
+        let readBack = try XCTUnwrap(
+            PropertyListSerialization.propertyList(from: stored, format: nil) as? [AnyHashable: Any]
+        )
+        XCTAssertEqual(NotificationClickTarget.from(userInfo: readBack), target)
+
+        let nothing = SystemNotifications.content(body: "b", target: nil)
+        XCTAssertTrue(nothing.userInfo.isEmpty)
+    }
+
+    /// Anything missing, mistyped, empty, out of range or of another version
+    /// reads as naming nothing.
+    func testTheTargetSurvivesOnlyWhenWhole() {
+        let whole: [String: Any] = NotificationClickTarget(
+            workingFolderPath: "/Users/t/P", course: "ICS3U", section: 1
+        ).userInfo
+        XCTAssertNotNil(NotificationClickTarget.from(userInfo: whole))
+
+        let broken: [(String, [String: Any])] = [
+            ("no version", Self.without("v", from: whole)),
+            ("another version", Self.replacing("v", with: 2, in: whole)),
+            ("no folder", Self.without("workingFolder", from: whole)),
+            ("empty folder", Self.replacing("workingFolder", with: "", in: whole)),
+            ("no course", Self.without("course", from: whole)),
+            ("empty course", Self.replacing("course", with: "", in: whole)),
+            ("no section", Self.without("section", from: whole)),
+            ("section as text", Self.replacing("section", with: "1", in: whole)),
+            ("section 0", Self.replacing("section", with: 0, in: whole)),
+        ]
+        for (name, userInfo) in broken {
+            XCTAssertNil(NotificationClickTarget.from(userInfo: userInfo), name)
+        }
+        XCTAssertNil(NotificationClickTarget.from(userInfo: [:]))
+    }
+
+    /// Only a plain click on a scheduled publish's notification is routed.
+    func testOnlyAPlainClickOnAScheduledPublishIsRouted() {
+        let target: NotificationClickTarget = NotificationClickTarget(
+            workingFolderPath: "/Users/t/P", course: "ICS3U", section: 1
+        )
+        let identifier: String = ScheduledPublishNotice.identifier(course: "ICS3U", section: 1, folderID: Self.folderID)
+        XCTAssertEqual(
+            NotificationClickTarget.requested(identifier: identifier, isAClick: true, userInfo: target.userInfo),
+            .click(target)
+        )
+        XCTAssertEqual(
+            NotificationClickTarget.requested(identifier: identifier, isAClick: true, userInfo: [:]),
+            .click(nil)
+        )
+        XCTAssertEqual(
+            NotificationClickTarget.requested(identifier: identifier, isAClick: false, userInfo: target.userInfo),
+            .notAClick
+        )
+        XCTAssertEqual(
+            NotificationClickTarget.requested(identifier: "something-else", isAClick: true, userInfo: target.userInfo),
+            .notAClick
+        )
+    }
+
+    /// The run names the folder it ran in by the same step its folder id is
+    /// computed from, so the path the notification carries and the id #237
+    /// files the record under can never disagree.
+    func testTheRunNamesTheFolderItRanIn() {
+        let folder: URL = URL(fileURLWithPath: "/Users/teacher/Plantoir Courses")
+        let courseDirectory: URL = folder.appendingPathComponent("courses").appendingPathComponent("ICS3U")
+        let named: URL = ScheduledDeploy.workingFolderURL(forCourseDirectory: courseDirectory)
+        XCTAssertEqual(named.path, folder.path)
+        let viaTheRun: String = ScheduledDeploy.folderIDForRun(
+            label: nil, section: (courseDirectory: courseDirectory, courseCode: "ICS3U", sectionNumber: 1)
+        )
+        XCTAssertEqual(viaTheRun, BuildOutputLocation.folderIdentifier(forWorkingFolder: named.path))
+    }
+
     // MARK: - Functions
+
+    private static func without(_ key: String, from userInfo: [String: Any]) -> [String: Any] {
+        var result: [String: Any] = userInfo
+        result[key] = nil
+        return result
+    }
+
+    private static func replacing(_ key: String, with value: Any, in userInfo: [String: Any]) -> [String: Any] {
+        var result: [String: Any] = userInfo
+        result[key] = value
+        return result
+    }
 
     private static let destination: String = "Netlify"
 
@@ -336,7 +459,7 @@ final class ScheduledPublishNoticeTests: XCTestCase {
             try writeRecord(kind: kind, course: "ICS4U", section: 2)
         }
 
-        _ = await ScheduledPublishNotice.announce(inHomeFolder: home, course: "ICS4U", section: 2, folderID: Self.folderID, poster: fake)
+        _ = await ScheduledPublishNotice.announce(inHomeFolder: home, course: "ICS4U", section: 2, folderID: Self.folderID, workingFolderPath: Self.workingFolderPath, poster: fake)
 
         let label: String = "\(name) — \(kind?.rawValue ?? "no record")"
         let posts: Bool = try XCTUnwrap(oneCase["posts"] as? Bool, name)
@@ -494,6 +617,8 @@ nonisolated final class RecordingNotifications: NotificationPosting, @unchecked 
     private let lock: NSLock = NSLock()
     private var current: ScheduledPublishNotice.Permission
     private var shownByIdentifier: [String: String] = [:]
+    /// What a click on each would open (#306); nil when it names nothing.
+    private var targetsByIdentifier: [String: NotificationClickTarget?] = [:]
     private var asked: Int = 0
     private var checks: Int = 0
     private var attempts: Int = 0
@@ -513,6 +638,12 @@ nonisolated final class RecordingNotifications: NotificationPosting, @unchecked 
         lock.lock()
         defer { lock.unlock() }
         return shownByIdentifier
+    }
+
+    var targets: [String: NotificationClickTarget?] {
+        lock.lock()
+        defer { lock.unlock() }
+        return targetsByIdentifier
     }
 
     var questionsAsked: Int {
@@ -574,7 +705,7 @@ nonisolated final class RecordingNotifications: NotificationPosting, @unchecked 
         return given
     }
 
-    func post(identifier: String, body: String) async throws {
+    func post(identifier: String, body: String, target: NotificationClickTarget?) async throws {
         let (parks, fails): (Bool, Bool) = lock.withLock {
             attempts += 1
             return (neverAnswers, postFails)
@@ -589,6 +720,7 @@ nonisolated final class RecordingNotifications: NotificationPosting, @unchecked 
         }
         lock.withLock {
             shownByIdentifier[identifier] = body
+            targetsByIdentifier[identifier] = target
         }
     }
 

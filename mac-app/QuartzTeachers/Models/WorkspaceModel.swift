@@ -42,7 +42,7 @@ class WorkspaceModel {
 
     /// A folder the NEXT new window must open on, set just before something
     /// opens one for a reason of its own — the assistant revealing a
-    /// section. Taken by exactly one window; without it, a window opened
+    /// section, or a click on a scheduled publish's notification (#306). Taken by exactly one window; without it, a window opened
     /// with none other on screen would reopen the last working folder, write
     /// a reopen the teacher never saw, and then be moved (#311 review M1).
     static var folderForNextNewWindow: String?
@@ -820,6 +820,9 @@ class WorkspaceModel {
     enum ReopenOccasion: String {
         case rememberedWindow = "the window it was open in last time"
         case lastWorkingFolder = "the last working folder"
+        /// A window choosing a folder took the one a clicked scheduled
+        /// publish notification named (#306).
+        case scheduledPublishNotification = "the folder a clicked scheduled publish notification named"
     }
 
     /// Reopens a folder remembered from last time — THE route by which a
