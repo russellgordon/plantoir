@@ -349,7 +349,11 @@ adapt *Obsidian conventions* to *Quartz expectations* and are detailed in
   was until the day it is published. **And only pages the course teaches
   count**: the page carrying the connection must be linked from a class
   page, or from a page a class page links to. A page written over the
-  summer and never scheduled has addressed nothing yet. The map applies Quartz's own draft
+  summer and never scheduled has addressed nothing yet. Both readings take
+  every shape in `shared-rules.json` → `readingALink` — `![[A1.1#Examples|see]]`
+  counts, and `[[Worksheet#Part A\|a]]` on a class page makes Worksheet taught
+  ([#314](https://github.com/russellgordon/plantoir/issues/314); until then a
+  heading followed by an alias was not read as a link). The map applies Quartz's own draft
   test, and per-section publishing is resolved before it counts, so a
   course whose sections are at different points gets an honest map for
   each one.
