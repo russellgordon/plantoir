@@ -147,7 +147,7 @@ nonisolated enum WorkingFolderReach {
         // folder to a drive that is not plugged in cannot be asked of the
         // disk, and its raw text keeps the `..` names that would otherwise
         // compare as inside.
-        target = (target as NSString).standardizingPath
+        target = WorkingFolderReach.collapsingDots(target)
         let canonicalCourses: String = WorkingFolderReach.diskSpelling(target)
         if !isInside(canonicalFolderPath: canonicalCourses, canonicalHomePath: canonicalHome) {
             return Refusal(folderPath: url.path, folderName: url.lastPathComponent, whichPath: .coursesFolder)
@@ -162,7 +162,7 @@ nonisolated enum WorkingFolderReach {
     /// to the TEXT, and `/var/…` as text is outside a home of
     /// `/private/var/…` — a false verdict made of spelling, not of place.
     static func diskSpelling(_ path: String) -> String {
-        let standardized: String = (path as NSString).standardizingPath
+        let standardized: String = WorkingFolderReach.collapsingDots(path)
         let descriptor: Int32 = open(standardized, O_EVTONLY | O_NONBLOCK)
         if descriptor >= 0 {
             close(descriptor)
@@ -174,6 +174,26 @@ nonisolated enum WorkingFolderReach {
         }
         let name: String = (standardized as NSString).lastPathComponent
         return (WorkingFolderReach.diskSpelling(parent) as NSString).appendingPathComponent(name)
+    }
+
+    /// An absolute path with `.` and `..` taken away by their text alone —
+    /// written out rather than `standardizingPath`, which also expands `~`
+    /// and so asks where the home folder is (only `RealHome` may).
+    static func collapsingDots(_ path: String) -> String {
+        var kept: [String] = []
+        for name in path.components(separatedBy: "/") {
+            if name.isEmpty || name == "." {
+                continue
+            }
+            if name == ".." {
+                if !kept.isEmpty {
+                    kept.removeLast()
+                }
+                continue
+            }
+            kept.append(name)
+        }
+        return "/" + kept.joined(separator: "/")
     }
 
     /// Where a link points, or nil when the path is not a link.
