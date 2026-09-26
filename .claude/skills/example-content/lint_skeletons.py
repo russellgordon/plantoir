@@ -24,25 +24,113 @@ SKELETONS = ROOT / "support" / "skeletons"
 LINK = re.compile(r"!?\[\[([^\]|#]+?)(?:\\?\|[^\]]*)?(?:#[^\]|]*)?\]\]")
 CLASS_SENTINEL = re.compile(r"created: __CREATED_CLASS_(\d+)__")
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from generate_skeletons import article_for  # noqa: E402 — one rule for "a"/"an", shared with the generator
+
 # A {brace} placeholder is never filled — the generator's tokens are
 # %PERCENT% ones, because the pages carry LaTeX and YAML in earnest — so one
 # that reaches a page ships as written. Every Concepts page said "{subject}"
 # and three Fieldwork pages "{room}" until #328. A brace opened straight after
 # a letter, a backslash, `^`, `_`, `$` or another brace is LaTeX (`\frac{a}{b}`,
-# `x^{2}`, `\begin{aligned}`) and is left alone.
+# `x^{2}`, `\begin{aligned}`) and is left alone; so is anything inside `$…$`
+# or `$$…$$` (math_removed), and a brace after a LaTeX command and a space
+# (`\mathrm {kg}`), which is checked on the text before the match.
 BRACE_PLACEHOLDER = re.compile(r"(?<![\\\w}^_$])\{[A-Za-z_][A-Za-z0-9_ ]*\}")
+LATEX_COMMAND_BEFORE = re.compile(r"\\[A-Za-z]+\s*$")
 
 # The subject dropped in front of a noun where it does not fit: "a this
 # course course", "A this course class", "a the language course", "a English
 # course" — all shipped until #328. `%SUBJECT%` belongs after a preposition;
 # in front of a noun the generator has %A_SUBJECT_COURSE% and
-# %A_SUBJECT_CLASS_START%. "a u…" is not flagged, because "a unit" is right.
-MISFIT_SUBJECT = [
-    (re.compile(r"\bthis course (course|class)\b", re.IGNORECASE),
-     "the subject \"this course\" in front of a noun"),
-    (re.compile(r"\b[Aa] (this|the) \w+"), "\"a\" in front of \"this\" or \"the\""),
-    (re.compile(r"\b[Aa] [aeioAEIO]\w*"), "\"a\" in front of a vowel"),
+# %A_SUBJECT_CLASS_START%.
+THIS_COURSE_BEFORE_A_NOUN = re.compile(r"\bthis course (course|class)\b", re.IGNORECASE)
+LOWER_ARTICLE_BEFORE_THIS_OR_THE = re.compile(r"\ba (this|the)\b")
+# "a"/"an" is checked against article_for, the generator's own rule. A
+# capital "A" or "An" counts only where it cannot be a letter used as a name
+# — "Plan A or B", "Option A is" — so it is skipped straight after a word.
+ARTICLE_LOWER = re.compile(r"\b(a|an) ([A-Za-z][A-Za-z-]*)")
+ARTICLE_UPPER = re.compile(r"(?<![A-Za-z,] )\b(A|An) ([A-Za-z][A-Za-z-]*)")
+UPPER_START_OF_THIS_OR_THE = re.compile(r"(?<![A-Za-z,] )\bA (this|the)\b")
+
+# Shapes the checks must accept and refuse, run before every lint so a
+# widened rule cannot start biting real prose (or stop catching the #328
+# shapes) unnoticed. A failure here is a broken LINTER, not a broken page.
+MUST_BE_ACCEPTED = [
+    "Plan A or B is fine.",
+    "Option A is the default.",
+    "Start with a one-page summary.",
+    "a European exchange",
+    "a unit test, a university, a useful habit",
+    "an hour, an honest answer",
+    "an English course, an arts class, an economics course",
+    "a language course, a French course, a history course",
+    "The mass is $\\mathrm {kg}$ and $ {n} $ is the count.",
+    "Units: \\mathrm {kg} per \\text {m}.",
+    "$$\\begin{aligned} x &= \\frac{a}{b} \\\\ y^{2} \\end{aligned}$$",
+    "written for this course. This class asks people to try things.",
 ]
+MUST_BE_REFUSED = [
+    "When an idea in {subject} needs explaining",
+    "Work done outside the {room}.",
+    "a placeholder written for a this course course.",
+    "A this course class asks people to try things.",
+    "written for a the language course.",
+    "written for a English course.",
+    "An economics class? A economics class asks.",
+    "a urban studies course",
+    "an unit",
+    "an one-page summary",
+]
+
+
+def math_removed(text: str) -> str:
+    """The text with `$$…$$` and `$…$` spans taken out — LaTeX braces live there."""
+    text = re.sub(r"\$\$[\s\S]*?\$\$", "", text)
+    return re.sub(r"\$[^$\n]*\$", "", text)
+
+
+def prose_problems(prose: str) -> list:
+    """What is wrong with this prose (code already removed): unfilled
+    placeholders and a subject or article that does not fit the next word."""
+    problems = []
+    text = math_removed(prose)
+    unfilled = []
+    for match in BRACE_PLACEHOLDER.finditer(text):
+        line_start = text.rfind("\n", 0, match.start()) + 1
+        if LATEX_COMMAND_BEFORE.search(text[line_start:match.start()]):
+            continue
+        unfilled.append(match.group(0))
+    if unfilled:
+        problems.append(f"unfilled placeholder(s) left in the page: {sorted(set(unfilled))}")
+    misfit = THIS_COURSE_BEFORE_A_NOUN.search(text)
+    if misfit:
+        problems.append(f'the subject "this course" in front of a noun: {misfit.group(0)!r}')
+    for pattern in (LOWER_ARTICLE_BEFORE_THIS_OR_THE, UPPER_START_OF_THIS_OR_THE):
+        misfit = pattern.search(text)
+        if misfit:
+            problems.append(f'"a" in front of "this" or "the": {misfit.group(0)!r}')
+    for pattern in (ARTICLE_LOWER, ARTICLE_UPPER):
+        for match in pattern.finditer(text):
+            article, word = match.group(1), match.group(2)
+            if word.lower() in ("this", "the"):
+                continue
+            if article.lower() != article_for(word):
+                problems.append(f'"{article}" in front of {word!r}: {match.group(0)!r}')
+                break
+    return problems
+
+
+def check_the_checks() -> list:
+    """The linter's own rules against the shapes they must accept and refuse."""
+    failures = []
+    for sentence in MUST_BE_ACCEPTED:
+        found = prose_problems(sentence)
+        if found:
+            failures.append(f"refused a sentence it must accept: {sentence!r} -> {found}")
+    for sentence in MUST_BE_REFUSED:
+        if not prose_problems(sentence):
+            failures.append(f"accepted a sentence it must refuse: {sentence!r}")
+    return failures
 
 
 def frontmatter(text: str) -> dict:
@@ -141,13 +229,8 @@ def check(family: str) -> list:
         prose = re.sub(r"```[\s\S]*?```", "", text)
         prose = re.sub(r"`[^`\n]*`", "", prose)
 
-        unfilled = BRACE_PLACEHOLDER.findall(prose)
-        if unfilled:
-            problems.append(f"{relative}: unfilled placeholder(s) left in the page: {sorted(set(unfilled))}")
-        for pattern, what in MISFIT_SUBJECT:
-            misfit = pattern.search(prose)
-            if misfit:
-                problems.append(f"{relative}: {what}: {misfit.group(0)!r}")
+        for problem in prose_problems(prose):
+            problems.append(f"{relative}: {problem}")
         for link in LINK.finditer(prose):
             target = link.group(1).strip().rstrip("\\")
             if "/" in target:
@@ -237,6 +320,12 @@ def check(family: str) -> list:
 
 
 def main():
+    broken = check_the_checks()
+    if broken:
+        print("lint_skeletons.py's own checks are wrong — fix the linter before trusting it:")
+        for line in broken:
+            print(f"   {line}")
+        return 2
     families = sys.argv[1:] or sorted(p.name for p in SKELETONS.iterdir() if p.is_dir())
     total = 0
     for family in families:

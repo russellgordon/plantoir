@@ -1041,7 +1041,11 @@ than hand-written:
   after a preposition ("in music"); in front of a noun use
   `%A_SUBJECT_COURSE%` or `%A_SUBJECT_CLASS_START%`, which carry the
   article ("an English course", "this course" — never "a this course
-  course"), and the linter refuses the misfit.
+  course"), and the linter refuses the misfit. "a"/"an" follows the
+  first SOUND (`article_for`: "a unit", "a European", "an hour"), and the
+  linter checks every article by that rule. It tests its own rules against
+  `MUST_BE_ACCEPTED` / `MUST_BE_REFUSED` before every run and exits 2 if
+  one misbehaves — add a shape there when widening a check.
 - The sidebar is a RULE, not a list: the `Curriculum` folder is never
   visible, every other visible shared folder carries a chevron (including
   one the teacher adds), and per-section folders — `All Classes` — stay
