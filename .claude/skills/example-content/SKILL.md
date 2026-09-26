@@ -449,7 +449,12 @@ visible but not expandable). Layout: `shared/` → course root;
 puts the ring on a cell in the Curriculum Coverage map, and what answers
 Ontario's ask that every overall expectation be evaluated at least once.
 Normally `["Tasks"]`. The linter refuses a payload without it, and refuses
-a name that is not one of the course's own folders.
+a name that is not one of the course's own folders. It reaches a course by
+TWO routes — the command line's `setup_course.graded_folders_for`, and each
+app reading the manifest itself when its wizard writes the new course's file
+(#292, `gradedFolders.newCourse`, which sweeps every payload through both) —
+and that linter check is what keeps the two identical: an exact folder name
+means neither route has anything to respell or drop.
 
 Declare it rather than letting it be inferred. Inference is a SUBSTRING
 ("does the folder mention tasks?") while the build matches a pooled name
