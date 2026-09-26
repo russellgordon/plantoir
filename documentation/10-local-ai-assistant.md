@@ -1962,7 +1962,8 @@ that vetoed both 3B models.
 published is decided by what the BUILT SITE does with its flag, not by whether
 the line reads `true` — so `publish: maybe`, `publish: on` and `publish: true
 # covered Tuesday` are all pages students can already see. Asked to publish one
-of those, the assistant answers `It's already been published.` and leaves the
+of those, the assistant answers `AssistWording.alreadyPublishedOne` (in
+`contracts/assist-wording.json`) and leaves the
 file exactly as the teacher wrote it: tidying the value would be an edit nobody
 asked for, in a file Obsidian very likely has open. Asked to HIDE the same
 page, it changes and the odd value goes. Settled 2026-09-18 (issue #140); the
@@ -3541,6 +3542,63 @@ will HAVE. Adding the two counts instead would say 5 where three pages move;
 counting renames alone printed no line at all in exactly the shape that
 re-dates a teacher's whole year, and that is the card they agree to. The
 number is `expectOtherClassesMoving` in each contract case.
+
+#### The PLAN says it too (#185)
+
+**A duplicate that moves other classes now warns on its plan card that "Undo
+that" will not take it back — before Go, where a teacher can still say no.**
+Added 2026-09-26 ([#185](https://github.com/russellgordon/plantoir/issues/185)).
+Make-room's plan has said so since it was written; the duplicate's plan said
+how many later classes would move and nothing about the undo, although a
+duplicate that moves other classes IS a make-room (the table above), and the
+reply then told the teacher after the fact. The warning is
+`AssistWording.makingRoomCannotBeUndone(noun:)` — the SAME key make-room's plan
+says, not a new one — appended in `duplicateClassPlan` under exactly
+`ClassInsertionPlan.movesAnythingElse`, the property `duplicateClass` reads to
+withhold the undo. So the card warns exactly when the undo will be refused and
+never when it will be offered, and the contract pins that per case:
+`contracts/class-planning.json` → `duplication.undoRule.planWarns` (with
+`replySaysWhenWithheld` and `replySaysWhenOffered` for the reply), asserted in
+both directions by `testDuplicatingMatchesTheContract` through each case's
+`expectUndoOffered` — cases 1, 2 and 4 warn, 3 and 5 do not. The card takes
+the course's own noun (`makingRoomCannotBeUndoneForAMeeting` in a club); the
+model's copy of the plan says "class" whatever the course calls them, as every
+#267 plan does, and `ClubNounTests.testTheNounNeverReachesWhatTheModelReads`
+already runs a club duplicate whose later weeks move, so it checks the new line
+without a test of its own.
+
+**One sentence per TENSE, not one sentence.** The issue asked for "one
+sentence" for the caveat, and the literal reading — a single tense-neutral
+sentence for plans and replies — was rejected: it would have changed two
+sentences teachers already read, "moved" is false on a plan (nothing has moved
+yet) and "move" reads oddly after the fact, and Windows' reply form names the
+backup FILE, which exists only after the change. So the pair is deliberate:
+`makingRoomCannotBeUndone` on every PLAN that moves other classes (make-room
+and the duplicate), `otherClassesMoved` on every REPLY (the duplicate and
+make-room). What #185 was really about is that there be no inline copy, and
+the last one is gone: make-room's reply typed the caveat out in full and then
+"Look the section over in Plantoir before you publish."; it is now
+`otherClassesMoved + " " + lookTheSectionOverBeforePublishing`, byte-identical
+to what it said before (measured against the literal on the unchanged branch
+first).
+
+**Also rejected:** dropping make-room's "Look the section over…" tail so the
+two replies match (it changes a shipped sentence Claude Code reads over MCP
+and buys a teacher nothing — naming it costs one key); one combined key for
+caveat plus tail (a second copy of the caveat's text in the contract, which is
+the thing #185 is about); a new key for the duplicate's warning (identical text
+to `makingRoomCannotBeUndone` — two keys with one value is how they drift);
+renaming `makingRoomCannotBeUndone` to something generic (a rename changes the
+generated file for no gain, and Windows owes the key under its current name in
+#274).
+
+**What Windows owes** is in the `windows` issue opened for #185:
+`DuplicateClassPlan.Describe()` adds `MakingRoomCannotBeUndone` when
+`MovesOtherClasses`, and `Duplication_MatchesContract` reads
+`undoRule.planWarns`. Nothing goes red there when this is pulled —
+`Duplication_MatchesContract` reads fields by name — so it is unrun there,
+not failing. The trap: `OtherClassesMoved` is the past tense and must not go
+on a plan.
 
 #### Three things the duplicate did that nothing was watching
 

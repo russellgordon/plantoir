@@ -1055,9 +1055,10 @@ final class AssistToolRunner {
         }
         if moving.isEmpty {
             let unitWord: String = located.course.configuration.unitWord
-            let already: String = publishing
-                ? "\(unitWord) \(unit) has already been published."
-                : "\(unitWord) \(unit) is already hidden."
+            var already: String = AssistWording.unitAlreadyHidden(unitWord: unitWord, unit: unit)
+            if publishing {
+                already = AssistWording.unitAlreadyPublished(unitWord: unitWord, unit: unit)
+            }
             return AssistToolOutcome.wrote(already, detail: already)
         }
 
@@ -1212,9 +1213,10 @@ final class AssistToolRunner {
                 return AssistToolOutcome.wrote(aboutTheLeftAlone, detail: aboutTheLeftAlone)
             }
             let unitWord: String = located.course.configuration.unitWord
-            let already: String = publishing
-                ? "\(unitWord) \(unit) has already been published."
-                : "\(unitWord) \(unit) is already hidden."
+            var already: String = AssistWording.unitAlreadyHidden(unitWord: unitWord, unit: unit)
+            if publishing {
+                already = AssistWording.unitAlreadyPublished(unitWord: unitWord, unit: unit)
+            }
             return AssistToolOutcome.wrote(already, detail: already)
         }
 
@@ -2970,6 +2972,19 @@ final class AssistToolRunner {
                 renaming: request.plan.renames.count,
                 noun: request.located.course.configuration.classNoun
             ))
+            // And that the undo will not help (#185). The plan is where a
+            // teacher can still say no, and a duplicate that moves other
+            // classes IS a make-room, so it says what make-room's plan has
+            // always said — gated on the same `movesAnythingElse` that
+            // withholds the undo in `duplicateClass`, so the card warns
+            // exactly when the undo will be refused. The PLAN form, never
+            // `otherClassesMoved`: nothing has moved yet.
+            lines.append("")
+            lines.append(AssistWording.makingRoomCannotBeUndone())
+            cardLines.append("")
+            cardLines.append(AssistWording.makingRoomCannotBeUndone(
+                noun: request.located.course.configuration.classNoun
+            ))
         }
         return AssistToolOutcome.planned(
             "Worked out what duplicating “\(request.sourceTitle)” would do.",
@@ -3629,9 +3644,8 @@ final class AssistToolRunner {
             // so a teacher's whole year moved and the reply said nothing about
             // undo at all — while "undo that" answered "nothing to undo".
             if asked.plan.movesAnythingElse {
-                detail += "\n\nBecause other classes moved, “Undo that” will not take this back. "
-                        + "The copy made before any of it is in Plantoir's Backups list. Look the "
-                        + "section over in Plantoir before you publish."
+                detail += "\n\n" + AssistWording.otherClassesMoved + " "
+                        + AssistWording.lookTheSectionOverBeforePublishing
             }
             if backedUp {
                 detail += "\n\n" + AssistToolRunner.backedUpNote

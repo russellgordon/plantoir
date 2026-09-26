@@ -2700,12 +2700,16 @@
         "expectTranscript" : [
           "teacher: wording.deployAccepted"
         ],
+        "expectTranscriptContains" : [
+          "teacher: wording.deployAccepted",
+          "tool(deploy_section): wording.deployed"
+        ],
         "given" : {
           "pending" : "deploy_section"
         },
         "name" : "the deploy card is agreed to",
         "when" : "approve",
-        "why" : "What the teacher chose is part of the history, in their own bubble. A conversation where the assistant asked, nothing answered, and something plainly happened is worse than one you cannot read back at all."
+        "why" : "What the teacher chose is part of the history, in their own bubble. A conversation where the assistant asked, nothing answered, and something plainly happened is worse than one you cannot read back at all. And agreeing must actually deploy and SAY so, after the choice (#147): until 2026-09-26 this case named only the teacher's bubble, so a deploy that refused, failed or said nothing passed it. expectTranscript pins the bubble by equality; the contains list pins the order and the reply by substring, because the two platforms compose the tool line differently."
       },
       {
         "expectTranscript" : [

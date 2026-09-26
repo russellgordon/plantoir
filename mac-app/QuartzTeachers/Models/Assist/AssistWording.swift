@@ -548,6 +548,14 @@ nonisolated enum AssistWording {
     /// Said after a change that shuffled other classes: the undo list cannot
     /// take this back, and the backup is what can.
     ///
+    /// The REPLY form, said after both changes that shuffle other classes —
+    /// the duplicate and make-room. Its PLAN form is
+    /// `makingRoomCannotBeUndone(noun:)`. There are two on purpose: the plan
+    /// speaks before anything has moved ("move"), the reply after ("moved"),
+    /// and a single tense-neutral sentence would have changed two sentences
+    /// teachers already read (#185; documentation/10-local-ai-assistant.md →
+    /// "The PLAN says it too").
+    ///
     /// A partial undo — the copy deleted, every later class left renamed and
     /// re-dated — is worse than no undo at all, so the way back is named
     /// instead. Windows' `ClassChangeWording.OtherClassesMoved` has a second
@@ -650,7 +658,10 @@ nonisolated enum AssistWording {
         return "Moved to later \(noun.singular) days — \(count):"
     }
 
-    /// Said on a make-room plan that moves anything else.
+    /// The PLAN form of the undo caveat, said on every plan that moves other
+    /// classes — make-room AND a duplicate that makes room (#185), gated on
+    /// the same `ClassInsertionPlan.movesAnythingElse` that withholds the undo.
+    /// Its reply form, after the fact, is `otherClassesMoved`.
     static func makingRoomCannotBeUndone(noun: ClassNoun = .class) -> String {
         return "Because other \(noun.plural) move, “Undo that” will not take this back afterwards — "
              + "the copy made before any of it is in Plantoir's Backups list."
@@ -820,6 +831,58 @@ nonisolated enum AssistWording {
         }
         return "I couldn’t set the new dates on \(listing): the settings at the top of them are "
              + "written in a way I can’t add to. Open them in Obsidian to set the dates there."
+    }
+
+    // MARK: - Already the way you asked (#174)
+
+    // Asked to publish what is already published, or to hide what is already
+    // hidden, the assistant answers in four words rather than with a plan that
+    // changes nothing. These were typed inline — the page forms once in
+    // `AssistPublishPlan.nothingToDoSentence`, the whole-unit forms TWICE in
+    // `AssistToolRunner` (the plan path and the path that writes) — and were
+    // in no contract, so Windows' identical words were a coincidence nobody
+    // could check. One key per branch, because a rendering can show only one.
+
+    /// One page, asked to be published, already is.
+    static let alreadyPublishedOne: String = "It's already been published."
+
+    /// One page, asked to be hidden, already is.
+    static let alreadyHiddenOne: String = "It's already hidden."
+
+    /// Several pages, asked to be published, already are.
+    static let alreadyPublishedSeveral: String = "They have already been published."
+
+    /// Several pages, asked to be hidden, already are.
+    static let alreadyHiddenSeveral: String = "They have already been hidden."
+
+    /// Which of the four page sentences answers a request that changes nothing.
+    static func alreadyTheWayYouAsked(publishing: Bool, pages: Int) -> String {
+        if pages == 1 {
+            if publishing {
+                return alreadyPublishedOne
+            } else {
+                return alreadyHiddenOne
+            }
+        }
+        if publishing {
+            return alreadyPublishedSeveral
+        } else {
+            return alreadyHiddenSeveral
+        }
+    }
+
+    /// A whole unit, asked to be published, already is.
+    ///
+    /// - Parameter unitWord: the course's own word for a unit ("Unit",
+    ///   "Module"). No `…ForAMeeting` twin: nothing here says "class", and a
+    ///   club has no whole unit to ask about.
+    static func unitAlreadyPublished(unitWord: String, unit: Int) -> String {
+        return "\(unitWord) \(unit) has already been published."
+    }
+
+    /// A whole unit, asked to be hidden, already is.
+    static func unitAlreadyHidden(unitWord: String, unit: Int) -> String {
+        return "\(unitWord) \(unit) is already hidden."
     }
 
     // MARK: - What publishing means here
@@ -1274,6 +1337,12 @@ nonisolated enum AssistWording {
     /// depending only on whether a window happened to be open. The window is
     /// the thing a teacher opens; the console is a part of it.
     static let whereTheOutputIs: String = "The output is in that section's window in Plantoir."
+
+    /// The last words of make-room's reply when other classes moved, after
+    /// `otherClassesMoved`. Named rather than typed inline, so that reply
+    /// carries no copy of the undo caveat of its own (#185).
+    static let lookTheSectionOverBeforePublishing: String =
+        "Look the section over in Plantoir before you publish."
 
     /// The model answered with neither a tool nor anything to say.
     static let nothingToDo: String = "I am not sure what to do with that."

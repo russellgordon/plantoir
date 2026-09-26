@@ -222,6 +222,15 @@ enum AssistContract {
             "previewDidNotBuild": AssistWording.previewDidNotBuild(course: course, section: section),
             "whereTheOutputIs": AssistWording.whereTheOutputIs,
             "nothingToDo": AssistWording.nothingToDo,
+            // "Already the way you asked" (#174): one key per branch, and the
+            // whole-unit forms with a concrete unit, the way `wouldMakeRoom`
+            // shows a concrete position — neither runner substitutes {unit}.
+            "alreadyPublishedOne": AssistWording.alreadyPublishedOne,
+            "alreadyHiddenOne": AssistWording.alreadyHiddenOne,
+            "alreadyPublishedSeveral": AssistWording.alreadyPublishedSeveral,
+            "alreadyHiddenSeveral": AssistWording.alreadyHiddenSeveral,
+            "unitAlreadyPublished": AssistWording.unitAlreadyPublished(unitWord: "Unit", unit: 4),
+            "unitAlreadyHidden": AssistWording.unitAlreadyHidden(unitWord: "Unit", unit: 4),
             "answerWasCutOff": AssistWording.answerWasCutOff,
             "answerLeftOutWhatItWasFor": AssistWording.answerLeftOutWhatItWasFor,
             "noCourseNamed": AssistWording.noCourseNamed,
@@ -345,6 +354,9 @@ enum AssistContract {
             "movedToLaterDaysForAMeeting": AssistWording.movedToLaterDays(count: 3, noun: .meeting),
             "makingRoomCannotBeUndone": AssistWording.makingRoomCannotBeUndone(),
             "makingRoomCannotBeUndoneForAMeeting": AssistWording.makingRoomCannotBeUndone(noun: .meeting),
+            // Make-room's reply ends with this after `otherClassesMoved`
+            // (#185), so the caveat has no inline copy anywhere.
+            "lookTheSectionOverBeforePublishing": AssistWording.lookTheSectionOverBeforePublishing,
             "madeRoom": AssistWording.madeRoom(count: 1, at: "Unit 3, Day 4"),
             "madeRoomForAMeeting": AssistWording.madeRoom(count: 1, at: "Week 5", noun: .meeting),
             "publishedTheClassOn": AssistWording.publishedTheClassOn("2026-09-14"),

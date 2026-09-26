@@ -151,11 +151,7 @@ struct AssistPublishPlan {
         for page in namedPages where page.isVisibleToStudents != publishes || !page.visibilityIsCertain {
             return nil
         }
-        let done: String = publishes ? "published" : "hidden"
-        if namedPages.count == 1 {
-            return publishes ? "It's already been published." : "It's already hidden."
-        }
-        return "They have already been \(done)."
+        return AssistWording.alreadyTheWayYouAsked(publishing: publishes, pages: namedPages.count)
     }
 
     var verb: String {

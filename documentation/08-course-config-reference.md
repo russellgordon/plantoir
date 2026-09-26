@@ -399,7 +399,8 @@ right:
   right" list (both the NAMED pages and the LINKED ones on Windows), the
   nothing-to-do sentence, the whole-unit count of what would move, and the date
   a linked page inherits from the class that brought it. Without it, "publish
-  this page" on such a page answered *It's already been published* and wrote
+  this page" on such a page answered `AssistWording.alreadyPublishedOne` (in
+  `contracts/assist-wording.json`) and wrote
   nothing while the build was holding the page back — reporting success about
   the exact failure this rule exists to remove. **The honest way to find these
   is to grep for every place a collapsed "visible" decides to SKIP a write**,
@@ -449,7 +450,7 @@ separately from the reader:
 
 * **A page that already SAYS what was asked is left alone**, however oddly it
   says it. `publish: maybe` publishes the page, so "publish this page" is
-  answered "It's already been published." and the file is not touched. Tidying
+  answered `AssistWording.alreadyPublishedOne` and the file is not touched. Tidying
   the value to `true` would be an edit nobody asked for, in a file Obsidian very
   likely has open, and it would throw away whatever the word meant to the
   teacher. Asked to HIDE the same page, it changes and the odd value goes —
