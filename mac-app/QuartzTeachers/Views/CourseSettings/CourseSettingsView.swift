@@ -349,7 +349,7 @@ struct CourseSettingsView: View {
                 // save left them. The FILE's values, not this copy's memory
                 // of them: another window may have saved since (issue #265).
                 Button("Revert") {
-                    try? course.configuration.revertToFile(at: course.configFileURL)
+                    revertToFile()
                 }
                 .disabled(!course.configuration.hasUnsavedChanges)
                 .accessibilityIdentifier("revertButton")
@@ -655,30 +655,91 @@ struct CourseSettingsView: View {
     /// test can run exactly what the list runs — the goldens for issue #266
     /// drive these, and a closure in `body` cannot be reached from a test.
     ///
-    /// **No trail line here** (issue #152, from #85's third item). The line
-    /// used to be written on the click, so a Revert left the trail saying a
-    /// folder had been excluded when it never was. `item excluded` and
-    /// `item re-included` are written by `CourseConfiguration.write(to:)`,
-    /// from what actually reached the file — whichever writer saves it
-    /// (`excludedItems.recordedOnSave`).
+    /// **The trail line is written HERE, on the click, saved or not** —
+    /// Russell's decision of 2026-09-06
+    /// (overnight/issues/09-item-excluded-trail-on-click.md), confirmed for
+    /// issue #152 after a first build recorded at the write instead. The
+    /// attempt must leave a trace even if the teacher crashes before saving;
+    /// a Revert that takes it back writes `exclusions reverted`
+    /// (`revertToFile()`). `contracts/shared-rules.json` →
+    /// `excludedItems.recordedOnClick`.
     func folderWasRemoved(_ name: String, scope: FolderScope) {
         course.configuration.exclude(name, inScope: scope.exclusionKey)
         dropFromMarksPool(name)
+        ActivityTrail.note(.itemExcluded, "excluded " + trailWord(for: scope) + " folder " + name + " in " + course.code)
     }
 
     /// A folder name added back to a list is taken out of `excluded_items`.
     func folderWasAdded(_ name: String, scope: FolderScope) {
-        course.configuration.reinclude(name, inScope: scope.exclusionKey)
+        if course.configuration.reinclude(name, inScope: scope.exclusionKey) {
+            ActivityTrail.note(.itemReincluded, "re-included " + trailWord(for: scope) + " folder " + name + " in " + course.code)
+        }
     }
 
     /// The file twin of `folderWasRemoved`: a file is never in the marks pool.
     func fileWasRemoved(_ name: String, scope: FolderScope) {
         course.configuration.exclude(name, inScope: scope.exclusionKey)
+        ActivityTrail.note(.itemExcluded, "excluded " + trailWord(for: scope) + " file " + name + " in " + course.code)
     }
 
     /// The file twin of `folderWasAdded`.
     func fileWasAdded(_ name: String, scope: FolderScope) {
-        course.configuration.reinclude(name, inScope: scope.exclusionKey)
+        if course.configuration.reinclude(name, inScope: scope.exclusionKey) {
+            ActivityTrail.note(.itemReincluded, "re-included " + trailWord(for: scope) + " file " + name + " in " + course.code)
+        }
+    }
+
+    /// How the trail names a scope: "shared" or "per-section".
+    func trailWord(for scope: FolderScope) -> String {
+        switch scope {
+        case .shared:
+            return "shared"
+        case .perSection:
+            return "per-section"
+        }
+    }
+
+    /// What the Revert button does: puts the form back to the FILE (issue
+    /// #265), and — when that took back exclusion changes whose click lines
+    /// are already on the trail — says so, with how many (issue #152).
+    func revertToFile() {
+        let sharedBefore: [String] = course.configuration.excludedItems(forScope: FolderScope.shared.exclusionKey)
+        let perSectionBefore: [String] = course.configuration.excludedItems(forScope: FolderScope.perSection.exclusionKey)
+        do {
+            try course.configuration.revertToFile(at: course.configFileURL)
+        } catch {
+            return
+        }
+        let sharedAfter: [String] = course.configuration.excludedItems(forScope: FolderScope.shared.exclusionKey)
+        let perSectionAfter: [String] = course.configuration.excludedItems(forScope: FolderScope.perSection.exclusionKey)
+        let takenBack: Int = CourseSettingsView.namesThatDiffer(sharedBefore, sharedAfter)
+            + CourseSettingsView.namesThatDiffer(perSectionBefore, perSectionAfter)
+        if takenBack > 0 {
+            var noun: String = " unsaved exclusion changes"
+            if takenBack == 1 {
+                noun = " unsaved exclusion change"
+            }
+            ActivityTrail.note(
+                .exclusionsReverted,
+                "reverted " + String(takenBack) + noun + " in " + course.code
+            )
+        }
+    }
+
+    /// How many names are in one list and not the other, either way round.
+    static func namesThatDiffer(_ first: [String], _ second: [String]) -> Int {
+        var count: Int = 0
+        for name in first {
+            if !second.contains(name) {
+                count += 1
+            }
+        }
+        for name in second {
+            if !first.contains(name) {
+                count += 1
+            }
+        }
+        return count
     }
 
     // MARK: - Renaming a folder
