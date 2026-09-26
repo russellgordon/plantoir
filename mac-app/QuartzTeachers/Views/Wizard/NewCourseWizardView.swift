@@ -1857,7 +1857,27 @@ struct NewCourseWizardView: View {
 
         let structureFromExample: Bool = takesExampleContent
             && ExampleContentCatalog.hasContent(forCode: code)
-        if !structureFromExample {
+        if structureFromExample {
+            // The payload's own pool, as the command line writes it (GitHub
+            // issue #292). The app owns this answer, not `setup_course.py`:
+            // setup runs over the file written here, keeps a saved pool, and
+            // reads a saved file WITHOUT one as a course that was never
+            // asked — it works the pool out from the manifest only when
+            // there is no saved file at all, which only a command-line run
+            // has. Leaving the key out, as this did from 2026-08-24, gave
+            // every pre-populated course the historical "any folder with
+            // 'task' in its name" rule instead of the payload's Tasks.
+            //
+            // Never `chosenGradedFolders`: the structure editors are
+            // collapsed for a payload course, so that list is one the
+            // teacher never saw. `takesExampleContent` is already false
+            // for a club, which takes no ready-made pages (#267). An
+            // unreadable manifest leaves the key absent, as before.
+            // contracts/shared-rules.json → gradedFolders.newCourse.
+            if let payloadPool = ExampleContentCatalog.marksPool(forCode: code) {
+                config["graded_folders"] = payloadPool
+            }
+        } else {
             // Narrowed once more as the file is written, the way Windows does
             // it (NewCourseDialog.BuildConfiguration). The editor narrows the
             // pool wherever it changes the folder lists — a removal, a

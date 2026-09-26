@@ -1754,7 +1754,22 @@ def _extract_wikilink_targets(text: str) -> set[str]:
     """Extract all normalized wikilink target names from markdown text, excluding code fences and index/meta links."""
     outside_fences = re.sub(r"```[\s\S]*?```", "", text)
     outside_fences = re.sub(r"`[^`\n]*`", "", outside_fences)
-    link_pattern = re.compile(r"!?\[\[([^\]|#]+?)(?:\\?\|[^\]]*)?(?:#[^\]|]*)?\]\]")
+    # Heading BEFORE alias, the order Quartz and Obsidian write them in:
+    # [[Page#Heading|words]] and [[Page#Heading\|words]] (the backslash is how
+    # an alias pipe is escaped inside a table) are links to Page. Until #294
+    # the alias group came first, so neither shape matched at all. Now such a
+    # link is followed by both date passes: a page a visible, dated class
+    # links to that way takes its class's date (site and the teacher's file,
+    # _date_pages_from_their_classes), and a page reached that way only from
+    # a hidden or undated class, or only through another page, is no longer
+    # reset to the first class's date on the site (_sync_non_class_pages_created
+    # writes the build's copy only) and keeps its own. The mac app's re-date,
+    # whose target stops at '#', already read it as a link; now the two agree.
+    # documentation/05-build-pipeline.md -> "Which shapes are links".
+    # The lazy target plus '\\?\|' keeps the '\|' backslash off the name,
+    # and the rstrip below stays as a second guard. Shared contract:
+    # contracts/shared-rules.json -> readingALink.
+    link_pattern = re.compile(r"!?\[\[([^\]|#]+?)(?:#[^\]|]*)?(?:\\?\|[^\]]*)?\]\]")
     targets = set()
     for match in link_pattern.finditer(outside_fences):
         target = match.group(1).strip().rstrip("\\")

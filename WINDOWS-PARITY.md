@@ -1,4 +1,4 @@
-# Windows parity with mac v1.3.2: the strategy
+# Windows parity with mac v1.4.0: the strategy
 
 **Where this sits in the reading order.** `CLAUDE.md` comes first, as its
 own list says, and `WINDOWS-BOOTSTRAP.md` is the brief. Read this file when
@@ -13,7 +13,7 @@ instead of a pile.
 **This file expires.** It was written for `dev` = `68214a6c` on 2026-09-25,
 and it carries perishable state: red lists, counts, and "not touched since".
 That kind of state is what made `WINDOWS-HANDOFF.md` rot. **When the
-milestone "Windows: parity with mac v1.3.2" closes, delete this file** and the
+milestone "Windows: parity with mac v1.4.0" closes, delete this file** and the
 pointers to it in `WINDOWS-BOOTSTRAP.md` and `CLAUDE.md`. Do not keep it up to
 date past that point.
 
@@ -27,10 +27,10 @@ be found out from here at all.
 
 ## 1. The goal, and how "done" is measured
 
-**The goal.** Everything a teacher can do in the mac app through v1.3.2, a
+**The goal.** Everything a teacher can do in the mac app through v1.4.0, a
 Windows teacher can do too, and it behaves the same way wherever the contract
 says it must. The work is the 46 open issues on the milestone **"Windows:
-parity with mac v1.3.2"**, plus the batch-4 pieces still landing on the mac
+parity with mac v1.4.0"**, plus the batch-4 pieces still landing on the mac
 (section 5), which join the milestone as they land. It is judged against the
 shared contract, not against the Swift. Nothing in this plan asks a Windows
 session to read Swift. Where an issue points at a Swift file, that is a

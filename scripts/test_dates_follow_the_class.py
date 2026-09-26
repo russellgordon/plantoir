@@ -7,7 +7,8 @@ The cases are not retyped here: they are deserialised from
 contracts/class-planning.json ->
   sectionIndexPointer.dateCases            (the front page),
   datingPagesAClassBrings.atBuildTime      (the pages a class brings), and
-  datingPagesAClassBrings.atBuildTime.writingCases (the splice itself).
+  datingPagesAClassBrings.atBuildTime.writingCases (the splice itself),
+and from contracts/shared-rules.json -> readingALink (what a link names, #294).
 
 Each case is laid out as a teacher's course folder, then copied and read the
 way `build_section_site` copies and reads a section — the same
@@ -469,6 +470,58 @@ class DatesFollowTheClassTests(unittest.TestCase):
         nothing: list[str] = []
         build_site.announce_dated_pages({"rewritten": []}, "ICS4U", 1, printer=nothing.append)
         self.assertEqual(nothing, [])
+
+    def test_every_link_shape_reads_as_the_contract_says(self):
+        # shared-rules.json -> readingALink (#294): what a wikilink NAMES,
+        # including the escaped pipe Obsidian writes for an alias inside a
+        # table, [[Ohm's Law\|Ohm]]. The build already read that shape; this
+        # is the guard that keeps it reading it, and the reorder that made it
+        # read [[Page#Heading|words]] as well. The build compares names by
+        # their last path component AND by the whole path, lowercased, so it
+        # holds both for each name the case expects - and nothing else.
+        _load("sectionIndexPointer")  # points `contracts` at this checkout's files
+        rules = contracts.load("shared-rules")["readingALink"]
+        cases = rules["cases"]
+        self.assertGreaterEqual(len(cases), 10, "readingALink lost cases")
+        for case in cases:
+            with self.subTest(case=case["name"]):
+                read = build_site._extract_wikilink_targets(case["text"])
+                expected = set()
+                for name in case["expect"]:
+                    expected.add(name.split("/")[-1].strip().lower())
+                    expected.add(name.lower())
+                self.assertEqual(read, expected)
+                for target in read:
+                    self.assertFalse(target.endswith("\\"), f"{target!r} kept the backslash")
+
+    def test_a_page_a_class_links_to_by_a_heading_with_an_alias_takes_its_date(self):
+        # [[Worksheet#Part A\|part A]], written on Day 3. Before #294 the
+        # build did not read a heading followed by an alias as a link at all,
+        # so the worksheet was reset to the course's FIRST class date (Day 1)
+        # while the mac's re-date gave it Day 3's. Now both say Day 3.
+        case = {
+            "name": "a heading and an escaped alias",
+            "classes": [
+                {"title": "Unit 1, Day 1", "created": "2026-09-08T07:00:00.000+0000",
+                 "visible": True, "links": []},
+                {"title": "Unit 1, Day 3", "created": "2026-09-10T07:00:00.000+0000",
+                 "visible": True, "links": ["Worksheet#Part A\\|part A"]},
+            ],
+            "pages": [
+                {"title": "Worksheet", "folder": "Exercises",
+                 "frontmatter": "createdSection1: 2026-09-01T07:00:00.000+0000\npublishForSection1: true\n"},
+            ],
+        }
+        self.use_the_course_words(case)
+        folder = self.folder_for(case, 0)
+        self.assertIn("[[Worksheet#Part A\\|part A]]",
+                      folder.files_by_title["Unit 1, Day 3"].read_text(encoding="utf-8"))
+        content, result = folder.build(1)
+        self.assertEqual(frontmatter.load(self.copy_of(content, "Worksheet")).get("created"),
+                         "2026-09-10T07:00:00.000+0000")
+        self.assertEqual(self.date_the_build_reads(folder.files_by_title["Worksheet"], 1),
+                         "2026-09-10T07:00:00.000+0000")
+        self.assert_a_second_build_writes_nothing(folder, [1])
 
     # MARK: - Assertions
 

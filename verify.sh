@@ -245,6 +245,13 @@ else
   cat /tmp/verify_graded_rerun_test.log
 fi
 
+if (cd scripts && python3 test_graded_folders_new_course.py) >/tmp/verify_graded_new_course_test.log 2>&1; then
+  pass "setup_course.py: a new course is written its marks pool, as both apps write it (scripts/test_graded_folders_new_course.py)"
+else
+  fail "setup_course.py: a new course is written its marks pool, as both apps write it (scripts/test_graded_folders_new_course.py)"
+  cat /tmp/verify_graded_new_course_test.log
+fi
+
 if (cd scripts && python3 test_contracts.py) >/tmp/verify_contracts_test.log 2>&1; then
   pass "contracts.py: the scripts can read the Plantoir contract (scripts/test_contracts.py)"
 else

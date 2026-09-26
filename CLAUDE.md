@@ -683,7 +683,9 @@ each working folder's `.toolchain/`. The launchers:
   with the same function, so don't swap one for the other;
 - probe a free host port block per container (8081/8091/8101…, walking up
   through forty blocks and skipping any block another folder's container
-  holds, stopped ones included — `contracts/app-rules.json` → `previewPorts`,
+  holds, stopped ones included, or anything on the Mac, in ANY account, is
+  listening on — the kernel's `netstat` list joined to `lsof`, since #310 —
+  `contracts/app-rules.json` → `previewPorts`,
   one block of code shared by all three launchers), mapping to
   fixed container ports 8081–8084 for sites plus 9081–9084 for Quartz's
   live-reload websockets (`--wsPort` = port + 1000 — without it, concurrent
@@ -1016,7 +1018,7 @@ implemented and passing on both platforms; see `GUI-IMPROVEMENTS.md` rows
 | [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md) | The dated log of every GUI change, with a required "Notes for Windows port" column. Append here for any GUI change — and read it as HISTORY: it used to be described as "the spec", and `contracts/` is what a test should be written against now. |
 | [`MAC-BOOTSTRAP.md`](MAC-BOOTSTRAP.md) | **The brief for a macOS session**: adding a feature responsibly here, and taking work that arrived from Windows. |
 | [`WINDOWS-BOOTSTRAP.md`](WINDOWS-BOOTSTRAP.md) | **The brief for a Windows session**: what to read, the order of work, the rules while working, and the plan-first rule. Point a Windows agent at this file. |
-| [`WINDOWS-PARITY.md`](WINDOWS-PARITY.md) | **Temporary.** The ordered strategy for the milestone "Windows: parity with mac v1.3.2": every issue in a phase, what the shared Python gives free, the traps. `WINDOWS-BOOTSTRAP.md` points at it. The issues stay the source of truth, and the file is deleted when that milestone closes. |
+| [`WINDOWS-PARITY.md`](WINDOWS-PARITY.md) | **Temporary.** The ordered strategy for the milestone "Windows: parity with mac v1.4.0": every issue in a phase, what the shared Python gives free, the traps. `WINDOWS-BOOTSTRAP.md` points at it. The issues stay the source of truth, and the file is deleted when that milestone closes. |
 | [GitHub issues](https://github.com/russellgordon/plantoir/issues) | **Everything still to do**, on either platform. Labelled `mac`, `windows`, `toolchain`, `assistant`, `decision`; milestones pin an issue to a release. |
 | [`documentation/13-windows-port-archive.md`](documentation/13-windows-port-archive.md) | Write-ups for Windows-port work verified shipped as of 2026-08-22, kept for the reasoning. **History, not a specification** — where it and a contract disagree, the contract is true. Closed to new entries. |
 | [`contracts/`](contracts/README.md) | **The Plantoir contract**: what the two apps must agree on, as data both test suites run — the assistant's sentences and behaviour, launcher arguments, validation wording, failure explanations, date reading, class naming, file names, progress markers, preview ports. Three of the ten files are generated from the macOS app by `Plantoir --write-contracts` and must never be hand-edited; the other seven — `shared-rules.json` among them — are AUTHORED, and can be proposed or corrected from either platform. `contracts/README.md` says which is which, and this line used to say "never hand-edited" of all ten, which sent a Windows session on 2026-09-08 to ask the mac for an edit it could make itself. Its coverage table says what is deliberately NOT shared, and why. |

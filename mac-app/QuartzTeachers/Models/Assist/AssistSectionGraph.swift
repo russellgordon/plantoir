@@ -466,6 +466,14 @@ nonisolated struct AssistSectionGraph {
     ///
     /// The pattern is `WikiLinkRewriter`'s own, so a link this reads is exactly
     /// a link a rename would rewrite — one definition of "a link", not two.
+    /// That includes a link whose alias pipe is escaped, `[[Ohm's Law\|Ohm]]`,
+    /// as Obsidian writes it inside a table: the pattern stops the name before
+    /// the backslash, so publishing follows it, the dates a class brings reach
+    /// it, and the site check counts it (#294 — before then the name was read
+    /// as `Ohm's Law\`, matched no page, and was silently dropped).
+    ///
+    /// Links inside code ARE read here, unlike `linksAsWritten`; whether a
+    /// publish should follow a link an inline-code example names is #313.
     static func linkTargets(in text: String) -> [String] {
         guard let expression = try? NSRegularExpression(pattern: WikiLinkRewriter.pattern) else {
             return []
@@ -503,12 +511,14 @@ nonisolated struct AssistSectionGraph {
     ///   not a link: the Scavenger Hunt pages show `[[Page Name]]` to teach the
     ///   syntax. Read with the code left in, 188 targets came back as links to
     ///   pages that do not exist.
-    /// - A link inside a table escapes its pipe, `[[Ohm's Law\|Ohm]]`, which
-    ///   leaves the target ending in a backslash. Read with the backslash left
-    ///   on, 69 real links came back dead.
+    /// - A link inside a table escapes its pipe, `[[Ohm's Law\|Ohm]]`. When
+    ///   this was written the shared pattern kept the backslash on the name,
+    ///   and read that way 69 real links came back dead, so this function
+    ///   stripped it by hand. Since #294 the pattern itself stops before the
+    ///   backslash, for every reader, and the hand strip is gone: a second
+    ///   strip here would only hide a regression of the first.
     ///
-    /// `linkTargets` keeps its own reading because publishing follows it, and
-    /// changing what publishing follows is a change of its own.
+    /// So the one difference left from `linkTargets` is the code (#313).
     static func linksAsWritten(in text: String) -> [String] {
         guard let expression = try? NSRegularExpression(pattern: WikiLinkRewriter.pattern) else {
             return []
@@ -522,9 +532,6 @@ nonisolated struct AssistSectionGraph {
                 continue
             }
             var target: String = String(readable[targetRange]).trimmingCharacters(in: .whitespaces)
-            while target.hasSuffix("\\") {
-                target = String(target.dropLast()).trimmingCharacters(in: .whitespaces)
-            }
             if target.lowercased().hasSuffix(".md") {
                 target = String(target.dropLast(3))
             }
