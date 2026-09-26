@@ -740,6 +740,18 @@
           "expectVisible": ["Unit 2, Day 3", "Ohm's Law", "Watt", "Worked Example"],
           "expectUntouched": ["Unit 2, Day 4", "Worksheet"],
           "why": "Three of the four pages that go up are reachable ONLY through a table link, so the case cannot pass on a reader that drops them. Ohm's Law -> Worked Example proves the walk is still transitive through a table; Unit 2, Day 4 proves the #173 stop still holds when the class is linked from one."
+        },
+        {
+          "name": "a link shown as an example inside code is not followed",
+          "pages": [
+            {"title": "Unit 2, Day 3", "isClassPage": true, "visible": false, "body": "Link a page by typing `[[Answer Key]]`.\n\n```\n[[Answer Key]]\n```\n\nToday: [[Worksheet]].\n"},
+            {"title": "Answer Key", "isClassPage": false, "visible": false, "links": []},
+            {"title": "Worksheet", "isClassPage": false, "visible": false, "links": []}
+          ],
+          "publish": ["Unit 2, Day 3"],
+          "expectVisible": ["Unit 2, Day 3", "Worksheet"],
+          "expectUntouched": ["Answer Key"],
+          "why": "Quartz draws neither example as a link (readingALink.codeIsNeverALink), so publishing the answer key would put a page in front of students that nothing on the site leads to - and an answer key is exactly the page a teacher writes as an example and does not mean to publish. Worksheet proves the class still publishes what it really links to. #313."
         }
       ]
     },
@@ -812,9 +824,25 @@
   "readingALink": {
     "note": "What counts as a wikilink, and what it NAMES. One definition for every reader: publishing's walk, the dates a class brings, the site check, the answer to what a page links to, copying a page with the pages it links to, renaming a page, a unit word or a folder, and - when a course is installed - which class's date a ready-made page takes, pointing a template at the course's own expectation and unlinking the curriculum pages a teacher declined, as well as which pages the coverage map counts as taught and what it counts as covered (#314, scripts/test_install_link_readers.py). Pure: text in, the names it links to out.",
     "rule": "The name runs from [[ (or ![[) up to the first ], | or #, and a backslash immediately before that character is not part of it. An escaped pipe, [[Ohm's Law\\|Ohm]], is the same link as [[Ohm's Law|Ohm]] wherever it is written. It is most often inside a Markdown table, where Obsidian escapes the alias pipe so that the cell does not end there, but it turns up in ordinary sentences too and is a link there as well. A backslash anywhere else in a name is left alone.",
-    "whenRewritten": "A rename changes only the name. The backslash, the alias, the heading and the ! stay exactly where they were: dropping the backslash would split a table cell in two.",
+    "whenRewritten": "A rename changes only the name. The backslash, the alias, the heading and the ! stay exactly where they were: dropping the backslash would split a table cell in two. A link inside code is not a link, so a rename leaves it as written.",
+    "codeIsNeverALink": "A [[...]] or ![[...]] whose opening brackets (or the ! of ![[) sit inside a fenced code block or an inline code span is an EXAMPLE of a link, not a link. It is not followed by publishing, the dates a class brings, the site check, the answer to what a page links to, copying, the installer or the coverage map, and it is not rewritten by a page rename, a unit-word rename, a class insertion or a folder rename (#313). This is what Quartz v4.5.0 already does: ofm.ts builds links with mdast-util-find-and-replace over TEXT nodes only (quartz/plugins/transformers/ofm.ts lines 209-378), so code and inlineCode nodes are never searched. Built in real Quartz and checked: no link from `[[X]]`, from ``a ` [[X]] ``, from a span across two lines of one paragraph or in a table cell, from a ``` or ~~~ fence, from ```` holding ```, from a fence inside a > callout, or from a fence never closed; a link IS drawn from an indented line continuing a list item, after a lone unclosed backtick, inside HTML <code>, and after a ``` fence that held a ~~~ line. The pattern is unchanged: the rule is a mask applied to its matches, and the text is never rewritten to apply it.",
+    "whatIsCode": [
+      "The page is read a line at a time. A line ends at \\n; a \\r before it belongs to the line ending, not the line. A line's BODY is the line with any leading blockquote markers removed: spaces or tabs, then >, then one optional space, repeated.",
+      "1. Fenced code. Outside a fence, a line whose body (after leading spaces and tabs) starts with a run of three or more backticks, or three or more tildes, opens a fence - except that a run of backticks followed by another backtick later on the same line is inline code, not a fence. Every line from the opener through the closer, inclusive, is code. Inside a fence, a line whose body (after leading whitespace) is a run of the SAME character at least as long as the opener's run, with nothing after it but whitespace, closes the fence. A fence never closed runs to the end of the page.",
+      "2. Paragraphs, for code spans only: runs of consecutive lines outside fences. A new paragraph begins at a blank line (a body that is only whitespace), at a fence, and at a line whose body begins (after leading spaces and tabs) with a list marker (-, * or + then a space or tab; one to nine digits then . or ) then a space or tab), a heading (# to ###### then a space, a tab or the end of the line) or a table pipe (|). Such a line is the first line of the new paragraph.",
+      "3. Inline code spans, within one paragraph, scanning left to right. Outside a span, a backslash and the character after it are plain text (\\` does not open code, and \\\\ leaves the next backtick live). A run of N backticks opens a span, which closes at the next run of EXACTLY N backticks in the same paragraph; everything from the opening run through the closing run is code. A run never matched is plain text, and scanning carries on after it. Inside a span, backslashes are literal.",
+      "4. Nothing else is code: not indented lines (see whatIsCodeLimits), not HTML <code> or <pre>, not math, and not %% comments (a separate question, #331).",
+      "5. A link is in code when its [[, or the ! of ![[, starts inside a code range.",
+      "Every character the rule looks at is ASCII, so it can be computed over UTF-16 code units (Swift, C#) or code points (Python) and the offsets line up with that language's own regular expression matches. Do not scan user-perceived characters: \\r\\n is ONE grapheme in Swift, so a scan for \\n over Characters misses every line ending of a page written on Windows."
+    ],
+    "whatIsCodeLimits": [
+      "Indented code (four spaces) is not recognised. Measured with Quartz's own parser over all of support/: 0 of 39,570 links sit in indented code, and an 'indented after a blank line' heuristic drops real links from loose nested lists - the case 'an indented line in a list is not code' pins that.",
+      "A fence opened inside a list item whose lines fall back to column 0 runs to its own closer here; CommonMark ends it with the list item. That was the shape of TEJ2O's 'Control Something with Code', the one shipped page with it, fixed in #313 and caught by the payload linter since.",
+      "A paragraph is broken only at the block starts listed in whatIsCode. A code span CommonMark would stop at another kind of block boundary (a thematic break, say) can run on here.",
+      "Measured: these three limits disagree with Quartz on 0 of the 39,570 links in support/ once TEJ2O is fixed, and on 7 before."
+    ],
     "expectIs": "Each distinct name once, in the order it first appears, as written: spaces inside the brackets trimmed, a trailing .md dropped, capitals and any folder in front kept. A reader that compares names without regard to case or folder (the mac's section graph, the build's dating walk) compares against these the same way it compares against a page's title.",
-    "why": "Found by #167 and filed as #294. The example payloads and skeletons (12,128 files) carry 229 links with an escaped pipe - 142 in tables, 87 in sentences and in code examples; 230 over all of support/, the example course included - and neither app followed one: every reader took the name up to the pipe, so it ended in a backslash and matched no page. By an emulation of the section graph (an estimate, not a measurement), publishing a class with what it links to left about 137 pages behind across about 104 of 3,258 payload classes. Quartz v4.5.0, which draws the site, reads every one of them as a link (quartz/plugins/transformers/ofm.ts lines 117-119 at the tag the image clones, wikilinkRegex: the name excludes a backslash, the alias is \\\\?\\|).",
+    "why": "Found by #167 and filed as #294. The example payloads and skeletons (12,128 files) carry 229 links with an escaped pipe - 142 in tables, 87 in sentences and in code examples; 230 over all of support/, the example course included - and neither app followed one: every reader took the name up to the pipe, so it ended in a backslash and matched no page. By an emulation of the section graph (an estimate, not a measurement), publishing a class with what it links to left about 137 pages behind across about 104 of 3,258 payload classes. Quartz v4.5.0, which draws the site, reads every one of them as a link (quartz/plugins/transformers/ofm.ts lines 117-119 at the tag the image clones, wikilinkRegex: the name excludes a backslash, the alias is \\\\?\\|). Code (#313): over all of support/ (12,490 pages), read with Quartz's own parser (remark-parse 11 + remark-gfm 4), 39,570 links match the pattern: 37,674 outside code, 1,139 in inline code, 757 in fenced code and 0 in indented code. Only 8 page-to-page links existed solely inside code, on 3 pages - six of them TEJ2O's, in code only because its fence was broken - and by an emulation of the section graph no class page, of 3,258 in the payloads and 600 in the skeletons, reaches fewer pages when published. Before #313 the mac's publishing walk followed all 1,896 links in code, its links answer dropped 22 real ones and read 277 examples, Windows read 277 examples, and the build read 7.",
     "rejected": [
       {
         "option": "strip the backslash only where publishing reads links",
@@ -824,10 +852,9 @@
         "option": "treat a backslash as never part of a name",
         "why": "Closer to Quartz's own pattern, but [[a\\b]] would then name a, and a rename of a page called a would rewrite it. Stopping only at a backslash right before ], | or # changes nothing else: measured over 12,128 shipped pages, the same 38,659 links matched at the same places, and the 229 that read differently are exactly the escaped pipes."
       },
-      {
-        "option": "leave out links written inside code in the same change",
-        "why": "A real difference between the apps (Windows and the mac's answer to what a page links to skip them; the mac's publishing does not), but it changes what publishing takes by a different rule and needs its own measurement. Issue #313. No case here puts a link inside code, so this list does not decide it."
-      },
+      {"option": "recognise indented code (four spaces) as code", "why": "0 of 39,570 shipped links sit in it. Doing it properly needs list-container tracking in three languages, and Obsidian writes nested lists with tabs: any 'indented after a blank line' shortcut drops links from loose nested lists, silently, in the direction that leaves pages unpublished while the plan still looks right."},
+      {"option": "readers skip code, rewriters do not", "why": "The mac would have two definitions of a link again: a rename plan would count links publishing does not follow, and a folder rename would edit an example the teacher wrote, which copying a page already refused to do for fenced code. Measured: 0 class names and 0 real folder paths sit in shipped code, so this costs nothing that ships."},
+      {"option": "each platform keeps its own code stripper and fixes its own gaps", "why": "That is how three strippers came to disagree: the mac's links answer dropped 22 real links, both apps read 270 fences inside callouts, and the build missed ~~~ fences. One written rule plus its cases fixes it, with ONE implementation per language shared by every reader in that language. A real Markdown parser in the app was rejected too: nothing like it is available to the Python build and the C# app alike, so the three would drift at exactly the edges these cases pin."},
       {
         "option": "a case for a backslash inside a name, [[a\\b]]",
         "why": "Quartz does not draw it as a link at all, and nobody has chosen what it should mean; a case would assert an answer nobody decided."
@@ -843,7 +870,29 @@
       {"name": "spaces inside the brackets", "text": "| [[ Ohm's Law \\|Ohm]] |\n", "expect": ["Ohm's Law"]},
       {"name": "a picture with a size, in a table", "text": "| ![[circuit.png\\|300]] |\n", "expect": ["circuit.png"]},
       {"name": "an escaped pipe outside a table is the same link", "text": "That is the lesson of [[Yes Lets\\|Yes, Let's]].\n", "expect": ["Yes Lets"]},
-      {"name": "an unescaped link reads as it always did", "text": "[[Ohm's Law|Ohm]] and [[Ohm's Law#Example]] and [[Watt]]\n", "expect": ["Ohm's Law", "Watt"]}
+      {"name": "an unescaped link reads as it always did", "text": "[[Ohm's Law|Ohm]] and [[Ohm's Law#Example]] and [[Watt]]\n", "expect": ["Ohm's Law", "Watt"]},
+      {"name": "inline code is an example of a link, not a link", "text": "Write `[[Page Name]]` to make a link, as in [[Help Sessions]].\n", "expect": ["Help Sessions"]},
+      {"name": "a fenced block, backticks", "text": "```\n[[Fenced Example]]\n```\n\nThen [[Real Page]].\n", "expect": ["Real Page"]},
+      {"name": "a fenced block, tildes", "text": "~~~\n[[Fenced Example]]\n~~~\n\nThen [[Real Page]].\n", "expect": ["Real Page"]},
+      {"name": "a line of tildes inside a backtick fence does not close it", "text": "```text\n    ~~~~~~~~^^^^\n[[Fenced Example]]\n```\n\nThen [[Real Page]].\n", "expect": ["Real Page"], "why": "A Python traceback underlines the failing expression with ~~~~^^^^, inside a ```text block. The mac's answer to 'what does this page link to?' flipped its fence on any line starting with ~~~, so the ``` that really closed the block opened a new one and everything after it read as code: 22 real links dropped on four ICS4U pages (Testing and Regression 8, Reading a Traceback 7, Spot the Bug 5, Name That Error 2). #313."},
+      {"name": "a longer fence holds a shorter one", "text": "````markdown\n```\n[[Fenced Example]]\n```\n````\n\nThen [[Real Page]].\n", "expect": ["Real Page"]},
+      {"name": "a fence inside a callout", "text": "> [!example]\n> ```markdown\n> See [[Fenced Example]].\n> ```\n> Then [[Real Page]].\n", "expect": ["Real Page"], "why": "The Scavenger Hunt pages teach link syntax inside > [!example] callouts. Both apps looked for a fence only at the start of a line, so the > hid it and 270 examples were read as links. #313."},
+      {"name": "a fence that is never closed runs to the end of the page", "text": "First [[Real Page]].\n\n```\n[[Fenced Example]]\n\nStill [[Also Fenced]].\n", "expect": ["Real Page"], "why": "CommonMark and Quartz run an unclosed fence to the end of the page. TEJ2O's 'Control Something with Code' did exactly that on its site until #313 re-indented it: seven links and the curriculum block showed as code."},
+      {"name": "a lone backtick is only a character", "text": "It costs 5` and leads to [[Real Page]].\n", "expect": ["Real Page"]},
+      {"name": "double backticks hold a single one", "text": "``a ` [[Code Example]] `` then [[Real Page]].\n", "expect": ["Real Page"]},
+      {"name": "a code span can carry on to the next line", "text": "A span `starts here\n[[Code Example]] and ends` before [[Real Page]].\n", "expect": ["Real Page"]},
+      {"name": "a code span does not cross a blank line", "text": "One ` tick here.\n\n[[Real Page]] and another ` tick.\n", "expect": ["Real Page"]},
+      {"name": "an escaped backtick does not start code", "text": "\\`[[Real Page]]\\`\n", "expect": ["Real Page"]},
+      {"name": "code in a table cell, a link beside it", "text": "| Type this | To get |\n|---|---|\n| `[[Page Name]]` | [[Ohm's Law\\|Ohm]] |\n", "expect": ["Ohm's Law"]},
+      {"name": "an escaped pipe inside code is still code", "text": "In a table, write `[[Ohm's Law\\|Ohm]]`.\n", "expect": []},
+      {"name": "an indented line in a list is not code", "text": "- Read this first\n\n    [[Real Page]] explains it.\n", "expect": ["Real Page"]},
+      {"name": "an HTML code tag is not Markdown code", "text": "<code>[[Real Page]]</code>\n", "expect": ["Real Page"]},
+      {"name": "a fence in a page with Windows line endings", "text": "Intro.\r\n\r\n```\r\n[[Fenced Example]]\r\n```\r\n\r\nA span `across\r\n[[Code Example]] lines` then [[Real Page]].\r\n", "expect": ["Real Page"]},
+      {"name": "a code span does not reach into the next list item", "text": "- a stray ` here\n- [[Real Page]]\n- and another ` there\n", "expect": ["Real Page"]},
+      {"name": "a code span does not reach into the next table row", "text": "| a ` b |\n|---|\n| [[Real Page]] |\n| c ` d |\n", "expect": ["Real Page"]},
+      {"name": "an escaped backslash leaves the backtick live", "text": "\\\\`[[Code Example]]` then [[Real Page]].\n", "expect": ["Real Page"]},
+      {"name": "three backticks with more on the same line are inline code, not a fence", "text": "```[[Code Example]]``` is written inline.\n\nThen [[Real Page]].\n", "expect": ["Real Page"]},
+      {"name": "a stray [[ inside code does not swallow the link after it", "text": "Type `[[` to start a link, then [[Real Page]].\n", "expect": ["Real Page"], "why": "The link pattern crosses a [, so a match starting at the example's brackets runs on to the real link's name and swallows it. A reader must start looking again where the code ENDS, not where the swallowing match ends, or dropping the example drops the real link with it. Quartz never searches code, and its own pattern stops at [, so it draws this link. Found while implementing #313; the Scavenger Hunt pages carry this shape ('Type `[[`'), where a heading between the two happened to save the real link."}
     ]
   },
   "note": "The rule sets both apps need and neither platform owns. The MECHANISMS behind several of them differ completely - launchd against Task Scheduler, AppKit against WinUI, ~/Library/Logs against %LOCALAPPDATA% - which is exactly why the rules are written here instead: what must be refused, matched, stripped, or taken out of a problem report does not change with the machinery that does it.",
@@ -4383,6 +4432,13 @@
             "newName": "All Tasks",
             "expect": "| [[All Tasks/Quiz 1\\|quiz]] |",
             "why": "A GUARD, green before and after #294 on both apps: a folder rewrite changes only the folder at the front of the name, so the backslash of a table's escaped alias pipe was never at risk here. It is here because the pattern this rewriter finds links with changed in #294 (shared-rules.json -> readingALink), and a rewrite that dropped the backslash would split the table cell in two."
+          },
+          {
+            "given": "`[[Tasks/Quiz 1]]` and `[q](Tasks/Quiz%201.md)` show the syntax; [[Tasks/Quiz 1]] is the link.",
+            "oldName": "Tasks",
+            "newName": "All Tasks",
+            "expect": "`[[Tasks/Quiz 1]]` and `[q](Tasks/Quiz%201.md)` show the syntax; [[All Tasks/Quiz 1]] is the link.",
+            "why": "A link inside code is an example, not a link (readingALink.codeIsNeverALink, #313): a rename leaves both examples exactly as the teacher wrote them - a wikilink and a Markdown link alike - and moves only the real link. Windows' FolderPathRewriterTests runs this list and is RED on this case until it applies the same mask."
           }
         ]
       },
@@ -8859,7 +8915,7 @@
     },
     "picturesAndFiles": {
       "whereTheyAreFound": "Every place the page names something local: ![[x.png]] embeds, [[x.pdf]] links that point at a FILE rather than a page, HTML src and href attributes, and Markdown link destinations. Measured across 777 real markdown files: 1,474 embeds (1,274 of them media), 1,222 links of which 250 point at a file (235 PDFs), 5 HTML attributes naming a local file - one of them a live 1.1 MB picture on a copyable page - and 526 Markdown links, every one of them https://.",
-      "fencedCodeIsLeftAlone": "A name inside a fenced code block is prose about a file rather than a use of one, and rewriting it would edit an example a teacher wrote. Inline code spans are not tracked, which is the same known gap WikiLinkRewriter has.",
+      "fencedCodeIsLeftAlone": "A name inside code - a fenced block or an inline code span - is prose about a file rather than a use of one, and rewriting it would edit an example a teacher wrote. Nothing in code is carried, followed or rewritten, by the one definition in readingALink.whatIsCode (#313; until then inline code spans were not tracked here).",
       "sameNameSameFile": "Reused silently. Nothing is copied and nothing is said, beyond the count.",
       "sameNameDifferentFile": "The incoming file comes in under a NEW name and only the COPIED page is pointed at it. The teacher's own file is untouched. The new name is '<name> (from <source course folder>)<extension>' - the course's FOLDER name, because every picture comes from Media and saying so would say nothing, while ICS4U-2025 says which course it came out of. If that name is taken, a number is added; and if a bounded search still finds nothing free, THE PAGE IS NOT COPIED and says so. That last part is not tidiness: the destination already HAS a file of that name with different bytes - which is why a new name was needed - so a page written with the original name would show the teacher their own DIFFERENT picture, which is the one direction this feature must never err in. Merely listing the file said the opposite about a link that leads somewhere wrong.",
       "invisibleSpacesAreFoldedOnTheWayINOnly": "Resolving a reference against the SOURCE's Media folds U+00A0, U+202F and U+2007 to an ordinary space, so a link typed with real spaces finds a file whose name carries a no-break one. The DESTINATION name index does not fold them, so a destination holding a<NBSP>b.png and an incoming a b.png end up side by side with names that look identical. Nothing is overwritten and nothing is lost, which is the safe direction; measured, and left as it is rather than made cleverer.",
@@ -9980,6 +10036,7 @@
           "linksLeadingNowhere": []
         }
       },
+      {"name": "a picture and a page named inside inline code are left alone", "why": "Inline code is an example, not a use (readingALink.codeIsNeverALink, #313): the picture is not carried and the page it names is not copied with it, though the copy is asked to take linked pages.", "source": {"folder": "ICS4U-2025", "sharedFolders": ["Concepts"], "pages": [{"path": "Concepts/Teaching.md", "text": "Show a picture with `![[one.png]]` or link with `[[Ohm's Law]]`.\n"}, {"path": "Concepts/Ohm's Law.md", "text": "Body\n"}], "media": [{"name": "one.png", "bytes": "aaa"}]}, "destination": {"folder": "ICS4U", "sections": [1], "sharedFolders": ["Concepts"], "pages": [], "media": []}, "copy": {"page": "Concepts/Teaching.md", "intoFolder": "Concepts", "alsoCopiesLinkedPages": "yes"}, "expect": {"pages": ["Concepts/Teaching.md"], "mediaCreated": [], "mediaReused": [], "mediaRenamed": {}, "skipped": [], "linksLeadingNowhere": []}},
       {
         "name": "a picture named inside a fenced code block is left alone",
         "source": {
