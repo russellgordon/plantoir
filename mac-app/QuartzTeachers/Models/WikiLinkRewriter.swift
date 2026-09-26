@@ -33,10 +33,10 @@ import Foundation
 /// that sits immediately before `]`, `|` or `#`. The lookahead is zero-width,
 /// so the backslash falls outside the match and every rewriter that replaces
 /// the match (or group 2) carries it through untouched. Measured over the
-/// 12,128 shipped pages: the same 38,659 links matched at the same offsets as
+/// 12,128 payload and skeleton pages: the same 38,659 links matched at the same offsets as
 /// the old `([^\]|#]+)`, and 229 captures changed, every one a name that used
 /// to end in the backslash of a `\|` (142 in tables, 87 in prose and in code
-/// examples).
+/// examples; 39,570 and 230 over all of `support/`).
 ///
 /// Rejected:
 /// * stripping the backslash in `AssistSectionGraph.linkTargets` alone —
