@@ -44,10 +44,11 @@ Three notes about this course's status and this reproduction:
   like "character-to-integer" in `A1.2` are the document's own, not
   artifacts of a line break.
 
-Each page keeps its code, and every concept, exercise, and stage of
-[[The Software Project]] links back to the codes it addresses. The
-codes are also tags, so every page tagged `#C2` can be gathered in one
-place.
+Each page keeps its code, and every concept, exercise, and task in
+this course, and every stage of the large software project that
+[[B2. Software Project Contribution|B2]] asks for, links back to the
+codes it addresses. The codes are also tags, so every page tagged `#C2`
+can be gathered in one place.
 
 ## Why the codes matter more than they look
 

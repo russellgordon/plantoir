@@ -425,6 +425,34 @@ class TheTwoInstallsTogetherTests(unittest.TestCase):
                                  f"{code}: pages point at expectation pages that are not "
                                  "in the course")
 
+    def test_every_payloads_curriculum_links_resolve_in_a_skeleton_course(self):
+        # Issue #253. Since #251 a teacher who declines the ready-made pages
+        # still gets the payload's Curriculum folder, beside the skeleton's
+        # pages, so a curriculum page that links to a lesson, a task or a
+        # project page of the payload links to nothing in that course. Every
+        # link and embed, in every payload, after the real double install;
+        # code spans and fenced blocks are examples, not links.
+        codes = every_payload_code()
+        self.assertGreaterEqual(len(codes), 38)
+        for code in codes:
+            with self.subTest(code=code):
+                course_path = self.install(code)
+                present = {"index"}
+                for page in course_path.rglob("*.md"):
+                    present.add(page.stem)
+                unresolved = []
+                for page in sorted((course_path / "Curriculum").rglob("*.md")):
+                    text = page.read_text(encoding="utf-8")
+                    without_fences = re.sub(r"(`{3,})[\s\S]*?\1", "", text)
+                    without_code = re.sub(r"`[^`\n]*`", "", without_fences)
+                    for match in LINK_TARGET.finditer(without_code):
+                        target = match.group(1).strip().rstrip("\\").split("/")[-1]
+                        if target not in present:
+                            unresolved.append(f"{page.name}: [[{target}]]")
+                self.assertEqual(unresolved, [],
+                                 f"{code}: a curriculum page links to a page a skeleton "
+                                 "course does not have")
+
     def test_the_two_codes_with_no_A1_1_are_really_the_two(self):
         # The rename rule does nothing for the other 36, and a test that
         # could not tell the difference would pass even if it did nothing
