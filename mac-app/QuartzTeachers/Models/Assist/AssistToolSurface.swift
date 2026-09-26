@@ -1,7 +1,8 @@
 import Foundation
 
 /// The twenty-two tools that exist, and the thirteen of them the local model
-/// is shown.
+/// is shown — plus the twelve only an MCP client is offered (`mcpOnlyTools`),
+/// thirty-four in all on that surface.
 ///
 /// It was fifteen when routing accuracy was measured, and the seven that came
 /// after — reading and recording a section's timetable, adding the next class
@@ -155,6 +156,16 @@ extension AssistToolRunner {
     /// CODE, so publishing its schema would spend routing accuracy to buy
     /// something it already has.
     ///
+    /// The start-of-year pair joined for a fourth reason (#96): getting a
+    /// section ready puts every class after the first into draft at once,
+    /// which is a whole-section change a person should read in full, and the
+    /// app has its own button for it — so the local model needs no route to
+    /// it, and showing it one would be a routing change that needs the suites
+    /// re-run. **Appended here, never to `tools`**, so the local list and its
+    /// hash do not move; a must-fail proves it (M8). Should a fixed phrasing
+    /// ever reach it from the assistant window, the card must carry the
+    /// twin's plan code to the write, or every attempt is refused (R9).
+    ///
     /// What they share is only the test that matters: none of them costs the
     /// thirteen-tool surface the routing figures were measured against.
     static let mcpOnlyTools: [AssistToolDefinition] = [
@@ -168,6 +179,8 @@ extension AssistToolRunner {
         listCurriculumExpectationsTool,
         planCurriculumMentionsTool,
         addCurriculumMentionsTool,
+        planPrepareForStartOfYearTool,
+        prepareForStartOfYearTool,
     ]
 
     /// Everything the MCP client may call: every tool that exists, plus the
@@ -902,6 +915,55 @@ extension AssistToolRunner {
         ],
         required: ["course", "section", "page", "codes"],
         readOnly: true,
+        needsApproval: false
+    )
+
+    // MARK: - The start of the year (#96)
+
+    private static let planPrepareForStartOfYearTool: AssistToolDefinition = AssistToolDefinition(
+        name: "plan_prepare_for_start_of_year",
+        description: "Work out what getting a section ready for the start of the year would do, changing "
+                   + "nothing. Lists every page that would go into draft and why, what stays, the links "
+                   + "that would lead to hidden pages, and the plan code prepare_for_start_of_year needs.",
+        parameters: [
+            "course": courseHelp,
+            "section": sectionHelp,
+        ],
+        required: ["course", "section"],
+        readOnly: true,
+        needsApproval: false
+    )
+
+    private static let prepareForStartOfYearTool: AssistToolDefinition = AssistToolDefinition(
+        name: "prepare_for_start_of_year",
+        description: "TEACHERS SAY: \"get ready for the start of the year\", \"put everything after the "
+                   + "first class into draft\", \"hide every class past Day 1\". Put every class after "
+                   + "the first into draft, with the pages only later classes use, leaving the first "
+                   + "class, the pages it links to, Key Links and the pages it lists, folder pages and "
+                   + "curriculum pages as they are. Call plan_prepare_for_start_of_year FIRST, show the "
+                   + "teacher the whole plan and wait for them to agree; then pass the code the plan "
+                   + "gave. The course is backed up first, and undo_last_change takes it back. Nothing "
+                   + "reaches students until they deploy.",
+        parameters: [
+            "course": courseHelp,
+            "section": sectionHelp,
+            // NOT required, deliberately (the plan review's M4): a call
+            // without it has to be REACHABLE, because the answer to it is
+            // the plan and its code rather than an error the client cannot
+            // act on — and the contract's scenario for exactly that call is
+            // unrunnable through a real MCP client if the schema forbids it.
+            "planCode": AssistSchemaProperty(
+                kind: .string,
+                description: "The code on the last line of the plan plan_prepare_for_start_of_year gave, "
+                           + "for example \"3f9a1c07\". Without it, or if the section has changed since, "
+                           + "nothing is changed and the current plan comes back instead."
+            ),
+        ],
+        required: ["course", "section"],
+        readOnly: false,
+        // Not a deploy — nothing reaches students — and it has a plan gate
+        // of its own (the code) and an undo, the same reasoning as
+        // `re_date_classes`.
         needsApproval: false
     )
 

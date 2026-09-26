@@ -255,6 +255,11 @@ enum AssistContract {
             "couldNotUndo": AssistWording.couldNotUndo(changePlaceholder, leftAlone: 2),
             "undoIsStillAvailable": AssistWording.undoIsStillAvailable,
             "nothingToUndo": AssistWording.nothingToUndo,
+            "startOfYearNeedsItsPlan": AssistWording.startOfYearNeedsItsPlan(course: course, section: section),
+            "startOfYearPlanHasChanged": AssistWording.startOfYearPlanHasChanged(
+                course: course, section: section
+            ),
+            "startOfYearNeedsABackup": AssistWording.startOfYearNeedsABackup(course: course),
             "undoDoesNotReachTheLiveSite": AssistWording.undoDoesNotReachTheLiveSite,
             "aCreatedPageCanBeTakenBack": AssistWording.aCreatedPageCanBeTakenBack,
             // Duplicating a class. The date is a LITERAL rather than a
@@ -713,9 +718,11 @@ enum AssistContract {
             "note": "Three lists, deliberately. `all` is what the runner can execute; `local` is what the "
                   + "small model is SHOWN (the plan twins and remember_timetable are taken off, because "
                   + "the model never has to name a plan and dates it supplies are dates it may have "
-                  + "invented); `mcpOnly` is the ten offered to Claude Code on top of everything — three "
-                  + "asking for judgement about meaning, the rest either never needed by a model "
-                  + "scoped to one section or already reachable by it through a fixed phrasing.",
+                  + "invented); `mcpOnly` is the twelve offered to Claude Code on top of everything — three "
+                  + "asking for judgement about meaning, two that get a whole section ready for the "
+                  + "start of the year (a change a person should read in full, with a button of its "
+                  + "own in the app), the rest either never needed by a model scoped to one section "
+                  + "or already reachable by it through a fixed phrasing.",
             "all": all,
             "local": local,
             "mcpOnly": mcpOnly,
