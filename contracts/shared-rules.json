@@ -4280,7 +4280,7 @@
       },
       "linkRewriting": {
         "note": "How a folder’s new name is SPELLED inside the links a rename repoints. The rename itself is above; this is the half that decides whether the repointed link still resolves. The reference implementation is `FolderPathRewriter` on both sides.",
-        "rule": "In a MARKDOWN link, escape when the NEW name needs it, whatever the old segment looked like. In a WIKILINK, keep the plain spelling. A segment that ARRIVED percent-encoded goes back percent-encoded in either style, so a link a teacher already had keeps the shape it had.",
+        "rule": "In a MARKDOWN link, escape when the NEW name needs it, whatever the old segment looked like. In a WIKILINK, keep the plain spelling. A segment that ARRIVED percent-encoded goes back percent-encoded in either style, so a link a teacher already had keeps the shape it had. Inside ANGLE BRACKETS, `](<…>)`, keep the plain spelling unless the name contains `<`, `>` or a line break, which end that form (#97).",
         "why": "“Spell it the way the old segment was spelled” is the obvious rule and it is wrong. A Markdown destination ends at the first SPACE, so renaming Tasks to All Tasks turned `[q](Tasks/Quiz%201.md)` into `[q](All Tasks/Quiz%201.md)`, which neither Obsidian nor Quartz can follow. The old segment `Tasks` carries no `%`, so nothing escaped anything — the `%20` in that example belongs to the FILE name, which is what made it easy to miss by eye. Every Markdown-style link into the folder broke, in a teacher’s own pages, and nothing said so. Found on Windows by adversarial review 2026-09-06; the mac had the identical defect. Escaping a WIKILINK would be the mirror-image mistake: `[[All Tasks/Quiz 1]]` is exactly how Obsidian writes a wikilink whose folder has a space in it.",
         "needsEscapingInAMarkdownLink": {
           "characters": ["whitespace", "(", ")"],
@@ -4291,6 +4291,16 @@
           "onceEscapingIsTriggeredEncodeEverythingElse": "Nothing is encoded unless a name needs it — see needsEscapingInAMarkdownLink — or the old segment arrived encoded. `Café` goes into a link as `Café`; `Café Notes` goes in as `Caf%C3%A9%20Notes`. Both resolve; the Markdown parser normalises the first to `Caf%C3%A9` itself. Reading this key as “always encode” is the way the two apps would drift, so there is a case for it below.",
           "why": "Neither macOS’s `urlPathAllowed` nor .NET’s `Uri.EscapeDataString` is right, and both were tried. Quartz v4.5.0 resolves an internal link with `decodeURI` (`quartz/util/path.ts`, `transformInternalLink`), and `decodeURI` deliberately leaves the reserved set `; / ? : @ & = + $ , #` still encoded. It then slugs what comes back, turning `&` into `-and-` and `%` into `-percent` (`sluggify`, same file). So a folder called “Tasks & Quizzes” written as `Tasks%20%26%20Quizzes` decodes to `Tasks %26 Quizzes` and slugs to `Tasks--percent26-Quizzes`, while the real folder slugs to `Tasks--and--Quizzes`: a 404 on the published site, and invisible in Obsidian, which decodes `%26` perfectly well. The set here is what JavaScript’s `encodeURI` leaves alone, minus three — `(` and `)` close a destination, `#` starts a heading — and minus `/` and `:`, which the rename sheet refuses anyway. **`?` was excluded at first and was put back**, on the reasoning that a bare `?` is a query delimiter to any other reader of the file. That was never a rule the code applied — `?` is not in needsEscapingInAMarkdownLink, so `Why?` always went in unescaped — and it was measurably wrong when escaping DID run: `sluggify` strips a `?`, so the real folder `Why Not?` slugs to `Why-Not`, an unescaped `Why%20Not?` slugs to the same and resolves, and the escaped `Why%20Not%3F` slugs to `Why-Not-percent3F` and 404s. Excluding it meant a folder resolved when it was called `Why?` and not when it was called `Why Not?`. Verified against the running image 2026-09-06: `decodeURI` turns `Work%28new%29` into `Work(new)`, `Top%2010%25` into “Top 10%”, `Caf%C3%A9%20Notes` into “Café Notes”, and leaves `C%2B%2B` alone.",
           "windowsMustReplaceEscapeDataString": "`Uri.EscapeDataString` keeps only `A-Za-z0-9-._~`, so it over-encodes `;`, `,`, `@`, `&`, `=`, `+`, `$`, `?`, `'`, `!` and `*`. **Only the first eight of those actually break a link**, and the distinction is worth keeping straight: `decodeURI` leaves exactly `; / ? : @ & = + $ , #` encoded, so those come back as `%XX` and `sluggify` turns each into `-percent…`, while `%27`, `%21` and `%2A` decode back to `'`, `!` and `*` and resolve fine — over-encoding them is noise rather than a 404. (An earlier draft of this note said all eleven broke. They do not, and the same encoder is still the right answer, because the eight that DO break include the two that will happen.) **Done on Windows 2026-09-07** (documentation/06-quartz-customizations.md): `Spelled` now calls a `PercentEncoded` driven by `leaveUnescaped`, in BOTH of its branches, and `FolderPathRewriterTests` deserialises every case below rather than retyping five of them. Three cases had been failing there — the ampersand, the comma and the question mark. The comma is the one that was going to bite: “Unit 1, Day 2” is this project’s own naming pattern, and Windows wrote `Unit%201%2C%20Day%202`, which slugs to `Unit-1-percent2C-Day-2` and 404s. The per-cent case passed there even before the fix — `Top 10%` triggers escaping on its space, and `EscapeDataString` encodes the `%` too — so do NOT add `%` to WouldBreakAMarkdownTarget. Kept here rather than deleted because the reasoning is what stops the encoder being “simplified” back to the framework call."
+        },
+        "insideAngleBrackets": {
+          "characters": ["<", ">", "line break"],
+          "why": "A destination written as `](<Tasks/Quiz 1.md>)` is CommonMark's way of putting a space in a link without `%20`; Obsidian's own links never use it, so it appears only where a teacher typed it. Quartz v4.5.0 has no angle-link code of its own: `remark-parse` reads the destination and `remark-rehype` makes the `href`, and the rest is the path every Markdown link takes. Measured 2026-09-26 with remark-parse 11, remark-rehype 11 and rehype-stringify 10 from npm (the majors in Quartz's package.json, not the image's lockfile), node 22: `<All Tasks/Quiz 1.md>` → `All%20Tasks/Quiz%201.md`; `<Tasks & Quizzes/Quiz.md>` → `Tasks%20&%20Quizzes/Quiz.md`, `<Unit 1, Day 2/Quiz.md>` → `Unit%201,%20Day%202/Quiz.md` and `<Top 10%/Quiz.md>` → `Top%2010%25/Quiz.md`, each the SAME href the escaped form gives; `<Work(new)/Quiz.md>` → `Work(new)/Quiz.md`; a pre-encoded `<All%20Tasks/Quiz 1.md>` → `All%20Tasks/Quiz%201.md`; `<Tasks/Quiz 1.md> \"t\"` keeps the title. `<Unit 1 > Review/Quiz 1.md>` is NOT a link — it renders as literal text — while `<Unit%201%20%3E%20Review/…>` is, and `decodeURI` gives back `Unit 1 > Review`; so `<`, `>` and a line break force the ordinary percent-encoding (escapingSet) and nothing else does. An unterminated `](<Units/Tasks/Quiz1.md)` is literal text too, and must not be rewritten. Obsidian's reading was not driven; its help documents `[text](<Note with spaces.md>)` as supported.",
+          "rejected": [
+            "Applying the Markdown escaping inside the brackets (`<All%20Tasks/…>`). It resolves (measured), but it rewrites the spelling of a link whose only reason for brackets is to avoid `%20`, and it passes every guard case — which is why the `Unit 1, Day 2` and `Top 10%` cases below exist.",
+            "Dropping the brackets and converting the link to the percent-encoded form: that edits the teacher's text beyond the folder segment.",
+            "Escaping `>` as `\\>` (a CommonMark backslash escape) instead of `%3E`. remark accepts it (measured), but it is a second escaping mechanism whose reading in Obsidian is unmeasured; the existing encoder is contract-pinned and round-trips through `decodeURI`.",
+            "One pattern with an optional `<`: the `>` would have to be consumed or re-appended, and the spelling has to know the style anyway. Two patterns, and the plain one refuses a destination starting with `<`, so ONE link is read by ONE pattern."
+          ]
         },
         "cases": [
           {
@@ -4383,6 +4393,90 @@
             "newName": "All Tasks",
             "expect": "| [[All Tasks/Quiz 1\\|quiz]] |",
             "why": "A GUARD, green before and after #294 on both apps: a folder rewrite changes only the folder at the front of the name, so the backslash of a table's escaped alias pipe was never at risk here. It is here because the pattern this rewriter finds links with changed in #294 (shared-rules.json -> readingALink), and a rewrite that dropped the backslash would split the table cell in two."
+          },
+          {
+            "given": "[q](<Tasks/Quiz 1.md>)",
+            "oldName": "Tasks",
+            "newName": "All Tasks",
+            "expect": "[q](<All Tasks/Quiz 1.md>)",
+            "why": "The defect itself (#97): the plain pattern read the target as `<Tasks/Quiz`, so a folder in the FIRST segment was never seen. The name goes in plain, and the closing `>` survives."
+          },
+          {
+            "given": "[q](<Tasks/Quiz1.md>)",
+            "oldName": "Tasks",
+            "newName": "Assignments",
+            "expect": "[q](<Assignments/Quiz1.md>)",
+            "why": "No space anywhere: the old reading still took `<Tasks` as the segment and missed it."
+          },
+          {
+            "given": "[q](<Units/Tasks/Quiz 1.md> \"the quiz\")",
+            "oldName": "Tasks",
+            "newName": "Work(new)",
+            "expect": "[q](<Units/Work(new)/Quiz 1.md> \"the quiz\")",
+            "why": "A deeper segment and a title. The old reading rewrote this one by LUCK, as `Work%28new%29`; inside brackets a round bracket is fine (measured: `<Work(new)/Quiz.md>` gives the href `Work(new)/Quiz.md`), and the title is left alone."
+          },
+          {
+            "given": "![](<Tasks/a diagram.png>)",
+            "oldName": "Tasks",
+            "newName": "All Tasks",
+            "expect": "![](<All Tasks/a diagram.png>)",
+            "why": "An embed in the same form follows the folder too."
+          },
+          {
+            "given": "[q](<Tasks/Quiz 1.md>)",
+            "oldName": "Tasks",
+            "newName": "Unit 1, Day 2",
+            "expect": "[q](<Unit 1, Day 2/Quiz 1.md>)",
+            "why": "Plain even where the Markdown rule would escape: measured, `<Unit 1, Day 2/Quiz.md>` gives the href `Unit%201,%20Day%202/Quiz.md`, the same as the escaped form. Pins that the Markdown rule is not applied inside brackets."
+          },
+          {
+            "given": "[q](<Tasks/Quiz 1.md>)",
+            "oldName": "Tasks",
+            "newName": "Top 10%",
+            "expect": "[q](<Top 10%/Quiz 1.md>)",
+            "why": "Plain, `%` included: measured, `<Top 10%/Quiz.md>` gives the href `Top%2010%25/Quiz.md`, the same as the escaped form."
+          },
+          {
+            "given": "[q](<All%20Tasks/Quiz 1.md>)",
+            "oldName": "All Tasks",
+            "newName": "Tests and Quizzes",
+            "expect": "[q](<Tests%20and%20Quizzes/Quiz 1.md>)",
+            "why": "A segment that ARRIVED percent-encoded goes back percent-encoded, in this style as in the others; the file name's plain space is not the folder's and is left as it is."
+          },
+          {
+            "given": "[q](<Tasks/Quiz 1.md>)",
+            "oldName": "Tasks",
+            "newName": "Unit 1 > Review",
+            "expect": "[q](<Unit%201%20%3E%20Review/Quiz 1.md>)",
+            "why": "The one character set that forces escaping inside brackets. Measured, `<Unit 1 > Review/Quiz 1.md>` is not a link at all (literal text); `%3E` is outside the reserved set `decodeURI` keeps, so the encoded form gives back `Unit 1 > Review`."
+          },
+          {
+            "given": "[h](<https://example.com/Tasks/handout.pdf>)",
+            "oldName": "Tasks",
+            "newName": "All Tasks",
+            "expect": "[h](<https://example.com/Tasks/handout.pdf>)",
+            "why": "A GUARD: a web address inside brackets is refused like any other."
+          },
+          {
+            "given": "[q](<Units/Tasks.md>)",
+            "oldName": "Tasks",
+            "newName": "All Tasks",
+            "expect": "[q](<Units/Tasks.md>)",
+            "why": "A GUARD: the last segment is the page, never a folder candidate."
+          },
+          {
+            "given": "[q](<Units/Tasks/Quiz1.md)",
+            "oldName": "Tasks",
+            "newName": "All Tasks",
+            "expect": "[q](<Units/Tasks/Quiz1.md)",
+            "why": "Not a link — no closing `>`, so every Markdown reader shows it as literal text (measured) — and plain text is never rewritten. The old reading wrote `<Units/All%20Tasks/…` into it. Pins that the plain pattern refuses a destination that opens with `<`: one link, one reader."
+          },
+          {
+            "given": "[q](<Tasks/Quiz 1.md>) and [r](Tasks/Quiz%202.md)",
+            "oldName": "Tasks",
+            "newName": "All Tasks",
+            "expect": "[q](<All Tasks/Quiz 1.md>) and [r](All%20Tasks/Quiz%202.md)",
+            "why": "Both Markdown forms on one line: the spelling is decided per LINK, not per page."
           }
         ]
       },
