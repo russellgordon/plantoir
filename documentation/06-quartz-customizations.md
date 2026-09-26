@@ -682,18 +682,37 @@ The passes run wikilink, then angle-bracketed, then plain.
 inside the brackets (`<a\>b.md>`) is not decoded: the match stops at the `\>`,
 so a folder segment before it is still rewritten correctly, but a folder whose
 OLD name contains `<` or `>` written that way is not recognised — rare of rare,
-since Windows refuses those characters in names outright. And an unterminated
-`](<…` followed later on the same line by a stray `>` is read as a link, since
-the pattern does not check for the `)` after the `>`. Obsidian's reading of the
+since Windows refuses those characters in names outright. And the pattern does
+not check what FOLLOWS the `>`, so two shapes that are not links (measured:
+literal text to remark) are read as one — a `>` inside the target,
+`[q](<Tasks/a>b.md>)`, and an unterminated `](<…` followed later on the same
+line by a stray `>`. The harm is a rewrite of text that already names the
+folder; a tighter lookahead was considered and not taken. A `#` in a NEW name
+is not handled here any more than in the rest of this rule: `<Unit #2/…>`
+goes in plain and becomes a heading fragment on the site, where the escaped
+`%23` would 404 anyway (see the `#` bullet under "What was rejected"), while
+Obsidian — unmeasured — would read the two differently. Obsidian's reading of the
 form was **not measured**; its help documents `[text](<Note with spaces.md>)`
 as supported, and the site half above is the one that was.
 
 **Contract.** Twelve cases in `shared-rules.json` →
 `specialNames.renameFolder.linkRewriting.cases` (13 → 25), with the
 measurements in `insideAngleBrackets`. Both suites already deserialise that
-list, so nothing had to be wired. **Windows fails ten of the twelve on
-arrival** (all but the web-address and page-name guards), and that is the
-request: `FolderPathRewriter.cs` owes `(?!<)` on `MarkdownLink`, the angle
+list, so nothing had to be wired. **Windows fails eleven of the twelve on
+arrival** (all but the page-name guard), and that is the request.
+**The web-address guard is red there because it is a LIVE Windows defect
+today, not only a missing feature**: `FolderPathRewriter.cs`'s `Scheme`
+test is anchored at the start of the target, and the plain pattern reads
+`<https://example.com/Tasks/handout.pdf>` with its `<`, so the scheme is not
+seen and a rename of `Tasks` repoints the link at a page on somebody else's
+site — the 2026-09-01 bug again. The mac never had it: its test is "a colon
+before the first slash", which `<https:` still passes. (The plan's "identical
+pattern, so identical results" missed that the two apps' out-of-course tests
+differ; found by the implementation review, via a line-for-line Python port of
+the .cs, not under `dotnet`.) The mirrored fix clears it for free — the angle
+target is then `https://…` and the anchored scheme matches — but a PARTIAL
+port that adds `(?!<)` and forgets the angle pass turns that case green only by
+accident, because the link is then read by nobody. `FolderPathRewriter.cs` owes `(?!<)` on `MarkdownLink`, the angle
 pattern with its `>` as a lookahead, and a third branch in `Spelled`. The trap
 that passes review is keeping the Markdown rule inside brackets: it writes
 `<All%20Tasks/…>`, which resolves, and it fails five of the cases.
