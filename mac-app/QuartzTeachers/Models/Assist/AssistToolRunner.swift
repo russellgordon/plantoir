@@ -168,7 +168,10 @@ final class AssistToolRunner {
     /// Structural rather than one call at the top of `run`: there are six
     /// public ways in, and a seventh added later would be a stale reader
     /// nobody noticed. Each reading costs one directory listing and one small
-    /// JSON file per course (measured in docs 10), at human pace.
+    /// JSON file per course (measured in docs 10), at human pace. A runner is
+    /// never built over a window's model — `init` asserts it — because the
+    /// reading leaves a window's copy alone, and such a runner would miss
+    /// every write made outside this process.
     private var coursesAsSavedNow: [Course] {
         workspace.readCoursesAsSavedNow()
         return workspace.courses
@@ -202,6 +205,13 @@ final class AssistToolRunner {
          launchControl: LaunchControlRunning = LaunchControl(),
          openMainWindow: (@MainActor () -> Void)? = nil,
          surface: Surface = .local) {
+        // Never over a window's model (#322 review, L3): the per-call read
+        // refuses one, to keep its unsaved edits, so a runner built over it
+        // would quietly miss every write made outside this process.
+        assert(
+            !WorkspaceModel.isShownInAWindow(workspace),
+            "AssistToolRunner is built over its own WorkspaceModel, never a window's"
+        )
         self.surface = surface
         self.workspace = workspace
         self.siteWork = siteWork ?? AssistToolchainWork(workspace: workspace)

@@ -4483,7 +4483,7 @@ runs at 06:30 with nobody watching.
   and replacing them would throw those away. The guard makes that impossible
   rather than unlikely (`AssistSettingsFreshnessTests.testReadingAtTheCallNeverTouchesAWindowsCopy`).
 - `AssistToolRunner.coursesAsSavedNow` reads it, and is the ONLY way the runner
-  reads the course list: all twelve reads go through it (`locate`,
+  reads the course list: all eleven reads go through it (`locate`,
   `course(withCode:)`, the card's `explain`, `list_courses`, the
   reference-course gates, the briefing lines…). Structural rather than one
   call at the top of `run`, because there are six public ways in and a seventh
@@ -4551,6 +4551,12 @@ additional destination's refusal.
 - **Settings saved between the card and the Approve press**: the act reads
   fresh, so it may differ from what the card said. The `schedule_deploy` result
   names the destination it used, so the teacher sees it.
+- **The local assistant's deploy through an OPEN section window** runs
+  `window.deploy()`, which uses that window's copy of the course — including
+  Course Settings edits not yet saved — while the card, which reads the saved
+  file, may name the saved destination. The schedule sheet has the same shape.
+  Pre-existing (before #322 the card read an even older copy):
+  [issue #335](https://github.com/russellgordon/plantoir/issues/335).
 - **A config mid-write or malformed at the call** drops that course for that
   call ("no such course") — fail-closed, and what `reloadCourses` and Windows
   do too.
@@ -4558,6 +4564,10 @@ additional destination's refusal.
   session starts, and used only for the window's own chrome (suggestions, the
   dates offer). Stale after a mid-conversation change of the class noun;
   display-only.
+- **The refusal's first sentence on the trail** is cut at the first ". ". A
+  time written with a full stop and a space ("6:30 p. m.") would be cut early;
+  no stock format measured on this Mac (en_CA, en_AU, es_ES, en_GB, fr_CA)
+  writes one, and the line carries the moment anyway. Left as it is.
 
 ## The other doors: handing a course to an assistant the teacher already has
 

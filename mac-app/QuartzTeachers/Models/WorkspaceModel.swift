@@ -1432,8 +1432,6 @@ class WorkspaceModel {
         return refreshed.sorted()
     }
 
-    /// Scans `<workspace>/courses/` for course folders containing a
-    /// `course_config.json` and loads each one.
     /// Which folders in `courses/` are courses, each read from its
     /// `course_config.json` as it is on disk now, sorted by code.
     ///
@@ -1522,6 +1520,8 @@ class WorkspaceModel {
         }
     }
 
+    /// Scans `<workspace>/courses/` for course folders containing a
+    /// `course_config.json` and loads each one.
     func reloadCourses() {
         courses = []
         archivedItems = []
