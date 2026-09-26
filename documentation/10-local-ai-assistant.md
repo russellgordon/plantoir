@@ -1994,7 +1994,7 @@ read from `contentIndex.json` and the rendered article):
 
 **The rule, in short** — written out to be implemented from in
 `contracts/shared-rules.json` → `readingALink.whatIsCode`, with its limits in
-`whatIsCodeLimits` and 27 cases in `readingALink.cases`. The page is read a
+`whatIsCodeLimits` and 29 cases in `readingALink.cases`. The page is read a
 line at a time; a line's BODY has any `>` markers taken off, and its DEPTH is
 how many there were. A fence opens on a body starting with three or more
 backticks or tildes (backticks with another backtick later on the line are
@@ -2014,9 +2014,10 @@ match that starts in code is not merely dropped: the search starts again where
 that code ENDS.** The link pattern crosses a `[`, so in "Type `` `[[` `` to
 start one, then [[Real Page]]" a match from the example's brackets runs on to
 "Real Page" and swallows the real link; dropping that match would drop the
-link with it. That case was found while implementing, with five more. Two —
-a bare `~~~` line inside a backtick fence, and a TILDE fence inside a callout —
-because two mutations of the rule passed the first 21: the traceback case
+link with it. That case was found while implementing, with seven more. Four —
+a bare `~~~` line inside a backtick fence, a TILDE fence inside a callout, a
+heading, and a callout line straight after a paragraph — because four
+mutations of the rule passed the cases before them; for the first two: the traceback case
 carries text after its tildes, and the backtick callout's fence lines happen to
 pair up as an inline span. Three came from the implementation review, each a
 place where the first version DROPPED a real link Quartz draws: a fence left
@@ -2025,7 +2026,7 @@ callout — the fence belongs to its opener's quote DEPTH, and only a line at
 that depth closes it); a `> ```` line inside an unquoted fence closed it; and a
 backtick in frontmatter paired with one in the body (a rule line — `---`,
 `***`, `___`, `===` — now breaks a paragraph, and a heading is a paragraph on
-its own). None of the six was built in Quartz; all 37 cases were checked
+its own). None of the eight was built in Quartz; all 39 cases were checked
 against its parser stack (remark-parse 11 + remark-gfm 4 + remark-frontmatter,
 with Quartz's own link pattern run over text nodes), which agrees with every
 one. The same stack judged 20,000 random texts built from backticks, tildes,

@@ -251,7 +251,7 @@ final class SharedRulesContractTests: XCTestCase {
         XCTAssertNotNil(section["whenRewritten"] as? String)
         XCTAssertNotNil(section["why"] as? String)
         let cases: [[String: Any]] = try XCTUnwrap(section["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 37, "readingALink lost cases")
+        XCTAssertGreaterThanOrEqual(cases.count, 39, "readingALink lost cases")
         // #313: what code is, written to be implemented from.
         XCTAssertNotNil(section["codeIsNeverALink"] as? String)
         XCTAssertNotNil(section["whatIsCode"] as? [String])

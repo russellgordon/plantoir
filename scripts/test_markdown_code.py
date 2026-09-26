@@ -32,7 +32,7 @@ def link_cases():
         toolchain_paths.CONTRACTS_DIR = repo_contracts
     contracts.reset_cache()
     cases = contracts.load("shared-rules")["readingALink"]["cases"]
-    assert len(cases) >= 37, "readingALink lost cases"
+    assert len(cases) >= 39, "readingALink lost cases"
     return cases
 
 
@@ -145,7 +145,7 @@ class CoverageTests(unittest.TestCase):
         self.assertEqual(self.covered(body), {"A1.1": 0, "A1.2": 0, "B1.1": 1})
 
     def test_an_example_in_a_block_does_not_swallow_the_real_link_after_it(self):
-        body = "%%curriculum-start%%\nType `[[` then ![[B1.1]]\n%%curriculum-end%%\n"
+        body = "%%curriculum-start%%\nType `[[` then [[B1.1]]\n%%curriculum-end%%\n"
         self.assertEqual(self.covered(body), {"A1.1": 0, "A1.2": 0, "B1.1": 1})
 
     def test_a_real_embed_still_counts(self):
