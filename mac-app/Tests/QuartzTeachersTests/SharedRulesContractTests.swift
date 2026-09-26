@@ -236,6 +236,56 @@ final class SharedRulesContractTests: XCTestCase {
         XCTAssertTrue(all.contains("curriculum"))
     }
 
+    /// `readingALink.cases` (#294): what a wikilink NAMES, including the
+    /// escaped pipe Obsidian writes for an alias inside a table,
+    /// `[[Ohm's Law\|Ohm]]`. Walked through BOTH mac readers — the one the
+    /// links answer uses (names as written) and the one publishing, dating,
+    /// the site check and copying use (lowercased, last path component) —
+    /// because both read `WikiLinkRewriter.pattern`, and the second is the one
+    /// the issue was about.
+    @MainActor
+    func testEveryLinkShapeReadsAsTheContractSays() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("readingALink")
+        XCTAssertNotNil(section["rule"] as? String)
+        XCTAssertNotNil(section["whenRewritten"] as? String)
+        XCTAssertNotNil(section["why"] as? String)
+        let cases: [[String: Any]] = try XCTUnwrap(section["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 10, "readingALink lost cases")
+
+        for oneCase in cases {
+            let name: String = try XCTUnwrap(oneCase["name"] as? String)
+            let text: String = try XCTUnwrap(oneCase["text"] as? String, name)
+            let expected: [String] = try XCTUnwrap(oneCase["expect"] as? [String], name)
+
+            XCTAssertEqual(
+                AssistSectionGraph.linksAsWritten(in: text), expected,
+                "\(name): the names as written"
+            )
+
+            var expectedTargets: [String] = []
+            for written in expected {
+                expectedTargets.append(AssistSectionGraph.normalized(written))
+            }
+            XCTAssertEqual(
+                AssistSectionGraph.linkTargets(in: text), expectedTargets,
+                "\(name): the names publishing follows"
+            )
+        }
+    }
+
+    /// `followingLinks.publishing.casesNote` says what a case's `body` means,
+    /// so the other app can build the same harness without reading this one.
+    @MainActor
+    func testThePublishingCasesSayWhatABodyIs() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("followingLinks")
+        let publishing: [String: Any] = try XCTUnwrap(section["publishing"] as? [String: Any])
+        let note: String = try XCTUnwrap(publishing["casesNote"] as? String)
+        XCTAssertTrue(note.contains("`body`"))
+        XCTAssertTrue(note.contains("never both"))
+        let cases: [[String: Any]] = try XCTUnwrap(publishing["cases"] as? [[String: Any]])
+        XCTAssertFalse(cases.isEmpty)
+    }
+
     // MARK: - Asking before the assistant changes anything
 
     @MainActor

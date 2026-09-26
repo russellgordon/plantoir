@@ -1279,7 +1279,19 @@ nonisolated struct CoursePageCopySource: Sendable {
                 }) else {
                     break
                 }
-                let target: String = String(rest[rest.startIndex..<end])
+                var target: String = String(rest[rest.startIndex..<end])
+                // The backslash of an alias pipe escaped inside a table,
+                // `![[Note\|x]]`, is not part of the name — the rule
+                // `WikiLinkRewriter.pattern` follows for every other reader
+                // (#294). This scanner stays line-based and hand-rolled on
+                // purpose, so it strips by hand — EVERY trailing backslash,
+                // where the pattern drops only the one before the pipe: for
+                // the pathological `![[a\\|x]]` this reads `a` and the
+                // pattern `a\`. Nothing ships in that shape; parity was not
+                // worth a second rule.
+                while target.hasSuffix("\\") {
+                    target = String(target.dropLast())
+                }
                 found.append(AssistSectionGraph.normalized(target))
                 rest = rest[end...]
             }
