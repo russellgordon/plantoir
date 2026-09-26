@@ -609,10 +609,113 @@ not what triggers it.
   more names is a product decision nobody has made. For `#` neither spelling
   resolves in Quartz anyway (`%23` survives `decodeURI` and slugs through
   `-percent`); for `?` see the correction above.
-- **Angle-bracket destinations, `[q](<Tasks/Quiz 1.md>)`.** Neither app matches
-  them — the segment reads as `<Tasks` — and neither app has ever matched them.
-  Pre-existing on both sides and out of this piece's scope; noted here so it is
-  not mistaken for a regression.
+- **Angle-bracket destinations, `[q](<Tasks/Quiz 1.md>)`**, were left out of
+  that piece as pre-existing on both sides. They are handled on the mac since
+  #97 (2026-09-26) — see "Inside angle brackets: the third spelling (#97)"
+  below — and are owed on Windows.
+
+### Inside angle brackets: the third spelling (#97)
+
+CommonMark lets a Markdown destination sit inside angle brackets,
+`[q](<Tasks/Quiz 1.md>)`, which is how a space goes into a link without `%20`.
+Obsidian's own links never use this form, so it appears only where a teacher
+typed it — but where it does, a folder rename missed it. The plain pattern
+`(\]\()([^)\s]+)` reads up to the first space, so (measured with
+`NSRegularExpression` against the pre-fix pattern; Windows has the identical
+one in `FolderPathRewriter.cs`):
+
+| Link | Target read before #97 | What a rename of `Tasks` did |
+|---|---|---|
+| `[q](<Tasks/Quiz 1.md>)` | `<Tasks/Quiz` | nothing: the first segment is `<Tasks` — **the defect** |
+| `[q](<Tasks/Quiz1.md>)` | `<Tasks/Quiz1.md>` | nothing, for the same reason |
+| `[q](<Units/Tasks/Quiz1.md>)` | `<Units/Tasks/Quiz1.md>` | rewritten **by luck**, percent-encoded |
+| `[q](<Units/Tasks/Quiz1.md)` (no `>`: not a link) | `<Units/Tasks/Quiz1.md` | **rewritten**, although it is plain text |
+
+**What the site does with the form (measured).** Quartz v4.5.0 has no
+angle-link code of its own: `remark-parse` reads the destination (CommonMark),
+`remark-rehype` makes the `href`, and from there it is the path every Markdown
+link takes (`links.ts`). Measured on 2026-09-26 with `remark-parse@11`,
+`remark-rehype@11` and `rehype-stringify@10` from npm — the majors in Quartz's
+`package.json`, not the image's exact lockfile — under node 22:
+
+| Written | `href` produced |
+|---|---|
+| `[q](<All Tasks/Quiz 1.md>)` | `All%20Tasks/Quiz%201.md` |
+| `[q](<Tasks & Quizzes/Quiz.md>)` | `Tasks%20&%20Quizzes/Quiz.md` — the same as the escaped form |
+| `[q](<Unit 1, Day 2/Quiz.md>)` | `Unit%201,%20Day%202/Quiz.md` — the same |
+| `[q](<Top 10%/Quiz.md>)` | `Top%2010%25/Quiz.md` — the same |
+| `[q](<Work(new)/Quiz.md>)` | `Work(new)/Quiz.md` |
+| `[q](<All%20Tasks/Quiz 1.md>)` | `All%20Tasks/Quiz%201.md` |
+| `[q](<Tasks/Quiz 1.md> "t")` | `Tasks/Quiz%201.md`, with `title="t"` |
+| `[q](<Unit 1 > Review/Quiz 1.md>)` | **not a link** — literal text |
+| `[q](<Unit%201%20%3E%20Review/Quiz 1.md>)` | `Unit%201%20%3E%20Review/…`; `decodeURI` gives back `Unit 1 > Review` |
+| `[q](<Units/Tasks/Quiz1.md)` | **not a link** — literal text |
+
+So the third rule is: **inside angle brackets, write the new name PLAIN**,
+unless it contains `<`, `>` or a line break — the only characters that end the
+form — in which case it is percent-encoded with the existing encoder (`%3C` and
+`%3E` are outside the reserved set `decodeURI` keeps, so they come back as the
+real characters). The parser normalises the plain spelling to exactly the
+`href` the Markdown rule's escaping would have produced, and plain keeps the
+shape the teacher chose — the only reason to write the brackets is to avoid
+`%20`. The older second reason to escape still holds: a segment that ARRIVED
+percent-encoded goes back percent-encoded.
+
+**How the mac does it** (`FolderPathRewriter.swift`): a third `LinkStyle`,
+`angleBracketedMarkdown`, with the pattern `(\]\(<)([^<>\r\n]+)(?=>)`. Two
+details in it are load-bearing:
+
+- **The closing `>` is a lookahead.** The rewriter writes the opening group
+  and the rewritten target, then copies on from the END of the match; a
+  consumed `>` would be deleted from every rewritten link, leaving
+  `[q](<All Tasks/Quiz 1.md)` — which looks right in a diff line and is not a
+  link. (Must-fail M6 below.)
+- **The plain pattern gained `(?!<)`**, `(\]\()(?!<)([^)\s]+)`, so a
+  destination that opens with `<` is read by exactly ONE pattern. Without it
+  the plain reader still rewrites a deeper segment (percent-encoded, which
+  resolves and so passes by eye), counts the link twice, and rewrites the
+  unterminated `](<…` that is not a link.
+
+The passes run wikilink, then angle-bracketed, then plain.
+
+**Known limits, deliberately not handled.** A CommonMark backslash escape
+inside the brackets (`<a\>b.md>`) is not decoded: the match stops at the `\>`,
+so a folder segment before it is still rewritten correctly, but a folder whose
+OLD name contains `<` or `>` written that way is not recognised — rare of rare,
+since Windows refuses those characters in names outright. And an unterminated
+`](<…` followed later on the same line by a stray `>` is read as a link, since
+the pattern does not check for the `)` after the `>`. Obsidian's reading of the
+form was **not measured**; its help documents `[text](<Note with spaces.md>)`
+as supported, and the site half above is the one that was.
+
+**Contract.** Twelve cases in `shared-rules.json` →
+`specialNames.renameFolder.linkRewriting.cases` (13 → 25), with the
+measurements in `insideAngleBrackets`. Both suites already deserialise that
+list, so nothing had to be wired. **Windows fails ten of the twelve on
+arrival** (all but the web-address and page-name guards), and that is the
+request: `FolderPathRewriter.cs` owes `(?!<)` on `MarkdownLink`, the angle
+pattern with its `>` as a lookahead, and a third branch in `Spelled`. The trap
+that passes review is keeping the Markdown rule inside brackets: it writes
+`<All%20Tasks/…>`, which resolves, and it fails five of the cases.
+
+**Must-fails run on the mac** (each applied, seen red, reverted; counts are
+contract cases): dropping the angle pass — 9 red; dropping `(?!<)` — the
+unterminated case red and the link counted twice; spelling the angle style by
+the Markdown rule — 6 red; never escaping inside brackets — the `>` case red;
+dropping the arrived-encoded branch for this style — the `%20` case red;
+consuming the `>` — 9 red, every rewritten link losing its `>`.
+
+**Rejected:** applying the Markdown escaping inside the brackets (resolves, but
+rewrites the teacher's spelling, and passes every guard); dropping the brackets
+and converting the link (edits text beyond the folder segment); escaping `>` as
+`\>` (remark accepts it, but it is a second escaping mechanism with Obsidian's
+reading unmeasured); one pattern with an optional `<` (the `>` would have to be
+consumed or re-appended, and the spelling has to know the style anyway).
+
+**Not fixed here: `PageReferences` has the same blindness.** Its
+`markdownExpression`, `\]\(([^)\s]+)`, reads `<Tasks/Quiz` too. It is not a
+rename and has no contract case, so it is its own piece:
+[#325](https://github.com/russellgordon/plantoir/issues/325).
 
 ---
 
