@@ -133,8 +133,8 @@ still holds, with the names it finally took:
   updating the feed ships an update nobody is offered. `website/update_feed.py`
   builds and signs it at the cut, `website/build.py` copies it byte-for-byte (a
   re-serialised feed breaks its signature) and checks it before and after a
-  deploy — `RELEASING.md` → "The update feed (macOS)". Teachers on v1.3.2 or
-  earlier have no updater, and install the first release that carries one by hand.
+  deploy — `RELEASING.md` → "The update feed (macOS)". Teachers on v1.3.1 or
+  earlier — the last release without an updater — have no updater, and install the first release that carries one by hand.
 
 The rules a teacher is promised are `contracts/shared-rules.json` →
 `appUpdates`; the mac's mechanism, what was measured and what was rejected are
