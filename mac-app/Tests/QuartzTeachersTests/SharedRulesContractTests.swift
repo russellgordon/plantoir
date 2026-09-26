@@ -1012,7 +1012,8 @@ final class SharedRulesContractTests: XCTestCase {
         XCTAssertEqual(
             WizardWording.skeletonToggleLabelTemplate,
             section["skeletonToggleLabel"] as? String,
-            "The skeleton toggle's own label. {subject} is the family's label, lowercased."
+            "The skeleton toggle's own label. {article} and {subject} are filled as "
+            + "wizard.skeletonToggleLabelSubject says (#336)."
         )
         XCTAssertEqual(
             WizardWording.skeletonToggleLabelForAGeneralSkeleton,
@@ -1066,6 +1067,69 @@ final class SharedRulesContractTests: XCTestCase {
             "Start from a drama skeleton",
             "Every other family reads its own subject back, lowercased."
         )
+    }
+
+    /// The toggle label for the families it used to get wrong (#336), and
+    /// four it already got right, each resolved through the real catalog.
+    ///
+    /// The lists the rule is built from are pinned too, so a word added on
+    /// one side is a red line on this one rather than a label that differs
+    /// between the two apps for one family nobody tried.
+    func testTheSkeletonToggleLabelReadsEachFamilyAsTheContractSays() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("wizard")
+        let rule: [String: Any] = try XCTUnwrap(section["skeletonToggleLabelSubject"] as? [String: Any])
+        XCTAssertEqual(
+            WizardWording.skeletonToggleProperNouns,
+            rule["properNouns"] as? [String],
+            "The words that keep their capitals."
+        )
+        let article: [String: Any] = try XCTUnwrap(rule["article"] as? [String: Any])
+        XCTAssertEqual(
+            WizardWording.consonantSoundVowelStarts,
+            article["consonantSoundVowelStarts"] as? [String]
+        )
+        XCTAssertEqual(
+            WizardWording.vowelSoundConsonantStarts,
+            article["vowelSoundConsonantStarts"] as? [String]
+        )
+
+        let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 16, "Twelve families #336 fixed, four controls.")
+        for testCase in cases {
+            let familyName: String = try XCTUnwrap(testCase["family"] as? String)
+            let expected: String = try XCTUnwrap(testCase["expect"] as? String)
+            let family: SkeletonCatalog.Family = try XCTUnwrap(
+                SkeletonCatalog.family(named: familyName),
+                "No skeleton family called \(familyName)"
+            )
+            XCTAssertEqual(
+                WizardWording.skeletonToggleLabel(forFamilyNamed: family.name, label: family.label),
+                expected,
+                "The toggle label for \(familyName) (label \"\(family.label)\")."
+            )
+        }
+    }
+
+    /// The article rule on its own, for the words no family starts with
+    /// today — the #328 review's point that a first-letter check says
+    /// "an unit".
+    func testTheArticleFollowsTheSoundNotTheLetter() {
+        let expectations: [(word: String, article: String)] = [
+            (word: "unit", article: "a"),
+            (word: "European", article: "a"),
+            (word: "one-page", article: "a"),
+            (word: "hour", article: "an"),
+            (word: "urban", article: "an"),
+            (word: "English", article: "an"),
+            (word: "history", article: "a"),
+        ]
+        for expectation in expectations {
+            XCTAssertEqual(
+                WizardWording.article(for: expectation.word),
+                expectation.article,
+                "The article in front of \(expectation.word)."
+            )
+        }
     }
 
     // MARK: - The skeleton toggle, in both directions
