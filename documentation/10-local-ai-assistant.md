@@ -1869,8 +1869,10 @@ escaping the pipe so the cell does not end there, and every reader took the
 name up to the pipe — `Ohm's Law\` — which matched no page and was silently
 dropped as "a link to something outside this section". The same form turns up
 in ordinary sentences as well, and Quartz v4.5.0, which draws the site, reads
-it as a link wherever it is (`ofm.ts`'s `wikilinkRegex`: the name excludes a
-backslash, the alias is `\\?\|`).
+it as a link wherever it is: `quartz/plugins/transformers/ofm.ts` lines
+117–119 at the v4.5.0 tag the image clones (read in the image, `/opt/quartz`),
+`/!?\[\[([^\[\]\|\#\\]+)?(#+[^\[\]\|\#\\]+)?(\\?\|[^\[\]\#]+)?\]\]/g` — the name
+excludes a backslash and the alias is `\\?\|`.
 
 **The rule** (`contracts/shared-rules.json` → `readingALink`, ten cases both
 apps and the build read): the name runs from `[[` up to the first `]`, `|` or
@@ -1904,13 +1906,20 @@ first. An eleventh reader is deliberately out of scope:
 `![[…]]` on `|` and `#`, and a line cannot start with `![[` inside a table
 row; 0 such lines ship.
 
-**Measured** over the 12,128 pages Plantoir ships (39 payloads and 50
-skeletons), with `NSRegularExpression`: the old and new patterns match the
-**same 38,659 links at the same offsets**, and **229** names read differently —
-every one a name that used to end in the backslash of a `\|`: 142 in tables,
-87 in sentences and in code examples. In the payloads, fixing it adds 46
-page-to-page links that resolve within a course, and **104 of 3,258** class
-pages reach **137** more pages when published. 0 of the 229 point at a class
+**Measured** over the 12,128 pages of the 39 payloads and 50 skeletons, with
+`NSRegularExpression`: the old and new patterns match the **same 38,659 links
+at the same offsets**, and **229** names read differently — every one a name
+that used to end in the backslash of a `\|`: 142 in tables, 87 in sentences
+and in code examples. Over ALL of `support/` (12,490 pages, the example course
+included) it is 39,570 links and **230**, the extra one a code example on
+EXC2O's Scavenger Hunt page. Read line by line (as `PageReferences` does),
+one more difference appears: the prose line "Type two open square brackets:
+`` `[[` ``", 90 times, used to match with the name "`" and now does not match at
+all — never a file, so harmless. **Estimated, not measured** (an emulation of
+the section graph that approximates `ClassPages` by a `Word N, Word N` name):
+in the payloads, fixing it adds about 46 page-to-page links that resolve within
+a course, and about **104 of 3,258** class pages reach about **137** more pages
+when published. 0 of the 229 point at a class
 page, so the insertion consequence is latent in shipped content and bites
 teacher-written tables.
 
