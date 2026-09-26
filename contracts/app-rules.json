@@ -668,6 +668,784 @@
     ],
     "note" : "Written by `Plantoir --write-contracts` from the app's own types and overwritten: credentialRequests, milestones. The rest is hand-written expectation and is preserved."
   },
+  "helperBootstrap" : {
+    "appliesOn" : [
+      "mac"
+    ],
+    "appliesOnWhy" : "PERMANENT: Windows builds natively. PlantoirSetup.exe carries its whole runtime and nothing is downloaded for building, so there are no helper programs to install and no virtual machine to create.",
+    "firstStartCases" : [
+      {
+        "bundle" : "present",
+        "expect" : {
+          "marker" : "seeded {seconds}",
+          "printed" : [
+            "firstStartSeeded"
+          ],
+          "starts" : [
+            [
+              "--cpu",
+              "{cpus}",
+              "--memory",
+              "{memory}",
+              "--vm-type",
+              "vz",
+              "--disk-image",
+              "{bundle}/vm/{image}"
+            ]
+          ]
+        },
+        "name" : "The first start, from the app's copy of the starting disk",
+        "seed" : "accepted",
+        "vmExists" : false,
+        "why" : "About half a minute, measured 22 to 27 s on an M4 Pro, and nothing downloaded."
+      },
+      {
+        "bundle" : "absent",
+        "expect" : {
+          "marker" : "downloaded {seconds}",
+          "printed" : [
+            "firstStartDownloading"
+          ],
+          "starts" : [
+            [
+              "--cpu",
+              "{cpus}",
+              "--memory",
+              "{memory}",
+              "--vm-type",
+              "vz"
+            ]
+          ]
+        },
+        "name" : "The first start with no copy in the app",
+        "seed" : "accepted",
+        "vmExists" : false
+      },
+      {
+        "bundle" : "otherArch",
+        "expect" : {
+          "marker" : "downloaded {seconds}",
+          "printed" : [
+            "firstStartDownloading"
+          ],
+          "starts" : [
+            [
+              "--cpu",
+              "{cpus}",
+              "--memory",
+              "{memory}",
+              "--vm-type",
+              "vz"
+            ]
+          ]
+        },
+        "name" : "The first start on an app carrying another kind of Mac's copy",
+        "seed" : "accepted",
+        "vmExists" : false
+      },
+      {
+        "bundle" : "present",
+        "expect" : {
+          "marker" : "seed-refused-then-downloaded {seconds}",
+          "printed" : [
+            "firstStartSeeded",
+            "firstStartDownloading"
+          ],
+          "starts" : [
+            [
+              "--cpu",
+              "{cpus}",
+              "--memory",
+              "{memory}",
+              "--vm-type",
+              "vz",
+              "--disk-image",
+              "{bundle}/vm/{image}"
+            ],
+            [
+              "--cpu",
+              "{cpus}",
+              "--memory",
+              "{memory}",
+              "--vm-type",
+              "vz"
+            ]
+          ]
+        },
+        "name" : "The app's starting disk is refused",
+        "seed" : "refused",
+        "vmExists" : false,
+        "why" : "Colima checks the file's SHA-512 itself and refuses a damaged one in about a second, leaving its folder behind; a plain start after that heals, measured."
+      },
+      {
+        "bundle" : "present",
+        "expect" : {
+          "marker" : "seed-failed-then-downloaded {seconds}",
+          "printed" : [
+            "firstStartSeeded",
+            "firstStartDownloading"
+          ],
+          "starts" : [
+            [
+              "--cpu",
+              "{cpus}",
+              "--memory",
+              "{memory}",
+              "--vm-type",
+              "vz",
+              "--disk-image",
+              "{bundle}/vm/{image}"
+            ],
+            [
+              "--cpu",
+              "{cpus}",
+              "--memory",
+              "{memory}",
+              "--vm-type",
+              "vz"
+            ]
+          ]
+        },
+        "name" : "The start from the app's copy fails for another reason",
+        "seed" : "fails",
+        "vmExists" : false,
+        "why" : "Any failure is retried with the same size, whether or not it left a folder behind; without the retry a failure that left nothing fell to a restart with no size at all."
+      },
+      {
+        "bundle" : "present",
+        "expect" : {
+          "marker" : null,
+          "printed" : [
+
+          ],
+          "starts" : [
+            [
+
+            ]
+          ]
+        },
+        "name" : "The website builder already exists",
+        "seed" : "accepted",
+        "vmExists" : true,
+        "why" : "Starting an existing builder never uses the starting disk and writes no line."
+      }
+    ],
+    "firstStartCasesNote" : "expect.starts lists the argument lists `colima start` is called with, in order: {cpus} and {memory} are the launcher's own sizing, {bundle} the app's helpers folder, {image} VM_IMAGE_NAME. seed is what Colima does with --disk-image: accepted, refused (checksum mismatch, leaving its folder behind) or fails (any other failure). marker is the PLANTOIR_BUILDER_CREATED line after the prefix, {seconds} a whole number.",
+    "installCases" : [
+      {
+        "arch" : "arm64",
+        "before" : {
+          "buildx" : "missing",
+          "colima" : "missing",
+          "docker" : "missing",
+          "limactl" : "missing",
+          "stamp" : "none"
+        },
+        "bundle" : "present",
+        "dockerAnswers" : false,
+        "downloadsServe" : "pinned",
+        "expect" : {
+          "downloads" : 0,
+          "exit" : 0,
+          "markers" : [
+            "bundled missing colima,limactl,docker {pins}",
+            "bundled missing buildx {pins}"
+          ],
+          "printed" : [
+            "preparingHelpers"
+          ],
+          "stamp" : "bundled",
+          "tools" : {
+            "buildx" : "bundled",
+            "colima" : "bundled",
+            "docker" : "bundled",
+            "limactl" : "bundled"
+          }
+        },
+        "name" : "A new Mac, with the app's copy (downloaded through a browser, so marked)",
+        "quarantined" : true,
+        "why" : "The case #312 exists for: nothing downloaded before the website builder exists. The copies lose the browser's quarantine mark; the app's own files keep theirs."
+      },
+      {
+        "arch" : "arm64",
+        "before" : {
+          "buildx" : "missing",
+          "colima" : "missing",
+          "docker" : "missing",
+          "limactl" : "missing",
+          "stamp" : "none"
+        },
+        "bundle" : "absent",
+        "dockerAnswers" : false,
+        "downloadsServe" : "pinned",
+        "expect" : {
+          "downloads" : 4,
+          "exit" : 0,
+          "markers" : [
+            "downloaded missing colima,limactl,docker {pins} none-in-app",
+            "downloaded missing buildx {pins} none-in-app"
+          ],
+          "printed" : [
+            "downloadingHelper"
+          ],
+          "stamp" : "downloaded",
+          "tools" : {
+            "buildx" : "downloaded",
+            "colima" : "downloaded",
+            "docker" : "downloaded",
+            "limactl" : "downloaded"
+          }
+        },
+        "name" : "A new Mac, with no copy in the app (a launcher typed at the command line)",
+        "why" : "Exactly what every launcher did before #312, now with each download checked against its pinned SHA-256. PLANTOIR_BUNDLED_HELPERS is UNSET here, which set -u must survive."
+      },
+      {
+        "arch" : "arm64",
+        "before" : {
+          "buildx" : "missing",
+          "colima" : "missing",
+          "docker" : "missing",
+          "limactl" : "missing",
+          "stamp" : "none"
+        },
+        "bundle" : "damaged",
+        "dockerAnswers" : false,
+        "downloadsServe" : "pinned",
+        "expect" : {
+          "downloads" : 3,
+          "exit" : 0,
+          "markers" : [
+            "downloaded missing colima,limactl,docker {pins} bundle-check-failed",
+            "bundled missing buildx {pins}"
+          ],
+          "printed" : [
+            "downloadingHelper"
+          ],
+          "stamp" : "downloaded",
+          "tools" : {
+            "buildx" : "bundled",
+            "colima" : "downloaded",
+            "docker" : "downloaded",
+            "limactl" : "downloaded"
+          }
+        },
+        "name" : "A new Mac whose app copy is damaged",
+        "why" : "The silent fallback the trail line exists to expose: the first run still works, only slower. Each program is checked on its own, so Buildx, which still matches, comes from the app."
+      },
+      {
+        "arch" : "arm64",
+        "before" : {
+          "buildx" : "missing",
+          "colima" : "missing",
+          "docker" : "missing",
+          "limactl" : "missing",
+          "stamp" : "none"
+        },
+        "bundle" : "otherArch",
+        "dockerAnswers" : false,
+        "downloadsServe" : "pinned",
+        "expect" : {
+          "downloads" : 4,
+          "exit" : 0,
+          "markers" : [
+            "downloaded missing colima,limactl,docker {pins} other-arch",
+            "downloaded missing buildx {pins} other-arch"
+          ],
+          "printed" : [
+            "downloadingHelper"
+          ],
+          "stamp" : "downloaded",
+          "tools" : {
+            "buildx" : "downloaded",
+            "colima" : "downloaded",
+            "docker" : "downloaded",
+            "limactl" : "downloaded"
+          }
+        },
+        "name" : "A new Mac whose app carries programs for another kind of Mac"
+      },
+      {
+        "arch" : "arm64",
+        "before" : {
+          "buildx" : "missing",
+          "colima" : "missing",
+          "docker" : "missing",
+          "limactl" : "missing",
+          "stamp" : "none"
+        },
+        "bundle" : "otherPins",
+        "dockerAnswers" : false,
+        "downloadsServe" : "pinned",
+        "expect" : {
+          "downloads" : 4,
+          "exit" : 0,
+          "markers" : [
+            "downloaded missing colima,limactl,docker {pins} bundle-check-failed",
+            "downloaded missing buildx {pins} bundle-check-failed"
+          ],
+          "printed" : [
+            "downloadingHelper"
+          ],
+          "stamp" : "downloaded",
+          "tools" : {
+            "buildx" : "downloaded",
+            "colima" : "downloaded",
+            "docker" : "downloaded",
+            "limactl" : "downloaded"
+          }
+        },
+        "name" : "A new Mac whose app carries other versions than this launcher pins",
+        "why" : "An app built after a pin bump but before a re-fetch carries the old programs with a MANIFEST that agrees with them; installing them would stamp old programs as current."
+      },
+      {
+        "arch" : "x86_64",
+        "before" : {
+          "buildx" : "missing",
+          "colima" : "missing",
+          "docker" : "missing",
+          "limactl" : "missing",
+          "stamp" : "none"
+        },
+        "bundle" : "present",
+        "dockerAnswers" : false,
+        "downloadsServe" : "pinned",
+        "expect" : {
+          "downloads" : 4,
+          "exit" : 0,
+          "markers" : [
+            "downloaded missing colima,limactl,docker {pins} other-arch",
+            "downloaded missing buildx {pins} other-arch"
+          ],
+          "printed" : [
+            "downloadingHelper"
+          ],
+          "stamp" : "downloaded",
+          "tools" : {
+            "buildx" : "downloaded",
+            "colima" : "downloaded",
+            "docker" : "downloaded",
+            "limactl" : "downloaded"
+          }
+        },
+        "name" : "An Intel Mac",
+        "why" : "The app carries Apple-silicon programs only, so an Intel Mac downloads its own, checked against the Intel SHA-256s. With only one set pinned, every Intel first run would be refused."
+      },
+      {
+        "arch" : "arm64",
+        "before" : {
+          "buildx" : "present",
+          "colima" : "current",
+          "docker" : "current",
+          "limactl" : "current",
+          "stamp" : "current"
+        },
+        "bundle" : "present",
+        "dockerAnswers" : false,
+        "downloadsServe" : "pinned",
+        "expect" : {
+          "downloads" : 0,
+          "exit" : 0,
+          "markers" : [
+
+          ],
+          "printed" : [
+
+          ],
+          "stamp" : "unchanged",
+          "tools" : {
+            "buildx" : "unchanged",
+            "colima" : "unchanged",
+            "docker" : "unchanged",
+            "limactl" : "unchanged"
+          }
+        },
+        "name" : "Plantoir's copies are current",
+        "why" : "The ordinary start of a stopped website builder: nothing copied, nothing printed."
+      },
+      {
+        "arch" : "arm64",
+        "before" : {
+          "buildx" : "present",
+          "colima" : "current",
+          "docker" : "current",
+          "limactl" : "current",
+          "stamp" : "current"
+        },
+        "bundle" : "resigned",
+        "dockerAnswers" : false,
+        "downloadsServe" : "pinned",
+        "expect" : {
+          "downloads" : 0,
+          "exit" : 0,
+          "markers" : [
+
+          ],
+          "printed" : [
+
+          ],
+          "stamp" : "unchanged",
+          "tools" : {
+            "buildx" : "unchanged",
+            "colima" : "unchanged",
+            "docker" : "unchanged",
+            "limactl" : "unchanged"
+          }
+        },
+        "name" : "Plantoir's copies are current and the app's copy was signed again by an update",
+        "why" : "Every release signs the programs again, so their bytes change while their versions do not. The stamp is compared on the pins line, never on the app's hashes, or every update would reinstall and call the tools older."
+      },
+      {
+        "arch" : "arm64",
+        "before" : {
+          "buildx" : "present",
+          "colima" : "unrecorded",
+          "docker" : "unrecorded",
+          "limactl" : "unrecorded",
+          "stamp" : "none"
+        },
+        "bundle" : "absent",
+        "dockerAnswers" : false,
+        "downloadsServe" : "pinned",
+        "expect" : {
+          "downloads" : 0,
+          "exit" : 0,
+          "markers" : [
+
+          ],
+          "printed" : [
+
+          ],
+          "stamp" : "none",
+          "tools" : {
+            "buildx" : "unchanged",
+            "colima" : "unchanged",
+            "docker" : "unchanged",
+            "limactl" : "unchanged"
+          }
+        },
+        "name" : "Copies from before the stamp existed, and no copy in the app",
+        "why" : "Every Mac set up before #312, run from Terminal or on an Intel Mac: used as they are, exactly as before. Treating a missing stamp as a difference would re-download on every such Mac and fail on one whose network filters downloads."
+      },
+      {
+        "arch" : "arm64",
+        "before" : {
+          "buildx" : "present",
+          "colima" : "unrecorded",
+          "docker" : "unrecorded",
+          "limactl" : "unrecorded",
+          "stamp" : "none"
+        },
+        "bundle" : "present",
+        "dockerAnswers" : false,
+        "downloadsServe" : "pinned",
+        "expect" : {
+          "downloads" : 0,
+          "exit" : 0,
+          "markers" : [
+            "bundled unrecorded colima,limactl,docker {pins}"
+          ],
+          "printed" : [
+            "preparingHelpers"
+          ],
+          "stamp" : "bundled",
+          "tools" : {
+            "buildx" : "unchanged",
+            "colima" : "bundled",
+            "docker" : "bundled",
+            "limactl" : "bundled"
+          }
+        },
+        "name" : "Copies from before the stamp existed, with the app's copy",
+        "why" : "The installed base's first slow start after updating: the app's signed copies replace the downloaded ones, and are recorded from then on."
+      },
+      {
+        "arch" : "arm64",
+        "before" : {
+          "buildx" : "present",
+          "colima" : "current",
+          "docker" : "current",
+          "limactl" : "current",
+          "stamp" : "different"
+        },
+        "bundle" : "present",
+        "dockerAnswers" : false,
+        "downloadsServe" : "pinned",
+        "expect" : {
+          "downloads" : 0,
+          "exit" : 0,
+          "markers" : [
+            "bundled different colima,limactl,docker {pins}"
+          ],
+          "printed" : [
+            "preparingHelpers"
+          ],
+          "stamp" : "bundled",
+          "tools" : {
+            "buildx" : "unchanged",
+            "colima" : "bundled",
+            "docker" : "bundled",
+            "limactl" : "bundled"
+          }
+        },
+        "name" : "Copies of other versions, with the app's copy",
+        "why" : "A pin bump reaching a Mac that already has tools, which before #312 never happened."
+      },
+      {
+        "arch" : "arm64",
+        "before" : {
+          "buildx" : "present",
+          "colima" : "current",
+          "docker" : "current",
+          "limactl" : "current",
+          "stamp" : "different"
+        },
+        "bundle" : "absent",
+        "dockerAnswers" : false,
+        "downloadsServe" : "pinned",
+        "expect" : {
+          "downloads" : 3,
+          "exit" : 0,
+          "markers" : [
+            "downloaded different colima,limactl,docker {pins} none-in-app"
+          ],
+          "printed" : [
+            "downloadingHelper"
+          ],
+          "stamp" : "downloaded",
+          "tools" : {
+            "buildx" : "unchanged",
+            "colima" : "downloaded",
+            "docker" : "downloaded",
+            "limactl" : "downloaded"
+          }
+        },
+        "name" : "Copies of other versions, and no copy in the app"
+      },
+      {
+        "arch" : "arm64",
+        "before" : {
+          "buildx" : "present",
+          "colima" : "current",
+          "docker" : "current",
+          "limactl" : "current",
+          "stamp" : "different"
+        },
+        "bundle" : "absent",
+        "dockerAnswers" : false,
+        "downloadsServe" : "nothing",
+        "expect" : {
+          "downloads" : 1,
+          "exit" : 0,
+          "markers" : [
+
+          ],
+          "printed" : [
+            "downloadingHelper",
+            "downloadFailed",
+            "keptTheCopyHere"
+          ],
+          "stamp" : "unchanged",
+          "tools" : {
+            "buildx" : "unchanged",
+            "colima" : "unchanged",
+            "docker" : "unchanged",
+            "limactl" : "unchanged"
+          }
+        },
+        "name" : "Copies of other versions, no copy in the app, and no internet",
+        "why" : "Only a refresh failed, so the copies already here, which worked yesterday, are used; the stamp is left as it was so the next start tries again."
+      },
+      {
+        "arch" : "arm64",
+        "before" : {
+          "buildx" : "present",
+          "colima" : "current",
+          "docker" : "damaged",
+          "limactl" : "current",
+          "stamp" : "current"
+        },
+        "bundle" : "present",
+        "dockerAnswers" : false,
+        "downloadsServe" : "pinned",
+        "expect" : {
+          "downloads" : 0,
+          "exit" : 0,
+          "markers" : [
+            "bundled damaged docker {pins}"
+          ],
+          "printed" : [
+            "preparingHelpers"
+          ],
+          "stamp" : "bundled",
+          "tools" : {
+            "buildx" : "unchanged",
+            "colima" : "unchanged",
+            "docker" : "bundled",
+            "limactl" : "unchanged"
+          }
+        },
+        "name" : "One of Plantoir's copies is damaged"
+      },
+      {
+        "arch" : "arm64",
+        "before" : {
+          "buildx" : "missing",
+          "colima" : "elsewhere",
+          "docker" : "missing",
+          "limactl" : "missing",
+          "stamp" : "none"
+        },
+        "bundle" : "present",
+        "dockerAnswers" : false,
+        "downloadsServe" : "pinned",
+        "expect" : {
+          "downloads" : 0,
+          "exit" : 0,
+          "markers" : [
+            "bundled missing limactl,docker {pins}",
+            "bundled missing buildx {pins}"
+          ],
+          "printed" : [
+            "preparingHelpers"
+          ],
+          "stamp" : "bundled",
+          "tools" : {
+            "buildx" : "bundled",
+            "colima" : "asFound",
+            "docker" : "bundled",
+            "limactl" : "bundled"
+          }
+        },
+        "name" : "Colima from Homebrew, the others missing",
+        "why" : "A program found outside Plantoir's folder is used as it is and never replaced, one program at a time."
+      },
+      {
+        "arch" : "arm64",
+        "before" : {
+          "buildx" : "missing",
+          "colima" : "current",
+          "docker" : "current",
+          "limactl" : "current",
+          "stamp" : "current"
+        },
+        "bundle" : "present",
+        "dockerAnswers" : true,
+        "downloadsServe" : "pinned",
+        "expect" : {
+          "downloads" : 0,
+          "exit" : 0,
+          "markers" : [
+            "bundled missing buildx {pins}"
+          ],
+          "printed" : [
+
+          ],
+          "stamp" : "unchanged",
+          "tools" : {
+            "buildx" : "bundled",
+            "colima" : "unchanged",
+            "docker" : "unchanged",
+            "limactl" : "unchanged"
+          }
+        },
+        "name" : "The website builder answers and Buildx is missing",
+        "why" : "The fast path installs nothing but Buildx, and takes it from the app first."
+      },
+      {
+        "arch" : "arm64",
+        "before" : {
+          "buildx" : "link",
+          "colima" : "current",
+          "docker" : "current",
+          "limactl" : "current",
+          "stamp" : "current"
+        },
+        "bundle" : "present",
+        "dockerAnswers" : true,
+        "downloadsServe" : "pinned",
+        "expect" : {
+          "downloads" : 0,
+          "exit" : 0,
+          "markers" : [
+
+          ],
+          "printed" : [
+
+          ],
+          "stamp" : "unchanged",
+          "tools" : {
+            "buildx" : "unchanged",
+            "colima" : "unchanged",
+            "docker" : "unchanged",
+            "limactl" : "unchanged"
+          }
+        },
+        "name" : "Buildx is a link that leads nowhere",
+        "why" : "Docker Desktop keeps its Buildx as a link in the same folder; it is Docker Desktop's to mend, and replacing it would take it away from Docker Desktop."
+      },
+      {
+        "arch" : "arm64",
+        "before" : {
+          "buildx" : "missing",
+          "colima" : "missing",
+          "docker" : "missing",
+          "limactl" : "missing",
+          "stamp" : "none"
+        },
+        "bundle" : "absent",
+        "dockerAnswers" : false,
+        "downloadsServe" : "wrongBytes",
+        "expect" : {
+          "downloads" : 1,
+          "exit" : 1,
+          "markers" : [
+
+          ],
+          "printed" : [
+            "downloadingHelper",
+            "downloadFailed"
+          ],
+          "stamp" : "none",
+          "tools" : {
+            "buildx" : "none",
+            "colima" : "none",
+            "docker" : "none",
+            "limactl" : "none"
+          }
+        },
+        "name" : "A download that is not what was pinned",
+        "why" : "Refused as a failed download: the file is deleted and nothing is installed."
+      }
+    ],
+    "installCasesNote" : "Each case is one start of the website builder with the state in `before`. A tool is missing (not on this Mac), elsewhere (found outside Plantoir's folder), current/damaged/unrecorded (Plantoir's own copy: recorded by the stamp, recorded but no longer hashing to it, or with no stamp at all). stamp is none, current or different (other pins). bundle: present, absent (PLANTOIR_BUNDLED_HELPERS unset), damaged (a file no longer matches the MANIFEST), otherArch, otherPins (a MANIFEST of other versions), resigned (the same versions with different bytes and a MANIFEST that agrees). downloadsServe: pinned (the pinned bytes), wrongBytes, nothing (no internet). expect.tools: bundled, downloaded, asFound, unchanged or none, per program; markers carry {pins} for the versions word; downloads counts every download started. Every case is run under `set -euo pipefail` AND without it, and afterwards the app's copy must be byte-for-byte what it was, with no staging folder left behind.",
+    "markersAre" : "Pinned where the events are: shared-rules.json → activityTrail.mustRecord, \"helper programs installed\" and \"website builder created\", each with its marker.",
+    "printed" : {
+      "buildingFirstTime" : "🧱 Building your website builder — the first time downloads about 400 MB and takes a few minutes…",
+      "downloadFailed" : "❌ Could not download what your website builder needs ({n} of 4).",
+      "downloadingHelper" : "📦 Downloading what your website builder needs ({n} of 4)…",
+      "firstStartDownloading" : "   About 350 MB is downloaded once; this can take several minutes.",
+      "firstStartSeeded" : "   This takes about a minute.",
+      "keptTheCopyHere" : "   Carrying on with what is already on this Mac.",
+      "preparingHelpers" : "📦 Getting what your website builder needs ready…"
+    },
+    "printedNote" : "Words pinned by scripts/test_helper_bootstrap.py against the launchers. buildingFirstTime is printed only when no website builder has been built on this Mac before (a rebuild after an update keeps the older line); the first-start sentences follow the unchanged line that names the CPUs and memory. firstStartDownloading says 350 MB because the Intel disk is 358 MB and the Apple-silicon one 332 MB; it replaced a line that said 600 MB for the whole first run.",
+    "rejected" : [
+      "Running the programs from inside the app. HelperPrograms, the quit path, the MCP server and every scheduled-publish script look in the tools folder; the app can move, be translocated or be renamed; limactl's host agent runs for the life of the virtual machine and an update would swap the app out from under it; and anything written inside the app turns every Sparkle delta into a full download.",
+      "Seeding Colima's download cache (~/Library/Caches/colima/caches/<sha256 of the URL>). It works, but it is Colima's private layout; --disk-image is the documented flag and brings Colima's own SHA-512 check with it.",
+      "Copying the starting disk into Application Support. It is needed exactly once, and the path Colima remembers is never read again (measured: a restart and a resize with the file gone both work).",
+      "An installer in Swift. Neither app contains toolchain logic of its own; the launcher is where Terminal, the app and a scheduled publish all meet.",
+      "Comparing the stamp with the app's per-file hashes. Every release signs the programs again, so every update would reinstall and the trail would call the programs older when only their signatures had changed.",
+      "Treating a missing stamp as different when the app has no copy. Every Mac set up before #312 would re-download 135 MB on its next start, and one behind a download filter would stop working.",
+      "A universal (Intel) payload: about 500 MB more for every Apple-silicon teacher. Intel Macs download as before."
+    ],
+    "rule" : "The Mac app carries Apple-silicon copies of Colima, Lima, the Docker CLI and Buildx, and the website builder's starting disk, in Contents/Resources/helpers with a MANIFEST, and tells a launcher where through PLANTOIR_BUNDLED_HELPERS (set by HelperPrograms.environment only when the folder exists, so every run the app starts carries it, scheduled publishes included). The launchers INSTALL the programs into Plantoir's tools folder and run them from there, never from inside the app: copied (cloned) and checked against the MANIFEST when the app's copy is usable, downloaded and checked against the pinned SHA-256s otherwise. A program found outside Plantoir's folder is used as it is. The stamp (.installed) is read as three questions about Plantoir's own copies only — different pins, damaged bytes, or no stamp at all — and a missing stamp means replace only when the app has a copy to replace them with. Buildx is installed only when `docker buildx version` fails, outside the stamp, and a link is never replaced. On a first start the website builder is created from the app's starting disk with --disk-image; any failure is retried once with the same size and no disk image, which downloads it as before.",
+    "stamp" : {
+      "file" : "~/Library/Application Support/Plantoir/tools/.installed",
+      "manifest" : "Contents/Resources/helpers/MANIFEST: arch <arm64>, the same pins line, image vm/<name>, then one <sha256>  <path> line for every file but the starting disk, which Colima checks itself. Written by mac-app/Vendor/fetch-helpers.sh and written again by publish.sh after it signs the programs.",
+      "shape" : "the pins line (pins <colima> <lima> <docker> <buildx> <starting disk SHA-512>), then source <bundled|downloaded>, then one <sha256>  <path> line per program file it vouches for (bin/colima, bin/limactl, bin/lima, bin/docker)"
+    },
+    "why" : "GitHub #312. A first run downloaded about 857 MB before the first site existed: 135 MB of programs, a 332 MB starting disk, and about 390 MB while building the website builder — and the launcher said 600 MB. The first two now come inside the app, so a first run downloads only the build, and a school filter that blocks GitHub releases no longer stops Plantoir. Russell's decision (issue comment, 2026-09-26): carry the helpers AND the disk, keep building the website builder on the Mac, and rely on Sparkle deltas to keep updates small."
+  },
   "launcherFlags" : {
     "alsoAccepted" : {
       "flags" : [

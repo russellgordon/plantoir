@@ -449,18 +449,53 @@ _wait_for_docker() {
 
 # ---- Tools install themselves; nothing is asked of the teacher --------
 # Everything the toolchain needs on the host — Colima, Lima, the Docker
-# CLI, and BuildKit — downloads as static binaries into the app's own
-# space under Application Support. No Homebrew, no administrator rights.
-# Tools already on the machine (Homebrew installs included) are used
-# as-is; downloads happen only for what is missing.
+# CLI, and BuildKit — is installed as static binaries into the app's own
+# space under Application Support: copied out of the Mac app when it carries
+# them (Apple silicon, since GitHub #312), downloaded and checked otherwise.
+# No Homebrew, no administrator rights. Tools already on the machine
+# (Homebrew installs included) are used as-is.
 TOOLS_DIR="$HOME/Library/Application Support/Plantoir/tools"
 export PATH="$TOOLS_DIR/bin:$PATH"
 
-# Pinned versions, bumped deliberately with toolchain updates.
+# >>> FIRST-RUN BLOCK >>> From this line to the bare `ensure_container_runtime`
+# below, this text is IDENTICAL in setup.sh, preview.sh and deploy.sh.
+# AppRulesContractTests (the three copies agree, and no printed line names the
+# machinery) and scripts/test_helper_bootstrap.py (every case in
+# contracts/app-rules.json → helperBootstrap, run for real) both read it from
+# this line, so keep the line as it is.
+#
+# Pinned versions, bumped deliberately with toolchain updates. A bump reaches
+# a Mac that already has Plantoir's copies too: the install stamp below
+# records the versions it installed, and a different set is replaced on the
+# next start of the website builder (GitHub #312).
 COLIMA_VERSION="v0.10.3"
 LIMA_VERSION="2.2.0"
 DOCKER_CLI_VERSION="29.7.2"
 BUILDX_VERSION="v0.36.1"
+# What each download must hash to, for BOTH kinds of Mac (GitHub #312).
+# Nothing was checked before #312. A download that does not match is deleted
+# and treated as a failed download, so nothing half-verified is installed.
+# Taken from the files themselves on 2026-09-26 and cross-checked against
+# Lima's SHA256SUMS and Colima's .sha256sum (Docker publishes no checksums for
+# these two). Bump each pair with its version; mac-app/Vendor/fetch-helpers.sh
+# reads the Apple-silicon ones from here rather than keeping its own.
+LIMA_SHA256_ARM64="bbdef91774885a0d05f7b048c4eb89ae2bcf3a0c252ae7ca7934e63df76d93c3"
+LIMA_SHA256_X86_64="0d6f99c19f6e4bc3c92730c4c29d929e6927f0cb0a0ba1a84383367135a8ff31"
+COLIMA_SHA256_ARM64="980ad8bf61a4ca370243f4cb41401a61276dcd2c2502bee7b9b86f9250169f34"
+COLIMA_SHA256_X86_64="3082737fe8a98afda11cba7d9a20b6e56fe80c6153464beda04bec630758770b"
+DOCKER_CLI_SHA256_ARM64="b8683ed19d1f06048a496f9b8429e2c71d0b088d475b7487c054ea3666c02a3c"
+DOCKER_CLI_SHA256_X86_64="fb1f1aa7ac7af4364165b9eadfda92e96c8ced508fca74f53079719891367438"
+BUILDX_SHA256_ARM64="214cdc36788602862dbc82b523d58648b4585c7b0ff95218b0817c44db5573d7"
+BUILDX_SHA256_X86_64="52a39ee4012d18f83373656712102ebda55656121dcdabbbb1ccfbd41b7debe8"
+# The website builder's starting disk, which the Mac app carries for Apple
+# silicon (GitHub #312). It is the file COLIMA_VERSION itself downloads on a
+# first start: Colima has its SHA-512 compiled in and refuses any other, so
+# bumping Colima usually means bumping these four as well — fetch-helpers.sh
+# refuses a pair that does not agree.
+VM_IMAGE_RELEASE="v0.10.4"
+VM_IMAGE_NAME="ubuntu-24.04-minimal-cloudimg-arm64-docker.raw.gz"
+VM_IMAGE_SHA256="1fc0354f4f99734ce3886628cc7af8b0437c1a1d391b126bd09cba0df35ee53f"
+VM_IMAGE_SHA512="32242674b046b5057e60c4aba334b51e3665f05412cda89ed081cc2de153ae5c41f6b105b5c442cbe48d78e2cc21e9ba1950e406b6fb4fc2fd1dd2259240abbd"
 # Colima's size, computed from this Mac rather than pinned.
 #
 # The old fixed 2 CPUs / 4 GB was chosen for an 8 GB machine and then applied
@@ -526,44 +561,368 @@ _colima_growth_flags() {
 
 
 
+
+# ---- Where the helper programs come from (GitHub #312) ------------------
+#
+# The Mac app carries Apple-silicon copies of all four programs AND the
+# website builder's starting disk, in Plantoir.app/Contents/Resources/helpers,
+# and says where through PLANTOIR_BUNDLED_HELPERS. Nothing else sets it: a
+# launcher typed at the command line, or run on an Intel Mac, downloads as it
+# always has. The copies are INSTALLED into TOOLS_DIR and run from there,
+# never from inside the app — the app can move, be renamed or be replaced by
+# an update while the website builder is running, and anything written inside
+# it would make every later update a full download instead of a small one.
+# Why each rule is the way it is: documentation/03-launcher-scripts.md →
+# "Where the helper programs come from".
+#
+# `.installed` in TOOLS_DIR is the install stamp: the pins line below, where
+# the copies came from, and the SHA-256 of each program as installed. It is
+# read as three separate questions, and ONLY for Plantoir's own copies — a
+# program found anywhere else (Homebrew, a developer's own) is used as it is:
+#   - different: the stamp's pins are not this launcher's, so a version
+#     bump reaches a Mac that already has tools;
+#   - damaged: a program no longer hashes to what was installed;
+#   - unrecorded: no stamp at all (every Mac set up before #312). Replaced
+#     from the app's copy when there is one; otherwise left exactly as it is,
+#     which is the rule every launcher followed before the stamp existed.
+
+# The line the stamp and the app's MANIFEST are compared on.
+_helper_pins() {
+  echo "pins ${COLIMA_VERSION} ${LIMA_VERSION} ${DOCKER_CLI_VERSION} ${BUILDX_VERSION} ${VM_IMAGE_SHA512}"
+}
+
+# The same versions as one word, for the line the app reads.
+_helper_pins_word() {
+  printf 'colima=%s,lima=%s,docker=%s,buildx=%s\n' "$COLIMA_VERSION" "$LIMA_VERSION" "$DOCKER_CLI_VERSION" "$BUILDX_VERSION"
+}
+
+_helper_arch() {
+  if [[ "$(uname -m)" == "arm64" ]]; then echo "arm64"; else echo "x86_64"; fi
+}
+
+# The pinned SHA-256 of one download for this Mac: `_helper_sha256 LIMA`.
+_helper_sha256() {
+  local name="${1}_SHA256_ARM64"
+  if [[ "$(_helper_arch)" != "arm64" ]]; then name="${1}_SHA256_X86_64"; fi
+  echo "${!name}"
+}
+
+# What each program brings with it, as paths inside TOOLS_DIR and inside the
+# app's copy alike.
+_helper_paths() {
+  local tool
+  for tool in "$@"; do
+    case "$tool" in
+      colima) echo "bin/colima" ;;
+      limactl) echo "bin/limactl bin/lima share/lima" ;;
+      docker) echo "bin/docker" ;;
+      buildx) echo "cli-plugins/docker-buildx" ;;
+    esac
+  done
+}
+
+# The files the stamp vouches for: the programs themselves, not Lima's data.
+_helper_stamped_paths() {
+  local tool
+  for tool in "$@"; do
+    case "$tool" in
+      colima) echo "bin/colima" ;;
+      limactl) echo "bin/limactl bin/lima" ;;
+      docker) echo "bin/docker" ;;
+    esac
+  done
+}
+
+# The "<sha256>  <path>" lines of a MANIFEST or stamp for the given paths; a
+# directory path takes every file under it.
+_helper_hash_lines() {
+  local list="$1"
+  shift
+  awk -v wanted="$*" '
+    BEGIN { count = split(wanted, prefix, " ") }
+    length($1) == 64 && substr($0, 65, 2) == "  " {
+      path = substr($0, 67)
+      for (i = 1; i <= count; i++) {
+        if (path == prefix[i] || index(path, prefix[i] "/") == 1) { print; next }
+      }
+    }' "$list"
+}
+
+# True when every one of the given paths has a line in the list, and the
+# files under $1 still hash to what it says.
+_helper_hashes_hold() {
+  local folder="$1" list="$2" path lines
+  shift 2
+  for path in "$@"; do
+    if ! grep -q "^[0-9a-f]*  ${path}\(/.*\)\{0,1\}$" "$list"; then
+      return 1
+    fi
+  done
+  lines="$(_helper_hash_lines "$list" "$@")"
+  if [[ -z "$lines" ]]; then
+    return 1
+  fi
+  (cd "$folder" && echo "$lines" | shasum -a 256 -c --status) >/dev/null 2>&1
+}
+
+# Why the app's own copy cannot be used for the given programs, as one word,
+# or nothing when it can.
+_bundle_problem() {
+  local bundle="${PLANTOIR_BUNDLED_HELPERS:-}"
+  if [[ -z "$bundle" || ! -f "$bundle/MANIFEST" ]]; then
+    echo "none-in-app"
+    return 0
+  fi
+  if ! grep -qx "arch $(_helper_arch)" "$bundle/MANIFEST"; then
+    echo "other-arch"
+    return 0
+  fi
+  # A copy of other versions is refused, even one that matches its own
+  # MANIFEST: an app built before a re-fetch carries the old programs.
+  if ! grep -qxF "$(_helper_pins)" "$bundle/MANIFEST"; then
+    echo "bundle-check-failed"
+    return 0
+  fi
+  if [[ $# -gt 0 ]]; then
+    # shellcheck disable=SC2046  # the paths have no spaces, by construction
+    if ! _helper_hashes_hold "$bundle" "$bundle/MANIFEST" $(_helper_paths "$@"); then
+      echo "bundle-check-failed"
+    fi
+  fi
+  return 0
+}
+
+# Copies the given programs out of the app into a staging folder, strips the
+# browser's quarantine mark from the COPIES (never from the app), and checks
+# the copies against the app's MANIFEST.
+_stage_from_bundle() {
+  local staging="$1" bundle="${PLANTOIR_BUNDLED_HELPERS:-}" path
+  shift
+  for path in $(_helper_paths "$@"); do
+    mkdir -p "$staging/$(dirname "$path")"
+    if ! cp -Rc "$bundle/$path" "$staging/$path" 2>/dev/null; then
+      return 1
+    fi
+  done
+  xattr -dr com.apple.quarantine "$staging" 2>/dev/null || true
+  # shellcheck disable=SC2046
+  _helper_hashes_hold "$staging" "$bundle/MANIFEST" $(_helper_paths "$@")
+}
+
 _download() {
-  local url="$1" destination="$2" label="$3"
+  local url="$1" destination="$2" expected="$3" label="$4" actual=""
   echo "📦 Downloading ${label}…"
-  if ! curl -fsSL --retry 3 -o "$destination" "$url"; then
-    echo "❌ Could not download ${label}."
-    echo "   An internet connection is needed for this one-time setup."
-    exit 1
+  if curl -fsSL --retry 3 -o "$destination" "$url"; then
+    actual="$(shasum -a 256 "$destination" 2>/dev/null | awk '{ print $1 }')"
+    if [[ -n "$expected" && "$actual" == "$expected" ]]; then
+      return 0
+    fi
+  fi
+  rm -f "$destination"
+  echo "❌ Could not download ${label}."
+  echo "   An internet connection is needed for this one-time setup."
+  return 1
+}
+
+# Downloads the given programs into a staging folder, each checked against
+# its pinned SHA-256 before anything is unpacked.
+_stage_downloads() {
+  local staging="$1" arch lima_arch docker_arch buildx_arch tool
+  shift
+  arch="$(_helper_arch)"
+  if [[ "$arch" == "arm64" ]]; then
+    lima_arch="arm64"; docker_arch="aarch64"; buildx_arch="arm64"
+  else
+    lima_arch="x86_64"; docker_arch="x86_64"; buildx_arch="amd64"
+  fi
+  mkdir -p "$staging/bin"
+  # In the order the teacher is told about them: 1 of 4, 2 of 4, and so on.
+  for tool in limactl colima docker buildx; do
+    case " $* " in
+      *" $tool "*) ;;
+      *) continue ;;
+    esac
+    case "$tool" in
+      limactl)
+        _download "https://github.com/lima-vm/lima/releases/download/v${LIMA_VERSION}/lima-${LIMA_VERSION}-Darwin-${lima_arch}.tar.gz" "$staging/lima.tar.gz" "$(_helper_sha256 LIMA)" "what your website builder needs (1 of 4)" || return 1
+        tar xzf "$staging/lima.tar.gz" -C "$staging" || return 1
+        # The manuals and notes are not needed, and the notes hold a link
+        # that moving file by file would follow.
+        rm -rf "$staging/lima.tar.gz" "$staging/share/doc" "$staging/share/man"
+        ;;
+      colima)
+        _download "https://github.com/abiosoft/colima/releases/download/${COLIMA_VERSION}/colima-Darwin-${arch}" "$staging/bin/colima" "$(_helper_sha256 COLIMA)" "what your website builder needs (2 of 4)" || return 1
+        chmod +x "$staging/bin/colima"
+        ;;
+      docker)
+        _download "https://download.docker.com/mac/static/stable/${docker_arch}/docker-${DOCKER_CLI_VERSION}.tgz" "$staging/docker.tar.gz" "$(_helper_sha256 DOCKER_CLI)" "what your website builder needs (3 of 4)" || return 1
+        tar xzf "$staging/docker.tar.gz" -C "$staging" || return 1
+        mv -f "$staging/docker/docker" "$staging/bin/docker"
+        rm -rf "$staging/docker" "$staging/docker.tar.gz"
+        ;;
+      buildx)
+        mkdir -p "$staging/cli-plugins"
+        _download "https://github.com/docker/buildx/releases/download/${BUILDX_VERSION}/buildx-${BUILDX_VERSION}.darwin-${buildx_arch}" "$staging/cli-plugins/docker-buildx" "$(_helper_sha256 BUILDX)" "what your website builder needs (4 of 4)" || return 1
+        chmod +x "$staging/cli-plugins/docker-buildx"
+        ;;
+    esac
+  done
+}
+
+# Moves every file of a staging folder into place, one rename each, so a
+# program that is running keeps the copy it started with.
+_move_into_place() {
+  local staging="$1" destination="$2" file
+  for file in $(cd "$staging" && find . -type f); do
+    file="${file#./}"
+    mkdir -p "$destination/$(dirname "$file")"
+    mv -f "$staging/$file" "$destination/$file" || return 1
+  done
+}
+
+# Rewrites the stamp: the pins, where this install came from, and the hash of
+# every program of Plantoir's that it can vouch for — the ones just installed,
+# and the ones an up-to-date stamp already vouched for.
+_write_stamp() {
+  local how="$1" stamp="$TOOLS_DIR/.installed" next tool carried=""
+  shift
+  next="$TOOLS_DIR/.installed.next.$$"
+  for tool in colima limactl docker; do
+    case " $* " in
+      *" $tool "*) ;;
+      *)
+        if [[ -f "$stamp" ]] && grep -qxF "$(_helper_pins)" "$stamp"; then
+          # shellcheck disable=SC2046
+          carried="${carried}$(_helper_hash_lines "$stamp" $(_helper_stamped_paths "$tool"))"$'\n'
+        fi
+        ;;
+    esac
+  done
+  {
+    _helper_pins
+    echo "source ${how}"
+    printf '%s' "$carried" | grep -v '^$' || true
+    # shellcheck disable=SC2046
+    (cd "$TOOLS_DIR" && shasum -a 256 $(_helper_stamped_paths "$@"))
+  } > "$next"
+  mv -f "$next" "$stamp"
+}
+
+# Installs the given programs into TOOLS_DIR, from the app's copy or by
+# downloading, and says so on the line the app reads. $1 is bundled or
+# downloaded; $2 is the reason the app's copy was not used, when it was not.
+_install_helpers() {
+  local how="$1" why_not="$2" staging
+  shift 2
+  staging="$(mktemp -d "$TOOLS_DIR/.staging.XXXXXX")" || return 1
+  if [[ "$how" == "bundled" ]]; then
+    if ! _stage_from_bundle "$staging" "$@"; then
+      rm -rf "$staging"
+      return 1
+    fi
+  elif ! _stage_downloads "$staging" "$@"; then
+    rm -rf "$staging"
+    return 1
+  fi
+  if ! _move_into_place "$staging" "$TOOLS_DIR"; then
+    rm -rf "$staging"
+    return 1
+  fi
+  rm -rf "$staging"
+  _write_stamp "$how" "$@"
+  return 0
+}
+
+_note_helpers_installed() {
+  local how="$1" why="$2" why_not="$3" which
+  shift 3
+  which="$(echo "$*" | tr ' ' ',')"
+  if [[ "$how" == "bundled" ]]; then
+    echo "PLANTOIR_HELPERS_INSTALLED: ${how} ${why} ${which} $(_helper_pins_word)"
+  else
+    echo "PLANTOIR_HELPERS_INSTALLED: ${how} ${why} ${which} $(_helper_pins_word) ${why_not}"
   fi
 }
 
 ensure_local_tools() {
   mkdir -p "$TOOLS_DIR/bin"
-  local arch lima_arch docker_arch buildx_arch
-  arch="$(uname -m)"
-  if [[ "$arch" == "arm64" ]]; then
-    lima_arch="arm64"; docker_arch="aarch64"; buildx_arch="arm64"
+  local stamp="$TOOLS_DIR/.installed" tool where missing="" ours="" refresh="" why="" why_not
+
+  # Which programs are Plantoir's to look after: the ones not on this Mac
+  # at all, and the ones in its own folder. Anything else is used as found.
+  for tool in colima limactl docker; do
+    where="$(command -v "$tool" 2>/dev/null || true)"
+    if [[ -z "$where" ]]; then
+      missing="${missing} ${tool}"
+    elif [[ "$where" == "$TOOLS_DIR/bin/$tool" ]]; then
+      ours="${ours} ${tool}"
+    fi
+  done
+
+  if [[ -n "$ours" ]]; then
+    if [[ ! -f "$stamp" ]]; then
+      why="unrecorded"
+    elif ! grep -qxF "$(_helper_pins)" "$stamp"; then
+      why="different"
+    else
+      # Only the programs that no longer hash to what was installed.
+      for tool in $ours; do
+        # shellcheck disable=SC2046
+        if ! _helper_hashes_hold "$TOOLS_DIR" "$stamp" $(_helper_stamped_paths "$tool"); then
+          why="damaged"
+          refresh="${refresh} ${tool}"
+        fi
+      done
+    fi
+    if [[ "$why" == "different" || "$why" == "unrecorded" ]]; then
+      refresh="$ours"
+    fi
+  fi
+
+  # shellcheck disable=SC2086  # word lists, by construction
+  why_not="$(_bundle_problem $missing $refresh)"
+  if [[ "$why" == "unrecorded" && -n "$why_not" ]]; then
+    # No copy of Plantoir's own to replace them with: keep what works.
+    refresh=""
+  fi
+  if [[ -z "${missing}${refresh}" ]]; then
+    ensure_buildx
+    return 0
+  fi
+
+  if [[ -z "$why_not" ]]; then
+    echo "📦 Getting what your website builder needs ready…"
+    # shellcheck disable=SC2086
+    if _install_helpers bundled "" $missing $refresh; then
+      if [[ -n "$missing" ]]; then
+        # shellcheck disable=SC2086
+        _note_helpers_installed bundled missing "" $missing
+      fi
+      if [[ -n "$refresh" ]]; then
+        # shellcheck disable=SC2086
+        _note_helpers_installed bundled "$why" "" $refresh
+      fi
+      ensure_buildx
+      return 0
+    fi
+    why_not="bundle-check-failed"
+  fi
+
+  # shellcheck disable=SC2086
+  if _install_helpers downloaded "$why_not" $missing $refresh; then
+    if [[ -n "$missing" ]]; then
+      # shellcheck disable=SC2086
+      _note_helpers_installed downloaded missing "$why_not" $missing
+    fi
+    if [[ -n "$refresh" ]]; then
+      # shellcheck disable=SC2086
+      _note_helpers_installed downloaded "$why" "$why_not" $refresh
+    fi
+  elif [[ -n "$missing" ]]; then
+    exit 1
   else
-    arch="x86_64"; lima_arch="x86_64"; docker_arch="x86_64"; buildx_arch="amd64"
-  fi
-
-  if ! command -v limactl >/dev/null 2>&1; then
-    local lima_tgz="$TOOLS_DIR/lima.tar.gz"
-    _download "https://github.com/lima-vm/lima/releases/download/v${LIMA_VERSION}/lima-${LIMA_VERSION}-Darwin-${lima_arch}.tar.gz" "$lima_tgz" "what your website builder needs (1 of 4)"
-    tar xzf "$lima_tgz" -C "$TOOLS_DIR"
-    rm -f "$lima_tgz"
-  fi
-
-  if ! command -v colima >/dev/null 2>&1; then
-    _download "https://github.com/abiosoft/colima/releases/download/${COLIMA_VERSION}/colima-Darwin-${arch}" "$TOOLS_DIR/bin/colima" "what your website builder needs (2 of 4)"
-    chmod +x "$TOOLS_DIR/bin/colima"
-  fi
-
-  if ! command -v docker >/dev/null 2>&1; then
-    local docker_tgz="$TOOLS_DIR/docker.tar.gz"
-    _download "https://download.docker.com/mac/static/stable/${docker_arch}/docker-${DOCKER_CLI_VERSION}.tgz" "$docker_tgz" "what your website builder needs (3 of 4)"
-    tar xzf "$docker_tgz" -C "$TOOLS_DIR"
-    mv -f "$TOOLS_DIR/docker/docker" "$TOOLS_DIR/bin/docker"
-    rm -rf "$TOOLS_DIR/docker" "$docker_tgz"
+    # Only a refresh failed: the copies already here still work.
+    echo "   Carrying on with what is already on this Mac."
   fi
 
   ensure_buildx
@@ -571,16 +930,86 @@ ensure_local_tools() {
 
 # BuildKit is what builds the image. Without the plugin the build silently
 # degrades to the legacy builder, which corrupts the export-scripts layer.
+#
+# Installed only when `docker buildx version` fails, and outside the stamp:
+# it lives in ~/.docker/cli-plugins, which Docker Desktop and Homebrew share.
+# A link there is theirs, and is never replaced (GitHub #312).
 ensure_buildx() {
   if docker buildx version >/dev/null 2>&1; then
     return 0
   fi
-  local arch buildx_arch
-  arch="$(uname -m)"
-  if [[ "$arch" == "arm64" ]]; then buildx_arch="arm64"; else buildx_arch="amd64"; fi
-  mkdir -p "$HOME/.docker/cli-plugins"
-  _download "https://github.com/docker/buildx/releases/download/${BUILDX_VERSION}/buildx-${BUILDX_VERSION}.darwin-${buildx_arch}" "$HOME/.docker/cli-plugins/docker-buildx" "what your website builder needs (4 of 4)"
-  chmod +x "$HOME/.docker/cli-plugins/docker-buildx"
+  local plugins="$HOME/.docker/cli-plugins" staging why_not
+  if [[ -L "$plugins/docker-buildx" ]]; then
+    return 0
+  fi
+  mkdir -p "$plugins"
+  staging="$(mktemp -d "$plugins/.staging.XXXXXX")"
+  why_not="$(_bundle_problem buildx)"
+  if [[ -z "$why_not" ]]; then
+    if _stage_from_bundle "$staging" buildx; then
+      mv -f "$staging/cli-plugins/docker-buildx" "$plugins/docker-buildx"
+      rm -rf "$staging"
+      _note_helpers_installed bundled missing "" buildx
+      return 0
+    fi
+    why_not="bundle-check-failed"
+  fi
+  if ! _stage_downloads "$staging" buildx; then
+    rm -rf "$staging"
+    exit 1
+  fi
+  mv -f "$staging/cli-plugins/docker-buildx" "$plugins/docker-buildx"
+  rm -rf "$staging"
+  _note_helpers_installed downloaded missing "$why_not" buildx
+}
+
+# Creates the website builder's virtual machine on a first start. With the
+# app's copy of its starting disk it starts from that file (about half a
+# minute, nothing downloaded); without one, or when that start fails for ANY
+# reason, it starts the way it always has, which downloads the disk. Colima
+# checks the file's SHA-512 itself, so a damaged copy is refused in a second
+# and the plain start heals it (measured, GitHub #312).
+_create_the_builder() {
+  local started="$SECONDS" seed="" how="" log status_file
+  if [[ -z "$(_bundle_problem)" && -f "${PLANTOIR_BUNDLED_HELPERS:-}/vm/${VM_IMAGE_NAME}" ]]; then
+    seed="${PLANTOIR_BUNDLED_HELPERS}/vm/${VM_IMAGE_NAME}"
+  fi
+  if [[ -n "$seed" ]]; then
+    echo "   This takes about a minute."
+    log="$(mktemp "${TMPDIR:-/tmp}/plantoir-first-start.XXXXXX")"
+    status_file="${log}.status"
+    # Shown as it happens, and kept, so a refusal can be told from a failure.
+    {
+      if colima start --cpu "$(_colima_cpus)" --memory "$(_colima_memory_gb)" --vm-type vz --disk-image "$seed" 2>&1; then
+        echo "0" > "$status_file"
+      else
+        echo "1" > "$status_file"
+      fi
+    } | tee "$log"
+    if [[ "$(cat "$status_file" 2>/dev/null || true)" == "0" ]]; then
+      how="seeded"
+    elif grep -qi "checksum mismatch" "$log"; then
+      how="seed-refused-then-downloaded"
+    else
+      how="seed-failed-then-downloaded"
+    fi
+    rm -f "$log" "$status_file"
+  fi
+  if [[ "$how" != "seeded" ]]; then
+    echo "   About 350 MB is downloaded once; this can take several minutes."
+    # vz is macOS's own virtualization — no extra software needed, unlike
+    # the qemu default.
+    if colima start --cpu "$(_colima_cpus)" --memory "$(_colima_memory_gb)" --vm-type vz; then
+      how="${how:-downloaded}"
+    else
+      # The wait and the restart below say what happens next.
+      how=""
+    fi
+  fi
+  if [[ -n "$how" ]]; then
+    echo "PLANTOIR_BUILDER_CREATED: ${how} $((SECONDS - started))"
+  fi
+  return 0
 }
 
 ensure_container_runtime() {
@@ -607,10 +1036,7 @@ ensure_container_runtime() {
     # What is being set up here is Colima's Linux virtual machine; the
     # teacher is told only what it is FOR (GitHub #263, rule 1).
     echo "🚀 First start: setting up your website builder ($(_colima_cpus) CPUs · $(_colima_memory_gb) GB of memory)."
-    echo "   About 600 MB is downloaded once; this can take several minutes."
-    # vz is macOS's own virtualization — no extra software needed, unlike
-    # the qemu default.
-    colima start --cpu "$(_colima_cpus)" --memory "$(_colima_memory_gb)" --vm-type vz
+    _create_the_builder
   else
     # The app's friendlyPhase matches "Starting the website builder" (#228).
     echo "▶️  Starting the website builder…"
@@ -747,7 +1173,14 @@ build_image_if_missing() {
     echo "   Build it first, e.g.: docker buildx build --load -t $IMAGE ."
     exit 1
   fi
-  echo "🧱 Building your website builder — the first time takes a few minutes…"
+  # The size is said only when there is no earlier website builder on this
+  # Mac: a rebuild after an update reuses most of what the first one fetched
+  # (GitHub #312, measured at about 390 MB and 1.5 to 2.5 minutes here).
+  if [[ -z "$(docker images -q --filter 'reference=teaching-quartz:*' 2>/dev/null || true)" ]]; then
+    echo "🧱 Building your website builder — the first time downloads about 400 MB and takes a few minutes…"
+  else
+    echo "🧱 Building your website builder — the first time takes a few minutes…"
+  fi
   local build_cmd=(docker buildx build --load)
   if ! docker buildx version >/dev/null 2>&1; then
     # BuildKit either way: the legacy builder silently mangles the
