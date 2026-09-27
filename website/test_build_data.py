@@ -219,6 +219,16 @@ class ReleaseReadinessTests(unittest.TestCase):
         shots = {"shots": [{"id": "no-such-shot-anywhere", "awaiting_capture": True}]}
         self.assertIn("no-such-shot-anywhere", build.release_readiness_refusal(site, shots))
 
+    def test_a_missing_picture_waiting_on_a_named_issue_is_deployed(self):
+        site = {"version": "1.4.0", "new_in": {"version": "1.4"}}
+        shots = {"shots": [{"id": "no-such-shot-anywhere", "awaiting_capture": True, "waiting_on": "#367"}]}
+        self.assertIsNone(build.release_readiness_refusal(site, shots))
+
+    def test_waiting_on_must_name_an_issue(self):
+        site = {"version": "1.4.0", "new_in": {"version": "1.4"}}
+        shots = {"shots": [{"id": "no-such-shot-anywhere", "awaiting_capture": True, "waiting_on": "later"}]}
+        self.assertIn("no-such-shot-anywhere", build.release_readiness_refusal(site, shots))
+
     def test_a_ready_release_deploys(self):
         site = {"version": "1.4.1", "new_in": {"version": "1.4"}}
         self.assertIsNone(build.release_readiness_refusal(site, {"shots": []}))
