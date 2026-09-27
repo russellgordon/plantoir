@@ -43,8 +43,9 @@ Three notes about this course's status and this reproduction:
 
 Each page keeps its code, and every concept, exercise, and task in this
 course links back to the codes it addresses — including every stage of
-[[The Community App]]. The codes are also tags, so every page tagged
-`#B4` can be gathered in one place.
+a longer project, where [[B4. The Software Development Life Cycle|B4]]
+is met. The codes are also tags, so every page tagged `#B4` can be
+gathered in one place.
 
 ## Why the codes matter more than they look
 
