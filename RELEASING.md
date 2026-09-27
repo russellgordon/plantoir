@@ -234,7 +234,9 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
 4a. **Take the marketing screenshots, BEFORE anything is published**: the
    `marketing-screenshots` skill (`python3 website/shots/capture.py --scenes`,
    both colour schemes) against the build being released; commit the images;
-   `python3 website/build.py --check` clean with no awaiting-capture note.
+   `python3 website/build.py --check` clean with no awaiting-capture note
+   other than one "waiting on #<n>" (a shot shipped without its picture by
+   decision, `waiting_on` in shots.json — read that issue first).
    `build.py --deploy` refuses without them, and it runs AFTER the release is
    public — checklist step 4a says what that would leave behind.
 5. **Tell Claude "cut the release."** It drafts teacher-friendly notes, adds the
@@ -368,7 +370,10 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    BOTH colour schemes) against the build being released; commit the
    promoted images and bring them to `main` with everything else (CLAUDE.md
    rule 6); run `python3 website/build.py --check` and read its output for
-   any awaiting-capture note — there must be none; and dry-run the refusal
+   any awaiting-capture note — there must be none, except one ending
+   "waiting on #<n>", which marks a shot `waiting_on` an issue and is let
+   through by `--deploy` (read the issue: v1.4.0 shipped with #367 open for
+   schedule and how-i-teach); and dry-run the refusal
    with the new version, from `website/`: `python3 -c 'import json,build;
    s=json.load(open("site.json")); s["version"]="<version>";
    print(build.release_readiness_refusal(s, json.load(open("shots.json"))))'`

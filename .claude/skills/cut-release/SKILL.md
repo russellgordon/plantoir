@@ -76,7 +76,12 @@ this skill automates its steps 5–6 and the note-writing.
    - commit the promoted images on an issue branch and get them to `main`
      with everything else (CLAUDE.md rule 6 — the merge is Russell's);
    - `python3 website/build.py --check` must be clean, with **no
-     awaiting-capture note** in its output;
+     awaiting-capture note** in its output — except a note ending
+     "waiting on #<n>": a shot marked `waiting_on: "#<n>"` in shots.json goes
+     out without its picture by decision (`--deploy` lets it through). Read
+     that issue: if it is closed, the pictures should be there; if open, say
+     in the release hand-over that the site ships without them (v1.4.0:
+     #367, schedule and how-i-teach);
    - dry-run the refusal itself with the new version, from `website/`:
      `python3 -c 'import json,build; s=json.load(open("site.json"));
      s["version"]="<version>"; print(build.release_readiness_refusal(s,
