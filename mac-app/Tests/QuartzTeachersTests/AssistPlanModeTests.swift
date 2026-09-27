@@ -324,6 +324,9 @@ final class AssistPlanModeTests: XCTestCase {
             "plan_add_classes": ["unit": 6, "howMany": 2],
             "plan_make_room_for_classes": ["unit": 3, "atDay": 2],
             "plan_curriculum_mentions": ["page": "Loops", "codes": "A1.1"],
+            // #209's page, for a course that has none yet — the case a
+            // teacher meets first. The rich section's ICS3U has no page.
+            "plan_write_how_i_teach": ["text": "I teach by asking first."],
         ]
 
         var ranCount: Int = 0
@@ -357,7 +360,7 @@ final class AssistPlanModeTests: XCTestCase {
         }
         XCTAssertEqual(ranCount, happyArguments.count,
                        "A case names a plan tool the surface no longer has, or one was skipped.")
-        XCTAssertGreaterThanOrEqual(ranCount, 10, "The walk ran fewer plan tools than exist today.")
+        XCTAssertGreaterThanOrEqual(ranCount, 11, "The walk ran fewer plan tools than exist today.")
     }
 
     /// Every card that reaches a write with a twin stops at Go in plan mode —
@@ -438,6 +441,37 @@ final class AssistPlanModeTests: XCTestCase {
         )
         XCTAssertTrue(movedOn.contains("Three four."),
                       "Unit 3, Day 4 was not moved on to Day 5 to make room:\n\(movedOn)")
+    }
+
+    /// #209's How I Teach page, for a course that has no page yet: the plan
+    /// is marked a plan and writes nothing, and the SAME arguments — which is
+    /// what Go carries to the write — then save the page.
+    ///
+    /// Driven on the runner rather than through the window, because no card
+    /// reaches `write_how_i_teach` and the local model is not offered it (so
+    /// since #327 the window refuses it); the plan is what an outside
+    /// session is shown before it asks the teacher, and accepting it is
+    /// running the write with the arguments the plan was made from.
+    func testTheHowITeachPlanForACourseWithNoPageIsAPlanThatCanBeAccepted() async throws {
+        let made: AssistFixture.Made = try AssistFixture.makeRichSection(for: self)
+        defer { try? FileManager.default.removeItem(at: made.root) }
+        XCTAssertNil(HowITeachPage.existingURL(for: made.course), "The fixture already has a page.")
+
+        let arguments: [String: Any] = ["text": "I teach by asking first."]
+        let plan: AssistToolOutcome = await AssistFixture.run(
+            "plan_write_how_i_teach", with: arguments, on: made.runner
+        )
+        XCTAssertTrue(plan.isPlan, "The How I Teach plan is not marked as a plan: \(plan.summary)")
+        XCTAssertNil(HowITeachPage.existingURL(for: made.course), "The plan wrote the page.")
+
+        let saved: AssistToolOutcome = await AssistFixture.run(
+            "write_how_i_teach", with: arguments, on: made.runner
+        )
+        XCTAssertEqual(saved.summary, AssistWording.howITeachSaved(course: "ICS3U"))
+        let pageURL: URL = try XCTUnwrap(HowITeachPage.existingURL(for: made.course),
+                                         "Accepting the plan saved no page.")
+        let written: String = try String(contentsOf: pageURL, encoding: .utf8)
+        XCTAssertTrue(written.contains("I teach by asking first."), written)
     }
 
     // MARK: - Helpers
