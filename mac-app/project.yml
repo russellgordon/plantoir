@@ -32,6 +32,17 @@ targets:
       - path: Vendor/llama
         buildPhase: resources
         type: folder
+      # The website builder's helper programs (Colima, Lima, Docker CLI,
+      # Buildx) and its starting disk, Apple silicon only, fetched by
+      # Vendor/fetch-helpers.sh (GitHub #312). A folder reference, landing at
+      # Contents/Resources/helpers: the launchers COPY the programs out of it
+      # into Plantoir's tools folder (never run them from here) and create the
+      # website builder from the disk. About 470 MB; run fetch-helpers.sh
+      # before `xcodegen generate`, and `xcodegen generate` again after it
+      # replaces the folder (Trap 1).
+      - path: Vendor/helpers
+        buildPhase: resources
+        type: folder
       # The app icon, authored in Icon Composer.
       - path: Plantoir.icon
         buildPhase: resources

@@ -35,7 +35,7 @@ final class AssistToolDescriptionContractTests: XCTestCase {
                 + "measure it (doc 10, 'One description per tool'), then change both."
             )
         }
-        XCTAssertEqual(served.count, 35, "a tool was added or removed; toolDescriptions and doc 10 count them")
+        XCTAssertEqual(served.count, 37, "a tool was added or removed; toolDescriptions and doc 10 count them")
 
         let notShared: [String: Any] = try XCTUnwrap(pinned["notShared"] as? [String: Any])
         let windowsOnly: [String] = try XCTUnwrap(notShared["windows"] as? [String])

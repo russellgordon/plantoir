@@ -737,6 +737,9 @@ class ScriptRunner {
         // A preview whose address was held by something else on this Mac,
         // or whose look could not be made (#310).
         PreviewAddressHeldReport.noteOnTheTrail(from: text)
+        // The helper programs installed and the website builder created on
+        // a first run, and where each came from (#312).
+        HelperBootstrapReport.noteOnTheTrail(from: text)
         // A How I Teach page the course had listed for the website, kept off
         // it by this build (#209).
         HowITeachKeptOffReport.noteOnTheTrail(from: text)
@@ -900,6 +903,9 @@ class ScriptRunner {
         // Every marker, by the one rule (#128) that subsumes each reader's own
         // `isMarkerLine`.
         if BuildMarkerLine.isMachineLine(line) {
+            return false
+        }
+        if HelperBootstrapReport.isMarkerLine(line) {
             return false
         }
         if line.hasSuffix(":") || line.hasSuffix("?") || line.hasSuffix(">") {
