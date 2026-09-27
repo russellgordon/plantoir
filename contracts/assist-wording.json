@@ -139,6 +139,8 @@
     "rebuiltForACallerWithNoWindow" : "Rebuilt the preview for {course} Section {section}. Open that section in Plantoir to look it over.",
     "reDated" : "Re-dated 12 classes and 5 pages they use.",
     "reDatedForAMeeting" : "Re-dated 12 meetings and 5 pages they use.",
+    "reDatedOnlyPagesTheyUse" : "Every class was already on its day, so only the 3 pages they use were re-dated.",
+    "reDatedOnlyPagesTheyUseForAMeeting" : "Every meeting was already on its day, so only the 3 pages they use were re-dated.",
     "reDatingOntoTheDatesOnFile" : "{course} Section {section}: re-dating onto the class dates on file.",
     "reDatingOntoTheDatesOnFileForAMeeting" : "{course} Section {section}: re-dating onto the meeting dates on file.",
     "rolloverCouldNotStartANewWebsite" : "I could not move this section off .netlify_sites/section1.json, so publishing it will still replace last year's website there. Try again, or check whether that file is locked or open somewhere else.",
