@@ -337,12 +337,12 @@ struct SidebarView: View {
                             }
                         }
                         // `.contain` (#353). A List section's header is merged into ONE
-                        // static text, so the two identifiers cannot both reach the tree:
-                        // without it the text read "backupsGroup-backupsGroup" and
-                        // `backupsTotal` was dead; with it the text carries `backupsTotal`
-                        // (read off the real tree, 2026-09-26). The total is the one read.
+                        // static text, so two identifiers cannot both reach the tree:
+                        // with an identifier on the header as well, the text read
+                        // "backupsGroup-backupsGroup" and `backupsTotal` was dead (read
+                        // off the real tree, 2026-09-26). The header's own was dropped;
+                        // nothing read it.
                         .accessibilityElement(children: .contain)
-                        .accessibilityIdentifier("backupsGroup")
                     }
                 }
 

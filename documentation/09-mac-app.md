@@ -7547,9 +7547,39 @@ see the four Swift traps measured 2026-09-20). `backUpCourse`, `archiveCourse`,
 and names cross, never a `Course` (`@Observable`, not `Sendable`), and
 pruning comes back to the main actor after the await. Every caller awaits it:
 the assistant, Back Up Now, the archive a restore makes first, removing a
-course or a section, the unit-word rename and its sheet, and Copy a Page
-(`CourseArchiver.backingUp`, the zip without the pruning). Russell's ruling on
-bundle C put all of these in the one piece rather than a follow-up.
+course or a section, the unit-word rename and its sheet, Copy a Page
+(`CourseArchiver.backingUp`, the zip without the pruning), and — merged in
+from #96 in the review round — Get Ready for the Start of the Year, from its
+sheet and from the assistant (the assistant's through `savingACopy`, so it
+shows the line and leaves "assistant backed up a course" on the trail). Twelve
+callers, one door. Russell's ruling on bundle C put all of these in the one
+piece rather than a follow-up.
+
+**Two main-thread waits are left, deliberately, and they are not zips.**
+`CourseRestorer.unpack` runs `/usr/bin/ditto -x` with `waitUntilExit` during a
+restore, and the problem report packs its folder with `NSFileCoordinator`. Both
+have the same nested-run-loop shape, but both are a teacher's deliberate,
+occasional act with a sheet or alert already in front of them, and neither is
+reached from the assistant window whose lazy stack turned the wait into a
+freeze. Moving them is its own piece if one is ever measured slow.
+
+**While a copy is being zipped, nothing changes the course under it** (the
+review round's S1). Before #351 the frozen window made every one of these
+impossible; now `CourseActivity` records a copy for the length of its zip
+(`beginCopy`/`endCopy`, in `CourseArchiver`'s main-actor entry points, so every
+caller is covered) and: Back Up Now, Restore and Remove for that course are
+greyed and refuse if reached another way; its preview cannot be started; its
+sidebar row shows a small spinner; and ⌘Q asks first ("saving a copy of
+ICS3U" — `shared-rules.json` → `quittingWhileWorkIsUnderWay`, the
+`copiesBeingSaved` case). `WorkspaceModel.restoreBackup` asks `courseIsBusy`
+AGAIN after its zip, since a preview or publish could have started during it.
+A reference course being removed is unlocked after its archive and just before
+the delete (`archiveAndRemoveCourse(beforeRemoving:)`): unlocked before, a
+folder read during the zip locked it again and the delete failed after the
+archive was made. `WhileACopyIsSavedTests` pins all four, interleaving
+deterministically (the work cannot resume on the main actor until the test
+suspends). Copy a Page's own backup does not record one: its sheet is modal
+and already says what it is doing.
 `ClassInsertionPlanner.apply` and `PlaceholderClassPlanner.apply` lost a
 `backingUpInto:` parameter that no caller passed — the assistant, their only
 caller, saves its own copy first — rather than going async for a zip that
@@ -7609,7 +7639,7 @@ inside it, so an inner identifier never reaches the tree — measured on the
 credential sheet, whose field and Send button both read "credentialSheet".
 `.accessibilityElement(children: .contain)` before the identifier makes the
 stack an element of its own and keeps its children's. Applied to the credential
-sheet, `backupsGroup` (its `backupsTotal`), `cloudSyncNotice` (its two
+sheet, the Backups header (its `backupsTotal`), `cloudSyncNotice` (its two
 buttons), `settingsSaveNotice` (Preview Again and its note) and
 `copyPageResult` (Show in Finder). Left alone, because they are real
 accessibility elements already: an identifier on a `Button` or `Toggle` whose
@@ -7618,9 +7648,9 @@ label holds another (its label is part of the control), the sidebar `List` and
 field and button by identifier; the opt-in `ContainerIdentifiersUITests` reads
 the Backups total off the real tree. **One place `.contain` cannot give both:**
 a `List` section's header is merged into ONE static text ("Backups, 4 KB").
-Without `.contain` that text read "backupsGroup-backupsGroup" and `backupsTotal`
-was dead; with it, the text carries `backupsTotal` and `backupsGroup` is not in
-the tree. Nothing reads `backupsGroup`; the total is what a test needs. No unit test: in process the tree does not
+With an identifier on the header too, that text read "backupsGroup-backupsGroup"
+and `backupsTotal` was dead; the header's own identifier (`backupsGroup`, read by
+nothing) was dropped in the review round, and the text carries `backupsTotal`. No unit test: in process the tree does not
 reach hosted SwiftUI.
 
 ## A field in a labelled row has no title of its own (#354)
@@ -7658,4 +7688,19 @@ The empty page this makes counts as NOT written for every assistant tool —
 cases: `contracts/shared-rules.json` → `howITeachPage.settingsButton`.
 REJECTED: `obsidian://new` (no `publish: false`, nothing recorded); creating
 without opening; a starter text.
+
+**Measured against a running Obsidian (the review round's S3, 2026-09-27).** The
+worry: in the registered-vault branch the link reaches a RUNNING Obsidian
+milliseconds after the file appears, before its watcher has seen it. With a
+scratch vault registered and open in Obsidian 1.13.6, the page written exactly
+as `startOrFind` writes it (a plain write, closed when it returns) and the
+`obsidian://open?path=` link sent from the same process straight after, via
+`NSWorkspace.open`, Obsidian opened the new page in **41 of 42** trials (plus 5
+of 5 with the link sent from a second process). The one miss was the very
+first in-process trial, while a system permission prompt was up over
+Obsidian's window, and did not recur in 41 more; no trial made a second file or
+showed "file not found". So nothing was changed: the file is complete before
+the link is sent, which is the "wait on the file" the ruling asked for, and a
+timed delay was not added. Russell's `obsidian.json` was backed up first,
+restored byte for byte, and his three open vaults reopened.
 

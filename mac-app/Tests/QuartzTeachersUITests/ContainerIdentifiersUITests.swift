@@ -33,11 +33,10 @@ final class ContainerIdentifiersUITests: XCTestCase {
         defer { application.typeKey("q", modifierFlags: .command) }
 
         // Read off the real tree, 2026-09-26. A List section's header is
-        // merged into ONE static text ("Backups, 4 KB"). Without `.contain`
-        // it carried "backupsGroup-backupsGroup" and `backupsTotal` was dead;
-        // with it, the text carries `backupsTotal` and `backupsGroup` is not
-        // in the tree at all — nothing reads that one, and the total is the
-        // one a test needs.
+        // merged into ONE static text ("Backups, 4 KB"). With an identifier
+        // on the header too, it read "backupsGroup-backupsGroup" and
+        // `backupsTotal` was dead; the header's own was dropped (nothing read
+        // it), and the text carries `backupsTotal`.
         let total: XCUIElement = application.descendants(matching: .any)["backupsTotal"]
         if !total.waitForExistence(timeout: 20) {
             print("=== SIDEBAR TREE ===")

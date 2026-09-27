@@ -77,16 +77,19 @@ final class WhileACopyIsSavedTests: XCTestCase {
         XCTAssertNil(QuitConfirmation.workUnderWay())
     }
 
-    func testASecondBackUpWhileTheFirstIsSavingMakesNoSecondCopy() async throws {
+    /// Two copies begun in the same second share a name, so a second zip
+    /// would ADD to the first rather than show as a second file — the
+    /// copy under way is recorded by hand here, and the press must make
+    /// nothing at all.
+    func testBackUpNowWhileACopyIsSavingMakesNone() async throws {
         let (root, workspace, course) = try makeWorkspace()
-        let first: Task<Void, Never> = Task { @MainActor in
-            await workspace.backUp(course)
-        }
-        await waitForTheCopyToStart(in: workspace)
+        CourseActivity.beginCopy(folderPath: root.path, courseCode: "ICS3U")
         await workspace.backUp(course)
-        await first.value
-        let backups: [BackupItem] = WorkspaceModel.findBackupItems(in: root.appendingPathComponent("courses"))
-        XCTAssertEqual(backups.count, 1, "a second press during the zip made a second full copy")
+        XCTAssertEqual(WorkspaceModel.findBackupItems(in: root.appendingPathComponent("courses")).count, 0,
+                       "a second press during a zip made a second copy")
+        CourseActivity.endCopy(folderPath: root.path, courseCode: "ICS3U")
+        await workspace.backUp(course)
+        XCTAssertEqual(WorkspaceModel.findBackupItems(in: root.appendingPathComponent("courses")).count, 1)
     }
 
     func testARestoreRefusesAPreviewOrPublishThatBeganDuringItsZip() async throws {

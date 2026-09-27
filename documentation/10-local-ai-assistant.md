@@ -5688,7 +5688,8 @@ answer states the exact name and place for an agent to relay.
    first" while acting on the greeting at once.
 2. **`read_how_i_teach`**, what the greeting sentence resolves to.
 3. **MCP `initialize.instructions`** (mac only; Windows' server sends none):
-   one paragraph naming each LIVE course whose page exists — the case the
+   one paragraph naming each LIVE course whose page has been WRITTEN — an
+   empty one is left out (`howITeachPage.emptyPageIsNotWritten`) — the case the
    greeting cannot cover, since it names one course. A folder with no page and
    no reference course still sends nothing at all. Third, not first: whether
    clients read `instructions` has never been measured.
@@ -5783,8 +5784,10 @@ pins it.
 
 ### The trail
 
-Three events (`activityTrail.mustRecord`): `How I Teach page read` (course,
-word count, cut short or not — never the words), `How I Teach page written`
+Four events (`activityTrail.mustRecord`): `How I Teach page read` (course,
+word count, cut short or not — never the words — or, since #329, that the page
+was found EMPTY), `How I Teach page started` (Course Settings made an empty
+page, #329 — or could not), `How I Teach page written`
 (created or replaced, word counts, the backup's name — "did I write this, or
 did an assistant?"), and `How I Teach page kept off the website`, read from
 the build's `PLANTOIR_KEPT_OFF:` line — printed ONLY when a page the course's
@@ -5792,6 +5795,29 @@ settings had LISTED is dropped, so the one transition a teacher will ask about
 ("my How I Teach page vanished from the site") is recorded and a course whose
 page was never on the site leaves no line on every build. Read by the app from
 a run's console and from a scheduled publish's log, as `PLANTOIR_DATED:` is.
+
+### The gap between a plan and its write (#351)
+
+Every assistant write saves a copy of the course first (once per conversation,
+or its own copy for the start of the year), and since #351 that copy is zipped
+off the main actor: it can take a minute, and while it does the teacher can
+edit a page in Obsidian and an outside assistant's second call can run. A write
+that carried out the plan it made BEFORE the copy would then act on a course
+that is no longer the one it planned for. So every write that saves a copy
+first works its plan out AGAIN after the copy and refuses, with
+`changedWhileSavingACopy`, when it no longer matches — remember_timetable,
+duplicating a class, make_room_for_classes, add_next_class / add_classes and
+add_curriculum_mentions compare the plan's own description (and, for a
+duplicate, the source page's words and the new page's name);
+prepare_for_start_of_year compares its fingerprint and answers
+`startOfYearPlanHasChanged`; write_how_i_teach compares the page's mark and
+answers `howITeachChangedSincePlanned`. A course removed meanwhile no longer
+locates, so a write never makes its folder again. The writes that reach the
+copy through publish_pages, unpublish_pages, publish_class_on and
+re_date_classes re-read every page at the write already, and decline a page
+edited since (#186). REJECTED: making the copy BEFORE planning — it would save
+one for every refusal too; and a lock on the course for the length of the
+copy, which would refuse a teacher's own edit in Obsidian rather than notice it.
 
 ### An empty page is not written (#329)
 

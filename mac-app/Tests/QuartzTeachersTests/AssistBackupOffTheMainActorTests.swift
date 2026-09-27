@@ -251,4 +251,76 @@ final class AssistBackupOffTheMainActorTests: XCTestCase {
             "assistant backed up the course as EXC2O_backup_2026-09-26_101500_assistant-section1.zip (3.2 MB, 0.4 s)"
         )
     }
+
+    // MARK: - The gap between a plan and its write (the review round's S2, B1)
+
+    /// A write works its plan out again after the copy, and refuses one the
+    /// course has outrun: here the page add_next_class was about to create
+    /// is written by the teacher while the copy is being saved.
+    func testAWriteRefusesAPlanTheCourseOutranDuringItsCopy() async throws {
+        let made: AssistFixture.Made = try makeRunner()
+        // The class dates, remembered by ANOTHER conversation, so this one
+        // still has its first copy to make.
+        let other: AssistToolRunner = AssistToolRunner(
+            workspace: { () -> WorkspaceModel in
+                let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
+                workspace.chooseWorkspace(at: made.root)
+                return workspace
+            }(),
+            siteWork: StubSiteWork(),
+            today: { return CalendarDay(year: 2026, month: 9, day: 8)! },
+            launchControl: SilentLaunchControl()
+        )
+        try AssistFixture.write(page: "Unit 4, Day 12", publish: "true", date: "2026-09-08", body: "Twelve.", in: made.course)
+        _ = await AssistFixture.run(
+            "remember_timetable", with: ["dates": "2026-09-08; 2026-09-10; 2026-09-14"], on: other
+        )
+        holdEveryCopy(on: made.runner)
+
+        let runner: AssistToolRunner = made.runner
+        let adding: Task<AssistToolOutcome, Never> = Task { @MainActor in
+            return await AssistFixture.run("add_next_class", with: [:], on: runner)
+        }
+        await waitUntil("the copy to start") { return !heldCopies.isEmpty }
+        let theirs: String = "---\ntitle: Unit 4, Day 13\npublish: false\n---\n\nWritten by the teacher meanwhile.\n"
+        try theirs.write(to: AssistFixture.pageURL(of: "Unit 4, Day 13", in: made.course), atomically: true, encoding: .utf8)
+        releaseHeldCopies()
+        let outcome: AssistToolOutcome = await adding.value
+
+        XCTAssertEqual(outcome.summary, AssistWording.changedWhileSavingACopy(course: "ICS3U", section: "1"), outcome.detail)
+        XCTAssertEqual(
+            try String(contentsOf: AssistFixture.pageURL(of: "Unit 4, Day 13", in: made.course), encoding: .utf8),
+            theirs, "the teacher's page was written over"
+        )
+        XCTAssertFalse(FileManager.default.fileExists(
+            atPath: AssistFixture.pageURL(of: "Unit 4, Day 14", in: made.course).path
+        ), "a page was made from the plan the course outran")
+    }
+
+    /// The assistant's start-of-the-year copy goes through the same door:
+    /// the window's line while it runs, and one trail line (#96 merged in).
+    func testTheStartOfTheYearCopyGoesThroughTheDoor() async throws {
+        let made: AssistFixture.Made = try makeRunner()
+        try AssistFixture.write(page: "Unit 1, Day 3", publish: "true", body: "Three.", in: made.course)
+        _ = await AssistFixture.run("publish_pages", with: ["pages": "Unit 1, Day 1, Unit 1, Day 2"], on: made.runner)
+        let planned: AssistToolOutcome = await AssistFixture.run("plan_prepare_for_start_of_year", with: [:], on: made.runner)
+        let code: String = try XCTUnwrap(StartOfYearPlanner.planCode(in: planned.detail), planned.detail)
+        let linesBefore: Int = backupLines(in: trail()).count
+        CourseArchiver.lastZipRanOnTheMainThread = nil
+        holdEveryCopy(on: made.runner)
+
+        let runner: AssistToolRunner = made.runner
+        let preparing: Task<AssistToolOutcome, Never> = Task { @MainActor in
+            return await AssistFixture.run("prepare_for_start_of_year", with: ["planCode": code], on: runner)
+        }
+        await waitUntil("the copy to start") { return !heldCopies.isEmpty }
+        XCTAssertEqual(made.runner.courseBeingBackedUp, "ICS3U", "the window's line shows for this copy too")
+        releaseHeldCopies()
+        _ = await preparing.value
+
+        XCTAssertEqual(copiesAskedFor, 1)
+        XCTAssertEqual(backupLines(in: trail()).count, linesBefore + 1, trail())
+        XCTAssertEqual(CourseArchiver.lastZipRanOnTheMainThread, false)
+    }
 }
+
