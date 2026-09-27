@@ -374,7 +374,9 @@ final class FileFormatsContractTests: XCTestCase {
             return "noRoomForAKey"
         }
     }
-    private static func section(_ name: String) throws -> [String: Any] {
+    /// One section of `contracts/file-formats.json`. Not private: the wizard's
+    /// integration test reads `pageVisibility.keys` through it (#139).
+    static func section(_ name: String) throws -> [String: Any] {
         let url: URL = repositoryRoot().appendingPathComponent("contracts/file-formats.json")
         let all: [String: Any] = try XCTUnwrap(
             try JSONSerialization.jsonObject(with: try Data(contentsOf: url)) as? [String: Any]

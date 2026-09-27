@@ -58,7 +58,7 @@ enum AssistWindowPlacement {
         _ window: NSWindow,
         courseCode: String,
         sectionNumber: Int,
-        defaults: UserDefaults = UserDefaults.standard
+        defaults: UserDefaults = PlantoirDefaults.shared
     ) {
         let key: String = storageKey(courseCode: courseCode, sectionNumber: sectionNumber)
         guard let saved = defaults.string(forKey: key) else {
@@ -113,7 +113,7 @@ enum AssistWindowPlacement {
         _ window: NSWindow?,
         courseCode: String,
         sectionNumber: Int,
-        defaults: UserDefaults = UserDefaults.standard
+        defaults: UserDefaults = PlantoirDefaults.shared
     ) {
         guard let window else {
             return

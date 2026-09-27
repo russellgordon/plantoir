@@ -218,6 +218,16 @@ final class AssistToolchainWork: AssistSiteWork {
 
         let destinations: [CourseConfiguration.DeployDestination] = course.configuration.allDeployDestinations
         let needsBuild: Bool = BuildFreshness.needsRebuild(course: course, sectionNumber: sectionNumber)
+        // `course` here is already the saved copy — #322's reading at the
+        // call — so the deploy follows the file. What an in-app assistant
+        // adds is the SAYING (#335): when a window holds unsaved Course
+        // Settings edits, the conversation is told the deploy used the saved
+        // ones, as the window would be. In-process only: the MCP server is
+        // another process with no window models, so nothing unsaved exists
+        // that it could see, and it says nothing.
+        let notice: String? = SettingsSaveNotice.whenDeployStarts(
+            settingsHaveUnsavedChanges: WorkspaceModel.anyCopyHasUnsavedChanges(configFileURL: course.configFileURL)
+        )
         CourseActivity.beginPublish(
             folderPath: workspaceURL.path, courseCode: course.code, sectionNumber: sectionNumber
         )
@@ -238,6 +248,14 @@ final class AssistToolchainWork: AssistSiteWork {
                 sectionNumber: sectionNumber, holding: holding
             )
             return AssistSiteWorkResult.builtElsewhere(course: course)
+        }
+
+        // Noted once nothing can refuse it any more.
+        if notice != nil {
+            SettingsSaveNotice.noteDeployUsedTheSavedSettings(
+                act: "deployed by the assistant with no section window open",
+                saved: course, windowCourse: nil, sectionNumber: sectionNumber
+            )
         }
 
         // The same sequencer the Deploy button uses. Built separately
@@ -266,6 +284,7 @@ final class AssistToolchainWork: AssistSiteWork {
             if let runner = deployRunner.legs.first?.runner {
                 message = SiteHealthFinding.appending(to: message, from: runner)
             }
+            message = SettingsSaveNotice.addingTheNotice(notice, to: message)
             return AssistSiteWorkResult(succeeded: false, message: message)
         }
 
@@ -275,14 +294,16 @@ final class AssistToolchainWork: AssistSiteWork {
             destinationCount: destinations.count,
             outcome: deployRunner.outcome
         )
-        guard let runner = deployRunner.legs.first?.runner else {
-            return outcome
-        }
+        var message: String = outcome.message
         // Taken from the FIRST leg: every destination publishes the same built
         // site, so a second leg only repeats the same findings.
+        if let runner = deployRunner.legs.first?.runner {
+            message = SiteHealthFinding.appending(to: message, from: runner)
+        }
+        message = SettingsSaveNotice.addingTheNotice(notice, to: message)
         return AssistSiteWorkResult(
             succeeded: outcome.succeeded,
-            message: SiteHealthFinding.appending(to: outcome.message, from: runner),
+            message: message,
             isAboutTheDestination: outcome.isAboutTheDestination
         )
     }

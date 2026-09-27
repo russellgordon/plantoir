@@ -2588,5 +2588,180 @@
         }
       ]
     }
+  },
+  "reDatingASection": {
+    "note": "Re-dating a whole section onto a new timetable (re_date_classes), and what the reply says it did.",
+    "reportedCounts": {
+      "rule": "The reply counts the classes whose date was written and the pages they use whose date was written, each from its own list. Neither count is ever the other subtracted from a total. A page left on its day, or one whose settings leave no room for a date (#186), is counted nowhere. When no class moved and pages they use did, the reply is wording.reDatedOnlyPagesTheyUse rather than 'Re-dated 0 classes'; when no date was written at all it is wording.everyPageIsAlreadyOnItsDay (or, when a page was declined, the declined sentence alone).",
+      "why": "Issue #343: a teacher was told 'Re-dated 14 classes and -4 pages they use'. The reply computed pages as (pages whose date changes) - (every numbered class in the section), but a class already on its day is not among the pages whose date changes, so the subtraction understates and goes negative. Both platforms had the same arithmetic. The class figure was wrong in the same case: it counted every class, not the ones that moved.",
+      "shape": "classes[{title,date,links}] are numbered class pages in the section; pages[{title,visible,date}] are course-level pages; timetable is the list of class dates remembered before re-dating; expect gives the two counts and which wording key the reply begins with.",
+      "cases": [
+        {
+          "name": "every class moves and brings one page",
+          "classes": [
+            {
+              "title": "Unit 1, Day 1",
+              "date": "2025-09-08",
+              "links": [
+                "Worksheet"
+              ]
+            },
+            {
+              "title": "Unit 1, Day 2",
+              "date": "2025-09-10"
+            }
+          ],
+          "pages": [
+            {
+              "title": "Worksheet",
+              "visible": false,
+              "date": "2025-09-08"
+            }
+          ],
+          "timetable": [
+            "2026-09-08",
+            "2026-09-10"
+          ],
+          "expect": {
+            "classesReDated": 2,
+            "pagesTheyUseReDated": 1,
+            "sentence": "reDated"
+          },
+          "why": "The control: the old arithmetic got this one right."
+        },
+        {
+          "name": "classes already on their days, a page one brings moves",
+          "classes": [
+            {
+              "title": "Unit 1, Day 1",
+              "date": "2026-09-08"
+            },
+            {
+              "title": "Unit 1, Day 2",
+              "date": "2026-09-10",
+              "links": [
+                "Worksheet"
+              ]
+            }
+          ],
+          "pages": [
+            {
+              "title": "Worksheet",
+              "visible": false,
+              "date": "2025-01-05"
+            }
+          ],
+          "timetable": [
+            "2026-09-08",
+            "2026-09-10"
+          ],
+          "expect": {
+            "classesReDated": 0,
+            "pagesTheyUseReDated": 1,
+            "sentence": "reDatedOnlyPagesTheyUse"
+          },
+          "why": "The old code said 'Re-dated 2 classes and -1 pages they use'."
+        },
+        {
+          "name": "some classes already on their days",
+          "classes": [
+            {
+              "title": "Unit 1, Day 1",
+              "date": "2026-09-08"
+            },
+            {
+              "title": "Unit 1, Day 2",
+              "date": "2025-09-10"
+            },
+            {
+              "title": "Unit 1, Day 3",
+              "date": "2025-09-14"
+            }
+          ],
+          "pages": [],
+          "timetable": [
+            "2026-09-08",
+            "2026-09-10",
+            "2026-09-14"
+          ],
+          "expect": {
+            "classesReDated": 2,
+            "pagesTheyUseReDated": 0,
+            "sentence": "reDated"
+          },
+          "why": "The old code said 'Re-dated 3 classes and -1 pages they use'."
+        },
+        {
+          "name": "the reported failure's shape",
+          "classes": [
+            {
+              "title": "Unit 1, Day 1",
+              "date": "2026-09-08"
+            },
+            {
+              "title": "Unit 1, Day 2",
+              "date": "2026-09-10"
+            },
+            {
+              "title": "Unit 1, Day 3",
+              "date": "2025-09-14"
+            },
+            {
+              "title": "Unit 1, Day 4",
+              "date": "2025-09-16",
+              "links": [
+                "Worksheet"
+              ]
+            }
+          ],
+          "pages": [
+            {
+              "title": "Worksheet",
+              "visible": false,
+              "date": "2025-09-16"
+            }
+          ],
+          "timetable": [
+            "2026-09-08",
+            "2026-09-10",
+            "2026-09-14",
+            "2026-09-16"
+          ],
+          "expect": {
+            "classesReDated": 2,
+            "pagesTheyUseReDated": 1,
+            "sentence": "reDated"
+          },
+          "why": "The old code said 'Re-dated 4 classes and -1 pages they use'."
+        },
+        {
+          "name": "no date written: an overflow class already on the last day is only hidden",
+          "classes": [
+            {
+              "title": "Unit 1, Day 1",
+              "date": "2026-09-08"
+            },
+            {
+              "title": "Unit 1, Day 2",
+              "date": "2026-09-08"
+            }
+          ],
+          "pages": [],
+          "timetable": [
+            "2026-09-08"
+          ],
+          "expect": {
+            "classesReDated": 0,
+            "pagesTheyUseReDated": 0,
+            "sentence": "everyPageIsAlreadyOnItsDay"
+          },
+          "why": "The plan is not empty (the second class runs out of days and is hidden), but no date is written. The first fix said 'Every class was already on its day, so only the 0 pages they use were re-dated.' (the implementation review's F4); the reply is the no-change sentence instead, wording.everyPageIsAlreadyOnItsDay, rendered for ICS3U section 1. When every move was DECLINED (#186) the reply is the declined sentence alone, because a declined page is not on its day."
+        }
+      ],
+      "appliesOn": [
+        "mac",
+        "windows"
+      ]
+    }
   }
 }

@@ -10,6 +10,12 @@ import Foundation
 /// switches having "no correlation" with the site.
 ///
 /// The decision is kept out of the view so it can be tested without one.
+/// Whose sentence a section window's unsaved-settings banner is (#335).
+enum UnsavedSettingsNoticeOwner: Equatable {
+    case preview
+    case deploy
+}
+
 struct SettingsSaveNotice: Equatable {
 
     // MARK: - Stored properties
@@ -264,6 +270,109 @@ struct SettingsSaveNotice: Equatable {
             return SpecialNames.previewUsesSavedSettings
         }
         return nil
+    }
+
+    /// The same, when a deploy starts (#335) — or nil.
+    static func whenDeployStarts(settingsHaveUnsavedChanges: Bool) -> String? {
+        if settingsHaveUnsavedChanges {
+            return SpecialNames.deployUsesSavedSettings
+        }
+        return nil
+    }
+
+    /// The same, in the schedule sheet (#335) — or nil.
+    static func whenSchedulingOpens(settingsHaveUnsavedChanges: Bool) -> String? {
+        if settingsHaveUnsavedChanges {
+            return SpecialNames.schedulingUsesSavedSettings
+        }
+        return nil
+    }
+
+    /// `message` with the unsaved-settings sentence after it, or `message`
+    /// alone when there is none (#335). The one place a deploy's result gains
+    /// the sentence, for the window's assistant and the headless path alike.
+    static func addingTheNotice(_ notice: String?, to message: String) -> String {
+        guard let notice else {
+            return message
+        }
+        return message + "\n\n" + notice
+    }
+
+    /// The kinds of place a course deploys to, in words for the trail:
+    /// "Netlify", "Cloudflare Pages" or "a folder" — never a path or a site
+    /// name (#335).
+    static func destinationKinds(of configuration: CourseConfiguration) -> [String] {
+        var kinds: [String] = []
+        for destination in configuration.allDeployDestinations {
+            if destination.type == "local_folder" {
+                kinds.append("a folder")
+            } else {
+                kinds.append(DeployCommand.destinationDescription(for: destination))
+            }
+        }
+        return kinds
+    }
+
+    /// Whether any copy of this course holding unsaved edits — `windowCourse`
+    /// or another window's — names a different KIND of destination from the
+    /// saved settings (#335).
+    static func unsavedDestinationDiffers(
+        from saved: Course,
+        windowCourse: Course?,
+        in models: [WorkspaceModel] = WorkspaceModel.windowModels
+    ) -> Bool {
+        let savedKinds: [String] = destinationKinds(of: saved.configuration)
+        var unsavedCopies: [Course] = []
+        if let windowCourse, windowCourse.configuration.hasUnsavedChanges {
+            unsavedCopies.append(windowCourse)
+        }
+        let wantedPath: String = FolderIdentity.canonicalPath(saved.configFileURL.standardizedFileURL.path)
+        for model in models {
+            for course in model.courses where course.configuration.hasUnsavedChanges {
+                let coursePath: String = FolderIdentity.canonicalPath(course.configFileURL.standardizedFileURL.path)
+                if coursePath == wantedPath {
+                    unsavedCopies.append(course)
+                }
+            }
+        }
+        for copy in unsavedCopies {
+            if destinationKinds(of: copy.configuration) != savedKinds {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// The `deploy used the saved settings` line (#335): which act, where the
+    /// saved settings sent it, and whether the unsaved edits named a
+    /// different kind of destination. The one record that the screen and the
+    /// act disagreed — the `settings saved` line is absent, since nothing was
+    /// saved.
+    static func deployUsedTheSavedSettingsLine(act: String, savedKinds: [String], destinationDiffered: Bool) -> String {
+        var line: String = "\(act) while Course Settings had changes nobody saved — used the settings as last saved ("
+            + savedKinds.joined(separator: ", ") + ")"
+        if destinationDiffered {
+            line += "; the unsaved changes named somewhere else to deploy"
+        } else {
+            line += "; the unsaved changes did not change where it deploys"
+        }
+        return line
+    }
+
+    /// Writes that line.
+    static func noteDeployUsedTheSavedSettings(
+        act: String, saved: Course, windowCourse: Course?, sectionNumber: Int
+    ) {
+        ActivityTrail.note(
+            .deployUsedTheSavedSettings,
+            deployUsedTheSavedSettingsLine(
+                act: act,
+                savedKinds: destinationKinds(of: saved.configuration),
+                destinationDiffered: unsavedDestinationDiffers(from: saved, windowCourse: windowCourse)
+            ),
+            course: saved.code,
+            section: sectionNumber
+        )
     }
 
     /// The "settings saved" line for the trail: which sidebar items this Save

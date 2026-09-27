@@ -173,6 +173,7 @@ struct CourseSettingsView: View {
                 Section {
                     StringListEditorView(
                         title: "Shared folders (all sections)",
+                        removalTrail: removalTrail(for: .sharedFolders),
                         items: $configuration.sharedFolders,
                         onRemove: { name in
                             folderWasRemoved(name, scope: .shared)
@@ -210,6 +211,7 @@ struct CourseSettingsView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             MembershipToggleListView(
                                 title: CurriculumFoldersOffer.label,
+                                removalTrail: removalTrail(for: .curriculumFolders),
                                 allItems: offeredCurriculumFolders,
                                 members: curriculumFolderTicksBinding,
                                 protection: curriculumFolderTickProtection
@@ -219,6 +221,7 @@ struct CourseSettingsView: View {
                     }
                     StringListEditorView(
                         title: "Shared files (all sections)",
+                        removalTrail: removalTrail(for: .sharedFiles),
                         hidesMarkdownExtension: true,
                         items: $configuration.sharedFiles,
                         onRemove: { name in
@@ -230,6 +233,7 @@ struct CourseSettingsView: View {
                     )
                     StringListEditorView(
                         title: "Per-section folders",
+                        removalTrail: removalTrail(for: .perSectionFolders),
                         items: $configuration.perSectionFolders,
                         onRemove: { name in
                             folderWasRemoved(name, scope: .perSection)
@@ -262,6 +266,7 @@ struct CourseSettingsView: View {
                     )
                     StringListEditorView(
                         title: "Per-section files",
+                        removalTrail: removalTrail(for: .perSectionFiles),
                         hidesMarkdownExtension: true,
                         items: $configuration.perSectionFiles,
                         onRemove: { name in
@@ -282,6 +287,7 @@ struct CourseSettingsView: View {
                 Section {
                     MembershipToggleListView(
                         title: GradedFolderWording.listTitle,
+                        removalTrail: removalTrail(for: .marks),
                         allItems: marks.choices,
                         members: gradedFoldersBinding(offered: marks.choices),
                         protection: { folder in
@@ -575,6 +581,12 @@ struct CourseSettingsView: View {
     }
 
     // MARK: - Functions
+
+    /// What a blocked removal in one of this course's lists leaves on the
+    /// trail: the course, by its code (#171).
+    func removalTrail(for list: RemovalTrail.List) -> RemovalTrail {
+        return RemovalTrail.inCourseSettings(courseCode: course.code, list: list)
+    }
 
     func save() {
         saveProblem = nil

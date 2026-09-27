@@ -238,12 +238,20 @@ enum SectionReDatePlanner {
         return dates[dates.count - 1]
     }
 
-    /// Carry it out. Returns the change record so it can be undone, and the
+    /// Carry it out. Returns the change record so it can be undone, the
     /// titles of the pages the writer DECLINED — their settings have no place
     /// a new date line can go (#186) — so the reply can name them rather than
-    /// count them among the classes it moved.
+    /// count them, and how many classes and pages they use actually had a
+    /// new date WRITTEN (#343).
+    ///
+    /// **The two counts come from what was written, each from its own kind.**
+    /// The reply used to say `moves.count - classCount` pages, but
+    /// `classCount` counts every numbered class while `moves` holds only the
+    /// pages whose date changes — so a section with some classes already on
+    /// their days was told "Re-dated 14 classes and -4 pages they use". A
+    /// page left on its day, or declined, is counted nowhere.
     static func apply(_ plan: SectionReDatePlan, forSection sectionNumber: Int, in course: Course)
-        throws -> (change: AssistChange, leftAlone: [String]) {
+        throws -> (change: AssistChange, leftAlone: [String], classesReDated: Int, pagesTheyUseReDated: Int) {
         let tail: String = ClassPages.siblingTimeAndOffset(
             from: ClassPages.list(forSection: sectionNumber, in: course),
             forSection: sectionNumber
@@ -251,6 +259,8 @@ enum SectionReDatePlanner {
 
         var saved: [AssistSavedFile] = []
         var leftAlone: [String] = []
+        var classesReDated: Int = 0
+        var pagesTheyUseReDated: Int = 0
         for move in plan.moves {
             let before: String = try String(contentsOf: move.fileURL, encoding: .utf8)
             let dated: (text: String, outcome: FrontmatterWriteOutcome) = PageFrontmatter.settingCreated(
@@ -280,6 +290,14 @@ enum SectionReDatePlanner {
             if declined {
                 leftAlone.append(move.fileURL.deletingPathExtension().lastPathComponent)
             }
+            if dated.outcome == .written {
+                switch move.reason {
+                case .aClass:
+                    classesReDated += 1
+                case .broughtBy, .yearRound:
+                    pagesTheyUseReDated += 1
+                }
+            }
             if after == before {
                 continue
             }
@@ -291,15 +309,25 @@ enum SectionReDatePlanner {
             saved.append(repointed)
         }
 
+        // The undo line names what MOVED (#343), not every class in the section.
+        let whatHappened: String
+        if classesReDated == 0 {
+            whatHappened = "re-dated what the classes use"
+        } else {
+            whatHappened = "re-dated \(classesReDated) "
+                         + "\(classesReDated == 1 ? "class" : "classes") and what they use"
+        }
         let change: AssistChange = AssistChange(
-            whatHappened: "re-dated \(plan.classCount) "
-                        + "\(plan.classCount == 1 ? "class" : "classes") and what they use",
+            whatHappened: whatHappened,
             courseCode: course.code,
             sectionNumber: sectionNumber,
             rebuildsThePreview: true,
             files: saved
         )
-        return (change: change, leftAlone: leftAlone)
+        return (
+            change: change, leftAlone: leftAlone,
+            classesReDated: classesReDated, pagesTheyUseReDated: pagesTheyUseReDated
+        )
     }
 }
 

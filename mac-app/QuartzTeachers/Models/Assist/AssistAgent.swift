@@ -1243,10 +1243,11 @@ final class AssistAgent {
         // has a `plan_` twin that works the change out and changes nothing,
         // so this is the assistant answering "what would that do?" in words
         // before it does it.
-        // The twin has to actually exist. Four writes are their own reversal
+        // The twin has to actually exist. Five writes are their own reversal
         // and have none — rebuild_preview changes no page, undo_last_change
-        // IS the undo, deploy_section already waits on its own button, and
-        // cancelling a scheduled deploy is remedied by scheduling it again.
+        // IS the undo, deploy_section already waits on its own button,
+        // cancelling a scheduled deploy is remedied by scheduling it again,
+        // and back_up_course writes a copy outside the course (#343).
         // Asking the surface rather than assuming keeps that list in ONE
         // place: without this check, plan mode would ask for a tool that is
         // not there and show the teacher an error where their plan should be.

@@ -58,6 +58,11 @@ nonisolated enum ActivityTrail {
         /// A preview started while Course Settings held changes nobody had
         /// saved, and the teacher was told it uses the saved settings (#265).
         case previewStartedWithUnsavedSettings = "preview started with unsaved settings"
+        /// A deploy, or setting one, went ahead from the SAVED settings while
+        /// Course Settings held changes nobody had saved (#335): carries which
+        /// act, and whether the unsaved destination differed from the saved
+        /// one — by kind only, never a path or a site name.
+        case deployUsedTheSavedSettings = "deploy used the saved settings"
         /// Preview Again, pressed beside the sentence Course Settings shows
         /// after a Save that an open preview could not see (#265).
         case previewAgainAfterSettingsSaved = "preview again after settings saved"
@@ -478,7 +483,9 @@ nonisolated enum ActivityTrail {
         /// feature depends on, and was shown why it cannot go and which
         /// switch to turn off first. Recorded because "I could not remove
         /// the folder" is a report support will receive, and the line says
-        /// which rule refused and what the teacher was told.
+        /// which rule refused and what the teacher was told — and, since
+        /// #171, which course and which screen: "new course SNC4M: …" in the
+        /// New Course wizard, "SNC4M: …" in Course Settings (`RemovalTrail`).
         case removalBlocked = "removal blocked"
         /// A folder was renamed from inside Plantoir — on disk, in every
         /// section that had one, with the config keys that named it carried

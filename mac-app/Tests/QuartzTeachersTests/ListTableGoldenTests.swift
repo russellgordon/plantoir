@@ -69,6 +69,7 @@ final class ListTableGoldenTests: XCTestCase {
         let box: ListBox = ListBox(["All Classes", "Tasks"])
         let editor: StringListEditorView = StringListEditorView(
             title: "Per-section folders",
+            removalTrail: RemovalTrail.inNewCourse(typedCode: "snc4m", list: .perSectionFolders),
             items: box.binding,
             protection: { folder in
                 if folder == "All Classes" {
@@ -80,10 +81,47 @@ final class ListTableGoldenTests: XCTestCase {
         let question: PendingRemoval? = editor.requestRemoval(of: "All Classes")
         XCTAssertNil(question)
         XCTAssertEqual(box.names, ["All Classes", "Tasks"], "A blocked folder was removed")
-        XCTAssertTrue(trailText().contains("was told All Classes cannot be removed from Per-section folders — "))
+        XCTAssertTrue(
+            trailText().contains(
+                "new course SNC4M: could not remove “All Classes” from the per-section folders — "
+                    + SpecialNames.classFolderBlocked
+            ),
+            trailText()
+        )
 
         editor.requestRemoval(of: "Tasks")
         XCTAssertEqual(box.names, ["All Classes"])
+    }
+
+    /// The row's info button and a blocked −/Delete/Remove leave the SAME
+    /// trail line (#171) — `documentation/09-mac-app.md` promises it, and
+    /// until this test nothing held the two together.
+    func testTheInfoButtonWritesTheSameLineAsABlockedRemoval() throws {
+        let box: ListBox = ListBox(["All Classes"])
+        let editor: StringListEditorView = StringListEditorView(
+            title: "Per-section folders (all sections)",
+            removalTrail: RemovalTrail.inCourseSettings(courseCode: "SNC4M", list: .perSectionFolders),
+            items: box.binding,
+            protection: { folder in
+                return .blocked(reason: SpecialNames.classFolderBlocked)
+            }
+        )
+        editor.requestRemoval(of: "All Classes")
+        editor.explainWhyBlocked("All Classes", reason: SpecialNames.classFolderBlocked)
+
+        var blockedLines: [String] = []
+        for line in trailText().components(separatedBy: "\n") {
+            if line.contains("could not remove") {
+                blockedLines.append(line)
+            }
+        }
+        XCTAssertEqual(blockedLines.count, 2, trailText())
+        let first: String = try XCTUnwrap(blockedLines.first)
+        let second: String = try XCTUnwrap(blockedLines.last)
+        let firstSentence: String = try XCTUnwrap(first.components(separatedBy: "SNC4M: ").last)
+        let secondSentence: String = try XCTUnwrap(second.components(separatedBy: "SNC4M: ").last)
+        XCTAssertEqual(firstSentence, secondSentence, "the info button and the − button wrote different lines")
+        XCTAssertFalse(first.contains("new course"), "a Course Settings refusal was written as the wizard's")
     }
 
     /// A consequential removal asks first and removes nothing until
@@ -92,6 +130,7 @@ final class ListTableGoldenTests: XCTestCase {
         let box: ListBox = ListBox(["Tasks", "Tests"])
         let editor: StringListEditorView = StringListEditorView(
             title: "Shared folders",
+            removalTrail: RemovalTrail.inCourseSettings(courseCode: "SNC4M", list: .sharedFolders),
             items: box.binding,
             protection: { folder in
                 return .consequential(title: "Remove?", message: "Sure?")
@@ -186,6 +225,7 @@ final class TableCourseSettingsGestures: ListGestureAdapter {
         }
         let list: MembershipToggleListView = MembershipToggleListView(
             title: GradedFolderWording.listTitle,
+            removalTrail: view.removalTrail(for: .marks),
             allItems: view.gradedFolderChoices,
             members: view.gradedFoldersBinding,
             protection: view.gradedFolderProtection
@@ -233,6 +273,7 @@ final class TableWizardGestures: ListGestureAdapter {
         }
         let list: MembershipToggleListView = MembershipToggleListView(
             title: GradedFolderWording.listTitle,
+            removalTrail: state.wizard().removalTrail(for: .marks),
             allItems: state.wizard().gradedFolderChoices,
             members: state.gradedFoldersBinding,
             protection: { folder in return self.state.wizard().wizardGradedFolderProtection(for: folder) }

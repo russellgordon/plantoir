@@ -152,13 +152,22 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
     /// No under tests; no for the assistant's server, a scheduled publish, or
     /// writing the contracts (each read from its own constant, never retyped);
     /// no when the bundle has no feed — every development build.
+    ///
+    /// No under a state folder (#154), whatever the bundle carries: the
+    /// updater keeps its own values in the REAL preferences domain (it opens
+    /// the host bundle's defaults itself, past `PlantoirDefaults`) and could
+    /// replace the app a test is driving.
     nonisolated static func shouldStart(
         infoDictionary: [String: Any],
         arguments: [String],
         isRunningTests: Bool,
+        stateDirectory: URL?,
         headlessFlags: [String]
     ) -> Bool {
         if isRunningTests {
+            return false
+        }
+        if stateDirectory != nil {
             return false
         }
         for flag in headlessFlags {
@@ -457,7 +466,7 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
             // has written them, at the end of the session.
             var saved: [String: Any?] = [:]
             for key in AppUpdates.skippedVersionKeys {
-                saved[key] = UserDefaults.standard.object(forKey: key)
+                saved[key] = PlantoirDefaults.shared.object(forKey: key)
             }
             skippedVersionsToRestore = saved
         }
@@ -485,9 +494,9 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
         skippedVersionsToRestore = nil
         for (key, value) in saved {
             if let value {
-                UserDefaults.standard.set(value, forKey: key)
+                PlantoirDefaults.shared.set(value, forKey: key)
             } else {
-                UserDefaults.standard.removeObject(forKey: key)
+                PlantoirDefaults.shared.removeObject(forKey: key)
             }
         }
     }
@@ -520,7 +529,7 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
             UpdateTrail.installingLine(from: AppUpdates.runningVersion, to: version, moment: moment)
         )
         if let versionInHand {
-            UserDefaults.standard.set(versionInHand, forKey: UpdateTrail.installingVersionKey)
+            PlantoirDefaults.shared.set(versionInHand, forKey: UpdateTrail.installingVersionKey)
         }
     }
 
@@ -694,7 +703,7 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
 
     /// Writes `app updated` when this launch's version differs from the last
     /// one's — by its own updater, or by hand.
-    static func noteIfThisIsANewVersion(defaults: UserDefaults = UserDefaults.standard) {
+    static func noteIfThisIsANewVersion(defaults: UserDefaults = PlantoirDefaults.shared) {
         if let line = UpdateTrail.appUpdatedLine(current: AppUpdates.runningVersion, defaults: defaults) {
             ActivityTrail.note(.appUpdated, line)
         }

@@ -73,7 +73,7 @@ struct AssistPromptShelfView: View {
     /// Stored as one string because `@AppStorage` holds no sets. Group titles
     /// contain no `|`, so it is a safe separator; a title that ever does will
     /// simply be forgotten rather than corrupting the rest.
-    @AppStorage("AssistPromptShelfOpenGroups") private var openGroupsRaw: String = ""
+    @AppStorage("AssistPromptShelfOpenGroups", store: PlantoirDefaults.shared) private var openGroupsRaw: String = ""
 
     /// How tall the groups actually are, measured.
     @State private var contentHeight: CGFloat = 0

@@ -13,6 +13,23 @@ struct QuartzTeachersApp: App {
     // MARK: - Initializer
 
     init() {
+        // A folder standing in for the home folder (#154), checked before
+        // ANYTHING else — before the server, the scheduled run and the
+        // contracts below, which all keep state of their own. A malformed flag
+        // ends the launch here: a redirect that silently did not happen is a
+        // test that reports success while writing the teacher's real trail.
+        do {
+            if let stateDirectory = try RealHome.stateDirectory(fromArguments: CommandLine.arguments) {
+                try FileManager.default.createDirectory(at: stateDirectory, withIntermediateDirectories: true)
+            }
+        } catch let problem as RealHome.StateDirectoryProblem {
+            FileHandle.standardError.write(Data(("Plantoir: " + problem.explanation + "\n").utf8))
+            exit(64)
+        } catch {
+            FileHandle.standardError.write(Data(("Plantoir: could not create the state folder: \(error)\n").utf8))
+            exit(64)
+        }
+
         // Claude Code drives the same tools the built-in assistant does, by
         // launching this binary with --mcp-stdio. Checked FIRST, and it never
         // returns: a server must not put a window on screen, register fonts,
