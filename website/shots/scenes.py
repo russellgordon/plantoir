@@ -94,7 +94,7 @@ SCENES: list[Scene] = [
         identifiers=["referenceYear-", "copyAPage-", "copyPageDestinationCourse", "copyPageChecklist",
                      "copyPageRefusal"],
         what_it_sets_up="Reference Courses › 2025–26 unfolded; Copy a Page from the reference ICS3U, "
-                        "\"The Unplugged Algorithm\" into ICS4U, with its linked pages listed; cancelled.",
+                        "\"The Unplugged Algorithm\" into ICS4U with its linked pages coming too, before Copy is pressed; cancelled.",
     ),
     Scene(
         name="start-of-year", produces=["start-of-year"], kind="ui-test", test="testGetReadyForTheStartOfTheYear",
@@ -546,8 +546,36 @@ class ObsidianRegistryKept:
         self.was_running: bool = subprocess.run(["pgrep", "-x", "Obsidian"], capture_output=True).returncode == 0
         return self
 
+    def register(self, vault: Path) -> bool:
+        """Make `vault` a known vault, so `obsidian://open?path=` can find it.
+
+        Opening a note by path works ONLY for a folder already in the list:
+        otherwise Obsidian says "Vault not found" (measured 2026-09-27, two
+        such dialogs left over a teacher's windows). The entry is written
+        only while Obsidian is NOT running — it keeps the list in memory and
+        would overwrite it — and goes when the saved list is put back. With
+        Obsidian already open, the scene is refused: somebody's open notes
+        are theirs, and quitting it is not the capture's to do.
+        """
+        if self.was_running:
+            return False
+        import secrets
+        registry = json.loads(OBSIDIAN_REGISTRY.read_text(encoding="utf-8")) if OBSIDIAN_REGISTRY.exists() else {}
+        vaults = registry.setdefault("vaults", {})
+        for entry in vaults.values():
+            if entry.get("path") == str(vault):
+                return True
+        vaults[secrets.token_hex(8)] = {"path": str(vault), "ts": int(time.time() * 1000), "open": True}
+        OBSIDIAN_REGISTRY.parent.mkdir(parents=True, exist_ok=True)
+        OBSIDIAN_REGISTRY.write_text(json.dumps(registry), encoding="utf-8")
+        return True
+
     def __exit__(self, exc_type, exc_value, traceback) -> bool:
         if self.saved is None:
+            if not self.was_running and OBSIDIAN_REGISTRY.exists():
+                subprocess.run(["osascript", "-e", 'quit app "Obsidian"'], capture_output=True)
+                time.sleep(2)
+                OBSIDIAN_REGISTRY.unlink()
             return False
         if not self.was_running:
             subprocess.run(["osascript", "-e", 'quit app "Obsidian"'], capture_output=True)
