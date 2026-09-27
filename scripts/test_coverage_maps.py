@@ -212,8 +212,13 @@ class WhichFolders(unittest.TestCase):
                 for name in case["folders"]:
                     (root / name).mkdir()
                     write(root / name / "index.md", "x")
+                # A folder in withPages holds a LETTER-FIRST page unless the
+                # case lists letter-first holders separately; the rest hold only
+                # a College Board skill, which the fallback takes last.
+                letter_first = case.get("withLetterFirstPages", case["withPages"])
                 for name in case["withPages"]:
-                    write(root / name / "Unit 1" / "A1.1.md", "x")
+                    stem = "A1.1" if name in letter_first else "1.A"
+                    write(root / name / "Unit 1" / f"{stem}.md", "x")
                 config = {"curriculum_folders": case["curriculumFolders"],
                           "curriculum_folder": case["curriculumFolder"]}
                 configured = build_site.configured_curriculum_folders(config)
@@ -294,6 +299,45 @@ class TwoMaps(unittest.TestCase):
             # A map is never a lesson, whatever it is called.
             self.assertFalse(build_site._is_class_page(Path("College Board Curriculum Coverage.md")))
 
+    def test_a_map_goes_under_its_own_folder_whichever_comes_first(self):
+        # With several maps the wording fallback ("…curriculum expectations]]")
+        # must not apply: here the College Board bullet is FIRST and the
+        # wording bullet names Ontario, and each map still goes under its own.
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.make(root)
+            write(root / "Key Links.md", "---\ntitle: Key Links\n---\n"
+                  "- [[College Board Curriculum/index|College Board]]\n"
+                  "- [[Ontario Curriculum/index|Curriculum expectations]]\n"
+                  "- [[Course Outline]]\n")
+            build(root, ["Ontario Curriculum", "College Board Curriculum"])
+            lines = (root / "Key Links.md").read_text(encoding="utf-8").split("\n")
+            board = lines.index("- [[College Board Curriculum/index|College Board]]")
+            self.assertEqual(lines[board + 1], "- [[College Board Curriculum Coverage]]")
+            ontario = lines.index("- [[Ontario Curriculum/index|Curriculum expectations]]")
+            self.assertEqual(lines[ontario + 1], "- [[Curriculum Coverage]]")
+
+    def test_a_teachers_own_page_by_a_second_maps_name_is_the_health_fact(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.make(root)
+            configured = ["Ontario Curriculum", "College Board Curriculum"]
+            plan = build_site.plan_coverage_maps(root, configured)
+            self.assertIsNone(build_site.hand_written_coverage_page(root, plan))
+            write(root / "College Board Curriculum Coverage.md", "my own notes")
+            self.assertEqual(build_site.hand_written_coverage_page(root, plan),
+                             "College Board Curriculum Coverage")
+            self.assertEqual(build_site.hand_written_coverage_page(root, []), None)
+            write(root / "Curriculum Coverage.md", "mine too")
+            self.assertEqual(build_site.hand_written_coverage_page(root, []), "Curriculum Coverage")
+
+    def test_one_map_names_no_folder_on_the_console(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            make_ontario_course(root, "Curriculum")
+            _, console = build(root, ["Curriculum"])
+            self.assertIn("🗺️  Curriculum Coverage: 4 expectations", console)
+
     def test_the_marker(self):
         use_the_repository_contracts()
         lines = []
@@ -329,8 +373,9 @@ class TwoMaps(unittest.TestCase):
             root = Path(temp)
             self.make(root)
             maps, _ = build(root, [])
-            self.assertEqual([item["folder"] for item in maps], ["College Board Curriculum"],
-                             "the scan is a fallback: one folder, the alphabetically first with pages")
+            self.assertEqual([item["folder"] for item in maps], ["Ontario Curriculum"],
+                             "the fallback prefers a folder of letter-first codes, as before #128 — "
+                             "College Board's 1.A pages must not take Ontario's map")
             maps, _ = build(root, ["Ontario Curriculum"])
             self.assertEqual([item["folder"] for item in maps], ["Ontario Curriculum"])
 
@@ -339,10 +384,12 @@ class OneMapIsUnchanged(unittest.TestCase):
     """T5: byte for byte what origin/dev wrote, for a Curriculum/ course and for
     the LCS default (Ontario with pages, College Board empty, nothing declared)."""
 
-    def run_fixture(self, folder, second, configured):
+    def run_fixture(self, folder, second, configured, board_pages=()):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / "content"
             make_ontario_course(root, folder, second)
+            for stem in board_pages:
+                write(root / second / f"{stem}.md", f"---\ntitle: {stem}\n---\nA skill.\n")
             maps, _ = build(root, configured)
             build_site.link_coverage_from_key_links(root, maps)
             backlinks = Path(temp) / "Backlinks.tsx"
@@ -362,6 +409,15 @@ class OneMapIsUnchanged(unittest.TestCase):
 
     def test_the_lcs_default(self):
         self.assertEqual(self.run_fixture("Ontario Curriculum", "College Board Curriculum", []),
+                         GOLDEN["lcs"])
+
+    def test_the_lcs_default_with_college_board_pages_and_nothing_declared(self):
+        # The #128 review's finding 1: College Board sorts first, and its `1.A`
+        # pages are expectations now — the undeclared fallback must still pick
+        # Ontario's letter-first pages, byte for byte what ff1213ed built.
+        def with_board_pages(folder, second, configured):
+            return self.run_fixture(folder, second, configured, board_pages=["1.A", "1.B"])
+        self.assertEqual(with_board_pages("Ontario Curriculum", "College Board Curriculum", []),
                          GOLDEN["lcs"])
 
     def test_the_lcs_default_declared_in_the_order_the_apps_write(self):

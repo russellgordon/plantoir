@@ -260,8 +260,11 @@ enum CurriculumFolderRule {
     /// The folders the build draws a coverage map from, primary first.
     ///
     /// `withPages` names the folders (as the LIST spells them) that hold at
-    /// least one expectation page.
-    nonisolated static func mappedFolders(declared: [String], in folders: [String], withPages: [String]) -> [String] {
+    /// least one expectation page; `withLetterFirstPages` the ones among them
+    /// holding a letter-first page (`A1.1`) — nil means all of them.
+    nonisolated static func mappedFolders(
+        declared: [String], in folders: [String], withPages: [String], withLetterFirstPages: [String]? = nil
+    ) -> [String] {
         var mapped: [String] = []
         for name in declared {
             guard let folder = folderNamed(name, in: folders) else {
@@ -275,6 +278,16 @@ enum CurriculumFolderRule {
         if !mapped.isEmpty {
             return mapped
         }
+        // The fallback keeps its pre-#128 answer: a folder of letter-first
+        // codes first, and only then a folder of any codes — or a College
+        // Board folder of `1.A` pages, sorting first, would take Ontario's map
+        // on a course that declared nothing (the #128 review's finding 1).
+        let letterFirst: [String] = withLetterFirstPages ?? withPages
+        for candidate in foldersMentioningTheCurriculum(in: folders) {
+            if withPages.contains(candidate) && letterFirst.contains(candidate) {
+                return [candidate]
+            }
+        }
         for candidate in foldersMentioningTheCurriculum(in: folders) {
             if withPages.contains(candidate) {
                 return [candidate]
@@ -287,8 +300,12 @@ enum CurriculumFolderRule {
     /// folder holds an expectation page — the ONE folder the by-name rule
     /// gives: the first declared name the course has, else the alphabetically
     /// first folder whose name mentions the curriculum.
-    nonisolated static func resolvedFolders(declared: [String], in folders: [String], withPages: [String]) -> [String] {
-        let mapped: [String] = mappedFolders(declared: declared, in: folders, withPages: withPages)
+    nonisolated static func resolvedFolders(
+        declared: [String], in folders: [String], withPages: [String], withLetterFirstPages: [String]? = nil
+    ) -> [String] {
+        let mapped: [String] = mappedFolders(
+            declared: declared, in: folders, withPages: withPages, withLetterFirstPages: withLetterFirstPages
+        )
         if !mapped.isEmpty {
             return mapped
         }
@@ -343,23 +360,38 @@ enum CurriculumFolderRule {
     }
 
     /// Every map's title for a course, from the declared names and the disk.
-    nonisolated static func coveragePageTitles(declared: [String], in folders: [String], withPages: [String]) -> [String] {
-        let mapped: [String] = mappedFolders(declared: declared, in: folders, withPages: withPages)
+    nonisolated static func coveragePageTitles(
+        declared: [String], in folders: [String], withPages: [String], withLetterFirstPages: [String]? = nil
+    ) -> [String] {
+        let mapped: [String] = mappedFolders(
+            declared: declared, in: folders, withPages: withPages, withLetterFirstPages: withLetterFirstPages
+        )
         return coveragePageTitles(for: mapped, primary: primaryFolder(declared: declared, mapped: mapped))
     }
 
     /// Which of `names` hold at least one expectation page anywhere inside —
     /// the same test the build makes (`_holds_expectation_pages`), recursive,
     /// with the same code rule (`AssistCurriculumMentions.isExpectationCode`).
-    nonisolated static func foldersHoldingExpectationPages(in courseDirectory: URL, among names: [String]) -> [String] {
+    nonisolated static func foldersHoldingExpectationPages(
+        in courseDirectory: URL, among names: [String], letterFirstOnly: Bool = false
+    ) -> [String] {
         var holding: [String] = []
         for name in names {
             let folder: URL = courseDirectory.appendingPathComponent(name, isDirectory: true)
-            if folderHoldsAnExpectationPage(folder) {
+            if folderHoldsAnExpectationPage(folder, letterFirstOnly: letterFirstOnly) {
                 holding.append(name)
             }
         }
         return holding
+    }
+
+    /// Whether a code is Ontario's letter-first shape (`A1.1`, `b2.3`), the
+    /// only shape there was before #128.
+    nonisolated static func isLetterFirstCode(_ code: String) -> Bool {
+        guard let first = code.unicodeScalars.first else {
+            return false
+        }
+        return CharacterSet.letters.contains(first) && !code.contains("-")
     }
 
     /// The names worth looking inside: every declared folder the course has,
@@ -392,15 +424,27 @@ enum CurriculumFolderRule {
     /// for nothing. The window is short because a teacher can add the first
     /// page in Obsidian while the window is open.
     static func foldersWithPages(for course: Course) -> [String] {
+        return pagesOnDisk(for: course, letterFirstOnly: false)
+    }
+
+    /// The same, counting only letter-first pages — what the fallback prefers.
+    static func foldersWithLetterFirstPages(for course: Course) -> [String] {
+        return pagesOnDisk(for: course, letterFirstOnly: true)
+    }
+
+    private static func pagesOnDisk(for course: Course, letterFirstOnly: Bool) -> [String] {
         let configuration: CourseConfiguration = course.configuration
         let candidates: [String] = candidateFolders(declared: declaredFolders(of: configuration),
                                                     in: configuration.sharedFolders)
-        let key: String = course.directoryURL.path + "\u{0}" + candidates.joined(separator: "\u{0}")
+        let key: String = course.directoryURL.path + (letterFirstOnly ? "\u{1}" : "\u{0}")
+            + candidates.joined(separator: "\u{0}")
         let now: Date = Date()
         if let remembered = recentlyRead[key], now.timeIntervalSince(remembered.when) < 2 {
             return remembered.holding
         }
-        let holding: [String] = foldersHoldingExpectationPages(in: course.directoryURL, among: candidates)
+        let holding: [String] = foldersHoldingExpectationPages(
+            in: course.directoryURL, among: candidates, letterFirstOnly: letterFirstOnly
+        )
         recentlyRead[key] = (when: now, holding: holding)
         return holding
     }
@@ -413,7 +457,8 @@ enum CurriculumFolderRule {
         let configuration: CourseConfiguration = course.configuration
         return resolvedFolders(declared: declaredFolders(of: configuration),
                                in: configuration.sharedFolders,
-                               withPages: foldersWithPages(for: course))
+                               withPages: foldersWithPages(for: course),
+                               withLetterFirstPages: foldersWithLetterFirstPages(for: course))
     }
 
     // MARK: - Stored properties
@@ -457,7 +502,7 @@ enum CurriculumFolderRule {
         return true
     }
 
-    nonisolated private static func folderHoldsAnExpectationPage(_ folder: URL) -> Bool {
+    nonisolated private static func folderHoldsAnExpectationPage(_ folder: URL, letterFirstOnly: Bool) -> Bool {
         guard let enumerator = FileManager.default.enumerator(
             at: folder, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]
         ) else {
@@ -467,9 +512,14 @@ enum CurriculumFolderRule {
             if url.pathExtension.lowercased() != "md" {
                 continue
             }
-            if AssistCurriculumMentions.isExpectationCode(url.deletingPathExtension().lastPathComponent) {
-                return true
+            let code: String = url.deletingPathExtension().lastPathComponent
+            if !AssistCurriculumMentions.isExpectationCode(code) {
+                continue
             }
+            if letterFirstOnly && !isLetterFirstCode(code) {
+                continue
+            }
+            return true
         }
         return false
     }
@@ -566,14 +616,12 @@ enum CurriculumFoldersOffer {
         return offered
     }
 
-    /// The folders shown ticked: the ones the build maps, or — while none
-    /// holds a page — the declared folders the course has. Never a folder
-    /// just because of its name.
+    /// The folders shown ticked: the ones the build maps, then every declared
+    /// folder the course has, in declared order — so a folder ticked before
+    /// its first page is written stays ticked (the #128 review's finding 2).
+    /// Never a folder just because of its name.
     nonisolated static func ticked(folders: [String], declared: [String], mapped: [String]) -> [String] {
-        if !mapped.isEmpty {
-            return mapped
-        }
-        var ticked: [String] = []
+        var ticked: [String] = mapped
         for name in declared {
             for folder in folders where folder.lowercased() == name.lowercased() && !ticked.contains(folder) {
                 ticked.append(folder)

@@ -503,7 +503,8 @@ enum SpecialFolderRenamer {
         to newName: String,
         scope: FolderScope,
         in values: [String: Any],
-        foldersWithPages: [String] = []
+        foldersWithPages: [String] = [],
+        foldersWithLetterFirstPages: [String]? = nil
     ) -> [String: Any] {
         var updated: [String: Any] = values
 
@@ -523,7 +524,8 @@ enum SpecialFolderRenamer {
             list: values["curriculum_folders"], legacy: values["curriculum_folder"]
         )
         let resolvedCurriculum: [String] = CurriculumFolderRule.resolvedFolders(
-            declared: declaredCurriculum, in: sharedFolders, withPages: foldersWithPages
+            declared: declaredCurriculum, in: sharedFolders, withPages: foldersWithPages,
+            withLetterFirstPages: foldersWithLetterFirstPages
         )
         var wasACurriculumFolder: Bool = false
         if scope == .shared {
@@ -563,6 +565,11 @@ enum SpecialFolderRenamer {
                 }
             }
             updated["curriculum_folders"] = materialised
+            // The primary folder in the legacy key too, for an older Plantoir
+            // that reads only that one (Russell's ruling on the #128 review).
+            if let primary = materialised.first {
+                updated["curriculum_folder"] = primary
+            }
         }
 
         // Three flat lists that name folders from EITHER scope, so each is

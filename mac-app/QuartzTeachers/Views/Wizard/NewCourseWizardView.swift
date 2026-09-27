@@ -180,9 +180,11 @@ struct NewCourseWizardView: View {
         classFolderName: String = ClubVocabulary.course.classFolder,
         unitWord: String = ClassPageTerm.standard,
         frontPageHeading: String = ClubVocabulary.course.frontPageHeading,
-        classNoun: ClassNoun = ClubVocabulary.course.noun
+        classNoun: ClassNoun = ClubVocabulary.course.noun,
+        curriculumFolderTicks: [String]? = nil
     ) {
         _creator = State(initialValue: creator)
+        _curriculumFolderTicks = State(initialValue: curriculumFolderTicks)
         if startedForTesting {
             _hasStarted = State(initialValue: true)
         }
@@ -1919,8 +1921,11 @@ struct NewCourseWizardView: View {
             for name in curriculumFolderTicks where chosenSharedFolders.contains(name) {
                 declared.append(name)
             }
-            if !declared.isEmpty {
+            if let primary = declared.first {
                 config["curriculum_folders"] = declared
+                // The primary in the legacy key as well, for an older Plantoir
+                // that reads only that one (the #128 review's ruling).
+                config["curriculum_folder"] = primary
             }
         }
 

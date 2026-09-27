@@ -4620,7 +4620,7 @@
       "why": "Asked, rather than refused, when the coverage map is on and the course has ANOTHER curriculum folder with a map (#128): the course keeps a map, so removing this one is allowed, but it is not a small thing. It does not promise that another map stays - the plan's first draft did, and on the default LCS course (College Board empty) that sentence was false in both directions."
     },
     "curriculumFoldersResolution": {
-      "note": "Which curriculum folders a course has, for the build's maps and for what both apps protect and name (#128). DECLARED names come first: curriculum_folders, in order, then the legacy curriculum_folder if it is not already there (null, empty, non-string and path-like entries dropped; repeats compared ignoring letter case). `mapped` is the build's answer: every declared folder among `folders` that holds an expectation page (`withPages`, found in any letter case, the LIST's spelling kept), in declared order - or, when none does, the ONE folder the old scan finds: the alphabetically first whose name mentions 'curriculum' and holds a page. `resolved` is what the apps protect and name: `mapped` when it is not empty, otherwise the single folder the old by-name rule gives - the first declared name in the list, else the alphabetically first name mentioning 'curriculum' - so a course whose folders are still empty is protected exactly as before. `titles` is curriculumRules.coveragePageTitles over `mapped`. The build reads the merged tree on disk; the apps read the course folder's SHARED folders on disk (withPages); the wizard, which has no disk yet, treats the payload's declared folder as holding pages when curriculum pages are being installed.",
+      "note": "Which curriculum folders a course has, for the build's maps and for what both apps protect and name (#128). DECLARED names come first: curriculum_folders, in order, then the legacy curriculum_folder if it is not already there (null, empty, non-string and path-like entries dropped; repeats compared ignoring letter case). `mapped` is the build's answer: every declared folder among `folders` that holds an expectation page (`withPages`, found in any letter case, the LIST's spelling kept), in declared order - or, when none does, the ONE folder the old scan finds: the alphabetically first whose name mentions 'curriculum' and holds a LETTER-FIRST page (`A1.1`, the only shape before #128), and only when none does, the first holding any expectation page. `withLetterFirstPages`, when a case gives it, names the folders among `withPages` holding a letter-first page; absent, every folder in `withPages` does. `resolved` is what the apps protect and name: `mapped` when it is not empty, otherwise the single folder the old by-name rule gives - the first declared name in the list, else the alphabetically first name mentioning 'curriculum' - so a course whose folders are still empty is protected exactly as before. `titles` is curriculumRules.coveragePageTitles over `mapped`. The build reads the merged tree on disk; the apps read the course folder's SHARED folders on disk (withPages); the wizard, which has no disk yet, treats the payload's declared folder as holding pages when curriculum pages are being installed.",
       "why": "Replaces curriculumFolderResolution, deleted rather than kept beside this: its Ontario/College Board case asserted the tie #90 described - the apps protecting College Board while the build mapped Ontario - and a case kept alive describes a rule that no longer exists while passing. Deciding from pages on disk is the plan review's finding 1: on the default LCS course College Board is empty, and a by-name rule protected it and told a teacher removing Ontario that another map would remain. Maps only for DECLARED folders, not every folder whose name mentions 'curriculum' (Russell's ruling on #128): an archived copy of a revised curriculum kept beside the current one would otherwise gain a second, overlapping map. Both apps OFFER to declare such a folder (curriculumFoldersOffer); neither declares one silently.",
       "cases": [
         {
@@ -4748,7 +4748,7 @@
           "why": "The by-name rule named College Board here (the #90 tie). The map is Ontario's, so Ontario is the folder named and protected."
         },
         {
-          "name": "nothing declared, both hold pages: still ONE map",
+          "name": "nothing declared, both hold letter-first pages: still ONE map",
           "curriculumFolder": null,
           "curriculumFolders": null,
           "folders": [
@@ -4768,7 +4768,61 @@
           "titles": [
             "Curriculum Coverage"
           ],
-          "why": "The scan is a fallback, not additive: a second map comes from declaring the folder. What the build did before #128 for this course, unchanged."
+          "why": "The scan is a fallback, not additive: a second map comes from declaring the folder. Both folders hold A1.1-style pages here, so this is what the build did before #128, unchanged.",
+          "withLetterFirstPages": [
+            "College Board Curriculum",
+            "Ontario Curriculum"
+          ]
+        },
+        {
+          "name": "the LCS course of #90: nothing declared, College Board holds 1.A pages",
+          "curriculumFolder": null,
+          "curriculumFolders": null,
+          "folders": [
+            "College Board Curriculum",
+            "Ontario Curriculum",
+            "Tasks"
+          ],
+          "withPages": [
+            "College Board Curriculum",
+            "Ontario Curriculum"
+          ],
+          "withLetterFirstPages": [
+            "Ontario Curriculum"
+          ],
+          "mapped": [
+            "Ontario Curriculum"
+          ],
+          "resolved": [
+            "Ontario Curriculum"
+          ],
+          "titles": [
+            "Curriculum Coverage"
+          ],
+          "why": "The #128 implementation review's finding 1, measured: with the widened code rule and a plain alphabetical fallback, College Board's 1.A pages took the map titled Curriculum Coverage and Ontario's map vanished. The fallback keeps its pre-#128 answer by preferring a folder of letter-first codes."
+        },
+        {
+          "name": "nothing declared, only College Board holds pages",
+          "curriculumFolder": null,
+          "curriculumFolders": null,
+          "folders": [
+            "College Board Curriculum",
+            "Ontario Curriculum"
+          ],
+          "withPages": [
+            "College Board Curriculum"
+          ],
+          "withLetterFirstPages": [],
+          "mapped": [
+            "College Board Curriculum"
+          ],
+          "resolved": [
+            "College Board Curriculum"
+          ],
+          "titles": [
+            "Curriculum Coverage"
+          ],
+          "why": "The second pass: with no letter-first folder at all, a folder of other codes is mapped rather than none."
         },
         {
           "name": "declared, but no page yet anywhere",
@@ -5094,7 +5148,7 @@
       "label": "Curriculum folders",
       "caption": "Tick each folder that holds curriculum expectations. Each one gets its own coverage map on your website.",
       "lastStaysTicked": "At least one curriculum folder stays ticked, so your course keeps its coverage map. Tick another folder first.",
-      "rule": "Course Settings and the new-course wizard list, as checkboxes, every shared folder whose name mentions 'curriculum' plus every declared folder the course has, in the order the list shows them - but only when there are at least TWO such folders, because with one there is nothing to choose. TICKED are the folders the build maps (curriculumFoldersResolution's `mapped`), or, while none holds a page, the declared folders the course has; the wizard, which has no pages yet, ticks the payload's declared folder and whatever the teacher ticked. A folder is never ticked just because of its name. Ticking writes curriculum_folders as the folders already ticked, in their order - so the primary folder, whose map is 'Curriculum Coverage', stays primary - then the new one. Unticking writes the others; the last ticked folder cannot be unticked.",
+      "rule": "Course Settings and the new-course wizard list, as checkboxes, every shared folder whose name mentions 'curriculum' plus every declared folder the course has, in the order the list shows them - but only when there are at least TWO such folders, because with one there is nothing to choose. TICKED are the folders the build maps (curriculumFoldersResolution's `mapped`), then every declared folder the course has that is not among them, in declared order - so a folder ticked before its first page is written stays ticked; the wizard, which has no pages yet, ticks the payload's declared folder and whatever the teacher ticked. A folder is never ticked just because of its name. Ticking writes curriculum_folders as the folders already ticked, in their order - so the primary folder, whose map is 'Curriculum Coverage', stays primary - then the new one. Unticking writes the others; the last ticked folder cannot be unticked.",
       "why": "Russell's ruling on #128: maps only for DECLARED folders, and the apps OFFER to declare one rather than deciding for the teacher. Showing the folder the build maps today as ticked, even on a course that declared nothing, is what stops the first tick from quietly dropping that map: declaring only College Board would otherwise end the fallback that found Ontario. Rejected: ticking every folder whose name mentions the curriculum by default (the by-name guess this piece removes from the build, back by another route), and a checkbox on every shared folder (one choice buried in a dozen that are not curriculum at all).",
       "cases": [
         {
@@ -5257,6 +5311,29 @@
             "Ontario Curriculum",
             "AP CSP"
           ]
+        },
+        {
+          "name": "a declared folder with no pages yet stays ticked beside the mapped one",
+          "folders": [
+            "Ontario Curriculum",
+            "College Board Curriculum"
+          ],
+          "declared": [
+            "Ontario Curriculum",
+            "College Board Curriculum"
+          ],
+          "mapped": [
+            "Ontario Curriculum"
+          ],
+          "offered": [
+            "Ontario Curriculum",
+            "College Board Curriculum"
+          ],
+          "ticked": [
+            "Ontario Curriculum",
+            "College Board Curriculum"
+          ],
+          "why": "The #128 review's finding 2: the support page's own order - make the folder, tick it, then write the pages - sprang the box back empty when ticked meant mapped alone."
         }
       ]
     },
@@ -5299,7 +5376,7 @@
           "class_folder",
           "curriculum_folders"
         ],
-        "rule": "Renaming a folder the course currently RESOLVES to as its class folder, or as ONE OF its curriculum folders (specialNames.curriculumFoldersResolution's `resolved`), writes that key, even on a course that never had one: class_folder, and curriculum_folders - the course's declared list (or, when it declared nothing, the folders it resolves to) with the old name replaced by the new, in the same place. The legacy curriculum_folder is rewritten only when it named the renamed folder, and is never created.",
+        "rule": "Renaming a folder the course currently RESOLVES to as its class folder, or as ONE OF its curriculum folders (specialNames.curriculumFoldersResolution's `resolved`), writes that key, even on a course that never had one: class_folder, and curriculum_folders - the course's declared list (or, when it declared nothing, the folders it resolves to) with the old name replaced by the new, in the same place - and, beside the list, the legacy curriculum_folder naming the list's FIRST (primary) folder, so an older Plantoir that reads only that key keeps its map (Russell's ruling on the #128 review).",
         "why": "Both are found by guessing at the name when the key is absent — 'class' in it, or 'curriculum' in it — and a course made from scratch has `curriculum_folder: null` and no `class_folder` at all. Rename `Curriculum` to `Expectations` without writing the key and the guess stops finding it: the map is built from nothing, and NOBODY IS TOLD, because from the coverage check's point of view the folder was never there. Carrying an existing key across is not enough; the key has to be created. A rename is the one moment Plantoir witnesses the change, which is the whole reason renaming belongs in the app rather than in Obsidian.",
         "curriculumFoldersCases": [
           {
@@ -5322,7 +5399,7 @@
               "curriculum_folders": [
                 "Ontario Expectations"
               ],
-              "curriculum_folder": null
+              "curriculum_folder": "Ontario Expectations"
             },
             "why": "The by-name rule would have taken College Board here and written nothing for Ontario; after the rename the scan finds no page in any folder mentioning the curriculum and the map is gone, with nobody told."
           },
@@ -5351,7 +5428,7 @@
                 "Ontario Curriculum",
                 "AP CSP"
               ],
-              "curriculum_folder": null
+              "curriculum_folder": "Ontario Curriculum"
             }
           },
           {

@@ -1070,8 +1070,15 @@ path-like names and repeats in any letter case dropped). `_find_curriculum_folde
 keeps every declared folder that holds at least one expectation page — found
 in any letter case, the ON-DISK spelling kept — in declared order. Only when no
 declared folder holds a page does the old scan run, and it still gives exactly
-ONE folder (the alphabetically first top-level folder whose name mentions
-"curriculum" and holds a page). The scan is a FALLBACK, never additive:
+ONE folder: the alphabetically first top-level folder whose name mentions
+"curriculum" and holds a LETTER-FIRST page (`A1.1`, the only shape before this
+piece), and only if there is none, the first holding any expectation page.
+That preference is the fix for the implementation review's finding 1,
+measured: with the widened code rule and a plain alphabetical scan, a scratch
+LCS course whose `College Board Curriculum` held `1.A` pages had Ontario's map
+silently replaced by College Board's under the same title, because `College`
+sorts before `Ontario`. A golden (Ontario with pages, College Board with `1.A`
+pages, nothing declared) holds it byte for byte to what ff1213ed built. The scan is a FALLBACK, never additive:
 Russell's ruling on the plan. A course made from scratch declares nothing, so
 the scan is still its real path, and its site is unchanged. The whole rule is
 `contracts/shared-rules.json` → `specialNames.curriculumFoldersResolution`,
@@ -1151,8 +1158,12 @@ teacher as raw JSON the way `PLANTOIR_DATED:` still does on Windows (#279).
 
 **Setup.** `setup_course.py` writes `curriculum_folders` (the manifest's one
 folder) for a course with nothing recorded, keeps a saved list exactly, and
-never writes the legacy key. It used to write `curriculum_folder` from the
-manifest unconditionally, and because the saved-keys merge only restores keys
+writes the list's FIRST (primary) folder in the legacy `curriculum_folder` as
+well — Russell's ruling on the implementation review: an older Plantoir on a
+second Mac reads only that key, and a primary folder renamed to something
+without "curriculum" in it would otherwise leave that Mac publishing no map.
+Both apps and the renamer do the same whenever they write the list. Setup used
+to write `curriculum_folder` from the manifest unconditionally, and because the saved-keys merge only restores keys
 the fresh dict lacks, a re-run put `Curriculum` (or null) back over a name a
 rename had recorded — `test_setup_curriculum_folders.py` is the must-fail.
 Manifests keep their singular key: 89 of 89 declare exactly one folder.
@@ -1167,8 +1178,9 @@ one refused, where the by-name rule used to protect the empty College Board.
 While no folder holds a page they fall back to the single by-name folder, so
 an empty new course is protected exactly as before. Both apps OFFER to declare
 a folder whose name mentions "curriculum" under "Curriculum folders"
-(`curriculumFoldersOffer`); the map folders are shown ticked, so the first tick
-never drops the map the scan found. A rename of any of them materialises
+(`curriculumFoldersOffer`); the map folders are shown ticked, then every
+declared folder (so a folder ticked before its first page stays ticked), and
+the first tick never drops the map the scan found. A rename of any of them materialises
 `curriculum_folders`, with the new name in the old one's place.
 
 **Rejected, so nobody re-proposes them.**

@@ -5303,10 +5303,13 @@ def _curriculum_pages_in_order(curriculum_dir: Path) -> list:
                                            page.relative_to(curriculum_dir).as_posix()))
 
 
-def _holds_expectation_pages(folder: Path) -> bool:
+def _holds_expectation_pages(folder: Path, letter_first_only: bool = False) -> bool:
     for page in folder.rglob("*.md"):
-        if is_expectation_code(page.stem):
-            return True
+        if not is_expectation_code(page.stem):
+            continue
+        if letter_first_only and not _is_letter_first(page.stem):
+            continue
+        return True
     return False
 
 
@@ -5348,11 +5351,18 @@ def _find_curriculum_folders(content_root: Path, configured: list) -> list:
             found.append(match)
     if found:
         return found
-    for candidate in on_disk:
-        if "curriculum" not in candidate.name.lower():
-            continue
-        if _holds_expectation_pages(candidate):
-            return [candidate]
+    # The fallback keeps its pre-#128 answer: a folder holding a LETTER-FIRST
+    # code (`A1.1`, the only shape there was) is preferred, and only when none
+    # does is a folder of other codes taken. Without this a scratch LCS course
+    # whose College Board folder has `1.A` pages silently swapped its Ontario
+    # map for College Board's under the same title, because `College Board…`
+    # sorts before `Ontario…` (measured on the #128 implementation review).
+    for letter_first_only in (True, False):
+        for candidate in on_disk:
+            if "curriculum" not in candidate.name.lower():
+                continue
+            if _holds_expectation_pages(candidate, letter_first_only=letter_first_only):
+                return [candidate]
     return []
 
 
@@ -5390,6 +5400,15 @@ def _first_existing_page(content_root: Path, titles: list):
         if (content_root / f"{title}.md").exists():
             return title
     return None
+
+
+def hand_written_coverage_page(content_root: Path, plan: list):
+    """The health fact `hand_written_coverage_page`: the title of the first map
+    (primary first) whose page is ALREADY in the content — the teacher's own,
+    about to be overwritten — or None. `Curriculum Coverage` when there is no
+    map at all, as before #128."""
+    titles = [title for _, title in plan] or [COVERAGE_PAGE_TITLE]
+    return _first_existing_page(content_root, titles)
 
 
 def plan_coverage_maps(content_root: Path, configured: list) -> list:
@@ -5962,7 +5981,11 @@ def build_curriculum_coverage(content_root: Path, course_code: str,
                                       first_class_stamp=first_class_stamp,
                                       names_the_folder=several or title != COVERAGE_PAGE_TITLE)
         (content_root / f"{title}.md").write_text(body, encoding="utf-8")
-        printer(f"🗺️  {title} ({curriculum_dir.name}): {counts['total']} expectations, "
+        # The folder is named only where it tells two maps apart; a course with
+        # its one `Curriculum Coverage` map reads exactly as it always did.
+        named = several or title != COVERAGE_PAGE_TITLE
+        where = f" ({curriculum_dir.name})" if named else ""
+        printer(f"🗺️  {title}{where}: {counts['total']} expectations, "
                 f"{counts['uncovered']} not yet addressed, "
                 f"{counts['unevaluated']} overall expectation(s) without assessed work.")
         written.append({"title": title, "folder": curriculum_dir.name,
@@ -6589,8 +6612,7 @@ def build_section_site(
         # is one that is about to be overwritten. The FIRST such title (primary
         # map first), or None — one finding names one page, which is enough
         # to send a teacher looking (#128).
-        "hand_written_coverage_page": _first_existing_page(
-            content_root, coverage_titles_here or [COVERAGE_PAGE_TITLE]),
+        "hand_written_coverage_page": hand_written_coverage_page(content_root, coverage_plan),
         # Pages hidden because their settings could not be read (#246), by
         # their names in the course folder, and whether the front page is one.
         "unreadable_pages": _unreadable_page_facts(),

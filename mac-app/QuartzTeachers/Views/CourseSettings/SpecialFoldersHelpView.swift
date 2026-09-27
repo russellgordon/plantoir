@@ -175,7 +175,8 @@ struct SpecialFoldersHelpView: View {
         return CurriculumFolderRule.coveragePageTitles(
             declared: configuration.curriculumFolders,
             in: configuration.sharedFolders,
-            withPages: CurriculumFolderRule.foldersWithPages(for: course)
+            withPages: CurriculumFolderRule.foldersWithPages(for: course),
+            withLetterFirstPages: CurriculumFolderRule.foldersWithLetterFirstPages(for: course)
         )
     }
 

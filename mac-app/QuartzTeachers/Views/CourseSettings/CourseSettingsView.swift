@@ -477,7 +477,8 @@ struct CourseSettingsView: View {
         let mapped: [String] = CurriculumFolderRule.mappedFolders(
             declared: declared,
             in: course.configuration.sharedFolders,
-            withPages: CurriculumFolderRule.foldersWithPages(for: course)
+            withPages: CurriculumFolderRule.foldersWithPages(for: course),
+            withLetterFirstPages: CurriculumFolderRule.foldersWithLetterFirstPages(for: course)
         )
         return CurriculumFoldersOffer.ticked(
             folders: course.configuration.sharedFolders, declared: declared, mapped: mapped
@@ -812,6 +813,7 @@ struct CourseSettingsView: View {
         // curriculum folders hold expectation pages decides whether this one
         // is a curriculum folder whose name must be written down (#128).
         let curriculumWithPages: [String] = CurriculumFolderRule.foldersWithPages(for: course)
+        let curriculumWithLetterFirstPages: [String] = CurriculumFolderRule.foldersWithLetterFirstPages(for: course)
         do {
             outcome = try await Task.detached(priority: .userInitiated) {
                 return try SpecialFolderRenamer.rename(
@@ -826,7 +828,8 @@ struct CourseSettingsView: View {
         do {
             try course.configuration.recordOnDisk({ values in
                 return SpecialFolderRenamer.renaming(
-                    oldName, to: newName, scope: scope, in: values, foldersWithPages: curriculumWithPages
+                    oldName, to: newName, scope: scope, in: values, foldersWithPages: curriculumWithPages,
+                    foldersWithLetterFirstPages: curriculumWithLetterFirstPages
                 )
             }, at: course.configFileURL)
         } catch {

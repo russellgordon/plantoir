@@ -1690,6 +1690,16 @@ SPECIFIC_EXPECTATION_STEM = re.compile(r"^([A-Z])(\d+)\.(\d+)$")
 WIKI_LINK_TARGET = re.compile(r"(!?\[\[)([^\]\[|#]+)")
 
 
+def primary_curriculum_folder(folders):
+    """The first usable name in a `curriculum_folders` list, or None."""
+    if not isinstance(folders, list):
+        return None
+    for name in folders:
+        if isinstance(name, str) and name:
+            return name
+    return None
+
+
 def curriculum_folders_to_record(saved_config: dict, manifest_folder):
     """
     What `curriculum_folders` this run writes, or None to leave it out (#128).
@@ -1706,8 +1716,10 @@ def curriculum_folders_to_record(saved_config: dict, manifest_folder):
       list of one; nothing when it declares none (a course made from
       scratch), which leaves the build to find its folder by name.
 
-    `curriculum_folder` itself is never written any more; it is still READ,
-    by the build and both apps, unioned with the list.
+    Whenever the list is written, the legacy `curriculum_folder` is written
+    too, naming the list's FIRST (primary) folder, so an older Plantoir reading
+    only that key still finds the folder its map comes from. A course with only
+    a legacy key keeps it exactly as it is.
     `contracts/file-formats.json` -> `courseConfigKeys`.
     """
     saved_config = saved_config or {}
@@ -3025,6 +3037,14 @@ def setup_course(no_backup: bool = False):
     )
     if recorded_curriculum is not None:
         config["curriculum_folders"] = recorded_curriculum
+        # And the PRIMARY folder in the legacy key too (Russell's ruling on the
+        # #128 review): an older Plantoir on a second Mac reads only
+        # `curriculum_folder`, and without it would build no map at all for a
+        # folder whose name does not say "curriculum". Harmless here: the
+        # build unions the two, and the list comes first.
+        primary = primary_curriculum_folder(recorded_curriculum)
+        if primary is not None:
+            config["curriculum_folder"] = primary
 
     previous_map = saved_config.get("color_schemes", {}) or {}
     if schemes:
