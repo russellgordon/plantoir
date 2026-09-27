@@ -1479,9 +1479,11 @@ final class AssistToolRunner {
     /// pages are needed — "Publish Unit 3", "Hide Week 1" — or nil for a
     /// section with no pages at all.
     ///
-    /// The lowest unit that has class pages, because "Publish Unit 3" and
-    /// "Hide Unit 3" are both read in CODE (the whole-unit frames), so
-    /// following the advice never reaches the model. A numbered course has no
+    /// The lowest unit that has class pages, because in a Unit course
+    /// "Publish Unit 3" and "Hide Unit 3" are both read in CODE (the
+    /// whole-unit frames), so following the advice never reaches the model.
+    /// The frames are term-blind, so a Module or numbered course's example
+    /// is read by the model instead. A numbered course has no
     /// units, so its first class page is named instead; a section with no
     /// class pages names its first page. Built through `ClassPageNaming`,
     /// never typed as "Unit", so a Module course says "Module 3" (#268).

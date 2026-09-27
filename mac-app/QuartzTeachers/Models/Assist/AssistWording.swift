@@ -1292,8 +1292,10 @@ nonisolated enum AssistWording {
     /// three on one real course, and this app used to answer that with
     /// "Nothing needed changing." — success, about a request that did
     /// nothing. `example` is something they can type next, built from the
-    /// section's own pages ("Publish Unit 3"), and matched in code, so
-    /// following the advice never reaches the model.
+    /// section's own pages ("Publish Unit 3"). In a Unit course that sentence
+    /// is matched in code, so following the advice never reaches the model;
+    /// a Module or numbered course's example ("Publish Module 2", "Publish
+    /// Week 1") is read by the model, because the frames are term-blind.
     static func everyPageIsNotAPageToPublish(example: String) -> String {
         return "Nothing was published, because I need to know which pages. "
              + "Say which ones — for example “\(example)”."

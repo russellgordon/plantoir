@@ -35,8 +35,9 @@ import Foundation
 /// is a routing change, so measure first (doc 10, "One description per
 /// tool"). The local model is shown the same text, never a shortened copy.
 /// (This comment used to say the descriptions were the Windows server's own,
-/// shortened; they had diverged — 28 of 32 by 2026-09-26 — and the mac's text
-/// is the one both servers now serve.)
+/// shortened; they had diverged — 28 of 32 by 2026-09-26. The mac serves the
+/// pinned text; Windows is owed it, behaviour and measurement first — the
+/// `windows` issue from #197/#114.)
 ///
 /// The `TEACHERS SAY` phrasings are load-bearing rather than decorative — they
 /// are what took routing from 69% to 91% — so they are COPIED, not improved.

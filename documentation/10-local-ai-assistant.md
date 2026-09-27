@@ -1675,7 +1675,10 @@ misspelled title too.
   page really titled "All" publishes that page.
 - **When the list is nothing but such words** they are dropped, and then:
   dates given → the date range (so "all" with `onOrAfter`/`before` publishes
-  the classes in range); `onOrAfter` alone on a publish → the existing
+  the classes in range — and "all" with `before` ALONE on a publish publishes
+  every class dated before that day, which the existing no-pages rule already
+  did and which plan mode shows on a card first; no contract case pins that
+  direction); `onOrAfter` alone on a publish → the existing
   open-ended refusal; nothing else → `AssistWording.everyPageIsNotAPageToPublish`
   / `…ToHide`, with an example.
 - **When names were given and none was found** → `AssistWording.noPageCalled`
@@ -1697,8 +1700,10 @@ misspelled title too.
   "Hide" and the LOWEST unit that has class pages, named through
   `ClassPageNaming` ("Publish Module 2" in a Module course, #268's lesson); in
   a numbered course its first class page ("Publish Week 1", #267); failing
-  both, the first page. "Publish Unit 3" and "Hide Unit 3" are matched in code,
-  so following the advice never reaches the model. It names a real unit and is
+  both, the first page. In a Unit course "Publish Unit 3" and "Hide Unit 3" are
+  matched in code, so following the advice never reaches the model; the frames
+  are term-blind, so a Module or numbered course's example is read by the model
+  (the planner accepts "Module 2"; that route is not measured). It names a real unit and is
   a backed-up, undoable whole-unit publish — but it is not what they asked for,
   and a teacher may copy it unread. The alternative, no example, is advice
   nobody can follow.
