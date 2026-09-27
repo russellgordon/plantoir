@@ -562,10 +562,10 @@
         "why": "Added with #204. 'It broke after the update' needs to know WHEN the update was. Written at the first launch whose version differs from the last launch's, so it covers an install by hand too - which is why it is owed on Windows from the day it is read, updater or not."
       },
       {
-        "carries": "the course, whether a page was there, and when it was, how many words it had and whether the answer was cut short. Never the words.",
+        "carries": "the course, whether a page was there, whether it had any words (howITeachPage.emptyPageIsNotWritten), and when it had, how many and whether the answer was cut short. Never the words.",
         "event": "How I Teach page read",
         "why": "GitHub #209 was filed because an outside assistant, asked 'how about my teaching style?', did not know how the course is taught. After 'started Claude Code for ICS4U' the trail says nothing about what a session read, so 'the assistant ignored my How I Teach page' is answerable only by this line. It is written when the page is read THROUGH PLANTOIR (read_how_i_teach). Stated honestly: its ABSENCE does not prove the page was never read - both doors start in the working folder, where the agent's own file tools can open the page, and that leaves no line. Present = read through Plantoir, and how long it was then.",
-        "line": "an outside assistant read the How I Teach page ({words} words) / an outside assistant found no How I Teach page yet"
+        "line": "an outside assistant read the How I Teach page ({words} words) / an outside assistant found no How I Teach page yet / an outside assistant found an empty How I Teach page"
       },
       {
         "carries": "the course, whether the page was created or replaced, its word count before and after, and the name of the backup made first. Never the words.",
@@ -578,6 +578,12 @@
         "event": "How I Teach page kept off the website",
         "why": "#209's build rule can take a page OFF a site that used to publish it: a teacher who already had a page called How I Teach, meant for students, finds it gone after an update, and the build's console, which said why, is gone by the time they ask. Read from the build's own PLANTOIR_KEPT_OFF: line (howITeachPage.keptOffMarker) - by the app from the console of a run it started and from a scheduled publish's own log, as PLANTOIR_DATED: is. Printed only when the build dropped a listed page, so a course whose page was never on the site leaves no line on every build.",
         "line": "howITeachPage.keptOffTrailLine"
+      },
+      {
+        "carries": "the course, and that Course Settings made an EMPTY page (so no counts); or that it could not, and why.",
+        "event": "How I Teach page started",
+        "why": "#329: Course Settings' 'Create and Open' puts a page the teacher did not write into the course folder, and the assistant then calls it 'not written yet' (howITeachPage.emptyPageIsNotWritten) - so 'where did this page come from?' is answerable by this line and nothing else. The #209 lines cover reads and ASSISTANT writes, not this door. Opening a page that is there writes nothing, as the toolbar's Open in Obsidian writes nothing. No appliesOn: Windows gets the same row and owes the same line.",
+        "line": "started an empty How I Teach page from Course Settings / could not start the How I Teach page from Course Settings: {reason}"
       },
       {
         "carries": "the course and section, and for each coverage map the build wrote its title, the folder it was built from and how many expectations it shows - or that it wrote none. NEVER anything written on a page.",
@@ -13862,6 +13868,111 @@
         "windows"
       ]
     },
+    "settingsButton": {
+      "rule": "Course Settings has a How I Teach row, in the content-structure part beside the curriculum folders, shown for every course the form is drawn for. Its button says openButton when the course has a page (found by LISTING the course folder, as `matching` says - the teacher's own spelling counts) and createButton when it has none. Pressing it opens that page in Obsidian; when there is none it first writes exactly createdBytes to fileName at the top of the course folder, never over a file already there (a page that appears between the look and the write is the teacher's, and is what is opened), then opens it. Opening a page that is there writes nothing, to the page or to the trail. A page that cannot be made shows couldNotCreate under the row and writes nothing.",
+      "appliesOn": [
+        "mac",
+        "windows"
+      ],
+      "rowLabel": "How I Teach page",
+      "openButton": "Open",
+      "createButton": "Create and Open",
+      "caption": "Your notes on how this course is taught, for you and any assistant you use. It is never on the website.",
+      "couldNotCreate": "The How I Teach page could not be made: {reason}",
+      "createdBytes": "---\npublish: false\n---\n",
+      "why": "Russell on #329, 2026-09-26: the row opens the page, or creates it and opens it. #209 left the page to be written in Obsidian or drafted by an outside assistant, and a teacher had no way to find or start it from Plantoir. Empty, never a starter text: #209 rejected a template because an assistant reads the page as the teacher's own approach (see `rejected`), so the page is made with its settings and nothing else - and emptyPageIsNotWritten is what stops that empty page being described as written.",
+      "cases": [
+        {
+          "name": "no page yet: one is made, exactly createdBytes, and opened",
+          "existing": null,
+          "expect": "created",
+          "button": "createButton"
+        },
+        {
+          "name": "the page is there: opened, untouched",
+          "existing": {
+            "file": "How I Teach.md",
+            "text": "I teach by asking first.\n"
+          },
+          "expect": "opened",
+          "button": "openButton"
+        },
+        {
+          "name": "the teacher's own spelling is the page: opened, and no second file",
+          "existing": {
+            "file": "how i teach.md",
+            "text": "Mine.\n"
+          },
+          "expect": "opened",
+          "button": "openButton"
+        },
+        {
+          "name": "an empty page is still the page: opened, not made again",
+          "existing": {
+            "file": "How I Teach.md",
+            "text": "---\npublish: false\n---\n"
+          },
+          "expect": "opened",
+          "button": "openButton"
+        },
+        {
+          "name": "a look-alike is not the page: a new one is made beside it",
+          "existing": {
+            "file": "How I Teach 1.md",
+            "text": "Something else.\n"
+          },
+          "expect": "created",
+          "button": "createButton"
+        },
+        {
+          "name": "a course folder that cannot be written: nothing is made, and it says why",
+          "existing": null,
+          "unwritable": true,
+          "expect": "couldNotCreate",
+          "button": "createButton"
+        }
+      ]
+    },
+    "emptyPageIsNotWritten": {
+      "rule": "A How I Teach page with no WORDS after its settings block - its body, without a byte-order mark and whitespace, is empty - counts as NOT WRITTEN everywhere that describes it. read_how_i_teach answers the wording key howITeachEmpty followed by howITeachDraftingBrief (never howITeachRead); list_courses gives howITeachListedAsNotWritten; the session briefing does not name the course; plan_write_how_i_teach plans it as a new page (howITeachPlanCreates, at the page's own path) and write_how_i_teach saves into it WITHOUT a replacing mark, keeping its settings block byte for byte (a page with no settings block is written as a new page, with newPageBytes' settings). Decided against the bytes read at the write, so a page the teacher typed into after the plan is refused with howITeachAlreadyWritten as before. A page whose bytes cannot be read as text is never taken to be empty. The trail's read line for it is 'an outside assistant found an empty How I Teach page'.",
+      "appliesOn": [
+        "mac",
+        "windows"
+      ],
+      "why": "settingsButton makes a page with its settings and nothing else. Without this rule that page was read to an assistant as the teacher's own account (an empty one), listed as 'yes', named in the briefing, and a first draft was refused with 'a teacher's own page is never replaced without their agreement' - a sentence that is false about a page with nothing in it. ONE predicate on both platforms, so read, list, plan and write cannot disagree about the same bytes (planAndWriteAgree). Russell accepted it on #329 (Q1 of bundle C, 2026-09-26).",
+      "writeText": "New words.",
+      "cases": [
+        {
+          "name": "settings only - what the button makes",
+          "text": "---\npublish: false\n---\n",
+          "written": false,
+          "afterWrite": "---\npublish: false\n---\n\nNew words.\n"
+        },
+        {
+          "name": "settings and blank lines",
+          "text": "---\npublish: false\n---\n\n  \n\n",
+          "written": false,
+          "afterWrite": "---\npublish: false\n---\n\nNew words.\n"
+        },
+        {
+          "name": "a byte-order mark and settings",
+          "text": "\ufeff---\npublish: false\n---\n",
+          "written": false,
+          "afterWrite": "\ufeff---\npublish: false\n---\n\nNew words.\n"
+        },
+        {
+          "name": "no settings, whitespace only",
+          "text": " \n\n",
+          "written": false,
+          "afterWrite": "---\npublish: false\n---\n\nNew words.\n"
+        },
+        {
+          "name": "one word",
+          "text": "---\npublish: false\n---\nHello\n",
+          "written": true
+        }
+      ]
+    },
     "rejected": [
       "publish: false as the guarantee - see neverOnTheWebsite.whyNotTheFlag.",
       "A hidden location (.plantoir/how-i-teach.md, courses/.internal/...) - Obsidian does not show dot-folders, so the teacher could not write or read it, which is half the decision.",
@@ -13877,8 +13988,12 @@
       "The local assistant reading or drafting it - a routing and prompt change owing re-measurement, and the wrong job for a small model.",
       "A starter page from the wizard or setup_course.py, or payloads shipping one - a template is text an agent would read as the teacher's own approach, and it would put words in the teacher's mouth.",
       "Leaving the page out of the section's '- Edited' fingerprint - a wire format held byte for byte in three implementations; follow-up #330.",
-      "A button to open or create the page - a GUI surface on both platforms; follow-up #329.",
-      "read_page redirecting to read_how_i_teach - read_page answers as it does for any page not in the section, and the tool's own description is what an agent finds."
+      "A button to open or create the page - was a follow-up; it shipped in #329 as settingsButton.",
+      "read_page redirecting to read_how_i_teach - read_page answers as it does for any page not in the section, and the tool's own description is what an agent finds.",
+      "A starter text in a page Course Settings makes (#329) - the template #209 rejected, by another door.",
+      "Creating the page with obsidian://new (#329) - Obsidian writes the file without publish: false, and nothing would record that the app made it.",
+      "Creating the page without opening it (#329) - the ruling was 'creates it and opens it'; a made page nobody sees is a file the teacher did not ask for.",
+      "Leaving an empty page counted as written (#329) - an assistant would be told 'already written' about a page with nothing in it; see emptyPageIsNotWritten."
     ]
   }
 }

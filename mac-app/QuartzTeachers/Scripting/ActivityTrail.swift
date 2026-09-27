@@ -902,6 +902,12 @@ nonisolated enum ActivityTrail {
         /// LISTED for the website (#209) — one earlier builds published.
         /// Read from the build's `PLANTOIR_KEPT_OFF:` line.
         case howITeachPageKeptOff = "How I Teach page kept off the website"
+        /// Course Settings made an EMPTY How I Teach page (#329) — or could
+        /// not, and why: carries the course. A page the teacher did not
+        /// write appears in the course folder, and the assistant then calls
+        /// it "not written yet"; this is the only record the button made it.
+        /// Opening a page that is there writes nothing.
+        case howITeachPageStarted = "How I Teach page started"
         /// The assistant saved a copy of a course (#351) — its first write in
         /// a conversation, or the `back_up_course` tool: the course, the
         /// section the copy is named for, the backup's FILE NAME, its size

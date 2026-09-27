@@ -1419,6 +1419,16 @@ nonisolated enum AssistWording {
              + "it there in Obsidian, or you can offer to draft one."
     }
 
+    /// The page is there and has nothing written in it (#329) — Course
+    /// Settings' "Create and Open" makes exactly that. Said so an agent does
+    /// not read an empty page as the teacher's account, and knows it may
+    /// offer a draft without replacing anything.
+    static func howITeachEmpty(course: String) -> String {
+        return "\(course)’s How I Teach page has been started but has nothing written in it yet, so "
+             + "there is nothing to keep to. The teacher can write it in Obsidian, or you can offer to "
+             + "draft one; saving a draft fills the empty page, and needs no replacing mark."
+    }
+
     /// How to offer, and draft, a page: the product decision in prose.
     ///
     /// Names no teaching approach on purpose. Whatever lean the ready-made

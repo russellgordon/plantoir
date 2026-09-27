@@ -291,6 +291,7 @@ enum AssistContract {
             // The How I Teach page (#209): shared-rules.json -> howITeachPage.
             "howITeachRead": AssistWording.howITeachRead(course: course, text: "{text}"),
             "howITeachMissing": AssistWording.howITeachMissing(course: course),
+            "howITeachEmpty": AssistWording.howITeachEmpty(course: course),
             "howITeachDraftingBrief": AssistWording.howITeachDraftingBrief,
             "howITeachCutShort": AssistWording.howITeachCutShort(course: course, path: "{path}"),
             "howITeachPlanCreates": AssistWording.howITeachPlanCreates(course: course, path: "{path}"),
