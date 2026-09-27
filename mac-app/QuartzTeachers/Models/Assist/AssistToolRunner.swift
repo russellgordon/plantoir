@@ -4139,7 +4139,9 @@ final class AssistToolRunner {
         if surface != .mcp {
             return ""
         }
-        if HowITeachPage.existingURL(for: course) != nil {
+        // Written means WORDS (#329): an empty page — Course Settings'
+        // "Create and Open" makes one — is "not written yet".
+        if HowITeachPage.writtenURL(for: course) != nil {
             return "\n" + AssistWording.howITeachListedAsWritten
         }
         return "\n" + AssistWording.howITeachListedAsNotWritten
@@ -4152,7 +4154,7 @@ final class AssistToolRunner {
     func coursesWithAHowITeachPage() -> [String] {
         var codes: [String] = []
         for course in coursesAsSavedNow where !course.isKeptForReference {
-            if HowITeachPage.existingURL(for: course) != nil {
+            if HowITeachPage.writtenURL(for: course) != nil {
                 codes.append(course.code)
             }
         }
@@ -4477,6 +4479,19 @@ final class AssistToolRunner {
         guard let pageData = try? Data(contentsOf: pageURL), let pageText = HowITeachPage.text(of: pageData) else {
             return AssistToolOutcome.couldNotRead(AssistToolRefusal.unreadablePage(HowITeachPage.title).message)
         }
+        // Started and never written (#329): Course Settings' "Create and
+        // Open" makes a page with its settings and nothing else. Handed over
+        // as nothing to keep to, with the way to offer a draft — never as the
+        // teacher's account of their course.
+        if !HowITeachPage.hasWords(pageText) {
+            ActivityTrail.note(
+                .howITeachPageRead,
+                "\(course.code) · " + HowITeachPage.trailLineForARead(words: nil, cutShort: false, empty: true)
+            )
+            let answer: String = AssistWording.howITeachEmpty(course: course.code)
+                + "\n\n" + AssistWording.howITeachDraftingBrief
+            return AssistToolOutcome.read(answer, detail: answer)
+        }
 
         let body: String = HowITeachPage.trimmed(HowITeachPage.body(of: pageText))
         let words: Int = HowITeachPage.wordCount(of: pageText)
@@ -4510,6 +4525,10 @@ final class AssistToolRunner {
         let existingMark: String?
         /// The mark the caller passed, trimmed; empty when none.
         let replacing: String
+        /// Whether the page there has WORDS (#329). A page without them is
+        /// planned and written as a new one — no mark needed — with its
+        /// settings block kept byte for byte.
+        let existingIsWritten: Bool
     }
 
     private func howITeachPlan(_ arguments: [String: Any]) -> Result<PlannedHowITeach, AssistToolRefusal> {
@@ -4553,13 +4572,18 @@ final class AssistToolRunner {
                 return .failure(.notInThisBuild(AssistWording.howITeachChangedSincePlanned(course: course.code)))
             }
         }
+        var existingIsWritten: Bool = false
+        if let existingText {
+            existingIsWritten = HowITeachPage.hasWords(existingText)
+        }
         return .success(PlannedHowITeach(
             course: course,
             text: pageText,
             existingURL: existingURL,
             existingText: existingText,
             existingMark: existingMark,
-            replacing: replacing
+            replacing: replacing,
+            existingIsWritten: existingIsWritten
         ))
     }
 
@@ -4575,9 +4599,13 @@ final class AssistToolRunner {
         }
         guard let existingURL = planned.existingURL,
               let existingText = planned.existingText,
-              let existingMark = planned.existingMark else {
+              let existingMark = planned.existingMark,
+              planned.existingIsWritten else {
+            // A new page — or an EMPTY one (#329), which is saved into where
+            // it already is, under the teacher's own spelling.
             let path: String = AssistSectionGraph.relativePath(
-                of: HowITeachPage.newPageURL(for: planned.course), workspaceURL: workspace.workspaceURL
+                of: planned.existingURL ?? HowITeachPage.newPageURL(for: planned.course),
+                workspaceURL: workspace.workspaceURL
             )
             let plan: String = AssistWording.howITeachPlanCreates(course: planned.course.code, path: path)
             return AssistToolOutcome.planned("Worked out where the How I Teach page would go.", plan: plan)
@@ -4613,15 +4641,25 @@ final class AssistToolRunner {
         case .success(let found):
             planned = found
         }
-        if planned.existingURL != nil && planned.replacing.isEmpty {
+        // Decided against the bytes read HERE, at the write (#329): a page
+        // the teacher typed into in Obsidian after the plan is written, and
+        // refused as it always was.
+        if planned.existingIsWritten && planned.replacing.isEmpty {
             return AssistToolOutcome.refused(AssistWording.howITeachAlreadyWritten(course: planned.course.code))
         }
 
         let pageURL: URL = planned.existingURL ?? HowITeachPage.newPageURL(for: planned.course)
         let newText: String
-        if let existingText = planned.existingText {
+        if let existingText = planned.existingText, HowITeachPage.settingsBlock(of: existingText) != nil {
+            // Replaced — or an empty page filled — keeping its settings byte
+            // for byte.
+            newText = HowITeachPage.replacedPageText(existing: existingText, with: planned.text)
+        } else if let existingText = planned.existingText, planned.existingIsWritten {
+            // A written page with no settings is given none: the location is
+            // the guarantee.
             newText = HowITeachPage.replacedPageText(existing: existingText, with: planned.text)
         } else {
+            // A new page, or an empty one with no settings: written as new.
             newText = HowITeachPage.newPageText(planned.text)
         }
 
@@ -4635,6 +4673,13 @@ final class AssistToolRunner {
         let standInSection: Int = sections.first ?? 1
         let backedUp: Bool = await backUpOnceForThisConversation(planned.course, forSection: standInSection)
 
+        // The copy is saved off the main actor (#351), and the teacher can be
+        // typing in Obsidian while it runs: the page must still be the one
+        // the plan read, or nothing is written.
+        if howITeachPageMovedOn(since: planned) {
+            return AssistToolOutcome.refused(AssistWording.howITeachChangedSincePlanned(course: planned.course.code))
+        }
+
         do {
             try newText.write(to: pageURL, atomically: true, encoding: .utf8)
         } catch {
@@ -4646,7 +4691,7 @@ final class AssistToolRunner {
         // never match, so the undo would leave the page alone as "edited
         // since". `before` keeps it, so taking the change back restores it.
         let readBack: String = (try? String(contentsOf: pageURL, encoding: .utf8)) ?? newText
-        let created: Bool = planned.existingText == nil
+        let created: Bool = !planned.existingIsWritten
         history.record(AssistChange(
             whatHappened: created ? "wrote a new How I Teach page" : "replaced the How I Teach page",
             courseCode: planned.course.code,
@@ -4657,7 +4702,7 @@ final class AssistToolRunner {
         ))
 
         var wordsBefore: Int? = nil
-        if let existingText = planned.existingText {
+        if let existingText = planned.existingText, planned.existingIsWritten {
             wordsBefore = HowITeachPage.wordCount(of: existingText)
         }
         var backupName: String? = nil
@@ -4679,6 +4724,23 @@ final class AssistToolRunner {
             detail += "\n\n" + AssistToolRunner.backedUpNote
         }
         return AssistToolOutcome.wrote(saved, detail: detail)
+    }
+
+    /// Whether the How I Teach page on disk is no longer the one a write
+    /// planned from: a page has appeared where there was none, or the one
+    /// there has other bytes. Read after the backup, which now runs off the
+    /// main actor (#351) and can take a minute — long enough for a teacher
+    /// to type into the page in Obsidian.
+    private func howITeachPageMovedOn(since planned: PlannedHowITeach) -> Bool {
+        let nowURL: URL? = HowITeachPage.existingURL(for: planned.course)
+        guard let plannedURL = planned.existingURL else {
+            return nowURL != nil
+        }
+        guard let nowURL, nowURL.lastPathComponent == plannedURL.lastPathComponent,
+              let data = try? Data(contentsOf: nowURL) else {
+            return true
+        }
+        return HowITeachPage.mark(of: data) != planned.existingMark
     }
 
     /// A course and section the model named, both found.

@@ -37,6 +37,27 @@ enum FolderActions {
     /// afterwards, the asked-for one last so it lands in front.
     static func openInObsidian(revealing folderURL: URL, vaultURL: URL) {
         let target: URL = FolderActions.obsidianTarget(forFolder: folderURL, vaultURL: vaultURL)
+        FolderActions.open(target: target, vaultURL: vaultURL)
+    }
+
+    /// Opens one PAGE in Obsidian — Course Settings' How I Teach row (#329).
+    ///
+    /// The same registering, quitting and reopening as `openInObsidian`, but
+    /// the page is its own target: `obsidianTarget` is for FOLDERS, and a
+    /// page handed to it would be looked for as `<page>/index.md`, not found,
+    /// and replaced by the vault — opening the course, not the page.
+    static func openPageInObsidian(_ pageURL: URL, vaultURL: URL) {
+        FolderActions.open(target: FolderActions.pageTarget(pageURL, vaultURL: vaultURL), vaultURL: vaultURL)
+    }
+
+    /// What a page's link points at: the page itself.
+    static func pageTarget(_ pageURL: URL, vaultURL: URL) -> URL {
+        return pageURL
+    }
+
+    /// Opens a file (or a vault) in Obsidian, registering the vault first
+    /// when Obsidian has never seen it — the body both doors share.
+    private static func open(target: URL, vaultURL: URL) {
         guard let obsidianLink = FolderActions.obsidianURL(forFolder: target) else {
             return
         }
