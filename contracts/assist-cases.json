@@ -2957,6 +2957,9 @@
       "list_curriculum_expectations",
       "plan_curriculum_mentions",
       "add_curriculum_mentions",
+      "read_how_i_teach",
+      "plan_write_how_i_teach",
+      "write_how_i_teach",
       "plan_prepare_for_start_of_year",
       "prepare_for_start_of_year"
     ],
@@ -2964,7 +2967,7 @@
       "deploy_section",
       "schedule_deploy"
     ],
-    "note" : "Three lists, deliberately. `all` is what the runner can execute; `local` is what the small model is SHOWN (the plan twins and remember_timetable are taken off, because the model never has to name a plan and dates it supplies are dates it may have invented); `mcpOnly` is the twelve offered to Claude Code on top of everything — three asking for judgement about meaning, two that get a whole section ready for the start of the year (a change a person should read in full, with a button of its own in the app), the rest either never needed by a model scoped to one section or already reachable by it through a fixed phrasing.",
+    "note" : "Three lists, deliberately. `all` is what the runner can execute; `local` is what the small model is SHOWN (the plan twins and remember_timetable are taken off, because the model never has to name a plan and dates it supplies are dates it may have invented); `mcpOnly` is the fifteen offered to Claude Code on top of everything — six asking for judgement about meaning (the three curriculum tools and the three for the How I Teach page), two that get a whole section ready for the start of the year (a change a person should read in full, with a button of its own in the app), the rest either never needed by a model scoped to one section or already reachable by it through a fixed phrasing.",
     "planTwins" : {
       "add_classes" : "plan_add_classes",
       "add_next_class" : "plan_add_next_class",
@@ -2975,7 +2978,8 @@
       "re_date_classes" : "plan_re_date_classes",
       "remember_timetable" : "plan_remember_timetable",
       "schedule_deploy" : "plan_scheduled_deploy",
-      "unpublish_pages" : "plan_unpublish_pages"
+      "unpublish_pages" : "plan_unpublish_pages",
+      "write_how_i_teach" : "plan_write_how_i_teach"
     },
     "planTwinsNote" : "A write with a twin is shown as a plan first. Four writes have none, deliberately: rebuild_preview changes no page, undo_last_change IS the remedy, deploy_section waits on its own button whatever plan mode says, and a cancelled scheduled deploy is remedied by scheduling it again."
   },
@@ -4330,6 +4334,81 @@
       },
       {
         "function" : {
+          "description" : "Read the teacher's How I Teach page for a course: their own account of how the course is taught. Read it before drafting or revising any page in the course, and keep to it. If there is none yet, it says how to offer to draft one. Changes nothing.",
+          "name" : "read_how_i_teach",
+          "parameters" : {
+            "properties" : {
+              "course" : {
+                "description" : "The course code, for example ICS3U.",
+                "type" : "string"
+              }
+            },
+            "required" : [
+              "course"
+            ],
+            "type" : "object"
+          }
+        },
+        "type" : "function"
+      },
+      {
+        "function" : {
+          "description" : "Shows where the teacher's How I Teach page would be saved and whether it replaces one they already have, changing nothing. Use it before write_how_i_teach, and show the teacher the whole text.",
+          "name" : "plan_write_how_i_teach",
+          "parameters" : {
+            "properties" : {
+              "course" : {
+                "description" : "The course code, for example ICS3U.",
+                "type" : "string"
+              },
+              "replacing" : {
+                "description" : "Only when replacing a page the teacher already has: the mark plan_write_how_i_teach gave for it, passed only after the teacher agreed to replace their page. Leave empty for a new page.",
+                "type" : "string"
+              },
+              "text" : {
+                "description" : "The whole page, in Markdown, as the teacher agreed to it — words only, with no --- settings block at the top.",
+                "type" : "string"
+              }
+            },
+            "required" : [
+              "course",
+              "text"
+            ],
+            "type" : "object"
+          }
+        },
+        "type" : "function"
+      },
+      {
+        "function" : {
+          "description" : "Save the teacher's How I Teach page for a course, once they have read the whole text and agreed. Call plan_write_how_i_teach FIRST. The course is backed up first, and the page is never put on the website.",
+          "name" : "write_how_i_teach",
+          "parameters" : {
+            "properties" : {
+              "course" : {
+                "description" : "The course code, for example ICS3U.",
+                "type" : "string"
+              },
+              "replacing" : {
+                "description" : "Only when replacing a page the teacher already has: the mark plan_write_how_i_teach gave for it, passed only after the teacher agreed to replace their page. Leave empty for a new page.",
+                "type" : "string"
+              },
+              "text" : {
+                "description" : "The whole page, in Markdown, as the teacher agreed to it — words only, with no --- settings block at the top.",
+                "type" : "string"
+              }
+            },
+            "required" : [
+              "course",
+              "text"
+            ],
+            "type" : "object"
+          }
+        },
+        "type" : "function"
+      },
+      {
+        "function" : {
           "description" : "Work out what getting a section ready for the start of the year would do, changing nothing. Lists every page that would go into draft and why, what stays, the links that would lead to hidden pages, and the plan code prepare_for_start_of_year needs.",
           "name" : "plan_prepare_for_start_of_year",
           "parameters" : {
@@ -4363,7 +4442,7 @@
                 "type" : "string"
               },
               "planCode" : {
-                "description" : "The code on the last line of the plan plan_prepare_for_start_of_year gave, for example \"3f9a1c07\". Without it, or if the section has changed since, nothing is changed and the current plan comes back instead.",
+                "description" : "The code on the line that starts \"Plan code:\" in the plan plan_prepare_for_start_of_year gave, for example \"3f9a1c07\". Without it, or if the section has changed since, nothing is changed and the current plan comes back instead.",
                 "type" : "string"
               },
               "section" : {

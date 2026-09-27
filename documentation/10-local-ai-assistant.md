@@ -1273,8 +1273,16 @@ and was recorded here rather than fixed at the time; it was fixed in
 [#294](https://github.com/russellgordon/plantoir/issues/294), for every reader
 at once, in the one pattern they all share — see
 ["What counts as a link"](#what-counts-as-a-link) below. The code difference
-remains and is its own question,
-[#313](https://github.com/russellgordon/plantoir/issues/313).
+was settled in [#313](https://github.com/russellgordon/plantoir/issues/313):
+every reader now skips code by one shared mask, so this answer and publishing
+read exactly the same links — see
+["Code is never a link"](#code-is-never-a-link-313) below. The answer's own
+stripper, it turned out, had been wrong in the other direction as well: it
+flipped its fence on any line that STARTED with `~~~`, so a Python traceback's
+`~~~~^^^^` inside a ```` ```text ```` block ended the fence, and the real
+closer opened a new one — **22 real links** left out of the answer on four ICS4U
+pages (Testing and Regression 8, Reading a Traceback 7, Spot the Bug 5, Name
+That Error 2).
 
 **The page asked about is found by file name first, then by the name the
 sidebar shows** — a folder's landing page by its folder's name as well, so
@@ -1875,7 +1883,7 @@ it as a link wherever it is: `quartz/plugins/transformers/ofm.ts` lines
 excludes a backslash and the alias is `\\?\|`.
 
 **The rule** (`contracts/shared-rules.json` → `readingALink`, ten cases both
-apps and the build read): the name runs from `[[` up to the first `]`, `|` or
+apps and the build read when #294 landed — forty since #313, below): the name runs from `[[` up to the first `]`, `|` or
 `#`, and a backslash immediately before that character is not part of it. The
 pattern is `(!?\[\[)([^\]|#]+?)(?=\\?[\]|#])` — lazy, stopping BEFORE an
 optional backslash, with the backslash in a zero-width lookahead. That last part
@@ -1898,6 +1906,11 @@ cell in two — which every "does the link point at the new name?" check passes.
 | `PageReferences` — pictures carried by a copy | `![[pic.png\|300]]` in a table was not carried |
 | `WikiLinkRewriter.rewriting` / `countLinks` — the unit-word rename and CLASS INSERTION | the link was not renamed. After inserting a class, `[[Unit 2, Day 4\|Thursday]]` would still say Day 4 — which is now the class just inserted: a link to the wrong lesson, not a dead one |
 | `FolderPathRewriter` | harmless (it rewrites a folder prefix), but it held a COPY of the pattern string; it now references `WikiLinkRewriter.pattern` |
+
+Since #313 every one of these reads its matches through ONE entry point,
+`WikiLinkRewriter.linkMatches` (or, for the Markdown-link and `src` shapes,
+`MarkdownCode.matches(of:in:outside:)`), which applies the same code mask —
+see ["Code is never a link"](#code-is-never-a-link-313).
 
 `AssistSectionGraph.linksAsWritten` (#167) used to strip the backslash by hand;
 the strip is gone, because a second strip would only hide a regression of the
@@ -1943,13 +1956,195 @@ the insertion case above. Excluding the backslash from names altogether
 (`[^\]|#\\]+`, closer to Quartz's own class): `[[a\b]]` would then name `a`,
 and a rename of a page called `a` would rewrite it; the lookahead differs from
 the old pattern only at a backslash right before `]`, `|` or `#`. Skipping
-links inside code in the same change: a real difference (the links answer and
-Windows skip them, publishing does not), with its own measurement —
-[#313](https://github.com/russellgordon/plantoir/issues/313). A contract case
+links inside code in the same change: deferred because it changes what
+publishing takes by a different rule and needed its own measurement, and
+decided since in [#313](https://github.com/russellgordon/plantoir/issues/313)
+— below. A contract case
 for `[[a\b]]`: Quartz does not draw it as a link, and nobody has decided what it
 should mean. The install-time readers in `setup_course.py` and the
-curriculum-coverage patterns share the cause but not the feature —
-[#314](https://github.com/russellgordon/plantoir/issues/314).
+curriculum-coverage patterns shared the cause but not the feature, and were
+fixed separately in
+[#314](https://github.com/russellgordon/plantoir/issues/314) — see
+[05 → Which shapes are links](05-build-pipeline.md#dates-drive-everything).
+
+#### Code is never a link (#313)
+
+Settled 2026-09-26, [issue #313](https://github.com/russellgordon/plantoir/issues/313).
+**A `[[…]]` or `![[…]]` whose opening brackets sit inside a fenced code block
+or an inline code span is an EXAMPLE of a link, not a link.** It is not
+followed by publishing, the dates a class brings, the site check, "what does
+this page link to?", copying, the installer or the coverage map, and it is not
+rewritten by a page rename, a unit-word rename, a class insertion or a folder
+rename. That is what Quartz already does: `ofm.ts` builds links with
+`mdast-util-find-and-replace` over TEXT nodes only (lines 209–378 at v4.5.0),
+so `code` and `inlineCode` are never searched.
+
+**Built in real Quartz, shape by shape** (`npx quartz build` on v4.5.0, links
+read from `contentIndex.json` and the rendered article):
+
+| Shape | Quartz draws a link? |
+|---|---|
+| `` `[[X]]` ``, ``` ``a ` [[X]] `` ```, a span across two lines of one paragraph, a span in a table cell | no |
+| ```` ``` ```` fence, `~~~` fence, ```` ```` ```` holding ```` ``` ````, a fence inside a `>` callout, a fence never closed | no |
+| four-space indented code after a paragraph and a blank line | no |
+| an indented line that continues a LIST item | **yes** |
+| a lone, never-closed backtick before the link | **yes** |
+| `<code>[[X]]</code>` (raw HTML) | **yes** |
+| `~~~` inside a ```` ``` ```` fence, then a link after the ```` ``` ```` closes | **yes**, the link after |
+
+**The rule, in short** — written out to be implemented from in
+`contracts/shared-rules.json` → `readingALink.whatIsCode`, with its limits in
+`whatIsCodeLimits` and 30 of the 40 cases in `readingALink.cases`. The page is read a
+line at a time; a line's BODY has any `>` markers taken off, and its DEPTH is
+how many there were. A fence opens on a body starting with three or more
+backticks or tildes (backticks with another backtick later on the line are
+inline code instead), closes on a line at the same depth holding a run of the
+SAME character at least as long with nothing after it, ends at a line with
+fewer `>` (a fence in a callout ends with the callout), and runs to the end of
+the page if never closed. Code spans live within a paragraph — which breaks at
+a blank line, a fence, a deeper quote, a list marker, a heading (which is a
+paragraph on its own), a table row or a rule line such as frontmatter's
+`---` — and a run of N
+backticks closes on the next run of EXACTLY N; a run never closed is plain
+text; outside a span a backslash escapes. Nothing else is code: not indented
+code, not HTML `<code>`, not math, not `%%` comments (a separate question,
+[#331](https://github.com/russellgordon/plantoir/issues/331)). A link is in
+code when its `[[`, or the `!` of `![[`, starts inside a code range. **And a
+match that starts in code is not merely dropped: the search starts again where
+that code ENDS.** The link pattern crosses a `[`, so in "Type `` `[[` `` to
+start one, then [[Real Page]]" a match from the example's brackets runs on to
+"Real Page" and swallows the real link; dropping that match would drop the
+link with it. That case was found while implementing, with eight more. Four —
+a bare `~~~` line inside a backtick fence, a TILDE fence inside a callout, a
+heading, and a callout line straight after a paragraph — because four
+mutations of the rule passed the cases before them; for the first two: the traceback case
+carries text after its tildes, and the backtick callout's fence lines happen to
+pair up as an inline span. Three came from the first implementation review, each a
+place where the first version DROPPED a real link Quartz draws: a fence left
+open inside a callout ran on to the end of the page (it now ends with the
+callout — the fence belongs to its opener's quote DEPTH, and only a line at
+that depth closes it); a `> ```` line inside an unquoted fence closed it; and a
+backtick in frontmatter paired with one in the body (a rule line — `---`,
+`***`, `___`, `===` — now breaks a paragraph, and a heading is a paragraph on
+its own). A fourth came from the second review: a paragraph's quote depth is
+its FIRST line's, because an unquoted line inside a callout paragraph is a
+lazy continuation and must not make the next `>` line look deeper. None of
+the nine was built in Quartz; all 40 cases were checked
+against its parser stack (remark-parse 11 + remark-gfm 4 + remark-frontmatter,
+with Quartz's own link pattern run over text nodes), which agrees with every
+one. The same stack judged 20,000 random texts built from backticks, tildes,
+`>`, list and heading markers, rule lines, indents and `[[x]]`: every text in
+which the rule reads as code a link Quartz draws contains a four-space or tab
+indent or a list marker — the two stated limits, indented code and list
+containers.
+
+**One implementation per language, shared by every reader and rewriter in it.**
+On the mac, `MarkdownCode` (UTF-16 offsets, the unit `NSRegularExpression`
+reports — never `Character`s, since `"\r\n"` is one grapheme and a scan for
+`"\n"` misses every line ending of a page written on Windows), behind
+`WikiLinkRewriter.linkMatches`; in the build and the installer,
+`scripts/markdown_code.py`. Measured, the two agree offset for offset on all
+12,490 pages of `support/` and on 50,000 fuzzed texts built from backticks,
+tildes, `>`, `[[`, `]]`, backslashes, CRLFs, an accent and an emoji. What
+changed on the mac:
+
+- `AssistSectionGraph.linkTargets` (publishing, dating, the site check,
+  copying) read EVERY match, code and all — 1,896 across `support/`.
+- `AssistSectionGraph.linksAsWritten` had its own stripper, `withoutCode`,
+  now DELETED: the `~~~` flip above dropped 22 real links, and it saw no fence
+  inside a callout, so 270 examples on the Scavenger Hunt pages read as links.
+- `WikiLinkRewriter.rewriting` and `countLinks` (page rename, unit-word
+  rename, class insertion), `FolderPathRewriter` (both link styles),
+  `PageReferences` (the copy's pictures, all three of its shapes, inline code
+  now included) and `CoursePageCopy.pagesEmbeddedIn` (a hand-rolled scanner,
+  now `linkMatches` keeping the `![[`).
+
+**Measured with Quartz's own parser** (remark-parse 11 + remark-gfm 4, the
+stack v4.5.0 uses, classifying every match by its enclosing node; it skips
+Quartz's `textTransform` pre-pass, which cannot create or remove a code node
+in shipped content, and it measures what the SITE shows, not Obsidian's
+editor). Over all of `support/` (39 payloads, 50 skeletons, the example
+course; 12,490 pages), 39,570 links match: **37,674 outside code, 1,139 in
+inline code, 757 in fenced code and 0 in indented code**. Only **8**
+page-to-page links existed solely inside code, on 3 pages: SBI4U's and SPH3U's
+"What This Site Can Do" naming a concept as syntax, and six on TEJ2O's
+"Control Something with Code", in code only because its fence was broken (see
+below). By an emulation of the section graph (an estimate), **no class page —
+of 3,258 in the payloads and 600 in the skeletons — reaches fewer pages when
+published.** 0 class names and 0 real folder paths sit in shipped code, so the
+rewriter half moves nothing that ships; it matters for what teachers write.
+
+| Reader, before #313 | Real links it dropped | Examples it read as links |
+|---|---|---|
+| mac `linksAsWritten` (`withoutCode`) | **22** | 277 |
+| mac `linkTargets` (publishing, dating, site check, copy) | 0 | **1,896** |
+| Windows `WikiLinks.Parse` (`WithoutCode`, emulated) | 0 | 277 |
+| build `_extract_wikilink_targets` | 0 | 7 (TEJ2O only) |
+| the rule | **0** | 7 before the TEJ2O fix, **0** after |
+
+**The shipped page this exposed.** TEJ2O's `shared/Labs/Control Something with
+Code.md` opened `   ```python` at three spaces inside step 4 of a numbered
+list and wrote the program at column 0. CommonMark cannot continue a fence
+lazily, so the list item — and the fence — ended at the first column-0 line,
+and the column-0 closer then OPENED a fence that ran to the end of the page:
+on the site, `[[Debugging Basics]]` showed as raw text and the whole curriculum
+block as code (built in Quartz and seen). Re-indented in the same piece, so
+the coverage map keeps B2.3, B2.4, B5.1, B5.2 and B5.4 for that page under the
+new rule; it reaches NEW TEJ2O courses only (existing folders keep a page whose
+site was already broken — no migration). `lint_payload.py` now refuses the
+shape: a fence opened on an indented line whose lines fall back before the
+closer.
+
+**What a teacher can see change.** A publish plan no longer names a page that
+is only shown as syntax; the site check stops warning about example "links"
+into hidden pages, and a visible page mentioned only in code can now be called
+an orphan — which is true, since the site has no link to it; the links answer
+lists the ICS4U traceback pages' links in full; a new TEJ2O course's lab page
+renders. No sentence changed and no trail event was added: no line records
+which links a reader followed, and the lines that carry a count of links
+rewritten become more correct, not untrue.
+
+**Rejected**, with the reasons that travel:
+
+- **Readers skip code, rewriters do not.** Two definitions of a link again: a
+  rename plan would count links publishing does not follow, and a folder
+  rename would edit an example the teacher wrote (`PageReferences` already
+  refused that for fenced code).
+- **Recognising indented code.** 0 shipped links sit in it, and doing it
+  properly needs list-container tracking in three languages. Obsidian writes
+  nested lists with tabs, and an "indented after a blank line" shortcut drops
+  links from loose nested lists — silently, in the direction that leaves
+  pages unpublished. The case "an indented line in a list is not code" pins
+  it.
+- **Treating HTML `<code>` as code.** Quartz draws a link inside it, so the
+  site HAS that link; skipping it would leave a linked page unpublished.
+- **Each platform keeping its own stripper.** That is how three came to
+  disagree. One written rule and its cases, one implementation per language.
+- **A real Markdown parser in the app** (swift-markdown, cmark). Nothing like
+  it is shared by Swift, Python and C#, so the three would drift at exactly
+  the edges the contract pins, and it is a dependency to vendor and sign. The
+  measurement used one — remark — to JUDGE the portable rule, which is the
+  right place for it.
+- **Leaving TEJ2O alone and matching CommonMark's container rule**: the list
+  tracking rejected above, to "correctly" hide seven links on a page whose
+  author plainly meant them.
+- **Stripping `%%` comments in the same change** — not this question and not
+  measured for its effect on publishing:
+  [#331](https://github.com/russellgordon/plantoir/issues/331).
+
+**Not covered, on purpose — readers of one fixed shape, not of links in
+general, named so nobody has to find them again** (from the implementation
+review): `SectionIndexPointer.repointing` and its build twin
+`build_site._class_embed_target` read a front page's whole-line `![[…]]` by
+hand, so a front page showing `![[Unit 1, Day 2]]` alone on a line inside a
+fence could have that line repointed — 0 of the 89 section front pages in
+`support/` hold a fence; `AssistCurriculumMentions` asks whether a page
+already says `[[A1.1]]` with a plain text search, so an example of it in code
+counts as "already there" and the real mention is not added; and
+`build_site.rewrite_section_wikilinks` rewrites a section-path alias link in
+the BUILT copy only, so an example in code is displayed shortened and the
+teacher's file is untouched. Each would take the mask in a line; none has
+shipped content that reaches it.
 
 ### No booleans, and separate verbs
 
@@ -2029,14 +2224,15 @@ configuration is updated in memory as it is written to disk. Windows'
 deliberately: a server that silently swapped its courses under a conversation
 would be worse than one that has to be restarted.
 
-Claude Code is offered a **longer** list than the local model: 34 tools
-against 13 — the twenty-two that exist, plus twelve served only over MCP (ten
-until #96 added the start-of-year pair on 2026-09-26; see "Getting a section
-ready for the start of the year" below).
+Claude Code is offered a **longer** list than the local model: 37 tools
+against 13 — the twenty-two that exist, plus fifteen served only over MCP
+(#209's three How I Teach tools and #96's start-of-year pair, both 2026-09-26;
+see "Getting a section ready for the start of the year" below).
 (Windows' separate `plantoir-mcp.exe` serves 37; the gap is recorded in
-[issue #66](https://github.com/russellgordon/plantoir/issues/66).) Three of the extra ones ask for judgement about meaning — reading the
-curriculum and deciding which expectations a page addresses — which a large
-model does well and a 4B model does not. Anything shown to the local model has
+[issue #66](https://github.com/russellgordon/plantoir/issues/66).) Six of the extra ones ask for judgement about meaning — reading the
+curriculum and deciding which expectations a page addresses, and reading or
+drafting the teacher's How I Teach page (#209, "Telling an outside assistant how
+the course is taught") — which a large model does well and a 4B model does not. Anything shown to the local model has
 been measured against it, and a unit test pins the count so the list cannot
 grow by accident.
 
@@ -2938,7 +3134,8 @@ for behaviour only one platform has.
 
 `assist-cases.json` → `toolSchemas` now carries the tool definitions **exactly
 as each client sends them** — name, description and parameter schema, for both
-the 13-tool local surface and the 32-tool MCP one. (It said 23; corrected
+the 13-tool local surface and the 35-tool MCP one (32 until #209 added three
+How I Teach tools). (It said 23; corrected
 2026-09-06 when the list was first run against this side. `plantoir-mcp.exe`
 serves 37, and the twelve it has beyond the contract are named in
 `AssistSurfaceContractTests`.) The mac's own test has
@@ -2986,8 +3183,8 @@ half-built mac version of any of them:
 `plan_make_room_for_classes`, `plan_sync_page_dates`, `read_timetable`,
 `roll_over_section`, `sync_page_dates`.
 
-**Seven of those twelve are the mac's now**, and the surface is **32** (22 plus
-ten MCP-only). All six tools this sorting judged the mac should have were built
+**Seven of those twelve are the mac's now**, and the surface was **32** (22 plus
+ten MCP-only) — 35 since #209 added the three How I Teach tools. All six tools this sorting judged the mac should have were built
 on 2026-09-08 — `list_courses`, the `add_classes` pair, the
 `make_room_for_classes` pair, `explain_publishing` and `back_up_course`
 (`GUI-IMPROVEMENTS.md` rows 452–456, and item 46 below). So the set difference
@@ -4567,7 +4764,8 @@ not a git repository.
    make the two greetings diverge. Also seen: asked about the teacher's
    teaching style, both honestly said they did not know yet — neither had read
    a page, and nothing Plantoir hands them says how the course is taught.
-   That is issue #209.
+   That is issue #209, answered by "Telling an outside assistant how the
+   course is taught (#209)" below.
 
 Whole `exec` session including the model call: 15 s. MCP cold-start was not
 timed separately, and a signed-out launch was not measured (expected: Codex
@@ -4679,6 +4877,183 @@ will eventually ask why the two are not the same.
   were added FIRST, before anything was touched, precisely so the extraction can
   be done later and proved not to have moved anything.
 
+## Telling an outside assistant how the course is taught (#209)
+
+Asked "How about my teaching style?", both doors' sessions said they did not
+know (item 6 above). Russell decided on 2026-09-26: **a "How I Teach" page per
+course, plain Markdown in the course folder, never published, that the teacher
+writes or the assistant drafts from the course's pages; both outside doors read
+it as part of the briefing.** Rejected by him: a Course Settings field. The rule,
+its cases and everything rejected are `contracts/shared-rules.json` →
+`howITeachPage`; this section is the why.
+
+### The page, and why its LOCATION is the guarantee
+
+`How I Teach.md` at the top of the course folder — the top of the Obsidian
+vault, beside `course_config.json` — matched on the whole name after NFC with
+only A–Z folded (so `how i teach.md` is it and `How I Teach 1.md` is not; ASCII
+folding because Python's `casefold` and Swift's `lowercased` disagree on a few
+letters, and two implementations of one rule must not). Measured before this
+existed: a page with that name at the top of a course, and at the top of
+`section1/`, was DISCOVERED, copied to the top of the site's content and
+PUBLISHED — a page typed in Obsidian has no frontmatter, and `publish: false`
+would not have saved it anyway, because `publishForSection<N>: true` beats it
+and that is exactly what `publish_pages` writes on a course-level page. So the
+build keeps it off by location, in shared Python (`scripts/how_i_teach.py`;
+docs 05 has the four points), and the `publish: false` a NEW page is given is
+only for a page later moved into a folder. The same name at the top of a
+section folder is kept off too, because the build copies it to the same place.
+
+A name that LOOKS like the page and is not ("How I Teach 1", "How I teach
+ICS4U") is published like any page, silently — the privacy risk runs that way,
+not the other — so the build names it in the console, and the missing-page
+answer states the exact name and place for an agent to relay.
+
+### Three channels, and which one is relied on
+
+1. **The greeting** (both doors, one string both platforms pin:
+   `app-rules.json` → `outsideAgents.greetingHowITeachSentence`), straight after
+   "Start by listing its sections…". The same sentence whether or not a page
+   exists: the tool's answer handles absence. It is the LOAD-BEARING channel,
+   because item 6 measured Codex deferring a tool whose description says "call
+   first" while acting on the greeting at once.
+2. **`read_how_i_teach`**, what the greeting sentence resolves to.
+3. **MCP `initialize.instructions`** (mac only; Windows' server sends none):
+   one paragraph naming each LIVE course whose page exists — the case the
+   greeting cannot cover, since it names one course. A folder with no page and
+   no reference course still sends nothing at all. Third, not first: whether
+   clients read `instructions` has never been measured.
+
+`list_courses` also says, per course, "How I Teach page: yes / not written
+yet" — to an MCP client ONLY. The local window reaches `list_courses` by a
+phrase matched in code and SHOWS the answer to the teacher, and the local
+assistant neither reads nor drafts the page, so the line would be a suggestion
+that window cannot act on (plan review, item 1).
+
+**Both doors start in the working folder, where the agent's own file tools can
+open the page.** A read that way leaves no trail line, so the
+`How I Teach page read` line means "read THROUGH PLANTOIR" and its absence
+proves nothing. Russell's acceptance (below) records which way each read went;
+if file reads turn out common, the lever is the greeting's wording, which is his
+decision.
+
+### Three tools, MCP only; the local thirteen do not move
+
+`read_how_i_teach` (course only; works on a reference course, whose page is
+evidence), `plan_write_how_i_teach`, `write_how_i_teach`. MCP-only for the
+curriculum tools' reason — drafting a teacher's account of their own teaching is
+judgement about meaning — and because anything on the local surface owes a
+routing re-measurement. The surface is 22 / 13 local / 35 MCP (was 32).
+`toolhash.py` (now committed in `research/ai-assist/`; the recipe is in its
+docstring) gives, after regeneration:
+
+- `local 13 tools 46b965622213567d49aae523c70f9bcd2c9fd3d1c21279e167d0da2b2cd96cb6` — unchanged, and now PINNED in full by `scripts/test_tool_surface_digest.py`;
+- `mcp 35 tools 777bf545185efd47333e13877c263884c9a3e3d19d6deb82388f6eb5c2fdcc54` — moved, as it must with three new tools; recorded here, not pinned. Re-hashed after merging `dev` 9eb779ac (#204, which touched no tool): both digests unchanged.
+
+What the write keeps, and why:
+
+- **`replacing` is a MARK, not a boolean.** The plan's first form was
+  `replacing: true`; this surface carries no boolean anywhere
+  (`toolSchemas.departures`, `testNothingOnThisSurfaceIsAPreviewFlagOrAnyBoolean`),
+  because a boolean is an argument the model decides under pressure. The mark
+  is the first eight hex digits of the SHA-256 of the page's bytes as they are
+  on disk (`howITeachPage.tools.markCases` pins the recipe, BOM included), which
+  `plan_write_how_i_teach` reports. It DETECTS a page that changed after the
+  plan — a teacher's edit between the plan and the write refuses the write,
+  which a boolean could not. It is not an enforcement boundary: an agent with a
+  shell can hash the file itself (no easier than calling the plan), and could
+  write the file with its own tools anyway. The gates are the teacher reading
+  the plan and the client's permission prompt; the mark steers the agent
+  through the plan and catches a stale one. With no mark, an existing page is
+  never replaced.
+- **Refused, by the plan and the write alike:** empty text, more than 8,000
+  characters, text whose first non-blank line (after a byte-order mark) is a
+  `---` fence (so an agent cannot write `publish: true` into it), a wrong mark,
+  and a reference course — the plan is read-only and would otherwise pass the
+  shared write gate, promising what the write refuses.
+- **A new page** is `---\npublish: false\n---\n\n<text>\n`. **A replaced page**
+  keeps its settings block byte for byte (LF or CRLF, a leading byte-order mark
+  included) and only the body changes; a page that opens a fence and never
+  closes it is replaced whole, so the old text cannot survive under a
+  "block" that swallowed it. Foundation's UTF-8 reading drops a byte-order
+  mark, so the page is decoded from its bytes (`HowITeachPage.text(of:)`) and
+  the undo entry's `after` is the file as it reads back.
+- **The teacher's own spelling** is found by listing the folder, so
+  `how i teach.md` is what is read, planned and replaced, and a case-sensitive
+  volume cannot end up with two.
+- **Backed up once per conversation, one undo entry, no preview touched.**
+  The backup and the entry need a section, so the lowest stands in; the
+  change's description names the course alone (`AssistChange.appliesToTheWholeCourse`),
+  and the Backups list says "before an assistant chat about Section 1" —
+  accepted rather than teaching the backup-name parser a new maker on both
+  platforms (plan review, item 6).
+
+The drafting brief (`AssistWording.howITeachDraftingBrief`, handed over with a
+missing page) says: offer, do not draft unasked; read the landing page, class
+pages from at least two units, some warm-ups/tasks/discussions, and a reference
+course of the same code; write in the teacher's first person; say what the
+pages SHOW and never invent; 200–500 words; show the whole draft and change it
+until they agree; save it only through the tools. It names no teaching
+approach on purpose: a lean should be FOUND in the pages, not asserted by
+Plantoir about a teacher who may have rewritten them.
+
+### Never listed, never published, and link rewriting still sees it
+
+The assistant's LISTINGS leave the page out — `list_pages`, the section graph
+(so `publish_pages` and `unpublish_pages` cannot find it by title) and
+curriculum mentions — through `ClassPages.pagesTheAssistantLists`. Asked for by
+title, publishing and hiding answer `wording.howITeachIsNeverPublished`, on the
+local window too, with no routing change: the model still picks
+`publish_pages`, the refusal is in code. An ordinary page of the same name
+inside a folder publishes like any other. **`ClassPages.pagesOfSection` is NOT
+narrowed** (plan review, item 2): it is also the walk that rewrites
+`[[links]]` when classes are renamed, and a How I Teach page that links to
+[[Unit 2, Day 3]] must follow that class — Obsidian only rewrites links when
+Obsidian does the rename. `HowITeachTests.testMakingRoomRewritesALinkOnTheHowITeachPage`
+pins it.
+
+### The trail
+
+Three events (`activityTrail.mustRecord`): `How I Teach page read` (course,
+word count, cut short or not — never the words), `How I Teach page written`
+(created or replaced, word counts, the backup's name — "did I write this, or
+did an assistant?"), and `How I Teach page kept off the website`, read from
+the build's `PLANTOIR_KEPT_OFF:` line — printed ONLY when a page the course's
+settings had LISTED is dropped, so the one transition a teacher will ask about
+("my How I Teach page vanished from the site") is recorded and a course whose
+page was never on the site leaves no line on every build. Read by the app from
+a run's console and from a scheduled publish's log, as `PLANTOIR_DATED:` is.
+
+### What is deliberately not in this piece
+
+- The section's "— Edited" fingerprint still counts the page, so editing it
+  makes the next Publish rebuild although the site would not change — a wire
+  format held byte for byte in three implementations; follow-up
+  [#330](https://github.com/russellgordon/plantoir/issues/330).
+- A button to open or create the page — a GUI surface on both platforms;
+  follow-up [#329](https://github.com/russellgordon/plantoir/issues/329).
+- No starter page from the wizard, `setup_course.py` or a payload: a template is
+  text an agent would read as the teacher's approach.
+- The local assistant neither reads nor drafts it.
+
+### Acceptance: through the real doors, by Russell
+
+Not automatable, and not headless: under `claude -p` an MCP write outside
+`--allowedTools` is denied, and `codex exec` ran with approvals at `never` and a
+read-only sandbox (item 2) — so write probes fail for reasons that are not the
+product's. In a SCRATCH working folder, ICS4U from its payload, the Debug build,
+each door three times: (A) greeting with no page — was `read_how_i_teach`
+called, did it offer to draft; (B) a 150-word page with a distinctive claim, then
+"How about my teaching style?" — PASS BAR: the answer reflects the page, 3/3 on
+both doors; "read at the greeting" is recorded as information, not a bar;
+(C) "Draft my How I Teach page" — pages read, plan before write, waited; (D)
+"Replace it with …" — refused without the mark, asked, then saved; (E) preview
+— no page on the site, the console line shown. For every probe, record whether
+the page was read THROUGH THE TOOL or with the agent's own file tools. A
+shortfall on B is recorded on #209 and flagged, not tuned away (steer with
+code, not descriptions), and does not block the merge. Results: not yet run
+(Russell's list, `ready/209.md`).
+
 ## A course kept for reference: the write gate, and the seam it is NOT gated on
 
 A reference course is read-only to every tool on both surfaces. The gate is one
@@ -4726,7 +5101,10 @@ toolSchemas.local  n=13  sha256 = 1b3666437802e1038b7801727abbe0968232c32ff878c3
 toolSchemas.mcp    n=32  sha256 = 079594d16aad00a8339a6e2cf560fcb508f98711339e14c0ae07bb97f8e76c84
 ```
 
-Both identical afterwards. Nothing here is a routing change, so the 29-probe
+Both identical afterwards. (These full digests were made with an earlier
+recipe, not `research/ai-assist/toolhash.py`'s, so they do not match the
+`46b96562…` that script gives for the same local thirteen; the truncated
+digests elsewhere in this page are toolhash.py's.) Nothing here is a routing change, so the 29-probe
 suite does not need re-running: the gate is code in front of the dispatch, and
 the sentences are tool OUTPUT rather than definitions.
 
@@ -5067,8 +5445,10 @@ preview up to date.
 The pair is appended to `mcpOnlyTools`, never to `tools`: the local model is
 shown the same 13 tools, byte for byte — local `46b96562…2cd96cb6` before and
 after (the recipe: sha256 of `json.dumps(toolSchemas[k], sort_keys=True,
-ensure_ascii=False)` over `contracts/assist-cases.json`). MCP goes from 32
-(`9bcc7eb7…9cef36f7`) to **34** (`4196ec20…3870bc32`). Should a fixed phrasing
+ensure_ascii=False)` over `contracts/assist-cases.json`, which is
+`research/ai-assist/toolhash.py`). MCP went from 32 (`9bcc7eb7…9cef36f7`) to 34
+(`4196ec20…3870bc32`) on #96's branch, and is **37** (`85bc3f80…05aa7639f`)
+with #209's three How I Teach tools merged in. Should a fixed phrasing
 ever reach the write from the assistant window, the card must carry the twin's
 plan code, or every attempt is refused.
 

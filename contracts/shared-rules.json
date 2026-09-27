@@ -542,6 +542,24 @@
         "why": "Added with #204. 'It broke after the update' needs to know WHEN the update was. Written at the first launch whose version differs from the last launch's, so it covers an install by hand too - which is why it is owed on Windows from the day it is read, updater or not."
       },
       {
+        "carries": "the course, whether a page was there, and when it was, how many words it had and whether the answer was cut short. Never the words.",
+        "event": "How I Teach page read",
+        "why": "GitHub #209 was filed because an outside assistant, asked 'how about my teaching style?', did not know how the course is taught. After 'started Claude Code for ICS4U' the trail says nothing about what a session read, so 'the assistant ignored my How I Teach page' is answerable only by this line. It is written when the page is read THROUGH PLANTOIR (read_how_i_teach). Stated honestly: its ABSENCE does not prove the page was never read - both doors start in the working folder, where the agent's own file tools can open the page, and that leaves no line. Present = read through Plantoir, and how long it was then.",
+        "line": "an outside assistant read the How I Teach page ({words} words) / an outside assistant found no How I Teach page yet"
+      },
+      {
+        "carries": "the course, whether the page was created or replaced, its word count before and after, and the name of the backup made first. Never the words.",
+        "event": "How I Teach page written",
+        "why": "The page is the teacher's own account, in their own voice, and the one question that must be answerable later is 'did I write this, or did an assistant?'. Written when an outside assistant saves it through write_how_i_teach. An agent that edits the file with its OWN file tools leaves no line - the tool is the recorded path, and the drafting brief tells it to use it.",
+        "line": "an outside assistant wrote a new How I Teach page ({after} words) / replaced the How I Teach page ({before} → {after} words), after backing up the course as {backup}"
+      },
+      {
+        "carries": "the course and section built, and the place in the course folder of each page with the reserved name that the build dropped from a copy list the course's settings had named it in. Never anything written on it.",
+        "event": "How I Teach page kept off the website",
+        "why": "#209's build rule can take a page OFF a site that used to publish it: a teacher who already had a page called How I Teach, meant for students, finds it gone after an update, and the build's console, which said why, is gone by the time they ask. Read from the build's own PLANTOIR_KEPT_OFF: line (howITeachPage.keptOffMarker) - by the app from the console of a run it started and from a scheduled publish's own log, as PLANTOIR_DATED: is. Printed only when the build dropped a listed page, so a course whose page was never on the site leaves no line on every build.",
+        "line": "howITeachPage.keptOffTrailLine"
+      },
+      {
         "carries": "the course and section; where it was asked from (the app, the assistant, an outside assistant); how many classes and how many other pages went into draft, the other pages split into those first used by a later class and those nothing students can see links to; how many pages were left as they were; the backup's FILE NAME; whether the preview was rebuilt. Never a page's name - the backup is how anyone finds the pages.",
         "event": "section made ready for the start of the year",
         "line": "{course}/{section} · made ready for the start of the year {from the app|from the assistant|from an outside assistant} — {N classes} and {N other pages} put into draft ({N} first used later, {N} that nothing students can see links to), {N} left as they were; backup {file name}; preview {rebuilt|not rebuilt}",
@@ -798,20 +816,88 @@
           "expectVisible": ["Unit 2, Day 3", "Ohm's Law", "Watt", "Worked Example"],
           "expectUntouched": ["Unit 2, Day 4", "Worksheet"],
           "why": "Three of the four pages that go up are reachable ONLY through a table link, so the case cannot pass on a reader that drops them. Ohm's Law -> Worked Example proves the walk is still transitive through a table; Unit 2, Day 4 proves the #173 stop still holds when the class is linked from one."
+        },
+        {
+          "name": "a link shown as an example inside code is not followed",
+          "pages": [
+            {"title": "Unit 2, Day 3", "isClassPage": true, "visible": false, "body": "Link a page by typing `[[Answer Key]]`.\n\n```\n[[Answer Key]]\n```\n\nToday: [[Worksheet]].\n"},
+            {"title": "Answer Key", "isClassPage": false, "visible": false, "links": []},
+            {"title": "Worksheet", "isClassPage": false, "visible": false, "links": []}
+          ],
+          "publish": ["Unit 2, Day 3"],
+          "expectVisible": ["Unit 2, Day 3", "Worksheet"],
+          "expectUntouched": ["Answer Key"],
+          "why": "Quartz draws neither example as a link (readingALink.codeIsNeverALink), so publishing the answer key would put a page in front of students that nothing on the site leads to - and an answer key is exactly the page a teacher writes as an example and does not mean to publish. Worksheet proves the class still publishes what it really links to. #313."
         }
       ]
     },
     "unpublishing": {
       "takesALinkedPageOnlyWhenNothingElseNeedsIt": true,
       "aReferrerCountsOnlyWhenVisible": true,
-      "why": "'X still links to it' is a reason to keep a page published only when students can SEE X. Counting hidden referrers left pages visible and reachable from nothing, held up by drafts nobody had published - kept alive by a page that is not there. Safe in one direction because of the other: publishing is transitive, so a page taken down here comes back the moment anything visible needs it again. That safety argument has ONE exception since 2026-09-19 (issue #173): publishing now stops at a class page, so a CLASS this sweep takes down does not come back by republishing the page that referred to it. The exception exists because the two reaches were decided apart - publishing and date-moving stop at a class, unpublishing does not yet - and closing issue #201 removes it rather than adding a rule."
+      "why": "'X still links to it' is a reason to keep a page published only when students can SEE X. Counting hidden referrers left pages visible and reachable from nothing, held up by drafts nobody had published - kept alive by a page that is not there. Safe in one direction because of the other: publishing is transitive, so a page taken down here comes back the moment anything visible needs it again. That argument had ONE exception from 2026-09-19 (issue #173), when publishing began to stop at a class page: a CLASS this sweep took down did not come back by republishing the page that referred to it. Issue #201 closed it on 2026-09-26 by making this sweep stop at a class too (stopsAtAClassPage.appliesTo), so the argument now holds without an exception.",
+      "casesNote": "Run through a REAL unpublish on a course laid out from `pages`, the same layout as publishing.casesNote (`links` or `body`, never both - a harness given both must fail the case rather than choose). Ask for the plan first (the plan twin, or the plan the tool shows before it acts), then carry out the unpublish of the pages named in `unpublish`. `expectPlanSays` / `expectPlanDoesNotSay` name assist-wording.json keys whose rendered sentence must or must not appear in that plan - looked up in the wording file, never retyped; every key named renders a page title, and a harness must FAIL a case that has no page of that title, or a renamed case would pass by never matching. Every `expectHidden` page must read hidden for section 1 afterwards, and every `expectUntouched` page must be BYTE-IDENTICAL to what was written: a page that stayed visible but was re-written is not untouched. Added by #201.",
+      "cases": [
+        {
+          "name": "a visible class linked from the class being hidden stays, and the plan says why",
+          "pages": [
+            {"title": "Unit 2, Day 3", "isClassPage": true, "visible": true, "links": ["Unit 2, Day 4"]},
+            {"title": "Unit 2, Day 4", "isClassPage": true, "visible": true, "links": ["Worksheet"]},
+            {"title": "Worksheet", "isClassPage": false, "visible": true, "links": []}
+          ],
+          "unpublish": ["Unit 2, Day 3"],
+          "expectHidden": ["Unit 2, Day 3"],
+          "expectUntouched": ["Unit 2, Day 4", "Worksheet"],
+          "expectPlanSays": ["linkedClassStaysVisible"],
+          "why": "The issue itself: hiding today's class hid tomorrow's. Worksheet proves the walk does not ENTER the class - it is Day 4's material, and nothing but Day 4 links to it."
+        },
+        {
+          "name": "reached through a page that is not a class, the walk still stops at the class",
+          "pages": [
+            {"title": "Unit 2, Day 3", "isClassPage": true, "visible": true, "links": ["Ohm's Law"]},
+            {"title": "Ohm's Law", "isClassPage": false, "visible": true, "links": ["Unit 2, Day 4"]},
+            {"title": "Unit 2, Day 4", "isClassPage": true, "visible": true, "links": ["Worksheet"]},
+            {"title": "Worksheet", "isClassPage": false, "visible": true, "links": []}
+          ],
+          "unpublish": ["Unit 2, Day 3"],
+          "expectHidden": ["Unit 2, Day 3", "Ohm's Law"],
+          "expectUntouched": ["Unit 2, Day 4", "Worksheet"],
+          "expectPlanSays": ["linkedClassStaysVisible"],
+          "why": "The sweep is still transitive - Ohm's Law, which only Day 3 links to, comes down with it - and the stop holds mid-chain."
+        },
+        {
+          "name": "both classes named means both come down, with what only they link to",
+          "pages": [
+            {"title": "Unit 2, Day 3", "isClassPage": true, "visible": true, "links": ["Unit 2, Day 4"]},
+            {"title": "Unit 2, Day 4", "isClassPage": true, "visible": true, "links": ["Worksheet"]},
+            {"title": "Worksheet", "isClassPage": false, "visible": true, "links": []}
+          ],
+          "unpublish": ["Unit 2, Day 3", "Unit 2, Day 4"],
+          "expectHidden": ["Unit 2, Day 3", "Unit 2, Day 4", "Worksheet"],
+          "expectUntouched": [],
+          "expectPlanDoesNotSay": ["linkedClassStaysVisible"],
+          "why": "The named pages are never stopped: naming two classes makes both of them starting points. A regression guard, green before #201 and after."
+        },
+        {
+          "name": "a linked class that is already hidden is not entered, and not mentioned",
+          "pages": [
+            {"title": "Unit 2, Day 3", "isClassPage": true, "visible": true, "links": ["Unit 2, Day 4"]},
+            {"title": "Unit 2, Day 4", "isClassPage": true, "visible": false, "links": ["Worksheet"]},
+            {"title": "Worksheet", "isClassPage": false, "visible": true, "links": []}
+          ],
+          "unpublish": ["Unit 2, Day 3"],
+          "expectHidden": ["Unit 2, Day 3"],
+          "expectUntouched": ["Unit 2, Day 4", "Worksheet"],
+          "expectPlanDoesNotSay": ["linkedClassStaysVisible"],
+          "why": "Worksheet is Day 4's material, and whether students see it is Day 4's business: taking it down because the class in front of it was hidden is the old behaviour through a hidden door. And a hidden class is not 'staying visible', so the plan does not say it is."
+        }
+      ]
     },
     "stopsAtAClassPage": {
       "value": true,
-      "appliesTo": ["publishing", "the dates a class brings", "copying a page into another course"],
-      "why": "A class goes up when the teacher names that class. A link that lands on another class publishes nothing and is not followed through, so material reachable only THROUGH another class belongs to that class and goes up with it. Publishing Day 4's worksheet because Day 3 links to Day 4 puts it in front of students a day early and dates it to the wrong lesson. Decided 2026-09-19 (issue #173), after the two apps were found to disagree: Windows stopped, the mac walked through. REJECTED: the middle position - do not publish the linked class, but walk past it to the material beyond - for the same two reasons. UNPUBLISHING is deliberately NOT in this list: its reach is the sibling decision, held as issue #201, and until that lands an unpublish still walks through a class page on both platforms.",
+      "appliesTo": ["publishing", "the dates a class brings", "copying a page into another course", "unpublishing"],
+      "why": "A class goes up when the teacher names that class. A link that lands on another class publishes nothing and is not followed through, so material reachable only THROUGH another class belongs to that class and goes up with it. Publishing Day 4's worksheet because Day 3 links to Day 4 puts it in front of students a day early and dates it to the wrong lesson. Decided 2026-09-19 (issue #173), after the two apps were found to disagree: Windows stopped, the mac walked through. REJECTED: the middle position - do not publish the linked class, but walk past it to the material beyond - for the same two reasons. Unpublishing joined 2026-09-26 (issue #201): a class is hidden when the teacher names it, and a link from the class being hidden does not take another class down or reach through it. Decided by Russell to mirror #173, after it was found that NEITHER platform stopped. It is a stop in the walk, not a fourth entry in neverTakenDownByFollowingLinks: those are pages reached from somewhere other than a lesson, and a class is the thing a lesson IS.",
       "theNamedPagesAreNeverStopped": "The rule is about pages REACHED. Naming two classes makes both of them starting points, and publishing a whole unit names every class in it, so nothing is lost by asking for more.",
-      "saidToTheTeacher": "The plan and the reply name the linked classes that were left alone, so a teacher is not surprised by a link students cannot follow yet - but only the ones students cannot already see, since 'publish it when you get to that class' is false about a class that is already published.",
+      "saidToTheTeacher": "The plan and the reply name the linked classes that were left alone, so a teacher is not surprised by a link students cannot follow yet - but only the ones students cannot already see, since 'publish it when you get to that class' is false about a class that is already published. When unpublishing, a linked class students can see is named among the pages that stay, with the reason wording.linkedClassStaysVisible gives; a linked class already hidden is not mentioned. The publishing sentence is not reused, since 'publish it when you get to that class' is false about a class an unpublish left up.",
       "cases": [
         {
           "name": "a class linked from a class is neither published nor walked through",
@@ -868,11 +954,30 @@
     }
   },
   "readingALink": {
-    "note": "What counts as a wikilink, and what it NAMES. One definition for every reader: publishing's walk, the dates a class brings, the site check, the answer to what a page links to, copying a page with the pages it links to, and renaming a page, a unit word or a folder. Pure: text in, the names it links to out.",
+    "note": "What counts as a wikilink, and what it NAMES. One definition for every reader: publishing's walk, the dates a class brings, the site check, the answer to what a page links to, copying a page with the pages it links to, renaming a page, a unit word or a folder, and - when a course is installed - which class's date a ready-made page takes, pointing a template at the course's own expectation and unlinking the curriculum pages a teacher declined, as well as which pages the coverage map counts as taught and what it counts as covered (#314, scripts/test_install_link_readers.py). Pure: text in, the names it links to out.",
     "rule": "The name runs from [[ (or ![[) up to the first ], | or #, and a backslash immediately before that character is not part of it. An escaped pipe, [[Ohm's Law\\|Ohm]], is the same link as [[Ohm's Law|Ohm]] wherever it is written. It is most often inside a Markdown table, where Obsidian escapes the alias pipe so that the cell does not end there, but it turns up in ordinary sentences too and is a link there as well. A backslash anywhere else in a name is left alone.",
-    "whenRewritten": "A rename changes only the name. The backslash, the alias, the heading and the ! stay exactly where they were: dropping the backslash would split a table cell in two.",
+    "whenRewritten": "A rename changes only the name. The backslash, the alias, the heading and the ! stay exactly where they were: dropping the backslash would split a table cell in two. A link inside code is not a link, so a rename leaves it as written.",
+    "codeIsNeverALink": "A [[...]] or ![[...]] whose opening brackets (or the ! of ![[) sit inside a fenced code block or an inline code span is an EXAMPLE of a link, not a link. It is not followed by publishing, the dates a class brings, the site check, the answer to what a page links to, copying, the installer or the coverage map, and it is not rewritten by a page rename, a unit-word rename, a class insertion or a folder rename (#313). This is what Quartz v4.5.0 already does: ofm.ts builds links with mdast-util-find-and-replace over TEXT nodes only (quartz/plugins/transformers/ofm.ts lines 209-378), so code and inlineCode nodes are never searched. Built in real Quartz and checked: no link from `[[X]]`, from ``a ` [[X]] ``, from a span across two lines of one paragraph or in a table cell, from a ``` or ~~~ fence, from ```` holding ```, from a fence inside a > callout, or from a fence never closed; a link IS drawn from an indented line continuing a list item, after a lone unclosed backtick, inside HTML <code>, and after a ``` fence that held a ~~~ line. The pattern is unchanged: the rule is a mask applied to its matches, and the text is never rewritten to apply it.",
+    "whatIsCode": [
+      "The page is read a line at a time. A line ends at \\n; a \\r before it belongs to the line ending, not the line. A line's BODY is the line with any leading blockquote markers removed: spaces or tabs, then >, repeated, then one optional space after the last >. Its DEPTH is how many > markers were removed (0 outside a callout). WHITESPACE means the five ASCII characters space, tab, \\r, form feed and vertical tab, and nothing else (not a no-break space); a line is BLANK when its body is only whitespace.",
+      "1. Fenced code. Outside a fence, a line whose body, after leading spaces and tabs, starts with a run of three or more backticks, or three or more tildes, opens a fence at that line's depth - except that a run of backticks followed by another backtick later on the same line is inline code, not a fence. Every line from the opener through the closer, inclusive, is code. Inside a fence, a line at the SAME depth whose body, after leading spaces and tabs, is a run of the SAME character at least as long as the opener's run, with nothing after it but whitespace, closes the fence. A line at a SMALLER depth ends the fence without being part of it (a fence opened in a callout ends with the callout) and is read as an ordinary line; a line at a greater depth is inside the fence. A fence never closed runs to the end of the page.",
+      "2. Paragraphs, for code spans only: runs of consecutive lines outside fences. A new paragraph begins at a blank line, at a fence, at a line whose depth is greater than the depth of the paragraph's FIRST line (an unquoted line inside a callout paragraph is a lazy continuation and does not lower it), and at a line whose body, after leading spaces and tabs, begins with a list marker (-, * or + then a space, a tab or the end of the line; one to nine digits 0-9 then . or ) then a space, a tab or the end of the line), a heading (one to six # then a space, a tab or the end of the line), a table pipe (|), or is a rule line (three or more of one of - * _ = with nothing else on the line but spaces and tabs: a thematic break, a setext underline, the --- around frontmatter). Such a line is the first line of the new paragraph. A heading is a paragraph on its own: the line after it begins a new one.",
+      "3. Inline code spans, within one paragraph, scanning left to right. Outside a span, a backslash and the character after it are plain text (\\` does not open code, and \\\\ leaves the next backtick live). A run of N backticks opens a span, which closes at the next run of EXACTLY N backticks in the same paragraph; everything from the opening run through the closing run is code. A run never matched is plain text, and scanning carries on after it. Inside a span, backslashes are literal.",
+      "4. Nothing else is code: not indented lines (see whatIsCodeLimits), not HTML <code> or <pre>, not math, and not %% comments (a separate question, #331).",
+      "5. A link is in code when its [[, or the ! of ![[, starts inside a code range. Apply the link pattern to the page as written, and when a match STARTS in code, skip it and search again from where THAT CODE RANGE ENDS - not from the end of the match. The pattern's name crosses a [, so in \"Type `[[` to start one, then [[Real Page]]\" the match from the example's brackets runs on through the real link; resuming after the match would lose the real link with the example. The text itself is never rewritten to apply the mask, so a rewriter can use the offsets as they are.",
+      "Every character the rule looks at is ASCII, so it can be computed over UTF-16 code units (Swift, C#) or code points (Python) and the offsets line up with that language's own regular expression matches. Do not scan user-perceived characters: \\r\\n is ONE grapheme in Swift, so a scan for \\n over Characters misses every line ending of a page written on Windows."
+    ],
+    "whatIsCodeLimits": [
+      "Indented code (four spaces) is not recognised. Measured with Quartz's own parser over all of support/: 0 of 39,570 links sit in indented code, and an 'indented after a blank line' heuristic drops real links from loose nested lists - the case 'an indented line in a list is not code' pins that.",
+      "A fence opener indented four or more spaces (or a tab) opens a fence here. CommonMark reads it as indented code at the top level, but inside a list item it is an ordinary fence, and telling the two apart needs the list tracking the first limit rejects. A closer indented four or more spaces still closes here, where CommonMark would not.",
+      "A fence opened inside a list item whose lines fall back to column 0 (or, inside a callout, to the callout's own column) runs to its own closer here; CommonMark ends it with the list item. That was the shape of TEJ2O's 'Control Something with Code', the one shipped page with it, fixed in #313 and caught by the payload linter since.",
+      "A paragraph is broken only at the block starts listed in whatIsCode. A code span CommonMark would stop at another kind of block boundary (an HTML block, say) can run on here.",
+      "A line beginning with | always breaks a paragraph here, whether or not a table's delimiter row makes it a table in GFM; a span that would cross such a line is cut there. And a line ends only at \\n: a lone \\r, which CommonMark also treats as a line ending, is an ordinary character here. Neither shape occurs in support/.",
+      "Frontmatter is read as ordinary lines; the --- around it breaks a paragraph, so a backtick in a title cannot pair with one in the body. The mac reads the whole file and the build reads the page after its frontmatter; for every shape in the cases the two agree.",
+      "Measured: these limits disagree with Quartz's parser on 0 of the 39,570 links in support/ once TEJ2O is fixed, and on 7 before. On 20,000 random texts built from backticks, tildes, >, list and heading markers, rule lines, indents and [[x]] (no |, no lone \\r), every text in which this rule reads as code a link Quartz draws contains a four-space or tab indent or a list marker - the first two limits."
+    ],
     "expectIs": "Each distinct name once, in the order it first appears, as written: spaces inside the brackets trimmed, a trailing .md dropped, capitals and any folder in front kept. A reader that compares names without regard to case or folder (the mac's section graph, the build's dating walk) compares against these the same way it compares against a page's title.",
-    "why": "Found by #167 and filed as #294. The example payloads and skeletons (12,128 files) carry 229 links with an escaped pipe - 142 in tables, 87 in sentences and in code examples; 230 over all of support/, the example course included - and neither app followed one: every reader took the name up to the pipe, so it ended in a backslash and matched no page. By an emulation of the section graph (an estimate, not a measurement), publishing a class with what it links to left about 137 pages behind across about 104 of 3,258 payload classes. Quartz v4.5.0, which draws the site, reads every one of them as a link (quartz/plugins/transformers/ofm.ts lines 117-119 at the tag the image clones, wikilinkRegex: the name excludes a backslash, the alias is \\\\?\\|).",
+    "why": "Found by #167 and filed as #294. The example payloads and skeletons (12,128 files) carry 229 links with an escaped pipe - 142 in tables, 87 in sentences and in code examples; 230 over all of support/, the example course included - and neither app followed one: every reader took the name up to the pipe, so it ended in a backslash and matched no page. By an emulation of the section graph (an estimate, not a measurement), publishing a class with what it links to left about 137 pages behind across about 104 of 3,258 payload classes. Quartz v4.5.0, which draws the site, reads every one of them as a link (quartz/plugins/transformers/ofm.ts lines 117-119 at the tag the image clones, wikilinkRegex: the name excludes a backslash, the alias is \\\\?\\|). Code (#313): over all of support/ (12,490 pages), read with Quartz's own parser (remark-parse 11 + remark-gfm 4), 39,570 links match the pattern: 37,674 outside code, 1,139 in inline code, 757 in fenced code and 0 in indented code. Only 8 page-to-page links existed solely inside code, on 3 pages - six of them TEJ2O's, in code only because its fence was broken - and by an emulation of the section graph no class page, of 3,258 in the payloads and 600 in the skeletons, reaches fewer pages when published. Before #313 the mac's publishing walk followed all 1,896 links in code, its links answer dropped 22 real ones and read 277 examples, Windows read 277 examples, and the build read 7.",
     "rejected": [
       {
         "option": "strip the backslash only where publishing reads links",
@@ -882,10 +987,9 @@
         "option": "treat a backslash as never part of a name",
         "why": "Closer to Quartz's own pattern, but [[a\\b]] would then name a, and a rename of a page called a would rewrite it. Stopping only at a backslash right before ], | or # changes nothing else: measured over 12,128 shipped pages, the same 38,659 links matched at the same places, and the 229 that read differently are exactly the escaped pipes."
       },
-      {
-        "option": "leave out links written inside code in the same change",
-        "why": "A real difference between the apps (Windows and the mac's answer to what a page links to skip them; the mac's publishing does not), but it changes what publishing takes by a different rule and needs its own measurement. Issue #313. No case here puts a link inside code, so this list does not decide it."
-      },
+      {"option": "recognise indented code (four spaces) as code", "why": "0 of 39,570 shipped links sit in it. Doing it properly needs list-container tracking in three languages, and Obsidian writes nested lists with tabs: any 'indented after a blank line' shortcut drops links from loose nested lists, silently, in the direction that leaves pages unpublished while the plan still looks right."},
+      {"option": "readers skip code, rewriters do not", "why": "The mac would have two definitions of a link again: a rename plan would count links publishing does not follow, and a folder rename would edit an example the teacher wrote, which copying a page already refused to do for fenced code. Measured: 0 class names and 0 real folder paths sit in shipped code, so this costs nothing that ships."},
+      {"option": "each platform keeps its own code stripper and fixes its own gaps", "why": "That is how three strippers came to disagree: the mac's links answer dropped 22 real links, both apps read 270 fences inside callouts, and the build missed ~~~ fences. One written rule plus its cases fixes it, with ONE implementation per language shared by every reader in that language. A real Markdown parser in the app was rejected too: nothing like it is available to the Python build and the C# app alike, so the three would drift at exactly the edges these cases pin."},
       {
         "option": "a case for a backslash inside a name, [[a\\b]]",
         "why": "Quartz does not draw it as a link at all, and nobody has chosen what it should mean; a case would assert an answer nobody decided."
@@ -901,7 +1005,37 @@
       {"name": "spaces inside the brackets", "text": "| [[ Ohm's Law \\|Ohm]] |\n", "expect": ["Ohm's Law"]},
       {"name": "a picture with a size, in a table", "text": "| ![[circuit.png\\|300]] |\n", "expect": ["circuit.png"]},
       {"name": "an escaped pipe outside a table is the same link", "text": "That is the lesson of [[Yes Lets\\|Yes, Let's]].\n", "expect": ["Yes Lets"]},
-      {"name": "an unescaped link reads as it always did", "text": "[[Ohm's Law|Ohm]] and [[Ohm's Law#Example]] and [[Watt]]\n", "expect": ["Ohm's Law", "Watt"]}
+      {"name": "an unescaped link reads as it always did", "text": "[[Ohm's Law|Ohm]] and [[Ohm's Law#Example]] and [[Watt]]\n", "expect": ["Ohm's Law", "Watt"]},
+      {"name": "inline code is an example of a link, not a link", "text": "Write `[[Page Name]]` to make a link, as in [[Help Sessions]].\n", "expect": ["Help Sessions"]},
+      {"name": "a fenced block, backticks", "text": "```\n[[Fenced Example]]\n```\n\nThen [[Real Page]].\n", "expect": ["Real Page"]},
+      {"name": "a fenced block, tildes", "text": "~~~\n[[Fenced Example]]\n~~~\n\nThen [[Real Page]].\n", "expect": ["Real Page"]},
+      {"name": "a line of tildes inside a backtick fence does not close it", "text": "```text\n    ~~~~~~~~^^^^\n[[Fenced Example]]\n```\n\nThen [[Real Page]].\n", "expect": ["Real Page"], "why": "A Python traceback underlines the failing expression with ~~~~^^^^, inside a ```text block. The mac's answer to 'what does this page link to?' flipped its fence on any line starting with ~~~, so the ``` that really closed the block opened a new one and everything after it read as code: 22 real links dropped on four ICS4U pages (Testing and Regression 8, Reading a Traceback 7, Spot the Bug 5, Name That Error 2). #313."},
+      {"name": "a longer fence holds a shorter one", "text": "````markdown\n```\n[[Fenced Example]]\n```\n````\n\nThen [[Real Page]].\n", "expect": ["Real Page"]},
+      {"name": "a fence inside a callout", "text": "> [!example]\n> ```markdown\n> See [[Fenced Example]].\n> ```\n> Then [[Real Page]].\n", "expect": ["Real Page"], "why": "The Scavenger Hunt pages teach link syntax inside > [!example] callouts. Both apps looked for a fence only at the start of a line, so the > hid it and 270 examples were read as links. #313."},
+      {"name": "a fence that is never closed runs to the end of the page", "text": "First [[Real Page]].\n\n```\n[[Fenced Example]]\n\nStill [[Also Fenced]].\n", "expect": ["Real Page"], "why": "CommonMark and Quartz run an unclosed fence to the end of the page. TEJ2O's 'Control Something with Code' did exactly that on its site until #313 re-indented it: seven links and the curriculum block showed as code."},
+      {"name": "a lone backtick is only a character", "text": "It costs 5` and leads to [[Real Page]].\n", "expect": ["Real Page"]},
+      {"name": "double backticks hold a single one", "text": "``a ` [[Code Example]] `` then [[Real Page]].\n", "expect": ["Real Page"]},
+      {"name": "a code span can carry on to the next line", "text": "A span `starts here\n[[Code Example]] and ends` before [[Real Page]].\n", "expect": ["Real Page"]},
+      {"name": "a code span does not cross a blank line", "text": "One ` tick here.\n\n[[Real Page]] and another ` tick.\n", "expect": ["Real Page"]},
+      {"name": "an escaped backtick does not start code", "text": "\\`[[Real Page]]\\`\n", "expect": ["Real Page"]},
+      {"name": "code in a table cell, a link beside it", "text": "| Type this | To get |\n|---|---|\n| `[[Page Name]]` | [[Ohm's Law\\|Ohm]] |\n", "expect": ["Ohm's Law"]},
+      {"name": "an escaped pipe inside code is still code", "text": "In a table, write `[[Ohm's Law\\|Ohm]]`.\n", "expect": []},
+      {"name": "an indented line in a list is not code", "text": "- Read this first\n\n    [[Real Page]] explains it.\n", "expect": ["Real Page"]},
+      {"name": "an HTML code tag is not Markdown code", "text": "<code>[[Real Page]]</code>\n", "expect": ["Real Page"]},
+      {"name": "a fence in a page with Windows line endings", "text": "Intro.\r\n\r\n```\r\n[[Fenced Example]]\r\n```\r\n\r\nA span `across\r\n[[Code Example]] lines` then [[Real Page]].\r\n", "expect": ["Real Page"]},
+      {"name": "a code span does not reach into the next list item", "text": "- a stray ` here\n- [[Real Page]]\n- and another ` there\n", "expect": ["Real Page"]},
+      {"name": "a code span does not reach into the next table row", "text": "| a ` b |\n|---|\n| [[Real Page]] |\n| c ` d |\n", "expect": ["Real Page"]},
+      {"name": "an escaped backslash leaves the backtick live", "text": "\\\\`[[Code Example]]` then [[Real Page]].\n", "expect": ["Real Page"]},
+      {"name": "three backticks with more on the same line are inline code, not a fence", "text": "```[[Code Example]]``` is written inline.\n\nThen [[Real Page]].\n", "expect": ["Real Page"]},
+      {"name": "a stray [[ inside code does not swallow the link after it", "text": "Type `[[` to start a link, then [[Real Page]].\n", "expect": ["Real Page"], "why": "The link pattern crosses a [, so a match starting at the example's brackets runs on to the real link's name and swallows it. A reader must start looking again where the code ENDS, not where the swallowing match ends, or dropping the example drops the real link with it. Quartz never searches code, and its own pattern stops at [, so it draws this link. Found while implementing #313; the Scavenger Hunt pages carry this shape ('Type `[[`'), where a heading between the two happened to save the real link."},
+      {"name": "a bare line of tildes inside a backtick fence does not close it either", "text": "```\n~~~\n[[Fenced Example]]\n```\n\nThen [[Real Page]].\n", "expect": ["Real Page"], "why": "Only the SAME character closes a fence. The traceback case above carries text after its tildes, so it would pass a reader that let any fence character close; this one would not. Added while implementing #313, so that a reader closing on either character goes red; checked with Quartz's parser stack (remark-parse 11 + remark-gfm 4, Quartz's own link pattern over text nodes), not a full build."},
+      {"name": "a tilde fence inside a callout", "text": "> [!example]\n> ~~~\n> See [[Fenced Example]].\n> ~~~\n> Then [[Real Page]].\n", "expect": ["Real Page"], "why": "The backtick callout case above also reads right for a reader that never takes the > off, because its fence lines happen to pair up as an inline span; tildes make no span, so only a reader that sees the fence inside the callout passes. Added while implementing #313; checked with Quartz's parser stack, not a full build."},
+      {"name": "a fence in a callout ends with the callout", "text": "> [!example]\n> ```\n> [[Fenced Example]]\n\nThen [[Real Page]].\n", "expect": ["Real Page"], "why": "A fence left open inside a callout ends where the callout ends - Obsidian and Quartz both show it that way, so the teacher sees nothing wrong - and must not run on to the end of the page taking every later link with it. Found in #313's implementation review; checked with Quartz's parser stack."},
+      {"name": "a quoted fence line does not close a fence outside the callout", "text": "```\n> ```\n[[Fenced Example]]\n```\n\nThen [[Real Page]].\n", "expect": ["Real Page"], "why": "Inside a fence opened outside any callout, a line starting with > is content, not a closer; reading it as one would turn the real closer into an opener and hide every link after it. Found in #313's implementation review; checked with Quartz's parser stack."},
+      {"name": "frontmatter's closing --- ends a paragraph", "text": "---\ntitle: It`s here\n---\nSee [[Real Page]] and a ` tick.\n", "expect": ["Real Page"], "why": "A backtick in the frontmatter must not pair with one in the body. The build reads the page after its frontmatter and the mac reads the whole file; the --- breaking a paragraph is what makes them agree. Found in #313's implementation review; checked with Quartz's parser stack (with remark-frontmatter)."},
+      {"name": "a heading is a paragraph on its own", "text": "# A `heading\n[[Real Page]] and a ` tick.\n", "expect": ["Real Page"], "why": "A heading is one line, so a backtick in it cannot pair with one on the line below. Added while implementing #313 so that a reader that lets a span run on from a heading goes red; checked with Quartz's parser stack."},
+      {"name": "a callout line after a paragraph starts a new one", "text": "A ` tick.\n> [[Real Page]] and a ` tick.\n", "expect": ["Real Page"], "why": "A > line interrupts the paragraph before it, so a span cannot reach from the paragraph into the callout. Added while implementing #313 so that a reader that ignores a deeper quote goes red; checked with Quartz's parser stack."},
+      {"name": "an unquoted line inside a callout paragraph does not end it", "text": "> a `b\nc\n> d` then [[Real Page]] and a ` tick.\n", "expect": ["Real Page"], "why": "The unquoted middle line is a lazy continuation of the callout's paragraph, so the > line after it is not a deeper quote: the span runs from b to d and the link after it is real. Found in #313's second review, where comparing each line's depth with the line before it hid this link; a paragraph is compared with its FIRST line. Checked with Quartz's parser stack."}
     ]
   },
   "note": "The rule sets both apps need and neither platform owns. The MECHANISMS behind several of them differ completely - launchd against Task Scheduler, AppKit against WinUI, ~/Library/Logs against %LOCALAPPDATA% - which is exactly why the rules are written here instead: what must be refused, matched, stripped, or taken out of a problem report does not change with the machinery that does it.",
@@ -4338,7 +4472,7 @@
       },
       "linkRewriting": {
         "note": "How a folder’s new name is SPELLED inside the links a rename repoints. The rename itself is above; this is the half that decides whether the repointed link still resolves. The reference implementation is `FolderPathRewriter` on both sides.",
-        "rule": "In a MARKDOWN link, escape when the NEW name needs it, whatever the old segment looked like. In a WIKILINK, keep the plain spelling. A segment that ARRIVED percent-encoded goes back percent-encoded in either style, so a link a teacher already had keeps the shape it had.",
+        "rule": "In a MARKDOWN link, escape when the NEW name needs it, whatever the old segment looked like. In a WIKILINK, keep the plain spelling. A segment that ARRIVED percent-encoded goes back percent-encoded in either style, so a link a teacher already had keeps the shape it had. Inside ANGLE BRACKETS, `](<…>)`, keep the plain spelling unless the name contains `<`, `>` or a line break, which end that form (#97).",
         "why": "“Spell it the way the old segment was spelled” is the obvious rule and it is wrong. A Markdown destination ends at the first SPACE, so renaming Tasks to All Tasks turned `[q](Tasks/Quiz%201.md)` into `[q](All Tasks/Quiz%201.md)`, which neither Obsidian nor Quartz can follow. The old segment `Tasks` carries no `%`, so nothing escaped anything — the `%20` in that example belongs to the FILE name, which is what made it easy to miss by eye. Every Markdown-style link into the folder broke, in a teacher’s own pages, and nothing said so. Found on Windows by adversarial review 2026-09-06; the mac had the identical defect. Escaping a WIKILINK would be the mirror-image mistake: `[[All Tasks/Quiz 1]]` is exactly how Obsidian writes a wikilink whose folder has a space in it.",
         "needsEscapingInAMarkdownLink": {
           "characters": ["whitespace", "(", ")"],
@@ -4349,6 +4483,16 @@
           "onceEscapingIsTriggeredEncodeEverythingElse": "Nothing is encoded unless a name needs it — see needsEscapingInAMarkdownLink — or the old segment arrived encoded. `Café` goes into a link as `Café`; `Café Notes` goes in as `Caf%C3%A9%20Notes`. Both resolve; the Markdown parser normalises the first to `Caf%C3%A9` itself. Reading this key as “always encode” is the way the two apps would drift, so there is a case for it below.",
           "why": "Neither macOS’s `urlPathAllowed` nor .NET’s `Uri.EscapeDataString` is right, and both were tried. Quartz v4.5.0 resolves an internal link with `decodeURI` (`quartz/util/path.ts`, `transformInternalLink`), and `decodeURI` deliberately leaves the reserved set `; / ? : @ & = + $ , #` still encoded. It then slugs what comes back, turning `&` into `-and-` and `%` into `-percent` (`sluggify`, same file). So a folder called “Tasks & Quizzes” written as `Tasks%20%26%20Quizzes` decodes to `Tasks %26 Quizzes` and slugs to `Tasks--percent26-Quizzes`, while the real folder slugs to `Tasks--and--Quizzes`: a 404 on the published site, and invisible in Obsidian, which decodes `%26` perfectly well. The set here is what JavaScript’s `encodeURI` leaves alone, minus three — `(` and `)` close a destination, `#` starts a heading — and minus `/` and `:`, which the rename sheet refuses anyway. **`?` was excluded at first and was put back**, on the reasoning that a bare `?` is a query delimiter to any other reader of the file. That was never a rule the code applied — `?` is not in needsEscapingInAMarkdownLink, so `Why?` always went in unescaped — and it was measurably wrong when escaping DID run: `sluggify` strips a `?`, so the real folder `Why Not?` slugs to `Why-Not`, an unescaped `Why%20Not?` slugs to the same and resolves, and the escaped `Why%20Not%3F` slugs to `Why-Not-percent3F` and 404s. Excluding it meant a folder resolved when it was called `Why?` and not when it was called `Why Not?`. Verified against the running image 2026-09-06: `decodeURI` turns `Work%28new%29` into `Work(new)`, `Top%2010%25` into “Top 10%”, `Caf%C3%A9%20Notes` into “Café Notes”, and leaves `C%2B%2B` alone.",
           "windowsMustReplaceEscapeDataString": "`Uri.EscapeDataString` keeps only `A-Za-z0-9-._~`, so it over-encodes `;`, `,`, `@`, `&`, `=`, `+`, `$`, `?`, `'`, `!` and `*`. **Only the first eight of those actually break a link**, and the distinction is worth keeping straight: `decodeURI` leaves exactly `; / ? : @ & = + $ , #` encoded, so those come back as `%XX` and `sluggify` turns each into `-percent…`, while `%27`, `%21` and `%2A` decode back to `'`, `!` and `*` and resolve fine — over-encoding them is noise rather than a 404. (An earlier draft of this note said all eleven broke. They do not, and the same encoder is still the right answer, because the eight that DO break include the two that will happen.) **Done on Windows 2026-09-07** (documentation/06-quartz-customizations.md): `Spelled` now calls a `PercentEncoded` driven by `leaveUnescaped`, in BOTH of its branches, and `FolderPathRewriterTests` deserialises every case below rather than retyping five of them. Three cases had been failing there — the ampersand, the comma and the question mark. The comma is the one that was going to bite: “Unit 1, Day 2” is this project’s own naming pattern, and Windows wrote `Unit%201%2C%20Day%202`, which slugs to `Unit-1-percent2C-Day-2` and 404s. The per-cent case passed there even before the fix — `Top 10%` triggers escaping on its space, and `EscapeDataString` encodes the `%` too — so do NOT add `%` to WouldBreakAMarkdownTarget. Kept here rather than deleted because the reasoning is what stops the encoder being “simplified” back to the framework call."
+        },
+        "insideAngleBrackets": {
+          "characters": ["<", ">", "line break"],
+          "why": "A destination written as `](<Tasks/Quiz 1.md>)` is CommonMark's way of putting a space in a link without `%20`; Obsidian's own links never use it, so it appears only where a teacher typed it. Quartz v4.5.0 has no angle-link code of its own: `remark-parse` reads the destination and `remark-rehype` makes the `href`, and the rest is the path every Markdown link takes. Measured 2026-09-26 with remark-parse 11, remark-rehype 11 and rehype-stringify 10 from npm (the majors in Quartz's package.json, not the image's lockfile), node 22: `<All Tasks/Quiz 1.md>` → `All%20Tasks/Quiz%201.md`; `<Tasks & Quizzes/Quiz.md>` → `Tasks%20&%20Quizzes/Quiz.md`, `<Unit 1, Day 2/Quiz.md>` → `Unit%201,%20Day%202/Quiz.md` and `<Top 10%/Quiz.md>` → `Top%2010%25/Quiz.md`, each the SAME href the escaped form gives; `<Work(new)/Quiz.md>` → `Work(new)/Quiz.md`; a pre-encoded `<All%20Tasks/Quiz 1.md>` → `All%20Tasks/Quiz%201.md`; `<Tasks/Quiz 1.md> \"t\"` keeps the title. `<Unit 1 > Review/Quiz 1.md>` is NOT a link — it renders as literal text — while `<Unit%201%20%3E%20Review/…>` is, and `decodeURI` gives back `Unit 1 > Review`; so `<`, `>` and a line break force the ordinary percent-encoding (escapingSet) and nothing else does. An unterminated `](<Units/Tasks/Quiz1.md)` is literal text too, and must not be rewritten. Obsidian's reading was not driven; its help documents `[text](<Note with spaces.md>)` as supported.",
+          "rejected": [
+            "Applying the Markdown escaping inside the brackets (`<All%20Tasks/…>`). It resolves (measured), but it rewrites the spelling of a link whose only reason for brackets is to avoid `%20`, and it passes every guard case — which is why the `Unit 1, Day 2` and `Top 10%` cases below exist.",
+            "Dropping the brackets and converting the link to the percent-encoded form: that edits the teacher's text beyond the folder segment.",
+            "Escaping `>` as `\\>` (a CommonMark backslash escape) instead of `%3E`. remark accepts it (measured), but it is a second escaping mechanism whose reading in Obsidian is unmeasured; the existing encoder is contract-pinned and round-trips through `decodeURI`.",
+            "One pattern with an optional `<`: the `>` would have to be consumed or re-appended, and the spelling has to know the style anyway. Two patterns, and the plain one refuses a destination starting with `<`, so ONE link is read by ONE pattern."
+          ]
         },
         "cases": [
           {
@@ -4441,6 +4585,104 @@
             "newName": "All Tasks",
             "expect": "| [[All Tasks/Quiz 1\\|quiz]] |",
             "why": "A GUARD, green before and after #294 on both apps: a folder rewrite changes only the folder at the front of the name, so the backslash of a table's escaped alias pipe was never at risk here. It is here because the pattern this rewriter finds links with changed in #294 (shared-rules.json -> readingALink), and a rewrite that dropped the backslash would split the table cell in two."
+          },
+          {
+            "given": "`[[Tasks/Quiz 1]]` and `[q](Tasks/Quiz%201.md)` show the syntax; [[Tasks/Quiz 1]] is the link.",
+            "oldName": "Tasks",
+            "newName": "All Tasks",
+            "expect": "`[[Tasks/Quiz 1]]` and `[q](Tasks/Quiz%201.md)` show the syntax; [[All Tasks/Quiz 1]] is the link.",
+            "why": "A link inside code is an example, not a link (readingALink.codeIsNeverALink, #313): a rename leaves both examples exactly as the teacher wrote them - a wikilink and a Markdown link alike - and moves only the real link. Windows' FolderPathRewriterTests runs this list and is RED on this case until it applies the same mask."
+          },
+          {
+            "given": "[q](<Tasks/Quiz 1.md>)",
+            "oldName": "Tasks",
+            "newName": "All Tasks",
+            "expect": "[q](<All Tasks/Quiz 1.md>)",
+            "why": "The defect itself (#97): the plain pattern read the target as `<Tasks/Quiz`, so a folder in the FIRST segment was never seen. The name goes in plain, and the closing `>` survives."
+          },
+          {
+            "given": "[q](<Tasks/Quiz1.md>)",
+            "oldName": "Tasks",
+            "newName": "Assignments",
+            "expect": "[q](<Assignments/Quiz1.md>)",
+            "why": "No space anywhere: the old reading still took `<Tasks` as the segment and missed it."
+          },
+          {
+            "given": "[q](<Units/Tasks/Quiz 1.md> \"the quiz\")",
+            "oldName": "Tasks",
+            "newName": "Work(new)",
+            "expect": "[q](<Units/Work(new)/Quiz 1.md> \"the quiz\")",
+            "why": "A deeper segment and a title. The old reading rewrote this one by LUCK, as `Work%28new%29`; inside brackets a round bracket is fine (measured: `<Work(new)/Quiz.md>` gives the href `Work(new)/Quiz.md`), and the title is left alone."
+          },
+          {
+            "given": "![](<Tasks/a diagram.png>)",
+            "oldName": "Tasks",
+            "newName": "All Tasks",
+            "expect": "![](<All Tasks/a diagram.png>)",
+            "why": "An embed in the same form follows the folder too."
+          },
+          {
+            "given": "[q](<Tasks/Quiz 1.md>)",
+            "oldName": "Tasks",
+            "newName": "Unit 1, Day 2",
+            "expect": "[q](<Unit 1, Day 2/Quiz 1.md>)",
+            "why": "Plain even where the Markdown rule would escape: measured, `<Unit 1, Day 2/Quiz.md>` gives the href `Unit%201,%20Day%202/Quiz.md`, the same as the escaped form. Pins that the Markdown rule is not applied inside brackets."
+          },
+          {
+            "given": "[q](<Tasks/Quiz 1.md>)",
+            "oldName": "Tasks",
+            "newName": "Top 10%",
+            "expect": "[q](<Top 10%/Quiz 1.md>)",
+            "why": "Plain, `%` included: measured, `<Top 10%/Quiz.md>` gives the href `Top%2010%25/Quiz.md`, the same as the escaped form."
+          },
+          {
+            "given": "[q](<All%20Tasks/Quiz 1.md>)",
+            "oldName": "All Tasks",
+            "newName": "Tests and Quizzes",
+            "expect": "[q](<Tests%20and%20Quizzes/Quiz 1.md>)",
+            "why": "A segment that ARRIVED percent-encoded goes back percent-encoded, in this style as in the others; the file name's plain space is not the folder's and is left as it is."
+          },
+          {
+            "given": "[q](<Tasks/Quiz 1.md>)",
+            "oldName": "Tasks",
+            "newName": "Unit 1 > Review",
+            "expect": "[q](<Unit%201%20%3E%20Review/Quiz 1.md>)",
+            "why": "The one character set that forces escaping inside brackets. Measured, `<Unit 1 > Review/Quiz 1.md>` is not a link at all (literal text); `%3E` is outside the reserved set `decodeURI` keeps, so the encoded form gives back `Unit 1 > Review`."
+          },
+          {
+            "given": "[h](<https://example.com/Tasks/handout.pdf>)",
+            "oldName": "Tasks",
+            "newName": "All Tasks",
+            "expect": "[h](<https://example.com/Tasks/handout.pdf>)",
+            "why": "A GUARD: a web address inside brackets is refused like any other."
+          },
+          {
+            "given": "[q](<Units/Tasks.md>)",
+            "oldName": "Tasks",
+            "newName": "All Tasks",
+            "expect": "[q](<Units/Tasks.md>)",
+            "why": "A GUARD: the last segment is the page, never a folder candidate."
+          },
+          {
+            "given": "[q](<Units/Tasks/Quiz1.md)",
+            "oldName": "Tasks",
+            "newName": "All Tasks",
+            "expect": "[q](<Units/Tasks/Quiz1.md)",
+            "why": "Not a link — no closing `>`, so every Markdown reader shows it as literal text (measured) — and plain text is never rewritten. The old reading wrote `<Units/All%20Tasks/…` into it. Pins that the plain pattern refuses a destination that opens with `<`: one link, one reader."
+          },
+          {
+            "given": "[q](<Tasks/Quiz 1.md>) and [r](Tasks/Quiz%202.md)",
+            "oldName": "Tasks",
+            "newName": "All Tasks",
+            "expect": "[q](<All Tasks/Quiz 1.md>) and [r](All%20Tasks/Quiz%202.md)",
+            "why": "Both Markdown forms on one line: the spelling is decided per LINK, not per page."
+          },
+          {
+            "given": "`[q](<Tasks/Quiz 1.md>)` shows the syntax; [q](<Tasks/Quiz 1.md>) is the link.",
+            "oldName": "Tasks",
+            "newName": "All Tasks",
+            "expect": "`[q](<Tasks/Quiz 1.md>)` shows the syntax; [q](<All Tasks/Quiz 1.md>) is the link.",
+            "why": "The third link style (#97, angle brackets) goes through the same code mask as the other two (#313, readingALink.codeIsNeverALink): the example inside inline code is left exactly as written, and only the real link moves."
           }
         ]
       },
@@ -8917,7 +9159,7 @@
     },
     "picturesAndFiles": {
       "whereTheyAreFound": "Every place the page names something local: ![[x.png]] embeds, [[x.pdf]] links that point at a FILE rather than a page, HTML src and href attributes, and Markdown link destinations. Measured across 777 real markdown files: 1,474 embeds (1,274 of them media), 1,222 links of which 250 point at a file (235 PDFs), 5 HTML attributes naming a local file - one of them a live 1.1 MB picture on a copyable page - and 526 Markdown links, every one of them https://.",
-      "fencedCodeIsLeftAlone": "A name inside a fenced code block is prose about a file rather than a use of one, and rewriting it would edit an example a teacher wrote. Inline code spans are not tracked, which is the same known gap WikiLinkRewriter has.",
+      "fencedCodeIsLeftAlone": "A name inside code - a fenced block or an inline code span - is prose about a file rather than a use of one, and rewriting it would edit an example a teacher wrote. Nothing in code is carried, followed or rewritten, by the one definition in readingALink.whatIsCode (#313; until then inline code spans were not tracked here).",
       "sameNameSameFile": "Reused silently. Nothing is copied and nothing is said, beyond the count.",
       "sameNameDifferentFile": "The incoming file comes in under a NEW name and only the COPIED page is pointed at it. The teacher's own file is untouched. The new name is '<name> (from <source course folder>)<extension>' - the course's FOLDER name, because every picture comes from Media and saying so would say nothing, while ICS4U-2025 says which course it came out of. If that name is taken, a number is added; and if a bounded search still finds nothing free, THE PAGE IS NOT COPIED and says so. That last part is not tidiness: the destination already HAS a file of that name with different bytes - which is why a new name was needed - so a page written with the original name would show the teacher their own DIFFERENT picture, which is the one direction this feature must never err in. Merely listing the file said the opposite about a link that leads somewhere wrong.",
       "invisibleSpacesAreFoldedOnTheWayINOnly": "Resolving a reference against the SOURCE's Media folds U+00A0, U+202F and U+2007 to an ordinary space, so a link typed with real spaces finds a file whose name carries a no-break one. The DESTINATION name index does not fold them, so a destination holding a<NBSP>b.png and an incoming a b.png end up side by side with names that look identical. Nothing is overwritten and nothing is lost, which is the safe direction; measured, and left as it is rather than made cleverer.",
@@ -10038,6 +10280,7 @@
           "linksLeadingNowhere": []
         }
       },
+      {"name": "a picture and a page named inside inline code are left alone", "why": "Inline code is an example, not a use (readingALink.codeIsNeverALink, #313): the picture is not carried and the page it names is not copied with it, though the copy is asked to take linked pages.", "source": {"folder": "ICS4U-2025", "sharedFolders": ["Concepts"], "pages": [{"path": "Concepts/Teaching.md", "text": "Show a picture with `![[one.png]]` or link with `[[Ohm's Law]]`.\n"}, {"path": "Concepts/Ohm's Law.md", "text": "Body\n"}], "media": [{"name": "one.png", "bytes": "aaa"}]}, "destination": {"folder": "ICS4U", "sections": [1], "sharedFolders": ["Concepts"], "pages": [], "media": []}, "copy": {"page": "Concepts/Teaching.md", "intoFolder": "Concepts", "alsoCopiesLinkedPages": "yes"}, "expect": {"pages": ["Concepts/Teaching.md"], "mediaCreated": [], "mediaReused": [], "mediaRenamed": {}, "skipped": [], "linksLeadingNowhere": []}},
       {
         "name": "a picture named inside a fenced code block is left alone",
         "source": {
@@ -11564,6 +11807,196 @@
       "Accepting that a quit installs during a scheduled publish, or keeping Plantoir running out of sight until it ends (the plan's Q1 options A and B): the stand-down answer cancels it and the quit still goes ahead.",
       "The scheduled job's own file as the sign a scheduled publish is running: the run deletes it in its first line.",
       "A Settings switch for the daily check: the teacher decides at every offer, and a school's IT turns the check off with a managed setting (the support page says how)."
+    ]
+  }
+,
+  "howITeachPage": {
+    "note": "GitHub #209, decided by Russell 2026-09-26: each course may have ONE page, in plain Markdown in the course folder, that says how the course is taught - written by the teacher, or drafted by an outside assistant from the course's own pages and saved only once the teacher agrees. Both outside doors (Claude, Codex; outsideAgents in app-rules.json) ask the session to read it and keep to it. It is NEVER on the website. Rejected by Russell: a Course Settings field in course_config.json. The build's half of this is shared Python (scripts/how_i_teach.py), so Windows inherits it; the rest is each app's.",
+    "fileName": "How I Teach.md",
+    "where": "At the top of the course folder, beside course_config.json - which is the top of the Obsidian vault, so the teacher sees and edits it there like any other page. The doors read the course's page only. The BUILD also keeps the same name off the site at the top of a section folder (section<N>/How I Teach.md), because the build copies a section's top-level files to the same place in the site as the course's own: the guarantee is stated about the SITE, not about one source.",
+    "matching": {
+      "rule": "The whole file name, compared after Unicode NFC, with ONLY the letters A-Z folded to a-z. Nothing is trimmed, and nothing else is folded, so 'how i teach.md' and 'HOW I TEACH.MD' are the page and a name with a non-ASCII look-alike letter, a leading space, a suffix or another extension is an ordinary page.",
+      "why": "Case-insensitive because APFS and NTFS are, and a teacher typing 'How I teach' in Obsidian must get the same guarantee. ASCII-only folding rather than each language's own case folding, because Python's casefold and Swift's lowercased disagree on a handful of letters (the Kelvin sign, a dotted capital I): with only A-Z folded, the two implementations cannot disagree about any name, and the name itself is ASCII. Exact rather than 'starts with', because a rule nobody can state is one nobody can rely on; the build SAYS so when a name looks like the page and is not (lookAlikeLine)."
+    },
+    "nameCases": [
+      {
+        "path": "How I Teach.md",
+        "reserved": true,
+        "listedAsAPage": false,
+        "why": "The page."
+      },
+      {
+        "path": "how i teach.md",
+        "reserved": true,
+        "listedAsAPage": false,
+        "why": "The file system is case-insensitive, so a teacher who typed it in lower case gets the same guarantee."
+      },
+      {
+        "path": "HOW I TEACH.MD",
+        "reserved": true,
+        "listedAsAPage": false,
+        "why": "The extension is folded too."
+      },
+      {
+        "path": "section1/How I Teach.md",
+        "reserved": true,
+        "listedAsAPage": false,
+        "why": "The build puts a section's top-level files at the top of the site exactly as it does the course's, so the build keeps it off too. The doors do not read this one."
+      },
+      {
+        "path": "section1/HOW I TEACH.md",
+        "reserved": true,
+        "listedAsAPage": false,
+        "why": "The same, in capitals - the spelling whose web address is HOW-I-TEACH, which a case-sensitive check of the site would miss."
+      },
+      {
+        "path": "How I Teach 1.md",
+        "reserved": false,
+        "listedAsAPage": true,
+        "why": "Obsidian's name for a duplicate is an ordinary page, and is published like one. The build says so (lookAlikeLine)."
+      },
+      {
+        "path": "How-I-Teach.md",
+        "reserved": false,
+        "listedAsAPage": true,
+        "why": "A near-miss spelling is an ordinary page."
+      },
+      {
+        "path": "How I Teach.txt",
+        "reserved": false,
+        "listedAsAPage": false,
+        "why": "Not a page at all."
+      },
+      {
+        "path": " How I Teach.md",
+        "reserved": false,
+        "listedAsAPage": true,
+        "why": "Exact name: stated so nobody trims."
+      },
+      {
+        "path": "How İ Teach.md",
+        "reserved": false,
+        "listedAsAPage": true,
+        "why": "A non-ASCII look-alike (a dotted capital I). Pinned so both implementations are held to 'not reserved' rather than to whatever their own case folding happens to do with it."
+      },
+      {
+        "path": "Ｈow I Teach.md",
+        "reserved": false,
+        "listedAsAPage": true,
+        "why": "A full-width H. The same reason."
+      },
+      {
+        "path": "Concepts/How I Teach.md",
+        "reserved": false,
+        "listedAsAPage": true,
+        "why": "Inside a folder it is an ordinary page, published unless it says publish: false."
+      },
+      {
+        "path": "section1/All Classes/How I Teach.md",
+        "reserved": false,
+        "listedAsAPage": true,
+        "why": "The same, inside a section's folder."
+      }
+    ],
+    "nameCasesRead": "Each path is relative to the course folder. `reserved` is what the build keeps off the website; `listedAsAPage` is whether an app's own page listing for section 1 (the assistant's list_pages, the pages it can publish by title, the pages it can add curriculum expectations to) shows it. An app's page walk that link rewriting uses is NOT narrowed - see notListedAsAPage.",
+    "neverOnTheWebsite": {
+      "rule": "The build keeps the page off the site by its LOCATION, at four points, all run on every build so no course needs a full rebuild: discovery never adds it to shared_files / per_section_files; a name ALREADY listed there (a course whose page predates this) is dropped from the list on the next build, and the configuration written back without it; the lists a build copies from are filtered where they are read, so a hand-added name is ignored; and a final sweep deletes any match from the top of the merged content before the site is built, so a copy path added later that forgets the rule still cannot ship it.",
+      "measured": "Before #209 (2026-09-26, build_site.discover_shared_items / discover_section_items on a scratch course): a page named 'How I Teach.md' at the top of a course AND at the top of section1 were both discovered, both copied to the top of the site's content, and both published - a page typed in Obsidian carries no frontmatter, and patches/publish.ts publishes any page that does not say publish: false.",
+      "whyNotTheFlag": "publish: false cannot be the guarantee. file-formats.json -> pageVisibility fixes the key order as publishForSection<N>, publish, draftSection<N>, draft, so a later publishForSection2: true beats it - and that is exactly what publish_pages and a teacher's publish toggle write on a course-level page. A page the teacher types by hand has no flag at all. So the location is the guarantee and the flag is not relied on anywhere.",
+      "appliesOn": [
+        "mac",
+        "windows"
+      ],
+      "appliesOnWhy": "The same Python runs on both (build_site.py + how_i_teach.py), so Windows has this the moment it has the scripts. scripts/test_how_i_teach.py is discovered by its PythonToolchainTests."
+    },
+    "keptOffTheWebsiteLine": "🔒 Kept your How I Teach page off the website — it is for you and your assistant. If you meant students to see it, give it another name.",
+    "keptOffTheWebsiteLineWhen": "Printed once per build when a page with the reserved name is at the top of the course or of the section being built, in any spelling, so a teacher who sees it in Obsidian can see it being kept back.",
+    "lookAlikeLine": "📝 “{name}” will be on the website like any other page. Only a page named exactly “How I Teach”, at the top of the course folder, is kept off it.",
+    "lookAlikeLineWhen": "Once per page, for a .md file at the top of the course or the section whose name, folded as `matching` folds it, STARTS with 'how i teach' and is not the page. The failure it catches is SILENT PUBLICATION: 'How I Teach 1.md' or 'How I teach ICS4U.md' is published with no frontmatter, and the teacher who meant it to be private is told nothing otherwise.",
+    "keptOffMarker": {
+      "prefix": "PLANTOIR_KEPT_OFF:",
+      "rule": "One line on stdout, printed only when the build DROPPED the page from a copy list the course's settings had named it in - the course's page predates this rule, or somebody added it by hand - so a page the earlier builds published is now kept off. The prefix, then a single-line JSON object carrying course (the course folder's name), section (a number) and pages (each dropped page's place in the course folder without .md, e.g. \"How I Teach\" or \"section1/How I Teach\"). Not printed for a page that was never listed: that one was never on the site, and a line on every build would bury the one that matters. The apps keep the marker line itself out of the console a teacher reads, as they do PLANTOIR_DATED: (pagesDatedByTheBuild.marker).",
+      "examples": [
+        "PLANTOIR_KEPT_OFF: {\"course\": \"ICS4U\", \"section\": 1, \"pages\": [\"How I Teach\"]}"
+      ],
+      "why": "The report this answers is real and arrives late: a teacher who already had a page called How I Teach, meant for students, finds it gone from the site after an update, and the console that said why is long gone - the same argument pagesDatedByTheBuild makes for itself. Read by the app the way PLANTOIR_DATED: is: from the console of a run it started, and from a scheduled publish's own log."
+    },
+    "keptOffTrailLine": "the build kept {count} page(s) named How I Teach off the website that the course's settings had listed for it: {names}",
+    "notListedAsAPage": {
+      "rule": "The assistant's own page listings leave the page out wherever the assistant LISTS pages for a teacher or a model: list_pages, the pages publish_pages / unpublish_pages (and their plans) can find by title, and the pages add_curriculum_mentions can write into. Asked to publish or hide it by title, the answer is wording.howITeachIsNeverPublished rather than 'no page is called that'.",
+      "notNarrowed": "The walk link rewriting uses when classes are renamed (make room, re-date, insert) is NOT narrowed: a How I Teach page that links to [[Unit 2, Day 3]] must follow that class when it is renamed, and Obsidian only rewrites links when Obsidian does the rename. So the skip is applied at each listing, never inside the shared page walk.",
+      "appliesOn": [
+        "mac",
+        "windows"
+      ]
+    },
+    "tools": {
+      "names": [
+        "read_how_i_teach",
+        "plan_write_how_i_teach",
+        "write_how_i_teach"
+      ],
+      "surface": "MCP only. The local assistant's thirteen tools are unchanged: a prompt change would owe a routing re-measurement, and a small local model drafting a teacher's pedagogy is the wrong job for it.",
+      "arguments": "course only (the page is per course, so there is no section). write takes `text` and, only when it replaces a page, `replacing`.",
+      "mostCharacters": 8000,
+      "readCutsAt": "A page longer than mostCharacters is read up to that length and the answer names the file (wording.howITeachCutShort), so an agent can read the rest with its own tools.",
+      "readOnAReferenceCourse": "works - reading last year's page is evidence; writing one is refused by the gate every write shares (referenceCourses).",
+      "newPageFrontmatter": "publish: false",
+      "newPageBytes": "---\\npublish: false\\n---\\n\\n<text>\\n",
+      "newPageWhy": "Not the guarantee (the location is). It is there so a page later MOVED into a folder in Obsidian, where it becomes an ordinary page, arrives hidden rather than published.",
+      "replacingKeepsTheirFrontmatter": "When a page is replaced, its frontmatter block - from an opening --- line to the next --- line, CRLF or LF - is kept byte for byte and only the body after it is replaced; no key is added. A page that opens with --- and never closes it has no frontmatter to keep, and is replaced whole. A leading byte-order mark is kept with the block.",
+      "refusals": [
+        "empty or whitespace-only text: wording.howITeachNeedsWords",
+        "text longer than mostCharacters: wording.howITeachTooLong",
+        "text whose first non-blank line (after a byte-order mark and blank lines) is a --- fence: wording.howITeachCarriesNoSettings - so an agent cannot write publish: true into it",
+        "a page is already there and `replacing` is empty: wording.howITeachAlreadyWritten - a teacher's own words are never overwritten by a call they did not see planned",
+        "a page is already there and `replacing` is not its current mark: wording.howITeachChangedSincePlanned"
+      ],
+      "replacingIsAMarkNotABoolean": "`replacing` is the page's MARK as plan_write_how_i_teach reports it - the first eight lowercase hexadecimal digits of the SHA-256 of the file's bytes as they are on disk (a byte-order mark included) - rather than a true/false. The tool surface carries no boolean anywhere (assist-cases.json -> toolSchemas.departures), because a boolean is an argument the model decides under pressure. The mark is a value tied to the exact bytes the plan described, and what it DOES is detect a page that changed after the plan: a teacher's edit in Obsidian between the plan and the write refuses the write. It is NOT an enforcement boundary: an agent with a shell can hash the file itself, and could write the file with its own tools anyway. The gates are the teacher reading the plan and the MCP client's own permission prompt; the mark steers the agent through the plan and catches a stale one.",
+      "markCases": [
+        {"text": "My own words.\n", "mark": "d7669ade", "why": "The recipe, on plain UTF-8 bytes."},
+        {"text": "---\ntitle: x\n---\nold\n", "startsWithAByteOrderMark": true, "mark": "8a1f94ce", "why": "The bytes AS ON DISK: the file is EF BB BF followed by text's UTF-8, and the byte-order mark is hashed, so an implementation that hashes text decoded without it (Foundation and .NET both drop it) gives a different mark. Carried as a flag rather than as U+FEFF in the string because a JSON reader may drop a leading U+FEFF (measured: Foundation's JSONSerialization did)."}
+      ],
+      "planAndWriteAgree": "plan_write_how_i_teach refuses exactly what write_how_i_teach refuses, so a plan cannot promise what the write will refuse.",
+      "oneUndoEntry": "The write records one change (the whole file, before and after), so 'undo that' takes back THIS write rather than the previous change, and taking it back never stops or rebuilds a preview: the page is never on the site.",
+      "backedUpFirst": "Once per conversation, as every write is. The backup is named for the course's lowest section, as the assistant's backups are - cosmetic; the zip holds the whole course.",
+      "appliesOn": [
+        "mac",
+        "windows"
+      ]
+    },
+    "briefingInInstructions": {
+      "rule": "The MCP server's initialize.instructions names, for each LIVE course in the folder whose page EXISTS, that it has one and that read_how_i_teach reads it. Nothing is added for a course without one, so a folder with no page and no reference course still sends no instructions at all.",
+      "why": "Covers what the greeting cannot: the greeting names ONE course (outsideAgents.courseIsNamedInTheGreetingOnly), and a teacher who says 'now let's do MPM2D' mid-session is otherwise never told MPM2D has a page. Third channel, not first: whether clients read instructions has never been measured.",
+      "appliesOn": [
+        "mac"
+      ],
+      "appliesOnWhy": "Windows' server sends no instructions today. Adopting it is optional and would be its own issue."
+    },
+    "listCoursesLine": {
+      "rule": "list_courses, answered to an MCP client, gives each course one more line: '  How I Teach page: yes' or '  How I Teach page: not written yet'. The LOCAL window's list_courses answer (reached by a phrase matched in code, and shown to the teacher) never carries it, because the local assistant neither reads nor drafts the page.",
+      "appliesOn": [
+        "mac",
+        "windows"
+      ]
+    },
+    "rejected": [
+      "publish: false as the guarantee - see neverOnTheWebsite.whyNotTheFlag.",
+      "A hidden location (.plantoir/how-i-teach.md, courses/.internal/...) - Obsidian does not show dot-folders, so the teacher could not write or read it, which is half the decision.",
+      "An excluded_items entry in course_config.json - it can be un-excluded from Course Settings, and it depends on a config write reaching the build; the location needs no config.",
+      "A Course Settings field - rejected by Russell: not prose-shaped, and not something the teacher can edit in Obsidian.",
+      "A CLAUDE.md / AGENTS.md in the folder - agent-specific, developer-looking in the vault, read at the WORKING folder's top rather than per course, and already rejected for the doors (documentation/10).",
+      "An MCP resource instead of a tool - neither agent reads resources by itself; the tool path is the one measured to work.",
+      "Putting the page's text in the greeting - it is a shell argument, shown in the terminal as the teacher's own typing, and unbounded in length.",
+      "The whole text in MCP instructions - per folder rather than per course, and Windows sends none.",
+      "A greeting that asks for the page only when one exists - the greeting is built when the menu item is clicked, a uniform sentence is one string both platforms pin, and 'if I have written one' invites the agent to skip the call.",
+      "Letting the agent write the file with its own tools only - no plan, no refusal to overwrite, no publish: false, no backup, no undo entry and no trail line, and 'undo that' would then take back the PREVIOUS change.",
+      "A boolean `replacing` - the plan's first form. The tool surface carries none (replacingIsAMarkNotABoolean).",
+      "The local assistant reading or drafting it - a routing and prompt change owing re-measurement, and the wrong job for a small model.",
+      "A starter page from the wizard or setup_course.py, or payloads shipping one - a template is text an agent would read as the teacher's own approach, and it would put words in the teacher's mouth.",
+      "Leaving the page out of the section's '- Edited' fingerprint - a wire format held byte for byte in three implementations; follow-up #330.",
+      "A button to open or create the page - a GUI surface on both platforms; follow-up #329.",
+      "read_page redirecting to read_how_i_teach - read_page answers as it does for any page not in the section, and the tool's own description is what an agent finds."
     ]
   },
   "startOfYear": {
