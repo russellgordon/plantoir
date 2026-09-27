@@ -546,8 +546,8 @@ undated.
 
   **A stray `[[` followed by a heading cannot swallow the link after it** (since
   [#314](https://github.com/russellgordon/plantoir/issues/314)): the heading
-  group stops at `[`, as Quartz's own `wikilinkRegex` does. This reader strips
-  inline code, but a `[[` typed in a sentence, followed later by a `#` and a
+  group stops at `[`, as Quartz's own `wikilinkRegex` does. This reader skips
+  inline code (since #313, below), but a `[[` typed in a sentence, followed later by a `#` and a
   real `[[Page|words]]`, otherwise read as one link with a garbage name and
   the real one was lost. Only the heading group stops at `[`; the name still
   crosses it, so a stray `[[` with no `#` before the next link still swallows
@@ -563,8 +563,8 @@ undated.
   map's two (`BLOCK_LINK`, behind "pages the course teaches", and
   `TRANSCLUSION`, what it counts as covered) already read `\|` but had the old
   alias-before-heading order, so `[[P#h|a]]` and `![[A1.1#h\|a]]` matched
-  nothing. They were NOT given #294's plain reorder: those two strip fenced
-  code but not inline code, and on `Tutorials/Scavenger Hunt.md` (the example
+  nothing. They were NOT given #294's plain reorder: those two stripped fenced
+  code but not inline code (until #313, below), and on `Tutorials/Scavenger Hunt.md` (the example
   course and every skeleton family, 90 files) the reordered pattern ran from
   "type `` `[[` ``" through a `### Custom Display Words` heading and swallowed
   the real `[[Help Sessions|…]]` after it. With the heading stopping at `[`:
@@ -575,7 +575,42 @@ undated.
   all six readers — each needs different groups, and a new sibling module is a
   Dockerfile change (`test_baked_modules.py` exists because one was once
   missed); and stripping inline code in `_pages_the_course_teaches`, which
-  changes what counts as taught by a different rule (#313's question).
+  changes what counts as taught by a different rule (#313's question — since
+  answered, below, WITH a shared module: the mask is one rule every reader
+  needs identically, which the six patterns were not).
+
+  **A link written inside code is not a link, for every one of these readers**
+  (since [#313](https://github.com/russellgordon/plantoir/issues/313)). A
+  `[[…]]` whose brackets start inside a fenced block or an inline code span is
+  an example of the syntax, and Quartz draws none. `scripts/markdown_code.py`
+  is the one Python definition of where code is — `readingALink.whatIsCode`,
+  implemented identically by the mac's `MarkdownCode` (measured: the two agree
+  offset for offset on all 12,490 files in `support/`) — and every reader here
+  asks it: `_extract_wikilink_targets` (both date passes), `BLOCK_LINK` behind
+  "pages the course teaches", `TRANSCLUSION` in the coverage count, and the
+  installer's three. It is baked beside `class_pages.py` (a Dockerfile `COPY`,
+  guarded by `test_baked_modules.py` and `verify.sh`'s baked-file check).
+  What changed: the dating walk used to strip ```` ``` ```` fences and one-line
+  spans with two regexes, so a `~~~` fence, a span across two lines of a
+  paragraph, a ```` ``` ```` held inside ```` ```` ```` and an escaped backtick
+  were all read wrongly; the coverage map's two readers stripped fences only;
+  the installer's three stripped nothing. The coverage count now also reads a
+  `%%curriculum-start%%` block only where its markers are OUTSIDE code
+  (`_curriculum_blocks_outside_code`) — a fenced example of a curriculum block
+  on a page that teaches how to write one used to count as coverage — and a
+  marker shown inside a fence neither opens nor closes a block, so a fenced
+  example cannot swallow the real block after it. A match that starts in code
+  is not simply dropped: the search starts again where that code ENDS, or an
+  example `` `[[` `` would swallow the real link after it. Measured over
+  `support/` with Quartz's own parser: 1,896 of 39,570 links sit in code, 0 in
+  indented code (which the rule deliberately does not recognise); the build
+  read 7 of them as links before, all on TEJ2O's "Control Something with
+  Code", whose fence inside a list had fallen out to column 0 — fixed in the
+  same piece, so its coverage is unchanged. `scripts/test_markdown_code.py`
+  runs every case through the dating walk and a rename, and checks the
+  coverage count; `verify.sh` lists it and Windows' `PythonToolchainTests`
+  discovers it. The why, the table built in Quartz, and what was rejected are
+  in [10 → Code is never a link](10-local-ai-assistant.md#code-is-never-a-link-313).
 - **A class dated with a plain YAML date** (`created: 2026-09-24`, unquoted —
   what Obsidian's Date property writes) counts, as midnight in Toronto. Until
   the fix round `_parse_created_value` read it as no date at all, so such a

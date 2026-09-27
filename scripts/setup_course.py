@@ -9,6 +9,7 @@ from pathlib import Path
 import sys as _sys
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
 import class_pages
+import markdown_code
 import page_visibility
 import toolchain_paths
 import re
@@ -1563,12 +1564,14 @@ def first_use_dates(payload_dir: Path, reference,
     # in front of one: [[Worksheet\|w]] (the escaped pipe Obsidian writes for
     # an alias inside a table) names Worksheet, not "Worksheet\". Shared
     # contract: contracts/shared-rules.json -> readingALink (#294, #314).
+    # A link inside code is an example, not a link, and dates nothing
+    # (#313, readingALink.whatIsCode; markdown_code is the one mask).
     link_target_pattern = re.compile(r"!?\[\[([^\]#|]+?)(?=\\?[\]|#])")
     dates = {}
     for ordinal, text in class_pages:
         class_date = semester_class_timestamp(ordinal, reference, weekday_step,
                                               start_school_day)
-        for match in link_target_pattern.finditer(text):
+        for match in markdown_code.matches_outside_code(link_target_pattern, text):
             target = match.group(1).strip().split("/")[-1]
             if target and target != "index" and target not in dates:
                 dates[target] = class_date
@@ -1579,7 +1582,7 @@ def first_use_dates(payload_dir: Path, reference,
     if index_file.is_file():
         with open(index_file, "r", encoding="utf-8") as handle:
             index_text = handle.read()
-        for match in link_target_pattern.finditer(index_text):
+        for match in markdown_code.matches_outside_code(link_target_pattern, index_text):
             target = match.group(1).strip().split("/")[-1]
             if target in class_date_by_stem:
                 dates["index"] = class_date_by_stem[target]
@@ -1752,7 +1755,8 @@ def retargeted_expectation_references(text: str, renames: dict) -> str:
     """
     Point every link and embed at the expectation that will actually be
     there. Only the TARGET changes; an alias or a heading after it is left
-    exactly as written.
+    exactly as written. A link shown inside code is an example and is left
+    exactly as written too (#313, readingALink.whenRewritten).
     """
     if not renames:
         return text
@@ -1768,7 +1772,14 @@ def retargeted_expectation_references(text: str, renames: dict) -> str:
         replaced = stripped[:len(stripped) - len(name)] + renames[name]
         return opening + target.replace(stripped, replaced, 1)
 
-    return WIKI_LINK_TARGET.sub(replacement, text)
+    pieces = []
+    carried_to = 0
+    for match in markdown_code.matches_outside_code(WIKI_LINK_TARGET, text):
+        pieces.append(text[carried_to:match.start()])
+        pieces.append(replacement(match))
+        carried_to = match.end()
+    pieces.append(text[carried_to:])
+    return "".join(pieces)
 
 
 def jurisdiction_name(manifest: dict) -> str:
@@ -1899,9 +1910,22 @@ def unlink_curriculum_references(text: str, page_names: set) -> str:
     link_pattern = re.compile(
         r"(!?)\[\[([^\]#|]+?)(?=\\?[\]|#])\\?(#[^\[\]|]*)?(?:\\?\|([^\]]*))?\]\]")
 
+    # A link inside code is an example of one, and stays as written (#313,
+    # readingALink.whatIsCode): the mask is taken over the whole page, since
+    # a fence or a span can cross lines, and applied line by line by offset.
+    code = markdown_code.code_ranges(text)
     result_lines = []
+    line_start = 0
     for line in text.split("\n"):
-        replaced = link_pattern.sub(replace_link, line)
+        pieces = []
+        carried_to = 0
+        for match in markdown_code.matches_outside_code(link_pattern, line, code, line_start):
+            pieces.append(line[carried_to:match.start()])
+            pieces.append(replace_link(match))
+            carried_to = match.end()
+        pieces.append(line[carried_to:])
+        replaced = "".join(pieces)
+        line_start += len(line) + 1
         # A line that held only a transclusion (possibly inside a callout)
         # would otherwise linger as an empty shell.
         if replaced != line and replaced.strip() in ("", ">"):
