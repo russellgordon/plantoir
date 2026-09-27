@@ -115,13 +115,14 @@ final class AssistantRolloverUITests: XCTestCase {
             return
         }
         // **The freeze #154 found is gone (#351), and this is where it was.**
-        // Approving runs the once-per-conversation backup, whose zip used to
-        // run with `Process.waitUntilExit()` ON THE MAIN THREAD: the nested
-        // run loop re-entered SwiftUI's transaction flush, and XCUITest
-        // reported "main thread busy for 30.0s" (93 busy one-second samples
-        // in 122 s, 2026-09-26). This step was held open by a strict expected
-        // failure matched to that message until the zip moved off the main
-        // actor; with the wrapper gone, the freeze coming back is a failure.
+        // After Approve, XCUITest reported "main thread busy for 30.0s". #154
+        // put it down to the backup's zip, which did run on the main thread
+        // (`Process.waitUntilExit()`, a nested run loop); moving the zip off
+        // the main actor was NOT enough — the test still failed — because
+        // what held the thread was the conversation's LAZY stack, placing
+        // itself in a loop that never ended (samples: 98% of every second).
+        // Both are fixed; this step was held open by a strict expected failure
+        // until then, and with the wrapper gone the freeze coming back fails.
         approve.click()
         let approvedAt: Date = Date()
 
@@ -132,10 +133,14 @@ final class AssistantRolloverUITests: XCTestCase {
             ),
             "The website question never appeared in the window."
         )
-        // Printed, not asserted: how long the question took after the
-        // approval, the number #351 was measured by (doc 09 → "#351"). A
-        // threshold would be a guess; the freeze itself fails the step above.
-        print("ROLLOVER-TIMING question after approval: \(Date().timeIntervalSince(approvedAt)) s")
+        // How long the question took after the approval, the number #351 was
+        // measured by (doc 09 → "#351"): 1.05–1.07 s on 2026-09-26, against
+        // two minutes and more while the conversation was a lazy stack.
+        // Thirty seconds is XCUITest's own "main thread busy" limit, not a
+        // guess at what is fast enough.
+        let secondsToQuestion: TimeInterval = Date().timeIntervalSince(approvedAt)
+        print("ROLLOVER-TIMING question after approval: \(secondsToQuestion) s")
+        XCTAssertLessThan(secondsToQuestion, 30, "The question took \(secondsToQuestion) s after Approve (#351).")
 
         let marker: URL = try XCTUnwrap(liveMarkerURL)
         XCTAssertTrue(

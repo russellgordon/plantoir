@@ -298,7 +298,19 @@ struct AssistWindowView: View {
     private var conversation: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 12) {
+                // A plain VStack, NOT lazy (#351). The lazy stack went into a
+                // placement loop after Approve that never ended: one-second
+                // samples showed the main thread 98% inside SwiftUI placing it
+                // (`LazySubviewPlacements`, the `ForEach` over the transcript),
+                // nothing else on the main actor ran — the copy the approved
+                // change waited for was made in two seconds and its result never
+                // read — and XCUITest reported "main thread busy for 30.0s".
+                // Measured on the rollover UI test, 2026-09-26: lazy, 0 runs in
+                // 6 passed with the animated scroll and 2 in 7 without it; plain,
+                // 8 in 8, the question 1.05–1.07 s after Approve. A conversation
+                // is dozens of lines, not thousands, so laziness bought nothing.
+                // `AssistConversationStackTests` holds this file to it.
+                VStack(alignment: .leading, spacing: 12) {
                     ForEach(Array(transcriptLines.enumerated()), id: \.element.id) { position, line in
                         switch line {
                         case .said(let entry):
