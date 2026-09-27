@@ -379,7 +379,10 @@ struct SectionDetailView: View {
                 // they wear their titles; the neighbouring icons are the
                 // familiar Obsidian and Safari actions and stay icon-only.
                 .labelStyle(.titleAndIcon)
-                .disabled(!previewRunner.isRunning && isBusy)
+                // Nor while a copy of the course is being zipped (#351): a
+                // restore or removal is waiting on that zip to replace the
+                // folder a preview would be serving from.
+                .disabled(!previewRunner.isRunning && (isBusy || workspace.isBeingCopied(course.code)))
                 .help(previewRunner.isRunning ? "Stop previewing this section" : "Preview this section's website")
                 .accessibilityIdentifier(previewRunner.isRunning ? "stopPreviewButton" : "previewButton")
 
@@ -405,7 +408,9 @@ struct SectionDetailView: View {
                 // was clickable again the instant that phase started — a
                 // second click there raced its own stop-preview-then-deploy
                 // sequence against the first's.
-                .disabled(deployRunner.isRunning || isPreparingDeploy)
+                // Nor while a copy of the course is being zipped (#351): a
+                // removal waiting on that zip deletes what this would publish.
+                .disabled(deployRunner.isRunning || isPreparingDeploy || workspace.isBeingCopied(course.code))
                 .help("Deploy this section's website")
                 .accessibilityIdentifier("deployButton")
                 }
@@ -1081,6 +1086,10 @@ struct SectionDetailView: View {
         guard let workspaceURL = workspace.workspaceURL else {
             return
         }
+        // Every way in, not only the button (#351): see its `.disabled`.
+        if workspace.isBeingCopied(course.code) {
+            return
+        }
         // One of the moments the teacher ACTS on a reference course, so the
         // lock is re-asserted here: a folder that came back from a backup, or
         // from a second Mac, is not locked until somebody asks. Cheap — a
@@ -1454,6 +1463,12 @@ struct SectionDetailView: View {
                 message: AssistWording.sectionIsBusy(
                     course: course.code, section: String(sectionNumber)
                 )
+            )
+        }
+        // Every way in, the assistant's included (#351's second review, SF1).
+        if CourseActivity.courseIsBeingCopied(folderPath: workspaceURL.path, courseCode: course.code) {
+            return AssistSiteWorkResult(
+                succeeded: false, message: AssistWording.courseIsBeingCopied(course: course.code)
             )
         }
 

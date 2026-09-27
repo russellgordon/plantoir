@@ -699,6 +699,130 @@ fi
 # to be settled — after stop mode, which must never create anything.
 link_course_build_output "$COURSE"
 
+# >>> GETTING-READY TURN BLOCK >>> — identical in setup.sh, preview.sh and
+# deploy.sh, extracted between these two markers by
+# scripts/test_getting_ready_turn.py, which checks the three copies agree and
+# runs the real thing against every case in contracts/app-rules.json →
+# builderWarmUp.turnCases. Keep the markers, and keep the three copies the same.
+#
+# ---- One launcher at a time gets the website builder ready -------------
+# Starting the builder's virtual machine and building the website builder are
+# the two slow, network-hungry steps, and two launchers doing either at once
+# is never useful: two first starts fight over one virtual machine, and two
+# builds of one recipe download the same ~340 MB twice. Since Plantoir began
+# getting the builder ready in the BACKGROUND at first launch (bundle B), a
+# teacher who clicks Create or Preview while that is still going is exactly
+# this case, so the rule is structural here rather than something the app has
+# to remember: whoever holds the turn goes first, and everyone else waits for
+# it, then finds the builder ready and builds nothing.
+#
+# The turn is a folder, because `mkdir` either makes it or fails, atomically,
+# on every Mac. Inside it is the holder's process id. A turn whose holder is
+# no longer running — a launcher that was killed, a Mac that went to sleep
+# and was restarted — is taken over rather than waited on for ever, and so is
+# one whose id now belongs to a process started after the turn was taken, or
+# one older than a ceiling; a turn with no id in it yet is given a minute. It is handed back as soon
+# as the builder is ready (never held through a build or a publish), and on
+# any exit. A waiting launcher says so once, after a couple of seconds, so a
+# turn held for a moment says nothing at all.
+READY_TURN="${HOME%/}/Library/Application Support/Plantoir/getting-ready.turn"
+READY_TURN_IS_OURS=""
+READY_TURN_SEEN_HOLDER=""
+READY_TURN_PAUSE="${READY_TURN_PAUSE:-2}"
+
+READY_TURN_CEILING="${READY_TURN_CEILING:-7200}"
+
+# How many seconds a process has been running, from `ps -o etime=`
+# ([[dd-]hh:]mm:ss), or nothing when there is no such process.
+seconds_a_process_has_run() {
+  local elapsed days=0 hours=0 minutes=0 seconds=0 rest first second third
+  elapsed="$(ps -o etime= -p "$1" 2>/dev/null | tr -d ' ')"
+  [[ -n "$elapsed" ]] || return 1
+  rest="$elapsed"
+  if [[ "$rest" == *-* ]]; then
+    days="${rest%%-*}"
+    rest="${rest#*-}"
+  fi
+  IFS=: read -r first second third <<<"$rest"
+  if [[ -n "$third" ]]; then
+    hours="$first"; minutes="$second"; seconds="$third"
+  else
+    minutes="$first"; seconds="$second"
+  fi
+  echo $(( 10#$days * 86400 + 10#$hours * 3600 + 10#$minutes * 60 + 10#$seconds ))
+}
+
+# True when the turn's holder has gone: its process is not running; or the
+# process with its id STARTED AFTER the turn was taken, so the id has been
+# reused by something else; or the turn is older than the ceiling (two hours
+# by default — no builder takes that long to get ready); or it never wrote its
+# id and the turn is more than a minute old. Without the middle two, a holder
+# that died uncleanly and whose id a long-lived process later reused would be
+# waited on for as long as that process lives — a scheduled publish included.
+the_ready_turn_is_abandoned() {
+  local made now age running
+  made="$(stat -f %m "$READY_TURN" 2>/dev/null || echo 0)"
+  now="$(date +%s)"
+  age=$((now - made))
+  READY_TURN_SEEN_HOLDER="$(cat "$READY_TURN/pid" 2>/dev/null || true)"
+  if [[ -n "$READY_TURN_SEEN_HOLDER" ]]; then
+    if ! kill -0 "$READY_TURN_SEEN_HOLDER" 2>/dev/null; then
+      return 0
+    fi
+    if [[ "$age" -gt "$READY_TURN_CEILING" ]]; then
+      return 0
+    fi
+    running="$(seconds_a_process_has_run "$READY_TURN_SEEN_HOLDER" || true)"
+    if [[ -n "$running" && $((running + 5)) -lt "$age" ]]; then
+      return 0
+    fi
+    return 1
+  fi
+  [[ "$age" -gt 60 ]]
+}
+
+take_the_ready_turn() {
+  if [[ -n "$READY_TURN_IS_OURS" ]]; then
+    return 0
+  fi
+  mkdir -p "$(dirname "$READY_TURN")" 2>/dev/null || true
+  local waited=0
+  while ! mkdir "$READY_TURN" 2>/dev/null; do
+    if the_ready_turn_is_abandoned; then
+      # Moved aside before it is removed, and only if it is still the one
+      # just judged abandoned, so two launchers taking over at once cannot
+      # remove a turn a third has just taken.
+      if [[ "$(cat "$READY_TURN/pid" 2>/dev/null || true)" == "$READY_TURN_SEEN_HOLDER" ]]; then
+        mv "$READY_TURN" "$READY_TURN.gone.$$" 2>/dev/null && rm -rf "$READY_TURN.gone.$$"
+      fi
+      continue
+    fi
+    if [[ "$waited" -eq 1 ]]; then
+      # Carries the words the app's progress bar matches (TaskMilestones:
+      # "Building your website builder"), so a waiting Create or Preview
+      # shows the step it is really waiting on. Plain words only (rule 1).
+      echo "⏳ Building your website builder — this Mac is already getting it ready, so this waits for that to finish…"
+    fi
+    waited=$((waited + 1))
+    sleep "$READY_TURN_PAUSE"
+  done
+  printf '%s\n' "$$" > "$READY_TURN/pid"
+  READY_TURN_IS_OURS=1
+  trap give_back_the_ready_turn EXIT
+}
+
+give_back_the_ready_turn() {
+  if [[ -z "$READY_TURN_IS_OURS" ]]; then
+    return 0
+  fi
+  if [[ "$(cat "$READY_TURN/pid" 2>/dev/null || true)" == "$$" ]]; then
+    rm -rf "$READY_TURN"
+  fi
+  READY_TURN_IS_OURS=""
+}
+# <<< GETTING-READY TURN BLOCK <<<
+take_the_ready_turn
+
 # >>> FIRST-RUN BLOCK >>> From this line to the bare `ensure_container_runtime`
 # below, this text is IDENTICAL in setup.sh, preview.sh and deploy.sh.
 # AppRulesContractTests (the three copies agree, and no printed line names the
@@ -1456,6 +1580,8 @@ build_image_if_missing() {
   fi
 }
 build_image_if_missing
+# The builder is ready: the next launcher may go (GETTING-READY TURN BLOCK).
+give_back_the_ready_turn
 
 
 

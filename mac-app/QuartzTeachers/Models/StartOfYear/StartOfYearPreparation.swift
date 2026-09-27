@@ -71,8 +71,8 @@ enum StartOfYearPreparation {
         in course: Course,
         workspaceURL: URL,
         today: CalendarDay,
-        backUp: (Course, URL) throws -> URL = { course, coursesDirectoryURL in
-            return try CourseArchiver.backUpCourse(course, coursesDirectoryURL: coursesDirectoryURL, madeBy: .teacher)
+        backUp: (Course, URL) async throws -> URL = { course, coursesDirectoryURL in
+            return try await CourseArchiver.backUpCourse(course, coursesDirectoryURL: coursesDirectoryURL, madeBy: .teacher)
         }
     ) async -> Outcome {
         let folderPath: String = workspaceURL.path
@@ -115,10 +115,27 @@ enum StartOfYearPreparation {
         let coursesDirectoryURL: URL = workspaceURL.appendingPathComponent("courses", isDirectory: true)
         let backupURL: URL
         do {
-            backupURL = try backUp(course, coursesDirectoryURL)
+            backupURL = try await backUp(course, coursesDirectoryURL)
         } catch {
             noteNotDone("backupFailed", course: course, section: sectionNumber)
             return .refused(StartOfYearWording.backupFailed(course: course.displayCode))
+        }
+
+        // 2a. The zip runs off the main actor (#351) and can take a minute:
+        // the teacher can edit a page in Obsidian meanwhile. Planned again
+        // and held to what they were shown, as step 1 does, so nothing is
+        // written from a plan the backup outlived.
+        let replanned: Result<StartOfYearPlan, StartOfYearProblem> = StartOfYearPlanner.plan(
+            forSection: sectionNumber, in: course, workspaceURL: workspaceURL,
+            today: today, scheduledDeploy: scheduled
+        )
+        if case .success(let afterTheBackup) = replanned, afterTheBackup.fingerprint != shownFingerprint {
+            noteNotDone("changedSinceShown", course: course, section: sectionNumber)
+            return .changedSinceShown(afterTheBackup)
+        }
+        if case .failure(let problem) = replanned {
+            noteNotDone(problem.trailReason, course: course, section: sectionNumber)
+            return .refused(problem.sentence)
         }
 
         // 3. Stop the preview, unless another program holds the course — its

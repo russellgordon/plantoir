@@ -262,8 +262,9 @@ def lint(course_code: str) -> int:
                 bulky_pies.append((rel, len(values)))
 
         # The whole link graph, so reachability can be checked below.
-        # Nothing inside code is a link (#313): the toolchain's own mask.
-        code = markdown_code.code_ranges(text)
+        # Nothing inside code or a %% comment is a link (#313, #331): the
+        # toolchain's own mask.
+        code = markdown_code.not_a_link_ranges(text)
         page_links[page.stem] = {
             link.group(1).strip().rstrip("\\").split("/")[-1]
             for link in markdown_code.matches_outside_code(link_pattern, text, code)
@@ -305,12 +306,23 @@ def lint(course_code: str) -> int:
         if text.count("%%curriculum-start%%") != text.count("%%curriculum-end%%"):
             problems.append(f"{rel}: unbalanced curriculum markers")
 
-        # A link inside a `%%` comment is invisible to every reader and
-        # visible to both gates: this script and build_site.py read the raw
-        # markdown without stripping comments, so a hidden `![[A1.2]]`
-        # counts as curriculum coverage no student page provides, and a
-        # hidden `[[Page]]` satisfies the two-hop reachability check for a
-        # page nothing on the site reaches. Comments hold plain text.
+        # Comments pair left to right (Quartz's lazy `%%[\s\S]*?%%`), so an
+        # odd number of `%%` means one has no partner: a `%%` written in the
+        # prose of a note closes that note early, and the rest of the note is
+        # on the site with a stray `%%` after it (#331: AVI1O's and TEJ4M's
+        # task templates did exactly that).
+        if text.count("%%") % 2 == 1:
+            problems.append(
+                f"{rel}: the last %% has no partner, so the site shows a "
+                f"stray %% and the pairing of every comment before it may be "
+                f"off — write \"double-percent\" in prose instead")
+
+        # A link inside a `%%` comment is not a link anywhere (#331,
+        # readingALink.whatIsAComment): Quartz strips it, and every reader
+        # masks it. A payload still writes names in a comment as plain text,
+        # so a teacher copying the note never expects it to work.
+        # (Before #331 this guarded coverage and reachability, which read
+        # comments as links; that reason is gone, the advice stays.)
         for comment in comment_pattern.finditer(text):
             body = comment.group(1)
             if body.strip().startswith("curriculum-"):
@@ -319,8 +331,8 @@ def lint(course_code: str) -> int:
                 problems.append(
                     f"{rel}: link inside a %% comment: "
                     f"[[{hidden.group(1).strip()}]] — it is stripped before "
-                    f"anyone can follow it, but still counts for coverage "
-                    f"and reachability. Write the name as plain text"
+                    f"anyone can follow it and is not a link anywhere. "
+                    f"Write the name as plain text"
                 )
 
         # Observation and conversation are the two evidence sources a real

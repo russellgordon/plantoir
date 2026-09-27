@@ -1219,8 +1219,12 @@ struct NewCourseWizardView: View {
                     }
                     .accessibilityIdentifier("clubNounPicker")
                 } else {
-                LabeledContent("What do you call a unit?") {
-                    TextField("Unit", text: $unitWord, prompt: Text(ClassPageTerm.standard))
+                // An EMPTY title (#354): in a grouped form a titled field
+                // draws its title beside it, so this row read "What do you
+                // call a unit?  Unit [Unit]". The placeholder stays, through
+                // `prompt:`; the club branch above has always been this shape.
+                LabeledContent(UnitWordRenameWording.fieldLabel) {
+                    TextField("", text: $unitWord, prompt: Text(ClassPageTerm.standard))
                         .textFieldStyle(.roundedBorder)
                         .accessibilityIdentifier("unitWordField")
                 }

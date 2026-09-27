@@ -209,7 +209,8 @@ struct SidebarView: View {
                             let busyReason: String? = busyReason(for: course)
                             CourseRowLabel(
                                 course: course,
-                                isBeingRenamed: renamingCourseCode == course.code
+                                isBeingRenamed: renamingCourseCode == course.code,
+                                isBeingCopied: workspace.isBeingCopied(course.code)
                             )
                                 .tag(SidebarSelection.course(course.code))
                                 .accessibilityIdentifier("sidebar-\(course.code)")
@@ -277,8 +278,12 @@ struct SidebarView: View {
                                     // the moment before risky editing is
                                     // exactly when it's wanted.
                                     Button("Back Up Now", systemImage: "clock.arrow.circlepath") {
-                                        workspace.backUp(course)
+                                        Task { await workspace.backUp(course) }
                                     }
+                                    // One copy at a time (#351): the zip runs
+                                    // off the main actor now, so a second press
+                                    // is possible while the first is saving.
+                                    .disabled(workspace.isBeingCopied(course.code))
                                     Divider()
                                     folderMenuItems(for: course.directoryURL)
                                 }
@@ -308,6 +313,7 @@ struct SidebarView: View {
                                     Button("Restore…", systemImage: "arrow.uturn.backward") {
                                         workspace.backupRestoreRequest = item
                                     }
+                                    .disabled(workspace.isBeingCopied(item.courseCode))
                                     Button("Show in Finder", systemImage: "finder") {
                                         NSWorkspace.shared.activateFileViewerSelecting([item.fileURL])
                                     }
@@ -330,7 +336,13 @@ struct SidebarView: View {
                                     .accessibilityIdentifier("backupsTotal")
                             }
                         }
-                        .accessibilityIdentifier("backupsGroup")
+                        // `.contain` (#353). A List section's header is merged into ONE
+                        // static text, so two identifiers cannot both reach the tree:
+                        // with an identifier on the header as well, the text read
+                        // "backupsGroup-backupsGroup" and `backupsTotal` was dead (read
+                        // off the real tree, 2026-09-26). The header's own was dropped;
+                        // nothing read it.
+                        .accessibilityElement(children: .contain)
                     }
                 }
 
@@ -429,6 +441,14 @@ struct SidebarView: View {
                 }
             }
 
+            // The one line the background warm-up ever shows (bundle B): no
+            // window, no progress bar, nothing to press. It goes when the
+            // builder is ready, or when getting it ready did not work out —
+            // then the first preview does it the old way, saying nothing here.
+            if BuilderWarmUp.shared.isGettingReady {
+                gettingReadyLine
+            }
+
             Divider()
 
             bottomBar
@@ -439,7 +459,7 @@ struct SidebarView: View {
             presenting: removalRequest
         ) { request in
             Button("Remove", role: .destructive) {
-                performRemoval(request)
+                Task { await performRemoval(request) }
             }
             Button("Cancel", role: .cancel) {
             }
@@ -465,7 +485,7 @@ struct SidebarView: View {
             presenting: workspace.backupRestoreRequest
         ) { item in
             Button("Restore") {
-                workspace.restoreBackup(item)
+                Task { await workspace.restoreBackup(item) }
             }
             Button("Cancel", role: .cancel) {
             }
@@ -766,6 +786,23 @@ struct SidebarView: View {
     /// list footers, for one — so the size is stated rather than inherited.
     static let footerGlyphSize: CGFloat = 15
 
+    /// The background warm-up's status line (`builderWarmUp.wording.statusLine`).
+    var gettingReadyLine: some View {
+        HStack(spacing: 6) {
+            ProgressView()
+                .controlSize(.small)
+            Text(BuilderWarmUp.statusLine)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("builderWarmUpStatusLine")
+    }
+
     /// Add, remove, and filter — the standard macOS list footer.
     var bottomBar: some View {
         @Bindable var workspace = workspace
@@ -803,7 +840,10 @@ struct SidebarView: View {
             .buttonStyle(.borderless)
             // An archived item is already put away, so there is nothing
             // for this button to do while one is selected.
-            .disabled(workspace.selectedCourse == nil)
+            // Nor while the course is being copied (#351): a second archive of
+            // a folder already being put away.
+            .disabled(workspace.selectedCourse == nil
+                      || workspace.isBeingCopied(workspace.selectedCourse?.code ?? ""))
             .help("Remove the selected course or section")
             .accessibilityIdentifier("removeSelectedButton")
             .padding(.trailing, 5)
@@ -1186,7 +1226,7 @@ struct SidebarView: View {
                     }
             }
         } label: {
-            CourseRowLabel(course: course, isBeingRenamed: false)
+            CourseRowLabel(course: course, isBeingRenamed: false, isBeingCopied: workspace.isBeingCopied(course.code))
                 .tag(SidebarSelection.course(course.code))
                 .accessibilityIdentifier("sidebar-\(course.code)")
                 .contextMenu {
@@ -1204,8 +1244,9 @@ struct SidebarView: View {
                     // travels in its settings, and the restore locks it
                     // again.
                     Button("Back Up Now", systemImage: "clock.arrow.circlepath") {
-                        workspace.backUp(course)
+                        Task { await workspace.backUp(course) }
                     }
+                    .disabled(workspace.isBeingCopied(course.code))
                     Divider()
                     folderMenuItems(for: course.directoryURL)
                 }
@@ -1555,8 +1596,9 @@ struct SidebarView: View {
     ///
     /// The view keeps one call and the alert; the order, the reporting and the
     /// trail line live in `ScheduledDeployCleanup`, where a test can drive
-    /// them — nothing in the suite constructs this view.
-    func performRemoval(_ request: RemovalRequest) {
+    /// them — nothing in the suite constructs this view. Async since #351:
+    /// the archive made before a removal is a zip, run off the main actor.
+    func performRemoval(_ request: RemovalRequest) async {
         guard let coursesDirectoryURL = workspace.coursesDirectoryURL else {
             return
         }
@@ -1569,16 +1611,20 @@ struct SidebarView: View {
         guard let courseToRemove else {
             return
         }
+        // One archive at a time (#351); the button is greyed then too.
+        if workspace.isBeingCopied(courseToRemove.code) {
+            return
+        }
 
         var result: ScheduledDeployCleanup.RemovalResult
         if let sectionNumber = request.sectionNumber {
-            result = ScheduledDeployCleanup.removeSection(
+            result = await ScheduledDeployCleanup.removeSection(
                 sectionNumber,
                 from: courseToRemove,
                 coursesDirectoryURL: coursesDirectoryURL
             )
         } else {
-            result = ScheduledDeployCleanup.removeCourse(
+            result = await ScheduledDeployCleanup.removeCourse(
                 courseToRemove,
                 coursesDirectoryURL: coursesDirectoryURL
             )
@@ -1656,6 +1702,9 @@ struct CourseRowLabel: View {
     /// is read.
     let isBeingRenamed: Bool
 
+    /// Whether a copy of the course is being zipped right now (#351).
+    var isBeingCopied: Bool = false
+
     // MARK: - Body
 
     var body: some View {
@@ -1666,7 +1715,18 @@ struct CourseRowLabel: View {
             // ICS3U, never the folder name. The year group above this row
             // already says 2025–26, so the suffix would be redundant as
             // well as wrong.
-            Label(course.displayCode, systemImage: "books.vertical")
+            HStack(spacing: 6) {
+                Label(course.displayCode, systemImage: "books.vertical")
+                // A copy of the course is being zipped (#351) — a backup, or
+                // the archive before a restore or removal. The row says so
+                // rather than the window going quiet for the minute it takes.
+                if isBeingCopied {
+                    ProgressView()
+                        .controlSize(.small)
+                        .accessibilityLabel("Saving a copy")
+                        .accessibilityIdentifier("courseBeingCopied-\(course.code)")
+                }
+            }
         }
     }
 }

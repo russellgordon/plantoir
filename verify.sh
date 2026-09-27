@@ -224,6 +224,20 @@ else
   cat /tmp/verify_site_health_test.log
 fi
 
+if (cd scripts && python3 test_getting_ready_turn.py) >/tmp/verify_getting_ready_turn_test.log 2>&1; then
+  pass "Launchers: one at a time gets the website builder ready, and setup.sh --prepare-builder does only that (scripts/test_getting_ready_turn.py, bundle B)"
+else
+  fail "Launchers: one at a time gets the website builder ready, and setup.sh --prepare-builder does only that (scripts/test_getting_ready_turn.py, bundle B)"
+  cat /tmp/verify_getting_ready_turn_test.log
+fi
+
+if (cd scripts && python3 test_section_fingerprint.py) >/tmp/verify_section_fingerprint_test.log 2>&1; then
+  pass "section_fingerprint.py: the \"— Edited\" fingerprint's rule 2 leaves How I Teach out, and the default stays rule 1 until Windows moves (scripts/test_section_fingerprint.py, #330)"
+else
+  fail "section_fingerprint.py: the \"— Edited\" fingerprint's rule 2 leaves How I Teach out, and the default stays rule 1 until Windows moves (scripts/test_section_fingerprint.py, #330)"
+  cat /tmp/verify_section_fingerprint_test.log
+fi
+
 if (cd scripts && python3 test_recipe_folders.py) >/tmp/verify_recipe_folders_test.log 2>&1; then
   pass "the toolchain recipe's folder list agrees everywhere it is copied (scripts/test_recipe_folders.py)"
 else
@@ -786,6 +800,22 @@ else
   cat /tmp/verify_unreadable_page_settings_test.log
 fi
 
+# ---- build_site.py: links students would find dead (#333) ----
+# Every case in contracts/shared-rules.json -> siteHealth.linksIntoHiddenPages
+# through the build's own reader, in the image because it imports build_site
+# (python-frontmatter): a link on a page students can see into one they
+# cannot, named by its place in the course folder, once, and ONE finding.
+echo ""
+echo "🔎 Checking that links into hidden pages are named…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/test_links_into_hidden_pages.py" /opt/scripts/test_links_into_hidden_pages.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_links_into_hidden_pages.py >/tmp/verify_links_into_hidden_pages_test.log 2>&1; then
+  pass "build_site.py: a link on a page students can see into a hidden page is named (scripts/test_links_into_hidden_pages.py, #333)"
+else
+  fail "build_site.py: a link on a page students can see into a hidden page is named (scripts/test_links_into_hidden_pages.py, #333)"
+  cat /tmp/verify_links_into_hidden_pages_test.log
+fi
+
 # ---- Whether the site shows a page: the contract, run down the REAL chain ----
 # The one check here that is not about a rule being implemented right — it is
 # about the rule being TRUE. Both apps are tested against
@@ -1158,13 +1188,27 @@ check_client_source /opt/quartz/quartz/util/resources.tsx 'moduleType ?? "applic
 echo ""
 echo "🔎 Checking the Explorer's hide filter is baked into the image, and wired to a live omit Set…"
 ANCHOR_OK="true"
-for layout in /opt/quartz/quartz.layout.ts /opt/quartz-site/quartz.layout.ts; do
+for layout in /opt/quartz/quartz.layout.ts; do
   if ! docker run --rm "$DEV_TEST_IMAGE" grep -Pzoq '//[ \t]*CQ4T-OMIT-ANCHOR:[^\n]*\n[ \t]*const[ \t]+omit[ \t]*=[ \t]*new[ \t]+Set' "$layout" 2>/dev/null; then
     fail "The Explorer's hide filter is missing or structurally detached from $layout in the image — hidden pages would be published"
     ANCHOR_OK="false"
   fi
 done
-[[ "$ANCHOR_OK" == "true" ]] && pass "The Explorer's hide filter is baked into the image and wired to a live omit Set (both Quartz copies)"
+[[ "$ANCHOR_OK" == "true" ]] && pass "The Explorer's hide filter is baked into the image and wired to a live omit Set"
+
+# #334: the unused second copy of the scaffold is gone (it was 468 MB of
+# image disk that nothing read), and Quartz is a one-commit clone.
+if docker run --rm "$DEV_TEST_IMAGE" test -e /opt/quartz-site; then
+  fail "The image still carries /opt/quartz-site, which nothing reads (#334)"
+else
+  pass "The image carries one copy of the website builder's scaffold (#334)"
+fi
+QUARTZ_COMMITS="$(docker run --rm "$DEV_TEST_IMAGE" git -C /opt/quartz rev-list --count HEAD 2>/dev/null || echo "?")"
+if [[ "$QUARTZ_COMMITS" == "1" ]]; then
+  pass "Quartz is cloned at depth 1: the tag's one commit (#334)"
+else
+  fail "Quartz carries ${QUARTZ_COMMITS} commits of history; the clone should be depth 1 (#334)"
+fi
 
 # -------------------- 5. Drive the real launcher against the image --------------------
 echo ""

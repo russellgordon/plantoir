@@ -803,6 +803,64 @@ mount paths. All of it went with the container path; if you meet it in
 built, pinned and shipped:
 [12 → Nothing here runs in a container](12-windows-app.md#nothing-here-runs-in-a-container).
 
+### One launcher at a time gets the builder ready (bundle B)
+
+Since the Mac app began getting the website builder ready in the BACKGROUND
+at first launch ([09 → Getting the builder ready in the background](09-mac-app.md)),
+a teacher who clicks Create or Preview while that is still going is a
+launcher arriving mid-build — and two launchers starting one virtual machine,
+or building one recipe, at once is never useful: two first starts fight over
+the machine, and two builds download the same ~340 MB twice. So the rule is
+in the launchers, not the app, and a teacher at the command line gets it too.
+
+**The GETTING-READY TURN BLOCK**, identical in `setup.sh`, `preview.sh` and
+`deploy.sh` just before the FIRST-RUN BLOCK, cut out by its markers and run
+for real by `scripts/test_getting_ready_turn.py`:
+
+- **The turn is a folder**, `~/Library/Application Support/Plantoir/getting-ready.turn`,
+  because `mkdir` makes it or fails atomically. Inside it is the holder's
+  process id.
+- **Taken before the builder is started** (`take_the_ready_turn`, the block's
+  last line) and **handed back as soon as the image is ready** —
+  `give_back_the_ready_turn` straight after `build_image_if_missing` in
+  `setup.sh` and `preview.sh`. `deploy.sh` hands it back straight after
+  starting the builder and takes it again only inside `ensure_image_present`,
+  when it must BUILD to make a workspace — asking again once it has the turn,
+  since the holder may have just built that very image. It is never held
+  through a site build or a publish. An EXIT trap hands it back on any exit.
+- **Waiting.** A launcher that finds the turn held waits, and after a couple
+  of seconds says so, once: "⏳ Building your website builder — this Mac is
+  already getting it ready, so this waits for that to finish…"
+  (`builderWarmUp.wording.waitingLine`). It carries the words the app's
+  progress bar matches, so a waiting Create or Preview shows "Building your
+  website builder…". When the turn is handed back, it takes it, finds the
+  image ready ("✅ Website builder is ready."), and builds nothing.
+- **Abandoned turns are taken over**: a holder whose process is not running
+  (killed, or a Mac restarted mid-build); a holder whose id now belongs to a
+  process that STARTED AFTER the turn was taken (`ps -o etime=` against the
+  turn's age — the id was reused by something else, which would otherwise be
+  waited on for as long as it lives, a scheduled publish included; review N1);
+  a turn older than a ceiling (two hours, `READY_TURN_CEILING`); or a turn
+  with no id written after a minute. Before removing one it checks the id is still the one it judged
+  gone, so two launchers taking over at once cannot remove a turn a third has
+  just taken. (A narrower race remains — the cost of losing it is two builds,
+  which is what happened before the turn existed.)
+
+**`setup.sh --builder-tag`** prints `BUILDER_TAG=<name>` — the image name the
+recipe's hash gives — and starts nothing; the app asks it at launch to know
+whether the builder it got ready is still this recipe's.
+
+**`setup.sh --prepare-builder`** is the mode the app runs in the background:
+the tool bootstrap, the builder's start and `build_image_if_missing`, then
+`BUILDER_READY=<image>` and exit 0 — no `courses/` folder (the folders
+section is skipped), no workspace, no builds folder. The app runs it from its
+own folder holding only that launcher and a mirror of the recipe, so the
+image tag — a hash of the recipe — is the one every working folder looks for.
+
+Cases: `contracts/app-rules.json` → `builderWarmUp.turn.cases` (7) and
+`.sequences.cases` (2). Mac only, permanently (`builderWarmUp.appliesOn`):
+Windows carries its runtime and builds natively, with no builder to get ready.
+
 ### Which app macOS asks about when it protects the Desktop
 
 **Met on a second Mac running v1.2.0, 2026-09-19** ([issue
@@ -1360,6 +1418,9 @@ nobody can ever close. The one thing that side does owe is the new
 
 ### `setup.sh`
 
+- With `--prepare-builder` (bundle B), gets the website builder ready and
+  stops before anything below — see "One launcher at a time gets the builder
+  ready" above.
 - Creates `courses/` and `courses/_backups/` on the host if missing, and
   relaxes permissions (`chmod -R u+rwX,go+rwX`) so the container user can
   write regardless of UID mismatches.

@@ -30,6 +30,9 @@ final class QuitConfirmationTests: XCTestCase {
             let buildCount: Int = try XCTUnwrap(
                 given["previewsBeingBuilt"] as? Int, "\(name): no previewsBeingBuilt"
             )
+            let copyCount: Int = try XCTUnwrap(
+                given["copiesBeingSaved"] as? Int, "\(name): no copiesBeingSaved"
+            )
             let reasonName: String = try XCTUnwrap(given["quitReason"] as? String)
             let reason: QuitConfirmation.Reason = reasonName == "theMacIsLoggingOutOrShuttingDown"
                 ? .theMacIsLoggingOutOrShuttingDown
@@ -55,6 +58,9 @@ final class QuitConfirmationTests: XCTestCase {
                 CourseActivity.beginPreviewBuild(
                     folderPath: "/pretend", courseCode: "ENG2D", sectionNumber: index + 1
                 )
+            }
+            for _ in 0..<copyCount {
+                CourseActivity.beginCopy(folderPath: "/pretend", courseCode: "SCH3U")
             }
 
             // The no-argument form, on purpose: it is the one the delegate

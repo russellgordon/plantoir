@@ -49,12 +49,12 @@ Use good judgement when choosing expectations: these links directly inform how t
 %%
 Triangulation — the evidence you will not have unless you go and get it.
 This block is a note to yourself. It is never published: everything
-between the %% markers is stripped before the site is built. Keep it
-OUTSIDE the curriculum markers above, or it disappears for any teacher
-who installs the course without curriculum pages. Plain text only: no
-wikilinks and no transclusions, because both are read straight off the
-file and would count as coverage for work no student page does. Write
-bare codes and page names as words.
+between the double-percent markers is stripped before the site is built.
+Keep it OUTSIDE the curriculum markers above, or it disappears for any
+teacher who installs the course without curriculum pages. Plain text
+only: a wikilink or a transclusion in here is invisible on the site and
+is not a link anywhere in Plantoir, so write bare codes and page names
+as words.
 
 OBSERVE — Unit _, Day _, the period this is actually available in
   Watch for: something visible only while they work, and gone from the
