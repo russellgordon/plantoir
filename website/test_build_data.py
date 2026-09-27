@@ -219,9 +219,30 @@ class ReleaseReadinessTests(unittest.TestCase):
         shots = {"shots": [{"id": "no-such-shot-anywhere", "awaiting_capture": True}]}
         self.assertIn("no-such-shot-anywhere", build.release_readiness_refusal(site, shots))
 
+    def test_a_missing_picture_waiting_on_a_named_issue_is_deployed(self):
+        site = {"version": "1.4.0", "new_in": {"version": "1.4"}}
+        shots = {"shots": [{"id": "no-such-shot-anywhere", "awaiting_capture": True, "waiting_on": "#367"}]}
+        self.assertIsNone(build.release_readiness_refusal(site, shots))
+
+    def test_waiting_on_must_name_an_issue(self):
+        site = {"version": "1.4.0", "new_in": {"version": "1.4"}}
+        shots = {"shots": [{"id": "no-such-shot-anywhere", "awaiting_capture": True, "waiting_on": "later"}]}
+        self.assertIn("no-such-shot-anywhere", build.release_readiness_refusal(site, shots))
+
     def test_a_ready_release_deploys(self):
         site = {"version": "1.4.1", "new_in": {"version": "1.4"}}
         self.assertIsNone(build.release_readiness_refusal(site, {"shots": []}))
+
+
+class WindowsSwapTests(unittest.TestCase):
+
+    def test_windows_false_shows_the_mac_picture_to_everybody(self):
+        # `preview` has -windows files on disk; with `windows: false` they are
+        # not offered, because the alt text and caption describe the Mac one.
+        shot = {"id": "preview", "alt": "a", "caption": "c", "windows": False}
+        self.assertNotIn("data-win-src", build.picture_element(shot, [], "", "./"))
+        shot["windows"] = True
+        self.assertIn("data-win-src", build.picture_element(shot, [], "", "./"))
 
 
 class AwaitingCaptureTests(unittest.TestCase):

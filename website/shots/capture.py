@@ -338,19 +338,32 @@ def export_attachments(bundle: Path, suffix: str, parts: set[str] | None = None,
 # ---------- Provisioning and publishing ----------
 
 def app_bundle_resources() -> Path:
-    """The Resources folder of the Debug build the UI tests run against."""
-    candidates = sorted(
-        (Path.home() / "Library/Developer/Xcode/DerivedData").glob(
-            "Plantoir-*/Build/Products/Debug/Plantoir.app/Contents/Resources"
-        )
+    """The Resources folder of the Debug build the UI tests run against.
+
+    That is the build of THIS checkout's project, found by the WorkspacePath
+    DerivedData records for it. It used to be whichever Plantoir-* folder
+    sorted last, and on a Mac with several clones that was a two-day-old
+    bundle from another one — launchers and a build recipe the app under
+    test did not carry.
+    """
+    import plistlib
+    project = (MAC_APP / "Plantoir.xcodeproj").resolve()
+    for derived in sorted((Path.home() / "Library/Developer/Xcode/DerivedData").glob("Plantoir-*")):
+        try:
+            with (derived / "info.plist").open("rb") as handle:
+                recorded = plistlib.load(handle).get("WorkspacePath", "")
+        except (OSError, plistlib.InvalidFileException):
+            continue
+        if not recorded or Path(recorded).resolve() != project:
+            continue
+        resources = derived / "Build/Products/Debug/Plantoir.app/Contents/Resources"
+        if resources.is_dir():
+            return resources
+    raise SystemExit(
+        f"No built Plantoir.app found for {project}. Build it first:\n"
+        "  cd mac-app && xcodebuild -project Plantoir.xcodeproj -scheme Plantoir "
+        "-configuration Debug build"
     )
-    if not candidates:
-        raise SystemExit(
-            "No built Plantoir.app found. Build it first:\n"
-            "  cd mac-app && xcodebuild -project Plantoir.xcodeproj -scheme Plantoir "
-            "-configuration Debug build"
-        )
-    return candidates[-1]
 
 
 def _recipe_folders() -> list:
@@ -439,7 +452,12 @@ def workspace_has_course(workspace: Path, code: str) -> bool:
 
 
 def ensure_launchers(workspace: Path) -> None:
-    """A brand-new folder needs the three launchers before anything else."""
+    """A brand-new folder needs the three launchers before anything else —
+    and a `courses/` folder. The app reads a folder with launchers and no
+    `courses/` as a problem ("There are no courses in this folder yet") and
+    keeps the folder picker up, so the new-course button a provisioning test
+    clicks is never shown; that is how the first marketing set-up failed."""
+    (workspace / "courses").mkdir(parents=True, exist_ok=True)
     resources = app_bundle_resources()
     for name in ["setup.sh", "preview.sh", "deploy.sh"]:
         destination = workspace / name
@@ -579,7 +597,66 @@ def kill_orphaned_model_servers() -> None:
     at both moments no app instance is (or is about to stay) running, so
     every engine from the app bundle is an orphan by definition.
     """
-    subprocess.run(["pkill", "-f", "Resources/llama/llama-server"], capture_output=True)
+    # Only engines from THIS checkout's build, and only orphans (parent 1).
+    # The sweep used to `pkill -f Resources/llama/llama-server`, which on a
+    # Mac where other sessions run UI tests from their own clones killed
+    # THEIR engines too (2026-09-27: one from ~/plantoir-r mid-run).
+    try:
+        ours = str(app_bundle_resources() / "llama" / "llama-server")
+    except SystemExit:
+        return
+    listing = subprocess.run(["ps", "-axo", "pid=,ppid=,command="], capture_output=True, text=True).stdout
+    for line in listing.splitlines():
+        parts = line.strip().split(None, 2)
+        if len(parts) < 3:
+            continue
+        pid, ppid, command = parts
+        if ppid == "1" and command.startswith(ours):
+            subprocess.run(["kill", pid], capture_output=True)
+
+
+class KeyboardNavigationOff:
+    """Keyboard navigation off for the run, put back afterwards.
+
+    With it on (System Settings › Keyboard › Keyboard navigation, the global
+    `AppleKeyboardUIMode` 2), every sheet opens with a focus ring round its
+    first control — the start-of-year plan's first list, in the 2026-09-27
+    capture. Most teachers have it off, so the pictures should too. Passing
+    `-AppleKeyboardUIMode 0` to the app under test was tried first and did
+    not take: AppKit reads it from the global domain. So the global value is
+    borrowed and restored exactly — including its absence (CLAUDE.md rule 9).
+    """
+
+    def __enter__(self) -> "KeyboardNavigationOff":
+        read = subprocess.run(["defaults", "read", "-g", "AppleKeyboardUIMode"], capture_output=True, text=True)
+        self.saved: str | None = read.stdout.strip() if read.returncode == 0 else None
+        # A run ended by SIGTERM or SIGHUP (a closed terminal, a killed
+        # shell) would skip __exit__: Python has no handler for either, so
+        # turn both into SystemExit and the `with` unwinds as for Ctrl-C.
+        import signal
+        self.previous_handlers: dict = {}
+        for number in (signal.SIGTERM, signal.SIGHUP):
+            self.previous_handlers[number] = signal.signal(number, KeyboardNavigationOff.exit_on_signal)
+        if self.saved not in (None, "0"):
+            subprocess.run(["defaults", "write", "-g", "AppleKeyboardUIMode", "-int", "0"], capture_output=True)
+            print(f"   Keyboard navigation off for the run (was {self.saved}; put back afterwards — if this run "
+                  f"is killed hard, restore it with: defaults write -g AppleKeyboardUIMode -int {self.saved}).")
+        return self
+
+    @staticmethod
+    def exit_on_signal(number, frame) -> None:
+        raise SystemExit(128 + number)
+
+    def __exit__(self, exc_type, exc_value, traceback) -> bool:
+        import signal
+        for number, handler in self.previous_handlers.items():
+            signal.signal(number, handler)
+        if self.saved is None:
+            subprocess.run(["defaults", "delete", "-g", "AppleKeyboardUIMode"], capture_output=True)
+        elif self.saved != "0":
+            subprocess.run(["defaults", "write", "-g", "AppleKeyboardUIMode", "-int", self.saved], capture_output=True)
+            print(f"   Keyboard navigation put back ({self.saved}).")
+        return False
 
 
 class BackupsSetAside:
@@ -890,6 +967,12 @@ def capture_phone(dark: bool) -> None:
     run(["xcrun", "simctl", "openurl", udid, url], capture_output=True)
     time.sleep(9)
     dismiss_safari_onboarding(udid)
+    # The site remembers a light/dark choice in Mobile Safari's own storage,
+    # which outranks the simulator's appearance: the committed "light" phone
+    # shot had been dark all along (median luminance 18, measured
+    # 2026-09-27). Tapping the site's own switch through RocketSim by its
+    # label ("Light mode") was tried and did nothing, so the shot is checked
+    # below and named when it is wrong, rather than filed as right.
 
     destination = IMAGE_DIR / f"site-phone-{suffix}.png"
     with destination.open("wb") as handle:
@@ -909,6 +992,12 @@ def capture_phone(dark: bool) -> None:
         run(["xcrun", "simctl", "io", udid, "screenshot", str(destination)],
             capture_output=True)
     prepare(destination, WIDEST_PHONE_PIXELS)
+    from safari import page_is_dark
+    if page_is_dark(destination) != dark:
+        print(f"   ✗ {destination.name} came out {'light' if dark else 'dark'}: the site has the other "
+              "theme saved in the simulator's Safari. Open it there, tap the site's light/dark switch "
+              "until it follows the phone, and re-take with --phone. Do not commit this one.",
+              file=sys.stderr)
     print(f"   saved {destination.name}")
 
     if not was_booted:
@@ -1179,7 +1268,7 @@ def run_scenes(folder: Path, chosen: list) -> int:
         shutil.rmtree(staging)
     kill_orphaned_model_servers()
     try:
-        with RememberedWindowFrames(), BackupsSetAside(folder):
+        with RememberedWindowFrames(), BackupsSetAside(folder), KeyboardNavigationOff():
             for dark in (False, True):
                 suffix = "dark" if dark else "light"
                 print(f"   {suffix} appearance")
@@ -1198,8 +1287,13 @@ def run_scenes(folder: Path, chosen: list) -> int:
                                 failures.append(f"{scene.name} ({suffix}): {problem}")
                         elif scene.kind == "obsidian":
                             note = folder / "courses" / marketing_folder.CURRICULUM_COURSE / marketing_folder.HOW_I_TEACH_NAME
-                            with scene_book.ObsidianRegistryKept():
-                                if not capture_note_in_obsidian(note, staging / f"how-i-teach-{suffix}.png"):
+                            with scene_book.ObsidianRegistryKept() as registry:
+                                if not registry.register(note.parent):
+                                    failures.append(f"{scene.name} ({suffix}): Obsidian is open, and opening a "
+                                                    "note in it would need its list of vaults changed under it; "
+                                                    "quit Obsidian (it is not the capture's to quit) and re-take "
+                                                    "with --only how-i-teach")
+                                elif not capture_note_in_obsidian(note, staging / f"how-i-teach-{suffix}.png"):
                                     failures.append(f"{scene.name} ({suffix}): Obsidian's window was not found")
                     # Checked in STAGING, and only what passes is promoted —
                     # to site/img, or to the parts folder for a composite. A
@@ -1279,6 +1373,9 @@ def promote_captured_shots(passed: list[str]) -> None:
             continue
         if shot.pop("awaiting_capture", None):
             changed.append(f"{identifier}: taken")
+        issue = shot.pop("waiting_on", None)
+        if issue:
+            changed.append(f"{identifier}: no longer waiting on {issue} — close it when every shot it names is taken")
         retake = shot.pop("retake", None)
         if retake:
             for key in ("alt", "caption", "expectText"):

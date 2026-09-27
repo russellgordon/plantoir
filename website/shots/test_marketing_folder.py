@@ -80,17 +80,6 @@ class FileStepTests(unittest.TestCase):
             with self.assertRaises(mf.ForeignFolder):
                 mf.apply_file_steps(folder, FAKE_PAGES)
 
-    def test_a_netlify_destination_somebody_chose_is_left_alone(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            folder = staged_folder(Path(temporary))
-            config_path = folder / "courses" / "ICS3U" / "course_config.json"
-            config = json.loads(config_path.read_text(encoding="utf-8"))
-            config["deploy_target"] = "netlify"
-            config_path.write_text(json.dumps(config), encoding="utf-8")
-            mf.apply_file_steps(folder, FAKE_PAGES)
-            after = json.loads(config_path.read_text(encoding="utf-8"))
-        self.assertEqual(after["deploy_target"], "netlify")
-
     def test_a_reference_copy_of_ics3u_is_not_foreign(self):
         with tempfile.TemporaryDirectory() as temporary:
             folder = staged_folder(Path(temporary))
@@ -128,6 +117,63 @@ class FileStepTests(unittest.TestCase):
             config = json.loads((folder / "courses" / "ICS3U" / "course_config.json").read_text(encoding="utf-8"))
         self.assertIn(mf.COLLEGE_BOARD_FOLDER, config["hidden"])
         self.assertEqual(config["deploy_target"], "local_folder")
+
+    def test_section_two_moves_to_a_second_semester_by_whole_weeks(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = staged_folder(Path(temporary))
+            course = folder / "courses" / "ICS3U"
+            own = course / "section2" / "All Classes"
+            own.mkdir(parents=True)
+            (own / "Unit 1, Day 1.md").write_text(
+                "---\ntitle: Unit 1, Day 1\ncreated: 2026-09-08T07:00:00.000+0000\n---\nBody\n", encoding="utf-8")
+            (own / "Unit 1, Day 2.md").write_text(
+                "---\ntitle: Unit 1, Day 2\ncreated: 2026-09-09T07:00:00.000+0000\n---\nBody\n", encoding="utf-8")
+            shared = course / "Concepts" / "A Shared Page.md"
+            shared.parent.mkdir(parents=True, exist_ok=True)
+            shared.write_text("---\ncreatedSection1: 2026-09-08T07:00:00.000+0000\n"
+                              "createdSection2: 2026-09-08T07:00:00.000+0000\n---\nText\n", encoding="utf-8")
+            mf.apply_file_steps(folder, FAKE_PAGES)
+            first = (own / "Unit 1, Day 1.md").read_text(encoding="utf-8")
+            second = (own / "Unit 1, Day 2.md").read_text(encoding="utf-8")
+            both = shared.read_text(encoding="utf-8")
+            before = {path: path.read_bytes() for path in folder.rglob("*") if path.is_file()}
+            mf.apply_file_steps(folder, FAKE_PAGES)
+            after = {path: path.read_bytes() for path in folder.rglob("*") if path.is_file()}
+        # 21 weeks: Tuesday 2026-09-08 becomes Tuesday 2027-02-02, the week of 2027-02-01.
+        self.assertIn("created: 2027-02-02T07:00:00.000+0000", first)
+        self.assertIn("created: 2027-02-03T07:00:00.000+0000", second)
+        self.assertIn("createdSection2: 2027-02-02T07:00:00.000+0000", both)
+        self.assertIn("createdSection1: 2026-09-08T07:00:00.000+0000", both, "section 1 keeps its dates")
+        self.assertEqual(before, after, "a second run moves nothing")
+
+    def test_the_new_course_panels_netlify_is_not_a_choice(self):
+        # The app writes "netlify" for every new course; with no site recorded
+        # nobody chose it, and the folder destination replaces it.
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = staged_folder(Path(temporary))
+            config_path = folder / "courses" / "ICS3U" / "course_config.json"
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+            config["deploy_target"] = "netlify"
+            config["deploy_folder_path"] = ""
+            config_path.write_text(json.dumps(config), encoding="utf-8")
+            mf.apply_file_steps(folder, FAKE_PAGES)
+            after = json.loads(config_path.read_text(encoding="utf-8"))
+        self.assertEqual(after["deploy_target"], mf.FOLDER_DESTINATION)
+
+    def test_a_netlify_site_somebody_published_to_is_left_alone(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = staged_folder(Path(temporary))
+            course = folder / "courses" / "ICS3U"
+            config_path = course / "course_config.json"
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+            config["deploy_target"] = "netlify"
+            config_path.write_text(json.dumps(config), encoding="utf-8")
+            (course / ".netlify_sites").mkdir()
+            (course / ".netlify_sites" / "section1.json").write_text("{}", encoding="utf-8")
+            report = mf.apply_file_steps(folder, FAKE_PAGES)
+            after = json.loads(config_path.read_text(encoding="utf-8"))
+        self.assertEqual(after["deploy_target"], "netlify")
+        self.assertTrue(any("netlify" in line for line in report.named_and_skipped))
 
     def test_a_destination_somebody_chose_is_left_alone(self):
         with tempfile.TemporaryDirectory() as temporary:
