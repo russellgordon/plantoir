@@ -44,7 +44,7 @@ enum HowITeachPage {
     /// disagree on a handful of letters; with only ASCII folded, the two
     /// implementations of this rule cannot disagree about any name
     /// (`howITeachPage.matching`).
-    static func folded(_ name: String) -> String {
+    nonisolated static func folded(_ name: String) -> String {
         var result: String = ""
         for scalar in name.precomposedStringWithCanonicalMapping.unicodeScalars {
             if scalar.value >= 65 && scalar.value <= 90, let lower = Unicode.Scalar(scalar.value + 32) {
@@ -57,7 +57,7 @@ enum HowITeachPage {
     }
 
     /// Whether one file NAME is the page. Nothing is trimmed.
-    static func isTheHowITeachPageName(_ name: String) -> Bool {
+    nonisolated static func isTheHowITeachPageName(_ name: String) -> Bool {
         return folded(name) == folded(fileName)
     }
 
@@ -86,8 +86,24 @@ enum HowITeachPage {
         return isASectionFolderName(folder.lastPathComponent)
     }
 
+    /// Whether a path relative to the COURSE folder is one of the two places
+    /// the build keeps off the site: the top of the course, or the top of a
+    /// `section<N>/` folder. `how_i_teach.is_reserved_place` is the build's
+    /// copy. Used by the "— Edited" fingerprint's rule 2 (#330), which runs
+    /// off the main actor, hence `nonisolated`.
+    nonisolated static func isAtAReservedPlace(relativePath: String) -> Bool {
+        let parts: [Substring] = relativePath.split(separator: "/", omittingEmptySubsequences: false)
+        if parts.count == 1 {
+            return isTheHowITeachPageName(String(parts[0]))
+        }
+        if parts.count == 2 {
+            return isASectionFolderName(String(parts[0])) && isTheHowITeachPageName(String(parts[1]))
+        }
+        return false
+    }
+
     /// `section` followed by one or more ASCII digits.
-    static func isASectionFolderName(_ name: String) -> Bool {
+    nonisolated static func isASectionFolderName(_ name: String) -> Bool {
         let prefix: String = "section"
         if !name.hasPrefix(prefix) {
             return false
