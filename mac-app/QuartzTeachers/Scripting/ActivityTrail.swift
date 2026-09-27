@@ -447,11 +447,21 @@ nonisolated enum ActivityTrail {
         /// because it also carries the runs that stood down (plan review L3).
         case scheduledPublishReadTheSettings = "scheduled publish read the course's settings"
         /// A folder or file was removed in Course Settings, excluding it
-        /// from previews and deploys.
+        /// from previews and deploys. Written on the CLICK, saved or not —
+        /// Russell's decision of 2026-09-06
+        /// (overnight/issues/09-item-excluded-trail-on-click.md): the attempt
+        /// must leave a trace even if the teacher crashes before saving.
+        /// Carries the scope and whether it was a folder or a file.
         case itemExcluded = "item excluded"
         /// A previously excluded folder or file was added back in Course
-        /// Settings, returning it to previews and deploys.
+        /// Settings, returning it to previews and deploys. Written on the
+        /// click, and only for a name that WAS excluded.
         case itemReincluded = "item re-included"
+        /// A Revert in Course Settings took back unsaved exclusion changes —
+        /// the other half of the decision above, so a removal that never
+        /// reached the file is followed by a line saying it was taken back.
+        /// Carries HOW MANY, never the names (issue #152).
+        case exclusionsReverted = "exclusions reverted"
         /// A teacher tried to remove or untick a folder or file that a
         /// feature depends on, and was shown why it cannot go and which
         /// switch to turn off first. Recorded because "I could not remove

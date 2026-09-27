@@ -25,6 +25,14 @@ struct MembershipToggleListView: View {
 
     var protection: ((String) -> ItemProtection)? = nil
 
+    /// The protection asked at the moment a teacher ACTS on a row — nil to
+    /// ask `protection` again. The rows are DRAWN from `protection`, which
+    /// Course Settings answers from one walk of the course folder per drawing;
+    /// a decision is taken afresh, because the marks floor depends on what is
+    /// on disk and a folder deleted in Finder since the list was drawn must
+    /// count as gone (issue #152, `gradedFolders.floor`).
+    var protectionWhenActedOn: ((String) -> ItemProtection)? = nil
+
     @State var activeExplanation: ActiveExplanation? = nil
     @State var selectedRowID: String? = nil
 
@@ -148,6 +156,18 @@ struct MembershipToggleListView: View {
         return .ordinary
     }
 
+    /// The protection an untick is DECIDED with: asked afresh when the list
+    /// has `protectionWhenActedOn`, and otherwise the one the row was drawn
+    /// with. Asked here, in the binding's setter — which runs when the box is
+    /// clicked, not while a cell is drawn — so the #266 rule above (a cell
+    /// never asks the course a question) still holds.
+    func protectionWhenActing(on item: String, drawn: ItemProtection) -> ItemProtection {
+        if let protectionWhenActedOn, members.contains(item) {
+            return protectionWhenActedOn(item)
+        }
+        return drawn
+    }
+
     /// The members with one item added or taken out — the ONE place a tick
     /// becomes a list, shared by every checkbox in the app's folder tables so
     /// no second copy can drift. Every other member is preserved in place,
@@ -185,7 +205,7 @@ struct MembershipToggleListView: View {
                     if members.contains(item) {
                         return
                     }
-                } else if case .blocked(let reason) = protection {
+                } else if case .blocked(let reason) = protectionWhenActing(on: item, drawn: protection) {
                     activeExplanation = ActiveExplanation(item: item, reason: reason)
                     ActivityTrail.note(.removalBlocked, "was told " + item + " cannot be unticked under " + title + " — " + reason)
                     return

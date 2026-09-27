@@ -21,6 +21,35 @@ import Foundation
 /// deliberately, so the two files can be read against each other.
 enum GradedFolderChoices {
 
+    // MARK: - Types
+
+    /// One folder the walk found, and WHERE — what the marks floor needs to
+    /// work out the walk after a removal without walking again (issue #152,
+    /// `gradedFolders.floor`).
+    ///
+    /// The walk records EVERY occurrence of a name, not the first: a course
+    /// with `Portfolios/Tasks` and a top-level `Tasks` has two, and removing
+    /// `Portfolios` must still leave the top-level one found (the floor's case
+    /// F16). `nestedFolderNames` is these names with the repeats taken out.
+    nonisolated struct WalkedFolder: Equatable, Sendable {
+
+        // MARK: - Stored properties
+
+        /// The folder's own name, as spelled on disk.
+        let name: String
+
+        /// The folder directly inside the course that it was found under —
+        /// itself, for a folder directly inside the course. What a SHARED
+        /// exclusion of that name takes off the walk.
+        let courseLevelFolder: String
+
+        /// Every folder on its path that sits directly inside a section
+        /// folder, wherever that section folder was found — itself included,
+        /// when it does. What a PER-SECTION exclusion of any of these names
+        /// takes off the walk.
+        let sectionLevelFolders: [String]
+    }
+
     // MARK: - Stored properties
 
     /// How far below the course folder the walk goes. The course folder's
@@ -140,11 +169,24 @@ enum GradedFolderChoices {
     /// The declared lists come first because they are what a teacher arranged
     /// deliberately; the walked names are the safety net underneath them.
     static func choices(for configuration: CourseConfiguration, nestedNames: [String]) -> [String] {
+        return choices(
+            sharedFolders: configuration.sharedFolders,
+            perSectionFolders: configuration.perSectionFolders,
+            nestedNames: nestedNames
+        )
+    }
+
+    /// The same, from the lists themselves — what the marks floor asks about
+    /// a removal that has not happened yet, with the lists as it would leave
+    /// them.
+    nonisolated static func choices(
+        sharedFolders: [String], perSectionFolders: [String], nestedNames: [String]
+    ) -> [String] {
         var offered: [String] = []
-        for folder in configuration.sharedFolders {
+        for folder in sharedFolders {
             offer(folder, into: &offered)
         }
-        for folder in configuration.perSectionFolders {
+        for folder in perSectionFolders {
             offer(folder, into: &offered)
         }
         for folder in nestedNames {
@@ -193,12 +235,72 @@ enum GradedFolderChoices {
         excludedShared: [String] = [],
         excludedPerSection: [String] = []
     ) -> [String] {
-        var found: [String] = []
+        return names(of: walkedFolders(
+            inCourseDirectory: courseDirectory,
+            excludedShared: excludedShared,
+            excludedPerSection: excludedPerSection
+        ))
+    }
+
+    /// Every folder the walk finds — EVERY occurrence, in the walk's order,
+    /// each with where it was found. `nestedFolderNames` is this with the
+    /// repeats taken out; the marks floor needs the repeats (`WalkedFolder`).
+    nonisolated static func walkedFolders(
+        inCourseDirectory courseDirectory: URL,
+        excludedShared: [String] = [],
+        excludedPerSection: [String] = []
+    ) -> [WalkedFolder] {
+        var found: [WalkedFolder] = []
         walk(
             courseDirectory, depth: 1, scopeOfChildren: FolderScope.shared,
+            courseLevelFolder: nil, sectionLevelFolders: [],
             found: &found, excludedShared: excludedShared, excludedPerSection: excludedPerSection
         )
         return found
+    }
+
+    /// The walked names, each once, where the walk first reached it.
+    nonisolated static func names(of walked: [WalkedFolder]) -> [String] {
+        var names: [String] = []
+        for folder in walked {
+            if !names.contains(folder.name) {
+                names.append(folder.name)
+            }
+        }
+        return names
+    }
+
+    /// The walk as it would be once `name` is removed from the course in
+    /// `scope` — worked out in memory, without walking again.
+    ///
+    /// A shared removal excludes the folder of that name directly inside the
+    /// course, and so everything found under it; a per-section removal
+    /// excludes the folder of that name directly inside every section folder,
+    /// and everything under those. Compared EXACTLY, case included, because
+    /// `excluded_items` is matched exactly by the walk and by the build
+    /// (`excludedItems.matching`): removing a list entry `tasks` whose folder
+    /// on disk is `Tasks` leaves `Tasks` walked, discovered and published, and
+    /// the floor must see that too (its case F17). A case-insensitive
+    /// comparison here — the house idiom for folder names — would make the
+    /// floor refuse a removal the real walk allows.
+    nonisolated static func walkedFolders(
+        _ walked: [WalkedFolder], withoutFolderNamed name: String, scope: FolderScope
+    ) -> [WalkedFolder] {
+        var remaining: [WalkedFolder] = []
+        for folder in walked {
+            switch scope {
+            case .shared:
+                if folder.courseLevelFolder == name {
+                    continue
+                }
+            case .perSection:
+                if folder.sectionLevelFolders.contains(name) {
+                    continue
+                }
+            }
+            remaining.append(folder)
+        }
+        return remaining
     }
 
     // MARK: - The walk
@@ -220,9 +322,16 @@ enum GradedFolderChoices {
     ///   that section folder was found. Nowhere else: a folder two levels down
     ///   an ordinary folder is not something the build's preflight scan
     ///   discovers, so nothing there is excluded by name.
+    ///
+    /// - Parameters:
+    ///   - courseLevelFolder: the folder directly inside the course that this
+    ///     directory is, or is under — nil for the course folder itself.
+    ///   - sectionLevelFolders: the folders on the path to this directory that
+    ///     sit directly inside a section folder.
     nonisolated private static func walk(
         _ directory: URL, depth: Int, scopeOfChildren: FolderScope?,
-        found: inout [String], excludedShared: [String], excludedPerSection: [String]
+        courseLevelFolder: String?, sectionLevelFolders: [String],
+        found: inout [WalkedFolder], excludedShared: [String], excludedPerSection: [String]
     ) {
         if depth > maxDepth {
             return
@@ -269,12 +378,23 @@ enum GradedFolderChoices {
                 continue
             }
             let isSection: Bool = isSectionFolder(name)
-            if !isSection && !found.contains(name) {
-                found.append(name)
+            let childCourseLevelFolder: String = courseLevelFolder ?? name
+            var childSectionLevelFolders: [String] = sectionLevelFolders
+            if scopeOfChildren == FolderScope.perSection {
+                childSectionLevelFolders.append(name)
+            }
+            // Every occurrence, not the first: see `WalkedFolder`.
+            if !isSection {
+                found.append(WalkedFolder(
+                    name: name,
+                    courseLevelFolder: childCourseLevelFolder,
+                    sectionLevelFolders: childSectionLevelFolders
+                ))
             }
             walk(
                 child, depth: depth + 1,
                 scopeOfChildren: isSection ? FolderScope.perSection : nil,
+                courseLevelFolder: childCourseLevelFolder, sectionLevelFolders: childSectionLevelFolders,
                 found: &found, excludedShared: excludedShared, excludedPerSection: excludedPerSection
             )
         }
