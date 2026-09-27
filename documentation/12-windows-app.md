@@ -1132,12 +1132,25 @@ as history, not as what Windows does today.
 - **New windows** (entry 84): inherit the folder of the window that was
   key when the command ran; with no windows open, show the folder picker.
   Decide the folder BEFORE first paint or the picker flashes.
-- **Updates**: WinSparkle, with its own feed at `site/appcast-windows.xml`
-  alongside the mac's `site/appcast-macos.xml` — **per-platform file names from
-  the start**, so the two update feeds can never collide. (An earlier draft of
-  this line said the two would share one appcast; that is exactly the collision
-  the mac side asked to avoid. Deferred on both platforms until the first
-  release.)
+- **Updates** (#204): **NetSparkleUpdater**, not WinSparkle — corrected
+  2026-09-25, when the mac shipped Sparkle and the Windows half was drafted as
+  its own `windows` issue (milestone v1.4.0). NetSparkle reads the same feed
+  format and can run the per-user Inno installer silently
+  (`PrivilegesRequired=lowest`, so no administrator prompt — unlike a standard
+  account on a Mac). Its OWN feed, `https://plantoir.app/updates/windows.xml`
+  (never a GitHub release asset, never shared with the mac's
+  `updates/macos.xml`), signed with its OWN key, with NetSparkle's separate
+  `.signature` file beside it. What is owed is the promise, not the mechanism:
+  `contracts/shared-rules.json` → `appUpdates` (ask first; once a day; never
+  install while this app is publishing or building a preview, or a scheduled
+  publish of this install is running — Task Scheduler's run is the counterpart
+  of the mac's launchd one; never refuse a quit), and the eight trail events it
+  added to `activityTrail.mustRecord`. NetSparkle gathers the notes of every
+  newer release itself, so a skipped release's warning is not lost the way it
+  would be on the mac without the cumulative notes; each Windows item carries
+  only its own. The mac's reasoning: [`09-mac-app.md`](09-mac-app.md) →
+  "Updating itself". (Earlier drafts of this line said WinSparkle with
+  `site/appcast-windows.xml`, and before that one shared appcast.)
 - **Stable code signing** (entry from the signing fix): sign dev builds
   with a stable identity or Windows will re-prompt for permissions —
   same class of problem as macOS ad-hoc signing.
