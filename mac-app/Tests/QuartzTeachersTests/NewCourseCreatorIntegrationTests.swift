@@ -35,7 +35,7 @@ final class NewCourseCreatorIntegrationTests: XCTestCase {
             throw XCTSkip(
                 "Set INTEGRATION_WORKSPACE to a working folder inside your home folder to run the wizard end to end "
                     + "through setup.sh; which keys a new course is written with is checked without it by "
-                    + "scripts/test_page_visibility.py."
+                    + "scripts/test_page_visibility.py → NewCourseIsWrittenInTheCurrentKeys."
             )
         }
         let workspaceURL: URL = URL(fileURLWithPath: workspacePath)
