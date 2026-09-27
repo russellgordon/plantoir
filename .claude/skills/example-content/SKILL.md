@@ -125,10 +125,17 @@ specific expectation named for its code (`A1.1.md`, `D2.3.md`) and one per
 overall expectation (`A1. Something.md`). Two consequences worth knowing
 while authoring:
 
-- **A curriculum page that links OUT of the folder will dangle** in a
-  skeleton course, which has none of the payload's task pages. Four payloads
-  do this once each, in `About These Expectations.md` — CGC1W, ICS3U, ICS4U,
-  MDM4U — and it is a known, unfixed fault rather than a pattern to copy.
+- **A curriculum page links only inside its own folder.** A link OUT of it
+  dangles in a skeleton course, which has none of the payload's task,
+  lesson or project pages. `lint_payload.py` refuses one (links and embeds
+  alike; code spans and fences are skipped), and
+  `scripts/test_starting_content_prompts.py` checks every payload after the
+  real double install. Point at an expectation page in the folder instead
+  (`[[B2. Software Project Contribution|B2]]`), or use plain words that are
+  true without the payload. Four `About These Expectations.md` pages broke
+  this until GitHub issue #253 — CGC1W, ICS3U, ICS4U, MDM4U — and were
+  reworded so the sentence is true in either kind of course, not merely
+  unlinked.
 - **The first specific expectation, by filename order, is what the
   skeleton's template pages embed** when the payload has no `A1.1` of its
   own (MCMPR11 starts at `D1.1`, MTH1W at `B1.1`). Nothing to do while
@@ -949,6 +956,20 @@ the linter.
    from boilerplate, and boilerplate is the failure mode this block has —
    which only shows up when you compare two of them. Check the days named
    are days that task actually runs on.
+
+   **Two things the linter reads the way the site does (#313).** A link
+   written inside code — a fence of either character, a fence inside a
+   callout, an inline span — is an example of the syntax, not a link: it
+   reaches nothing and dates nothing, because Quartz draws none. The linter
+   finds code with the toolchain's own `scripts/markdown_code.py`, so a page
+   reachable only through a link shown in code is reported as unreached.
+   And it REFUSES a fence opened inside a list item (`   ```python` under
+   "4.") whose lines fall back to column 0 before the closer: Markdown ends
+   the fence with the list item there, the closer then opens a new fence,
+   and the site shows the rest of the page as code, links and curriculum
+   block included. Indent every line up to the closing fence as far as the
+   opening one. TEJ2O's "Control Something with Code" shipped that way and
+   was fixed in #313.
 2. Installer E2E without Docker: import `scripts/setup_course.py` via
    importlib, call `install_example_content` into a temp dir for both
    curriculum states; assert no curriculum folder/links remain when
