@@ -171,6 +171,10 @@ class MultiDestinationDeployRunner {
     /// build failing, stops the whole run — a failed build would just
     /// publish the same stale content to every remaining destination,
     /// which is not redundancy, it is the same mistake published twice.
+    ///
+    /// Pass a course read by `Course.asSavedNow()` or by the runner's fresh
+    /// reading, and destinations taken from THAT course — never a window's
+    /// copy, which may hold unsaved Course Settings edits (#335).
     func run(
         course: Course,
         sectionNumber: Int,

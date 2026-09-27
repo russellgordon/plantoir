@@ -786,6 +786,23 @@ nonisolated enum AssistWording {
              + "they use."
     }
 
+    /// Said when re-dating a section wrote no date: its plan changed nothing,
+    /// or everything it would have written was already right (#343's review,
+    /// F4). The one no-change sentence, named so the reply and its twin
+    /// cannot drift.
+    static func everyPageIsAlreadyOnItsDay(course: String, section: Int) -> String {
+        return "Every page in \(course) Section \(section) is already on the day it should be."
+    }
+
+    /// Said instead of `reDated` when every class was already on its day and
+    /// only pages they use moved (#343) — where `reDated` would say
+    /// "Re-dated 0 classes".
+    static func reDatedOnlyPagesTheyUse(pagesTheyUse: Int, noun: ClassNoun = .class) -> String {
+        return "Every \(noun.singular) was already on its day, so only the \(pagesTheyUse) "
+             + "\(pagesTheyUse == 1 ? "page" : "pages") they use "
+             + "\(pagesTheyUse == 1 ? "was" : "were") re-dated."
+    }
+
     // MARK: - Publishing stops at a class
 
     /// Said when publishing followed a link onto another class and left it

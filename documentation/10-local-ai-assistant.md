@@ -1939,6 +1939,27 @@ because Day 3 was published in Obsidian, so no pointer ran. See
   teacher-authored content only. It is the decision working rather than a
   regression; it is written here so it is not discovered as one.
 
+**How a re-date's reply counts (#343).** "Re-dated N classes and M pages they
+use" counts what `SectionReDatePlanner.apply` actually WROTE, each from its own
+kind: a move of reason `.aClass` whose date write came back `.written` is a
+class, `.broughtBy` and `.yearRound` are pages they use. It used to say
+`moves.count - classCount` pages — but `classCount` is every numbered class in
+the section while `moves` holds only pages whose date changes, so a section
+with some classes already on their days was told "Re-dated 14 classes and -4
+pages they use", and the class figure counted classes that had not moved. A
+page left on its day is counted nowhere, and so is one #186's writer declined
+(no column-0 room for `created:`), which `sayingPagesWhoseNewDateCouldNotBeSet`
+still names. When no class moved, the reply is
+`AssistWording.reDatedOnlyPagesTheyUse` rather than "Re-dated 0 classes"; the
+undo line names the classes that moved ("re-dated 2 classes and what they
+use", or "re-dated what the classes use"). When NO date was written — the only
+moves hid an overflow class already on the last day, or were declined — the
+reply is the no-change sentence, `AssistWording.everyPageIsAlreadyOnItsDay`
+(the one a plan that changes nothing gets), or, when a page was declined, the
+declined sentence alone, since that page is not on its day (the
+implementation review's F4; "only the 0 pages" was the first fix's answer). Windows had the same subtraction in
+two places. Cases: `class-planning.json` → `reDatingASection.reportedCounts`.
+
 **What the teacher is told.** The plan and the reply name the linked classes
 that were left alone (`AssistWording.linkedClassesWereLeftAlone`, said once via
 `AssistPublishPlan.describe()`, which is the text both surfaces use). Windows
@@ -2414,15 +2435,16 @@ assistant states what it understood and what it is about to do, and waits for
 Go or Cancel. This is applied by Swift, from whether the tool has a `plan_`
 twin — the model is not asked to decide whether something is risky.
 
-Four of the window's writes have no twin and no plan, deliberately:
+Five writes have no twin and no plan, deliberately (`tools.planTwinsNote` said
+"four" until #343):
 `rebuild_preview` (changes no page), `undo_last_change` (is the remedy),
 `cancel_scheduled_deploy` (re-scheduling is the remedy), and `deploy_section` —
 which instead waits on its own separate approval, in the teacher's words and
 naming the real destination, whether or not plan mode is on. Deploying is the
-one act that reaches students, so it never rides on a general setting. On the
-full thirty-two-tool surface a fifth has none: `back_up_course`, reached by the
-card "back up this course", writes a zip beside the course, changes no page and
-is its own safety net. `AssistPlanModeTests` pins all five, walking every write
+one act that reaches students, so it never rides on a general setting. The
+fifth is `back_up_course`: not among the local model's tools, but reached in
+the window by the card "back up this course" as well as over MCP, it writes a
+zip beside the course, changes no page and is its own safety net. `AssistPlanModeTests` pins all five, walking every write
 on the whole surface since #327 (it used to walk the twenty-two in `tools`,
 and the one write whose twin was named wrong — `add_curriculum_mentions` — was
 in the other ten).
@@ -5250,12 +5272,15 @@ additional destination's refusal.
 - **Settings saved between the card and the Approve press**: the act reads
   fresh, so it may differ from what the card said. The `schedule_deploy` result
   names the destination it used, so the teacher sees it.
-- **The local assistant's deploy through an OPEN section window** runs
-  `window.deploy()`, which uses that window's copy of the course — including
-  Course Settings edits not yet saved — while the card, which reads the saved
-  file, may name the saved destination. The schedule sheet has the same shape.
-  Pre-existing (before #322 the card read an even older copy):
-  [issue #335](https://github.com/russellgordon/plantoir/issues/335).
+- **The local assistant's deploy through an OPEN section window** used that
+  window's copy of the course — including Course Settings edits not yet saved —
+  while the card named the saved destination; the schedule sheet had the same
+  shape. Resolved by
+  [issue #335](https://github.com/russellgordon/plantoir/issues/335): the
+  window's deploy and the sheet read the saved file at the act too, refuse when
+  it cannot be read, and the reply carries `specialNames.deployUsesSavedSettings`
+  when a window holds unsaved edits (docs 07, "The window's acts read the saved
+  settings too").
 - **A config mid-write or malformed at the call** drops that course for that
   call ("no such course") — fail-closed, and what `reloadCourses` and Windows
   do too.

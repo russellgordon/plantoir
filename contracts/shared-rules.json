@@ -60,6 +60,11 @@
         "why": "A preview reads the SAVED settings file, while Course Settings keeps unsaved edits in memory and goes on showing them after the teacher leaves the form. A preview started in that state disagrees with the switches on screen for a reason nothing on screen explains, so the teacher is told (specialNames.previewUsesSavedSettings) and the trail says it happened (issue #265)."
       },
       {
+        "carries": "the course code and the section, which act (deployed from the section window, deployed by the assistant through the section window, deployed by the assistant with no section window open, or set a deploy for a moment), the kinds of destination the SAVED settings sent it to, and whether the unsaved edits named a different kind — by kind only (Netlify, Cloudflare Pages or a folder), never a path or a site name",
+        "event": "deploy used the saved settings",
+        "why": "Issue #335: a deploy, or setting one, reads the settings as SAVED in the file, while Course Settings keeps unsaved edits in memory — so a teacher can set a folder on screen and have the site go to Netlify. The `settings saved` line is absent (nothing was saved) and the deploy's own line names where it went, so this line is the only record that the screen and the act disagreed, and the one read that settles 'I set a folder and it went to Netlify'. Written only when some window held unsaved edits at the act. `preview started with unsaved settings` stays as it is: it is preview-only, and renaming it would break the pinned list on both platforms."
+      },
+      {
         "carries": "the course code and the sections whose preview was built again — or, when none was still open at the moment of the press, that nothing was",
         "event": "preview again after settings saved",
         "why": "The button beside specialNames.settingsSavedWhilePreviewing. It stops and restarts a preview that may be in another window, so the trail says it was the Settings button that did it rather than a press in that window (issue #265)."
@@ -6681,6 +6686,18 @@
     "previewUsesSavedSettings": {
       "message": "Course Settings has changes you have not saved, so this preview uses the settings as they were last saved.",
       "why": "Shown where a preview's progress appears when the preview starts while Course Settings holds unsaved changes — in ANY window open on that folder, not only the one previewing (issue #265; the review's L1: with two windows the unsaved switches can be in the other one, and asking only the previewing window's copy said nothing). Unsaved edits live in memory and survive leaving the form, so the switches can say one thing and the preview another with nothing on screen explaining it. Rejected: saving automatically (a half-typed setting would be written without a Save) and refusing the preview (previewing the saved settings may be the point)."
+    },
+    "deployUsesSavedSettings": {
+      "message": "Course Settings has changes you have not saved, so this deploy uses the settings as they were last saved.",
+      "why": "Shown where a deploy's progress appears in the section window, and added to what the local assistant says, when a deploy starts while Course Settings holds unsaved changes in ANY window on that folder (issue #335; actsUseTheSavedSettings). The deploy reads the saved file for where it goes and for everything it builds — before #335 the Deploy button took the DESTINATION from the window's unsaved copy and everything else from the file, a publish half from each, to a place the approval card had not named. For ANY unsaved setting, not only a changed destination: the whole site is built from the saved file, as the preview's sentence already says. The banner is owned by the deploy, so a preview ending (which clears only a preview's own sentence) cannot take it away. A caption: `message`, never `reason`."
+    },
+    "schedulingUsesSavedSettings": {
+      "message": "Course Settings has changes you have not saved, so what is shown here is worked out from the settings as they were last saved. A deploy set now uses whatever is saved when it runs.",
+      "why": "Shown in the schedule sheet when Course Settings holds unsaved changes in any window on that folder (issue #335). The sheet's description, its refusal and what it records are worked out from the saved file; since #323 the run reads the file again when it fires, so the second sentence is true, and it is the whole of 'save first' without a second Save path. Rejected: a Save button in the sheet (director's ruling on #335's plan) — it would either duplicate Course Settings' validation, after-Save notice and trail line or skip them, and the unsaved edits may be in another window's copy. A caption: `message`, never `reason`."
+    },
+    "settingsCouldNotBeReadToDeploy": {
+      "message": "{course}’s settings could not be read just now, so there is no telling where to deploy it. Open Course Settings, check them and save, then try again.",
+      "why": "The refusal when a deploy, or the schedule sheet, cannot read the course's settings file at the act (issue #335). The window's unsaved copy is never used in its place: a destination has no safe default (#323's rule). {course} is the course as a teacher reads it. A refusal the teacher can act on in Course Settings, raised as the window's alert; `message`, never `reason`."
     },
     "settingsSaveReplacedSidebarChange": {
       "message": "Which items the sidebar hides had also been changed somewhere else since this window read them — most likely in another Plantoir window. This save replaced that change with the switches shown here.",
@@ -14938,6 +14955,169 @@
         ],
         "why": "A page's link to itself rescues nothing. (Whether a self-link alone keeps a page out of group 2 is left as each app has it today and not pinned here.)"
       }
+    ]
+  },
+  "actsUseTheSavedSettings": {
+    "rule": "Every act that sends a site somewhere or sets a deploy reads the course's settings as SAVED in its file at that moment: the Deploy button, the assistant pressing it, the assistant deploying with no window open, and the schedule sheet (what it shows, what it refuses, and what it writes). Unsaved Course Settings edits change none of them. When such an act starts while ANY window holds unsaved edits for that course, the teacher is told, in the same place and the same way the preview already tells them (specialNames.previewUsesSavedSettings). When the file cannot be read, the act is refused with specialNames.settingsCouldNotBeReadToDeploy and the window's copy is never used instead.",
+    "why": "Issue #335. Course Settings edits live in the shared in-memory configuration until Save. The Deploy button, the local assistant's deploy through an open section window and the schedule sheet read that copy, so an unsaved destination edit produced a MIXED publish: the destination (for example --to-folder) from memory, the site and any site id or name from the file, which the launcher's deploy reads. Since #322 the approval card reads the file, so the card could name Netlify while the window deployed to an unsaved folder; since #323 a scheduled run reads the file when it fires, so the sheet could promise a folder while the run went to Netlify, or refuse over a destination nobody had saved. One rule now covers preview, deploy, schedule and both assistants.",
+    "rejected": [
+      "Saving automatically before the act: it would write a half-typed setting (the preview's precedent, #265).",
+      "Refusing the act while anything is unsaved: deploying the saved settings may be the point.",
+      "Using the unsaved edits for everything: the card, both assistants, the launcher's deploy and the scheduled run all read the file, so one act following memory is the odd one out and the publish is mixed.",
+      "Fixing only the schedule sheet: it leaves the worse half, a deploy to an unsaved destination while the card named the saved one.",
+      "A notice only when the DESTINATION differs: the whole site is built from the saved file, and the preview's notice fires for any unsaved edit; the trail line still records whether the destination differed.",
+      "A Save button in the schedule sheet (director's ruling): a second Save path would duplicate or skip Course Settings' checks, notices and trail line, and the unsaved edits may be in another window. Since #323 a Save after scheduling is honoured anyway.",
+      "Refreshing the window's copy from disk before the act: it would throw away the teacher's unsaved edits."
+    ],
+    "sentences": [
+      "deployUsesSavedSettings",
+      "schedulingUsesSavedSettings",
+      "settingsCouldNotBeReadToDeploy",
+      "previewUsesSavedSettings"
+    ],
+    "trailEvent": "deploy used the saved settings",
+    "shape": "act is deployNow (the Deploy button), assistantDeployThroughWindow (the local assistant pressing it) or scheduleSheet. saved is the course_config.json keys on disk; unsavedInWindow the keys the window's in-memory copy holds on top of them (empty: nothing unsaved); savedFileIsNotJSON replaces the file with text that does not parse. savedDeployedBefore lists the destination types section 1 has been deployed to (a marker exists). A deploy_folder_path of {folder} is an existing folder made for the case. expect.destinations lists the destination types the act would send the site to; expect.refusal names the refusal (a scheduledDeployRefusals key, or the specialNames key); expect.schedulable for the sheet; expect.notice is the specialNames key shown, or null.",
+    "cases": [
+      {
+        "name": "a deploy uses the saved destination, not the unsaved one",
+        "act": "deployNow",
+        "saved": {
+          "deploy_target": "netlify"
+        },
+        "unsavedInWindow": {
+          "deploy_target": "local_folder",
+          "deploy_folder_path": "{folder}"
+        },
+        "savedDeployedBefore": [
+          "netlify"
+        ],
+        "expect": {
+          "destinations": [
+            "netlify"
+          ],
+          "notice": "deployUsesSavedSettings"
+        },
+        "why": "The reported shape: before #335 the window sent local_folder."
+      },
+      {
+        "name": "the assistant pressing the window's Deploy does the same, and says so",
+        "act": "assistantDeployThroughWindow",
+        "saved": {
+          "deploy_target": "netlify"
+        },
+        "unsavedInWindow": {
+          "deploy_target": "local_folder",
+          "deploy_folder_path": "{folder}"
+        },
+        "savedDeployedBefore": [
+          "netlify"
+        ],
+        "expect": {
+          "destinations": [
+            "netlify"
+          ],
+          "notice": "deployUsesSavedSettings"
+        },
+        "why": "The same act as the button, reached through the window controller the local assistant presses; since #322 the assistant itself read the file, so it and the window disagreed. The notice is shown in the window AND added to what the assistant says."
+      },
+      {
+        "name": "the schedule sheet refuses from the saved settings",
+        "act": "scheduleSheet",
+        "saved": {
+          "deploy_target": "netlify"
+        },
+        "unsavedInWindow": {
+          "deploy_target": "local_folder",
+          "deploy_folder_path": "{folder}"
+        },
+        "savedDeployedBefore": [],
+        "expect": {
+          "schedulable": false,
+          "refusal": "neverDeployed",
+          "refusalNames": "Netlify",
+          "notice": "schedulingUsesSavedSettings"
+        },
+        "why": "The saved Netlify destination has never been deployed to, which is what the run would meet."
+      },
+      {
+        "name": "the schedule sheet schedules from the saved settings",
+        "act": "scheduleSheet",
+        "saved": {
+          "deploy_target": "local_folder",
+          "deploy_folder_path": "{folder}"
+        },
+        "unsavedInWindow": {
+          "deploy_target": "netlify"
+        },
+        "savedDeployedBefore": [],
+        "expect": {
+          "schedulable": true,
+          "destinations": [
+            "local_folder"
+          ],
+          "notice": "schedulingUsesSavedSettings"
+        },
+        "why": "Proves the direction: the unsaved never-deployed Netlify is not what the sheet refuses over."
+      },
+      {
+        "name": "nothing unsaved, nothing said",
+        "act": "deployNow",
+        "saved": {
+          "deploy_target": "netlify"
+        },
+        "unsavedInWindow": {},
+        "savedDeployedBefore": [
+          "netlify"
+        ],
+        "expect": {
+          "destinations": [
+            "netlify"
+          ],
+          "notice": null
+        },
+        "why": "The notice is about unsaved edits, and there are none."
+      },
+      {
+        "name": "any unsaved setting is said, not only a destination",
+        "act": "deployNow",
+        "saved": {
+          "deploy_target": "netlify"
+        },
+        "unsavedInWindow": {
+          "footer_html": "<p>An unsaved footer</p>"
+        },
+        "savedDeployedBefore": [
+          "netlify"
+        ],
+        "expect": {
+          "destinations": [
+            "netlify"
+          ],
+          "notice": "deployUsesSavedSettings"
+        },
+        "why": "Any unsaved setting changes the built site, the same as the preview's rule."
+      },
+      {
+        "name": "a settings file that cannot be read refuses, and never falls back",
+        "act": "deployNow",
+        "saved": {
+          "deploy_target": "local_folder",
+          "deploy_folder_path": "{folder}"
+        },
+        "savedFileIsNotJSON": true,
+        "unsavedInWindow": {},
+        "savedDeployedBefore": [],
+        "expect": {
+          "refusal": "settingsCouldNotBeReadToDeploy",
+          "destinations": [],
+          "notice": null
+        },
+        "why": "The window's copy is valid and names a folder; it must not be used in the file's place, because a destination has no safe default (#323)."
+      }
+    ],
+    "appliesOn": [
+      "mac",
+      "windows"
     ]
   }
 }
