@@ -3,8 +3,11 @@
 **One product, one version series, one GitHub release carrying both platforms'
 assets.** The product version lives in ONE place — `<Version>` in
 `windows-app/Plantoir/Plantoir.csproj` — and `MARKETING_VERSION` in
-`mac-app/project.yml` must say the same number. The About panels read them and
-the git tag must match.
+`mac-app/project.yml` must say the same number once both platforms have
+shipped it. The About panels read them, and every platform whose asset a cut
+attaches must match the tag; a platform that ships nothing in a cut keeps its
+lower number until it passes that version's contracts ("Two platforms, one
+version series", below).
 
 > **Which repository?** plantoir.app's download links resolve against
 > `github.com/russellgordon/plantoir`, which matches `origin`. Pass
@@ -107,8 +110,71 @@ whether a teacher will notice, and whether both platforms have it.
 **Clear this list when the tag goes up**, in the same commit that moves the
 version line. A list that survives its own release is worse than no list.
 
+Filled 2026-09-27 for v1.4.0 from `GUI-IMPROVEMENTS.md` rows 539–605 (every
+row since the v1.3.1 cut) and the closed v1.4.0 milestone — one line per piece.
+
+**What a teacher notices** (macOS; the Windows installer is not part of
+v1.4.0 — its half of each is tracked on the milestone "Windows: parity with
+mac v1.4.0"). "Shared toolchain" marks a change in the shared scripts, which a
+Windows teacher gets with the next Windows release.
+
 | Landed | What a teacher sees | Platforms | Log |
 |---|---|---|---|
+| 2026-09-25 | Plantoir finds its own new versions, asks first, and never installs while it is working (#204). | macOS | 581 |
+| 2026-09-26 | The first course on a new Mac no longer waits minutes for downloads: the app carries its website builder's helpers (#312). | macOS | 600 |
+| 2026-09-27 | A smaller first build of the website builder, which is got ready in the background at first launch (#334). | macOS | 604 |
+| 2026-09-26 | "Get Ready for the Start of the Year…" puts every class after the first into draft, previewed and undoable (#96). | macOS | 599 |
+| 2026-09-26 | A How I Teach page per course that Claude and Codex read, with a Course Settings row to open or create it (#209, #329). | macOS | 587, 605 |
+| 2026-09-26 | A course with two curriculum folders gets two coverage maps, and College Board codes count (#128). | macOS; shared toolchain | 590 |
+| 2026-09-24 | "This is a club" in the New Course wizard: weekly pages, a club front page, "meeting" in the assistant (#267, #268). | macOS | 541–543 |
+| 2026-09-24 | Ready-made example content for TAS2O (#270, #271). | shared toolchain | — |
+| 2026-09-24 | Every folder and file list in Course Settings and the wizard is a table with checkboxes (#266). | macOS | 539 |
+| 2026-09-24 | "Hide from the site's sidebar" and the built sidebar agree, across two windows and a running preview (#265). | macOS | 540 |
+| 2026-09-26 | Plantoir reopens on the last working folder, and refuses one the website builder cannot reach (#311, #290). | macOS | 579 |
+| 2026-09-25 | A publish set for later says how it went in a notification, even with Plantoir closed (#212); clicking it opens the section (#306). | macOS | 569, 580 |
+| 2026-09-25 | Two working folders holding the same course each keep their own scheduled publish (#237). | macOS | 573 |
+| 2026-09-26 | A scheduled publish goes where the course publishes when it runs, and every publish uses the settings as SAVED (#323, #335). | macOS | 592, 603 |
+| 2026-09-26 | The assistant reads a course's settings when it acts, not when its window opened (#322). | macOS | 589 |
+| 2026-09-25 | A scheduled publish whose build failed no longer names a destination nobody reached (#137). | macOS | 560 |
+| 2026-09-25 | "Deploy at 6:30" and other times it cannot place are asked about instead of deploying now (#194, #277). | macOS | 548, 554 |
+| 2026-09-25 | "What does Unit 2, Day 3 link to?" is answered straight from the page (#167). | macOS | 567 |
+| 2026-09-26 | "Publish all of those" asks which pages; "Publish all the classes in Unit 2." publishes the unit (#197, #114). | macOS | 597 |
+| 2026-09-26 | Duplicating a class that moves others warns on its card that Undo will not take it back (#185, #174, #147). | macOS | 591 |
+| 2026-09-26 | Unpublishing a class no longer hides another class it links to (#201). | macOS | 588 |
+| 2026-09-26 | Publishing follows links written with an escaped pipe, in angle brackets or Markdown style, and never a link inside code or a `%%` comment (#294, #314, #326, #97, #325, #313, #331). | macOS; shared toolchain | 577, 582, 584, 586, 604 |
+| 2026-09-27 | The build warns when a published class links to pages students cannot see yet (#333). | shared toolchain | 604 |
+| 2026-09-25 | The front page and every page a class links to carry their class's date (#275, #276). | macOS; shared toolchain | 549 |
+| 2026-09-25 | A page whose settings the build cannot read is hidden and named, instead of published or stopping the build (#246). | shared toolchain | 563 |
+| 2026-09-25 | Pages with unusually written settings are no longer read as hidden, broken by a restore, or skipped (#188, #182, #186); moving or renaming a class leaves no half-date behind (#199). | macOS; shared toolchain | 571, 547 |
+| 2026-09-25 | Adding a section no longer publishes a page the teacher hid (#175). | macOS | 546 |
+| 2026-09-25 | The Backups list says what each backup takes, and several can be deleted at once (#242). | macOS | 550 |
+| 2026-09-26 | Approving an assistant change no longer freezes the window while the course is backed up (#351). | macOS | 605 |
+| 2026-09-26 | Marks-pool and exclusion edges settled; a course from example content records which folders count for marks; a setup re-run keeps the pool (#152, #292, #192). | macOS; shared toolchain | 593, 576, 556 |
+| 2026-09-25 | Preview: the address is never lost, a Mac that cannot reach the builder stops in seconds, a folder finds room for its previews, and two accounts on one Mac no longer see each other's (#235, #234, #280, #310). | macOS | 545, 559, 552, 578 |
+| 2026-09-25 | Remaking a folder's website builder waits for a build or publish, and refuses while a preview is open (#94). | macOS | 572 |
+| 2026-09-25 | The window, the assistant, a scheduled publish and an outside assistant never build one course at once (#156). | macOS | 553 |
+| 2026-09-25 | A publish to a folder lands where it says, or says it did not (#227); Cancel during a publish ends quietly (#259). | macOS; shared toolchain | 566, 544 |
+| 2026-09-25 | A site is recognised as a preview's by any page, and a page merely mentioning `ws://localhost:` is not (#136, #291). | shared toolchain | 558, 585 |
+| 2026-09-25 | Folder problems tell the truth, and the first-run lines say "your website builder" (#153, #263). | macOS | 562, 557 |
+| 2026-09-25 | Reference copies and imports leave a course's Obsidian add-ons behind (#255). | macOS | 561 |
+| 2026-09-25 | One working folder, one spelling: an accented or re-cased path no longer gets a second website builder (#189). | macOS | 570 |
+| 2026-09-25 | A course cannot be called "work" (#101); the path under a chosen folder names every folder (#295). | macOS | 568, 564 |
+| 2026-09-26 | One unreadable character no longer empties the problem report (#301). | macOS | 575 |
+| 2026-09-26 | Wording: skeleton pages no longer say "{subject}", the skeleton toggle says "an English skeleton", the wizard's unit row loses a stray "Unit", and the folder note keeps its lines (#328, #336, #354, #213). | macOS; shared toolchain | 594, 595, 605 |
+| 2026-09-26 | Four ready-made curriculum explainers no longer link to pages a skeleton course lacks (#253). | shared toolchain | 585 |
+
+**Under the hood** (nothing a teacher sees; listed so the notes can leave
+them out on purpose):
+
+| Landed | What changed | Platforms | Log |
+|---|---|---|---|
+| 2026-09-25 | The activity trail keeps every line when several programs write at once (#238); import refusals and lease edges are recorded (#287, #245). | macOS | 565, 555, 551 |
+| 2026-09-26 | Every `plan_` tool proved on a happy path; `add_curriculum_mentions` is gated by plan mode (#150, #327). | macOS | 596 |
+| 2026-09-26 | The folder-removal order is pinned by tests (#183); the wizard's blocked-removal trail line names its course (#171, #139). | macOS | 574, 602 |
+| 2026-09-26 | UI tests keep their state in their own folder, and skip rather than fail on a locked or hidden screen (#154, #249, #315). | macOS | 601 |
+| 2026-09-25 | Test and gate fixes: #243, #264, #273, #293, #341, #353. | macOS; toolchain | — |
+| 2026-09-26 | plantoir.app rewritten for v1.4.0, with a scene for every new picture (website half A). | website | 598 |
+| 2026-09-26 | documentation/03's Windows docker path corrected (#229). | docs | — |
 
 ## Warnings the release notes MUST carry
 
@@ -122,6 +188,19 @@ commit that moves the version line.
 
 | Added | The warning | Why it cannot be left out |
 |---|---|---|
+| 2026-09-27 | **The Mac download is now about 410 MB** (it was about 60 MB), because Plantoir carries its own copies of the helper programs it used to download the first time it ran. | A teacher on a school connection sees a download seven times the size they remember and may think it is the wrong file. The first run is faster for it (#312). 410,488,446 bytes at the #312 rehearsal; no v1.4.0 candidate DMG existed on 2026-09-27, so **re-measure the signed DMG at the cut** and write that number. |
+| 2026-09-27 | **This is the last release you install by hand.** From v1.4.0, Plantoir on the Mac checks for new versions itself and asks before installing one. | Teachers on v1.3.1 or earlier have no updater, so this release reaches them only if they download it; the next one reaches them only if they have this one (#204). |
+| 2026-09-27 | **A publish you scheduled before updating still happens as set**, and keeps its old name until it runs. | It is shown, cancelled and run as before, but under its old name; rescheduling it in its own folder retires the old one (#237; `shared-rules.json` → `scheduledDeployCancellation.theDestination.setBeforeTheUpdate`). A teacher who sees an unfamiliar-looking entry should not think the update broke it. |
+
+**`--required-warning` for v1.4.0: do NOT pass it**, although the table above
+has rows — the one exception to "The update feed (macOS)"'s rule, and why:
+all three warnings are for a teacher installing v1.4.0 BY HAND, from the
+release notes and the download page. No installed Plantoir has an updater
+below v1.4.0, so no update window will ever offer this release, and the flag
+would be inert (`update_feed.critical_version` would mark it critical from
+every version, for no app that can read the feed) while leaving v1.4.0 marked
+important in `macos-notes.html` for good. From v1.4.1 on, the rule applies
+as written.
 
 ## The short version
 
@@ -133,8 +212,12 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    gaps, and step 2 says what to check in it. Then **actually publish a
    section from an app** — see step 2 for why that is not optional.
 2. **Check the version** in `windows-app/Plantoir/Plantoir.csproj` and
-   `mac-app/project.yml`; they must match each other and the tag you are about
-   to cut.
+   `mac-app/project.yml`: **every platform whose asset this cut attaches must
+   read the tag's number**, set BEFORE its bundle is built; a platform that
+   ships nothing in this cut keeps its lower number (see "Two platforms, one
+   version series" above, and the `cut-release` skill's step 5). For v1.4.0,
+   a mac-only cut: `MARKETING_VERSION` goes to 1.4.0 before `publish.sh
+   -Sign`, and the csproj stays at 1.1.0.
 3. **Build the signed Windows bundle**: `az login`, then
    `cd windows-app; powershell -File publish.ps1 -Sign`. It fails fast with the
    remedy if anything is missing. Output lands in `windows-app\dist\PlantoirSetup.exe`
@@ -148,6 +231,12 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    **410 MB** (ULMO; 410,488,446 bytes at the #312 rehearsal) rather than 59 MB — the notarization upload takes
    correspondingly longer ("The update feed (macOS)" → "Deltas" for why
    updates stay small).
+4a. **Take the marketing screenshots, BEFORE anything is published**: the
+   `marketing-screenshots` skill (`python3 website/shots/capture.py --scenes`,
+   both colour schemes) against the build being released; commit the images;
+   `python3 website/build.py --check` clean with no awaiting-capture note.
+   `build.py --deploy` refuses without them, and it runs AFTER the release is
+   public — checklist step 4a says what that would leave behind.
 5. **Tell Claude "cut the release."** It drafts teacher-friendly notes, adds the
    SHA-256 table, creates the GitHub Draft Release, uploads the assets, publishes
    the release, **builds and signs the mac's update feed from the exact DMG it
@@ -268,6 +357,26 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
 
    Output: **`mac-app/dist/Plantoir-macOS.dmg`** + SHA-256.
 
+4a. **Marketing screenshots — before the tag, not after.** `python3
+   website/build.py --deploy` (step 6) refuses while any `website/shots.json`
+   entry marked `awaiting_capture` lacks `site/img/<id>-light.png` or
+   `-dark.png` (`release_readiness_refusal`). Step 6 runs after the release
+   is public and the mac's update feed is built, so a refusal there leaves a
+   published release, a feed that is not live, and a site still offering the
+   old version. Before step 5: run the `marketing-screenshots` skill
+   (`python3 website/shots/capture.py --scenes`, which takes every scene in
+   BOTH colour schemes) against the build being released; commit the
+   promoted images and bring them to `main` with everything else (CLAUDE.md
+   rule 6); run `python3 website/build.py --check` and read its output for
+   any awaiting-capture note — there must be none; and dry-run the refusal
+   with the new version, from `website/`: `python3 -c 'import json,build;
+   s=json.load(open("site.json")); s["version"]="<version>";
+   print(build.release_readiness_refusal(s, json.load(open("shots.json"))))'`
+   must print `None`. On 2026-09-27 it named eight shots (schedule,
+   reference, start-of-year, two-maps, curriculum-settings, both-curricula,
+   how-i-teach, club). `website/README.md` → "Until the release it
+   photographs exists" has the rule from the site's side.
+
 5. **Tag and release** — ask Claude to "cut the release". Since the branch
    model arrived (CLAUDE.md rule 6), a release starts by merging `dev` into
    `main`: the tag points at `main`, and the website commit the flow makes
@@ -358,8 +467,10 @@ the release side.
   - **Each `.delta` lands beside the DMG** (`mac-app/dist/Plantoir<new>-<old>.delta`)
     and **must be uploaded to the SAME release** as the DMG, BEFORE the feed is
     deployed. `build.py --deploy`'s live check follows every delta the newest
-    item offers, and refuses a missing one: Sparkle would fall back to the
-    full download without a word.
+    item offers and prints ❌ for a missing one — AFTER the deploy
+    (`update_feeds.verify_live`), so it reports rather than refuses: upload
+    first, and read that line. Sparkle would fall back to the full download
+    without a word.
   - `generate_appcast` rewrites the item of every archive it is given —
     measured: the earlier item's download moved to the NEW release and lost
     its notes, even with `--versions` — so `update_feed.py` puts every earlier

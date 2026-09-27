@@ -62,6 +62,26 @@ this skill automates its steps 5–6 and the note-writing.
    The same evergreen URL is why a one-platform cut has to touch the site:
    the moment the new release becomes "latest", the missing platform's
    evergreen link 404s. See "Publish", step 2.
+3b. **The marketing screenshots must be taken, committed and checked BEFORE
+   anything is published — a stop, not a reminder.** `build.py --deploy`
+   (Publish, step 2) refuses while any `website/shots.json` entry marked
+   `awaiting_capture` lacks `site/img/<id>-light.png` or `-dark.png`
+   (`release_readiness_refusal`). Step 2 runs AFTER the release is public (step
+   1) and the feed is built (step 1a), so a refusal there leaves a published
+   release, an update feed that is not live, and a site still offering the
+   old version. So, before step 1:
+   - run the `marketing-screenshots` skill (`python3
+     website/shots/capture.py --scenes`, which takes every scene in BOTH
+     colour schemes) against the build being released;
+   - commit the promoted images on an issue branch and get them to `main`
+     with everything else (CLAUDE.md rule 6 — the merge is Russell's);
+   - `python3 website/build.py --check` must be clean, with **no
+     awaiting-capture note** in its output;
+   - dry-run the refusal itself with the new version, from `website/`:
+     `python3 -c 'import json,build; s=json.load(open("site.json"));
+     s["version"]="<version>"; print(build.release_readiness_refusal(s,
+     json.load(open("shots.json"))))'` must print `None`. (On 2026-09-27,
+     before v1.4.0, it named eight shots.)
 4. Confirm `<Version>` in `windows-app/Plantoir/Plantoir.csproj` matches
    the intended tag, and that the working tree is clean. Confirm you are on
    `main` with `dev` fully merged in (`git log main..dev` is empty) — the tag
@@ -213,7 +233,9 @@ gh release upload v<version> mac-app/dist/*.delta -R <owner/repo>
 ```
 
    A delta the feed names and the release lacks makes Sparkle fall back to the
-   full download silently; `build.py --deploy` refuses it. The first release
+   full download silently. `build.py --deploy` does NOT refuse it: the check
+   runs AFTER the deploy (`update_feeds.verify_live`) and prints ❌ for a
+   delta that does not answer, so upload first and read that line. The first release
    with Sparkle (v1.4.0) has none — nothing before it is in the feed.
 
 2. **Update and deploy plantoir.app**:
