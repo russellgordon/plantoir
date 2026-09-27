@@ -158,6 +158,26 @@ provisions demo courses in `%TEMP%`, stages each view (`courses`, `new-course`,
 `ElementTheme.Dark`, captures 2x HiDPI `RenderTargetBitmap`s, generates WebP
 companions, and rebuilds the site.
 
+### Only macOS's own window capture, kept whole
+
+Every picture is made ONLY with `screencapture -x -o -l <window id>` —
+macOS's built-in window capture, with the window's real corners transparent
+— and a figure of several windows is those captures placed WHOLE: never a
+crop through a window, never a corner re-rounded or a rounded mask drawn,
+never a drawn shadow shape (a shadow is the capture's own alpha, blurred),
+scaling only with Lanczos. A figure that must not show Safari's toolbar is
+taken in a window that has none (`shots/webwindow.swift`), not cut out.
+`shots/test_native_corners.py` fails on any picture the pages show whose
+corner is square or drawn, and `capture.py` refuses the same pictures before
+it calls them done. The rule, what was removed and what Windows owes:
+[`SCREENSHOTS.md`](SCREENSHOTS.md), "The one rule".
+
+```bash
+python3 website/shots/test_native_corners.py
+python3 website/shots/capture.py --colour-figures          # re-take colour-schemes and light-and-dark
+python3 website/shots/capture.py --browser-shots site-sch3u-chemistry   # re-take named class-site shots
+```
+
 ### What it borrows and puts back
 
 The Mac's appearance, the app's remembered window sizes, the frontmost
@@ -232,6 +252,8 @@ python3 website/shots/capture.py --only reference,two-maps   # re-take some
 python3 website/shots/capture.py --publish     # republish the three demo class sites
 python3 website/shots/capture.py --app         # hero and the ENG2D window shots, in ~/Desktop/Teaching
 python3 website/shots/capture.py --sites       # the class sites, search, phone and the figures
+python3 website/shots/capture.py --colour-figures   # only the two colour figures, from the three home pages
+python3 website/shots/capture.py --browser-shots <id,id>   # only these class-site shots
 python3 website/build.py && python3 website/build.py --check
 ```
 

@@ -429,14 +429,16 @@ def banner_in_window(number: int, needle: str, destination: Path) -> bool:
     08:13 on 2026-09-27, with Focus off and the notification delivered, were
     reported as "no banner appeared".
 
-    So the window is photographed as it stands, Vision finds the line that
-    names the course, and the banner is the opaque card around that line:
+    So the window is photographed as it stands — `screencapture -x -o -l`,
+    which returns the layer mostly transparent with each banner's REAL
+    corners in its alpha — Vision finds the line that names the course, and
+    the banner is the opaque card around that line:
     the window's background is transparent, and cards are separated by
     transparent gaps, so the run of solid pixels through the line's middle,
     across and down, is exactly the card. Another app's banner stacked above
     it is left out. True when a card was found and saved.
     """
-    from PIL import Image, ImageChops, ImageDraw
+    from PIL import Image
 
     with tempfile.TemporaryDirectory() as scratch:
         whole = Path(scratch) / "notification-center.png"
@@ -484,28 +486,44 @@ def banner_in_window(number: int, needle: str, destination: Path) -> bool:
             return False
         if card_bottom - card_top < line_box[3] * 2:
             return False
-        # The card's corner radius, measured: walking in from its top-left
-        # corner along the diagonal, the first solid pixel is r(1 - 1/√2) in.
-        step = 0
-        while step < 200 and alpha.getpixel((card_left + step, card_top + step)) < solid:
-            step += 1
-        radius = round(step / (1 - 0.7071)) if step else 0
-
-        # Cut to the card's own rounded shape. The rectangle round it also
-        # holds the card's SHADOW, which is invisible on a dark desktop and
-        # a grey box round the banner on a light one (seen in the first light
-        # composite, 2026-09-27). Drawn four times larger and shrunk, so the
-        # corners stay smooth.
-        box = (card_left, card_top, card_right + 1, card_bottom + 1)
-        card = picture.crop(box)
-        scale = 4
-        mask = Image.new("L", (card.width * scale, card.height * scale), 0)
-        ImageDraw.Draw(mask).rounded_rectangle(
-            (0, 0, card.width * scale - 1, card.height * scale - 1), radius=radius * scale, fill=255)
-        mask = mask.resize(card.size, Image.LANCZOS)
-        card.putalpha(ImageChops.multiply(card.getchannel("A"), mask))
-        card.save(destination)
+        # Kept WHOLE, with its real corners: the crop is widened from the
+        # card's own rectangle through its soft shadow until it reaches fully
+        # transparent pixels, so the crop line never passes through the card
+        # (whose corner curve lies inside that rectangle) and the shadow stays
+        # the one macOS drew. Nothing is masked or drawn. (Until 2026-09-27 the
+        # card was cut to its rectangle and a rounded mask was drawn over it,
+        # which is exactly what Russell ruled out.) A neighbouring card's
+        # solid pixels stop the widening, so another banner stacked beside
+        # this one stays out.
+        left, top, right, bottom = card_left, card_top, card_right, card_bottom
+        widest_shadow = 160
+        grew = True
+        while grew:
+            grew = False
+            if left > 0 and card_left - left < widest_shadow and line_can_join(alpha, left - 1, top, left - 1, bottom, solid):
+                left -= 1
+                grew = True
+            if right < picture.width - 1 and right - card_right < widest_shadow \
+                    and line_can_join(alpha, right + 1, top, right + 1, bottom, solid):
+                right += 1
+                grew = True
+            if top > 0 and card_top - top < widest_shadow and line_can_join(alpha, left, top - 1, right, top - 1, solid):
+                top -= 1
+                grew = True
+            if bottom < picture.height - 1 and bottom - card_bottom < widest_shadow \
+                    and line_can_join(alpha, left, bottom + 1, right, bottom + 1, solid):
+                bottom += 1
+                grew = True
+        picture.crop((left, top, right + 1, bottom + 1)).save(destination)
         return True
+
+
+def line_can_join(alpha, from_x: int, from_y: int, to_x: int, to_y: int, solid: int) -> bool:
+    """Whether one more row or column belongs round a banner: it still holds
+    some of the banner's shadow (alpha above 0) and none of another card."""
+    region = alpha.crop((from_x, from_y, to_x + 1, to_y + 1))
+    lowest, highest = region.getextrema()
+    return 0 < highest < solid
 
 
 def ask_over_mcp(app_binary: Path, working_folder: Path, tool: str, arguments: dict) -> dict:

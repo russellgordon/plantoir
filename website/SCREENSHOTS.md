@@ -54,6 +54,48 @@ Furthermore, **screenshots are platform-aware**:
 
 ---
 
+## The one rule: only macOS's own window capture, kept whole
+
+Russell's rule, stated more than once and last on 2026-09-27: **every picture
+on plantoir.app is made ONLY with macOS's built-in window capture** —
+`screencapture -x -o -l <window id>`, the programmatic Option-click capture —
+which returns the window with its own rounded corners, transparent outside
+the curve. Figures made of several windows are built from those captures
+WHOLE:
+
+- no crop that passes through a window, and no re-rounding of a corner;
+- no rounded mask, corner or shadow shape drawn in Pillow — a shadow, where
+  there is one, is the capture's own alpha channel, blurred;
+- scaling with Lanczos, of the whole image only;
+- if a figure must not show the browser's toolbar, the picture is taken in a
+  window that never had one (`website/shots/webwindow.swift`: a class site in
+  a plain macOS window drawn by WebKit), never cut out of a Safari capture.
+
+The code that broke this is gone, with no fallback and no flag:
+`composite.py`'s `rounded()`, `without_chrome()` and shape-drawn
+`with_shadow()` (they cut Safari's toolbar off the `colour-schemes` and
+`light-and-dark` parts and painted 18 px corners back on — the drawn corners
+Russell saw on the live site), and the schedule scene's banner trim, which
+cut the notification out of Notification Center's window and drew its
+corners. A banner is now cropped only to the edge of its own shadow, which
+never passes through the card.
+
+**The gate:** `website/shots/test_native_corners.py` opens every picture the
+pages show a Mac visitor (from `shots.json` and the pages, PNG and WebP) and
+fails on a corner that is square or tighter than any real macOS window;
+`capture.py` runs the same check (`corners.py`) before it promotes a scene
+and at the end of every run. It failed on the committed `colour-schemes` and
+`light-and-dark` before they were retaken, and passes after.
+
+**Windows owes the same rule.** `capture_windows.py` builds
+`light-and-dark-windows` and `colour-schemes-windows` with `composite.py`,
+which now leaves Playwright's square page screenshots square, and
+`hero_windows.py` still masks screen grabs with a drawn `rounded()`. Neither
+was edited from the mac; the gate does not judge `-windows-` pictures until
+Windows has an answer that keeps a window's own shape.
+
+---
+
 ## 2. The Capture Pipelines
 
 ### macOS Capture (`website/shots/capture.py`)
@@ -78,12 +120,16 @@ python3 website/shots/capture.py --scenes   # the v1.4.0 scenes, in ~/Plantoir M
   reference, start-of-year, curriculum-settings, two-maps, both-curricula,
   how-i-teach, club — with the state each sets up, and every picture is read
   back with Vision (`ocr.swift`) against `shots.json → expectText`. Two figures
-  are assembled per appearance from parts (`schedule` = the sheet with the
-  notification banner over it; `two-maps` = the two coverage maps side by side).
+  are assembled per appearance from whole captures (`schedule` = the sheet with
+  the notification banner over it; `two-maps` = the two coverage maps side by
+  side), by placing them, never by cutting or redrawing them.
   How to run it and what it leaves behind: `website/README.md`, "Regenerating
   every image".
 - **Class Sites**: Photographed in Safari on a real macOS display so native font
-  rasterization, scrollbars, and window chrome are preserved.
+  rasterization, scrollbars, and window chrome are preserved. The two colour
+  figures are the exception: their parts are the course home pages in a plain
+  window with no browser round it (`webwindow.swift`), because their subject
+  is the sites, and three toolbars read as three browsers.
 - **Mobile View**: Photographed in the iOS Simulator using RocketSim to render
   the authentic device bezel.
 - **Appearance Switching**: Machine appearance is toggled between Light and
@@ -204,12 +250,13 @@ Every screenshot on plantoir.app has both a macOS version (Safari / SwiftUI) and
 | `assistant` | Local AI assistant conversation & cards | `assistant-light.png/.webp`<br>`assistant-dark.png/.webp` | `assistant-windows-light.png/.webp`<br>`assistant-windows-dark.png/.webp` |
 | `site-eng2d` | Rendered class website (English) | `site-eng2d-light.png/.webp`<br>`site-eng2d-dark.png/.webp` | `site-eng2d-windows-light.png/.webp`<br>`site-eng2d-windows-dark.png/.webp` |
 | `site-mcv4u` | Rendered class website (Calculus math) | `site-mcv4u-light.png/.webp`<br>`site-mcv4u-dark.png/.webp` | `site-mcv4u-windows-light.png/.webp`<br>`site-mcv4u-windows-dark.png/.webp` |
+| `site-sch3u-chemistry` | Rendered class website (Chemistry: reactions, states, ions) — added 2026-09-27, macOS only | `site-sch3u-chemistry-light.png/.webp`<br>`site-sch3u-chemistry-dark.png/.webp` | none yet (`windows: false`) |
 | `site-sch3u` | Rendered class website (Chemistry) | `site-sch3u-light.png/.webp`<br>`site-sch3u-dark.png/.webp` | `site-sch3u-windows-light.png/.webp`<br>`site-sch3u-windows-dark.png/.webp` |
 | `site-phone` | Rendered class website on Mobile Viewport | `site-phone-light.png/.webp`<br>`site-phone-dark.png/.webp` | `site-phone-windows-light.png/.webp`<br>`site-phone-windows-dark.png/.webp` |
 | `coverage` | Curriculum expectation tag browser | `coverage-light.png/.webp`<br>`coverage-dark.png/.webp` | `coverage-windows-light.png/.webp`<br>`coverage-windows-dark.png/.webp` |
 | `search` | Quartz live search popover | `search-light.png/.webp`<br>`search-dark.png/.webp` | `search-windows-light.png/.webp`<br>`search-windows-dark.png/.webp` |
-| `colour-schemes`| 3 Quartz built-in colour palettes | `colour-schemes.png/.webp` | `colour-schemes-windows.png/.webp` |
-| `light-and-dark`| Split light/dark class page composite | `light-and-dark.png/.webp` | `light-and-dark-windows.png/.webp` |
+| `colour-schemes`| 3 course home pages, whole windows fanned out, own corners | `colour-schemes.png/.webp` | `colour-schemes-windows.png/.webp` |
+| `light-and-dark`| One course home page, light and dark, two whole windows side by side | `light-and-dark.png/.webp` | `light-and-dark-windows.png/.webp` |
 
 Added for v1.4.0, macOS only (a Windows visitor sees the mac picture until
 `capture_windows.py` takes an id marked `windows: true`, and the section says

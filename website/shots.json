@@ -98,6 +98,17 @@
       "caption": "The preview is the real site — equations and all."
     },
     {
+      "id": "site-sch3u-chemistry",
+      "capture": {
+        "kind": "browser",
+        "course": "SCH3U",
+        "path": "/style/what-this-site-can-do#mathematics-and-chemistry"
+      },
+      "alt": "A Grade 11 Chemistry class page with two balanced reactions set on lines of their own, states in brackets and subscripts set low, and the sulfate and ammonium ions written with their charges.",
+      "caption": "Chemistry too: formulas, charges, states and reaction arrows, set the way a textbook sets them.",
+      "windows": false
+    },
+    {
       "id": "site-sch3u",
       "capture": {
         "kind": "browser",
