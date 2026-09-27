@@ -262,7 +262,7 @@ struct SidebarView: View {
                                     // the moment before risky editing is
                                     // exactly when it's wanted.
                                     Button("Back Up Now", systemImage: "clock.arrow.circlepath") {
-                                        workspace.backUp(course)
+                                        Task { await workspace.backUp(course) }
                                     }
                                     Divider()
                                     folderMenuItems(for: course.directoryURL)
@@ -424,7 +424,7 @@ struct SidebarView: View {
             presenting: removalRequest
         ) { request in
             Button("Remove", role: .destructive) {
-                performRemoval(request)
+                Task { await performRemoval(request) }
             }
             Button("Cancel", role: .cancel) {
             }
@@ -450,7 +450,7 @@ struct SidebarView: View {
             presenting: workspace.backupRestoreRequest
         ) { item in
             Button("Restore") {
-                workspace.restoreBackup(item)
+                Task { await workspace.restoreBackup(item) }
             }
             Button("Cancel", role: .cancel) {
             }
@@ -1146,7 +1146,7 @@ struct SidebarView: View {
                     // travels in its settings, and the restore locks it
                     // again.
                     Button("Back Up Now", systemImage: "clock.arrow.circlepath") {
-                        workspace.backUp(course)
+                        Task { await workspace.backUp(course) }
                     }
                     Divider()
                     folderMenuItems(for: course.directoryURL)
@@ -1497,8 +1497,9 @@ struct SidebarView: View {
     ///
     /// The view keeps one call and the alert; the order, the reporting and the
     /// trail line live in `ScheduledDeployCleanup`, where a test can drive
-    /// them — nothing in the suite constructs this view.
-    func performRemoval(_ request: RemovalRequest) {
+    /// them — nothing in the suite constructs this view. Async since #351:
+    /// the archive made before a removal is a zip, run off the main actor.
+    func performRemoval(_ request: RemovalRequest) async {
         guard let coursesDirectoryURL = workspace.coursesDirectoryURL else {
             return
         }
@@ -1514,13 +1515,13 @@ struct SidebarView: View {
 
         var result: ScheduledDeployCleanup.RemovalResult
         if let sectionNumber = request.sectionNumber {
-            result = ScheduledDeployCleanup.removeSection(
+            result = await ScheduledDeployCleanup.removeSection(
                 sectionNumber,
                 from: courseToRemove,
                 coursesDirectoryURL: coursesDirectoryURL
             )
         } else {
-            result = ScheduledDeployCleanup.removeCourse(
+            result = await ScheduledDeployCleanup.removeCourse(
                 courseToRemove,
                 coursesDirectoryURL: coursesDirectoryURL
             )

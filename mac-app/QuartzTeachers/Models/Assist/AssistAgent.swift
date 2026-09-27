@@ -119,6 +119,12 @@ final class AssistAgent {
         return named
     }
 
+    /// The course whose copy the assistant is saving right now, for the line
+    /// under the three dots (#351); nil the rest of the time.
+    var courseBeingBackedUp: String? {
+        return tools.courseBeingBackedUp
+    }
+
     /// Whether a teacher can type right now.
     var isBusy: Bool {
         return activity != .idle

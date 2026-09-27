@@ -114,21 +114,14 @@ final class AssistantRolloverUITests: XCTestCase {
             XCTFail("Asking before changing is on, so a rollover must offer a plan first.")
             return
         }
-        // **A known product freeze, held open here (#154's R0).** Approving
-        // runs the once-per-conversation backup, which zips the course with
-        // `Process.waitUntilExit()` ON THE MAIN THREAD; the nested run loop it
-        // spins re-enters SwiftUI's transaction flush over and over, and the
-        // window is frozen — measured 93 one-second samples busy there, over
-        // 122 s, on 2026-09-26. XCUITest reports it as "main thread busy for
-        // 30.0s". Strict, and matched to that message only: the day the
-        // backup stops blocking the main thread this goes red, and whoever
-        // fixed it removes this wrapper. The issue is #351.
-        let freeze: XCTExpectedFailure.Options = XCTExpectedFailure.Options()
-        freeze.isStrict = true
-        freeze.issueMatcher = { issue in
-            return issue.compactDescription.contains("main thread busy")
-        }
-        XCTExpectFailure("The backup's zip blocks the main thread after Approve (#351).", options: freeze)
+        // **The freeze #154 found is gone (#351), and this is where it was.**
+        // Approving runs the once-per-conversation backup, whose zip used to
+        // run with `Process.waitUntilExit()` ON THE MAIN THREAD: the nested
+        // run loop re-entered SwiftUI's transaction flush, and XCUITest
+        // reported "main thread busy for 30.0s" (93 busy one-second samples
+        // in 122 s, 2026-09-26). This step was held open by a strict expected
+        // failure matched to that message until the zip moved off the main
+        // actor; with the wrapper gone, the freeze coming back is a failure.
         approve.click()
         let approvedAt: Date = Date()
 
@@ -139,8 +132,9 @@ final class AssistantRolloverUITests: XCTestCase {
             ),
             "The website question never appeared in the window."
         )
-        // Printed, not asserted: #88's "main thread busy ~30 s" after the
-        // approval is measured from here (doc 09 → "#154").
+        // Printed, not asserted: how long the question took after the
+        // approval, the number #351 was measured by (doc 09 → "#351"). A
+        // threshold would be a guess; the freeze itself fails the step above.
         print("ROLLOVER-TIMING question after approval: \(Date().timeIntervalSince(approvedAt)) s")
 
         let marker: URL = try XCTUnwrap(liveMarkerURL)

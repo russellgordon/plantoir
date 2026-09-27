@@ -962,8 +962,9 @@ nonisolated enum CoursePageCopier {
     /// ICS4U, the app's own zip command: **9.7 s and 467 MB**. On the main
     /// actor that is ten seconds of a window that cannot draw.
     ///
-    /// `CourseArchiver.backUpCourse` is what this does, taken apart so it can
-    /// leave the main actor — and NOT `WorkspaceModel.backUp(_:)`, which also
+    /// `CourseArchiver.backingUp` is what this does — the zip without the
+    /// pruning, off the main actor like every zip since #351 — and NOT
+    /// `WorkspaceModel.backUp(_:)`, which also
     /// sets `isShowingBackups` and reloads the courses, flipping the sidebar
     /// in the middle of a copy.
     @concurrent
@@ -973,10 +974,10 @@ nonisolated enum CoursePageCopier {
         coursesDirectoryPath: String
     ) async throws -> URL {
         CoursePageCopier.noteTheThread()
-        return try CourseArchiver.backUpCourseOffTheMainActor(
-            courseDirectoryURL: URL(fileURLWithPath: courseDirectoryPath),
+        return try await CourseArchiver.backingUp(
+            courseDirectoryPath: courseDirectoryPath,
             code: code,
-            coursesDirectoryURL: URL(fileURLWithPath: coursesDirectoryPath)
+            coursesDirectoryPath: coursesDirectoryPath
         )
     }
 

@@ -189,6 +189,7 @@ enum AssistContract {
             "linkedClassStaysVisible": AssistPublishPlan.stayingVisibleLine(
                 title: "Unit 2, Day 4", reason: .aClassOfItsOwn, noun: .class
             ),
+            "backingUpFirst": AssistWording.backingUpFirst(course: course),
             "backedUpCourse": AssistWording.backedUpCourse(
                 course: course, to: "{course}_backup_2026-09-08_190000.zip"
             ),
