@@ -327,6 +327,20 @@ final class ClassPlanningContractTests: XCTestCase {
         let undoRule: [String: Any] = try XCTUnwrap(section["undoRule"] as? [String: Any])
         let statedRule: String = try XCTUnwrap(undoRule["rule"] as? String)
         XCTAssertNotNil(undoRule["why"] as? String, "undoRule has no 'why'")
+        XCTAssertNotNil(undoRule["saidWhy"] as? String, "undoRule has no 'saidWhy'")
+        // What is SAID either side of the gate, by the contract's own names
+        // (#185): the plan warns exactly when the undo will be withheld, and
+        // the reply says the way back, or that the page can be taken back.
+        let planWarns: String = try ClassPlanningContractTests.wordingKey(
+            try XCTUnwrap(undoRule["planWarns"] as? String, "undoRule has no 'planWarns'")
+        )
+        let replySaysWhenWithheld: String = try ClassPlanningContractTests.wordingKey(
+            try XCTUnwrap(undoRule["replySaysWhenWithheld"] as? String)
+        )
+        let replySaysWhenOffered: String = try ClassPlanningContractTests.wordingKey(
+            try XCTUnwrap(undoRule["replySaysWhenOffered"] as? String)
+        )
+        let wording: [String: String] = try ClassPlanningContractTests.committedWording()
         let forcedUnpublished: Bool =
             (section["forcedUnpublished"] as? [String: Any])?["value"] as? Bool == true
 
@@ -384,6 +398,40 @@ final class ClassPlanningContractTests: XCTestCase {
                 + "\(plan.renames.count) renames and \(plan.moves.count) date moves"
             )
 
+            // The plan, before Go: the card in the course's own noun, the
+            // model's copy in "class" whatever the course says (#267).
+            let planned: AssistToolOutcome = await outcome(
+                made.runner, "plan_add_next_class",
+                ["course": "ICS3U", "section": 1, "duplicate": source]
+            )
+            XCTAssertTrue(planned.isPlan, "\(name): the plan came back as \(planned.detail)")
+            var cardWarningKey: String = planWarns
+            if made.course.configuration.classNoun == .meeting {
+                cardWarningKey = planWarns + "ForAMeeting"
+            }
+            let cardWarning: String = try XCTUnwrap(wording[cardWarningKey], cardWarningKey)
+            let modelWarning: String = try XCTUnwrap(wording[planWarns], planWarns)
+            if undoOffered {
+                XCTAssertFalse(
+                    planned.forTheCard.contains(cardWarning),
+                    "\(name): nothing else moves, so the card must not say the undo will not help"
+                )
+                XCTAssertFalse(
+                    planned.detail.contains(modelWarning),
+                    "\(name): nothing else moves, so the plan must not say the undo will not help"
+                )
+            } else {
+                XCTAssertTrue(
+                    planned.forTheCard.contains(cardWarning),
+                    "\(name): the undo will be withheld, so the card must say so before Go — "
+                    + planned.forTheCard
+                )
+                XCTAssertTrue(
+                    planned.detail.contains(modelWarning),
+                    "\(name): the undo will be withheld, so the plan must say so — \(planned.detail)"
+                )
+            }
+
             let said: String = await run(
                 made.runner, "add_next_class",
                 ["course": "ICS3U", "section": 1, "duplicate": source]
@@ -439,13 +487,17 @@ final class ClassPlanningContractTests: XCTestCase {
                     FileManager.default.fileExists(atPath: copyURL.path),
                     "\(name): the undo left a blank class page where the copy was"
                 )
+                XCTAssertTrue(
+                    said.contains(try XCTUnwrap(wording[replySaysWhenOffered], replySaysWhenOffered)),
+                    "\(name): the reply must say the copy can be taken back — \(said)"
+                )
             } else {
                 XCTAssertEqual(
                     undone, AssistWording.nothingToUndo,
                     "\(name): a partial undo is worse than none — \(undone)"
                 )
                 XCTAssertTrue(
-                    said.contains(AssistWording.otherClassesMoved),
+                    said.contains(try XCTUnwrap(wording[replySaysWhenWithheld], replySaysWhenWithheld)),
                     "\(name): the reply must say where the way back is — \(said)"
                 )
                 XCTAssertTrue(
@@ -1284,5 +1336,27 @@ final class ClassPlanningContractTests: XCTestCase {
 
     private static func cases(in name: String) throws -> [[String: Any]] {
         return try XCTUnwrap(section(name)["cases"] as? [[String: Any]])
+    }
+
+    /// "wording.otherClassesMoved" → "otherClassesMoved": the way one contract
+    /// file names a sentence in another.
+    private static func wordingKey(_ reference: String) throws -> String {
+        let prefix: String = "wording."
+        XCTAssertTrue(reference.hasPrefix(prefix), "“\(reference)” does not name a sentence")
+        return String(reference.dropFirst(prefix.count))
+    }
+
+    /// The sentences as COMMITTED in `contracts/assist-wording.json`, so a
+    /// case is checked against what the other platform reads, not against a
+    /// Swift name that could be renamed underneath it.
+    private static func committedWording() throws -> [String: String] {
+        let url: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("contracts/assist-wording.json")
+        let all: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: try Data(contentsOf: url)) as? [String: Any]
+        )
+        return try XCTUnwrap(all["wording"] as? [String: String], "No wording in assist-wording.json")
     }
 }
