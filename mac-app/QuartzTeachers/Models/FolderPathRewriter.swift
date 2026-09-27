@@ -254,7 +254,7 @@ enum FolderPathRewriter {
             return []
         }
         var found: [String] = []
-        let code: [NSRange] = MarkdownCode.ranges(in: text)
+        let code: [NSRange] = MarkdownCode.notALinkRanges(in: text)
         for match in MarkdownCode.matches(of: expression, in: text, outside: code) {
             if let targetRange = Range(match.range(at: 2), in: text) {
                 found.append(String(text[targetRange]))
@@ -274,7 +274,7 @@ enum FolderPathRewriter {
         guard let expression = style.expression else {
             return text
         }
-        let code: [NSRange] = MarkdownCode.ranges(in: text)
+        let code: [NSRange] = MarkdownCode.notALinkRanges(in: text)
         let matches: [NSTextCheckingResult] = MarkdownCode.matches(of: expression, in: text, outside: code)
         if matches.isEmpty {
             return text
@@ -427,6 +427,16 @@ enum FolderPathRewriter {
     /// `%20`. Applying the Markdown rule here would resolve too, and would
     /// quietly rewrite the spelling the teacher chose — the drift the contract
     /// cases for `Unit 1, Day 2` and `Top 10%` inside brackets exist to catch.
+    /// `spelled`'s rule for a destination written in angle brackets, for
+    /// another writer of that shape — `PageReferences`, when the copy renames
+    /// a picture named as `![](<one pic.png>)` (#325). One rule for the
+    /// shape, called rather than re-derived: plain inside the brackets unless
+    /// the name holds `<`, `>` or a line break, or the old segment arrived
+    /// percent-encoded.
+    nonisolated static func spelledInsideAngleBrackets(_ name: String, likeThe segment: String) -> String {
+        return FolderPathRewriter.spelled(name, likeThe: segment, in: .angleBracketedMarkdown)
+    }
+
     nonisolated private static func spelled(_ name: String, likeThe segment: String, in style: LinkStyle) -> String {
         if style == .markdown && wouldBreakAMarkdownTarget(name) {
             return percentEncoded(name)

@@ -447,6 +447,18 @@ what makes tracking upstream Quartz plausible (the cost of an upgrade is
 re-validating each patch's regex against the new source text — and replacing
 the three layer-A components).
 
+**One stock behaviour Plantoir's readers must match, not change: `%%`
+comments.** Quartz's `ofm.ts` removes every `%%…%%` from the raw page
+(`commentRegex = /%%[\s\S]*?%%/g`, line 130) in `textTransform` (lines
+160–163), before callouts, wikilinks or remark see anything. So a link written
+inside a comment is never drawn, and since
+[#331](https://github.com/russellgordon/plantoir/issues/331) no reader in the
+build, the installer, the linters or the mac app treats one as a link either —
+comments are masked FIRST, and code is found in what is left, Quartz's order.
+The rule, its cases and the trap it is built around (the curriculum markers
+are comments) are in [10 → A comment is never a link](10-local-ai-assistant.md#a-comment-is-never-a-link-331)
+and [05 → Which shapes are links](05-build-pipeline.md).
+
 ## Spelling a folder's new name inside a link
 
 Renaming a course folder repoints the qualified links that name it, and the
@@ -769,10 +781,37 @@ and converting the link (edits text beyond the folder segment); escaping `>` as
 reading unmeasured); one pattern with an optional `<` (the `>` would have to be
 consumed or re-appended, and the spelling has to know the style anyway).
 
-**Not fixed here: `PageReferences` has the same blindness.** Its
-`markdownExpression`, `\]\(([^)\s]+)`, reads `<Tasks/Quiz` too. It is not a
-rename and has no contract case, so it is its own piece:
-[#325](https://github.com/russellgordon/plantoir/issues/325).
+**`PageReferences`, the copy's reader, reads the third spelling too** (since
+[#325](https://github.com/russellgordon/plantoir/issues/325), 2026-09-26). Its
+Markdown pattern used to be `\]\(([^)\s]+)`, which read `](<one pic.png>)` as
+`<one` — a name that names nothing, so copying a page between courses silently
+left such a picture behind. Each Markdown shape is now read by ONE pattern, and
+both are REFERENCES to this section's constants (`markdownLinkPattern` with
+its `(?!<)`, `angleBracketedLinkPattern` with its lookahead `>`), never copies.
+A new `.angleBracketed` kind is read like `.encoded` — percent-decoded, the raw
+text when it does not decode, because remark resolves `<a%20b.png>` and
+`<a b.png>` to the same address — and written back through
+`FolderPathRewriter.spelledInsideAngleBrackets`, this section's own rule:
+PLAIN inside the brackets unless the name holds `<`, `>` or a line break, or
+the old segment arrived encoded. All four of its shapes go through the code
+and comment mask. Measured at 0 angle-bracket destinations in `support/`; it
+is here because a teacher can type it. `copyingAPageBetweenCourses.cases`
+carries two cases, and `PageReferencesTests` pins the rewritten text (which a
+case's `expect` does not carry).
+
+**The walks read Markdown-style page links too** (folded into #325 by the
+director's ruling). Publishing, the unpublish referrer test, the links
+question and check_section read wikilinks only until then, and never a
+Markdown-style link in any spelling: a teacher with Obsidian's "Use
+[[Wikilinks]]" turned off published classes without a page they use.
+`AssistSectionGraph.everyLinkAsWritten` now reads both Markdown shapes,
+through the same mask, resolving a destination by its last component the way
+a wikilink resolves (`shared-rules.json` → `followingLinks.markdownStyleLinks`).
+Measured: ONE local Markdown link in all of `support/` —
+`ENL1W/shared/Concepts/Indigenous Storywork.md`, `["I Lost My Talk"](I%20Lost%20My%20Talk)`,
+itself dead on the site (it resolved relative to `Concepts/` while the page is
+in `Reading/`) — now a wikilink. **Not done:** a page RENAME does not rewrite a
+Markdown-style link to the renamed page (a folder rename does, above).
 
 ---
 

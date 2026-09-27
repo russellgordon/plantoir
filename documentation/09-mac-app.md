@@ -5499,6 +5499,91 @@ machine starts with them.
 website builder's image too — Russell's decision was to keep building it on
 the Mac; and running the programs from inside the app (03).
 
+## Getting the builder ready in the background (bundle B)
+
+**What it is for.** A first preview used to install the helper programs,
+start the builder's virtual machine (22–27 s from the disk the app carries,
+#312) and build the website builder (~340 MB downloaded; 88–137 s in a fresh
+3-CPU virtual machine, 49 s here) before a single page appeared. The teacher
+spends minutes in the wizard anyway, so at first launch — and at the first
+launch of each new version, whose recipe is new — `BuilderWarmUp` does that
+work then, quietly. It runs again whenever the recipe the app carries is new
+— asked of the launcher itself (`setup.sh --builder-tag`, which starts
+nothing and prints the name the launchers' own hash gives), not read off the
+version, so a development build whose version never changes still re-warms
+after a recipe edit (review N2). Russell's change of 2026-09-26: build it (the plan had
+proposed it as a `decision` issue, asking whether ~340 MB may be downloaded
+before the teacher asks; his answer was yes).
+
+**What it runs.** `setup.sh --prepare-builder`
+([03 → One launcher at a time](03-launcher-scripts.md)), from
+`~/Library/Application Support/Plantoir/getting-ready`, which holds that
+launcher and a mirror of the recipe made by `WorkspaceModel.copyToolchainFiles`
+— the same function that mirrors a working folder's `.toolchain`, so the image
+tag (a hash of the recipe) is the one every working folder's launchers look
+for. A plain `Process` with `HelperPrograms.environment()`, so it installs
+from the app's own helpers; its output goes to `getting-ready/last-run.log`.
+A run that prints `BUILDER_READY=<name>` writes that name to
+`getting-ready/ready-for.txt`; nothing else does, so a failed or interrupted
+run is tried again at the next launch, and a launch whose recipe's name
+matches it starts nothing.
+
+**When it runs** (`contracts/app-rules.json` → `builderWarmUp.startsWhen`,
+`BuilderWarmUp.decide`): from `applicationDidFinishLaunching`, never in the
+unit suite or a UI test, never when the binary is the assistant's server, a
+scheduled publish or the contract writer (`AppUpdates.headlessFlags`), never
+when the app carries no recipe, never twice for one recipe, and not offline
+or in Low Data Mode — asked once of `NWPathMonitor`, three seconds without an
+answer counting as offline. Offline it says NOTHING to the teacher: the
+first preview gets the builder ready the old way.
+
+**What the teacher sees.** One line at the foot of the sidebar while it runs —
+`BuilderWarmUp.statusLine`, "Getting this Mac ready to build your websites…",
+with a small spinner — and nothing else: no window, no progress bar, nothing
+to press, nothing when it is skipped or fails. A Create or Preview that
+arrives mid-build waits in the launcher (the turn) and shows "Building your
+website builder…" on its own progress bar, then builds nothing.
+
+**The trail** (`activityTrail.mustRecord`): `builder got ready in the
+background: started` (the version), `…: finished` (the seconds — the wait the
+feature takes off the teacher), `…: did not finish` (how it ended, after how
+long), `…: skipped` (offline or Low Data Mode only; the reasons true on nearly
+every launch leave no line).
+
+**Quitting.** Not stopped at quit: what it has downloaded would be thrown
+away, and #220's quit path already leaves the builder running while any
+launcher is: `warmUpRunning` matches `…/getting-ready/setup.sh
+--prepare-builder`, and the trail says "left this Mac's website-building setup
+running because this Mac is still being got ready to build websites, in the
+background" — never "a publish or preview", which nobody started (review N5).
+The run finishes on its own; its result is then not written down (the app is
+gone), so the next launch runs it again and finds the builder ready in
+seconds.
+
+**Accepted, and said so nobody files them** (review nits, ruled 2026-09-27):
+the builder's virtual machine, once the warm-up has started it, stays up for
+the rest of that session even if the teacher never previews (once per recipe);
+the sequence cases drive a second `--prepare-builder` rather than `preview.sh`
+itself, whose wait is checked by placement; and `getting-ready/.toolchain` is
+a full mirror of the recipe (~61 MB) that is never cleaned up.
+
+**Measured** (M4 Pro, Colima 6 CPU / 12 GiB, 2026-09-27, the EXC2O
+fixture, 271 pages): with the builder ready and running, a FIRST preview
+build of a section — a new workspace, the scaffold staged from scratch
+(`--full-rebuild`) — took **4.1 s**, and 3.6–3.7 s again. Without the
+warm-up the same first preview also carries the builder's start (22–27 s from
+the app's disk, #312) and the build of the builder (49–52 s here with the base
+cached; 88–137 s in a teacher's fresh 3-CPU VM), so on this Mac the warm-up
+takes about 75 s off the first preview, and on a teacher's about 2–3 minutes.
+The warm-up itself, run for real from a folder like the app's: 0.8 s when the
+builder was already there, 4.0 s when only its layers were cached.
+
+**Rejected:** waiting in the app rather than the launchers (the command line,
+the assistant's server and a scheduled publish would not wait); a status
+window or progress bar; waiting until a working folder is chosen (its
+`.toolchain` exists only once it holds a course, and the wizard is the time
+this spends); stopping it at quit; asking first.
+
 ## Updating itself: what is held, what is not, and why (#204)
 
 From v1.4.0 a released Plantoir finds and installs its own new versions, with
