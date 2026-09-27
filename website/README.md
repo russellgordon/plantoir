@@ -274,7 +274,7 @@ missing, then, in the folder only — never the shipped payload:
   a row per page with its codes, a reason in our own words and an evidence
   phrase the tests find on the page; pages read and not tagged are listed
   under `dropped` with the reason. ICS4U's was made on 2026-09-27 by reading
-  every page of the payload; a test fails if an ICS4U activity page with a
+  every page of the payload and checked row by row by two Opus readers; a test fails if an ICS4U activity page with a
   curriculum block is neither tagged nor dropped;
 - ICS4U's second curriculum DECLARED (`curriculum_folders` gains
   `College Board Curriculum` after `Curriculum`, what ticking the box writes);

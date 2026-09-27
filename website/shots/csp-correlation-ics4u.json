@@ -1,5 +1,5 @@
 {
-  "note": "Which ICS4U activity pages reach which AP Computer Science Principles learning objectives, for the marketing working folder (~/Plantoir Marketing) only — never the shipped ICS4U payload. Same shape and rules as csp-correlation.json (ICS3U): marketing_folder.py appends one embed per code inside each page's existing '## Curriculum connection' block, after the Ontario embeds. Drafted 2026-09-27 by reading every ICS4U page in full — the 74 published activity pages that carry a curriculum block, plus the pages without one (which cannot carry an embed) and the class agendas. 'evidence' quotes the ICS4U page (our words, not the College Board's). An objective is tagged only where the page gives students something to do that the objective describes; AAP-4.A is kept to the pages that meet exponential growth, not every page that compares two polynomial algorithms. Every page with a block that is not tagged is listed under 'dropped', with the reason, so it is not proposed again.",
+  "note": "Which ICS4U activity pages reach which AP Computer Science Principles learning objectives, for the marketing working folder (~/Plantoir Marketing) only — never the shipped ICS4U payload. Same shape and rules as csp-correlation.json (ICS3U): marketing_folder.py appends one embed per code inside each page's existing '## Curriculum connection' block, after the Ontario embeds. Drafted 2026-09-27 by reading every ICS4U page in full — the 74 published activity pages that carry a curriculum block, plus the pages without one (which cannot carry an embed) and the class agendas. 'evidence' quotes the ICS4U page (our words, not the College Board's). An objective is tagged only where the page gives students something to do that the objective describes; AAP-4.A is kept to the pages that meet exponential growth, not every page that compares two polynomial algorithms. Every page with a block that is not tagged is listed under 'dropped', with the reason, so it is not proposed again. Checked row by row against each page's full text by two independent Opus readers; their verified findings were applied (three tags removed, six added).",
   "course": "ICS4U",
   "folder": "College Board Curriculum",
   "rows": [
@@ -10,16 +10,15 @@
         "AAP-3.A",
         "CRD-2.G"
       ],
-      "reason": "Students write methods on a class, work out what each call returns in the self-check, and give every method a docstring saying what it returns and when it refuses.",
+      "reason": "Students read how methods are written inside a class, work out what each call returns in the self-check, and see every method given a docstring saying what it returns and when it refuses.",
       "evidence": "A method is a function defined inside a class"
     },
     {
       "page": "Concepts/Choosing a Data Structure",
       "codes": [
-        "AAP-1.D",
-        "AAP-2.L"
+        "AAP-1.D"
       ],
-      "reason": "Students keep each record whole in a list of objects, and answer the same membership question with a list and with a dictionary, comparing the two approaches rather than assuming one.",
+      "reason": "Students keep each record whole in a list of objects, and choose a container by the question the program asks most often.",
       "evidence": "There is no best container."
     },
     {
@@ -46,7 +45,7 @@
         "AAP-4.B",
         "AAP-2.P"
       ],
-      "reason": "Students count steps to see how work grows, meet exponential growth that no faster machine rescues, read that the Halting Problem cannot be decided by any algorithm, and state binary search's need for sorted data.",
+      "reason": "Students count steps to see how work grows, read the growth classes up to exponential, read that the Halting Problem cannot be decided by any algorithm, and state binary search's need for sorted data.",
       "evidence": "as the input grows, how does the work grow?"
     },
     {
@@ -91,10 +90,9 @@
       "page": "Concepts/Objects Working Together",
       "codes": [
         "AAP-3.B",
-        "AAP-3.A",
         "CRD-2.F"
       ],
-      "reason": "Students give each question one owning method so the clash rule exists once, predict what each call returns, and sketch the design on CRC cards first.",
+      "reason": "Students give each question one owning method so the clash rule exists once, and sketch the design on CRC cards first.",
       "evidence": "The clash rule now exists once."
     },
     {
@@ -222,9 +220,10 @@
       "codes": [
         "AAP-3.C",
         "CRD-2.I",
-        "AAP-2.O"
+        "AAP-2.O",
+        "CRD-2.F"
       ],
-      "reason": "Students write methods on Book and Member, find and fix a missing self and an unassigned attribute, and write functions that loop over a list of books.",
+      "reason": "Students write methods on Book and Member, find and fix a missing self and an unassigned attribute, write functions that loop over a list of books, and design a drop-in program on CRC cards.",
       "evidence": "The missing three characters are self."
     },
     {
@@ -373,27 +372,30 @@
       "codes": [
         "AAP-2.O",
         "AAP-1.D",
-        "AAP-3.B"
+        "AAP-3.B",
+        "AAP-3.C"
       ],
-      "reason": "Students traverse a list of volunteer objects to find one, total the hours and find the maximum, reusing the search inside the remove procedure.",
+      "reason": "Students traverse a list of volunteer objects to find one, total the hours and find the maximum, reuse the search inside the remove procedure, and write average_hours on top of total_hours.",
       "evidence": "is the pattern everything else is built on"
     },
     {
       "page": "Programs/Searching and Timing It",
       "codes": [
         "AAP-2.P",
-        "CRD-2.J"
+        "CRD-2.J",
+        "AAP-2.L"
       ],
-      "reason": "Students count binary search's comparisons at growing sizes, check it agrees with linear search before timing it, and break its sorted-data precondition on purpose.",
+      "reason": "Students count binary search's comparisons at growing sizes, check it gives the same answers as linear search before timing it, and break its sorted-data precondition so the two disagree.",
       "evidence": "A fast wrong answer is not a result"
     },
     {
       "page": "Programs/Sorting and Timing It",
       "codes": [
         "AAP-3.D",
-        "AAP-2.E"
+        "AAP-2.E",
+        "AAP-2.M"
       ],
-      "reason": "Students set their insertion sort beside Python's built-in sort, which they are told to use in real work, and see how > compares strings by character code.",
+      "reason": "Students set their insertion sort beside Python's built-in sort, write selection sort and modify the insertion sort to order objects by hours, and see how > compares strings by character code.",
       "evidence": "Sorting names is sorting."
     },
     {
@@ -402,16 +404,15 @@
         "DAT-2.D",
         "DAT-2.C"
       ],
-      "reason": "Students write a program that turns a sheet of donation lines into totals, the most-donated item and a shortage list, and handle quantities that arrive as text.",
+      "reason": "Students read a program that turns a sheet of donation lines into totals, the most-donated item and a shortage list, and see why quantities arriving as text must be converted and what one invalid entry does.",
       "evidence": "Everything arrives from the file as text."
     },
     {
       "page": "Programs/Your First Class",
       "codes": [
-        "AAP-3.C",
-        "IOC-2.A"
+        "AAP-3.C"
       ],
-      "reason": "Students write a Volunteer class with methods, and deliberately store no last names, birthdates or addresses because data not kept cannot leak.",
+      "reason": "Students read a Volunteer class and write a method of their own that answers the coordinator's question.",
       "evidence": "Deciding what not to store is a design decision"
     },
     {
@@ -444,9 +445,10 @@
     {
       "page": "Tasks/The Efficiency Case",
       "codes": [
-        "CRD-2.J"
+        "CRD-2.J",
+        "AAP-2.M"
       ],
-      "reason": "Students prove a faster program still correct with tests, boundary cases included, run on both versions.",
+      "reason": "Students modify a slow program's algorithm to make it faster, and prove it still correct with tests, boundary cases included, run on both versions.",
       "evidence": "A faster wrong answer is worthless."
     },
     {
@@ -481,9 +483,10 @@
       "codes": [
         "CRD-2.F",
         "CRD-1.A",
-        "CRD-2.G"
+        "CRD-2.G",
+        "AAP-3.C"
       ],
-      "reason": "Students ask the person who deals with a real thing what they need to know, design a class from their answers, and document every method.",
+      "reason": "Students ask the person who deals with a real thing what they need to know, design a class from their answers with at least three methods that do real work, and document every method.",
       "evidence": "Ask the person who deals with it what they need to know"
     },
     {
