@@ -146,7 +146,8 @@ final class AssistScenarioTests: XCTestCase {
         // Windows has run these since the families were first described
         // (`AssistCardCommandTests.cs`) and the mac never did — so a family
         // whose example had stopped matching would have gone red on their
-        // machine, from a file generated on this one. Nine families now; the
+        // machine, from a file generated on this one. Nine families in ten
+        // entries now (#150 declares make-room's article form separately); the
         // deploy-at-a-time one also has a table of its own, in `deployAtATime`
         // and run by `ScheduleDeployCardTests`, because one example cannot
         // describe a grammar of times.
@@ -260,6 +261,17 @@ final class AssistScenarioTests: XCTestCase {
             FakePreview.shared.watch(pageAt: AssistFixture.pageURL(of: "Unit 1, Day 1", in: made.course))
         }
 
+        // Class pages a direct call needs, published (#96): the first is
+        // the first class a start-of-year plan keeps.
+        var day: Int = 8
+        for title in scenario.given["visibleClasses"] as? [String] ?? [] {
+            try AssistFixture.write(
+                page: title, publish: "true", date: String(format: "2026-09-%02d", day),
+                body: "The words of \(title).", in: made.course
+            )
+            day += 1
+        }
+
         switch scenario.when {
         case "approve", "decline", "say":
             try await runApproval(scenario, made: made)
@@ -272,6 +284,9 @@ final class AssistScenarioTests: XCTestCase {
         var arguments: [String: Any] = ["course": "ICS3U", "section": 1]
         if scenario.when == "unpublish_pages" {
             arguments["pages"] = "Unit 1, Day 1"
+        }
+        for (key, value) in scenario.given["arguments"] as? [String: Any] ?? [:] {
+            arguments[key] = value
         }
         let outcome: AssistToolOutcome = await made.runner.run(
             call: AssistScenarioTests.call(scenario.when, arguments: arguments)

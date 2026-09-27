@@ -106,9 +106,32 @@ enum WizardWording {
         + "and change it however you like."
 
     /// The skeleton toggle's own label, for a subject the app can name.
-    /// `{subject}` is the family's label, lowercased.
+    /// `{subject}` is the family's label lowercased except for its proper
+    /// nouns, and `{article}` is "a" or "an" for it by sound — the rule is
+    /// `contracts/shared-rules.json` → `wizard.skeletonToggleLabelSubject`
+    /// (#336, which found "Start from a english skeleton" on screen).
     nonisolated static let skeletonToggleLabelTemplate: String =
-        "Start from a {subject} skeleton"
+        "Start from {article} {subject} skeleton"
+
+    /// Words that keep their capitals when a family's label is lowercased
+    /// for the toggle. Pinned against the contract's `properNouns`.
+    nonisolated static let skeletonToggleProperNouns: [String] = [
+        "English", "French", "First Nations", "Métis", "Inuit", "Indigenous"
+    ]
+
+    /// Starts of words spelled with a vowel but said with a consonant
+    /// ("a unit", "a European", "a one-page") — checked before the others.
+    /// Pinned against the contract's `article.consonantSoundVowelStarts`,
+    /// and the same list as `article_for` in `generate_skeletons.py`.
+    nonisolated static let consonantSoundVowelStarts: [String] = [
+        "uni", "use", "usu", "uti", "ubi", "ura", "eu", "one", "once", "ewe"
+    ]
+
+    /// Starts of words spelled with a consonant but said with a vowel
+    /// ("an hour"). Pinned against `article.vowelSoundConsonantStarts`.
+    nonisolated static let vowelSoundConsonantStarts: [String] = [
+        "hour", "honest", "honour", "honor", "heir"
+    ]
 
     /// The same label for the GENERAL family — club codes, custom codes,
     /// and any prefix the map does not carry (MCMPR11, the one British
@@ -146,8 +169,55 @@ enum WizardWording {
         if familyName == SkeletonCatalog.generalFamilyName {
             return skeletonToggleLabelForAGeneralSkeleton
         }
-        return skeletonToggleLabelTemplate.replacingOccurrences(
-            of: "{subject}", with: label.lowercased()
-        )
+        let subject: String = skeletonToggleSubject(forLabel: label)
+        let firstWord: String = subject.components(separatedBy: " ").first ?? subject
+        return skeletonToggleLabelTemplate
+            .replacingOccurrences(of: "{article}", with: article(for: firstWord))
+            .replacingOccurrences(of: "{subject}", with: subject)
+    }
+
+    /// A family's label as it reads mid-sentence: lowercased, with each
+    /// proper noun put back the way `skeletonToggleProperNouns` writes it.
+    nonisolated static func skeletonToggleSubject(forLabel label: String) -> String {
+        var subject: String = label.lowercased()
+        for properNoun in skeletonToggleProperNouns {
+            let pattern: String = "\\b" + NSRegularExpression.escapedPattern(for: properNoun) + "\\b"
+            guard let expression = try? NSRegularExpression(
+                pattern: pattern, options: [.caseInsensitive]
+            ) else {
+                continue
+            }
+            let wholeSubject: NSRange = NSRange(subject.startIndex..., in: subject)
+            subject = expression.stringByReplacingMatches(
+                in: subject,
+                options: [],
+                range: wholeSubject,
+                withTemplate: NSRegularExpression.escapedTemplate(for: properNoun)
+            )
+        }
+        return subject
+    }
+
+    /// "a" or "an" for the word that follows it, by its first SOUND rather
+    /// than its first letter.
+    nonisolated static func article(for word: String) -> String {
+        let lowered: String = word.lowercased()
+        for start in consonantSoundVowelStarts {
+            if lowered.hasPrefix(start) {
+                return "a"
+            }
+        }
+        for start in vowelSoundConsonantStarts {
+            if lowered.hasPrefix(start) {
+                return "an"
+            }
+        }
+        let vowels: [String] = ["a", "e", "i", "o", "u"]
+        for vowel in vowels {
+            if lowered.hasPrefix(vowel) {
+                return "an"
+            }
+        }
+        return "a"
     }
 }

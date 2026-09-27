@@ -1,4 +1,5 @@
 import XCTest
+import SwiftUI
 @testable import QuartzTeachers
 
 /// Which folders the Marks checklist may OFFER — run from
@@ -70,6 +71,11 @@ final class GradedFolderChoicesTests: XCTestCase {
     /// A course folder holding the given directories, and a configuration to
     /// go with it. Nothing here writes `course_config.json` into the course
     /// folder itself: a file is not a folder, and the walk must not offer one.
+    ///
+    /// `writesTheFile` puts a real `course_config.json` in the course folder
+    /// and reads the configuration back from it, for the tests that Save,
+    /// Revert or add a section — each of which reads the file. A file is not
+    /// a folder, so the walk does not offer it.
     @discardableResult
     private func makeCourse(
         named name: String,
@@ -77,7 +83,9 @@ final class GradedFolderChoicesTests: XCTestCase {
         perSectionFolders: [String] = [],
         gradedFolders: [String]? = nil,
         excludedItems: [String: [String]]? = nil,
-        directories: [String] = []
+        coverage: Bool? = nil,
+        directories: [String] = [],
+        writesTheFile: Bool = false
     ) throws -> Course {
         let courseURL: URL = root.appendingPathComponent(name)
         try FileManager.default.createDirectory(at: courseURL, withIntermediateDirectories: true)
@@ -99,6 +107,18 @@ final class GradedFolderChoicesTests: XCTestCase {
         }
         if let excludedItems {
             values["excluded_items"] = excludedItems
+        }
+        if let coverage {
+            values["include_curriculum_coverage"] = coverage
+        }
+        if writesTheFile {
+            let fileURL: URL = courseURL.appendingPathComponent("course_config.json")
+            try JSONSerialization.data(withJSONObject: values, options: [.prettyPrinted, .sortedKeys])
+                .write(to: fileURL)
+            return Course(
+                code: "ICS3U", directoryURL: courseURL,
+                configuration: try CourseConfiguration(contentsOf: fileURL)
+            )
         }
         let configuration: CourseConfiguration = CourseConfiguration(values: values, lastSavedData: Data())
         return Course(code: "ICS3U", directoryURL: courseURL, configuration: configuration)
@@ -232,8 +252,8 @@ final class GradedFolderChoicesTests: XCTestCase {
         let rule: [String: Any] = try GradedFolderChoicesTests.gradedFoldersSection()["removingAFolder"] as? [String: Any] ?? [:]
         let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
         XCTAssertGreaterThanOrEqual(
-            cases.count, 7,
-            "The contract lost removal cases: \(cases.count) present, 7 expected at least."
+            cases.count, 8,
+            "The contract lost removal cases: \(cases.count) present, 8 expected at least."
         )
 
         var index: Int = 0
@@ -269,32 +289,183 @@ final class GradedFolderChoicesTests: XCTestCase {
         }
     }
 
-    /// A removal through the list editor leaves its line on the trail (rule 5):
-    /// one `.itemExcluded` line naming the folder, the list it left and the
-    /// course. Pinned here because the contract runner above now drives the
-    /// same path, and a line that went missing from it would otherwise be
-    /// noticed only when a teacher's report came back without it.
-    func testARemovalThroughTheListEditorLeavesItsLineOnTheTrail() throws {
-        let course: Course = try makeCourse(
-            named: "trail",
-            sharedFolders: ["Concepts"],
-            perSectionFolders: ["All Classes", "Labs"],
-            directories: ["Concepts", "Labs"]
+    // MARK: - The floor
+
+    /// `contracts/shared-rules.json` → `gradedFolders.floor`, every case, on a
+    /// real tree, through the protection Course Settings asks at the moment
+    /// of the gesture: the Marks checklist's for an untick, the row's in the
+    /// shared or per-section folder list for a removal (#152).
+    ///
+    /// The three outcomes are asserted WITH their sentence, so a case cannot
+    /// pass on another block — a per-section fixture with one per-section
+    /// folder would otherwise be "refused" by `lastPerSectionFolderBlocked`.
+    /// Every failing case is collected and reported together, so a mutation's
+    /// red set reads as one line.
+    func testTheMarksFloorMatchesTheContract() throws {
+        let rule: [String: Any] = try GradedFolderChoicesTests.gradedFoldersSection()["floor"] as? [String: Any] ?? [:]
+        let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(
+            cases.count, 17,
+            "The contract lost marks-floor cases: \(cases.count) present, 17 expected at least."
         )
-        let view: CourseSettingsView = CourseSettingsView(course: course)
 
-        removeThroughTheListEditor("Labs", scope: .perSection, in: view)
+        var failures: [String] = []
+        var index: Int = 0
+        for testCase in cases {
+            let caseName: String = try XCTUnwrap(testCase["name"] as? String)
+            var directories: [String] = try XCTUnwrap(testCase["directories"] as? [String])
+            directories.append("section1")
+            let course: Course = try makeCourse(
+                named: "floor\(index)",
+                sharedFolders: try XCTUnwrap(testCase["sharedFolders"] as? [String]),
+                perSectionFolders: try XCTUnwrap(testCase["perSectionFolders"] as? [String]),
+                gradedFolders: testCase["graded"] as? [String],
+                coverage: testCase["coverage"] as? Bool ?? true,
+                directories: directories
+            )
+            index += 1
+            let view: CourseSettingsView = CourseSettingsView(course: course)
 
-        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
-        var matchingLines: [String] = []
-        for line in trail.components(separatedBy: "\n") {
-            if line.hasSuffix("excluded per-section folder Labs in ICS3U") {
-                matchingLines.append(line)
+            let gesture: [String: Any] = try XCTUnwrap(testCase["gesture"] as? [String: Any], caseName)
+            let folder: String
+            let answer: ItemProtection
+            if let unticked = gesture["untick"] as? String {
+                folder = unticked
+                answer = view.gradedFolderProtection(for: unticked)
+            } else {
+                let removal: [String: Any] = try XCTUnwrap(gesture["remove"] as? [String: Any], caseName)
+                folder = try XCTUnwrap(removal["name"] as? String, caseName)
+                if (removal["scope"] as? String) == "per_section" {
+                    answer = view.perSectionFolderProtection(for: folder)
+                } else {
+                    answer = view.sharedFolderProtection(for: folder)
+                }
+            }
+
+            let expect: String = try XCTUnwrap(testCase["expect"] as? String, caseName)
+            let expected: ItemProtection
+            switch expect {
+            case "refused":
+                expected = .blocked(reason: SpecialNames.lastGradedFolderBlocked)
+            case "confirmed":
+                expected = .consequential(
+                    title: SpecialNames.removeGradedFolderTitle(for: folder),
+                    message: SpecialNames.removeGradedFolderMessage
+                )
+            default:
+                XCTAssertEqual(expect, "ordinary", "\(caseName): an unknown outcome")
+                expected = .ordinary
+            }
+            if answer != expected {
+                failures.append(caseName + " — expected " + expect + ", got " + String(describing: answer))
             }
         }
-        XCTAssertEqual(matchingLines.count, 1, trail)
-        XCTAssertEqual(course.configuration.perSectionFolders, ["All Classes"])
+        XCTAssertEqual(failures, [], "\n" + failures.joined(separator: "\n"))
     }
+
+    /// The floor is decided at the CLICK from the disk as it is then, not
+    /// from the walk the page was drawn with (#152's plan review, finding
+    /// 4). #80's own scenario: Settings is open, the teacher deletes `Tests`
+    /// in Finder and comes back — nothing the page observes has changed, so
+    /// nothing is redrawn, and a decision taken from the drawing's walk would
+    /// still count `Tests` and let the last real folder go.
+    ///
+    /// The lists here are built the way the body builds them: drawn from one
+    /// snapshot, acted on through `protectionWhenActedOn`.
+    func testAClickIsDecidedFromTheDiskAsItIsNotAsTheListWasDrawn() throws {
+        let course: Course = try makeCourse(
+            named: "stale",
+            sharedFolders: ["Concepts", "Tasks", "Tests"],
+            gradedFolders: ["Tasks", "Tests"],
+            directories: ["Concepts", "Tasks", "Tests", "section1"]
+        )
+        let view: CourseSettingsView = CourseSettingsView(course: course)
+        let drawn: MarksFloor.Snapshot = view.marksSnapshot()
+        XCTAssertEqual(view.gradedFolderProtection(for: "Tasks", marks: drawn), .ordinary)
+
+        try FileManager.default.removeItem(at: course.directoryURL.appendingPathComponent("Tests"))
+        XCTAssertEqual(
+            view.gradedFolderProtection(for: "Tasks", marks: drawn), .ordinary,
+            "the drawing's walk still counts Tests — which is why the click must not be decided from it"
+        )
+
+        let checklist: MembershipToggleListView = MembershipToggleListView(
+            title: GradedFolderWording.listTitle,
+            removalTrail: view.removalTrail(for: .marks),
+            allItems: drawn.choices,
+            members: view.gradedFoldersBinding(offered: drawn.choices),
+            protection: { folder in
+                return view.gradedFolderProtection(for: folder, marks: drawn)
+            },
+            protectionWhenActedOn: view.gradedFolderProtection
+        )
+        checklist.toggleMembership(of: "Tasks")
+        XCTAssertEqual(course.configuration.gradedFolders, ["Tasks", "Tests"], "the untick is refused")
+
+        let configuration: CourseConfiguration = course.configuration
+        let sharedList: StringListEditorView = StringListEditorView(
+            title: "Shared folders (all sections)",
+            removalTrail: view.removalTrail(for: .sharedFolders),
+            items: Binding(
+                get: { return configuration.sharedFolders },
+                set: { newValue in configuration.sharedFolders = newValue }
+            ),
+            onRemove: { name in view.folderWasRemoved(name, scope: .shared) },
+            protection: { folder in
+                return view.sharedFolderProtection(for: folder, marks: drawn)
+            },
+            protectionWhenActedOn: view.sharedFolderProtection
+        )
+        XCTAssertNil(sharedList.requestRemoval(of: "Tasks"), "refused, not asked about")
+        XCTAssertEqual(course.configuration.sharedFolders, ["Concepts", "Tasks", "Tests"])
+    }
+
+    /// The body draws every marks question from ONE walk and decides every
+    /// click with a fresh one, and each one-argument protection — what the
+    /// click and `CourseSettingsGestureScript` call — is nothing but the
+    /// two-argument form with a fresh snapshot. `CourseSettingsGestureScript`
+    /// hand-copies the body's wiring (the #183 seam), so if the body and the
+    /// one-argument forms ever diverged, every test through the script would
+    /// stay green while the page did something else. A source scan, because
+    /// the body's closures cannot be reached from a test.
+    func testTheBodyDrawsTheMarksQuestionsFromOneWalk() throws {
+        let sourceURL: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("QuartzTeachers/Views/CourseSettings/CourseSettingsView.swift")
+        let source: String = try String(contentsOf: sourceURL, encoding: .utf8)
+
+        let mustAppear: [String] = [
+            "let marks: MarksFloor.Snapshot = marksSnapshot()",
+            "return sharedFolderProtection(for: folder, marks: marks)",
+            "protectionWhenActedOn: sharedFolderProtection,",
+            "return perSectionFolderProtection(for: folder, marks: marks)",
+            "protectionWhenActedOn: perSectionFolderProtection,",
+            "allItems: marks.choices,",
+            "members: gradedFoldersBinding(offered: marks.choices),",
+            "return gradedFolderProtection(for: folder, marks: marks)",
+            "protectionWhenActedOn: gradedFolderProtection",
+            "return sharedFolderProtection(for: folder, marks: marksSnapshot())",
+            "return perSectionFolderProtection(for: folder, marks: marksSnapshot())",
+            "return gradedFolderProtection(for: folder, marks: marksSnapshot())",
+            // The Revert button goes through the method that writes
+            // `exclusions reverted` (excludedItems.recordedOnClick).
+            "Button(\"Revert\") {\n                    revertToFile()",
+        ]
+        for expected in mustAppear {
+            XCTAssertTrue(source.contains(expected), "CourseSettingsView no longer says: " + expected)
+        }
+        XCTAssertFalse(
+            source.contains("protection: sharedFolderProtection,"),
+            "the shared list would be drawn with a walk per row again"
+        )
+    }
+
+    // MARK: - The trail
+
+    /// When `item excluded`, `item re-included` and `exclusions reverted` are
+    /// written — on the click, and at a Revert — is
+    /// `contracts/shared-rules.json` → `excludedItems.recordedOnClick`, played
+    /// through this same page by `ExcludedItemsContractTests`.
 
     /// The still-offered question itself, asked the way the BUILD asks it.
     ///

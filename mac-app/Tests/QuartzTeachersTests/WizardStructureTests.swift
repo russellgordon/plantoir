@@ -507,6 +507,37 @@ final class WizardStructureTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(casesPlayed, 44, "every case, and one per payload for the sweep")
     }
 
+    /// `contracts/shared-rules.json` → `gradedFolders.reconcilingAChosenPool`
+    /// through `GradedFolderRule.reconciled`, the one copy of the rule the
+    /// wizard and the manifest reader share (#152, from #85's second item).
+    /// The command line runs the same cases through `graded_folders_for`.
+    func testAChosenPoolIsReconciledAsTheContractSays() throws {
+        let rule: [String: Any] = try WorkLeaseLivenessTests.sharedRules(["gradedFolders", "reconcilingAChosenPool"])
+        let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 7, "the contract lost reconciling cases")
+        for testCase in cases {
+            let caseName: String = testCase["name"] as? String ?? "unnamed"
+            let declared: [String] = try XCTUnwrap(testCase["declared"] as? [String], caseName)
+            let folders: [String] = try XCTUnwrap(testCase["folders"] as? [String], caseName)
+            let expected: [String] = try XCTUnwrap(testCase["expect"] as? [String], caseName)
+            XCTAssertEqual(GradedFolderRule.reconciled(declared, toFolders: folders), expected, caseName)
+        }
+    }
+
+    /// The same rule reaches the file Create writes: a course made from
+    /// scratch with a shared folder spelled `tasks` and the wizard's default
+    /// pool `["Tasks"]` is written `["tasks"]`, as the command line writes it
+    /// — not the empty pool an exact match gave, which read as "asked, and
+    /// nothing counts".
+    func testCreateWritesAChosenPoolInTheFoldersOwnSpelling() {
+        let wizard: NewCourseWizardView = NewCourseWizardView(
+            startedForTesting: true, courseCode: "ZZZ9Z", prepopulatesExampleContent: false,
+            startsFromSkeleton: false, sharedFolders: ["Concepts", "tasks"], gradedFolders: ["Tasks"]
+        )
+        let configuration: [String: Any] = wizard.buildConfigurationDictionary(code: "ZZZ9Z", name: "Respelled")
+        XCTAssertEqual(configuration["graded_folders"] as? [String], ["tasks"])
+    }
+
     // MARK: - What must not move
 
     /// A teacher who TAKES the example content gets byte for byte the

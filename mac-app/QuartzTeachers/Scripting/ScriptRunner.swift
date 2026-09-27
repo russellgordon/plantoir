@@ -729,12 +729,17 @@ class ScriptRunner {
                 course: report.course, section: report.section
             )
         }
+        // Which curriculum maps the build wrote (#128), read the same way.
+        CoverageMapsBuilt.noteOnTheTrail(from: text)
         // A launcher that waited for, or refused on, something running in
         // the folder's workspace before remaking it (#94).
         WorkspaceInUseReport.noteOnTheTrail(from: text)
         // A preview whose address was held by something else on this Mac,
         // or whose look could not be made (#310).
         PreviewAddressHeldReport.noteOnTheTrail(from: text)
+        // The helper programs installed and the website builder created on
+        // a first run, and where each came from (#312).
+        HelperBootstrapReport.noteOnTheTrail(from: text)
         // A How I Teach page the course had listed for the website, kept off
         // it by this build (#209).
         HowITeachKeptOffReport.noteOnTheTrail(from: text)
@@ -895,16 +900,12 @@ class ScriptRunner {
     /// `"sentence":` ends in a colon, and would otherwise be offered to the
     /// teacher as something to answer, raw JSON and all.
     static func looksLikeQuestion(_ line: String) -> Bool {
-        if SiteHealthFinding.isMarkerLine(line) || PagesDatedByTheBuild.isMarkerLine(line) {
+        // Every marker, by the one rule (#128) that subsumes each reader's own
+        // `isMarkerLine`.
+        if BuildMarkerLine.isMachineLine(line) {
             return false
         }
-        if WorkspaceInUseReport.isMarkerLine(line) {
-            return false
-        }
-        if PreviewAddressHeldReport.isMarkerLine(line) {
-            return false
-        }
-        if HowITeachKeptOffReport.isMarkerLine(line) {
+        if HelperBootstrapReport.isMarkerLine(line) {
             return false
         }
         if line.hasSuffix(":") || line.hasSuffix("?") || line.hasSuffix(">") {

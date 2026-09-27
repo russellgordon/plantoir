@@ -1,7 +1,8 @@
 import Foundation
 
 /// The twenty-two tools that exist, and the thirteen of them the local model
-/// is shown.
+/// is shown — plus the twelve only an MCP client is offered (`mcpOnlyTools`),
+/// thirty-four in all on that surface.
 ///
 /// It was fifteen when routing accuracy was measured, and the seven that came
 /// after — reading and recording a section's timetable, adding the next class
@@ -27,9 +28,17 @@ import Foundation
 /// than silently widening a gap nobody restates. The prose still has to be
 /// grepped for and corrected by hand, which is how these were found.
 ///
-/// The descriptions are the Windows server's own, put through the same
-/// shortening rule the narrowed surface uses there: keep the `TEACHERS SAY:`
-/// clause whole, then the first sentence of the rest, and nothing else.
+/// **There is ONE description per tool, and it is pinned in the contract**
+/// (#114, decided 2026-09-09 and 2026-09-26): `contracts/assist-cases.json`
+/// → `toolDescriptions`, hand-written, which `AssistToolDescriptionContractTests`
+/// holds equal to every description below byte for byte. So editing one here
+/// fails the mac suite until the contract is edited too — and a description
+/// is a routing change, so measure first (doc 10, "One description per
+/// tool"). The local model is shown the same text, never a shortened copy.
+/// (This comment used to say the descriptions were the Windows server's own,
+/// shortened; they had diverged — 28 of 32 by 2026-09-26. The mac serves the
+/// pinned text; Windows is owed it, behaviour and measurement first — the
+/// `windows` issue from #197/#114.)
 ///
 /// The `TEACHERS SAY` phrasings are load-bearing rather than decorative — they
 /// are what took routing from 69% to 91% — so they are COPIED, not improved.
@@ -92,9 +101,11 @@ extension AssistToolRunner {
 
     /// The tools the LOCAL model is actually shown.
     ///
-    /// Everything above still RUNS; this is only what the model is asked to
-    /// choose between, and every schema in the list costs it context and
-    /// accuracy. Nine are left out — the seven `plan_` twins, plus the two
+    /// Everything above still RUNS when code asks for it — plan mode, a
+    /// matched phrasing, an MCP client; this is only what the model is asked
+    /// to choose between, and every schema in the list costs it context and
+    /// accuracy. A local model that names something NOT on this list is
+    /// refused rather than obeyed (#327). Nine are left out — the seven `plan_` twins, plus the two
     /// named in `hiddenFromTheLocalModel` below — and none of them loses a
     /// teacher anything:
     ///
@@ -161,6 +172,16 @@ extension AssistToolRunner {
     /// small local model — and the local surface would owe a routing
     /// re-measurement for them.
     ///
+    /// The start-of-year pair joined for a fourth reason (#96): getting a
+    /// section ready puts every class after the first into draft at once,
+    /// which is a whole-section change a person should read in full, and the
+    /// app has its own button for it — so the local model needs no route to
+    /// it, and showing it one would be a routing change that needs the suites
+    /// re-run. **Appended here, never to `tools`**, so the local list and its
+    /// hash do not move; a must-fail proves it (M8). Should a fixed phrasing
+    /// ever reach it from the assistant window, the card must carry the
+    /// twin's plan code to the write, or every attempt is refused (R9).
+    ///
     /// What they share is only the test that matters: none of them costs the
     /// thirteen-tool surface the routing figures were measured against.
     static let mcpOnlyTools: [AssistToolDefinition] = [
@@ -177,6 +198,8 @@ extension AssistToolRunner {
         readHowITeachTool,
         planWriteHowITeachTool,
         writeHowITeachTool,
+        planPrepareForStartOfYearTool,
+        prepareForStartOfYearTool,
     ]
 
     /// Everything the MCP client may call: every tool that exists, plus the
@@ -341,7 +364,15 @@ extension AssistToolRunner {
         // recommendation rather than a boundary. The over-publish it was
         // meant to prevent is handled in code instead — see
         // `AssistToolRunner`'s refusal of an open-ended range — which cannot
-        // cost accuracy because it changes nothing the model reads.
+        // cost accuracy because it changes nothing the model reads. So is
+        // `"pages": "all"` (#197): a page list naming no page is answered in
+        // `AssistToolRunner.pagePlan`, not by a sentence here.
+        //
+        // Pinned in `toolDescriptions` (#114). Windows' "optionally along
+        // with every page they link to" was measured against this text on
+        // the smaller assistant: it ran "Put up Unit 3, Day 2 … along with
+        // everything it points at" to the length cap 10 times in 10, and this
+        // text does not.
         description: "Make pages visible to students, along with every page they link to, then rebuild "
                    + "the section preview. The linked pages come by themselves — there is nothing to ask "
                    + "for and no way to leave them out, because a published page whose links lead nowhere "
@@ -976,6 +1007,55 @@ extension AssistToolRunner {
         ],
         required: ["course", "section", "page", "codes"],
         readOnly: true,
+        needsApproval: false
+    )
+
+    // MARK: - The start of the year (#96)
+
+    private static let planPrepareForStartOfYearTool: AssistToolDefinition = AssistToolDefinition(
+        name: "plan_prepare_for_start_of_year",
+        description: "Work out what getting a section ready for the start of the year would do, changing "
+                   + "nothing. Lists every page that would go into draft and why, what stays, the links "
+                   + "that would lead to hidden pages, and the plan code prepare_for_start_of_year needs.",
+        parameters: [
+            "course": courseHelp,
+            "section": sectionHelp,
+        ],
+        required: ["course", "section"],
+        readOnly: true,
+        needsApproval: false
+    )
+
+    private static let prepareForStartOfYearTool: AssistToolDefinition = AssistToolDefinition(
+        name: "prepare_for_start_of_year",
+        description: "TEACHERS SAY: \"get ready for the start of the year\", \"put everything after the "
+                   + "first class into draft\", \"hide every class past Day 1\". Put every class after "
+                   + "the first into draft, with the pages only later classes use, leaving the first "
+                   + "class, the pages it links to, Key Links and the pages it lists, folder pages and "
+                   + "curriculum pages as they are. Call plan_prepare_for_start_of_year FIRST, show the "
+                   + "teacher the whole plan and wait for them to agree; then pass the code the plan "
+                   + "gave. The course is backed up first, and undo_last_change takes it back. Nothing "
+                   + "reaches students until they deploy.",
+        parameters: [
+            "course": courseHelp,
+            "section": sectionHelp,
+            // NOT required, deliberately (the plan review's M4): a call
+            // without it has to be REACHABLE, because the answer to it is
+            // the plan and its code rather than an error the client cannot
+            // act on — and the contract's scenario for exactly that call is
+            // unrunnable through a real MCP client if the schema forbids it.
+            "planCode": AssistSchemaProperty(
+                kind: .string,
+                description: "The code on the line that starts \"Plan code:\" in the plan "
+                           + "plan_prepare_for_start_of_year gave, for example \"3f9a1c07\". Without it, or if the section has changed since, "
+                           + "nothing is changed and the current plan comes back instead."
+            ),
+        ],
+        required: ["course", "section"],
+        readOnly: false,
+        // Not a deploy — nothing reaches students — and it has a plan gate
+        // of its own (the code) and an undo, the same reasoning as
+        // `re_date_classes`.
         needsApproval: false
     )
 
