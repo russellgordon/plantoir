@@ -1,5 +1,5 @@
 {
-  "note": "One entry per screenshot on plantoir.app. `build.py` reads alt and caption to write the <picture> element; `website/shots/capture.py` reads `capture` to know how each is produced. Every shot is taken twice, once with the Mac in light appearance and once in dark, and saved as site/img/<id>-light.png and -dark.png. Paths are lowercase because Quartz serves lowercase URLs and 301s anything else — a capitalised address would be photographed mid-redirect. Since v1.4.0: `capture.scene` names the scene in capture.py that makes the shot (`capture.py --only <scene>`); `capture.workspace` says which working folder it is taken in ('marketing' = ~/Plantoir Marketing, ICS3U; 'demo' = ~/Desktop/Teaching, the three published demo courses); `expectText` lists words the finished picture must show, read back with Vision text recognition, so a picture of the wrong state fails its scene; `awaiting_capture` marks a shot the pages already name whose capture waits for the release it photographs (build.py renders nothing for it meanwhile); `windows: true` marks the ids capture_windows.py also takes.",
+  "note": "One entry per screenshot on plantoir.app. `build.py` reads alt and caption to write the <picture> element; `website/shots/capture.py` reads `capture` to know how each is produced. Every shot is taken twice, once with the Mac in light appearance and once in dark, and saved as site/img/<id>-light.png and -dark.png. Paths are lowercase because Quartz serves lowercase URLs and 301s anything else — a capitalised address would be photographed mid-redirect. Since v1.4.0: `capture.scene` names the scene in capture.py that makes the shot (`capture.py --only <scene>`); `capture.workspace` says which working folder it is taken in ('marketing' = ~/Plantoir Marketing, ICS3U; 'demo' = ~/Desktop/Teaching, the three published demo courses); `expectText` lists words the finished picture must show, read back with Vision text recognition, so a picture of the wrong state fails its scene; `awaiting_capture` marks a shot the pages already name whose capture waits for the release it photographs (build.py renders nothing for it meanwhile); `waiting_on: \"#<issue>\"` beside it names the GitHub issue a capture waits on for a reason that is not the release — `--deploy` lets such a shot through, and the capture removes both flags; `windows: true` marks the ids capture_windows.py also takes.",
   "shots": [
     {
       "id": "hero",
@@ -196,7 +196,8 @@
           ]
         }
       },
-      "awaiting_capture": true
+      "awaiting_capture": true,
+      "waiting_on": "#367"
     },
     {
       "id": "reference",
@@ -306,7 +307,8 @@
       "expectText": [
         "How I Teach"
       ],
-      "awaiting_capture": true
+      "awaiting_capture": true,
+      "waiting_on": "#367"
     },
     {
       "id": "club",

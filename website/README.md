@@ -310,7 +310,11 @@ under `retake`. Pictures are checked in a staging folder and only those that
 pass are promoted; a shot taken in both appearances then loses
 `awaiting_capture`, and a retake's words are promoted with its picture
 (`capture.py → promote_captured_shots`), so the words never describe a
-picture that is not there. `--check` also reports a link to `page/#section`
+picture that is not there. A shot that cannot be taken for a reason that is
+not the release — the Mac's Focus, somebody's open Obsidian — carries
+`waiting_on: "#<issue>"` as well: `--deploy` lets it through, the section goes
+out on its text alone, and the issue says how to take it (the first two were
+`schedule` and `how-i-teach`, #367). Only an issue reference counts. `--check` also reports a link to `page/#section`
 whose section does not exist.
 
 ## What the pages read from data

@@ -1329,6 +1329,9 @@ def promote_captured_shots(passed: list[str]) -> None:
             continue
         if shot.pop("awaiting_capture", None):
             changed.append(f"{identifier}: taken")
+        issue = shot.pop("waiting_on", None)
+        if issue:
+            changed.append(f"{identifier}: no longer waiting on {issue} — close it when every shot it names is taken")
         retake = shot.pop("retake", None)
         if retake:
             for key in ("alt", "caption", "expectText"):
