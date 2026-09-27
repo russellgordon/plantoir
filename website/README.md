@@ -233,8 +233,11 @@ python3 website/build.py && python3 website/build.py --check
 **Before starting:** the screen unlocked and left alone for about an hour,
 Focus off, Plantoir's notifications allowed, the Safari profile `⎚` present,
 nothing else using Xcode, and the app built from the tree you are releasing
-(the Dock rebuild — `capture.py` photographs the newest Debug build in
-DerivedData). The run asks for Safari and UI-automation permission in its first
+(the Dock rebuild — `capture.py` tests the project in the checkout it sits in,
+and copies launchers from THAT checkout's Debug build, found by the
+`WorkspacePath` DerivedData records; until 2026-09-27 it took whichever
+`Plantoir-*` folder sorted last, which on a Mac with several clones was
+another clone's two-day-old bundle). The run asks for Safari and UI-automation permission in its first
 minute; answer both and walk away.
 
 **The marketing folder** (`website/shots/marketing_folder.py`) is made once and
@@ -251,13 +254,23 @@ missing, then, in the folder only — never the shipped payload:
   no reading of the columns can set out faithfully: `--provision` writes a draft
   of each into `.sources/College Board Curriculum drafts/`, and a person sets it
   out from the document into `.sources/College Board Curriculum/`, which is
-  then used as it is;
+  then used as it is (checked only for the objective's words and every EK
+  code — so READ the document's pages, not the draft: the drafts lose the
+  `←` arrows, even in statements not flagged as drawn, and miss a bullet
+  that runs onto the next page). The ten set out on 2026-09-27 put each
+  Text and Block form in its own fenced code block, the Block form as the
+  words drawn with nesting shown by indentation, the drawn boxes around
+  arguments left out and a box standing for a list or an index written as
+  `[ ]`;
 - an embed per objective in each activity `shots/csp-correlation.json` names,
   inside its existing `## Curriculum connection` block after the Ontario ones
   (the map counts transclusions, never plain links);
 - `How I Teach.md` (our own words, `shots/marketing/`), and a folder
   destination (`School Web Space`) so the scheduled publish makes nothing
-  public;
+  public. The new-course panel writes `deploy_target: netlify` for every
+  course, so `netlify` with no site recorded (`.netlify_sites/`, or a
+  section's older `.netlify_site.json`) is not a choice and is replaced; any
+  other destination, or Netlify once a site is recorded, is left alone;
 - a reference copy of ICS3U for 2025–26, through the app.
 
 Every step says "made" or "already there", a second run changes nothing, a file
