@@ -1881,6 +1881,45 @@ curriculum folder is what let the retired sentence sit unguarded, and the
 banned-word sweep could not stand in for it — a banned word catches only that
 word.
 
+### Curriculum folders: several maps, protection and the offer (#128)
+
+A course has one coverage map per declared curriculum folder that holds
+expectation pages (the rule and its reasons: `05-build-pipeline.md` → "The
+curriculum coverage maps"). Three places in the app follow it, all through
+`CurriculumFolderRule` in `SpecialNames.swift`, which is the build's rule over
+the course's SHARED folders:
+
+- **Protection** (`CurriculumFolderProtection.decide`, asked by Course Settings
+  and the wizard alike): only the LAST folder with a map is refused while the
+  map is on; the others ask first with
+  `SpecialNames.removeCurriculumFolderWithItsMapMessage`, which deliberately
+  does not promise that another map stays. The folders with a map are read
+  from the disk (`CurriculumFolderRule.foldersWithPages`, recursive, the same
+  code rule as the build); the wizard, with nothing on disk yet, counts the
+  payload's folder when its pages are being installed. Course Settings asks
+  once per row, so the disk answer is kept for two seconds per course — long
+  enough to cover one drawing of the lists, short enough that a page added in
+  Obsidian shows up.
+- **"Folders Plantoir uses"** names every curriculum folder with a map and
+  every map page, `whyForSeveral` when there is more than one.
+- **"Curriculum folders"** — checkboxes under the shared folders, in both
+  Course Settings and the wizard, shown only when there are two or more
+  folders to choose between (`CurriculumFoldersOffer`). Ticked are the
+  folders with a map — even on a course that declared nothing, so the first
+  tick writes them FIRST and never drops the map the build's fallback found —
+  then every declared folder, so a folder ticked before its first page is
+  written stays ticked (the review's finding 2); the last ticked folder cannot
+  be unticked. Whatever writes the list also writes its first folder in the
+  legacy `curriculum_folder`, for an older Plantoir on another Mac. The wizard writes
+  `curriculum_folders` only when the teacher touched the list, so every
+  existing wizard path writes the same file as before
+  (`WizardStructureTests`' golden).
+
+The build's `PLANTOIR_MAPS:` line is read by `CoverageMapsBuilt` (console and
+scheduled log) into `curriculum maps built` on the trail, and since this piece
+`BuildMarkerLine` keeps ANY `PLANTOIR_…:` line out of the console, so a marker
+the app has no reader for yet never reaches a teacher as raw JSON.
+
 ## The wizard's Starting Content section, and what governs what
 
 Five toggles can appear there, and their ORDER is their dependency, read
@@ -2231,6 +2270,18 @@ two lists.
 - *A file watcher per window*: a new moving part, for what reload-after-Save and
   reload-on-open already cover.
 
+**`followWrite` reaches WINDOW models only — the assistant reads at the call
+instead** (#322). The assistant's window and the `--mcp-stdio` server each own
+a `WorkspaceModel` that no window shows, and a Save never reached either: they
+held the settings as they were when they started, until a folder deploy was
+refused as "never deployed" and an outside assistant deployed to a
+destination the course had left. They now rediscover the courses on every
+tool call (`WorkspaceModel.readCoursesAsSavedNow()`), which never touches a
+window's model. Two mechanisms on purpose: an in-process follow cannot reach
+another process, and a per-call read must never replace a window's unsaved
+edits. The whole story is docs 10 → "Settings are read at the call, not when
+the window opened (#322)".
+
 **What a Save tells you** (`SettingsSaveNotice`). A preview and a publish read
 the settings once, when their build begins — measured: 20 s after a Save the
 served sidebar filter was unchanged. So:
@@ -2310,6 +2361,21 @@ unsaved settings` and `preview again after settings saved`.
 `PreviewLeases.active` and `CourseActivity.activePublishes`; no cell of the
 sidebar table asks the course anything while drawn (the #266 rule above).
 
+
+**A Save that affects a scheduled deploy says so** (#323). Since #323 a
+scheduled run reads the course's settings when it fires, so a Save can move or
+break a deploy already set. After a Save, for each section with a deploy set to
+happen on its own in THIS working folder and still to come,
+`SettingsSaveNotice.scheduledDeploysAtSave` decides one sentence:
+`SpecialNames.settingsSaveScheduledDeployCannotGoAheadAsSetNow` when it could
+not go ahead as the course is set now (changed or not), else
+`settingsSaveScheduledDeployGoesWhereTheCourseDeploysNow` when this Save changed
+where the course deploys (the file BEFORE the Save against what it wrote).
+They come before the "saved while publishing" early return, so a Save during a
+publish still says them; nothing is refused or undone. The trail's `settings
+saved` line carries the same facts from `SettingsSaveNotice.scheduledDeploys`.
+Contract: `savingSettings.scheduledDeploys`; the whole story is docs 07, "Where
+it deploys is read when it runs (#323)".
 ## Two programs, one course: the build, preview and publish leases (#156)
 
 Written 2026-09-25 for [issue #156](https://github.com/russellgordon/plantoir/issues/156).
@@ -2628,9 +2694,13 @@ Folder rows in Course Settings carry a pencil. It renames the folder **on
 disk** — in every section that has one — rewrites the qualified links that name
 it, and carries across every `course_config.json` key that mentioned it
 (`shared_folders`/`per_section_folders`, `graded_folders`, `curriculum_folder`,
-`class_folder`, `hidden`, `expandable`, `excluded_items`). Renaming the class
-folder or the curriculum folder also WRITES its key, even on a course that
-never had one — a rename is the one moment Plantoir witnesses the change, and
+`curriculum_folders`, `class_folder`, `hidden`, `expandable`, `excluded_items`).
+Renaming the class folder or ANY curriculum folder also WRITES its key, even on
+a course that never had one — `curriculum_folders`, the declared list (or the
+folders the course resolves to, read from the disk BEFORE the move) with the
+new name in the old one's place, so the primary map keeps its title (#128); the
+legacy `curriculum_folder` is written naming the list's first folder, for an
+older Plantoir that reads only that key — a rename is the one moment Plantoir witnesses the change, and
 without it the guess that finds those folders stops finding them with nobody
 told.
 
@@ -2644,15 +2714,17 @@ Four things about it are deliberate:
 - **It runs off the main actor.** The move is quick; reading every page in the
   course to rewrite links is not, on an iCloud-backed vault where an evicted
   file downloads on read.
-- **The new name is spelled differently in the two kinds of link**, and this
-  is measured rather than chosen. A Markdown destination ends at the first
+- **The new name is spelled differently in the three kinds of link**, and
+  this is measured rather than chosen. A Markdown destination ends at the first
   space, so a name containing one is percent-encoded on the way in
   (`[q](All%20Tasks/Quiz.md)`); a wikilink keeps the plain spelling, because
-  `[[All Tasks/Quiz 1]]` is exactly how Obsidian writes one. Which characters
+  `[[All Tasks/Quiz 1]]` is exactly how Obsidian writes one; and inside angle
+  brackets, `[q](<All Tasks/Quiz 1.md>)`, the name goes in plain too, unless it
+  holds a `<`, a `>` or a line break (#97). Which characters
   are encoded is fixed by what the built site can decode, not by any general
   URL rule — `&` and `,` are left alone on purpose, and a name needing nothing
   is left exactly as the teacher typed it. The rule, the measurements and the
-  twelve cases both apps run are in
+  cases both apps run are in
   [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
   `specialNames.renameFolder.linkRewriting`, and which suite deserialises them
   is recorded in [`contracts/README.md`](../contracts/README.md) rather than
@@ -6075,11 +6147,11 @@ and the deploy button — are the app's, not the tool's: over MCP the client is
 told which tools write (`readOnlyHint`) and does its own asking. The app itself answers the flag —
 `Plantoir.app/Contents/MacOS/Plantoir --mcp-stdio <working-folder>` — rather
 than shipping a second binary, so no packaging step can leave it out. Claude
-Code is offered a LONGER list than the local model — 32 tools against 13, with
+Code is offered a LONGER list than the local model — 35 tools against 13, with
 the local model seeing exactly the thirteen its routing was measured against.
-The ten it does not see are off its list for three different reasons: reading
-the curriculum and pointing a page at the expectations that fit is a judgement
-about meaning; listing the folder's courses and explaining what publishing
+The thirteen it does not see are off its list for three different reasons: reading
+the curriculum and pointing a page at the expectations that fit, and reading or
+drafting the teacher's How I Teach page (#209), are judgements about meaning; listing the folder's courses and explaining what publishing
 means are things a window scoped to one section never has to ask; and filling
 out a unit, making room in one and taking a copy are things it can already
 reach through a fixed phrasing, matched in code, that never consults a model.
@@ -6557,7 +6629,7 @@ that message, so it turns red the day the backup stops blocking.
 (the flag is read before the server starts) and is untested — a cheap
 follow-up for verify-deploy's headless refresh.
 
-## Testing: the tests that read the real window, and a window on another Space (#249)
+## Testing: the tests that read the real window, and a window on another Space or a locked screen (#249, #315)
 
 Written 2026-09-25. Six test classes read the real window through the
 accessibility tree, starting at `AXUIElementCreateApplication` on the test
@@ -6617,7 +6689,13 @@ that want `INTEGRATION_WORKSPACE` — plus a fourth,
 `QuitScriptRunsTests.testTheSharedMachineIsStoppedOnAClearAnswer`, whenever
 any launcher is running on the Mac (a preview in the app, another session's
 `verify.sh`; #243 is fixing that class). More than 3 means read the skip
-reasons: a Space skip says so, and so does that one. A test that always skips is a test nobody runs, and that
+reasons: a Space skip says so, and so does that one. **A run made while the
+screen is locked — the overnight gates, with nobody at the Mac — shows 8 more
+skipped and 0 failures** (`AccessibilityInspectorTests` 2 — the two live
+tests — `HitAreaTests` 1, `RemovalButtonTests` 1, `WindowPathBarTests` 1,
+`SidebarRestorationProbeTests` 2, `InAppUserInterfaceTests` 1), each reason
+naming #315; before #315 the same run showed 16 failures. A run with the
+window on a hidden Space skips the same 8, for the Space. A test that always skips is a test nobody runs, and that
 is the risk this change carries; the reason in the log is the defence. One
 way it could happen for good is the test host (the same bundle as the
 teacher's app) restoring a full-screen window. Checked 2026-09-25 after the
@@ -6645,15 +6723,107 @@ full-screen probe: there is no `Saved Application State` folder for
 - **Opt-in behind a flag**, as Windows' `PLANTOIR_UI_TESTS=1` is. An opt-in
   test is one nobody runs, and in the normal case these pass in the gate.
 
-**Test hygiene only**: no product file changed, so there is no
-`GUI-IMPROVEMENTS.md` row, no contract case, no trail event and no `windows`
-issue. Windows has no Spaces, and its UI Automation tests already require the
-foreground by design.
+**Test hygiene only**, for #249 and #315 alike: no product file changed, so
+there is no `GUI-IMPROVEMENTS.md` row, no contract case, no trail event and no
+`windows` issue. Windows has no Spaces, and its UI Automation tests already
+require the foreground by design, so nobody runs them locked. If one ever is,
+the rule below transfers: skip only when the app is absent from the tree AND
+the workstation is locked, never on the lock alone.
 
 **Honest limit.** Removing the check from one class and running it on the
 showing Space still passes, so the call sites are not proven by a must-fail;
 only the predicate is. The off-Space end-to-end path was measured with the
 probe above, before the helper existed, not re-run against it.
+
+### A locked screen, and another account on the screen (#315)
+
+Written 2026-09-26. The overnight gates run with the Mac locked, and every
+one of them showed the same 16 failures in the six classes above (`ready/`
+reports for #292, #294, #310 and #311 in the v1.3.2 run, each with
+`CGSSessionScreenIsLocked` read from `ioreg` at the time). A locked screen
+empties the tree as a hidden Space does, but the #249 check asks only about
+the Space, and on a locked screen it let every one of them through to fail
+(16 matches the class-by-class count of assertions exactly — which means the
+window read as visible and on the showing Space, or as hidden; the #249 check
+returns nil for both). A column of red that is always red for the same
+reason is one readers learn to ignore, and then a real failure hides in it.
+
+**What the window server says, measured.** `CGSessionCopyCurrentDictionary()`
+describes the login session the test host runs in; `ioreg -n Root -d1`
+shows the same record for every session under `IOConsoleUsers`.
+
+| Session state | `CGSSessionScreenIsLocked` | `kCGSSessionOnConsoleKey` | Where it was read |
+|---|---|---|---|
+| unlocked, at the Mac | **absent** (not false) | `1` (a `CFBoolean`) | in-process, in the test host, 2026-09-26, Darwin 25.6 |
+| locked | true | — | `ioreg`, four gate runs, 2026-09-2x |
+| another account using the screen (fast user switching) | absent | `No` | `ioreg`, the `plantoir` account behind Russell's, 2026-09-26 |
+
+The locked row has not yet been read inside the test host; see "Honest
+limit" below. A lock check on its own would miss the switched-away
+row — it carries no lock key at all — so both keys are read.
+
+**What the tests do now.** `AccessibilityInspector.SessionFacts` holds the
+two answers; `sessionFacts(from:)` reads them from the dictionary, accepting
+a Bool or a number, and reads a nil dictionary or a missing key as unlocked
+and on the console — "we could not tell" never causes a skip.
+`reasonTheWindowCannotBeRead` takes the session as a parameter with no
+default, so no caller can quietly leave it out, and asks in this order:
+
+1. The tree lists the test's window: nil. **First, so the session can only
+   ever EXPLAIN a window that is already missing — it cannot cause a skip
+   while the window can be read.** A reader stuck on "locked" therefore
+   skips only runs that were failing anyway.
+2. No test window among the app's windows: nil — a real fault, as before.
+3. The screen is locked: skip, saying so (#315).
+4. Another account has the screen: skip, saying so (#315).
+5. The window is not visible: nil, as before.
+6. On the showing Space: nil; otherwise the #249 Space skip.
+
+Steps 3 and 4 come before the visibility check on purpose: what AppKit says
+about visibility on a locked screen is not what a skip should rest on, and
+the only thing the order can mask is a hidden-window fault during a locked
+run, which the next unlocked run catches. No call site changed — all six
+classes already call `skipUnlessTheWindowCanBeRead` before every walk.
+
+Ten must-fail mutations over the decision and the reader went red
+(`AccessibilityInspectorTests`), among them: the session checked before the
+tree, the session checked before finding the test's window, the lock key
+misspelt, a number-only reader, and a live test
+(`testTheLiveSessionReadsUnlockedWhenTheWindowIsReadable`) that turns red if
+`currentSessionFacts` is stuck on locked while the tree can read the window.
+The six classes unlocked, after the change: 26 tests, 0 failures, 0 skipped.
+
+**Rejected:**
+
+- **Skip on the lock alone, with no tree check.** It would hide a real fault
+  in any locked run where the tree still works. The tree check is what makes
+  the lock a reason rather than an excuse.
+- **Skip while `ScreenSaverEngine` runs.** Whether a screensaver WITHOUT a
+  lock empties the tree is not measured; on this Mac the lock is immediate
+  (`sysadminctl -screenLock status`), so the lock key covers it. A skip on a
+  process being present is guesswork.
+- **Listen for `com.apple.screenIsLocked` notifications.** State kept across
+  a run, and blind to a lock that began before the test host launched.
+- **`IOConsoleLocked` from the registry root as the reader.** Just as
+  undocumented, and it does not cover another account on the screen. It is
+  the fallback if the session key ever stops appearing.
+- **Fail with a clearer message.** Still red on every away-from-desk run.
+- **Keep the Mac awake or unlocked for the run.** That changes Russell's
+  security settings; not ours to change.
+
+**If macOS renames either key**, the check stops firing and the tests go back
+to FAILING, not passing: it fails safe.
+
+**Honest limit.** The lock key was read from `ioreg` on a locked screen and
+from the test host's own session dictionary on an unlocked one, but not yet
+from inside the test host while locked: on 2026-09-26 the Mac stayed unlocked
+(display sleep held off) for the whole session, and locking it from a session
+that cannot unlock it again was not ours to do. `ioreg`'s `IOConsoleUsers`
+entry and the in-process dictionary carried the identical keys in the
+unlocked reading, so the two are the same record. The first locked gate run
+settles it: 8 skips naming #315 and 0 failures means the key fired; the old
+16 failures mean it did not, and `IOConsoleLocked` is the fallback. Either
+way the result is a failure or a skip with a reason, never a silent pass.
 
 ## A test host that segfaults, and the six levers that look like they should fix it
 

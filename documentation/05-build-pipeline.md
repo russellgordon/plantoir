@@ -8,7 +8,7 @@ site and either serves it (preview mode, the default) or builds it statically
 (`--build-only`, used by deploy).
 
 To achieve maximum performance across all host operating systems (especially
-Windows WSL2 and macOS Colima/Lima mounts), the pipeline uses a **dual-workspace
+macOS Colima/Lima mounts, and historically Windows WSL2), the pipeline uses a **dual-workspace
 architecture**:
 
 ```
@@ -140,6 +140,57 @@ discovery, every new folder would require re-running the setup wizard;
 with it, the folder just shows up on the next preview. Reserved names
 (`Media`, `.obsidian`, `.merged_output`, `node_modules`, `course_config.json`,
 OS junk files) are excluded from discovery.
+
+<a name="how-i-teach"></a>
+
+### The teacher's How I Teach page never reaches a site (#209)
+
+`How I Teach.md` at the top of a course folder is the teacher's own account of
+how the course is taught, read by the outside doors
+([10 → "Telling an outside assistant how the course is taught"](10-local-ai-assistant.md#telling-an-outside-assistant-how-the-course-is-taught-209)).
+Before #209, discovery listed it like any top-level file and the site
+published it — measured on a scratch course, at the course's top level and at
+`section1/`'s, both. `publish: false` cannot be the guarantee (a later
+`publishForSection<N>: true` beats it, and a page typed in Obsidian has no
+flag at all), so the build keeps it off by LOCATION, asking
+`scripts/how_i_teach.py` at four points, all in the ALWAYS section so no
+course needs `--full-rebuild`:
+
+1. **Discovery** — `discover_shared_items` / `discover_section_items` never
+   list it.
+2. **Preflight** — a name ALREADY listed in `shared_files` /
+   `per_section_files` (a course whose page predates the rule) is dropped and
+   the configuration written back, the way an excluded name is; the in-memory
+   config a build is handed without a write (`_dropping_excluded_items`) drops
+   it too.
+3. **The copy lists** are filtered where they are READ, not in each loop, so a
+   copy loop added later inherits the rule.
+4. **A final sweep** (`remove_from_content_root`) deletes any match from the
+   top of the merged `content/` before the health checks and Quartz — the
+   backstop that makes the guarantee a property of the output. Top level only:
+   inside a folder the name is an ordinary page, and the sweep only ever
+   touches the build's own copy, never the teacher's folder.
+
+The name is matched whole, after NFC, with only A–Z folded; at the top of a
+section folder too, because a section's top-level files land in the same place.
+The console says `howITeachPage.keptOffTheWebsiteLine` when a page is found,
+and names a LOOK-ALIKE ("How I Teach 1") that WILL be published
+(`lookAlikeLine`) — that silent publication is the failure the exact name risks.
+When a page the settings had listed is dropped, the build prints
+`PLANTOIR_KEPT_OFF: {json}`, which the app writes on the trail
+(`How I Teach page kept off the website`) — once, at the transition, not on every
+build. Gates: `scripts/test_how_i_teach.py` (Windows runs it too), and
+`verify.sh`'s real build, which plants pages with sentinel phrases and greps the
+whole of `public/` (pages, `contentIndex.json`, sitemap, RSS) — the reserved
+two absent, the look-alike present so the check cannot pass by building nothing.
+
+**One residual, needing no code** (plan review): a site built for PUBLISHING
+before the update, while such a page existed, and not rebuilt since, still holds
+the page, and a publish that uploads that existing build sends it. A new image
+tag does not by itself rebuild a site. It applies only to a teacher whose page
+was already public before the update; the first build after the update removes
+it (`public/` is cleaned and mirrored with `rsync --delete`), and every preview
+build is rebuilt before it is published.
 
 ## Stage 2: Scaffold management
 
@@ -500,7 +551,7 @@ undated.
   piece's.) "Links to directly" means the wikilinks written on the class page
   itself, resolved by relative path and by file name (`_pages_a_page_links_to`,
   shared with the first pass's walk) — never onto another class page, a
-  folder's index, Key Links or Curriculum Coverage. A page two links away is
+  folder's index, Key Links or any curriculum coverage map (#128). A page two links away is
   not dated by the class at all.
 
   **Which shapes are links** (`_extract_wikilink_targets`, the one reader both
@@ -542,10 +593,75 @@ undated.
   (payloads, skeletons and the example course, code stripped — the old and new
   readers give identical targets on all 12,490 files), so no shipped page
   moves; teacher-written ones will. No log line's wording changes and none
-  becomes untrue. The install-time readers in `setup_course.py`, and the
-  curriculum-coverage patterns (which already read `\|` but share the old
-  group order), are
-  [#314](https://github.com/russellgordon/plantoir/issues/314).
+  becomes untrue.
+
+  **A stray `[[` followed by a heading cannot swallow the link after it** (since
+  [#314](https://github.com/russellgordon/plantoir/issues/314)): the heading
+  group stops at `[`, as Quartz's own `wikilinkRegex` does. This reader skips
+  inline code (since #313, below), but a `[[` typed in a sentence, followed later by a `#` and a
+  real `[[Page|words]]`, otherwise read as one link with a garbage name and
+  the real one was lost. Only the heading group stops at `[`; the name still
+  crosses it, so a stray `[[` with no `#` before the next link still swallows
+  it — left as it is, since no shipped page has that shape and widening the
+  name is a change to `readingALink.rule` itself. Measured: 0 change on all
+  12,490 files in `support/`.
+
+  **The other readers of the same shapes, since #314.** The installer's three
+  (`setup_course.py`: `first_use_dates`, `WIKI_LINK_TARGET` for retargeting a
+  template's expectation, `unlink_curriculum_references`) now stop the name
+  before a backslash right in front of `]`, `|` or `#`, as `readingALink.rule`
+  says — all three had read `[[P\|a]]` as a page called `P\`. The coverage
+  map's two (`BLOCK_LINK`, behind "pages the course teaches", and
+  `TRANSCLUSION`, what it counts as covered) already read `\|` but had the old
+  alias-before-heading order, so `[[P#h|a]]` and `![[A1.1#h\|a]]` matched
+  nothing. They were NOT given #294's plain reorder: those two stripped fenced
+  code but not inline code (until #313, below), and on `Tutorials/Scavenger Hunt.md` (the example
+  course and every skeleton family, 90 files) the reordered pattern ran from
+  "type `` `[[` ``" through a `### Custom Display Words` heading and swallowed
+  the real `[[Help Sessions|…]]` after it. With the heading stopping at `[`:
+  0 differences over all 12,490 files, fences-only or inline-stripped. Every
+  `readingALink` case runs through every one of these readers in
+  `scripts/test_install_link_readers.py`, which `verify.sh` lists and Windows'
+  `PythonToolchainTests` discovers. Rejected: one shared `wiki_links.py` for
+  all six readers — each needs different groups, and a new sibling module is a
+  Dockerfile change (`test_baked_modules.py` exists because one was once
+  missed); and stripping inline code in `_pages_the_course_teaches`, which
+  changes what counts as taught by a different rule (#313's question — since
+  answered, below, WITH a shared module: the mask is one rule every reader
+  needs identically, which the six patterns were not).
+
+  **A link written inside code is not a link, for every one of these readers**
+  (since [#313](https://github.com/russellgordon/plantoir/issues/313)). A
+  `[[…]]` whose brackets start inside a fenced block or an inline code span is
+  an example of the syntax, and Quartz draws none. `scripts/markdown_code.py`
+  is the one Python definition of where code is — `readingALink.whatIsCode`,
+  implemented identically by the mac's `MarkdownCode` (measured: the two agree
+  offset for offset on all 12,490 files in `support/`) — and every reader here
+  asks it: `_extract_wikilink_targets` (both date passes), `BLOCK_LINK` behind
+  "pages the course teaches", `TRANSCLUSION` in the coverage count, and the
+  installer's three. It is baked beside `class_pages.py` (a Dockerfile `COPY`,
+  guarded by `test_baked_modules.py` and `verify.sh`'s baked-file check).
+  What changed: the dating walk used to strip ```` ``` ```` fences and one-line
+  spans with two regexes, so a `~~~` fence, a span across two lines of a
+  paragraph, a ```` ``` ```` held inside ```` ```` ```` and an escaped backtick
+  were all read wrongly; the coverage map's two readers stripped fences only;
+  the installer's three stripped nothing. The coverage count now also reads a
+  `%%curriculum-start%%` block only where its markers are OUTSIDE code
+  (`_curriculum_blocks_outside_code`) — a fenced example of a curriculum block
+  on a page that teaches how to write one used to count as coverage — and a
+  marker shown inside a fence neither opens nor closes a block, so a fenced
+  example cannot swallow the real block after it. A match that starts in code
+  is not simply dropped: the search starts again where that code ENDS, or an
+  example `` `[[` `` would swallow the real link after it. Measured over
+  `support/` with Quartz's own parser: 1,896 of 39,570 links sit in code, 0 in
+  indented code (which the rule deliberately does not recognise); the build
+  read 7 of them as links before, all on TEJ2O's "Control Something with
+  Code", whose fence inside a list had fallen out to column 0 — fixed in the
+  same piece, so its coverage is unchanged. `scripts/test_markdown_code.py`
+  runs every case through the dating walk and a rename, and checks the
+  coverage count; `verify.sh` lists it and Windows' `PythonToolchainTests`
+  discovers it. The why, the table built in Quartz, and what was rejected are
+  in [10 → Code is never a link](10-local-ai-assistant.md#code-is-never-a-link-313).
 - **A class dated with a plain YAML date** (`created: 2026-09-24`, unquoted —
   what Obsidian's Date property writes) counts, as midnight in Toronto. Until
   the fix round `_parse_created_value` read it as no date at all, so such a
@@ -788,7 +904,7 @@ findings are recorded when the BUILD happens.
 
 **Every check asks whether the FEATURE produced anything**, never whether a
 folder exists. Recreating an empty `Ontario Curriculum` folder does not restore
-a teacher's expectation pages — `_find_curriculum_folder` wants a page named for
+a teacher's expectation pages — `_find_curriculum_folders` wants a page named for
 an expectation code — so an existence check with a "fix it for me" button would
 have silenced the warning and left the map missing.
 
@@ -836,7 +952,7 @@ red.** Until
 [#251](https://github.com/russellgordon/plantoir/issues/251) (2026-09-22) a
 course made from a subject's skeleton had two pages in its Curriculum
 folder — a generic index and a placeholder called `A1.1` — so
-`_find_curriculum_folder` found a folder and `_collect_expectations`
+`_find_curriculum_folders` found a folder and `_collect_expectations`
 returned exactly one specific expectation. Switching the map on there would
 have drawn a single cell for an expectation that does not exist. A teacher
 who declines the ready-made pages for one of the 39 codes that have them
@@ -1050,6 +1166,170 @@ purpose: one records that something is wrong, the other that somebody acted on
 it, and a trail that could not tell them apart leaves "did they ever fix it?"
 unanswerable. Both are in `contracts/shared-rules.json` → `activityTrail`, and
 the repair rules themselves are in `siteHealth.repair`.
+
+
+## The curriculum coverage maps: one per curriculum folder (#128)
+
+Until #128 a course had ONE coverage map, built from ONE folder, and its
+expectation pages had to be named like `A1.1`. A course keeping both an
+`Ontario Curriculum` and a `College Board Curriculum` folder (every LCS course
+has both) got a map from Ontario only, while Course Settings and "Folders
+Plantoir uses" named College Board — and College Board's pages, named `1.A`,
+were never expectations to the build at all (#90, measured on this Mac
+2026-09-06). Now every curriculum folder the course DECLARES that holds an
+expectation page has a map of its own.
+
+**Which folders.** `configured_curriculum_folders(config)`: the new list key
+`curriculum_folders`, in the course's own order, then the legacy
+`curriculum_folder` if it is not already there (non-strings, empties,
+path-like names and repeats in any letter case dropped). `_find_curriculum_folders`
+keeps every declared folder that holds at least one expectation page — found
+in any letter case, the ON-DISK spelling kept — in declared order. Only when no
+declared folder holds a page does the old scan run, and it still gives exactly
+ONE folder: the alphabetically first top-level folder whose name mentions
+"curriculum" and holds a LETTER-FIRST page (`A1.1`, the only shape before this
+piece), and only if there is none, the first holding any expectation page.
+That preference is the fix for the implementation review's finding 1,
+measured: with the widened code rule and a plain alphabetical scan, a scratch
+LCS course whose `College Board Curriculum` held `1.A` pages had Ontario's map
+silently replaced by College Board's under the same title, because `College`
+sorts before `Ontario`. A golden (Ontario with pages, College Board with `1.A`
+pages, nothing declared) holds it byte for byte to what ff1213ed built. The scan is a FALLBACK, never additive:
+Russell's ruling on the plan. A course made from scratch declares nothing, so
+the scan is still its real path, and its site is unchanged. The whole rule is
+`contracts/shared-rules.json` → `specialNames.curriculumFoldersResolution`,
+run against the build by `scripts/test_coverage_maps.py` and against the apps
+by their contract suites.
+
+**Titles.** The PRIMARY folder's map — the first declared name, or the one
+folder the scan found — is always `Curriculum Coverage`; every other map is
+`<Folder> Coverage`, and a title that would repeat another gets ` (2)`
+(`curriculumRules.coveragePageTitles`). So a course with one map keeps the page,
+its address and every link to it, byte for byte (the goldens in
+`test_coverage_maps.py` were captured from origin/dev ff1213ed before any edit:
+a `Curriculum/` course and the LCS default, Ontario with pages and College
+Board empty), and a course that declares a second folder later gets a SECOND
+page rather than two renamed ones. Only a non-primary title is written quoted
+in the page's frontmatter, because a folder's name can carry a colon.
+
+**The code rule** (`is_expectation_code`, `fullmatch`) admits three shapes:
+letter, digits, dot, digits (`A1.1`, `b2.3`); digits, dot, ONE letter (`1.A`,
+a College Board skill); and two to four CAPITAL letters, a hyphen, digits, a
+dot, one capital letter (`CRD-1.A`, `AAP-2.B`, a College Board learning
+objective — added for Russell's marketing course). Still refused: `12.3`,
+`B2`, `A1. Heading`, `1.A.1` and `CRD-1.A.1`. Measured before widening: 2,842
+curriculum pages ship under `support/` (39 payloads, 50 skeleton families —
+2,214 codes, 494 overall headings, 89 indexes and a handful of about-pages),
+zero lower-case codes, zero digit-first or hyphenated stems, zero subfolders —
+and none of them changes classification. The build had DISAGREED with the
+contract about `b2.3` (its regex was upper-case only) since the contract was
+written, because nothing ran the contract's cases against the build; the new
+test does.
+
+**Order and columns.** `code_sort_key`: letter-first codes, then skills, then
+learning objectives by prefix, number and letter; `strand_of` gives the column
+— the upper-cased letter (so `b2.3` joins B), the skill number, or the
+learning-objective prefix (`CRD`). Only letter-first strands have overall
+expectations and chips; a map with none leaves out the chip sentence, the
+"Overall expectations with no assessed work" row and the chip part of the
+notes, and an empty chips `div` is never written. The old sort key read
+`int(code.split(".")[0][1:])`, which is `int("")` for `1.A`: widening the rule
+without replacing it would have stopped every such build with a traceback.
+
+**Nested pages and repeats.** Pages are collected RECURSIVELY, shallowest
+first then by path — a plain path sort puts `(old)/A1.1` and `2019 version/A1.1`
+ahead of the top-level `A1.1` (measured), and the map would point at the
+archive. A code met twice in one folder is one cell, the first page kept, with
+one console line naming it (`⚠️  College Board Curriculum has two pages called
+1.A — the map uses Unit 1/1.A`). Recursion changes nothing for shipped content
+(no subfolders) but does change a single-map course whose teacher keeps
+subfolders inside the curriculum folder: their nested pages now count.
+
+**Counting.** A page in ANY mapped folder never counts, and neither does any
+map page: a College Board page that transcludes `![[A1.1]]` is curriculum
+material, not a lesson that addressed Ontario's A1.1. A link finds its
+expectation in any letter case, as Obsidian and Quartz resolve it. The
+"taught" crawl is done once per build for every map.
+
+**Everywhere else a title was a literal.** Key Links gets each map directly
+under the bullet pointing into its folder (the "…curriculum expectations]]"
+wording fallback applies only with one map); the Backlinks panel skips every
+title and every mapped folder, in both spellings; the sidebar hides every
+map's file (and `Curriculum Coverage.md` always); class-page detection and both
+date passes ask `_is_coverage_page_name`, fed by `set_coverage_titles` (the
+`set_unit_word` pattern: one build is one process). `handWrittenCoveragePage`
+names the colliding title through `{page}`.
+
+**The trail.** Every build whose section wants the map prints
+`PLANTOIR_MAPS: {"course", "section", "maps": [{title, folder, expectations}]}`
+— an empty list included, because "my College Board map is missing" is the
+question it answers (`coverageMapsBuilt`). The mac reads it from the console
+(`ScriptRunner`) and from a scheduled publish's log
+(`ScheduledDeploy.recordFolderProblems`) and writes `curriculum maps built`.
+Nothing is printed when the map is switched off for the section. And since
+this piece, the mac keeps EVERY line carrying `PLANTOIR_` + capitals and a
+colon out of the console by one rule (`BuildMarkerLine`,
+`transcriptStripping.machineLines`), so the next marker cannot reach a
+teacher as raw JSON the way `PLANTOIR_DATED:` still does on Windows (#279).
+
+**Setup.** `setup_course.py` writes `curriculum_folders` (the manifest's one
+folder) for a course with nothing recorded, keeps a saved list exactly, and
+writes the list's FIRST (primary) folder in the legacy `curriculum_folder` as
+well — Russell's ruling on the implementation review: an older Plantoir on a
+second Mac reads only that key, and a primary folder renamed to something
+without "curriculum" in it would otherwise leave that Mac publishing no map.
+Both apps and the renamer do the same whenever they write the list. Setup used
+to write `curriculum_folder` from the manifest unconditionally, and because the saved-keys merge only restores keys
+the fresh dict lacks, a re-run put `Curriculum` (or null) back over a name a
+rename had recorded — `test_setup_curriculum_folders.py` is the must-fail.
+Manifests keep their singular key: 89 of 89 declare exactly one folder.
+
+**The apps** protect and name from the same rule, reading the course's
+SHARED folders on disk for expectation pages
+(`CurriculumFolderRule.foldersWithPages`): while the map is on only the LAST
+folder with a map is refused, the others ask first
+(`removeCurriculumFolderWithItsMapConfirmation`), and a folder with no pages is
+an ordinary folder — on the LCS default, Ontario (which holds the map) is the
+one refused, where the by-name rule used to protect the empty College Board.
+While no folder holds a page they fall back to the single by-name folder, so
+an empty new course is protected exactly as before. Both apps OFFER to declare
+a folder whose name mentions "curriculum" under "Curriculum folders"
+(`curriculumFoldersOffer`); the map folders are shown ticked, then every
+declared folder (so a folder ticked before its first page stays ticked), and
+the first tick never drops the map the scan found. A rename of any of them materialises
+`curriculum_folders`, with the new name in the old one's place.
+
+**Rejected, so nobody re-proposes them.**
+- Turning `curriculum_folder` into string-or-list: every reader branches on
+  type forever, and an old reader handed a list builds a path out of it. A new
+  key is ignored cleanly by old readers, and both apps keep unknown keys.
+- An array in manifests: no manifest has two folders.
+- A by-name ADDITIVE scan (the plan's first design): a teacher keeping
+  `Ontario Curriculum (2008)` beside the revised curriculum would get a second,
+  overlapping map — and, before the primary-title ruling, the real map renamed.
+  An overlap rule ("skip a folder whose codes repeat another map's") is not
+  safe either: a split-grade ICS3U/ICS4U course legitimately has `A1.1` in both.
+- `<Folder> Coverage` for every map, and `Curriculum Coverage` for whichever map
+  sorts first: both rename existing pages.
+- A per-map switch: one switch covers every map; a teacher who wants one map
+  fewer unticks the folder.
+- Bulk-migrating existing configs, and dropping the legacy key's READ.
+- A health finding for "a curriculum folder with no pages": every LCS course
+  not teaching AP would be nagged on day one.
+- `1.A.1`/`CRD-1.A.1` (essential knowledge): not measured on a real course.
+
+**Known limits.** A code in two folders counts on both maps (matching is by
+page name). The assistant still recognises curriculum pages by a folder name
+mentioning "curriculum", so a declared `AP CSP` folder's pages have a map but
+are not offered by the assistant (`isCurriculumPage.note`). Russell's own
+College Board layout was not measured (the working folders are his); the two
+read-only commands for him are in the #128 hand-over.
+
+**Adding a second curriculum.** Nothing ships the College Board's pages — the
+framework's text is the teacher's to bring. A teacher makes the folder
+(`College Board Curriculum`), ticks it under Course Settings → "Curriculum
+folders", and asks "Revise with Claude…" to draft one page per code from the
+framework they have; the next build draws its map.
 
 
 ## Stage 4: Configuration patching
@@ -1537,6 +1817,12 @@ the course folder, minus
 - `node_modules` and the legacy non-hidden `merged_output`,
 - `.DS_Store` / `Thumbs.db`,
 - `course_config.backup.json` and any `*.tmp`.
+
+The How I Teach page (#209) COUNTS, although it never reaches a site: editing it
+marks the section "— Edited" and makes the next Publish rebuild for nothing.
+Deliberately not excluded yet — this list is a wire format held byte for byte in
+three implementations, and changing one first would give the others a permanent
+false "Edited"; follow-up [#330](https://github.com/russellgordon/plantoir/issues/330).
 
 `course_config.json` itself COUNTS — fonts, the sidebar and the coverage map
 are inputs to the built site as surely as a page is. `Media/` counts, because

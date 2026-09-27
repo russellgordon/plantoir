@@ -238,6 +238,20 @@ else
   cat /tmp/verify_starting_content_test.log
 fi
 
+if (cd scripts && python3 test_install_link_readers.py) >/tmp/verify_install_link_readers_test.log 2>&1; then
+  pass "setup_course.py and the coverage map: every link shape the contract names is read by the installer's and the map's link readers (scripts/test_install_link_readers.py)"
+else
+  fail "setup_course.py and the coverage map: every link shape the contract names is read by the installer's and the map's link readers (scripts/test_install_link_readers.py)"
+  cat /tmp/verify_install_link_readers_test.log
+fi
+
+if (cd scripts && python3 test_markdown_code.py) >/tmp/verify_markdown_code_test.log 2>&1; then
+  pass "markdown_code.py: a link written inside code is not a link, for the build's and the installer's readers and the coverage map (scripts/test_markdown_code.py, #313)"
+else
+  fail "markdown_code.py: a link written inside code is not a link, for the build's and the installer's readers and the coverage map (scripts/test_markdown_code.py, #313)"
+  cat /tmp/verify_markdown_code_test.log
+fi
+
 if (cd scripts && python3 test_graded_folders_rerun.py) >/tmp/verify_graded_rerun_test.log 2>&1; then
   pass "setup_course.py: a re-run writes a saved marks pool back as it was (scripts/test_graded_folders_rerun.py)"
 else
@@ -306,6 +320,25 @@ if (cd scripts && python3 test_reference_course.py) >/tmp/verify_reference_cours
 else
   fail "a course kept for reference is never deployed, at every door the shared toolchain owns (scripts/test_reference_course.py)"
   cat /tmp/verify_reference_course_test.log
+fi
+
+# The teacher's How I Teach page is never on the website (#209): the name
+# rule against the contract's nameCases, discovery, preflight, the lists the
+# copy loops read and the final sweep. The real build is checked further down.
+if (cd scripts && python3 test_how_i_teach.py) >/tmp/verify_how_i_teach_test.log 2>&1; then
+  pass "the How I Teach page is never listed, copied or left in a site's pages (scripts/test_how_i_teach.py)"
+else
+  fail "the How I Teach page is never listed, copied or left in a site's pages (scripts/test_how_i_teach.py)"
+  cat /tmp/verify_how_i_teach_test.log
+fi
+
+# What the LOCAL model is shown has not moved a byte (#209's plan review):
+# the full digest of toolSchemas.local, made by research/ai-assist/toolhash.py.
+if (cd scripts && python3 test_tool_surface_digest.py) >/tmp/verify_tool_digest_test.log 2>&1; then
+  pass "the local assistant's thirteen tools are the ones routing was measured against (scripts/test_tool_surface_digest.py)"
+else
+  fail "the local assistant's thirteen tools are the ones routing was measured against (scripts/test_tool_surface_digest.py)"
+  cat /tmp/verify_tool_digest_test.log
 fi
 
 # RUNS deploy.sh, where the test above only reads it. That distinction is the
@@ -389,6 +422,21 @@ if (cd scripts && python3 test_preflight_exclusions.py) >/tmp/verify_preflight_e
 else
   fail "build_site.py: preflight excluded_items discovery skipping & index.md notes (scripts/test_preflight_exclusions.py)"
   cat /tmp/verify_preflight_exclusions_test.log
+fi
+
+# Issue #128: one coverage map per curriculum folder, and what setup records.
+if (cd scripts && python3 test_coverage_maps.py) >/tmp/verify_coverage_maps_test.log 2>&1; then
+  pass "build_site.py: one curriculum coverage map per curriculum folder, the code rule, and single-map output unchanged (scripts/test_coverage_maps.py)"
+else
+  fail "build_site.py: one curriculum coverage map per curriculum folder, the code rule, and single-map output unchanged (scripts/test_coverage_maps.py)"
+  sed 's/^/     /' /tmp/verify_coverage_maps_test.log | tail -40
+fi
+
+if (cd scripts && python3 test_setup_curriculum_folders.py) >/tmp/verify_setup_curriculum_folders_test.log 2>&1; then
+  pass "setup_course.py: curriculum_folders written for a new course, and a re-run keeps a recorded folder (scripts/test_setup_curriculum_folders.py)"
+else
+  fail "setup_course.py: curriculum_folders written for a new course, and a re-run keeps a recorded folder (scripts/test_setup_curriculum_folders.py)"
+  sed 's/^/     /' /tmp/verify_setup_curriculum_folders_test.log | tail -40
 fi
 
 # Issue #265: the build never changes `hidden`, the sidebar filter keeps the
@@ -483,13 +531,20 @@ fi
 # behavioural — a real preview-then-publish cycle would add minutes to every
 # run of this script — but it catches the guard being deleted, which is how it
 # came to be missing in the first place.
+#
+# deploy.sh is asked for its ONE reader of the rule (#291), which
+# scripts/test_preview_build_detection.py then runs against every case in
+# contracts/app-rules.json; deploy.ps1 still carries the bare address until
+# Windows adopts the same rule (GitHub #272).
 _folder_guard_ok=true
-for _launcher in deploy.sh deploy.ps1; do
-  if ! grep -q "ws://localhost:" "$_launcher"; then
-    _folder_guard_ok=false
-    echo "   $_launcher does not check for a preview build before publishing to a folder"
-  fi
-done
+if ! grep -q 'site_carries_preview_client "${PUBLIC_DIR_HOST}"' deploy.sh; then
+  _folder_guard_ok=false
+  echo "   deploy.sh does not check for a preview build before publishing to a folder"
+fi
+if ! grep -q "ws://localhost:" deploy.ps1; then
+  _folder_guard_ok=false
+  echo "   deploy.ps1 does not check for a preview build before publishing to a folder"
+fi
 if [ "$_folder_guard_ok" = true ]; then
   pass "publishing to a folder refuses a preview build (deploy.sh and deploy.ps1)"
 else
@@ -1011,6 +1066,8 @@ check_baked scripts/site_health.py        /opt/scripts/site_health.py
 # stands for the directory — the Dockerfile copies it wholesale.
 check_baked contracts/class-planning.json /opt/contracts/class-planning.json
 check_baked scripts/page_visibility.py    /opt/scripts/page_visibility.py
+check_baked scripts/markdown_code.py      /opt/scripts/markdown_code.py
+check_baked scripts/how_i_teach.py        /opt/scripts/how_i_teach.py
 check_baked scripts/setup_course.py       /opt/scripts/setup_course.py
 check_baked scripts/build_site.py         /opt/scripts/build_site.py
 check_baked scripts/deploy.py             /opt/scripts/deploy.py
@@ -1028,6 +1085,43 @@ check_baked support/favicon/icon.svg      /opt/support/favicon/icon.svg
 check_baked support/favicon/apple-touch-icon.png /opt/support/favicon/apple-touch-icon.png
 check_baked support/favicon/icon.png      /opt/support/favicon/icon.png
 [[ "$BAKED_OK" == "true" ]] && pass "Baked scripts, patches, and support files match the working tree"
+
+# -------------------- 4a. The live-reload client is still the one the rule names --------------------
+# Every check for "this site is a preview's" looks for the client's script tag
+# followed by its first statement (contracts/app-rules.json ->
+# buildFreshness.previewBuild.signature, #291). Those bytes are Quartz's, not
+# ours: if a Quartz raise or a patch changes them, the rule matches NOTHING,
+# every preview reads as a production build, and a preview is published — the
+# one catastrophic direction. So the source that produces them is asked for
+# here, in the image, which takes seconds rather than a serve cycle and fails
+# the day Quartz is raised. verify-deploy.sh checks a real serve-mode page
+# against the rule as well.
+#
+# The client's template is checked for ADJACENCY, not for its words: the
+# inline script's template literal must open with nothing but whitespace
+# before `const socket = new WebSocket(`, read as one record in the C locale
+# as deploy.sh reads a page. Three separate `grep -F`s (the first version)
+# would all still pass if a Quartz raise put a comment or "use strict" first,
+# and the rule would then match nothing (found by review, #291). The other two
+# lines — the address and the tag's type — are words, so a fixed string does.
+echo ""
+echo "🔎 Checking the image's Quartz still writes the live-reload client the preview rule looks for…"
+CLIENT_OK="true"
+check_client_source() {
+  local image_path="$1" expected="$2"
+  if ! docker run --rm "$DEV_TEST_IMAGE" grep -Fq -- "$expected" "$image_path" 2>/dev/null; then
+    CLIENT_OK="false"
+    fail "$image_path no longer holds: $expected — re-measure the preview rule in contracts/app-rules.json (#291)"
+  fi
+}
+QUARTZ_CLIENT_TEMPLATE='script: `[[:space:]]*const socket = new WebSocket('"'"'${wsUrl}'"'"')'
+if ! docker run --rm -e LC_ALL=C "$DEV_TEST_IMAGE" grep -zq -- "$QUARTZ_CLIENT_TEMPLATE" /opt/quartz/quartz/plugins/index.ts 2>/dev/null; then
+  CLIENT_OK="false"
+  fail "/opt/quartz/quartz/plugins/index.ts no longer opens the live-reload script with const socket = new WebSocket(…) — re-measure the preview rule in contracts/app-rules.json (#291)"
+fi
+check_client_source /opt/quartz/quartz/plugins/index.ts 'ws://localhost:${ctx.argv.wsPort}'
+check_client_source /opt/quartz/quartz/util/resources.tsx 'moduleType ?? "application/javascript"'
+[[ "$CLIENT_OK" == "true" ]] && pass "The image's Quartz writes the live-reload client the preview rule looks for (#291)"
 
 # -------------------- 4b. The hide filter must be IN THE IMAGE --------------------
 # The Explorer's filterFn is what makes a teacher's hidden pages hidden, and
@@ -1065,6 +1159,54 @@ echo ""
 echo "🧹 Removing existing '$CONTAINER_NAME' container so the launcher recreates it"
 echo "   from ${DEV_TEST_IMAGE}…"
 docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+
+# ---- #209: How I Teach pages, planted for the build below ----
+# Three pages, each carrying its own sentinel phrase so the check after the
+# build can look for the WORDS anywhere in the site (pages, contentIndex.json,
+# the sitemap, the RSS feed) rather than for a file name — the section's page
+# is spelled in capitals, whose web address a case-sensitive name check would
+# miss (#209 plan review, item 9). The course's settings are made to LIST the
+# two reserved pages, the way a course whose page predates the rule does, so
+# the preflight drop runs for real.
+#
+# They are put back by an EXIT trap, not only at the end of 6h: the fixture is
+# the developer's own git-ignored course, and a run stopped between here and
+# the check (^C, HUP, a hard exit) must not leave three pages and an edited
+# configuration for the next run to start from (#209 implementation review,
+# item 4). The build's preflight also rewrites course_config.backup.json, so
+# that is kept and put back too — or removed if there was none.
+HIT_COURSE="courses/EXC2O"
+HIT_CONFIG_BACKUP="$(mktemp -t cq4t-hit-config)"
+HIT_CONFIG_BACKUP_BACKUP="$(mktemp -t cq4t-hit-config-backup)"
+cp "$HIT_COURSE/course_config.json" "$HIT_CONFIG_BACKUP"
+HIT_HAD_CONFIG_BACKUP="no"
+if [[ -f "$HIT_COURSE/course_config.backup.json" ]]; then
+  cp "$HIT_COURSE/course_config.backup.json" "$HIT_CONFIG_BACKUP_BACKUP"
+  HIT_HAD_CONFIG_BACKUP="yes"
+fi
+restore_hit_fixture() {
+  [[ -n "${HIT_CONFIG_BACKUP:-}" && -f "$HIT_CONFIG_BACKUP" ]] || return 0
+  rm -f "$HIT_COURSE/How I Teach.md" "$HIT_COURSE/section1/HOW I TEACH.md" "$HIT_COURSE/How I Teach 1.md"
+  cp "$HIT_CONFIG_BACKUP" "$HIT_COURSE/course_config.json"
+  if [[ "$HIT_HAD_CONFIG_BACKUP" == "yes" ]]; then
+    cp "$HIT_CONFIG_BACKUP_BACKUP" "$HIT_COURSE/course_config.backup.json"
+  else
+    rm -f "$HIT_COURSE/course_config.backup.json"
+  fi
+  rm -f "$HIT_CONFIG_BACKUP" "$HIT_CONFIG_BACKUP_BACKUP"
+}
+trap 'restore_hit_fixture; release_verify_lock' EXIT
+printf 'I teach by plantoir-hit-sentinel-course-7f3a.\n' > "$HIT_COURSE/How I Teach.md"
+printf 'I teach by plantoir-hit-sentinel-section-7f3a.\n' > "$HIT_COURSE/section1/HOW I TEACH.md"
+printf 'A look-alike page: plantoir-hit-sentinel-lookalike-7f3a.\n' > "$HIT_COURSE/How I Teach 1.md"
+python3 - "$HIT_COURSE/course_config.json" <<'PY'
+import json, sys
+path = sys.argv[1]
+config = json.load(open(path, encoding="utf-8"))
+config.setdefault("shared_files", []).append("How I Teach.md")
+config.setdefault("per_section_files", []).append("HOW I TEACH.md")
+json.dump(config, open(path, "w", encoding="utf-8"), indent=2, ensure_ascii=False)
+PY
 
 STAMP_FILE="$(mktemp -t cq4t-stamp)"
 echo ""
@@ -1137,6 +1279,48 @@ if [[ -f "$SITE_INDEX" ]]; then
   done
   [[ "$ICON_OK" == "true" ]] && pass "Built site carries and links the Plantoir icon (tab, root, Apple touch)"
 fi
+
+# -------------------- 6h. The How I Teach page never reaches the site (#209) ----
+# The pages planted before the build above, looked for by their WORDS across
+# everything the site serves. Two halves that fail independently: the two
+# reserved pages must be nowhere, and the look-alike MUST be there — a site
+# that built nothing would pass the first half alone.
+HIT_OK="true"
+if [[ -d "$SITE_PUBLIC" ]]; then
+  for sentinel in plantoir-hit-sentinel-course-7f3a plantoir-hit-sentinel-section-7f3a; do
+    if grep -rIliq -- "$sentinel" "$SITE_PUBLIC"; then
+      fail "A How I Teach page reached the built site: '$sentinel' is in $(grep -rIli -- "$sentinel" "$SITE_PUBLIC" | head -3 | tr '\n' ' ')"
+      HIT_OK="false"
+    fi
+  done
+  if ! grep -rIliq -- plantoir-hit-sentinel-lookalike-7f3a "$SITE_PUBLIC"; then
+    fail "The look-alike page 'How I Teach 1' is missing from the built site — it is an ordinary page and must be published (without it the check above proves nothing)"
+    HIT_OK="false"
+  fi
+else
+  fail "No built site at $SITE_PUBLIC to check for How I Teach pages"
+  HIT_OK="false"
+fi
+if python3 - "$HIT_COURSE/course_config.json" <<'PY'
+import json, sys
+config = json.load(open(sys.argv[1], encoding="utf-8"))
+listed = [n for n in config.get("shared_files", []) + config.get("per_section_files", [])
+          if n.lower() in ("how i teach.md",)]
+sys.exit(1 if listed else 0)
+PY
+then :; else
+  fail "The course's settings still list a How I Teach page after a build — preflight did not drop it"
+  HIT_OK="false"
+fi
+for planted in "$HIT_COURSE/How I Teach.md" "$HIT_COURSE/section1/HOW I TEACH.md"; do
+  if [[ ! -f "$planted" ]]; then
+    fail "The build removed the teacher's own $planted — only the site's copy may ever be removed"
+    HIT_OK="false"
+  fi
+done
+[[ "$HIT_OK" == "true" ]] && pass "No How I Teach page reaches the built site, the look-alike does, and the teacher's own pages are untouched (#209)"
+restore_hit_fixture
+trap release_verify_lock EXIT
 
 # -------------------- 6c. An existing teacher's container is recreated ------
 # Every container that exists today was made WITHOUT the builds mount, and a

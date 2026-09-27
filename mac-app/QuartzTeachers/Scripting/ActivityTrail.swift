@@ -248,6 +248,15 @@ nonisolated enum ActivityTrail {
         /// is asked long after the console that said so has gone.
         case pagesDatedByTheBuild = "pages dated by the build"
 
+        /// The curriculum coverage maps a build wrote (#128): one per
+        /// curriculum folder the course declares, each with its title, the
+        /// folder it came from and how many expectations it shows — or that it
+        /// wrote none. Read from the build's `PLANTOIR_MAPS:` line
+        /// (`CoverageMapsBuilt`), printed on every build whose section wants
+        /// the map, so "my second map is missing" has an answer. Course
+        /// structure only, never anything written on a page.
+        case coverageMapsBuilt = "curriculum maps built"
+
         /// A teacher asked for a class to be duplicated, the room for it was
         /// made, and then no copy appeared.
         ///
@@ -411,7 +420,32 @@ nonisolated enum ActivityTrail {
         /// gone and `scheduled deploy turned off` says so beside this line.
         /// Saying "turned off" for the first would be false — the old job
         /// would still fire — which is why they are told apart.
+        ///
+        /// Since GitHub #322 also written when the deploy was REFUSED before
+        /// anything was written — at the schedule sheet's button, or by
+        /// `schedule_deploy` from either assistant — carrying the destination
+        /// it was refused for (by kind: Netlify, Cloudflare Pages or a
+        /// folder) and the refusal's first sentence. #322 took a code read to
+        /// diagnose; with this line the trail would have shown "never deployed
+        /// to Netlify" just under a Save that made the course a folder. Not
+        /// written by the approval card or `plan_scheduled_deploy`, which are
+        /// advisory and repeat.
         case scheduledDeployCouldNotBeSet = "scheduled deploy could not be set"
+        /// A scheduled publish read the course's settings when it fired and
+        /// something differed from what the teacher was told (GitHub #323):
+        /// it went ahead to where the course deploys NOW, somewhere other than
+        /// it was set to go; or it could not deploy the way the course is set
+        /// now and stood down, with the reason. Carries where it was set to
+        /// deploy (when that was recorded), where the course deploys now, and
+        /// the reason for a stand-down — never a credential.
+        ///
+        /// Written only when something differs, never on every run:
+        /// `scheduled publish finished` already names where a run went. What
+        /// it adds is that this was not where the teacher was told — the one
+        /// thing a teacher asking "why did it go THERE?" needs, and the thing
+        /// #323's stale deploys hid. Named "read" rather than "followed"
+        /// because it also carries the runs that stood down (plan review L3).
+        case scheduledPublishReadTheSettings = "scheduled publish read the course's settings"
         /// A folder or file was removed in Course Settings, excluding it
         /// from previews and deploys.
         case itemExcluded = "item excluded"
@@ -818,6 +852,21 @@ nonisolated enum ActivityTrail {
         /// in the same breath, and this is the line that is still there next
         /// week, when "why is this page still showing?" arrives.
         case pageSettingsLeftAsTheyWere = "page settings left as they were"
+        /// An outside assistant read a course's How I Teach page through
+        /// Plantoir (#209), or found there was none: carries the course, and
+        /// the word count and whether it was cut short — never the words.
+        /// Present means read THROUGH PLANTOIR; its absence does not prove
+        /// the page was never read, because an agent's own file tools can
+        /// open it from the working folder and leave no line.
+        case howITeachPageRead = "How I Teach page read"
+        /// An outside assistant saved a course's How I Teach page (#209):
+        /// created or replaced, word counts before and after, and the backup
+        /// made first. Answers "did I write this, or did an assistant?".
+        case howITeachPageWritten = "How I Teach page written"
+        /// A build dropped a How I Teach page the course's settings had
+        /// LISTED for the website (#209) — one earlier builds published.
+        /// Read from the build's `PLANTOIR_KEPT_OFF:` line.
+        case howITeachPageKeptOff = "How I Teach page kept off the website"
         /// Plantoir found a new version of itself (#204) — once per version
         /// per launch, and "found" rather than "offered", because the updater
         /// may hold its window back until the app is next in front. Carries
