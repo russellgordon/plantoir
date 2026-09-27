@@ -555,7 +555,7 @@ final class WorkLeaseDecliningTests: XCTestCase {
             .appendingPathComponent("QuartzTeachers/Views/Section/SectionDetailView.swift")
         let source: String = try String(contentsOf: url, encoding: .utf8)
 
-        let deploy: String = try WorkLeaseDecliningTests.body(of: "func deployAndWait()", in: source)
+        let deploy: String = try WorkLeaseDecliningTests.body(of: "func deployAndWait(pressedByTheAssistant:", in: source)
         let claim: Range<String.Index> = try XCTUnwrap(deploy.range(of: "WorkLeaseRegistry.claimAPublish("))
         let stop: Range<String.Index> = try XCTUnwrap(deploy.range(of: "await stopPreviewAndWait()"))
         XCTAssertLessThan(claim.lowerBound, stop.lowerBound, "The Deploy stops the preview before claiming the course.")
