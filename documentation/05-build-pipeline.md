@@ -8,7 +8,7 @@ site and either serves it (preview mode, the default) or builds it statically
 (`--build-only`, used by deploy).
 
 To achieve maximum performance across all host operating systems (especially
-Windows WSL2 and macOS Colima/Lima mounts), the pipeline uses a **dual-workspace
+macOS Colima/Lima mounts, and historically Windows WSL2), the pipeline uses a **dual-workspace
 architecture**:
 
 ```
