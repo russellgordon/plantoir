@@ -230,9 +230,12 @@ struct RealStateSnapshot {
         }
 
         let agents: URL = home.appendingPathComponent("Library/LaunchAgents")
-        let agentNames: [String]
+        var agentNames: [String] = []
         do {
             agentNames = try FileManager.default.contentsOfDirectory(atPath: agents.path)
+        } catch let error as NSError where isMissing(error) {
+            // A fresh account has no LaunchAgents folder: absent, compared as such.
+            snapshot.files[agents.path] = "absent"
         } catch {
             throw RealStateUnreadable(path: agents.path, error: error)
         }
@@ -245,6 +248,10 @@ struct RealStateSnapshot {
         let data: Data
         do {
             data = try Data(contentsOf: plist)
+        } catch let error as NSError where isMissing(error) {
+            // A fresh account has no preferences yet: absent, compared as such.
+            snapshot.files[plist.path] = "absent"
+            return snapshot
         } catch {
             throw RealStateUnreadable(path: plist.path, error: error)
         }
