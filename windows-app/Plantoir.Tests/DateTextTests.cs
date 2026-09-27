@@ -207,9 +207,11 @@ public class DateTextTests
                 var store = new ProblemReportStore(logs);
                 string path = store.SaveRunTranscript("setup.ps1", "finished", Moment, ["one line"]);
 
-                // The NAME decides what gets deleted: RunFilePaths and PruneRuns
-                // sort transcripts by file name, ordinally, so a name in another
-                // calendar's year would outrank every real one for ever.
+                // Until #144 the NAME decided what got deleted: RunFilePaths and
+                // PruneRuns sorted by it, ordinally, and a name in another
+                // calendar's year outranked every real one for ever. They order
+                // by write time now, but the name is still what a teacher reads
+                // in a problem report, and the "Started" line is teacher-visible.
                 Assert.Equal("2026-09-09 141530 setup.ps1.txt", Path.GetFileName(path));
                 string[] lines = File.ReadAllLines(path);
                 Assert.Equal("Started 2026-09-09 14:15:30.", lines[1]);
@@ -256,34 +258,64 @@ public class DateTextTests
         }
     }
 
+    /// <summary>
+    /// <c>file-formats.json</c> → <c>sectionTimetable.believable</c>: the window
+    /// outside which a remembered date is not believed, and a list holding one
+    /// is not written. Read from the contract, never retyped.
+    /// </summary>
+    public static IEnumerable<object[]> BelievableCases()
+    {
+        var believable = ContractLoader.LoadJson("file-formats.json")["sectionTimetable"]!["believable"]!;
+        foreach (var c in believable["cases"]!.AsArray())
+        {
+            yield return
+            [
+                c!["why"]!.ToString(),
+                string.Join(",", c["dates"]!.AsArray().Select(d => d!.ToString())),
+                c["today"]!.ToString(),
+                c["believed"]!.GetValue<bool>(),
+            ];
+        }
+    }
+
     [Fact]
-    public void ATimetableRememberedInAnotherCalendarsYearReadsAsNotRemembered()
+    public void TheBelievableWindowIsTheContracts()
+    {
+        var believable = ContractLoader.LoadJson("file-formats.json")["sectionTimetable"]!["believable"]!;
+        Assert.Equal(believable["earliest"]!.ToString(), DateText.Iso(TimetableMemory.EarliestBelievable));
+        Assert.Equal(believable["yearsAhead"]!.GetValue<int>(), TimetableMemory.YearsAheadBelievable);
+        Assert.True(believable["cases"]!.AsArray().Count >= 8, "The case list shrank; the loop below would prove less than it did.");
+    }
+
+    [Theory]
+    [MemberData(nameof(BelievableCases))]
+    public void ATimetableOutsideTheBelievableWindowIsNeitherReadNorWritten(string why, string datesText, string todayText, bool believed)
     {
         // Such a file is on every affected teacher's disk: the old writer put
         // 2569-09-08 there, and this reader has always taken that as the
         // Gregorian year 2569. Reading it as nothing makes the assistant ask
-        // again, and the next Write replaces it with a file it can read.
+        // again, and the next Write replaces it with a file it can read — and
+        // Write refuses the same list, so a tool that saved and then read back
+        // never finds nothing where it just wrote (the implementation review's
+        // finding: remember_timetable dereferenced that null).
+        var dates = datesText.Split(',').Select(d => DateOnly.ParseExact(d, "yyyy-MM-dd", CultureInfo.InvariantCulture)).ToList();
+        var today = DateOnly.ParseExact(todayText, "yyyy-MM-dd", CultureInfo.InvariantCulture);
         string workspace = Path.Combine(Path.GetTempPath(), "plantoir-144-" + Guid.NewGuid().ToString("N"));
         try
         {
             string folder = Path.Combine(workspace, "courses", "ICS3U", ".internal", "timetable");
             Directory.CreateDirectory(folder);
-            File.WriteAllText(Path.Combine(folder, "section1.json"),
-                """{"section":1,"dates":["2569-09-08","2569-09-10"],"source":"typed in by hand","recorded":"2569-09-09"}""");
-            Assert.Null(TimetableMemory.Read(workspace, "ICS3U", 1, today: Day));
+            string json = "{\"section\":1,\"dates\":[" + string.Join(",", dates.Select(d => "\"" + DateText.Iso(d) + "\"")) +
+                          "],\"source\":\"typed in by hand\",\"recorded\":\"" + DateText.Iso(today) + "\"}";
+            File.WriteAllText(Path.Combine(folder, "section1.json"), json);
 
-            // The bounds, both sides, and a real memory just inside them.
-            File.WriteAllText(Path.Combine(folder, "section1.json"),
-                """{"section":1,"dates":["2024-12-31","2026-09-10"],"source":"typed in by hand","recorded":"2026-09-09"}""");
-            Assert.Null(TimetableMemory.Read(workspace, "ICS3U", 1, today: Day));
-            File.WriteAllText(Path.Combine(folder, "section1.json"),
-                """{"section":1,"dates":["2026-09-08","2029-09-10"],"source":"typed in by hand","recorded":"2026-09-09"}""");
-            Assert.Null(TimetableMemory.Read(workspace, "ICS3U", 1, today: Day));
-            File.WriteAllText(Path.Combine(folder, "section1.json"),
-                """{"section":1,"dates":["2025-01-01","2029-09-09"],"source":"typed in by hand","recorded":"2026-09-09"}""");
-            var kept = TimetableMemory.Read(workspace, "ICS3U", 1, today: Day);
-            Assert.NotNull(kept);
-            Assert.Equal(2, kept!.Dates.Count);
+            var read = TimetableMemory.Read(workspace, "ICS3U", 1, today: today, recording: false);
+            Assert.True(believed == (read is not null), $"{why}: expected believed={believed}, read {(read is null ? "nothing" : read.Dates.Count + " dates")}.");
+
+            Assert.Equal(!believed, TimetableMemory.Unbelievable(dates, today) is not null);
+            Assert.Equal(believed, TimetableMemory.Write(workspace, "ICS3U", 2, dates, "typed in by hand", today));
+            if (believed)
+                Assert.NotNull(TimetableMemory.Read(workspace, "ICS3U", 2, today: today, recording: false));
         }
         finally
         {

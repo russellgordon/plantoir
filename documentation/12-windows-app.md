@@ -2293,25 +2293,48 @@ and this piece had two of those:
   twenty oldest runs and never the one being reported. The second comment on
   the issue had judged this reachable only after a locale change; the fix
   reaches it on day one. Both readers now order by the file's write time
-  (`File.GetLastWriteTimeUtc`, name as the tie-break), which has no calendar.
-  Rejected: skipping implausible names the way `ArchiveStamp` does — a name
-  is only a label here, and the write time is what "the last twenty tasks"
-  means anyway.
+  (`File.GetLastWriteTimeUtc`, name descending as the tie-break), which has
+  no calendar. **This reverses a mac decision on purpose**: the mac's
+  `runFileURLs` (`ProblemReport.swift`) sorts by NAME so that "nothing a copy
+  or a restore from a backup could disturb" is involved. That reason does not
+  hold here, because this folder never travels — `ProblemReportStore.LogsDirectory`
+  is `%LOCALAPPDATA%\Plantoir\Logs`, not the working folder — while the
+  mixed-calendar folder is real on the day the fix lands. Two consequences
+  worth knowing: the order is by when a task FINISHED (the file is written
+  once, at the end), so a long preview started earlier lists above a short
+  task that ended after it; and a file deleted between the listing and the
+  sort reads as 1601-01-01 and drops to the bottom, harmless. Rejected:
+  skipping implausible names the way `ArchiveStamp` does — a name is only a
+  label here, and the write time is what "the last twenty tasks" means anyway.
 - **A timetable already remembered in the other calendar** is still on that
   teacher's disk, and the invariant reader takes `2569-09-08` as the year
   2569. `TimetableMemory.Read` now returns null — "not remembered" — when any
-  date is before `EarliestBelievable` (2025-01-01) or more than
+  date is before `EarliestBelievable` (2000-01-01) or more than
   `YearsAheadBelievable` (3) years past today, the same shape as
   `ArchiveStamp`: a date that cannot be true does not get to decide anything.
   The assistant asks for the timetable again, and the next `Write` replaces
-  the file with one it can read. Three years, not `ArchiveStamp`'s two days,
-  because future class dates are the point of the file; the nearest wrong
-  reading is 543 years out, so anything between works. **No trail event was
-  added for this**, deliberately: the only visible effect is that the
-  assistant asks once for a timetable it had, on a machine whose file was
-  already unusable, and an event that both platforms must name in
-  `mustRecord` for a one-time recovery on one platform would cost more than
-  it tells. If a problem report ever needs it, that is the moment to add it.
+  the file with one it can read. **`Write` refuses the same list**
+  (`TimetableMemory.Unbelievable` is the one rule both consult), because the
+  implementation review found what a reader-only guard does: `remember_timetable`
+  saved the file, read it back for its reply, and dereferenced the null —
+  a crash after the write, where before there had been a working tool. The
+  two MCP tools and the section-schedule dialog now refuse first, naming the
+  date. The window is contract data since this piece —
+  `contracts/file-formats.json` → `sectionTimetable.believable` (the two
+  bounds and eight cases, run here by `DateTextTests`) — because a working
+  folder travels, so a file written by a pre-#144 Windows on a Thai PC can be
+  restored on a mac, whose `SectionTimetable` reads it just as invariantly;
+  the `mac` issue opened with this piece says so. The floor is 2000, not
+  `ArchiveStamp`'s 2025, because a teacher may keep last year's timetable;
+  it is still centuries clear of every wrong reading (2569, 1483, 1448). The
+  ceiling is three years, not two days, because future class dates are the
+  point of the file. **It leaves a trail line** — `remembered timetable set
+  aside`, `appliesOn: ["windows"]` in `shared-rules.json` → `activityTrail.mustRecord`,
+  carrying the date it refused — written by the reader, once per read of
+  such a file until the teacher answers and the file is replaced. Windows
+  only because only this app ever wrote such a file; the mac's guard, when
+  it adopts one, meets a file that arrived rather than one it wrote, and
+  can decide its own line then.
 
 **What is deliberately left in the machine's culture**, so nobody "fixes"
 it: `TaskScheduling.Schedule` formats the date for `schtasks.exe` and walks
@@ -2337,6 +2360,12 @@ dateline and the `when` readers are still cultural, so on a Thai PC a model
 echoing `2026-09-20 06:30` into `schedule_deploy` is refused as "already
 passed" (the cultural reader takes it as 1483). #159 merges first, or the two
 merge together; on a Gregorian machine neither order changes anything.
+**Whichever lands second needs one follow-up commit**: if #159 is already on
+`dev`, this branch's five `DeliberatelyCultural` entries excuse lines that
+no longer exist, and #159's `ReadTheMoment` carries a cultural FALLBACK that
+the source scan will flag — one entry to add, five to remove. (And #159's
+middle step, an invariant LENIENT parse, is the very `09/08/2026` month/day
+swap `TryReadDay` rejects; a comment on #159 says so.)
 
 **What keeps it fixed** is `DateTextTests`, and the two tests that matter are
 not the ones about the helper:
@@ -2353,7 +2382,12 @@ not the ones about the helper:
   in it until that branch lands, when its `ReadTheMoment` will want an entry
   of its own for its cultural FALLBACK. Its blind spot is a format passed
   through a variable, which is why `TaskScheduling`'s `when.ToString(format)`
-  is matched by name.
+  is matched by name. Three more, none with a site today: a second bare
+  `yyyy` on a line that also says `InvariantCulture` gets through; the line
+  after a `string.Create(CultureInfo.InvariantCulture, …)` is skipped
+  whatever it holds; and `{x:MMMM d, yyyy}` is missed because the pattern
+  wants `yyyy` right after the colon. A bare `{date}`, `ToString("d")` or
+  `ToShortDateString()` is not scanned at all, and the greps found none.
 - `EveryExcuseStillExcusesALineThatExists` fails the moment an entry matches
   nothing, so a dead excuse cannot one day excuse a new site by accident. The
   #159 entries are exempt from it, for the reason above.

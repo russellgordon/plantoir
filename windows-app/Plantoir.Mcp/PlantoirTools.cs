@@ -706,6 +706,11 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                     $"({string.Join(", ", unreadable.Take(5))}). Give them as YYYY-MM-DD.");
             if (parsed.Count == 0)
                 throw new AssistRefusal("Nothing was recorded — no dates were given.");
+            if (TimetableMemory.Unbelievable(parsed, DateOnly.FromDateTime(DateTime.Now)) is { } impossible)
+                throw new AssistRefusal(
+                    $"Nothing was recorded — {DateText.Iso(impossible)} can't be a class date. Plantoir keeps " +
+                    $"dates from {DateText.Iso(TimetableMemory.EarliestBelievable)} to " +
+                    $"{TimetableMemory.YearsAheadBelievable} years from today; check the year and try again.");
 
             parsed.Sort();
             return Proposing($"Would record {parsed.Count} class dates for {found.Code} Section {number}, " +
@@ -897,6 +902,11 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                     $"({string.Join(", ", unreadable.Take(5))}). Give them as YYYY-MM-DD and I'll keep the lot.");
             if (parsed.Count == 0)
                 throw new AssistRefusal("Nothing was recorded — no dates were given.");
+            if (TimetableMemory.Unbelievable(parsed, DateOnly.FromDateTime(DateTime.Now)) is { } impossible)
+                throw new AssistRefusal(
+                    $"Nothing was recorded — {DateText.Iso(impossible)} can't be a class date. Plantoir keeps " +
+                    $"dates from {DateText.Iso(TimetableMemory.EarliestBelievable)} to " +
+                    $"{TimetableMemory.YearsAheadBelievable} years from today; check the year and try again.");
 
             if (!TimetableMemory.Write(workspace.FolderPath, found.Code, number, parsed, source,
                                        DateOnly.FromDateTime(DateTime.Now)))
