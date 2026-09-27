@@ -533,6 +533,7 @@ brew install xcodegen
 cd mac-app
 ./Vendor/fetch-llama.sh     # REQUIRED before generating — see below
 ./Vendor/fetch-sparkle.sh   # REQUIRED too, since #204 — see below
+./Vendor/fetch-helpers.sh   # REQUIRED too, since #312 — ~470 MB, see below
 xcodegen generate
 open Plantoir.xcodeproj
 ```
@@ -555,6 +556,17 @@ and refusing a mismatch. Also **not optional**: `project.yml` embeds
 `Vendor/Sparkle/Sparkle.framework`, so generating without it fails. A Debug
 build carries no update feed and never checks for anything —
 `documentation/09-mac-app.md` → "Updating itself".
+
+`fetch-helpers.sh` fetches the website builder's helper programs (Colima,
+Lima, the Docker CLI, buildx) and the virtual machine's starting disk for
+Apple silicon — **about 470 MB** — which the app carries so a teacher's first
+run does not download them (#312). Also **not optional**: `project.yml` names
+`Vendor/helpers` as a resource folder. It reads every version and checksum
+from `setup.sh` and keeps its downloads in a cache OUTSIDE the repository
+(`${PLANTOIR_HELPERS_CACHE:-~/Library/Caches/Plantoir-dev/helpers}`), so a
+second clone or worktree costs a few seconds and no disk; the first costs the
+download. Run `xcodegen generate` again after it replaces the folder (Trap 1).
+`documentation/09-mac-app.md` → "What the app carries for the website builder".
 
 Debug builds are signed with a real "Apple Development" identity
 (`DEVELOPMENT_TEAM` in `project.yml`) rather than ad-hoc — an ad-hoc signature
