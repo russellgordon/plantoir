@@ -936,8 +936,8 @@ nonisolated enum ActivityTrail {
         if let word = everyPageWord {
             return "named no page while \(act): a word for every page (“\(word)”), so nothing was changed"
         }
-        let counted: String = unknownCount == 1 ? "1 name" : "\(unknownCount) names"
-        return "named no page while \(act): \(counted) that match no page, so nothing was changed"
+        let counted: String = unknownCount == 1 ? "1 name that matches" : "\(unknownCount) names that match"
+        return "named no page while \(act): \(counted) no page, so nothing was changed"
     }
 
     static func formatter(timeZone: TimeZone = TimeZone.current) -> DateFormatter {
