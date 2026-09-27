@@ -60,6 +60,10 @@ struct SidebarView: View {
     /// The section "Schedule Deploy…" was chosen on, while its sheet is up.
     @State var scheduleRequest: ScheduledDeployRequest?
 
+    /// The section "Get Ready for the Start of the Year…" (or its undo) was
+    /// chosen on, while its sheet is up (#96).
+    @State var startOfYearRequest: StartOfYearRequest?
+
     /// The scheduled deploy the teacher is being asked about cancelling.
     @State var cancelScheduleRequest: ScheduledDeployRequest?
 
@@ -179,6 +183,17 @@ struct SidebarView: View {
                                             }
                                             .accessibilityIdentifier("scheduleDeploy-\(course.code)-section\(sectionNumber)")
                                         }
+                                        // Getting ready for the start of the
+                                        // year only HIDES pages, and nothing
+                                        // reaches students until a deploy
+                                        // (#96). Never on a reference course;
+                                        // not while this course is being
+                                        // deployed. Its undo sits BESIDE it,
+                                        // never in its place, while one is
+                                        // held for this section.
+                                        if !course.isKeptForReference {
+                                            startOfYearItems(course: course, sectionNumber: sectionNumber)
+                                        }
                                         Divider()
                                         folderMenuItems(for: course.sectionDirectoryURL(forSection: sectionNumber))
                                     }
@@ -194,7 +209,8 @@ struct SidebarView: View {
                             let busyReason: String? = busyReason(for: course)
                             CourseRowLabel(
                                 course: course,
-                                isBeingRenamed: renamingCourseCode == course.code
+                                isBeingRenamed: renamingCourseCode == course.code,
+                                isBeingCopied: workspace.isBeingCopied(course.code)
                             )
                                 .tag(SidebarSelection.course(course.code))
                                 .accessibilityIdentifier("sidebar-\(course.code)")
@@ -264,6 +280,10 @@ struct SidebarView: View {
                                     Button("Back Up Now", systemImage: "clock.arrow.circlepath") {
                                         Task { await workspace.backUp(course) }
                                     }
+                                    // One copy at a time (#351): the zip runs
+                                    // off the main actor now, so a second press
+                                    // is possible while the first is saving.
+                                    .disabled(workspace.isBeingCopied(course.code))
                                     Divider()
                                     folderMenuItems(for: course.directoryURL)
                                 }
@@ -293,6 +313,7 @@ struct SidebarView: View {
                                     Button("Restore…", systemImage: "arrow.uturn.backward") {
                                         workspace.backupRestoreRequest = item
                                     }
+                                    .disabled(workspace.isBeingCopied(item.courseCode))
                                     Button("Show in Finder", systemImage: "finder") {
                                         NSWorkspace.shared.activateFileViewerSelecting([item.fileURL])
                                     }
@@ -575,6 +596,16 @@ struct SidebarView: View {
                 workspace.selection = SidebarSelection.section(course.code, sectionNumber)
             }
         }
+        .sheet(item: $startOfYearRequest) { request in
+            if let workspaceURL = workspace.workspaceURL {
+                StartOfYearSheet(model: StartOfYearSheetModel(
+                    course: request.course,
+                    sectionNumber: request.sectionNumber,
+                    workspaceURL: workspaceURL,
+                    mode: request.mode
+                ))
+            }
+        }
         .sheet(item: $scheduleRequest) { request in
             if let workspaceURL = workspace.workspaceURL {
                 ScheduleDeploySheet(
@@ -784,7 +815,10 @@ struct SidebarView: View {
             .buttonStyle(.borderless)
             // An archived item is already put away, so there is nothing
             // for this button to do while one is selected.
-            .disabled(workspace.selectedCourse == nil)
+            // Nor while the course is being copied (#351): a second archive of
+            // a folder already being put away.
+            .disabled(workspace.selectedCourse == nil
+                      || workspace.isBeingCopied(workspace.selectedCourse?.code ?? ""))
             .help("Remove the selected course or section")
             .accessibilityIdentifier("removeSelectedButton")
             .padding(.trailing, 5)
@@ -1076,6 +1110,39 @@ struct SidebarView: View {
         .accessibilityIdentifier("copyAPage-\(course.code)")
     }
 
+    /// "Get Ready for the Start of the Year…", and its undo while one is
+    /// held (#96).
+    @ViewBuilder
+    func startOfYearItems(course: Course, sectionNumber: Int) -> some View {
+        let deploying: Bool = isBeingDeployed(course)
+        Button(StartOfYearWording.menuItem, systemImage: "moon.zzz") {
+            startOfYearRequest = StartOfYearRequest(course: course, sectionNumber: sectionNumber, mode: .getReady)
+        }
+        .disabled(deploying)
+        .accessibilityIdentifier("startOfYear-\(course.code)-section\(sectionNumber)")
+        if let folder = workspace.workspaceURL,
+           StartOfYearUndoRegistry.shared.entry(
+               folderPath: folder.path, courseCode: course.code, sectionNumber: sectionNumber
+           ) != nil {
+            Button(StartOfYearWording.undoMenuItem, systemImage: "arrow.uturn.backward") {
+                startOfYearRequest = StartOfYearRequest(course: course, sectionNumber: sectionNumber, mode: .undo)
+            }
+            .disabled(deploying)
+            .accessibilityIdentifier("startOfYearUndo-\(course.code)-section\(sectionNumber)")
+        }
+        if deploying {
+            Text(CourseActivity.availableOnceDeployCompleted)
+        }
+    }
+
+    /// Whether a deploy of this course is running from this app.
+    func isBeingDeployed(_ course: Course) -> Bool {
+        guard let folder = workspace.workspaceURL else {
+            return false
+        }
+        return CourseActivity.coursePublishIsRunning(folderPath: folder.path, courseCode: course.code)
+    }
+
     /// Why the course is busy — previewing or publishing, in any window
     /// showing this working folder — or nil when it isn't.
     func busyReason(for course: Course) -> String? {
@@ -1134,7 +1201,7 @@ struct SidebarView: View {
                     }
             }
         } label: {
-            CourseRowLabel(course: course, isBeingRenamed: false)
+            CourseRowLabel(course: course, isBeingRenamed: false, isBeingCopied: workspace.isBeingCopied(course.code))
                 .tag(SidebarSelection.course(course.code))
                 .accessibilityIdentifier("sidebar-\(course.code)")
                 .contextMenu {
@@ -1154,6 +1221,7 @@ struct SidebarView: View {
                     Button("Back Up Now", systemImage: "clock.arrow.circlepath") {
                         Task { await workspace.backUp(course) }
                     }
+                    .disabled(workspace.isBeingCopied(course.code))
                     Divider()
                     folderMenuItems(for: course.directoryURL)
                 }
@@ -1518,6 +1586,10 @@ struct SidebarView: View {
         guard let courseToRemove else {
             return
         }
+        // One archive at a time (#351); the button is greyed then too.
+        if workspace.isBeingCopied(courseToRemove.code) {
+            return
+        }
 
         var result: ScheduledDeployCleanup.RemovalResult
         if let sectionNumber = request.sectionNumber {
@@ -1605,6 +1677,9 @@ struct CourseRowLabel: View {
     /// is read.
     let isBeingRenamed: Bool
 
+    /// Whether a copy of the course is being zipped right now (#351).
+    var isBeingCopied: Bool = false
+
     // MARK: - Body
 
     var body: some View {
@@ -1615,7 +1690,18 @@ struct CourseRowLabel: View {
             // ICS3U, never the folder name. The year group above this row
             // already says 2025–26, so the suffix would be redundant as
             // well as wrong.
-            Label(course.displayCode, systemImage: "books.vertical")
+            HStack(spacing: 6) {
+                Label(course.displayCode, systemImage: "books.vertical")
+                // A copy of the course is being zipped (#351) — a backup, or
+                // the archive before a restore or removal. The row says so
+                // rather than the window going quiet for the minute it takes.
+                if isBeingCopied {
+                    ProgressView()
+                        .controlSize(.small)
+                        .accessibilityLabel("Saving a copy")
+                        .accessibilityIdentifier("courseBeingCopied-\(course.code)")
+                }
+            }
         }
     }
 }

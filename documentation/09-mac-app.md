@@ -139,6 +139,20 @@ sentence needs about one line per character.
 | 2026-09-05 | the synced-folder notice (`CloudSyncNoticeView`) | 1,548 points, and the same 1,548 whether 700 points or nothing was proposed | the `fixedSize` deleted; `CloudSyncNoticeLayoutTests` written |
 | 2026-09-19 | the folder-publish Done panel and the scheduled-publish notice (issue #211) | **1,980**, **3,100** and **1,372** points | the `fixedSize` deleted; seven cases added to `ProgressViewSizeTests` |
 
+**A fifth was caught before it reached a teacher**, 2026-09-26: the line that
+says Course Settings has unsaved changes, so the preview uses the saved ones
+(`SpecialNames.previewUsesSavedSettings`, #265), sat in the detail column
+above the site's stack with `.fixedSize(horizontal: false, vertical: true)` on
+its sentence. Squeezed it claimed **1,337** points; in a real
+`NavigationSplitView` window at the 900 × 600 minimum (a standalone replica,
+not Plantoir itself) the area under it where the site sits was laid out
+**1,305** points tall inside a 600-point window, against 525 without the
+modifier. Found by the #213 planner, fixed in the same piece: the notice is its
+own view, `UnsavedSettingsNoticeView`, with no `fixedSize`, and
+`UnsavedSettingsNoticeLayoutTests` pins the squeeze, the wrapping and — read
+from the source, since `SectionDetailView` cannot be mounted in a unit test —
+that nothing in `SectionDetailView.swift` is `.fixedSize(` at all.
+
 The fourth is the one to learn from, because the third had already produced a
 rule, a comment and a test file, and the fault still shipped twice more in the
 same window. The comment lived on the view it was written for; the test file
@@ -2084,7 +2098,22 @@ first: ordinary removes; consequential asks (the existing confirmation);
 blocked removes nothing, shows the SAME named reason from the − button and
 notes `removalBlocked` with the SAME trail line the row's info button writes.
 Nothing new is recorded on the trail — what is written did not change, only
-which control triggers it. A fixed gesture script (`ListGestureScript.swift`)
+which control triggers it. **What that line SAYS changed with #171**
+(2026-09-26): it names the course and the screen, in Windows' words —
+`new course SNC4M: could not remove “Tasks” from the shared folders — <reason>`
+in the New Course wizard, `SNC4M: could not remove …` in Course Settings, and
+"the marks list" for an untick ("the curriculum folders" for #128's
+coverage-map ticks) — built by `RemovalTrail`, which both editors
+take as a REQUIRED parameter. Before, it named no course, and three of the
+five list titles are the same on both screens, so a refusal while a course
+was being made could not be told from the same refusal in one that exists.
+REJECTED: an optional context with a course-less fallback (a new call site
+that forgets it brings #171 back without a sound); pinning the words in the
+contract (only a line with two writers is pinned — `lineWhy`; the `carries`
+of `activityTrail.mustRecord` → "removal blocked" says what it holds);
+copying Windows' " - " separator, which is its own outlier among its trail
+lines. `ListTableGoldenTests.testTheInfoButtonWritesTheSameLineAsABlockedRemoval`
+holds the two paths to one line, which until then nothing did. A fixed gesture script (`ListGestureScript.swift`)
 was run through the OLD code before the redraw and captured into
 `Tests/Goldens/266-course-settings-gestures.json` and `266-wizard-gestures.json`;
 `ListTableGoldenTests` runs it through the new entry points and demands the
@@ -2398,7 +2427,14 @@ served sidebar filter was unchanged. So:
   course's shared configuration and survive leaving the form, so the switches
   and the page could disagree with nothing said. Rejected: saving automatically
   (a half-typed setting would be written) and refusing (previewing the saved
-  settings may be the point).
+  settings may be the point). **Since #335 the same holds for a deploy and
+  for the schedule sheet**: both read the SAVED file at the act
+  (`Course.asSavedNow()`), and say `deployUsesSavedSettings` (in the same
+  banner, identifier `deployUsesSavedSettingsNotice`, owned by the deploy so a
+  preview's end — which clears only a preview's sentence — cannot take it away) or
+  `schedulingUsesSavedSettings` (above the sheet's plan); a file that cannot be
+  read refuses with `settingsCouldNotBeReadToDeploy` — docs 07, "The window's
+  acts read the saved settings too (#335)".
 - *Rejected: rebuilding the preview automatically on every Save* — it kills a
   page the teacher may be reading, for a Save that may have changed only the
   footer, and the preview belongs to another window's runner.
@@ -2408,7 +2444,9 @@ only, compared with the file before the Save), which settings it kept or
 replaced from elsewhere (and, for the sidebar list, that the teacher was told),
 and whether a preview or a publish was running — the
 line that would have settled #265 in one read. New: `preview started with
-unsaved settings` and `preview again after settings saved`.
+unsaved settings` and `preview again after settings saved`; and, since #335,
+`deploy used the saved settings` (which act, the saved destination's kind and
+whether the unsaved edits named a different kind — never a path).
 
 **What the view must not do.** The notice is decided once, in `save()`, from
 `PreviewLeases.active` and `CourseActivity.activePublishes`; no cell of the
@@ -5383,6 +5421,109 @@ this is the app-side wiring.
   installed copy share the bundle identifier, so the answer given to one is the
   answer for both.
 
+## What the app carries for the website builder (#312)
+
+**The payload.** `Contents/Resources/helpers`: Colima, limactl with its `lima`
+wrapper, the Docker CLI and buildx, Lima's Linux guest agent and templates,
+and the Ubuntu disk Colima creates its virtual machine from — Apple silicon
+only, about 470 MB (135 MB of programs, 332 MB of disk) — with a `MANIFEST`.
+The launchers install the programs into
+`~/Library/Application Support/Plantoir/tools` and create the virtual machine
+from the disk; how, and every rule about when, is in
+`documentation/03-launcher-scripts.md` → "Where the helper programs come
+from", and the cases are `contracts/app-rules.json` → `helperBootstrap`. The
+app itself does ONE thing: `HelperPrograms.environment` sets
+`PLANTOIR_BUNDLED_HELPERS` to the folder when the app carries it, and removes
+an inherited value when it does not, so every launcher the app starts — from
+the window, the MCP server, and the publishes launchd starts through Plantoir
+— can install from it. No installer in Swift: neither app carries toolchain
+logic of its own.
+
+**Measured, 2026-09-26, M4 Pro.** A first run used to download ~857 MB (the
+launcher said 600): 135 MB of programs, the 332 MB disk, ~390 MB building the
+website builder. Now only the build is downloaded. The disk-seeded start of
+the virtual machine takes 22–27 s. Estimated for an 8 GB M1 at 25 Mbit/s:
+about 4.5 minutes rather than 7; at 10 Mbit/s about 7.5 rather than 14. The
+app bundle grows from ~125 MB to ~600 MB (599 MB signed); the DMG from 58.8 MB
+to **410,488,446 bytes** with LZMA (ULMO), which publish.sh now uses — the
+planner measured 466 MB with zlib and 432 MB with LZMA on an earlier app, and
+converting took 29 s at the rehearsal; macOS 15, the minimum, reads it. At the
+#312 rehearsal (two `-Sign` builds, 2026-09-26): upload to the notary about
+35 s each, **accepted after 625 s and 203 s** from submission, no issues in the
+notary log (nothing about `vm/*.raw.gz` or the Linux guest agent), stapled,
+and `spctl` accepted it; the whole `publish.sh -Sign` run took 783 s and 359 s.
+
+**Why Apple silicon only.** A universal payload would add ~135 MB of Intel
+programs and the 358 MB Intel disk to every Apple-silicon teacher's download.
+An Intel Mac downloads as before — each download is now checked against its
+own pinned SHA-256 — and the app's MANIFEST says `arch arm64`, which the
+launcher compares with `uname -m`.
+
+**Fetched, never committed.** `mac-app/Vendor/fetch-helpers.sh` (required
+before `xcodegen generate`, like fetch-llama.sh and fetch-sparkle.sh) reads
+every version and checksum from `setup.sh` rather than carrying its own —
+`HelperVersionsTests` fails if one is written into it — refuses any file that
+does not hash to its pin, and refuses a Colima that does not carry the disk's
+SHA-512 (Colima refuses any other disk, so a Colima bump without a disk bump
+would otherwise surface as a slow download at a teacher's first start). Its
+cache is outside the repository, under
+`${PLANTOIR_HELPERS_CACHE:-~/Library/Caches/Plantoir-dev/helpers}`, keyed by
+SHA-256, and the folder is made with clones, so a second worktree costs
+seconds and no disk. **Trap 1 applies**: run `xcodegen generate` after a
+re-fetch. `HelperVersionsTests.testTheAppsCopiesCarryTheLaunchersPins` asks
+the fetched folder AND the app the suite runs in whether their MANIFEST's pins
+are setup.sh's; the launcher refuses a copy whose are not.
+
+**Signing.** `publish.sh -Sign` runs `release/sign-helpers.sh` after the
+updater, the dylibs and llama-server and before the app: each program with
+`--options runtime --timestamp` under a fixed identifier
+(`ca.russellgordon.Plantoir.helper.<name>`; the Docker CLI's upstream one is
+`a.out`), limactl with `release/limactl.entitlements` — upstream's own set,
+`com.apple.security.virtualization` plus `network.client` and
+`network.server`, never the app's — and the others with none. Signing changes
+the bytes, so it then writes the `MANIFEST` again, and the app's signature
+seals it. `release/check-signatures.sh` refuses, before notarization, a helper
+off the team, without the runtime or a timestamp, carrying the app's
+`disable-library-validation`, carrying any entitlement it does not need, a
+limactl without the virtualization entitlement (a hardened limactl cannot
+start a vz machine without it — found otherwise only at a teacher's first
+start), a `MANIFEST` that no longer matches the signed programs (every
+teacher's Mac would refuse the copy and download instead), and an app with no
+helpers at all. `codesign --verify --deep --strict` sees none of this: it does
+not look inside `Resources`.
+
+**Nothing writes inside the app.** A Sparkle delta requires the installed
+bundle to be byte-for-byte what was shipped; a chmod or a quarantine strip
+inside it would silently turn every update into a full download. The
+launchers copy OUT and strip quarantine from the copies only, and
+`scripts/test_helper_bootstrap.py` checks the app's copy is unchanged after
+every case.
+
+**Updates stay small.** At the #312 rehearsal, Sparkle 2.9.6's `BinaryDelta`
+between the two signed, notarized rehearsal builds (one Swift string apart,
+every helper program signed again, so all four differ in bytes) made a
+**106,054-byte** delta in 6 s; applied to a copy of build 1 in 4 s, the result
+was byte-identical to build 2, verified `--deep --strict` and was accepted by
+`spctl` as Notarized Developer ID. The planner's earlier measurement between
+two real signed apps further apart: 3,658,602 bytes without the payload, 3,658,626 with an
+identical payload in both, 3,733,870 with the four programs' signatures
+changed. A version bump of one program costs roughly that file's binary
+difference; a new disk (rare: colima-core ships one with Colima releases)
+costs close to its 332 MB. `website/update_feed.py` therefore makes deltas
+from the three newest builds in the feed — reversing #204's decision, see
+"Updating itself" below.
+
+**What a teacher who already has Plantoir gains: nothing on the first run,**
+which they have had. They pay ~410 MB once, for v1.4.0, by hand (it is the
+first release with the updater); at their next start of the website builder
+the app's signed copies replace the downloaded ones ("replacing copies set up
+before Plantoir kept a record of them" on the trail) and the existing virtual
+machine starts with them.
+
+**Rejected, beyond what 03 lists:** a universal payload (above); carrying the
+website builder's image too — Russell's decision was to keep building it on
+the Mac; and running the programs from inside the app (03).
+
 ## Updating itself: what is held, what is not, and why (#204)
 
 From v1.4.0 a released Plantoir finds and installs its own new versions, with
@@ -5524,7 +5665,18 @@ to `AppUpdates.teacherAnsweredReady` first.
   record only, because the test host shares an executable with the Debug app
   a teacher opens, whose scheduled publish the live scan would find (the
   slice-1 review's L4). `SameExecutableProcessesTests` exercises the scan on
-  processes it starts itself.
+  processes it starts itself: a copy of `/bin/bash` named `Plantoir` in a
+  temporary folder, **re-signed ad hoc** (`codesign --force --sign -`), held on
+  `read -t 30` with its standard input a pipe the test keeps open (end-of-file
+  would end `read` at once; with no pipe the child would depend on the test
+  host's own standard input), with an assertion after every scan that the child
+  is still alive (#341). Measured on an M4 Pro, macOS 26.6: an unsigned copy of a system
+  binary run from a temporary folder is SIGKILLed within about 1–100 ms (60 of
+  60 copies of `/bin/sh`), so the tests used to pass only by scanning before
+  the kill, and flaked when they scanned after it. The re-signing is the part
+  that matters (a re-signed `/bin/sh` also stayed alive under the test host);
+  the start waits, polling every 10 ms for at most 2 s, until the scan sees
+  the child.
 - **The waiting is event-driven, never on a clock:** `withObservationTracking`
   on `CourseActivity.store`, `ProcessEnding.ends(of:)` for each process being
   waited for (a `DispatchSource` process-exit event — the app's second
@@ -5756,9 +5908,17 @@ R1 repeats it on Plantoir's own signed build, with must-fail (b).
 
 **The feed** is built by `website/update_feed.py` at the cut, checked and
 copied by `website/update_feeds.py` — `website/README.md` → "The update feeds"
-and `RELEASING.md` → "The update feed (macOS)". *Rejected:* deltas (each is
-another asset on the GitHub release under a name that would have to stay
-stable, to save part of a ~59 MB download once a release); generating the feed
+and `RELEASING.md` → "The update feed (macOS)". **Deltas were rejected here
+by #204 and turned on by #312**, and the reversal is the point of the note: the
+rejection (each is another asset on the GitHub release under a name that would
+have to stay stable, to save part of a ~59 MB download once a release) was
+sound for a 59 MB DMG. Since #312 the DMG carries the website builder's helper
+programs and starting disk and is ~410 MB, and a Swift-only update measured
+106 KB as a delta between the two signed rehearsal builds with or without that payload — so every update without
+deltas would be a 410 MB download. How they are made, and the rewrite of
+earlier items `generate_appcast` does that `update_feed.py` has to undo, is in
+"What the app carries for the website builder (#312)" below and in
+`RELEASING.md` → "The update feed (macOS)". Still rejected: generating the feed
 in `publish.sh` (the feed needs the APPROVED notes, which do not exist until the
 cut, and must follow the release being published); a feed parsed and rewritten
 by `build.py` (breaks its signature).
@@ -6185,11 +6345,12 @@ implementation's measurements:
 Every tool that changes a page runs in **plan mode**: the assistant states
 what it understood and what it is about to do, and waits for Go or Cancel.
 Swift decides this from whether the tool has a `plan_` twin, so the model is
-never asked to judge whether something is risky. Four writes have no plan —
-rebuilding the preview, undo, cancelling a scheduled deploy, and deploying,
-which waits on its own separate approval instead, whether or not plan mode is
-on (a fifth, backing up the course, changes no page; and a model that names a
-tool it was not offered is refused rather than obeyed, #327 — doc 10). A Mac running the smaller assistant cannot
+never asked to judge whether something is risky. Five writes have no plan —
+rebuilding the preview, undo, cancelling a scheduled deploy, backing up the
+course (it changes no page, and the card "back up this course" reaches it in
+the app, so "four" was wrong, #343), and deploying, which waits on its own
+separate approval instead, whether or not plan mode is on (and a model that
+names a tool it was not offered is refused rather than obeyed, #327 — doc 10). A Mac running the smaller assistant cannot
 turn plan mode off; on a 16 GB machine the app offers to stop asking after a
 run of plans the teacher has accepted unchanged. Behind it, every change is
 backed up once per conversation and can be undone.
@@ -6230,6 +6391,59 @@ the reasoning and a Windows-porting note per entry — is
 [`GUI-IMPROVEMENTS.md`](../GUI-IMPROVEMENTS.md). Architecture, build
 instructions (XcodeGen + Xcode), and the test suite are documented in
 [`mac-app/README.md`](../mac-app/README.md).
+
+## Get Ready for the Start of the Year (#96)
+
+A section's context menu carries **"Get Ready for the Start of the Year…"**
+(`StartOfYearWording.menuItem`), after Schedule/Cancel Deploy. It is not drawn
+on a course kept for reference, and it is disabled — with "Available once
+deploy completed" under it, the shape "Add Section…" uses — while this app is
+deploying the course. A running PREVIEW does not disable it: Go stops the
+preview and starts it again. The rule itself, the plan code and the
+measurements are `documentation/10-local-ai-assistant.md` → "Getting a section
+ready for the start of the year"; the contract is `shared-rules.json` →
+`startOfYear`.
+
+**The sheet** (`Views/Section/StartOfYearSheet.swift`, logic in the
+`@Observable` `StartOfYearSheetModel`, tested without a window) shows, before
+anything is written: the intro; the warnings (classes dated before today that
+are going into draft; this folder's scheduled deploy for the section, which
+would put the change in front of students; a first class that is itself in
+draft); every class and every other page going into draft, each with its
+reason, in disclosure groups; what stays; the links left on pages students will
+see that will lead to hidden pages, grouped by page with a count; the sentence
+that publishing a class by hand after this leaves it with dead links (issue
+#333); and that the undo ends when Plantoir quits. Go is disabled when there is
+nothing to do.
+
+**Go** (`StartOfYearPreparation.carryOut`), in order: re-plan from disk and,
+if the plan differs from the one on screen, write nothing and show the new one
+with `changedSinceShown`; back the course up as the TEACHER's
+(`CourseArchiver.backUpCourse(madeBy: .teacher)`, file name unchanged) and
+refuse if that fails; stop the preview if one is running and no other program
+holds the course (#156 — then the preview is left up and the result says it
+was not rebuilt); write; hold the undo; write the trail line; start the preview
+again. **Why the app refuses without a backup when the assistant's ordinary
+writes do not:** this is the largest single write the app makes, on one press,
+usually weeks before anyone looks at the site, and the undo does not survive a
+quit — the backup is the only way back that does.
+
+**The undo** is offered BESIDE the menu item ("Undo Getting Ready for the
+Start of the Year…"), never in its place, and from the result's own Undo…
+button. It is always a sheet listing what would go back and what changed since
+and will be left. `StartOfYearUndoRegistry` is process-wide, keyed by folder
+(`FolderIdentity`), course and section like `SectionWindowControllers`, so any
+window on the folder offers it. It ends at the section's next deploy
+(`CourseActivity.beginPublish` tells it), at a scheduled deploy (the one set at
+the time reaching its moment, or any whose log shows a run since the change —
+the schedule is re-read when the undo sheet opens), at the next change to the
+section's pages from anywhere (checked when the undo sheet opens), and when
+Plantoir quits. Go and Put Them Back both refuse while this app is deploying the
+course (`deployUnderWay`). A deploy by an outside assistant or `deploy.sh` from
+a terminal is not seen. It
+is offered once: a partial undo is not offered again, and names the backup.
+This undo, the assistant window's "undo that" and an outside assistant's
+`undo_last_change` are three separate stores.
 
 ## Testing: the real-home tripwire (#264)
 

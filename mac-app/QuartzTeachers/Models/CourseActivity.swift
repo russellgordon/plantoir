@@ -39,6 +39,17 @@ enum CourseActivity {
         let sectionNumber: Int
     }
 
+    /// A course whose folder is being ZIPPED — a backup, or the archive made
+    /// before a restore or a removal (#351). Recorded because the zip runs
+    /// off the main actor now: the window stays live for the minute it can
+    /// take, and nothing must change the course under it — no second Back
+    /// Up, Restore or Remove of the same course, no preview started, and ⌘Q
+    /// asks first.
+    struct CopyRecord: Equatable {
+        let folderPath: String
+        let courseCode: String
+    }
+
     /// The backing store is observable for the same reason as
     /// `PreviewLeases.Store`: views reading `courseIsBusy` must
     /// re-render the moment a publish begins or ends.
@@ -46,6 +57,7 @@ enum CourseActivity {
     final class Store {
         var activePublishes: [PublishRecord] = []
         var activePreviewBuilds: [PreviewBuildRecord] = []
+        var activeCopies: [CopyRecord] = []
     }
 
     // MARK: - Stored properties
@@ -70,7 +82,43 @@ enum CourseActivity {
         return store.activePreviewBuilds
     }
 
+    /// The courses being zipped right now, across all windows (#351).
+    static var activeCopies: [CopyRecord] {
+        return store.activeCopies
+    }
+
     // MARK: - Functions
+
+    /// Records that a course's folder has started being zipped (#351). One
+    /// record per zip, so two at once of one course end one at a time.
+    static func beginCopy(folderPath: String, courseCode: String) {
+        store.activeCopies.append(CopyRecord(folderPath: folderPath, courseCode: courseCode))
+    }
+
+    /// Records that one zip of a course has finished, however it finished.
+    static func endCopy(folderPath: String, courseCode: String) {
+        let finished: CopyRecord = CopyRecord(folderPath: folderPath, courseCode: courseCode)
+        var remaining: [CopyRecord] = []
+        var didRemoveOne: Bool = false
+        for existing in activeCopies {
+            if existing == finished && !didRemoveOne {
+                didRemoveOne = true
+                continue
+            }
+            remaining.append(existing)
+        }
+        store.activeCopies = remaining
+    }
+
+    /// True while a copy of the course is being zipped (#351).
+    static func courseIsBeingCopied(folderPath: String, courseCode: String) -> Bool {
+        for copy in activeCopies {
+            if copy.courseCode == courseCode && FolderIdentity.isSameFolder(copy.folderPath, folderPath) {
+                return true
+            }
+        }
+        return false
+    }
 
     /// Records that a publish of one section has begun.
     static func beginPublish(folderPath: String, courseCode: String, sectionNumber: Int) {
@@ -81,6 +129,12 @@ enum CourseActivity {
         )
         store.activePublishes.append(record)
         WorkLeaseRegistry.reconcile()
+        // A deploy ends the start-of-the-year undo for this section (#96):
+        // after it, students have the drafted state, and an undo would only
+        // put pages back that the next deploy then publishes.
+        StartOfYearUndoRegistry.shared.deployStarted(
+            folderPath: folderPath, courseCode: courseCode, sectionNumber: sectionNumber
+        )
     }
 
     /// Records that a publish has finished, however it finished.
@@ -178,6 +232,10 @@ enum CourseActivity {
     /// A short reason the course is busy — naming whichever activity is
     /// in the way — or nil when it isn't. Menu-length on purpose: it
     /// sits under a disabled menu item.
+    /// The menu-length reason while only a deploy is in the way — also said
+    /// under "Get Ready for the Start of the Year…" (#96), so it is written once.
+    static let availableOnceDeployCompleted: String = "Available once deploy completed"
+
     static func busyDescription(folderPath: String, courseCode: String) -> String? {
         var isPreviewing: Bool = false
         for lease in PreviewLeases.active {
@@ -195,7 +253,7 @@ enum CourseActivity {
             return "Available once preview completed"
         }
         if isPublishing {
-            return "Available once deploy completed"
+            return availableOnceDeployCompleted
         }
         return nil
     }
@@ -204,6 +262,7 @@ enum CourseActivity {
     static func reset() {
         store.activePublishes = []
         store.activePreviewBuilds = []
+        store.activeCopies = []
         WorkLeaseRegistry.reconcile()
     }
 }

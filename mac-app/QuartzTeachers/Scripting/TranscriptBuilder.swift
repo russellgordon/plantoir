@@ -71,6 +71,9 @@ struct TranscriptBuilder {
         if BuildMarkerLine.isMachineLine(currentLine) {
             return ""
         }
+        if HelperBootstrapReport.isMarkerLine(currentLine) {
+            return ""
+        }
         return currentLine
     }
 
@@ -174,6 +177,9 @@ struct TranscriptBuilder {
         // every marker's own check: PLANTOIR_HEALTH, _DATED, _WORKSPACE_IN_USE,
         // _PREVIEW_ADDRESS_HELD, _KEPT_OFF, _MAPS — and the next one.
         if BuildMarkerLine.isMachineLine(line) {
+            return
+        }
+        if HelperBootstrapReport.isMarkerLine(line) {
             return
         }
         lines.append(line)

@@ -190,6 +190,7 @@ enum AssistContract {
                 title: "Unit 2, Day 4", reason: .aClassOfItsOwn, noun: .class
             ),
             "backingUpFirst": AssistWording.backingUpFirst(course: course),
+            "changedWhileSavingACopy": AssistWording.changedWhileSavingACopy(course: course, section: section),
             "backedUpCourse": AssistWording.backedUpCourse(
                 course: course, to: "{course}_backup_2026-09-08_190000.zip"
             ),
@@ -280,6 +281,11 @@ enum AssistContract {
             "couldNotUndo": AssistWording.couldNotUndo(changePlaceholder, leftAlone: 2),
             "undoIsStillAvailable": AssistWording.undoIsStillAvailable,
             "nothingToUndo": AssistWording.nothingToUndo,
+            "startOfYearNeedsItsPlan": AssistWording.startOfYearNeedsItsPlan(course: course, section: section),
+            "startOfYearPlanHasChanged": AssistWording.startOfYearPlanHasChanged(
+                course: course, section: section
+            ),
+            "startOfYearNeedsABackup": AssistWording.startOfYearNeedsABackup(course: course),
             "undoDoesNotReachTheLiveSite": AssistWording.undoDoesNotReachTheLiveSite,
             "aCreatedPageCanBeTakenBack": AssistWording.aCreatedPageCanBeTakenBack,
             // Duplicating a class. The date is a LITERAL rather than a
@@ -502,6 +508,11 @@ enum AssistContract {
             ),
             "reDated": AssistWording.reDated(count: 12, pagesTheyUse: 5),
             "reDatedForAMeeting": AssistWording.reDated(count: 12, pagesTheyUse: 5, noun: .meeting),
+            "reDatedOnlyPagesTheyUse": AssistWording.reDatedOnlyPagesTheyUse(pagesTheyUse: 3),
+            "everyPageIsAlreadyOnItsDay": AssistWording.everyPageIsAlreadyOnItsDay(course: "ICS3U", section: 1),
+            "reDatedOnlyPagesTheyUseForAMeeting": AssistWording.reDatedOnlyPagesTheyUse(
+                pagesTheyUse: 3, noun: .meeting
+            ),
         ]
         return [
             "note": "Generated from mac-app AssistWording by `Plantoir --write-contracts`. "
@@ -783,19 +794,22 @@ enum AssistContract {
             "note": "Three lists, deliberately. `all` is what the runner can execute; `local` is what the "
                   + "small model is SHOWN (the plan twins and remember_timetable are taken off, because "
                   + "the model never has to name a plan and dates it supplies are dates it may have "
-                  + "invented); `mcpOnly` is the thirteen offered to Claude Code on top of everything — six "
+                  + "invented); `mcpOnly` is the fifteen offered to Claude Code on top of everything — six "
                   + "asking for judgement about meaning (the three curriculum tools and the three "
-                  + "for the How I Teach page), the rest either never needed by a model scoped to "
-                  + "one section or already reachable by it through a fixed phrasing.",
+                  + "for the How I Teach page), two that get a whole section ready for the start of "
+                  + "the year (a change a person should read in full, with a button of its own in the "
+                  + "app), the rest either never needed by a model scoped to one section or already "
+                  + "reachable by it through a fixed phrasing.",
             "all": all,
             "local": local,
             "mcpOnly": mcpOnly,
             "needsApproval": needsApproval.sorted(),
             "planTwins": twins,
-            "planTwinsNote": "A write with a twin is shown as a plan first. Four writes have none, "
+            "planTwinsNote": "A write with a twin is shown as a plan first. Five writes have none, "
                            + "deliberately: rebuild_preview changes no page, undo_last_change IS the "
-                           + "remedy, deploy_section waits on its own button whatever plan mode says, and "
-                           + "a cancelled scheduled deploy is remedied by scheduling it again.",
+                           + "remedy, deploy_section waits on its own button whatever plan mode says, "
+                           + "a cancelled scheduled deploy is remedied by scheduling it again, and "
+                           + "back_up_course writes a copy outside the course and changes no page.",
         ]
     }
 

@@ -391,6 +391,7 @@ final class GradedFolderChoicesTests: XCTestCase {
 
         let checklist: MembershipToggleListView = MembershipToggleListView(
             title: GradedFolderWording.listTitle,
+            removalTrail: view.removalTrail(for: .marks),
             allItems: drawn.choices,
             members: view.gradedFoldersBinding(offered: drawn.choices),
             protection: { folder in
@@ -404,6 +405,7 @@ final class GradedFolderChoicesTests: XCTestCase {
         let configuration: CourseConfiguration = course.configuration
         let sharedList: StringListEditorView = StringListEditorView(
             title: "Shared folders (all sections)",
+            removalTrail: view.removalTrail(for: .sharedFolders),
             items: Binding(
                 get: { return configuration.sharedFolders },
                 set: { newValue in configuration.sharedFolders = newValue }

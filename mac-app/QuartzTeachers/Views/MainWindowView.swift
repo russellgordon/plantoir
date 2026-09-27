@@ -164,6 +164,7 @@ struct MainWindowView: View {
                         workspace.backupRestoreRequest = item
                     }
                     .buttonStyle(.borderedProminent)
+                    .disabled(workspace.isBeingCopied(item.courseCode))
                     .accessibilityIdentifier("restoreBackupButton")
                     Button("Delete Backup…") {
                         workspace.requestDeleteBackup(item)

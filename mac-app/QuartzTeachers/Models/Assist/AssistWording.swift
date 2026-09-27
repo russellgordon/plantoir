@@ -455,6 +455,36 @@ nonisolated enum AssistWording {
         + "It may still try to publish, and it has no way to ask what the new website should be "
         + "called — turn it off from the section's menu."
 
+    // MARK: - Getting a section ready for the start of the year (#96)
+
+    /// An outside assistant called `prepare_for_start_of_year` without the
+    /// code its plan gave. Nothing is written; the reply carries the plan as
+    /// it stands and its code, so the next call can be the right one.
+    ///
+    /// Only an MCP client meets this (the tool is MCP-only), which is why it
+    /// may name the tool: it is read by the assistant, which then shows the
+    /// teacher the plan.
+    static func startOfYearNeedsItsPlan(course: String, section: String) -> String {
+        return "Nothing was changed. Getting \(course) Section \(section) ready for the start of the "
+             + "year needs the code from its plan. Show the teacher the plan below, and when they "
+             + "agree, call prepare_for_start_of_year again with its code."
+    }
+
+    /// The code given no longer matches the plan — a page changed after the
+    /// plan was made, or the code belongs to another plan. Nothing is written.
+    static func startOfYearPlanHasChanged(course: String, section: String) -> String {
+        return "Nothing was changed. \(course) Section \(section) is not what that plan described any "
+             + "more, so its code no longer fits. Show the teacher the plan below, which is how things "
+             + "stand now, and pass its code when they agree."
+    }
+
+    /// The fresh backup this write needs could not be made, so nothing was
+    /// written — the app's button refuses the same way.
+    static func startOfYearNeedsABackup(course: String) -> String {
+        return "Nothing was changed. Plantoir could not save a copy of \(course) first, and this "
+             + "change is too large to make without one."
+    }
+
     /// There is nothing on the list at all.
     ///
     /// "No PAGES", not "nothing", and the distinction is load-bearing. The old
@@ -756,6 +786,23 @@ nonisolated enum AssistWording {
              + "they use."
     }
 
+    /// Said when re-dating a section wrote no date: its plan changed nothing,
+    /// or everything it would have written was already right (#343's review,
+    /// F4). The one no-change sentence, named so the reply and its twin
+    /// cannot drift.
+    static func everyPageIsAlreadyOnItsDay(course: String, section: Int) -> String {
+        return "Every page in \(course) Section \(section) is already on the day it should be."
+    }
+
+    /// Said instead of `reDated` when every class was already on its day and
+    /// only pages they use moved (#343) — where `reDated` would say
+    /// "Re-dated 0 classes".
+    static func reDatedOnlyPagesTheyUse(pagesTheyUse: Int, noun: ClassNoun = .class) -> String {
+        return "Every \(noun.singular) was already on its day, so only the \(pagesTheyUse) "
+             + "\(pagesTheyUse == 1 ? "page" : "pages") they use "
+             + "\(pagesTheyUse == 1 ? "was" : "were") re-dated."
+    }
+
     // MARK: - Publishing stops at a class
 
     /// Said when publishing followed a link onto another class and left it
@@ -937,7 +984,14 @@ nonisolated enum AssistWording {
 
     // MARK: - Backing a course up
 
-    /// Where the copy went.
+    /// (T) A write refused because the section changed while the copy made
+    /// before it was being saved (#351): what was worked out no longer fits,
+    /// so nothing is written from it.
+    static func changedWhileSavingACopy(course: String, section: String) -> String {
+        return "Nothing was changed: \(course) Section \(section) changed while a copy of it was being "
+             + "saved, so what I worked out no longer fits. Ask again and I’ll work it out afresh."
+    }
+
     /// Shown under the three dots while the assistant saves a copy of a
     /// course before changing it (#351) — the wait a teacher approving a
     /// change used to see as a frozen window. It names the course and says
@@ -948,6 +1002,7 @@ nonisolated enum AssistWording {
              + "pictures can take a minute."
     }
 
+    /// Where the copy went.
     static func backedUpCourse(course: String, to name: String) -> String {
         return "Backed up \(course) to \(name). It is in Plantoir's Backups list, and restoring "
              + "from it puts the whole course back as it is right now."

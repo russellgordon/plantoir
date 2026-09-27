@@ -117,8 +117,17 @@ struct SectionDetailView: View {
     /// Said when a preview starts while Course Settings holds changes nobody
     /// saved (issue #265): the preview reads the saved settings, so the
     /// switches and the page can disagree. Cleared when the preview stops or
-    /// starts again with nothing unsaved.
+    /// starts again with nothing unsaved. Since #335 a deploy says its own
+    /// sentence here too — see `unsavedSettingsNoticeOwner`.
     @State var unsavedSettingsNotice: String? = nil
+
+    /// Whose sentence `unsavedSettingsNotice` is (#335, the implementation
+    /// review's F3). A preview's end clears only the PREVIEW's sentence:
+    /// `releasePreviewLease()` is also reached from the preview's wait loops,
+    /// which poll once a second and can wake after a deploy has set its own
+    /// sentence, so relying on the deploy setting it after the stop was a
+    /// race that usually went the right way. A state, not an ordering.
+    @State var unsavedSettingsNoticeOwner: UnsavedSettingsNoticeOwner? = nil
 
     /// Folder problems the last build reported, shown once when it finishes.
     ///
@@ -250,18 +259,10 @@ struct SectionDetailView: View {
                 )
             }
             if let unsavedSettingsNotice {
-                HStack(alignment: .firstTextBaseline) {
-                    Image(systemName: "info.circle")
-                        .foregroundStyle(.secondary)
-                    Text(unsavedSettingsNotice)
-                        .font(.callout)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Spacer()
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .accessibilityIdentifier("previewUsesSavedSettingsNotice")
-                Divider()
+                // Its own view, and never `fixedSize` — see the view. Since
+                // #335 it may be a deploy's sentence, named for UI tests by
+                // whose it is.
+                UnsavedSettingsNoticeView(sentence: unsavedSettingsNotice, identifier: unsavedSettingsNoticeIdentifier)
             }
             ZStack {
                 // Base layer: always laid out in the normal, safe-area
@@ -378,7 +379,10 @@ struct SectionDetailView: View {
                 // they wear their titles; the neighbouring icons are the
                 // familiar Obsidian and Safari actions and stay icon-only.
                 .labelStyle(.titleAndIcon)
-                .disabled(!previewRunner.isRunning && isBusy)
+                // Nor while a copy of the course is being zipped (#351): a
+                // restore or removal is waiting on that zip to replace the
+                // folder a preview would be serving from.
+                .disabled(!previewRunner.isRunning && (isBusy || workspace.isBeingCopied(course.code)))
                 .help(previewRunner.isRunning ? "Stop previewing this section" : "Preview this section's website")
                 .accessibilityIdentifier(previewRunner.isRunning ? "stopPreviewButton" : "previewButton")
 
@@ -466,7 +470,7 @@ struct SectionDetailView: View {
                     },
                     startPreview: { startPreview() },
                     stopPreview: { await stopPreviewAndWait() },
-                    deploy: { await deployAndWait() }
+                    deploy: { await deployAndWait(pressedByTheAssistant: true) }
                 )
             )
         }
@@ -809,14 +813,10 @@ struct SectionDetailView: View {
     /// every additional one — so a redundancy target with no valid folder
     /// or credential is caught here rather than discovered halfway
     /// through a run that already published to the others.
-    var deployRefusalReason: String? {
-        return SectionDetailView.deployRefusalReason(
-            configuration: course.configuration,
-            cloudflareAccountID: AppSettings.shared.cloudflareAccountID
-        )
-    }
-
-    /// The same check, free of the view, so it can be tested.
+    ///
+    /// Static only, and handed the SAVED settings (#335): the instance
+    /// property that read the window's copy was deleted so nothing can reach
+    /// the unsaved edits by it again.
     static func deployRefusalReason(configuration: CourseConfiguration, cloudflareAccountID: String) -> String? {
         return MultiDestinationDeployRunner.refusalReason(
             destinations: configuration.allDeployDestinations,
@@ -1084,6 +1084,10 @@ struct SectionDetailView: View {
         guard let workspaceURL = workspace.workspaceURL else {
             return
         }
+        // Every way in, not only the button (#351): see its `.disabled`.
+        if workspace.isBeingCopied(course.code) {
+            return
+        }
         // One of the moments the teacher ACTS on a reference course, so the
         // lock is re-asserted here: a folder that came back from a backup, or
         // from a second Mac, is not locked until somebody asks. Cheap — a
@@ -1157,6 +1161,7 @@ struct SectionDetailView: View {
         unsavedSettingsNotice = SettingsSaveNotice.whenPreviewStarts(
             settingsHaveUnsavedChanges: anyWindowHasUnsavedSettings
         )
+        unsavedSettingsNoticeOwner = unsavedSettingsNotice == nil ? nil : .preview
         if unsavedSettingsNotice != nil {
             ActivityTrail.note(
                 .previewStartedWithUnsavedSettings,
@@ -1294,8 +1299,12 @@ struct SectionDetailView: View {
             PreviewLeases.release(lease)
             previewLease = nil
         }
-        // The notice was about the preview that just ended.
-        unsavedSettingsNotice = nil
+        // The notice was about the preview that just ended — unless it is a
+        // deploy's, which a preview ending must not take away (#335, F3).
+        if SectionDetailView.previewEndClearsTheNotice(owner: unsavedSettingsNoticeOwner) {
+            unsavedSettingsNotice = nil
+            unsavedSettingsNoticeOwner = nil
+        }
     }
 
     /// Why this course is never deployed, or nil when it is an ordinary one.
@@ -1323,11 +1332,82 @@ struct SectionDetailView: View {
         )
     }
 
+    /// What a deploy from this window uses (#335): the course as its settings
+    /// file says it is at this moment, where that sends it, why it would be
+    /// refused, and what to say when some window holds unsaved edits.
+    ///
+    /// **Read from the file, never from `windowCourse`'s settings.** The
+    /// launcher's own deploy reads the file for everything but the
+    /// destination, and since #322 the approval card names the saved one — so
+    /// a destination taken from the window's unsaved edits published a site
+    /// half from memory and half from disk, somewhere the card did not name.
+    /// When the file cannot be read the deploy is refused with
+    /// `settingsCouldNotBeReadToDeploy`: a destination has no safe default
+    /// (#323's rule), so the window's copy is never used in its place.
+    static func whatADeployUses(
+        windowCourse: Course,
+        anyCopyUnsaved: Bool,
+        cloudflareAccountID: String
+    ) -> (course: Course?, destinations: [CourseConfiguration.DeployDestination], refusal: String?, notice: String?) {
+        let saved: Course
+        do {
+            saved = try windowCourse.asSavedNow()
+        } catch {
+            return (
+                course: nil,
+                destinations: [],
+                refusal: SpecialNames.settingsCouldNotBeReadToDeploy(course: windowCourse.displayCode),
+                notice: nil
+            )
+        }
+        return (
+            course: saved,
+            destinations: saved.configuration.allDeployDestinations,
+            refusal: SectionDetailView.deployRefusalReason(
+                configuration: saved.configuration, cloudflareAccountID: cloudflareAccountID
+            ),
+            notice: SettingsSaveNotice.whenDeployStarts(settingsHaveUnsavedChanges: anyCopyUnsaved)
+        )
+    }
+
+    /// What a deploy's caller is told (#335): when the assistant pressed the
+    /// button and the deploy used the saved settings over unsaved edits, the
+    /// window's sentence is added to the result it reads out, so the
+    /// conversation says what the window says. The button's own result is
+    /// never changed — the window already shows the sentence.
+    static func whatTheAssistantIsTold(
+        _ result: AssistSiteWorkResult, notice: String?, pressedByTheAssistant: Bool
+    ) -> AssistSiteWorkResult {
+        if !pressedByTheAssistant {
+            return result
+        }
+        return AssistSiteWorkResult(
+            succeeded: result.succeeded,
+            message: SettingsSaveNotice.addingTheNotice(notice, to: result.message),
+            isAboutTheDestination: result.isAboutTheDestination,
+            wasBuiltElsewhere: result.wasBuiltElsewhere
+        )
+    }
+
+    /// The notice's accessibility identifier, by whose sentence it is (#335).
+    var unsavedSettingsNoticeIdentifier: String {
+        if unsavedSettingsNoticeOwner == .deploy {
+            return "deployUsesSavedSettingsNotice"
+        }
+        return "previewUsesSavedSettingsNotice"
+    }
+
+    /// Whether a preview ending takes the unsaved-settings sentence away:
+    /// only when it is the preview's own, or nobody's (#335, F3).
+    static func previewEndClearsTheNotice(owner: UnsavedSettingsNoticeOwner?) -> Bool {
+        return owner != .deploy
+    }
+
     /// The Deploy button. The work itself is `deployAndWait()`, so the
     /// assistant can press the same button and be told how it went.
     func startDeploy() {
         Task {
-            let result: AssistSiteWorkResult = await deployAndWait()
+            let result: AssistSiteWorkResult = await deployAndWait(pressedByTheAssistant: false)
             // A refusal reaches the teacher as the alert this window has
             // always shown. The assistant's copy of the same sentence goes
             // into the conversation instead — see `deployAndWait()`.
@@ -1349,7 +1429,11 @@ struct SectionDetailView: View {
     /// answer has to come back to it. Duplicating the deploy for the second
     /// caller is how a Cloudflare course quietly starts deploying to Netlify
     /// from one of the two paths, so there is only ever one.
-    func deployAndWait() async -> AssistSiteWorkResult {
+    ///
+    /// `pressedByTheAssistant` so the conversation says what the window says:
+    /// when the deploy used the saved settings over unsaved edits (#335), the
+    /// same sentence is added to the result the assistant reads out.
+    func deployAndWait(pressedByTheAssistant: Bool) async -> AssistSiteWorkResult {
         // FIRST — before the busy check, before the destination check, before
         // any preview is stopped. A course kept for reference is never
         // deployed, and the teacher meets that as a missing button rather
@@ -1380,13 +1464,39 @@ struct SectionDetailView: View {
             )
         }
 
-        let destinations: [CourseConfiguration.DeployDestination] = course.configuration.allDeployDestinations
+        // Everything from here reads the settings as SAVED in the file at
+        // this moment (#335), never this window's copy, which may hold Course
+        // Settings edits nobody has saved. Every window's copy is asked about
+        // unsaved edits, not only this one's, as the preview does.
+        let anyWindowHasUnsavedSettings: Bool = course.configuration.hasUnsavedChanges
+            || WorkspaceModel.anyCopyHasUnsavedChanges(configFileURL: course.configFileURL)
+        let uses: (
+            course: Course?, destinations: [CourseConfiguration.DeployDestination], refusal: String?, notice: String?
+        ) = SectionDetailView.whatADeployUses(
+            windowCourse: course,
+            anyCopyUnsaved: anyWindowHasUnsavedSettings,
+            cloudflareAccountID: AppSettings.shared.cloudflareAccountID
+        )
+        guard let saved = uses.course else {
+            return AssistSiteWorkResult(
+                succeeded: false,
+                message: uses.refusal ?? SpecialNames.settingsCouldNotBeReadToDeploy(course: course.displayCode),
+                isAboutTheDestination: true
+            )
+        }
+        // The saved copy is checked too: `keptForReference` is not a Course
+        // Settings field, so the two cannot differ in practice, and checking
+        // costs nothing.
+        if let refusal = SectionDetailView.refusalForAReferenceCourse(saved) {
+            return refusal
+        }
+        let destinations: [CourseConfiguration.DeployDestination] = uses.destinations
 
         // Whatever is wrong with ANY configured destination is said here,
         // before a build starts: discovering it partway through a
         // redundancy run would waste the teacher's time and let some
         // destinations quietly go out while others never got the chance.
-        if let problem = deployRefusalReason {
+        if let problem = uses.refusal {
             return AssistSiteWorkResult(
                 succeeded: false, message: problem, isAboutTheDestination: true
             )
@@ -1451,6 +1561,27 @@ struct SectionDetailView: View {
             )
         }
 
+        // The unsaved-settings sentence, set AFTER the preview is stopped:
+        // stopping it runs `releasePreviewLease()`, which clears the notice,
+        // so setting it first would have the stop wipe it (#335). It stays
+        // up after this deploy ends — a teacher reading the console must
+        // still see why — and the next preview or deploy replaces it.
+        unsavedSettingsNotice = uses.notice
+        unsavedSettingsNoticeOwner = uses.notice == nil ? nil : .deploy
+        if uses.notice != nil {
+            SettingsSaveNotice.noteDeployUsedTheSavedSettings(
+                act: pressedByTheAssistant
+                    ? "deployed by the assistant through the section window" : "deployed from the section window",
+                saved: saved, windowCourse: course, sectionNumber: sectionNumber
+            )
+        }
+        // What the assistant is told carries the same sentence.
+        func said(_ result: AssistSiteWorkResult) -> AssistSiteWorkResult {
+            return SectionDetailView.whatTheAssistantIsTold(
+                result, notice: uses.notice, pressedByTheAssistant: pressedByTheAssistant
+            )
+        }
+
         // The note `startPreview()` makes, made here for the deploy —
         // AFTER any running preview has been stopped, never before. A
         // preview already running belongs to the folder IT started in, and
@@ -1464,15 +1595,15 @@ struct SectionDetailView: View {
         // already running in this window.
         if deployRunner.isRunning {
             isPreparingDeploy = false
-            return AssistSiteWorkResult(
+            return said(AssistSiteWorkResult(
                 succeeded: false,
                 message: AssistWording.sectionIsBusy(
                     course: course.code, section: String(sectionNumber)
                 )
-            )
+            ))
         }
 
-        let needsBuild: Bool = BuildFreshness.needsRebuild(course: course, sectionNumber: sectionNumber)
+        let needsBuild: Bool = BuildFreshness.needsRebuild(course: saved, sectionNumber: sectionNumber)
 
         // The real progress panel takes over from here — `deployRunner.run()`
         // is about to give `deployRunner.legs` fresh runners of its own and
@@ -1484,7 +1615,7 @@ struct SectionDetailView: View {
         // assistant's headless path, so an alarm set for half six sends
         // the site to the same destinations this button does.
         await deployRunner.run(
-            course: course,
+            course: saved,
             sectionNumber: sectionNumber,
             destinations: destinations,
             cloudflareAccountID: AppSettings.shared.cloudflareAccountID,
@@ -1503,12 +1634,12 @@ struct SectionDetailView: View {
             // below the early return had quietly dropped it altogether —
             // de-headlining it was the intent, discarding it was not.
             showHealthFindings(from: deployRunner.legs.first?.runner, cameFromPublishing: true)
-            return AssistSiteWorkResult(
+            return said(AssistSiteWorkResult(
                 succeeded: false,
                 message: AssistWording.couldNotBuildBeforeDeploying(
                     course: course.code, section: String(sectionNumber)
                 )
-            )
+            ))
         }
 
         // What the build said about this course's folders — AFTER the failure
@@ -1517,12 +1648,12 @@ struct SectionDetailView: View {
         // the same built site, so a second leg only repeats the findings.
         showHealthFindings(from: deployRunner.legs.first?.runner, cameFromPublishing: true)
 
-        return MultiDestinationDeployRunner.result(
+        return said(MultiDestinationDeployRunner.result(
             course: course.code,
             section: String(sectionNumber),
             destinationCount: destinations.count,
             outcome: deployRunner.outcome
-        )
+        ))
     }
 
     /// Opens the page currently shown in the preview (not just the site

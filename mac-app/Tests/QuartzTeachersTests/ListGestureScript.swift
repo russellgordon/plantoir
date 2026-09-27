@@ -156,6 +156,7 @@ enum CourseSettingsGestureScript {
         case .sharedFolders:
             return StringListEditorView(
                 title: "Shared folders (all sections)",
+                removalTrail: view.removalTrail(for: .sharedFolders),
                 items: Binding(
                     get: { return configuration.sharedFolders },
                     set: { newValue in configuration.sharedFolders = newValue }
@@ -170,6 +171,7 @@ enum CourseSettingsGestureScript {
         case .sharedFiles:
             return StringListEditorView(
                 title: "Shared files (all sections)",
+                removalTrail: view.removalTrail(for: .sharedFiles),
                 hidesMarkdownExtension: true,
                 items: Binding(
                     get: { return configuration.sharedFiles },
@@ -181,6 +183,7 @@ enum CourseSettingsGestureScript {
         case .perSectionFolders:
             return StringListEditorView(
                 title: "Per-section folders",
+                removalTrail: view.removalTrail(for: .perSectionFolders),
                 items: Binding(
                     get: { return configuration.perSectionFolders },
                     set: { newValue in configuration.perSectionFolders = newValue }
@@ -195,6 +198,7 @@ enum CourseSettingsGestureScript {
         case .perSectionFiles:
             return StringListEditorView(
                 title: "Per-section files",
+                removalTrail: view.removalTrail(for: .perSectionFiles),
                 hidesMarkdownExtension: true,
                 items: Binding(
                     get: { return configuration.perSectionFiles },
@@ -273,6 +277,7 @@ extension WizardListState {
         case .sharedFolders:
             return StringListEditorView(
                 title: "Shared folders",
+                removalTrail: self.wizard().removalTrail(for: .sharedFolders),
                 items: Binding(
                     get: { return self.sharedFolders },
                     set: { newValue in self.sharedFolders = newValue }
@@ -283,6 +288,7 @@ extension WizardListState {
         case .sharedFiles:
             return StringListEditorView(
                 title: "Shared files",
+                removalTrail: self.wizard().removalTrail(for: .sharedFiles),
                 hidesMarkdownExtension: true,
                 items: Binding(
                     get: { return self.sharedFiles },
@@ -292,6 +298,7 @@ extension WizardListState {
         case .perSectionFolders:
             return StringListEditorView(
                 title: "Per-section folders",
+                removalTrail: self.wizard().removalTrail(for: .perSectionFolders),
                 items: Binding(
                     get: { return self.perSectionFolders },
                     set: { newValue in self.perSectionFolders = newValue }
@@ -302,6 +309,7 @@ extension WizardListState {
         case .perSectionFiles:
             return StringListEditorView(
                 title: "Per-section files",
+                removalTrail: self.wizard().removalTrail(for: .perSectionFiles),
                 hidesMarkdownExtension: true,
                 items: Binding(
                     get: { return self.perSectionFiles },

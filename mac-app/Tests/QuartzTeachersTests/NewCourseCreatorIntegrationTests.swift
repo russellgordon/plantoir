@@ -5,7 +5,16 @@ import XCTest
 /// runs the REAL ./setup.sh — and verifies the wizard scaffolds it exactly
 /// as a command-line run would.
 ///
-/// Requires INTEGRATION_WORKSPACE (see ScriptRunnerIntegrationTests).
+/// The end-to-end test requires INTEGRATION_WORKSPACE (see
+/// ScriptRunnerIntegrationTests): a working folder INSIDE the home folder,
+/// because the launchers refuse to mount anything the Colima VM cannot see
+/// (#221). What it adds is the app's answer-pumping and the real image. Which
+/// keys a new course's pages are written with is checked without Docker by
+/// scripts/test_page_visibility.py → NewCourseIsWrittenInTheCurrentKeys, and
+/// the check this test makes of them runs in every suite through
+/// `testTheScaffoldingCheckAcceptsTheCurrentKeyAndRejectsTheLegacyOne` —
+/// until #139 it asserted the retired `draftSection1` key and, never running,
+/// agreed with nothing.
 final class NewCourseCreatorIntegrationTests: XCTestCase {
 
     // MARK: - Stored properties
@@ -23,7 +32,11 @@ final class NewCourseCreatorIntegrationTests: XCTestCase {
     @MainActor
     func testWizardDrivenCourseCreationMatchesCommandLine() async throws {
         guard let workspacePath = integrationWorkspacePath else {
-            throw XCTSkip("Set INTEGRATION_WORKSPACE to run the wizard equivalence test.")
+            throw XCTSkip(
+                "Set INTEGRATION_WORKSPACE to a working folder inside your home folder to run the wizard end to end "
+                    + "through setup.sh; which keys a new course is written with is checked without it by "
+                    + "scripts/test_page_visibility.py → NewCourseIsWrittenInTheCurrentKeys."
+            )
         }
         let workspaceURL: URL = URL(fileURLWithPath: workspacePath)
         let courseDirectoryURL: URL = workspaceURL
@@ -106,12 +119,100 @@ final class NewCourseCreatorIntegrationTests: XCTestCase {
         // multi-section publishing system depends on.
         let conceptsIndexURL: URL = courseDirectoryURL.appendingPathComponent("Concepts/index.md")
         let conceptsIndexText: String = try String(contentsOf: conceptsIndexURL, encoding: .utf8)
-        XCTAssertTrue(conceptsIndexText.contains("createdSection1:"), "Shared scaffolding should use createdSection1 keys")
-        XCTAssertTrue(conceptsIndexText.contains("draftSection1: false"), "Shared scaffolding should use draftSection1 keys")
+        let keyProblem: String? = try NewCourseCreatorIntegrationTests.courseLevelKeyProblem(
+            in: conceptsIndexText,
+            sections: [1]
+        )
+        XCTAssertNil(keyProblem, keyProblem ?? "")
 
         // Clean up the throwaway course (and its automatic backup).
         try? fileManager.removeItem(at: courseDirectoryURL)
         let backupURL: URL = workspaceURL.appendingPathComponent("courses/_backups/\(throwawayCode)")
         try? fileManager.removeItem(at: backupURL)
+    }
+
+    /// The check the end-to-end test makes of a scaffolded course-level page,
+    /// run on its own in every suite so it can never again agree with nothing.
+    /// The page text is what `Concepts/index.md` was measured to contain for a
+    /// new course on 2026-09-26 (setup_course.py, plain scaffold).
+    @MainActor
+    func testTheScaffoldingCheckAcceptsTheCurrentKeyAndRejectsTheLegacyOne() throws {
+        let currentPage: String = """
+            ---
+            title: Concepts
+            createdSection1: 2026-09-26T16:34:18.000-0400
+            publishForSection1: true
+            createdSection2: 2026-09-26T16:34:18.000-0400
+            publishForSection2: true
+            ---
+            This is the **Concepts** folder.
+            """
+        XCTAssertNil(try NewCourseCreatorIntegrationTests.courseLevelKeyProblem(in: currentPage, sections: [1, 2]))
+
+        let legacyPage: String = """
+            ---
+            title: Concepts
+            createdSection1: 2026-09-26T16:34:18.000-0400
+            draftSection1: false
+            ---
+            This is the **Concepts** folder.
+            """
+        XCTAssertNotNil(try NewCourseCreatorIntegrationTests.courseLevelKeyProblem(in: legacyPage, sections: [1]))
+
+        let oneSectionMissing: String = """
+            ---
+            title: Concepts
+            createdSection1: 2026-09-26T16:34:18.000-0400
+            publishForSection1: true
+            ---
+            """
+        XCTAssertNotNil(
+            try NewCourseCreatorIntegrationTests.courseLevelKeyProblem(in: oneSectionMissing, sections: [1, 2]),
+            "section 2 says nothing, so the page is not scaffolded for it"
+        )
+    }
+
+    /// A sentence saying what is wrong with a scaffolded course-level page, or
+    /// nil when every section has its `createdSection<N>` and its CURRENT
+    /// visibility key set to true, and no section has the legacy key. The two
+    /// key names are read from contracts/file-formats.json →
+    /// pageVisibility.keys.courseLevelPage, never typed here.
+    @MainActor
+    static func courseLevelKeyProblem(in pageText: String, sections: [Int]) throws -> String? {
+        let pageVisibility: [String: Any] = try FileFormatsContractTests.section("pageVisibility")
+        let keys: [String: Any] = try XCTUnwrap(pageVisibility["keys"] as? [String: Any])
+        let courseLevelPage: [String: String] = try XCTUnwrap(keys["courseLevelPage"] as? [String: String])
+        let currentPattern: String = try XCTUnwrap(courseLevelPage["current"])
+        let legacyPattern: String = try XCTUnwrap(courseLevelPage["legacy"])
+
+        var lines: [String] = []
+        for line in pageText.components(separatedBy: "\n") {
+            lines.append(line.trimmingCharacters(in: .whitespaces))
+        }
+
+        for section in sections {
+            let currentKey: String = currentPattern.replacingOccurrences(of: "<N>", with: String(section))
+            let legacyKey: String = legacyPattern.replacingOccurrences(of: "<N>", with: String(section))
+            var hasCreated: Bool = false
+            var hasCurrentTrue: Bool = false
+            for line in lines {
+                if line.hasPrefix("createdSection\(section):") {
+                    hasCreated = true
+                }
+                if line == "\(currentKey): true" {
+                    hasCurrentTrue = true
+                }
+                if line.hasPrefix("\(legacyKey):") {
+                    return "The page carries the retired key \(legacyKey)."
+                }
+            }
+            if !hasCreated {
+                return "The page carries no createdSection\(section)."
+            }
+            if !hasCurrentTrue {
+                return "The page does not say \(currentKey): true."
+            }
+        }
+        return nil
     }
 }

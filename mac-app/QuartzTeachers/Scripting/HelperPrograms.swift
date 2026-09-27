@@ -59,6 +59,13 @@ nonisolated enum HelperPrograms {
     /// the least a helper should be left with when there is nothing to inherit.
     static let pathWhenNothingWasInherited: String = "/usr/bin:/bin:/usr/sbin:/sbin"
 
+    /// The variable that tells a launcher where this app's own copies of the
+    /// helper programs and the website builder's starting disk are (GitHub
+    /// #312). The launchers INSTALL from it into `binDirectory` and run the
+    /// programs from there, never from inside the app: see
+    /// `contracts/app-rules.json` → `helperBootstrap` for why.
+    static let bundledHelpersVariable: String = "PLANTOIR_BUNDLED_HELPERS"
+
     // MARK: - Functions
 
     /// `~/Library/Application Support/Plantoir/tools/bin` — the folder the
@@ -107,14 +114,45 @@ nonisolated enum HelperPrograms {
         return parts.joined(separator: ":")
     }
 
+    /// `Contents/Resources/helpers` inside this app, or nil when the app
+    /// carries no helpers there (an app built without `fetch-helpers.sh`, or a
+    /// test bundle). What is inside is described by its own `MANIFEST`, which
+    /// the launcher checks; this only says whether the folder is there.
+    static func bundledHelpersDirectory(in bundle: Bundle = Bundle.main) -> URL? {
+        guard let resources = bundle.resourceURL else {
+            return nil
+        }
+        let folder: URL = resources.appendingPathComponent("helpers", isDirectory: true)
+        var isFolder: ObjCBool = false
+        if FileManager.default.fileExists(atPath: folder.path, isDirectory: &isFolder), isFolder.boolValue {
+            return folder
+        }
+        return nil
+    }
+
     /// The whole environment for a helper: what it would have inherited, with
     /// `PATH` replaced. `HOME` and everything else survive untouched.
+    ///
+    /// `PLANTOIR_BUNDLED_HELPERS` is added when this app carries its own
+    /// copies, and REMOVED when it does not, so a value inherited from some
+    /// other copy of Plantoir never points a launcher at a folder that is not
+    /// this app's. Every launcher the app runs is started with this
+    /// environment — from the window, from the MCP server, and the publishes
+    /// launchd starts through Plantoir itself — so all of them can install
+    /// from the app; a launcher typed at the command line has no such
+    /// variable and downloads, as it always has.
     static func environment(
         basedOn inherited: [String: String] = ProcessInfo.processInfo.environment,
-        inHomeFolder homeFolder: URL = RealHome.forFiles
+        inHomeFolder homeFolder: URL = RealHome.forFiles,
+        bundledHelpers: URL? = bundledHelpersDirectory()
     ) -> [String: String] {
         var result: [String: String] = inherited
         result["PATH"] = pathValue(inheriting: inherited["PATH"], inHomeFolder: homeFolder)
+        if let bundledHelpers {
+            result[bundledHelpersVariable] = bundledHelpers.path
+        } else {
+            result.removeValue(forKey: bundledHelpersVariable)
+        }
         return result
     }
 
