@@ -111,6 +111,11 @@ struct CredentialRequestSheet: View {
         }
         .padding(20)
         .frame(width: 460)
+        // A CONTAINER element with its own identifier (#353). Without
+        // `.contain` SwiftUI applies an identifier on a stack to every element
+        // inside it, so `credentialField` and `credentialSendButton` were
+        // read off the real tree as "credentialSheet" and could not be found.
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("credentialSheet")
         .onAppear {
             answer = initialAnswer
