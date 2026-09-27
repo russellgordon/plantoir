@@ -75,6 +75,22 @@ why it did not go through `screencapture -l`.** Do not paint over them, and
 do not add a fallback "just in case": a marketing screenshot is not worth
 having if it is the wrong picture.
 
+**The same rule covers every figure assembled from captures** (Russell,
+2026-09-27, angry, and not the first time he said it). A figure is built
+ONLY from whole `screencapture -x -o -l` captures, kept intact with their
+own alpha: no crop through a window, no re-rounding, no rounded mask drawn
+in Pillow, no shape drawn for a shadow (a shadow is the capture's own alpha,
+blurred). Scaling is Lanczos, of a whole image. If a figure must not show
+the browser's toolbar, the answer is a window that never had one
+(`website/shots/webwindow.swift`), never a crop. `composite.py` used to cut
+Safari's toolbar off and paint 18 px corners back on for `colour-schemes`
+and `light-and-dark`, and the schedule scene cut the notification banner out
+and drew its corners; both are gone. `website/shots/test_native_corners.py`
+reads every picture the pages show and fails on a square or drawn corner,
+and `capture.py` runs the same check before it calls a picture done. **Open
+the corners of every image you are about to commit and look** — a native
+corner fades over many pixels; a drawn one is tight.
+
 **2. NEVER capture in a Safari private window.** Safari marks a private
 window with a dark address bar, deliberately. On plantoir.app that is a black
 band across the top of every class-site shot, sitting beside shots that do
