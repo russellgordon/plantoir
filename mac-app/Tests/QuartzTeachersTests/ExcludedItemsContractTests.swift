@@ -111,6 +111,60 @@ final class ExcludedItemsContractTests: XCTestCase {
         }
     }
 
+    /// Two windows on one working folder (#265's shape): window B saves an
+    /// exclusion of `Labs` while window A holds an unrelated unsaved edit, so
+    /// A's copy is not brought up to date. A's Revert takes back only A's
+    /// own unsaved changes — none of them exclusions — so it must write no
+    /// `exclusions reverted` line; with one removal of its own, the count is
+    /// 1, not 2. Counting against the file said otherwise (review M1).
+    func testARevertCountsOnlyThisWindowsUnsavedExclusions() throws {
+        let root: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("revert-two-windows-\(UUID().uuidString)")
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: root.appendingPathComponent(".trail"))
+        defer {
+            ActivityTrail.store = previousStore
+            try? FileManager.default.removeItem(at: root)
+        }
+        let layout: [String: Any] = [
+            "sharedFolders": ["Concepts", "Tests"], "perSectionFolders": ["All Classes", "Labs"],
+            "sharedFiles": [String](), "perSectionFiles": ["index.md"],
+        ]
+        let windowA: Course = try ExcludedItemsContractTests.makeCourse(in: root, from: layout)
+        let windowB: Course = Course(
+            code: "ICS3U", directoryURL: windowA.directoryURL,
+            configuration: try CourseConfiguration(contentsOf: windowA.configFileURL)
+        )
+        let viewA: CourseSettingsView = CourseSettingsView(course: windowA)
+        let viewB: CourseSettingsView = CourseSettingsView(course: windowB)
+
+        windowA.configuration.courseName = "An unrelated unsaved edit in A"
+        CourseSettingsGestureScript.editor(for: .perSectionFolders, of: viewB).removeItem(named: "Labs")
+        viewB.save()
+
+        viewA.revertToFile()
+        var reverted: [[String: AnyHashable]] = []
+        for event in ExcludedItemsContractTests.exclusionEventsOnTheTrail() {
+            if event["event"] == "exclusions reverted" {
+                reverted.append(event)
+            }
+        }
+        XCTAssertEqual(reverted, [], "A never excluded anything")
+        XCTAssertEqual(windowA.configuration.excludedItems(forScope: "per_section"), ["Labs"], "A now shows B's save")
+
+        CourseSettingsGestureScript.editor(for: .sharedFolders, of: viewA).removeItem(named: "Tests")
+        CourseSettingsGestureScript.editor(for: .sharedFolders, of: viewB).removeItem(named: "Concepts")
+        viewB.save()
+        viewA.revertToFile()
+        reverted = []
+        for event in ExcludedItemsContractTests.exclusionEventsOnTheTrail() {
+            if event["event"] == "exclusions reverted" {
+                reverted.append(event)
+            }
+        }
+        XCTAssertEqual(reverted, [["event": "exclusions reverted", "count": 1]], "only A's own removal of Tests")
+    }
+
     // MARK: - Helpers
 
     private static func gestureList(_ key: String?) throws -> GestureList {

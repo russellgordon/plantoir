@@ -2212,7 +2212,10 @@ item). `item excluded` and `item re-included` are written on the CLICK, saved
 or not, so a folder removed and then Reverted used to leave a trail saying it
 had been excluded and nothing more. The Revert button now goes through
 `CourseSettingsView.revertToFile()`, which counts the names whose exclusion the
-Revert took back (both scopes, either direction) and writes ONE `exclusions
+Revert took back (both scopes, either direction), measured against what this
+copy last read or wrote (`savedExcludedItems`), never the file — another
+window's saved exclusion is not this Revert's (review M1,
+`testARevertCountsOnlyThisWindowsUnsavedExclusions`) and writes ONE `exclusions
 reverted` line with the count — never the names, which the click lines beside it
 already carry — and nothing when it took back none.
 
