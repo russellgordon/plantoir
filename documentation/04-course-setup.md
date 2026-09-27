@@ -705,7 +705,10 @@ Windows needs exactly three UI behaviours:
   course with example content" (default ON) with "Include Ontario
   curriculum pages" beneath it (default ON, disabled when the first is
   off). The SKELETON toggle goes BELOW that block (entry 123) — "Start
-  from a <subject> skeleton" — and since 2026-09-21 it is a sibling of it
+  from {article} <subject> skeleton", the subject lowercased except its
+  proper nouns and the article following its first SOUND ("an English",
+  "a French"; `shared-rules.json` → `wizard.skeletonToggleLabelSubject`,
+  #336) — and since 2026-09-21 it is a sibling of it
   rather than its `else`, so a code with ready-made pages shows it the
   moment those pages are turned down (#248). The quiet "empty folders"
   caption is the last resort, for a code with neither. (Both apps also
