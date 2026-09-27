@@ -308,7 +308,9 @@ Neither app contains toolchain logic of its own: they write the same
    The launchers never stop it on purpose — with ONE exception worth knowing
    before you read a log and think the rule was broken: when the Docker daemon
    has already failed to answer, they force-cycle it (`colima stop --force`
-   then `colima start`, `setup.sh:587`, `preview.sh:812`, `deploy.sh:1279`),
+   then `colima start`, in each launcher's `ensure_container_runtime` —
+   `setup.sh:1234`, `preview.sh:1457`, `deploy.sh:2099` on 2026-09-27; grep the
+   function name, since the line numbers drift),
    ungated, because at that point no Colima-based tool is working anyway.
    **The app's quit path is the other one, and as of
    2026-09-19 it does so for the first time** — it used to shell out to
@@ -725,10 +727,14 @@ Node 22, while the image ships Node 20 because that is what Quartz v4.5.0 is
 known-good against. **If you raise Node, revalidate Quartz before chasing a
 newer CLI.**
 
-First-run bootstrap: if Docker isn't available, the launchers download pinned
+First-run bootstrap: if Docker isn't available, the launchers install pinned
 static binaries (Colima, Lima, the Docker CLI, buildx) into `~/Library/
-Application Support/Plantoir/tools` — no Homebrew, no admin rights. The image
-lives inside the Colima VM's disk (`~/.colima`).
+Application Support/Plantoir/tools` — no Homebrew, no admin rights. Since #312
+the app CARRIES those helpers and the VM's starting disk, and hands them over
+through `PLANTOIR_BUNDLED_HELPERS`; downloading them is only the fallback, for
+a launcher typed at the command line or a copy the app does not have
+(`documentation/03-launcher-scripts.md` → "Where the helper programs come from
+(GitHub #312)"). The image lives inside the Colima VM's disk (`~/.colima`).
 
 ### Editing the toolchain: two traps that cost real time
 
@@ -836,11 +842,16 @@ Four things that cost a day each if you do not know them:
 - **Adding a tool is a routing change.** On the mac the local model is shown
   13 of the 22 tools that exist (`AssistToolRunner.localTools`); an MCP client
   is shown 37 (`.mcpTools`, the 22 plus fifteen: six that ask for judgement
-  about meaning — the three curriculum tools, and #209's three for the How I
-  Teach page — and #96's start-of-year pair). The local 13's full digest is pinned
-  (`scripts/test_tool_surface_digest.py`, made by `research/ai-assist/toolhash.py`). More choices is the classic way a router degrades. **Windows'
-  `plantoir-mcp.exe` serves 37**, so the two MCP surfaces are no longer the
-  same product — see [issue #66](https://github.com/russellgordon/plantoir/issues/66).
+  about meaning — the three curriculum tools and #209's three for the How I
+  Teach page — #96's start-of-year pair, and seven more: `list_courses`, `explain_publishing`, `back_up_course` and the
+  `add_classes` and `make_room_for_classes` pairs). The local 13's full digest is pinned
+  (`scripts/test_tool_surface_digest.py`, made by `research/ai-assist/toolhash.py`). More choices is the classic way a router degrades, and
+  that is true of the MCP list as well as the local one. **Windows'
+  `plantoir-mcp.exe` also serves 37, but not the same 37** — five tools on
+  each side are the other's to have or to decline, so the two MCP surfaces are
+  still not the same product; which five, and why, is in
+  `documentation/10-local-ai-assistant.md` → "The two MCP surfaces are not the
+  same product" (issue #66, now closed, is where the count was first measured).
 
 On the mac the MCP server IS the app: `Plantoir --mcp-stdio <working-folder>`
 serves the same tools to Claude Code, so there is no second binary to sign or
