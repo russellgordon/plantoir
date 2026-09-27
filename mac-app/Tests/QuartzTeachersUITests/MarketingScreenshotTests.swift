@@ -855,10 +855,22 @@ final class MarketingScenes: MarketingScreenshotCase {
         let go: XCUIElement = application.buttons["startOfYearGo"]
         XCTAssertTrue(go.waitForExistence(timeout: 60), "The plan should appear")
         // An empty plan photographed as the feature is the failure this
-        // guards: the button counts the pages, and is disabled at none.
+        // guards: the button is disabled when the plan changes nothing (#96).
         XCTAssertTrue(go.isEnabled, "There should be pages to put into draft")
-        XCTAssertTrue(go.label.range(of: "[1-9]", options: .regularExpression) != nil,
-                      "The button should count the pages it will put into draft; it says \(go.label)")
+        // The plan's lists arrive folded: "going into draft" (classes, then
+        // pages) and, last, "staying as they are". The page's copy says the
+        // plan gives each page's reason, so unfold every list but the last.
+        // The sheet itself, not the identifier: on a plain stack SwiftUI
+        // hands an identifier to each child rather than to a container.
+        let sheet: XCUIElement = application.sheets.firstMatch
+        let triangles: XCUIElementQuery = sheet.disclosureTriangles
+        XCTAssertGreaterThanOrEqual(triangles.count, 2,
+                                    "The plan should list what goes into draft and what stays")
+        var index: Int = 0
+        while index < triangles.count - 1 {
+            triangles.element(boundBy: index).click()
+            index += 1
+        }
         settle(1.5)
         save(window, as: "start-of-year")
         application.buttons["Cancel"].firstMatch.click()
