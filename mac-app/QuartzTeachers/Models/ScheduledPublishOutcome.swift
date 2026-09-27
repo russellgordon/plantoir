@@ -615,6 +615,15 @@ nonisolated enum ScheduledPublishOutcome {
                  + "so Plantoir left the site as it was rather than build it twice at once. Deploy it "
                  + "yourself when that has finished, or schedule another from the section’s menu."
         case .couldNotRunAsSetNow:
+            // A course kept for reference is never deployed, so "Deploy it
+            // yourself" would be false (#323 review, L-a): its own sentence,
+            // `sentences.couldNotRunAsSetNowForAReferenceCourse`, chosen by the
+            // reason the record carries.
+            if stopped.destination == ScheduledDeployRefusal.keptForReference.reasonClause {
+                return "\(course) Section \(section) was set to deploy on its own, but the course is kept "
+                     + "for reference now, and a course kept for reference is never deployed — so Plantoir "
+                     + "left the site as it was and turned that deploy off."
+            }
             // The reason is the record's second line: a clause true at the
             // run, with no remedy of its own (#323 review, M3) — the remedy is
             // this sentence's, and it is true for every reason.

@@ -2460,7 +2460,9 @@ sentence shows as `{reason}`. The sheet's own sentences stay for the sheet: thei
 remedies ("then schedule this again", "it would wait") are false at the run and
 at a Save (review M3). Settings that cannot be read stand down too — the
 opposite of the lateness window's default, because a destination has no safe
-default.
+default. A course kept for reference is never deployed, so its stand-down has a
+sentence of its own (`sentences.couldNotRunAsSetNowForAReferenceCourse`) with no
+"deploy it yourself" in it (the #323 review's L-a).
 
 **What the job keeps.** The plist is unchanged but for ONE note,
 `PLANTOIR_SCHEDULED_TO`: the destinations' descriptions the teacher was told,

@@ -328,6 +328,9 @@ final class ScheduledDeployAsSetNowTests: XCTestCase {
         )
         try FileManager.default.removeItem(at: plistURL)
         XCTAssertFalse(ScheduledDeploy.jobStillStands(label: label, environment: [ScheduledDeploy.scheduledForKey: stamp]))
+        // A job whose run carries no moment: the plist being gone is the ONLY
+        // thing that says it was cancelled (#323 review, M-a).
+        XCTAssertFalse(ScheduledDeploy.jobStillStands(label: label, environment: [:]))
     }
 
     /// Write-if-exists: a wrapper a cancel deleted is not brought back.
@@ -415,6 +418,27 @@ final class ScheduledDeployAsSetNowTests: XCTestCase {
         XCTAssertTrue(ScheduledPublishOutcome.Kind.couldNotRunAsSetNow.needsAttention)
     }
 
+    /// A reference course is never deployed, so its stand-down must not tell
+    /// the teacher to deploy it (#323 review, L-a): it has a sentence of its
+    /// own, `sentences.couldNotRunAsSetNowForAReferenceCourse`.
+    func testTheStandDownForAReferenceCourseDoesNotSayDeployIt() throws {
+        let reason: String = ScheduledDeployRefusal.keptForReference.reasonClause
+        let sentence: String = ScheduledPublishOutcome.sentence(
+            for: ScheduledPublishOutcome.Stopped(kind: .couldNotRunAsSetNow, destination: reason, when: Date()),
+            course: "ICS3U", section: 1
+        )
+        let template: String = try XCTUnwrap(
+            (try SharedRulesContractTests.section("scheduledPublishStopped")["sentences"] as? [String: String])?[
+                "couldNotRunAsSetNowForAReferenceCourse"
+            ]
+        )
+        XCTAssertEqual(
+            sentence,
+            template.replacingOccurrences(of: "{course}", with: "ICS3U").replacingOccurrences(of: "{section}", with: "1")
+        )
+        XCTAssertFalse(sentence.contains("Deploy it yourself"))
+    }
+
     // MARK: - The order the run does things in
 
     /// Source scan of `runScheduled`, which never returns: the lateness check,
@@ -448,9 +472,22 @@ final class ScheduledDeployAsSetNowTests: XCTestCase {
         XCTAssertLessThan(read, clear)
         XCTAssertLessThan(clear, run)
 
+        // The wrapper that runs is the one just written from the settings, at
+        // the call site too (#323 review, M-b): the write sits between the
+        // reading and the decision, and nothing hands the decision a made-up
+        // `.written`.
+        let write: String.Index = try position("writeTheRunsWrapper(command, to: URL(fileURLWithPath: script))", after: read)
+        let decide: String.Index = try position("whatTheRunDoes(", after: read)
+        XCTAssertLessThan(write, decide)
+        XCTAssertFalse(body.contains("wrapper = .written"))
+
+        // The leases go before the stand-down, searched for INSIDE that branch
+        // only (#323 review, L-c): the branch runs from its `case` to the
+        // `standDown(` call it ends in.
         let standDownBranch: String.Index = try position("case .standDown(let refusal):", after: read)
-        let release: String.Index = try position("WorkLeaseFiles.remove(at: lease)", after: standDownBranch)
-        let standDown: String.Index = try position("standDown(", after: release)
+        let standDown: String.Index = try position("                standDown(", after: standDownBranch)
+        let branch: String = String(body[standDownBranch..<standDown])
+        XCTAssertTrue(branch.contains("WorkLeaseFiles.remove(at: lease)"), "the stand-down does not release its leases first")
         XCTAssertLessThan(standDown, run)
         XCTAssertTrue(body.contains("kind: .couldNotRunAsSetNow, reason: refusal.reasonClause"))
     }

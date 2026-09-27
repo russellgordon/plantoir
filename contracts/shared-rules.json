@@ -1521,7 +1521,7 @@
       "succeeded": "It worked. Recorded for the same reason the failures are: a scheduled publish that leaves no trace cannot be told from one that never happened, so without it the trail can answer \u201cwhy did my site not update?\u201d and cannot answer \u201cdid it?\u201d",
       "tooLateToRun": "The day it was set for had gone by, by more than the course allows (scheduledDeployCancellation.howLateIsTooLate), so the run STOOD DOWN: it deployed nothing, cleared the job away, and said so. Added on the mac 2026-09-20 with the fix for a scheduled deploy outliving its course. It is a SEPARATE kind for the reason buildNeededAnAnswer is one, and the reason is already recorded there: didNotFinish's sentence names a DESTINATION that stopped, and here there was none, so filling that slot in would read correctly and be false. It is not a failure either - nothing was attempted and nothing went wrong - and the sentence has to say that, or a teacher goes looking for a fault there was not. WINDOWS MAY NOT NEED IT: their task is created with /SC ONCE, which has no annual recurrence to close, so this kind is owed there only if their task is set to run after a MISSED start. Say which, rather than adopting or declining it silently.",
       "courseWasBusy": "Another program on this computer was still BUILDING or PUBLISHING the course after the run had waited ten minutes for it (#156; shared-rules workLeases.declining), so the run STOOD DOWN: it deployed nothing, cleared the job away so it cannot recur, and said so. A SEPARATE kind for tooLateToRun's reason - nothing was attempted, so there is no destination for a sentence to name - and it earns the attention badge for the same reason: the site the teacher expected is not there. Added on the mac 2026-09-25. Windows owes it once its scheduled publish reads leases (it writes none today, and takes none).",
-      "couldNotRunAsSetNow": "The run read the course's settings when it fired (#323; scheduledDeployCancellation.theDestination) and could not deploy the way the course is set NOW: everything scheduledDeployRefusals refuses except a time already passed, or settings that could not be read, or a deploy it could not get ready. So it STOOD DOWN: deployed nothing, cleared the job away, and said why. Its record's second line is the REASON - a clause true at the run, from theDestination.reasonClauses or theDestination.wording - and unlike the other stand-downs it IS shown, as {reason}. One kind rather than one per refusal: seven kinds for one situation a teacher reads the same way, and the folder and account reasons carry varying text anyway. Earns the attention badge for tooLateToRun's reason. Added on the mac 2026-09-26; Windows owes it with theDestination."
+      "couldNotRunAsSetNow": "The run read the course's settings when it fired (#323; scheduledDeployCancellation.theDestination) and could not deploy the way the course is set NOW: everything scheduledDeployRefusals refuses except a time already passed, or settings that could not be read, or a deploy it could not get ready. So it STOOD DOWN: deployed nothing, cleared the job away, and said why. Its record's second line is the REASON - a clause true at the run, from theDestination.reasonClauses or theDestination.wording - and unlike the other stand-downs it IS shown, as {reason}. One kind rather than one per refusal: seven kinds for one situation a teacher reads the same way, and the folder and account reasons carry varying text anyway. Earns the attention badge for tooLateToRun's reason. Added on the mac 2026-09-26; Windows owes it with theDestination. When the reason is theDestination.reasonClauses.keptForReference the sentence is sentences.couldNotRunAsSetNowForAReferenceCourse instead, which names no reason and gives no 'deploy it yourself' - a course kept for reference is never deployed (the #323 review's L-a). It is a second SENTENCE for the same kind, not a kind of its own; a runner that walks `kinds` finds one kind."
     },
     "sentences": {
       "neededAnAnswer": "{course} Section {section} was set to publish on its own, and it stopped because publishing to {destination} needed an answer nobody was there to give. Publish this section once yourself, answer the question, and it can publish on its own after that.",
@@ -1531,7 +1531,8 @@
       "succeeded": "{course} Section {section} published on its own to {destination}. Your students have the new pages.",
       "tooLateToRun": "{course} Section {section} was set to deploy on its own, but this computer wasn’t awake at that time and too long has passed since. Plantoir left the site as it was. Deploy it yourself when you’re ready, or schedule another from the section’s menu.",
       "courseWasBusy": "{course} Section {section} was set to deploy on its own, but the course was still being built somewhere else on this computer after ten minutes of waiting, so Plantoir left the site as it was rather than build it twice at once. Deploy it yourself when that has finished, or schedule another from the section’s menu.",
-      "couldNotRunAsSetNow": "{course} Section {section} was set to deploy on its own, but it could not deploy the way the course is set now — {reason} — so Plantoir left the site as it was. Deploy it yourself from the section, or schedule another from the section’s menu."
+      "couldNotRunAsSetNow": "{course} Section {section} was set to deploy on its own, but it could not deploy the way the course is set now — {reason} — so Plantoir left the site as it was. Deploy it yourself from the section, or schedule another from the section’s menu.",
+      "couldNotRunAsSetNowForAReferenceCourse": "{course} Section {section} was set to deploy on its own, but the course is kept for reference now, and a course kept for reference is never deployed — so Plantoir left the site as it was and turned that deploy off."
     },
     "whichKind": {
       "note": "Which LEG stopped, and with which exit code, decides the kind \u2014 the code alone does not, because the build and the destinations both use 3 for a question and anything else for a failure (#132, #137). Exit 3 is tested BEFORE the general non-zero branch, since 3 is non-zero too. A build that stopped for ANY reason publishes nothing and names nothing. How a runner plays a case: run the REAL generated scheduled wrapper, with stand-in launchers, against one configured destination. For a `build` row the build launcher exits `exitCode`; for a `destination` row the build exits 0 and the one destination exits `exitCode`; for `none` everything exits 0. A wrapper that builds only when the site looks stale (the mac's) must be given a folder that looks stale. Then read the record: its kind must be `kind`; the teacher's sentence for it must contain the record's destination exactly when `namesADestination` is true; and the run must count as published \u2014 every destination leg ran and exited 0 \u2014 exactly when `anythingPublished` is true. Added 2026-09-25 with #137, because the decision asked for a case that names the exit code and the expected kind, so that a wrapper filing a failed build against every configured destination is caught by data rather than by a teacher.",
@@ -11394,6 +11395,24 @@
           },
           "expect": [],
           "why": "#237: that alarm belongs to the other folder, and this Save does not reach it."
+        },
+        {
+          "name": "nothing about deploying changed, but it still could not go ahead: said anyway",
+          "scheduled": [
+            1
+          ],
+          "before": {
+            "target": "cloudflare_pages",
+            "hasDeployedBefore": true
+          },
+          "saved": {
+            "target": "cloudflare_pages",
+            "cloudflareAccountID": ""
+          },
+          "expect": [
+            "cannotGoAheadAsSetNow"
+          ],
+          "why": "'Changed or not': a Save of, say, the footer while the deploy set for tomorrow could not go ahead (here, no Account ID) still says so, because the run would stand down whatever this Save touched (the #323 review's L-b)."
         }
       ]
     },

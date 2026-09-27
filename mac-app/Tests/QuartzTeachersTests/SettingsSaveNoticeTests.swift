@@ -401,7 +401,7 @@ final class SettingsSaveNoticeTests: XCTestCase {
         let section: [String: Any] = try sharedRulesSection("savingSettings")
         let rule: [String: Any] = try XCTUnwrap(section["scheduledDeploys"] as? [String: Any])
         let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
-        XCTAssertEqual(cases.count, 4)
+        XCTAssertEqual(cases.count, 5)
         for testCase in cases {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
             let fixture = try scheduledFixture()
