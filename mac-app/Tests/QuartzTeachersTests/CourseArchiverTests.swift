@@ -33,9 +33,9 @@ final class CourseArchiverTests: XCTestCase {
     }
 
     @MainActor
-    func testRemovingASectionArchivesItAndUpdatesTheCourse() throws {
+    func testRemovingASectionArchivesItAndUpdatesTheCourse() async throws {
         let fixture = try makeCourse()
-        let archiveURL: URL = try CourseArchiver.archiveAndRemoveSection(
+        let archiveURL: URL = try await CourseArchiver.archiveAndRemoveSection(
             2,
             from: fixture.course,
             coursesDirectoryURL: fixture.coursesURL
@@ -62,9 +62,9 @@ final class CourseArchiverTests: XCTestCase {
     }
 
     @MainActor
-    func testRemovingACourseArchivesTheWholeFolder() throws {
+    func testRemovingACourseArchivesTheWholeFolder() async throws {
         let fixture = try makeCourse()
-        let archiveURL: URL = try CourseArchiver.archiveAndRemoveCourse(
+        let archiveURL: URL = try await CourseArchiver.archiveAndRemoveCourse(
             fixture.course,
             coursesDirectoryURL: fixture.coursesURL
         )

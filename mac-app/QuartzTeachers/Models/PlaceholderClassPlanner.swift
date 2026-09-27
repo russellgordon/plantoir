@@ -146,25 +146,25 @@ enum PlaceholderClassPlanner {
     /// written: the plan may be minutes old, Obsidian is open in the other
     /// window, and a teacher who started the page themselves in between must
     /// not lose it.
+    ///
+    /// **Makes no backup of its own** (#351): the parameter that could ask
+    /// for one was passed by no caller, and it zipped on the main actor.
+    /// The assistant — the only caller that changes a course this way —
+    /// saves its copy first, once per conversation, off the main actor.
     @discardableResult
     static func apply(
         _ plan: PlaceholderClassPlan,
-        in course: Course,
-        backingUpInto coursesDirectoryURL: URL? = nil
+        in course: Course
     ) throws -> ClassChangeOutcome {
         if plan.courseCode != course.code {
             throw Problem.wrongCourse(plan.courseCode, course.code)
         }
         if plan.changesNothing {
             return ClassChangeOutcome(
-                message: "Nothing to add — every class asked for already exists.", backupURL: nil
+                message: "Nothing to add — every class asked for already exists."
             )
         }
 
-        var backupURL: URL? = nil
-        if let coursesDirectoryURL {
-            backupURL = try CourseArchiver.backUpCourse(course, coursesDirectoryURL: coursesDirectoryURL)
-        }
 
         let fileManager: FileManager = FileManager.default
         let folderURL: URL = ClassPages.folderURL(forSection: plan.sectionNumber, in: course)
@@ -214,7 +214,7 @@ enum PlaceholderClassPlanner {
         for planned in written {
             createdURLs.append(planned.fileURL)
         }
-        return ClassChangeOutcome(message: message, backupURL: backupURL, created: createdURLs)
+        return ClassChangeOutcome(message: message, created: createdURLs)
     }
 }
 

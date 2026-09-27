@@ -114,21 +114,15 @@ final class AssistantRolloverUITests: XCTestCase {
             XCTFail("Asking before changing is on, so a rollover must offer a plan first.")
             return
         }
-        // **A known product freeze, held open here (#154's R0).** Approving
-        // runs the once-per-conversation backup, which zips the course with
-        // `Process.waitUntilExit()` ON THE MAIN THREAD; the nested run loop it
-        // spins re-enters SwiftUI's transaction flush over and over, and the
-        // window is frozen — measured 93 one-second samples busy there, over
-        // 122 s, on 2026-09-26. XCUITest reports it as "main thread busy for
-        // 30.0s". Strict, and matched to that message only: the day the
-        // backup stops blocking the main thread this goes red, and whoever
-        // fixed it removes this wrapper. The issue is #351.
-        let freeze: XCTExpectedFailure.Options = XCTExpectedFailure.Options()
-        freeze.isStrict = true
-        freeze.issueMatcher = { issue in
-            return issue.compactDescription.contains("main thread busy")
-        }
-        XCTExpectFailure("The backup's zip blocks the main thread after Approve (#351).", options: freeze)
+        // **The freeze #154 found is gone (#351), and this is where it was.**
+        // After Approve, XCUITest reported "main thread busy for 30.0s". #154
+        // put it down to the backup's zip, which did run on the main thread
+        // (`Process.waitUntilExit()`, a nested run loop); moving the zip off
+        // the main actor was NOT enough — the test still failed — because
+        // what held the thread was the conversation's LAZY stack, placing
+        // itself in a loop that never ended (samples: 98% of every second).
+        // Both are fixed; this step was held open by a strict expected failure
+        // until then, and with the wrapper gone the freeze coming back fails.
         approve.click()
         let approvedAt: Date = Date()
 
@@ -139,9 +133,14 @@ final class AssistantRolloverUITests: XCTestCase {
             ),
             "The website question never appeared in the window."
         )
-        // Printed, not asserted: #88's "main thread busy ~30 s" after the
-        // approval is measured from here (doc 09 → "#154").
-        print("ROLLOVER-TIMING question after approval: \(Date().timeIntervalSince(approvedAt)) s")
+        // How long the question took after the approval, the number #351 was
+        // measured by (doc 09 → "#351"): 1.05–1.07 s on 2026-09-26, against
+        // two minutes and more while the conversation was a lazy stack.
+        // Thirty seconds is XCUITest's own "main thread busy" limit, not a
+        // guess at what is fast enough.
+        let secondsToQuestion: TimeInterval = Date().timeIntervalSince(approvedAt)
+        print("ROLLOVER-TIMING question after approval: \(secondsToQuestion) s")
+        XCTAssertLessThan(secondsToQuestion, 30, "The question took \(secondsToQuestion) s after Approve (#351).")
 
         let marker: URL = try XCTUnwrap(liveMarkerURL)
         XCTAssertTrue(
@@ -348,6 +347,18 @@ final class AssistantRolloverUITests: XCTestCase {
         application.activate()
         let window: XCUIElement = application.windows["assistant-AppWindow-1"]
         XCTAssertTrue(window.waitForExistence(timeout: 30), "The assistant window is not open.")
+        // The main window put out of the way when it covers the assistant.
+        // Its size comes from AppKit's own frame autosave in the REAL
+        // preferences (a residual #154 documents), and at 1512 × 948 it
+        // covered the assistant's centre on 2026-09-27: XCUITest then ran its
+        // interruption monitors over the main window's texts and raised
+        // "Can't do regex matching on object 1" — twice, and again after
+        // raising the assistant from the Window menu. Minimised, it covers
+        // nothing and the section's work in it carries on.
+        let mainWindow: XCUIElement = application.windows["main-AppWindow-1"]
+        if !window.isHittable && mainWindow.exists {
+            mainWindow.buttons[XCUIIdentifierMinimizeWindow].click()
+        }
         window.click()
 
         let field: XCUIElement = application.textFields["assistInputField"]

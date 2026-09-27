@@ -101,10 +101,10 @@ struct QuartzTeachersApp: App {
                 // its descendants claim, and one overgrown view drags
                 // the whole interface (sidebar included) out of view.
                 .frame(
-                    minWidth: 900,
+                    minWidth: WindowChrome.minimumWindowWidth,
                     idealWidth: 1100,
                     maxWidth: .infinity,
-                    minHeight: 600,
+                    minHeight: WindowChrome.minimumWindowHeight,
                     idealHeight: 720,
                     maxHeight: .infinity
                 )
