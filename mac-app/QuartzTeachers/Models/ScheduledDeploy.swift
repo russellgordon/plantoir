@@ -1732,7 +1732,7 @@ enum ScheduledDeploy {
             // the Account ID is the one the teacher set; measured under
             // launchd before this shipped — docs 07, "#323".
             let reading: RunReading = MainActor.assumeIsolated {
-                let accountID: String = UserDefaults.standard.string(forKey: AppSettings.cloudflareAccountIDKey) ?? ""
+                let accountID: String = PlantoirDefaults.shared.string(forKey: AppSettings.cloudflareAccountIDKey) ?? ""
                 return readAtTheRun(
                     label: jobLabel,
                     section: section,
