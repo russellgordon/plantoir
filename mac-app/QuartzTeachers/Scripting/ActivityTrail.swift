@@ -631,6 +631,24 @@ nonisolated enum ActivityTrail {
         /// deliberate choice was made, and a choice nobody was able to make is
         /// a different fact.
         case websiteBuilderCouldNotBeStopped = "website builder could not be stopped"
+        /// The website builder began being got ready in the background, at a
+        /// first launch or the first launch of a new version (bundle B,
+        /// `BuilderWarmUp`). Carries the version. With the three below, it is
+        /// what answers "why was my first preview slow?" — or why it was not.
+        case builderWarmUpStarted = "builder got ready in the background: started"
+        /// The background run finished and the builder is ready. Carries how
+        /// many seconds it took, the number the feature exists to hide.
+        case builderWarmUpFinished = "builder got ready in the background: finished"
+        /// The background run ended without the builder being ready — a
+        /// failed download, a builder that would not start. Carries how it
+        /// ended and after how long. Nothing is said to the teacher: the
+        /// first preview gets it ready the old way.
+        case builderWarmUpDidNotFinish = "builder got ready in the background: did not finish"
+        /// The background run was not started because the Mac was offline or
+        /// in Low Data Mode. Carries which. The other reasons not to start
+        /// (already ready, a headless run, the test suite) leave no line,
+        /// because they are true on nearly every launch.
+        case builderWarmUpSkipped = "builder got ready in the background: skipped"
         /// ⌘Q landed while this app was publishing or building a preview
         /// (the latter since issue #232), the teacher was asked whether to
         /// quit anyway, and this is what they chose.

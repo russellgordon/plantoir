@@ -1341,6 +1341,94 @@ _wait_for_docker() {
 TOOLS_DIR="$HOME/Library/Application Support/Plantoir/tools"
 export PATH="$TOOLS_DIR/bin:$PATH"
 
+# >>> GETTING-READY TURN BLOCK >>> — identical in setup.sh, preview.sh and
+# deploy.sh, extracted between these two markers by
+# scripts/test_getting_ready_turn.py, which checks the three copies agree and
+# runs the real thing against every case in contracts/app-rules.json →
+# builderWarmUp.turnCases. Keep the markers, and keep the three copies the same.
+#
+# ---- One launcher at a time gets the website builder ready -------------
+# Starting the builder's virtual machine and building the website builder are
+# the two slow, network-hungry steps, and two launchers doing either at once
+# is never useful: two first starts fight over one virtual machine, and two
+# builds of one recipe download the same ~340 MB twice. Since Plantoir began
+# getting the builder ready in the BACKGROUND at first launch (bundle B), a
+# teacher who clicks Create or Preview while that is still going is exactly
+# this case, so the rule is structural here rather than something the app has
+# to remember: whoever holds the turn goes first, and everyone else waits for
+# it, then finds the builder ready and builds nothing.
+#
+# The turn is a folder, because `mkdir` either makes it or fails, atomically,
+# on every Mac. Inside it is the holder's process id. A turn whose holder is
+# no longer running — a launcher that was killed, a Mac that went to sleep
+# and was restarted — is taken over rather than waited on for ever; a turn
+# with no id in it yet is given a minute to get one. It is handed back as soon
+# as the builder is ready (never held through a build or a publish), and on
+# any exit. A waiting launcher says so once, after a couple of seconds, so a
+# turn held for a moment says nothing at all.
+READY_TURN="${HOME%/}/Library/Application Support/Plantoir/getting-ready.turn"
+READY_TURN_IS_OURS=""
+READY_TURN_SEEN_HOLDER=""
+READY_TURN_PAUSE="${READY_TURN_PAUSE:-2}"
+
+# True when the turn's holder has gone: its process is not running, or it
+# never wrote its id and the turn is more than a minute old.
+the_ready_turn_is_abandoned() {
+  local made now
+  READY_TURN_SEEN_HOLDER="$(cat "$READY_TURN/pid" 2>/dev/null || true)"
+  if [[ -n "$READY_TURN_SEEN_HOLDER" ]]; then
+    if kill -0 "$READY_TURN_SEEN_HOLDER" 2>/dev/null; then
+      return 1
+    fi
+    return 0
+  fi
+  made="$(stat -f %m "$READY_TURN" 2>/dev/null || echo 0)"
+  now="$(date +%s)"
+  [[ $((now - made)) -gt 60 ]]
+}
+
+take_the_ready_turn() {
+  if [[ -n "$READY_TURN_IS_OURS" ]]; then
+    return 0
+  fi
+  mkdir -p "$(dirname "$READY_TURN")" 2>/dev/null || true
+  local waited=0
+  while ! mkdir "$READY_TURN" 2>/dev/null; do
+    if the_ready_turn_is_abandoned; then
+      # Moved aside before it is removed, and only if it is still the one
+      # just judged abandoned, so two launchers taking over at once cannot
+      # remove a turn a third has just taken.
+      if [[ "$(cat "$READY_TURN/pid" 2>/dev/null || true)" == "$READY_TURN_SEEN_HOLDER" ]]; then
+        mv "$READY_TURN" "$READY_TURN.gone.$$" 2>/dev/null && rm -rf "$READY_TURN.gone.$$"
+      fi
+      continue
+    fi
+    if [[ "$waited" -eq 1 ]]; then
+      # Carries the words the app's progress bar matches (TaskMilestones:
+      # "Building your website builder"), so a waiting Create or Preview
+      # shows the step it is really waiting on. Plain words only (rule 1).
+      echo "⏳ Building your website builder — this Mac is already getting it ready, so this waits for that to finish…"
+    fi
+    waited=$((waited + 1))
+    sleep "$READY_TURN_PAUSE"
+  done
+  printf '%s\n' "$$" > "$READY_TURN/pid"
+  READY_TURN_IS_OURS=1
+  trap give_back_the_ready_turn EXIT
+}
+
+give_back_the_ready_turn() {
+  if [[ -z "$READY_TURN_IS_OURS" ]]; then
+    return 0
+  fi
+  if [[ "$(cat "$READY_TURN/pid" 2>/dev/null || true)" == "$$" ]]; then
+    rm -rf "$READY_TURN"
+  fi
+  READY_TURN_IS_OURS=""
+}
+# <<< GETTING-READY TURN BLOCK <<<
+take_the_ready_turn
+
 # >>> FIRST-RUN BLOCK >>> From this line to the bare `ensure_container_runtime`
 # below, this text is IDENTICAL in setup.sh, preview.sh and deploy.sh.
 # AppRulesContractTests (the three copies agree, and no printed line names the
@@ -1995,6 +2083,10 @@ ensure_container_runtime() {
 THIS_RUN_STARTED_THE_BUILDER=""
 ensure_container_runtime
 # ====================================================================
+# A publish builds the website builder only when it has to make a workspace,
+# much later (run_container_with_mount), so the turn is handed back here and
+# taken again there, rather than held through the publish.
+give_back_the_ready_turn
 
 # -------------------- Mount-aware container handling --------------------
 HOST_COURSES="$(pwd)/courses"
@@ -2064,6 +2156,14 @@ ensure_image_present() {
   if docker image inspect "$IMAGE" >/dev/null 2>&1; then
     return 0
   fi
+  # Building is the one slow step this can take, so it takes the turn for it
+  # (GETTING-READY TURN BLOCK) and asks again once it has it: a launcher that
+  # held the turn may have just built this very image.
+  take_the_ready_turn
+  if docker image inspect "$IMAGE" >/dev/null 2>&1; then
+    give_back_the_ready_turn
+    return 0
+  fi
   if [[ -z "$BUILD_CONTEXT" ]]; then
     echo "❌ No local image named '$IMAGE'."
     echo "   Build it first, e.g.: docker buildx build --load -t $IMAGE ."
@@ -2083,6 +2183,7 @@ ensure_image_present() {
   fi
   if "${build_cmd[@]}" --progress=plain -t "$IMAGE" "$BUILD_CONTEXT"; then
     echo "✅ Website builder built."
+    give_back_the_ready_turn
     prune_superseded_images "$IMAGE"
   else
     echo "❌ Could not build the website builder."
