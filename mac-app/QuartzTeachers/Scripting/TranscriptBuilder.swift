@@ -65,20 +65,9 @@ struct TranscriptBuilder {
     /// It is not JSON, it lasts one refresh, and a rule that hid every line
     /// ending in a prefix of a prefix would hide ordinary text ending in "P".
     private var visibleCurrentLine: String {
-        if SiteHealthFinding.isMarkerLine(currentLine) {
-            return ""
-        }
-        if PagesDatedByTheBuild.isMarkerLine(currentLine) {
-            return ""
-        }
-        if WorkspaceInUseReport.isMarkerLine(currentLine) {
-            return ""
-        }
-        if PreviewAddressHeldReport.isMarkerLine(currentLine) {
-            return ""
-        }
-        // Every other marker too, by the one rule (#128): a marker the app has
-        // no reader for yet is still machinery.
+        // ONE rule for every marker (#128): each reader's own `isMarkerLine`
+        // is `contains("PLANTOIR_…:")`, all of them a case of this, so a
+        // marker the app has no reader for yet is machinery too.
         if BuildMarkerLine.isMachineLine(currentLine) {
             return ""
         }
@@ -181,18 +170,9 @@ struct TranscriptBuilder {
     /// A line CARRYING a marker goes whole, including whatever was glued in
     /// front of it (#153): see `SiteHealthFinding.isMarkerLine`.
     private mutating func appendUnlessMachineReadable(_ line: String) {
-        if SiteHealthFinding.isMarkerLine(line) {
-            return
-        }
-        if PagesDatedByTheBuild.isMarkerLine(line) {
-            return
-        }
-        if WorkspaceInUseReport.isMarkerLine(line) {
-            return
-        }
-        if PreviewAddressHeldReport.isMarkerLine(line) {
-            return
-        }
+        // The same one rule as `visibleCurrentLine` (#128), which subsumes
+        // every marker's own check: PLANTOIR_HEALTH, _DATED, _WORKSPACE_IN_USE,
+        // _PREVIEW_ADDRESS_HELD, _KEPT_OFF, _MAPS — and the next one.
         if BuildMarkerLine.isMachineLine(line) {
             return
         }

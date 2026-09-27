@@ -16,12 +16,14 @@ each case there is a tree of pages. The mac's own test suite runs the app's
 check and the scheduled publish's against it; this file runs the two readers
 the shared toolchain owns:
 
-- **deploy.sh.** Its check is cut out of the launcher — not retyped — and
-  must appear exactly three times, identically, naming the contract's
-  signature. That command is then RUN through bash against each case, the way
-  a Terminal runs it. Skipped where there is no bash that can reach a scratch
-  folder, as the launcher tests beside it are.
-- **deploy.py.** The real program is RUN against each case with a stand-in
+- **deploy.sh.** Its rule is cut out of the launcher — not retyped: one
+  `LIVE_RELOAD_CLIENT_PATTERN`, which bash must read as the contract's
+  `asABasicRegex`, and one `site_carries_preview_client`, called exactly three
+  times. That function is then RUN through bash against each case under a
+  UTF-8 locale, the way a Terminal runs it (#291). Skipped where there is no
+  bash that can reach a scratch folder, as the launcher tests beside it are.
+- **deploy.py.** The real program, which reads the signature from the
+  contract, is RUN against each case with a stand-in
   `build_site.py` and no Netlify token, so it stops before anything leaves the
   machine, and whether it announced a rebuild is the answer. `HOME`,
   `PLANTOIR_BUILD_ROOT` and the token are taken out of its environment, so it
@@ -65,10 +67,18 @@ DEPLOY_PY = SCRIPTS_FOLDER / "deploy.py"
 # teacher's sentence: the line is a progress note in the publish console.
 REBUILD_ANNOUNCEMENT = "Preview build detected"
 
-# deploy.sh's check, as it is written in the launcher.
-DEPLOY_SH_CHECK = re.compile(
-    r"""grep -rq --include='\*\.html' "(?P<signature>[^"]+)" "\$\{PUBLIC_DIR_HOST\}" 2>/dev/null"""
-)
+# deploy.sh's rule, as it is written in the launcher: the pattern, defined
+# once, and the one function that reads a tree with it (#291).
+DEPLOY_SH_PATTERN_LINE = re.compile(r"^LIVE_RELOAD_CLIENT_PATTERN=.*$", re.MULTILINE)
+DEPLOY_SH_FUNCTION = re.compile(r"^site_carries_preview_client\(\) \{\n.*?^\}\n", re.MULTILINE | re.DOTALL)
+DEPLOY_SH_CALL = re.compile(r"""site_carries_preview_client "\$\{PUBLIC_DIR_HOST\}";""")
+# Any grep of a built tree that still names the address itself.
+DEPLOY_SH_BARE_GREP = re.compile(r"grep[^\n]*ws://localhost")
+
+# The locale a teacher's Terminal runs deploy.sh in. The rule must hold there,
+# not only in the C locale launchd and many CI shells happen to give (#291:
+# under UTF-8, BSD grep -z misses the client in a file with an invalid byte).
+TERMINAL_LOCALE = "en_US.UTF-8"
 
 CAN_MAKE_UNREADABLE = os.name != "nt" and (not hasattr(os, "geteuid") or os.geteuid() != 0)
 
@@ -81,13 +91,24 @@ def the_rule():
     return contracts.section("app-rules", "buildFreshness", "previewBuild")
 
 
-def deploy_sh_checks():
-    """Every copy of deploy.sh's preview check, as (whole command, signature)."""
-    text = DEPLOY_SH.read_text(encoding="utf-8")
-    found = []
-    for match in DEPLOY_SH_CHECK.finditer(text):
-        found.append((match.group(0), match.group("signature")))
-    return found
+def deploy_sh_text() -> str:
+    return DEPLOY_SH.read_text(encoding="utf-8")
+
+
+def deploy_sh_rule() -> str:
+    """deploy.sh's pattern line and function, cut out of the launcher."""
+    text = deploy_sh_text()
+    pattern_lines = DEPLOY_SH_PATTERN_LINE.findall(text)
+    functions = DEPLOY_SH_FUNCTION.findall(text)
+    return "\n".join(pattern_lines + functions)
+
+
+def deploy_sh_pattern_as_bash_reads_it() -> str:
+    result = subprocess.run(
+        ["bash", "-c", deploy_sh_rule() + '\nprintf %s "$LIVE_RELOAD_CLIENT_PATTERN"'],
+        capture_output=True, timeout=60,
+    )
+    return result.stdout.decode("utf-8")
 
 
 def write_pages(test_case, public_dir: Path):
@@ -96,6 +117,11 @@ def write_pages(test_case, public_dir: Path):
         page = public_dir / relative_path
         page.parent.mkdir(parents=True, exist_ok=True)
         page.write_bytes(text.encode("utf-8"))
+    # Bytes that are not UTF-8 at the very start of the page, a line of their
+    # own, far from the client: under a UTF-8 locale grep -z still misses it.
+    for relative_path in test_case.get("invalidUTF8Before", []):
+        page = public_dir / relative_path
+        page.write_bytes(b"\xff\n" + page.read_bytes())
     locked = []
     for relative_path in test_case.get("unreadable", []):
         page = public_dir / relative_path
@@ -126,23 +152,38 @@ class TheLaunchersReadTheContractsCases(unittest.TestCase):
 
     # MARK: - deploy.sh
 
-    def test_deploy_sh_checks_three_times_the_same_way_for_the_contracts_signature(self):
-        checks = deploy_sh_checks()
+    def test_deploy_sh_defines_the_rule_once_and_uses_it_three_times(self):
+        text = deploy_sh_text()
         self.assertEqual(
-            len(checks), 3,
+            len(DEPLOY_SH_PATTERN_LINE.findall(text)), 1,
+            "deploy.sh defines LIVE_RELOAD_CLIENT_PATTERN exactly once",
+        )
+        self.assertEqual(
+            len(DEPLOY_SH_FUNCTION.findall(text)), 1,
+            "deploy.sh defines site_carries_preview_client exactly once",
+        )
+        self.assertEqual(
+            len(DEPLOY_SH_CALL.findall(text)), 3,
             "deploy.sh checks for a preview's build before the folder copy, after "
             "its rebuild, and to say it could not remove it — three times. A "
             "different count means the launcher changed and this file must be told.",
         )
-        commands = set()
-        for command, signature in checks:
-            commands.add(command)
-            self.assertEqual(signature, self.rule["signature"])
-        self.assertEqual(len(commands), 1, "The three checks must read the same tree the same way")
+        self.assertEqual(
+            DEPLOY_SH_BARE_GREP.findall(text), [],
+            "a grep for the bare address is the #291 fault: every check goes "
+            "through site_carries_preview_client",
+        )
+
+    @unittest.skipUnless(HAS_BASH, "no bash that can reach a scratch folder")
+    def test_deploy_sh_pattern_is_the_contracts(self):
+        self.assertEqual(
+            deploy_sh_pattern_as_bash_reads_it(),
+            self.rule["signature"]["asABasicRegex"],
+        )
 
     @unittest.skipUnless(HAS_BASH, "no bash that can reach a scratch folder")
     def test_deploy_sh_answers_every_case_as_the_contract_does(self):
-        command = deploy_sh_checks()[0][0]
+        rule = deploy_sh_rule()
         for test_case in self.cases_this_machine_can_build():
             with self.subTest(test_case["name"]):
                 with tempfile.TemporaryDirectory() as scratch:
@@ -151,8 +192,12 @@ class TheLaunchersReadTheContractsCases(unittest.TestCase):
                     try:
                         environment = dict(os.environ)
                         environment["PUBLIC_DIR_HOST"] = str(public_dir)
+                        environment["LANG"] = TERMINAL_LOCALE
+                        environment["LC_ALL"] = TERMINAL_LOCALE
+                        environment["LC_CTYPE"] = TERMINAL_LOCALE
                         result = subprocess.run(
-                            ["bash", "-c", "if " + command + "; then exit 0; else exit 1; fi"],
+                            ["bash", "-c", rule + '\nif site_carries_preview_client "${PUBLIC_DIR_HOST}"; '
+                             "then exit 0; else exit 1; fi"],
                             env=environment, capture_output=True, timeout=60,
                         )
                     finally:

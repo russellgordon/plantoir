@@ -218,9 +218,25 @@ if [ -n "$PREVIEW_PORT" ]; then
   CODE=$(curl -s -o "$WORK/preview.html" -w "%{http_code}" --max-time 10 "http://localhost:$PREVIEW_PORT/" 2>/dev/null)
   [ "$CODE" = "200" ] && ok "preview serves its front page (HTTP 200 on :$PREVIEW_PORT)" \
                       || no "preview answered HTTP $CODE"
-  grep -q "ws://localhost" "$WORK/preview.html" \
-    && ok "the preview carries the live-reload client, as a preview should" \
-    || no "the preview has no live-reload client — serve mode may not be running"
+  if grep -q "ws://localhost" "$WORK/preview.html"; then
+    ok "the preview carries the live-reload client, as a preview should"
+    # The only place anything reads a REAL serve-mode page: the client must
+    # still be what contracts/app-rules.json -> buildFreshness.previewBuild
+    # looks for (its tag, then its first statement, #291), or every check
+    # would read a preview's site as production and publish it. Read as one
+    # record in the C locale, exactly as deploy.sh reads it.
+    # The working folder's own copy, the one its launchers were given.
+    PREVIEW_RULE_FILE="$WORKING_FOLDER/.toolchain/contracts/app-rules.json"
+    [ -f "$PREVIEW_RULE_FILE" ] || PREVIEW_RULE_FILE="$(cd "$(dirname "$0")" && pwd)/contracts/app-rules.json"
+    PREVIEW_RULE=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["buildFreshness"]["previewBuild"]["signature"]["asABasicRegex"], end="")' "$PREVIEW_RULE_FILE" 2>/dev/null)
+    if [ -n "$PREVIEW_RULE" ] && LC_ALL=C grep -zq -- "$PREVIEW_RULE" "$WORK/preview.html"; then
+      ok "the preview's live-reload client matches the rule in contracts/app-rules.json"
+    else
+      no "the preview's live-reload client no longer matches the rule in contracts/app-rules.json — re-measure it (#291)"
+    fi
+  else
+    no "the preview has no live-reload client — serve mode may not be running"
+  fi
 else
   no "the preview never announced an address"
 fi
