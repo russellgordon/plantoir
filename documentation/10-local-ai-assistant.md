@@ -4542,6 +4542,21 @@ Two details that make the backups usable rather than merely present:
   the assistant's five, because the two are counted separately.
 - And prune ONLY backups at that: archives and the wizard's own zips live in
   the same folder and their parsers deliberately reject each other's forms.
+- **The zip runs off the main actor, and the window says what the wait is**
+  (#351, 2026-09-26). It used to run on the main thread and hold the window
+  for up to two minutes after the teacher approved a change. Now a line under
+  the three dots names the course being copied (`AssistWording.backingUpFirst`),
+  and a second write arriving while the first copy is still being zipped —
+  which an outside assistant can now do, because the main thread is free —
+  waits for THAT copy rather than making another. A copy that failed is not
+  remembered: the next write tries again, and no write says "backed up" about
+  it. Each real zip leaves one trail line, "assistant backed up a course",
+  with its file name, size and seconds; a reused copy leaves none. **What
+  froze the window after Approve was not the zip, though**: it was the
+  conversation's LAZY stack, placing itself in a loop that never ended and
+  kept the main thread for good; the conversation is a plain stack now.
+  How, measured, and what was rejected: [09-mac-app.md](09-mac-app.md) →
+  "Every zip is off the main actor (#351)".
 
 ### Restore is section-scoped, though the zip holds the course
 
@@ -5673,7 +5688,8 @@ answer states the exact name and place for an agent to relay.
    first" while acting on the greeting at once.
 2. **`read_how_i_teach`**, what the greeting sentence resolves to.
 3. **MCP `initialize.instructions`** (mac only; Windows' server sends none):
-   one paragraph naming each LIVE course whose page exists — the case the
+   one paragraph naming each LIVE course whose page has been WRITTEN — an
+   empty one is left out (`howITeachPage.emptyPageIsNotWritten`) — the case the
    greeting cannot cover, since it names one course. A folder with no page and
    no reference course still sends nothing at all. Third, not first: whether
    clients read `instructions` has never been measured.
@@ -5768,8 +5784,10 @@ pins it.
 
 ### The trail
 
-Three events (`activityTrail.mustRecord`): `How I Teach page read` (course,
-word count, cut short or not — never the words), `How I Teach page written`
+Four events (`activityTrail.mustRecord`): `How I Teach page read` (course,
+word count, cut short or not — never the words — or, since #329, that the page
+was found EMPTY), `How I Teach page started` (Course Settings made an empty
+page, #329 — or could not), `How I Teach page written`
 (created or replaced, word counts, the backup's name — "did I write this, or
 did an assistant?"), and `How I Teach page kept off the website`, read from
 the build's `PLANTOIR_KEPT_OFF:` line — printed ONLY when a page the course's
@@ -5778,14 +5796,71 @@ settings had LISTED is dropped, so the one transition a teacher will ask about
 page was never on the site leaves no line on every build. Read by the app from
 a run's console and from a scheduled publish's log, as `PLANTOIR_DATED:` is.
 
+### The gap between a plan and its write (#351)
+
+Every assistant write saves a copy of the course first (once per conversation,
+or its own copy for the start of the year), and since #351 that copy is zipped
+off the main actor: it can take a minute, and while it does the teacher can
+edit a page in Obsidian and an outside assistant's second call can run. A write
+that carried out the plan it made BEFORE the copy would then act on a course
+that is no longer the one it planned for. So every write that saves a copy
+first works its plan out AGAIN after the copy and refuses, with
+`changedWhileSavingACopy`, when it no longer matches — remember_timetable,
+duplicating a class, make_room_for_classes, add_next_class / add_classes and
+add_curriculum_mentions compare the plan's DISPLAYED summary (and, for a
+duplicate, the source page's words and the new page's name) — a summary that
+is lossy by design: a make-room plan names its first ten renames and moves and
+counts the rest, and a timetable names its count and its first and last dates,
+so a change past what the summary shows is not caught here; the apply's own
+guards (a rename onto a name in use is skipped, an existing page is never
+written over) are what stand behind it (accepted in the second review, N1);
+prepare_for_start_of_year compares its fingerprint and answers
+`startOfYearPlanHasChanged`, and refuses too when its plan cannot be made at
+all any more (a first class renamed or deleted meanwhile); write_how_i_teach compares the page's mark and
+answers `howITeachChangedSincePlanned`. A course removed meanwhile no longer
+locates, so a write never makes its folder again. The writes that reach the
+copy through publish_pages, unpublish_pages, publish_class_on and
+re_date_classes re-read every page at the write already, and decline a page
+edited since (#186). REJECTED: making the copy BEFORE planning — it would save
+one for every refusal too; and a lock on the course for the length of the
+copy, which would refuse a teacher's own edit in Obsidian rather than notice it.
+
+### An empty page is not written (#329)
+
+Course Settings' "Create and Open" makes a page with its settings and nothing
+else. Before #329 that page would have been read to an assistant as the
+teacher's account, listed as "How I Teach page: yes", named in the session
+briefing, and a first draft refused with `howITeachAlreadyWritten` — "a
+teacher's own page is never replaced" — about a page with nothing in it. So
+ONE predicate, `HowITeachPage.hasWords` (the body after the settings block,
+without a byte-order mark and whitespace, is not empty), decides it
+everywhere: `read_how_i_teach` answers `howITeachEmpty` and the drafting brief
+(trail: "found an empty How I Teach page"); `list_courses` says "not written
+yet"; the briefing leaves the course out; `plan_write_how_i_teach` plans it as
+new, at the page's own path; `write_how_i_teach` saves into it with no mark,
+keeping its settings block byte for byte (a whitespace-only page with no
+settings is written as a new page). Decided against the bytes read at the
+write, and — since the backup before it now runs off the main actor (#351) —
+re-checked after the backup, so a page the teacher typed into meanwhile is
+refused. A page whose bytes cannot be read as text is never taken to be empty.
+Contract: `howITeachPage.emptyPageIsNotWritten` (Russell accepted, Q1 of
+bundle C). REJECTED: leaving an empty page counted as written.
+
 ### What is deliberately not in this piece
 
 - ~~The section's "— Edited" fingerprint still counts the page~~ — done,
   versioned, by [#330](https://github.com/russellgordon/plantoir/issues/330):
   the stamp records `fingerprintRule`, and rule 2 leaves the page out
   ([05 → The — Edited marker](05-build-pipeline.md)).
-- A button to open or create the page — a GUI surface on both platforms;
-  follow-up [#329](https://github.com/russellgordon/plantoir/issues/329).
+- A button to open or create the page — shipped in
+  [#329](https://github.com/russellgordon/plantoir/issues/329) as Course
+  Settings' How I Teach row (above, and documentation/09). The page it makes
+  is left out of the "— Edited" fingerprint by #330's rule 2 like any How I
+  Teach page, written or not, so starting one never marks a section edited
+  once the section's stamp is rule 2. A section last published before #330
+  (its stamp still rule 1, which counts every file) IS marked "— Edited" once
+  by the first Create and Open, as #330's own `why` says of any first edit —
+  and on Windows, until it implements rule 2, every time.
 - No starter page from the wizard, `setup_course.py` or a payload: a template is
   text an agent would read as the teacher's approach.
 - The local assistant neither reads nor drafts it.

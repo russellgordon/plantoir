@@ -58,7 +58,7 @@ final class StartOfYearSheetModel {
     private let readToday: () -> CalendarDay
 
     /// How the backup is made. Injectable so a test can make it fail.
-    private let backUp: (Course, URL) throws -> URL
+    private let backUp: (Course, URL) async throws -> URL
 
     // MARK: - Computed properties
 
@@ -78,8 +78,8 @@ final class StartOfYearSheetModel {
          workspaceURL: URL,
          mode: StartOfYearSheetMode,
          today: @escaping () -> CalendarDay = { return CalendarDay.today() },
-         backUp: @escaping (Course, URL) throws -> URL = { course, coursesDirectoryURL in
-             return try CourseArchiver.backUpCourse(course, coursesDirectoryURL: coursesDirectoryURL, madeBy: .teacher)
+         backUp: @escaping (Course, URL) async throws -> URL = { course, coursesDirectoryURL in
+             return try await CourseArchiver.backUpCourse(course, coursesDirectoryURL: coursesDirectoryURL, madeBy: .teacher)
          }) {
         self.course = course
         self.sectionNumber = sectionNumber

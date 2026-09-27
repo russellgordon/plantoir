@@ -98,8 +98,10 @@ struct KeepACopyForReferenceSheet: View {
                 folderName = proposedFolderName()
             }
 
+            // An empty title for the same reason as the wizard's unit word
+            // (#354): a titled field in a labelled row draws its title twice.
             LabeledContent("Folder name") {
-                TextField("Folder name", text: $folderName)
+                TextField("", text: $folderName, prompt: Text("Folder name"))
                     .textFieldStyle(.roundedBorder)
                     .accessibilityIdentifier("keepACopyFolderName")
             }

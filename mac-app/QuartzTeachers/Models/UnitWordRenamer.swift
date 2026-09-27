@@ -341,16 +341,17 @@ nonisolated enum UnitWordRenamer {
         return plan(from: oldWord, to: rawNewWord, facts: facts(for: course))
     }
 
-    /// Read, back up, carry out — in that order, all on the caller's actor.
-    /// The sheet does the same three steps itself so the walks can leave the
-    /// main actor; this is for tests and for callers that do not mind.
+    /// Read, back up, carry out — in that order, on the caller's actor except
+    /// for the backup's zip, which leaves it like every zip (#351). The sheet
+    /// does the same three steps itself so the walks can leave the main actor
+    /// too; this is for tests and for callers that do not mind.
     @MainActor
     @discardableResult
     static func rename(
         _ plan: UnitWordRenamePlan,
         in course: Course,
         coursesDirectoryURL: URL
-    ) throws -> UnitWordRenameOutcome {
+    ) async throws -> UnitWordRenameOutcome {
         // This renames every class page in every section. On a course kept
         // for reference it is refused rather than attempted: the sheet is not
         // offered, and this is what catches any other caller.
@@ -361,7 +362,7 @@ nonisolated enum UnitWordRenamer {
         if let problem = plan.problems.first {
             throw UnitWordRenameProblem(sentence: problem, pagesRenamed: 0, linksRewritten: 0, changedTheCourse: false)
         }
-        let backupURL: URL = try CourseArchiver.backUpCourse(course, coursesDirectoryURL: coursesDirectoryURL)
+        let backupURL: URL = try await CourseArchiver.backUpCourse(course, coursesDirectoryURL: coursesDirectoryURL)
         return try carryOut(plan, texts: texts, facts: facts(for: course), backupURL: backupURL)
     }
 

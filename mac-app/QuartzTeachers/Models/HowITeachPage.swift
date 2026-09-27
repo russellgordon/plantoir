@@ -147,6 +147,88 @@ enum HowITeachPage {
         return matches.first
     }
 
+    /// Whether a page's text has any WORDS after its settings block (#329):
+    /// the body, without a byte-order mark and whitespace, is not empty.
+    ///
+    /// **A page without words counts as NOT WRITTEN everywhere that describes
+    /// it** (`howITeachPage.emptyPageIsNotWritten`). Course Settings' "Create
+    /// and Open" makes exactly `newPageSettings` and nothing else; before
+    /// this rule, that page would have been read to an assistant as the
+    /// teacher's account, listed as "yes", and refused to a first draft with
+    /// "a teacher's own page is never replaced" — about a page with nothing
+    /// in it. ONE predicate, so the read, the listing, the plan and the write
+    /// cannot disagree about the same bytes.
+    static func hasWords(_ text: String) -> Bool {
+        var remaining: String = body(of: text)
+        if remaining.unicodeScalars.first == "\u{FEFF}" {
+            remaining = String(String.UnicodeScalarView(remaining.unicodeScalars.dropFirst()))
+        }
+        return !remaining.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Whether the page at this place has been written: it has words, or its
+    /// bytes cannot be read as text — a page this app cannot read is never
+    /// taken to be empty, because "empty" is what lets a draft replace it
+    /// without the teacher's mark.
+    static func isWritten(_ pageURL: URL) -> Bool {
+        guard let data = try? Data(contentsOf: pageURL) else {
+            return true
+        }
+        guard let decoded = text(of: data) else {
+            return true
+        }
+        return hasWords(decoded)
+    }
+
+    /// The course's page when it has been written (`isWritten`), else nil —
+    /// what `list_courses` and the session briefing ask.
+    static func writtenURL(for course: Course) -> URL? {
+        guard let pageURL = existingURL(for: course) else {
+            return nil
+        }
+        return isWritten(pageURL) ? pageURL : nil
+    }
+
+    /// Course Settings' How I Teach row (#329): the course's page, found by
+    /// listing as `existingURL` finds it — or, when there is none, a new one
+    /// made with exactly `newPageSettings` and NOTHING else, never over a
+    /// file that is already there (`howITeachPage.settingsButton`).
+    ///
+    /// **No starter words.** #209 rejected a template: an assistant reads
+    /// the page as the teacher's own approach, so words the app put there
+    /// would be words in the teacher's mouth.
+    ///
+    /// `beforeWriting` is for a test to put a page in the way between the
+    /// look and the write; when one appears there, it is the teacher's and
+    /// it is what is opened. A page made here leaves one line on the trail
+    /// ("How I Teach page started"), and so does one that could not be made;
+    /// finding a page writes nothing, as opening it from the toolbar does.
+    static func startOrFind(for course: Course, beforeWriting: () -> Void = {}) throws -> (url: URL, created: Bool) {
+        if let existing = existingURL(for: course) {
+            return (existing, false)
+        }
+        beforeWriting()
+        let pageURL: URL = newPageURL(for: course)
+        do {
+            try Data(newPageSettings.utf8).write(to: pageURL, options: [.withoutOverwriting])
+        } catch {
+            if let appeared = existingURL(for: course) {
+                return (appeared, false)
+            }
+            ActivityTrail.note(
+                .howITeachPageStarted,
+                "\(course.code) · could not start the How I Teach page from Course Settings: "
+                    + error.localizedDescription
+            )
+            throw error
+        }
+        ActivityTrail.note(
+            .howITeachPageStarted,
+            "\(course.code) · started an empty How I Teach page from Course Settings"
+        )
+        return (pageURL, true)
+    }
+
     /// Whether a page with the name sits at either reserved place for one
     /// section — the top of the course, or the top of that section's folder.
     static func isThere(forSection sectionNumber: Int, in course: Course) -> Bool {
@@ -306,7 +388,10 @@ enum HowITeachPage {
     /// The trail's words for a read (`activityTrail.mustRecord` → "How I
     /// Teach page read"): how many words, never which. `words` nil means no
     /// page was there.
-    static func trailLineForARead(words: Int?, cutShort: Bool) -> String {
+    static func trailLineForARead(words: Int?, cutShort: Bool, empty: Bool = false) -> String {
+        if empty {
+            return "an outside assistant found an empty How I Teach page"
+        }
         guard let words else {
             return "an outside assistant found no How I Teach page yet"
         }
@@ -365,5 +450,33 @@ enum HowITeachPage {
             lines.append(String(current))
         }
         return lines
+    }
+}
+
+/// The words of Course Settings' How I Teach row (#329). Pinned by
+/// `contracts/shared-rules.json` → `howITeachPage.settingsButton`, which the
+/// Windows row reads too; FIRST DRAFTS for Russell's wording pass.
+enum HowITeachButtonWording {
+
+    // MARK: - Stored properties
+
+    /// The row's label.
+    static let rowLabel: String = "How I Teach page"
+
+    /// The button when the course has a page.
+    static let openButton: String = "Open"
+
+    /// The button when it has none.
+    static let createButton: String = "Create and Open"
+
+    /// Under the row.
+    static let caption: String =
+        "Your notes on how this course is taught, for you and any assistant you use. It is never on the website."
+
+    // MARK: - Functions
+
+    /// The page could not be made.
+    static func couldNotCreate(reason: String) -> String {
+        return "The How I Teach page could not be made: \(reason)"
     }
 }

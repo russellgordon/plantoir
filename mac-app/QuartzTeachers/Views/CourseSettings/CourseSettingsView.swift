@@ -16,6 +16,10 @@ struct CourseSettingsView: View {
     /// sheet is opened again.
     @State var unitWordNotice: String? = nil
     @State var saveProblem: String?
+
+    /// Why the How I Teach page could not be made, shown under its row until
+    /// the next press (#329).
+    @State var howITeachProblem: String? = nil
     @State var didJustSave: Bool = false
 
     /// What the last Save could not reach — a preview or a publish of this
@@ -219,6 +223,7 @@ struct CourseSettingsView: View {
                             ExampleCaption(CurriculumFoldersOffer.caption)
                         }
                     }
+                    howITeachRow
                     StringListEditorView(
                         title: "Shared files (all sections)",
                         removalTrail: removalTrail(for: .sharedFiles),
@@ -360,6 +365,10 @@ struct CourseSettingsView: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.top, 10)
+                // A container element with its own identifier (#353): without `.contain`
+                // SwiftUI applies an identifier on a stack to every element inside it,
+                // and the inner identifiers (settingsPreviewAgainButton, settingsPreviewAgainNothingOpen) never reach the tree.
+                .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("settingsSaveNotice")
             }
 
@@ -432,6 +441,37 @@ struct CourseSettingsView: View {
     }
 
     // MARK: - Computed properties
+
+    /// The course's How I Teach page, in Obsidian (#329): "Open" when the
+    /// course has one, "Create and Open" when it has none — the page is then
+    /// made with its settings and nothing else, never a starter text
+    /// (`HowITeachPage.startOrFind`). Shown for every course this form is
+    /// drawn for; a course kept for reference never reaches this form.
+    /// Whether the page is there is read on every drawing, and the drawing
+    /// is redone when the window becomes key (`marksWalkGeneration`), so a
+    /// page made or deleted in Obsidian meanwhile is noticed.
+    var howITeachRow: some View {
+        let pageExists: Bool = HowITeachPage.existingURL(for: course) != nil
+        return VStack(alignment: .leading, spacing: 4) {
+            LabeledContent(HowITeachButtonWording.rowLabel) {
+                Button(pageExists ? HowITeachButtonWording.openButton : HowITeachButtonWording.createButton) {
+                    openOrStartHowITeachPage()
+                }
+                .disabled(!FolderActions.obsidianIsInstalled)
+                .help("Edit this course's pages in Obsidian")
+                .accessibilityIdentifier("howITeachButton")
+            }
+            ExampleCaption(HowITeachButtonWording.caption)
+                .accessibilityIdentifier("howITeachCaption")
+            if let howITeachProblem {
+                Text(howITeachProblem)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("howITeachProblem")
+            }
+        }
+    }
 
     /// Why saving is blocked right now, or nil when it isn't. A deploy
     /// destination that cannot be reached must not reach disk: the deploy
@@ -581,6 +621,21 @@ struct CourseSettingsView: View {
     }
 
     // MARK: - Functions
+
+    /// Opens the course's How I Teach page, making an empty one first when
+    /// there is none (#329).
+    func openOrStartHowITeachPage() {
+        howITeachProblem = nil
+        do {
+            let page: (url: URL, created: Bool) = try HowITeachPage.startOrFind(for: course)
+            FolderActions.openPageInObsidian(page.url, vaultURL: course.directoryURL)
+            if page.created {
+                marksWalkGeneration += 1
+            }
+        } catch {
+            howITeachProblem = HowITeachButtonWording.couldNotCreate(reason: error.localizedDescription)
+        }
+    }
 
     /// What a blocked removal in one of this course's lists leaves on the
     /// trail: the course, by its code (#171).
