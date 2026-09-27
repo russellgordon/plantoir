@@ -1361,8 +1361,9 @@ export PATH="$TOOLS_DIR/bin:$PATH"
 # The turn is a folder, because `mkdir` either makes it or fails, atomically,
 # on every Mac. Inside it is the holder's process id. A turn whose holder is
 # no longer running — a launcher that was killed, a Mac that went to sleep
-# and was restarted — is taken over rather than waited on for ever; a turn
-# with no id in it yet is given a minute to get one. It is handed back as soon
+# and was restarted — is taken over rather than waited on for ever, and so is
+# one whose id now belongs to a process started after the turn was taken, or
+# one older than a ceiling; a turn with no id in it yet is given a minute. It is handed back as soon
 # as the builder is ready (never held through a build or a publish), and on
 # any exit. A waiting launcher says so once, after a couple of seconds, so a
 # turn held for a moment says nothing at all.
@@ -1371,20 +1372,55 @@ READY_TURN_IS_OURS=""
 READY_TURN_SEEN_HOLDER=""
 READY_TURN_PAUSE="${READY_TURN_PAUSE:-2}"
 
-# True when the turn's holder has gone: its process is not running, or it
-# never wrote its id and the turn is more than a minute old.
-the_ready_turn_is_abandoned() {
-  local made now
-  READY_TURN_SEEN_HOLDER="$(cat "$READY_TURN/pid" 2>/dev/null || true)"
-  if [[ -n "$READY_TURN_SEEN_HOLDER" ]]; then
-    if kill -0 "$READY_TURN_SEEN_HOLDER" 2>/dev/null; then
-      return 1
-    fi
-    return 0
+READY_TURN_CEILING="${READY_TURN_CEILING:-7200}"
+
+# How many seconds a process has been running, from `ps -o etime=`
+# ([[dd-]hh:]mm:ss), or nothing when there is no such process.
+seconds_a_process_has_run() {
+  local elapsed days=0 hours=0 minutes=0 seconds=0 rest first second third
+  elapsed="$(ps -o etime= -p "$1" 2>/dev/null | tr -d ' ')"
+  [[ -n "$elapsed" ]] || return 1
+  rest="$elapsed"
+  if [[ "$rest" == *-* ]]; then
+    days="${rest%%-*}"
+    rest="${rest#*-}"
   fi
+  IFS=: read -r first second third <<<"$rest"
+  if [[ -n "$third" ]]; then
+    hours="$first"; minutes="$second"; seconds="$third"
+  else
+    minutes="$first"; seconds="$second"
+  fi
+  echo $(( 10#$days * 86400 + 10#$hours * 3600 + 10#$minutes * 60 + 10#$seconds ))
+}
+
+# True when the turn's holder has gone: its process is not running; or the
+# process with its id STARTED AFTER the turn was taken, so the id has been
+# reused by something else; or the turn is older than the ceiling (two hours
+# by default — no builder takes that long to get ready); or it never wrote its
+# id and the turn is more than a minute old. Without the middle two, a holder
+# that died uncleanly and whose id a long-lived process later reused would be
+# waited on for as long as that process lives — a scheduled publish included.
+the_ready_turn_is_abandoned() {
+  local made now age running
   made="$(stat -f %m "$READY_TURN" 2>/dev/null || echo 0)"
   now="$(date +%s)"
-  [[ $((now - made)) -gt 60 ]]
+  age=$((now - made))
+  READY_TURN_SEEN_HOLDER="$(cat "$READY_TURN/pid" 2>/dev/null || true)"
+  if [[ -n "$READY_TURN_SEEN_HOLDER" ]]; then
+    if ! kill -0 "$READY_TURN_SEEN_HOLDER" 2>/dev/null; then
+      return 0
+    fi
+    if [[ "$age" -gt "$READY_TURN_CEILING" ]]; then
+      return 0
+    fi
+    running="$(seconds_a_process_has_run "$READY_TURN_SEEN_HOLDER" || true)"
+    if [[ -n "$running" && $((running + 5)) -lt "$age" ]]; then
+      return 0
+    fi
+    return 1
+  fi
+  [[ "$age" -gt 60 ]]
 }
 
 take_the_ready_turn() {

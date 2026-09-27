@@ -667,8 +667,8 @@
       },
       {
         "event": "builder got ready in the background: started",
-        "carries": "the app's version and build",
-        "line": "started getting this Mac ready to build websites, in the background, for version {version (build)}",
+        "carries": "the name of the builder being got ready (a hash of the recipe)",
+        "line": "started getting this Mac ready to build websites, in the background, for {the builder's name}",
         "why": "Added with bundle B's background warm-up. 'My first preview took five minutes' and 'my first preview was instant' are both answered by whether, and when, this ran.",
         "appliesOn": [
           "mac"

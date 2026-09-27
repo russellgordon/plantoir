@@ -4,10 +4,10 @@
       "mac"
     ],
     "appliesOnWhy" : "PERMANENT: Windows builds natively. PlantoirSetup.exe carries its whole runtime and nothing is downloaded or built for building (documentation/12-windows-app.md, the like-for-like table), so there is no builder to get ready in the background.",
-    "launcher" : "setup.sh --prepare-builder, run from ~/Library/Application Support/Plantoir/getting-ready, which holds that launcher and a mirror of the recipe made by the same function that mirrors a working folder's .toolchain, so the image built is the one every working folder's launchers look for (its tag is a hash of the recipe). It installs what the builder needs, starts it and builds it, then stops: no courses folder, no workspace, no builds folder.",
+    "launcher" : "setup.sh --prepare-builder, run from ~/Library/Application Support/Plantoir/getting-ready, which holds that launcher and a mirror of the recipe made by the same function that mirrors a working folder's .toolchain, so the image built is the one every working folder's launchers look for (its tag is a hash of the recipe). It installs what the builder needs, starts it and builds it, then stops: no courses folder, no workspace, no builds folder. `setup.sh --builder-tag` prints BUILDER_TAG=<name> for the same recipe and starts nothing.",
     "note" : "Getting the website builder ready in the background at first launch, and at the first launch of each new version, so the first preview is fast (bundle B; Russell's change of 2026-09-26, which replaced a 'decision' issue). The mac only, permanently: Windows carries its runtime and builds natively, with nothing to download or build first (appliesOn).",
     "readyLine" : "BUILDER_READY=",
-    "record" : "getting-ready/ready-for.txt holds the version and build ('1.4.0 (212)') of the last run that printed the ready line. A run that did not is not recorded, so the next launch tries again.",
+    "record" : "getting-ready/ready-for.txt holds the builder's name ('teaching-quartz:src-55e586fe') from the BUILDER_READY= line of the last run that printed it. A run that did not is not recorded, so the next launch tries again. At launch the app asks `setup.sh --builder-tag` (which starts nothing) for the name the recipe it carries would have, and warms up only when the two differ.",
     "rejected" : [
       "Waiting in the app: a preview started from the command line, the assistant's server or a scheduled publish would not wait, and 'the app remembers to' is the kind of rule that is forgotten at the next new entry point. The launchers are where every path meets.",
       "A status window or a progress bar: background work the teacher did not ask for gets one plain line.",
@@ -48,7 +48,7 @@
             "carriesTheRecipe" : true,
             "isAnAppLaunch" : true,
             "network" : "online",
-            "readyForThisVersion" : false
+            "readyForThisRecipe" : false
           },
           "name" : "the first launch, online"
         },
@@ -59,10 +59,10 @@
             "carriesTheRecipe" : true,
             "isAnAppLaunch" : true,
             "network" : "online",
-            "readyForThisVersion" : false
+            "readyForThisRecipe" : false
           },
-          "name" : "the first launch of a new version",
-          "why" : "The recipe changes only with the app, so a new version's builder is a new image; getting it ready now is what keeps the first preview after an update fast (an existing Mac re-downloads about 130 MB of it, #334)."
+          "name" : "the first launch with a new recipe",
+          "why" : "The recipe changes only with the app, so a new recipe's builder is a new image; getting it ready now keeps the first preview after an update fast (an existing Mac re-downloads about 130 MB of it, #334). Keyed on the recipe's own hash, not the version: a development build whose version never changes still gets a new recipe ready, and a release with an unchanged recipe starts nothing (implementation review N2)."
         },
         {
           "expect" : "skip",
@@ -71,9 +71,9 @@
             "carriesTheRecipe" : true,
             "isAnAppLaunch" : true,
             "network" : "online",
-            "readyForThisVersion" : true
+            "readyForThisRecipe" : true
           },
-          "name" : "this version is already ready",
+          "name" : "this recipe's builder is already ready",
           "why" : "Every later launch. No line: it would be on nearly every launch."
         },
         {
@@ -83,7 +83,7 @@
             "carriesTheRecipe" : true,
             "isAnAppLaunch" : true,
             "network" : "offline",
-            "readyForThisVersion" : false
+            "readyForThisRecipe" : false
           },
           "name" : "offline",
           "why" : "Russell, 2026-09-26: offline it says nothing to the teacher, and the old on-demand path runs at the first preview."
@@ -95,7 +95,7 @@
             "carriesTheRecipe" : true,
             "isAnAppLaunch" : true,
             "network" : "lowDataMode",
-            "readyForThisVersion" : false
+            "readyForThisRecipe" : false
           },
           "name" : "Low Data Mode",
           "why" : "The teacher has asked apps not to download what they were not asked for, and ~340 MB is exactly that."
@@ -107,7 +107,7 @@
             "carriesTheRecipe" : true,
             "isAnAppLaunch" : false,
             "network" : "online",
-            "readyForThisVersion" : false
+            "readyForThisRecipe" : false
           },
           "name" : "a headless run (the assistant's server, a scheduled publish, the contract writer)"
         },
@@ -118,7 +118,7 @@
             "carriesTheRecipe" : false,
             "isAnAppLaunch" : true,
             "network" : "online",
-            "readyForThisVersion" : false
+            "readyForThisRecipe" : false
           },
           "name" : "an app that carries no recipe"
         },
@@ -129,14 +129,15 @@
             "carriesTheRecipe" : true,
             "isAnAppLaunch" : true,
             "network" : "online",
-            "readyForThisVersion" : false
+            "readyForThisRecipe" : false
           },
           "name" : "a warm-up that did not finish is tried again at the next launch",
           "why" : "Only a run that printed the ready line writes the version down, so a failed or interrupted one leaves nothing that would stop the next launch trying."
         }
       ],
-      "note" : "BuilderWarmUp.decide over these facts. network is 'online', 'offline' (no usable path, or no answer within three seconds) or 'lowDataMode'."
+      "note" : "BuilderWarmUp.decide over these facts. readyForThisRecipe compares the name `setup.sh --builder-tag` prints for the recipe the app carries (the launchers' own hash) with the one getting-ready/ready-for.txt holds. network is 'online', 'offline' (no usable path, or no answer within three seconds) or 'lowDataMode'."
     },
+    "tagLine" : "BUILDER_TAG=",
     "turn" : {
       "cases" : [
         {
@@ -171,10 +172,24 @@
           "expectWaitingLine" : false,
           "holder" : "unwrittenOld",
           "name" : "a turn with no holder written, more than a minute old"
+        },
+        {
+          "expect" : "takes",
+          "expectWaitingLine" : false,
+          "holder" : "reused",
+          "name" : "the holder's id now belongs to a process that started after the turn was taken",
+          "why" : "A holder that died uncleanly, whose id a long-lived process later reused, would otherwise be waited on for as long as that process lives - a scheduled publish included (implementation review N1)."
+        },
+        {
+          "expect" : "takes",
+          "expectWaitingLine" : false,
+          "holder" : "pastTheCeiling",
+          "name" : "a turn older than the ceiling",
+          "why" : "No builder takes two hours to get ready; the ceiling bounds the wait whatever the id says."
         }
       ],
       "folder" : "~/Library/Application Support/Plantoir/getting-ready.turn",
-      "rule" : "One launcher at a time starts the builder and builds it. The turn is taken (mkdir) before the builder is started and handed back as soon as the image is ready - never held through a build of a site or a publish; deploy.sh hands it back after starting the builder and takes it again only if it has to build the image to make a workspace. It holds the holder's process id. A turn whose holder is not running is taken over; one with no id yet is waited on for a minute. Handed back on any exit.",
+      "rule" : "One launcher at a time starts the builder and builds it. The turn is taken (mkdir) before the builder is started and handed back as soon as the image is ready - never held through a build of a site or a publish; deploy.sh hands it back after starting the builder and takes it again only if it has to build the image to make a workspace. It holds the holder's process id. A turn is taken over when its holder is not running, when the process now holding its id started AFTER the turn was taken (the id was reused), or when it is older than a ceiling (two hours); one with no id yet is waited on for a minute. Handed back on any exit.",
       "where" : "The GETTING-READY TURN BLOCK, identical in setup.sh, preview.sh and deploy.sh, run for real by scripts/test_getting_ready_turn.py."
     },
     "why" : "Measured for #334 and #312: a first preview on a new Mac spent 22-27 s starting the builder from the app's disk and 88-137 s building the website builder in a fresh 3-CPU virtual machine (49 s on this M4 Pro), downloading ~340 MB, before any page appeared. The teacher spends that long in the wizard anyway.",

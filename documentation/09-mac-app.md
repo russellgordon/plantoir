@@ -5507,7 +5507,11 @@ start the builder's virtual machine (22–27 s from the disk the app carries,
 3-CPU virtual machine, 49 s here) before a single page appeared. The teacher
 spends minutes in the wizard anyway, so at first launch — and at the first
 launch of each new version, whose recipe is new — `BuilderWarmUp` does that
-work then, quietly. Russell's change of 2026-09-26: build it (the plan had
+work then, quietly. It runs again whenever the recipe the app carries is new
+— asked of the launcher itself (`setup.sh --builder-tag`, which starts
+nothing and prints the name the launchers' own hash gives), not read off the
+version, so a development build whose version never changes still re-warms
+after a recipe edit (review N2). Russell's change of 2026-09-26: build it (the plan had
 proposed it as a `decision` issue, asking whether ~340 MB may be downloaded
 before the teacher asks; his answer was yes).
 
@@ -5519,15 +5523,16 @@ launcher and a mirror of the recipe made by `WorkspaceModel.copyToolchainFiles`
 tag (a hash of the recipe) is the one every working folder's launchers look
 for. A plain `Process` with `HelperPrograms.environment()`, so it installs
 from the app's own helpers; its output goes to `getting-ready/last-run.log`.
-A run that prints `BUILDER_READY=` writes the version and build to
+A run that prints `BUILDER_READY=<name>` writes that name to
 `getting-ready/ready-for.txt`; nothing else does, so a failed or interrupted
-run is tried again at the next launch.
+run is tried again at the next launch, and a launch whose recipe's name
+matches it starts nothing.
 
 **When it runs** (`contracts/app-rules.json` → `builderWarmUp.startsWhen`,
 `BuilderWarmUp.decide`): from `applicationDidFinishLaunching`, never in the
 unit suite or a UI test, never when the binary is the assistant's server, a
 scheduled publish or the contract writer (`AppUpdates.headlessFlags`), never
-when the app carries no recipe, never twice for one version, and not offline
+when the app carries no recipe, never twice for one recipe, and not offline
 or in Low Data Mode — asked once of `NWPathMonitor`, three seconds without an
 answer counting as offline. Offline it says NOTHING to the teacher: the
 first preview gets the builder ready the old way.
@@ -5547,10 +5552,20 @@ every launch leave no line).
 
 **Quitting.** Not stopped at quit: what it has downloaded would be thrown
 away, and #220's quit path already leaves the builder running while any
-launcher is — `anyLauncherRunning` matches `…/getting-ready/setup.sh
---prepare-builder`. The run finishes on its own; the version is then not
-written down (the app is gone), so the next launch runs it again and finds
-the builder ready in seconds.
+launcher is: `warmUpRunning` matches `…/getting-ready/setup.sh
+--prepare-builder`, and the trail says "left this Mac's website-building setup
+running because this Mac is still being got ready to build websites, in the
+background" — never "a publish or preview", which nobody started (review N5).
+The run finishes on its own; its result is then not written down (the app is
+gone), so the next launch runs it again and finds the builder ready in
+seconds.
+
+**Accepted, and said so nobody files them** (review nits, ruled 2026-09-27):
+the builder's virtual machine, once the warm-up has started it, stays up for
+the rest of that session even if the teacher never previews (once per recipe);
+the sequence cases drive a second `--prepare-builder` rather than `preview.sh`
+itself, whose wait is checked by placement; and `getting-ready/.toolchain` is
+a full mirror of the recipe (~61 MB) that is never cleaned up.
 
 **Measured** (M4 Pro, Colima 6 CPU / 12 GiB, 2026-09-27, the EXC2O
 fixture, 271 pages): with the builder ready and running, a FIRST preview
