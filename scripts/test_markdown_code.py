@@ -107,6 +107,35 @@ class EdgeTests(unittest.TestCase):
         self.assertEqual(names_read("a ` b\n# [[Real]] ` c\n"), ["Real"])
 
 
+class CommentTests(unittest.TestCase):
+    """A %% comment is never a link either (#331, readingALink.whatIsAComment)."""
+
+    def test_comment_ranges_pair_left_to_right_and_leave_a_lone_one(self):
+        self.assertEqual(markdown_code.comment_ranges("a %%b%% c %%d"), [(2, 7)])
+        self.assertEqual(markdown_code.comment_ranges("%%\n%%"), [(0, 5)])
+
+    def test_code_ranges_hold_code_only(self):
+        # The curriculum markers are comments: code_ranges must not report
+        # them, or every block would be skipped and the map would go empty.
+        text = "%%curriculum-start%%\n![[A1.1]]\n%%curriculum-end%%\n"
+        self.assertEqual(markdown_code.code_ranges(text), [])
+        self.assertEqual(len(markdown_code.not_a_link_ranges(text)), 2)
+
+    def test_offsets_line_up_after_an_astral_character_before_a_comment(self):
+        # Built in the wrong unit, every range after the emoji is off by one.
+        text = "🙂 %% [[Hidden]] %% `[[Code]]` [[Real]]"
+        self.assertEqual(names_read(text), ["Real"])
+        start, end = markdown_code.code_ranges(text)[0]
+        self.assertEqual(text[start:end], "`[[Code]]`")
+        start, end = markdown_code.comment_ranges(text)[0]
+        self.assertEqual(text[start:end], "%% [[Hidden]] %%")
+
+    def test_the_installer_leaves_a_link_in_a_comment_alone(self):
+        text = "%% was [[Old]] %% now [[Old]]\n"
+        unlinked = setup_course.unlink_curriculum_references(text, {"Old"})
+        self.assertEqual(unlinked, "%% was [[Old]] %% now Old\n")
+
+
 class CoverageTests(unittest.TestCase):
     """The coverage map counts nothing written inside code."""
 
@@ -150,6 +179,14 @@ class CoverageTests(unittest.TestCase):
 
     def test_a_real_embed_still_counts(self):
         self.assertEqual(self.covered("![[A1.1]]\n"), {"A1.1": 1, "A1.2": 0, "B1.1": 0})
+
+    def test_an_embed_in_a_comment_counts_nothing_and_a_real_block_still_counts(self):
+        # #331: `%% ![[A1.1]] %%` is removed before Quartz draws anything, so
+        # it covers nothing; the block's markers are comments too, and the
+        # block must still count (the map-empties trap).
+        body = ("%% ![[A1.1]] %%\n\n"
+                "%%curriculum-start%%\n![[B1.1]]\n%%curriculum-end%%\n")
+        self.assertEqual(self.covered(body), {"A1.1": 0, "A1.2": 0, "B1.1": 1})
 
 
 if __name__ == "__main__":

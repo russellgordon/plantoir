@@ -46,6 +46,26 @@ import Foundation
 /// Measured with Quartz's own parser, these disagree with Quartz on 0 of the
 /// 39,570 shipped links.
 ///
+/// ### A comment is never a link either (#331)
+///
+/// Quartz removes every `%%…%%` from the RAW page before it parses anything
+/// (`ofm.ts:130`, `:160–163`): lazy, left to right, across lines, code or
+/// not; a `%%` with no partner is text. So this does the same, in the same
+/// order: `commentRanges(in:)` finds the comments on the page as written, and
+/// `ranges(in:)` finds code in the page WITH EVERY COMMENT REMOVED, mapped
+/// back to the page's own UTF-16 offsets. `notALinkRanges(in:)` is the two
+/// merged, and it is what every link reader and rewriter masks with
+/// (`readingALink.whatIsAComment`).
+///
+/// `ranges(in:)` still returns CODE ONLY, deliberately: the curriculum
+/// markers `%%curriculum-start%%` / `%%curriculum-end%%` are comments, and a
+/// reader asking "is this marker in code?" must not see them as masked, or
+/// every curriculum block is skipped and the coverage map goes empty.
+///
+/// Rejected: finding code on the page as written (R1). Simpler, but wrong on
+/// two contract cases — a fence opened inside a comment, and a backtick
+/// inside a comment pairing with one after it.
+///
 /// ### Rejected
 ///
 /// * A real Markdown parser (swift-markdown, cmark). The Python build and the
@@ -83,6 +103,7 @@ nonisolated enum MarkdownCode {
     private static let nine: UInt16 = 0x39
     private static let underscore: UInt16 = 0x5F
     private static let equals: UInt16 = 0x3D
+    private static let percent: UInt16 = 0x25
 
     // MARK: - Nested types
 
@@ -109,10 +130,69 @@ nonisolated enum MarkdownCode {
 
     // MARK: - Functions
 
+    /// Every `%%…%%` comment on the page as written, both `%%` included,
+    /// in UTF-16 offsets. A `%%` opens a comment that closes at the next
+    /// `%%`, across lines and whether or not either sits in code; a last
+    /// `%%` with no partner is text (#331, `readingALink.whatIsAComment`).
+    static func commentRanges(in text: String) -> [NSRange] {
+        let units: [UInt16] = Array(text.utf16)
+        return MarkdownCode.commentRanges(units)
+    }
+
     /// Every stretch of `text` that is code, sorted and non-overlapping, in
     /// UTF-16 offsets — the unit `NSRegularExpression` reports ranges in.
+    ///
+    /// Code is found in the page with its comments removed (Quartz's order,
+    /// #331) and mapped back to the page's own offsets. The stripped text
+    /// never leaves this function, so nothing can write it back. Comments are
+    /// NOT in the result — see the type's header for why that matters.
     static func ranges(in text: String) -> [NSRange] {
         let units: [UInt16] = Array(text.utf16)
+        let comments: [NSRange] = MarkdownCode.commentRanges(units)
+        if comments.isEmpty {
+            return MarkdownCode.codeRanges(units)
+        }
+        var kept: [UInt16] = []
+        var origin: [Int] = []
+        var last: Int = 0
+        for comment in comments {
+            var index: Int = last
+            while index < comment.location {
+                kept.append(units[index])
+                origin.append(index)
+                index += 1
+            }
+            last = NSMaxRange(comment)
+        }
+        var index: Int = last
+        while index < units.count {
+            kept.append(units[index])
+            origin.append(index)
+            index += 1
+        }
+        origin.append(units.count)
+        var mapped: [NSRange] = []
+        for range in MarkdownCode.codeRanges(kept) {
+            let start: Int = origin[range.location]
+            let end: Int = origin[NSMaxRange(range) - 1] + 1
+            mapped.append(NSRange(location: start, length: end - start))
+        }
+        return mapped
+    }
+
+    /// Code and comments together, sorted and merged: every stretch of
+    /// `text` in which a `[[` (or the `!` of `![[`) does not start a link.
+    /// This is the mask every link reader and rewriter uses.
+    static func notALinkRanges(in text: String) -> [NSRange] {
+        var both: [NSRange] = MarkdownCode.ranges(in: text)
+        for comment in MarkdownCode.commentRanges(in: text) {
+            both.append(comment)
+        }
+        return MarkdownCode.sortedAndMerged(both)
+    }
+
+    /// The #313 rule over `units` exactly as given (no comment removal).
+    private static func codeRanges(_ units: [UInt16]) -> [NSRange] {
         let length: Int = units.count
         var found: [NSRange] = []
         var fenceCharacter: UInt16 = 0
@@ -202,9 +282,10 @@ nonisolated enum MarkdownCode {
         return MarkdownCode.range(holding: location, in: ranges) != nil
     }
 
-    /// The matches of `expression` in `text` that do not START inside code —
-    /// the one mask every link reader and rewriter applies
-    /// (`readingALink.whatIsCode`, rule 5). The text is never changed, so a
+    /// The matches of `expression` in `text` that do not START inside one of
+    /// `ranges` — for a link reader or rewriter, `notALinkRanges(in:)`: code
+    /// and `%%` comments (`readingALink.whatIsCode`, rule 5, and
+    /// `whatIsAComment`). The text is never changed, so a
     /// rewriter can use the ranges as they are.
     ///
     /// A match that starts in code is not merely dropped: the search starts
@@ -246,6 +327,34 @@ nonisolated enum MarkdownCode {
     }
 
     // MARK: - Private helpers
+
+    private static func commentRanges(_ units: [UInt16]) -> [NSRange] {
+        var found: [NSRange] = []
+        var position: Int = 0
+        while true {
+            guard let start = MarkdownCode.doublePercent(in: units, from: position) else {
+                break
+            }
+            guard let end = MarkdownCode.doublePercent(in: units, from: start + 2) else {
+                break
+            }
+            found.append(NSRange(location: start, length: end + 2 - start))
+            position = end + 2
+        }
+        return found
+    }
+
+    /// Where the next `%%` begins, at or after `start`.
+    private static func doublePercent(in units: [UInt16], from start: Int) -> Int? {
+        var index: Int = start
+        while index + 1 < units.count {
+            if units[index] == percent && units[index + 1] == percent {
+                return index
+            }
+            index += 1
+        }
+        return nil
+    }
 
     private static func range(holding location: Int, in ranges: [NSRange]) -> NSRange? {
         var low: Int = 0

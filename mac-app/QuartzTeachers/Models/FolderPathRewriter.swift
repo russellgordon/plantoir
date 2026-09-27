@@ -254,7 +254,7 @@ enum FolderPathRewriter {
             return []
         }
         var found: [String] = []
-        let code: [NSRange] = MarkdownCode.ranges(in: text)
+        let code: [NSRange] = MarkdownCode.notALinkRanges(in: text)
         for match in MarkdownCode.matches(of: expression, in: text, outside: code) {
             if let targetRange = Range(match.range(at: 2), in: text) {
                 found.append(String(text[targetRange]))
@@ -274,7 +274,7 @@ enum FolderPathRewriter {
         guard let expression = style.expression else {
             return text
         }
-        let code: [NSRange] = MarkdownCode.ranges(in: text)
+        let code: [NSRange] = MarkdownCode.notALinkRanges(in: text)
         let matches: [NSTextCheckingResult] = MarkdownCode.matches(of: expression, in: text, outside: code)
         if matches.isEmpty {
             return text
