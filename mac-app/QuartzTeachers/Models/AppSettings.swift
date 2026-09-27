@@ -128,7 +128,7 @@ class AppSettings {
     /// False while the hosted tests drive the real app, so a test run
     /// cannot leave a fixture value behind in the teacher's preferences.
     private var canRemember: Bool {
-        if WorkspaceModel.isRunningTests && defaults === UserDefaults.standard {
+        if WorkspaceModel.isRunningTests && defaults === PlantoirDefaults.shared {
             return false
         }
         return true
@@ -136,7 +136,7 @@ class AppSettings {
 
     // MARK: - Initializer
 
-    init(defaults: UserDefaults = UserDefaults.standard) {
+    init(defaults: UserDefaults = PlantoirDefaults.shared) {
         self.defaults = defaults
         self.cloudflareAccountID = defaults.string(forKey: AppSettings.cloudflareAccountIDKey) ?? ""
         let storedChoice: String = defaults.string(forKey: AppSettings.assistantModelChoiceKey) ?? ""
