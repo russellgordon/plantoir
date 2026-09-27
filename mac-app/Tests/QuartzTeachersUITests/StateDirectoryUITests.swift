@@ -126,14 +126,47 @@ final class StateDirectoryUITests: XCTestCase {
     /// Skips when another Plantoir is running. Its writes to the real trail
     /// would read as a leak, and the teacher's copy is theirs to quit.
     func requireNoOtherPlantoirIsRunning() throws {
+        // The copy a previous UI test left running is this runner's own, not
+        // the teacher's: end it first. Only it — never a copy this runner did
+        // not launch.
+        if let leftOver = IsolatedLaunch.lastLaunched {
+            leftOver.terminate()
+            IsolatedLaunch.lastLaunched = nil
+        }
         let running: [NSRunningApplication] = NSRunningApplication.runningApplications(
             withBundleIdentifier: "ca.russellgordon.Plantoir"
         )
-        if !running.isEmpty {
+        var ownedHere: [NSRunningApplication] = []
+        for application in running {
+            // Another ACCOUNT's copy (a fast-user-switched session) writes
+            // another home's trail, and is no reason to skip: only this
+            // account's copies count.
+            if StateDirectoryUITests.ownerOfProcess(application.processIdentifier) == getuid() {
+                ownedHere.append(application)
+            }
+        }
+        if !ownedHere.isEmpty {
+            var described: [String] = []
+            for application in ownedHere {
+                described.append("pid \(application.processIdentifier) at \(application.bundleURL?.path ?? "?")")
+            }
             throw XCTSkip(
-                "Quit Plantoir first: its own writes to the trail cannot be told apart from the app under test."
+                "Quit Plantoir first: its own writes to the trail cannot be told apart from the app under test. "
+                + "Running: \(described)"
             )
         }
+    }
+
+    /// The user id a process runs as, asked of the kernel (the runner cannot
+    /// spawn `ps`). Nil when no process holds that id.
+    static func ownerOfProcess(_ processID: Int32) -> uid_t? {
+        var selector: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, processID]
+        var processInfo: kinfo_proc = kinfo_proc()
+        var infoSize: Int = MemoryLayout<kinfo_proc>.stride
+        if sysctl(&selector, 4, &processInfo, &infoSize, nil, 0) != 0 || infoSize == 0 {
+            return nil
+        }
+        return processInfo.kp_eproc.e_ucred.cr_uid
     }
 
     /// Polls a condition for up to `seconds`.
@@ -173,6 +206,10 @@ struct RealStateSnapshot {
 
         let trail: URL = home.appendingPathComponent("Library/Logs/Plantoir/activity.txt")
         snapshot.files[trail.path] = try describe(trail)
+        // Where the redirected preferences would land if the daemon refused
+        // the path it was given: `~/Library/Preferences/<last component>`.
+        let misrouted: URL = home.appendingPathComponent("Library/Preferences/preferences.plist")
+        snapshot.files[misrouted.path] = try describe(misrouted)
 
         for relative in StateDirectoryUITests.realFoldersWatched {
             let folder: URL = home.appendingPathComponent(relative)

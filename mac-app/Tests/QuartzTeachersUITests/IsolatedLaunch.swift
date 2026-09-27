@@ -38,6 +38,11 @@ struct IsolatedLaunch {
     /// message to say — nil when weights were not asked for.
     let modelChoiceNote: String?
 
+    /// The app this runner launched last, so a test that must know no OTHER
+    /// Plantoir is running can first end the one a previous test left behind
+    /// (XCUITest leaves it running after a test that did not quit it).
+    nonisolated(unsafe) static var lastLaunched: XCUIApplication?
+
     // MARK: - Computed properties
 
     /// The trail this launch writes: the redirected one.
@@ -110,6 +115,7 @@ struct IsolatedLaunch {
         application.launchEnvironment["UITEST_WORKSPACE"] = workspaceURL.path
         application.launchArguments += arguments
         application.launch()
+        lastLaunched = application
         return IsolatedLaunch(
             application: application,
             stateDirectory: stateDirectory,
