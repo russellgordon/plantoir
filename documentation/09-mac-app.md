@@ -7296,7 +7296,11 @@ accessibility elements already: an identifier on a `Button` or `Toggle` whose
 label holds another (its label is part of the control), the sidebar `List` and
 `SearchablePicker`'s `ScrollView`. `NewSiteDialogUITests` finds the sheet's
 field and button by identifier; the opt-in `ContainerIdentifiersUITests` reads
-the Backups total off the real tree. No unit test: in process the tree does not
+the Backups total off the real tree. **One place `.contain` cannot give both:**
+a `List` section's header is merged into ONE static text ("Backups, 4 KB").
+Without `.contain` that text read "backupsGroup-backupsGroup" and `backupsTotal`
+was dead; with it, the text carries `backupsTotal` and `backupsGroup` is not in
+the tree. Nothing reads `backupsGroup`; the total is what a test needs. No unit test: in process the tree does not
 reach hosted SwiftUI.
 
 ## A field in a labelled row has no title of its own (#354)

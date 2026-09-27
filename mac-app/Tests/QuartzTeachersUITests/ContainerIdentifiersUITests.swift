@@ -32,12 +32,16 @@ final class ContainerIdentifiersUITests: XCTestCase {
         let application: XCUIApplication = launch.application
         defer { application.typeKey("q", modifierFlags: .command) }
 
-        let group: XCUIElement = application.descendants(matching: .any)["backupsGroup"]
-        XCTAssertTrue(group.waitForExistence(timeout: 20), "No Backups header in the sidebar.")
+        // Read off the real tree, 2026-09-26. A List section's header is
+        // merged into ONE static text ("Backups, 4 KB"). Without `.contain`
+        // it carried "backupsGroup-backupsGroup" and `backupsTotal` was dead;
+        // with it, the text carries `backupsTotal` and `backupsGroup` is not
+        // in the tree at all — nothing reads that one, and the total is the
+        // one a test needs.
         let total: XCUIElement = application.descendants(matching: .any)["backupsTotal"]
         if !total.waitForExistence(timeout: 20) {
-            print("=== BACKUPS HEADER TREE ===")
-            print(group.debugDescription)
+            print("=== SIDEBAR TREE ===")
+            print(application.outlines.firstMatch.debugDescription)
             XCTFail("The Backups total has no identifier of its own: the header's swallowed it (#353).")
         }
     }
