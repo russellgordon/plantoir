@@ -597,7 +597,22 @@ def kill_orphaned_model_servers() -> None:
     at both moments no app instance is (or is about to stay) running, so
     every engine from the app bundle is an orphan by definition.
     """
-    subprocess.run(["pkill", "-f", "Resources/llama/llama-server"], capture_output=True)
+    # Only engines from THIS checkout's build, and only orphans (parent 1).
+    # The sweep used to `pkill -f Resources/llama/llama-server`, which on a
+    # Mac where other sessions run UI tests from their own clones killed
+    # THEIR engines too (2026-09-27: one from ~/plantoir-r mid-run).
+    try:
+        ours = str(app_bundle_resources() / "llama" / "llama-server")
+    except SystemExit:
+        return
+    listing = subprocess.run(["ps", "-axo", "pid=,ppid=,command="], capture_output=True, text=True).stdout
+    for line in listing.splitlines():
+        parts = line.strip().split(None, 2)
+        if len(parts) < 3:
+            continue
+        pid, ppid, command = parts
+        if ppid == "1" and command.startswith(ours):
+            subprocess.run(["kill", pid], capture_output=True)
 
 
 class BackupsSetAside:
@@ -1216,8 +1231,13 @@ def run_scenes(folder: Path, chosen: list) -> int:
                                 failures.append(f"{scene.name} ({suffix}): {problem}")
                         elif scene.kind == "obsidian":
                             note = folder / "courses" / marketing_folder.CURRICULUM_COURSE / marketing_folder.HOW_I_TEACH_NAME
-                            with scene_book.ObsidianRegistryKept():
-                                if not capture_note_in_obsidian(note, staging / f"how-i-teach-{suffix}.png"):
+                            with scene_book.ObsidianRegistryKept() as registry:
+                                if not registry.register(note.parent):
+                                    failures.append(f"{scene.name} ({suffix}): Obsidian is open, and opening a "
+                                                    "note in it would need its list of vaults changed under it; "
+                                                    "quit Obsidian (it is not the capture's to quit) and re-take "
+                                                    "with --only how-i-teach")
+                                elif not capture_note_in_obsidian(note, staging / f"how-i-teach-{suffix}.png"):
                                     failures.append(f"{scene.name} ({suffix}): Obsidian's window was not found")
                     # Checked in STAGING, and only what passes is promoted —
                     # to site/img, or to the parts folder for a composite. A
