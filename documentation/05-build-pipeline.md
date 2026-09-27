@@ -662,6 +662,39 @@ undated.
   coverage count; `verify.sh` lists it and Windows' `PythonToolchainTests`
   discovers it. The why, the table built in Quartz, and what was rejected are
   in [10 → Code is never a link](10-local-ai-assistant.md#code-is-never-a-link-313).
+
+  **A `%%` comment is never a link either** (since
+  [#331](https://github.com/russellgordon/plantoir/issues/331)). Quartz v4.5.0
+  removes every `%%…%%` from the RAW page before it reads anything
+  (`ofm.ts:130`, `:160–163`): lazily, left to right, across lines, whether or
+  not a `%%` sits in code, and a `%%` with no partner is plain text. So
+  `markdown_code.py` does the same, in the same order: `comment_ranges` finds
+  the comments on the page as written, `code_ranges` finds code in the page
+  WITH EVERY COMMENT REMOVED and maps the ranges back to the page's own
+  offsets, and `not_a_link_ranges` is the two merged — the default mask of
+  `matches_outside_code`, so every reader above, the installer's three and the
+  linters mask comments without being told. **The trap this is built around:
+  the curriculum markers `%%curriculum-start%%` and `%%curriculum-end%%` ARE
+  comments** (Quartz pairs lazily, so each marker is a whole comment and the
+  block between them is not). `_coverage_counts` therefore asks two different
+  questions: whether a MARKER is in code (`code_ranges`, which still returns
+  code only) and whether a LINK is a link (`not_a_link_ranges`). Folding the
+  comments into `code_ranges` would skip every block and empty every coverage
+  map while the build stayed green; `readingALink.cases` → "the curriculum
+  markers are comments, and what sits between them is not" and
+  `test_markdown_code.CommentTests.test_code_ranges_hold_code_only` guard it.
+  Measured in Quartz's own order over all of `support/`: 344 of the 39,570
+  matches sit inside a comment, all in skeletons (294 naming What This Site
+  Can Do, 50 Help Sessions); 100 page-to-page edges existed only inside
+  comments, none from a class page, and no class page of 3,944 reaches fewer
+  pages; both targets keep plain links, so the site check gains no orphan; 0
+  of the 344 sit inside a curriculum block. The rule agrees with Quartz on all
+  39,570 and on the 12 new cases; finding code on the page as written (R1)
+  also agrees on the corpus but gets two of the cases wrong. Found on the way
+  and fixed: AVI1O's and TEJ4M's `Tasks/_DUPLICATE ME.md` wrote "%%" in the
+  prose of their note, which closed the comment early and put the rest of the
+  teacher's note on the site of every copy (new courses only); the payload
+  linter now refuses a page with an odd number of `%%`.
 - **A class dated with a plain YAML date** (`created: 2026-09-24`, unquoted —
   what Obsidian's Date property writes) counts, as midnight in Toronto. Until
   the fix round `_parse_created_value` read it as no date at all, so such a
@@ -977,6 +1010,67 @@ is the intended reading rather than a defect to special-case — the page's
 caption already says "red in September, greener as the year goes on" — and
 `site_health` is quiet about it for the same reason the paragraph above
 gives.
+
+### Links into hidden pages (#333)
+
+`linksIntoHiddenPages` is the second check about PAGES rather than folders,
+and the last finding a build emits (after `pageSettingsUnreadable`, so the
+existing examples keep their order). A class published by its own flag — in
+Obsidian, by the assistant, by #96's Get Ready — can link to pages that are
+still hidden, and students who follow such a link find nothing. The director's
+ruling on [#333](https://github.com/russellgordon/plantoir/issues/333): the
+BUILD warns, because it is the one place that sees every publish (a flag
+flipped by hand, scheduled deploys, the MCP server); the app's publish does
+not start taking pages with it.
+
+- **The rule** (`_links_into_hidden_pages` in `build_site.py`; contract
+  `siteHealth.checks` → `linksIntoHiddenPages.rule`, cases
+  `siteHealth.linksIntoHiddenPages.cases`): after the merge and after the How
+  I Teach sweep, every page students can see has its links read — wikilinks
+  and embeds, and Markdown-style links in either shape
+  (`followingLinks.markdownStyleLinks`), all through the code and comment
+  mask. A link is resolved by its PATH first (`[[Concepts/Evidence]]`), then
+  by its name; when a name belongs to several pages it is listed only if
+  EVERY one of them is hidden, because which of two same-named pages Quartz
+  picks is not this check's to guess. Embeds count; pictures and files do
+  not; a link to a page that does not exist does not (check_section does not
+  list one either); and How I Teach, removed rather than hidden, resolves to
+  nothing. Each (from, to) pair once, named by its place in the course folder.
+- **One finding per section build**, naming at most ten pairs and counting the
+  rest, never one per link: both apps key a finding on name, course and
+  section, so per-link findings would collide (#246).
+- **Not repairable.** The two fixes are opposite choices — publish the page
+  the link leads to, or take the link off the page it is on — and only the
+  teacher knows which is meant. Scheduled deploys still publish
+  (`scheduledDeployPublishesAnyway`).
+- **The trail line** is the family's existing "found a problem with this
+  course's folders (linksIntoHiddenPages)". "Folders" is a stretch for links,
+  exactly as it already is for `pageSettingsUnreadable`; rewording the family
+  is its own case and was not done here. It never carries a page name.
+- **Measured (2026-09-26):** 0 links from a visible page into a hidden one
+  across all 39 payloads as installed, so a new course is not nagged. An
+  emulation of #96's rule (not its code) flipping SNC1W's second class
+  visible lists `Unit 1, Day 2 → What Counts as Evidence`, the dead link #333
+  describes. And a real second finding the emulation surfaced: the section
+  front page EMBEDS the newest class (`![[Unit 5, Day 17]]`), which only the
+  assistant's publish and unpublish repoint, so after classes are hidden by
+  hand the front page embeds a hidden class and the check lists it. Correct,
+  and wanted.
+- **#96's interplay.** Get Ready must leave no visible→hidden link — the front
+  page's embed included — or this check fires the moment a teacher uses it.
+- **The build's reading is the site's.** The assistant's check_section reads
+  the teacher's folder by title and the build reads merged content by stem,
+  so the two may differ on a page whose title is not its file name; the
+  shared cases use title == file name and hold for both
+  (`SiteHealthContractTests.testTheLinksIntoHiddenPagesCasesHoldForTheSectionGraph`).
+  Two pages sharing a name, one hidden, is deliberately not a shared case: the
+  mac's graph holds one page per title.
+
+Rejected: the app's publish taking a class's pages with it (the issue's other
+option — a flag flipped in Obsidian bypasses every app path); one finding per
+link; a repair button; limiting the check to links FROM class pages
+(check_section already lists every visible page's dead links, and two
+definitions of "a dead link" is what #313 ended).
 
 ### Where they run, and where they honestly do not
 
@@ -1829,11 +1923,48 @@ the course folder, minus
 - `.DS_Store` / `Thumbs.db`,
 - `course_config.backup.json` and any `*.tmp`.
 
-The How I Teach page (#209) COUNTS, although it never reaches a site: editing it
-marks the section "— Edited" and makes the next Publish rebuild for nothing.
-Deliberately not excluded yet — this list is a wire format held byte for byte in
-three implementations, and changing one first would give the others a permanent
-false "Edited"; follow-up [#330](https://github.com/russellgordon/plantoir/issues/330).
+**The How I Teach page (#209) is left out — under the fingerprint's RULE 2**
+(since [#330](https://github.com/russellgordon/plantoir/issues/330),
+2026-09-26). It never reaches a site, so editing it must not mark the section
+"— Edited" or make the next Publish rebuild for nothing. But this list is a
+wire format held byte for byte by three implementations that cannot change in
+the same hour, so the change is VERSIONED rather than made
+(`contracts/app-rules.json` → `publishedFreshness.fingerprintRules`):
+
+- **Rule 1** is everything above. **Rule 2** is rule 1 less `How I Teach.md` at
+  a reserved place — the top of the course, or the top of `section<N>/`
+  (`HowITeachPage.isAtAReservedPlace` / `how_i_teach.is_reserved_place`, the
+  same NFC-then-ASCII-only fold as `howITeachPage.matching`). Inside any other
+  folder it is an ordinary page and counts; a look-alike counts.
+  `filesCountedUnderRule2.cases` pins it.
+- **The stamp says which rule it was taken under**: `fingerprintRule`, absent in
+  every stamp written before #330 (and by Windows until it moves), which means
+  1. The reader compares under the stamp's own rule; a rule it does not know
+  counts as EDITED, as an unreadable stamp does. `stampRuleCases.cases` pins it.
+- **Who computes what.** The mac: Swift, in-process, interactive and launchd
+  alike — it never runs `section_fingerprint.py` — and it writes rule 2.
+  Windows interactive: C#. Windows scheduled: `section_fingerprint.py`, run by
+  the wrapper (`TaskScheduling.cs`), whose value the C# app records and later
+  compares. So the coupling that must never break is C# ↔ Python, both on
+  Windows — which is why **`section_fingerprint.py` takes `--rule 2` and KEEPS
+  rule 1 as its default**: a rule-2 value compared by the C# app under rule 1
+  would be a false "Edited" for every scheduled Windows teacher whose course
+  has the page. Windows flips the C#, the wrapper and the stamp together, in
+  one MUST issue. Do not "fix" the default on its own.
+- **The property that keeps it safe:** for a course with no How I Teach page at
+  a reserved place, rules 1 and 2 hash identically. So the upgrade costs
+  nothing there; a course WITH the page shows "— Edited" once, on the first
+  edit of that page after the upgrade (its stamp is still rule 1), and the
+  next publish writes rule 2.
+- **The accepted window.** A course folder shared by a Mac and a PC: the mac
+  reads the PC's stamps correctly as rule 1; the PC reads the mac's rule-2
+  stamps as if rule 1, a false "Edited" only for a course with the page, until
+  the PC publishes. Windows alone is unaffected.
+
+Rejected: changing all three unversioned (whichever lands second gives every
+teacher with the page a false "Edited" until their next publish, and a shared
+folder an argument that never settles); leaving the page out by its content,
+frontmatter say (the fingerprint deliberately reads no page).
 
 `course_config.json` itself COUNTS — fonts, the sidebar and the coverage map
 are inputs to the built site as surely as a page is. `Media/` counts, because
