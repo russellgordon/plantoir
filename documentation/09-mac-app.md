@@ -25,7 +25,7 @@ interfaces automatically.
 | App action | Toolchain mechanism used |
 |---|---|
 | Save | Writes `course_config.json`; [`build_site.py`](05-build-pipeline.md) applies it on the next build |
-| Revert | Puts the form's values back to the last-saved file contents |
+| Revert | Puts the form's values back to the last-saved file contents. When that takes back unsaved exclusion changes, writes `exclusions reverted` with how many — the click lines stay (`excludedItems.recordedOnClick`, #152) |
 | Preview | Runs [`preview.sh`](03-launcher-scripts.md) `--port N` (serve mode) and embeds the announced address in a web view once it responds — up to four sections per folder at once |
 | Deploy | Runs [`deploy.sh`](07-deployment.md) with output streamed into the app (prompts answered inline); if a preview is running or building, stops it and awaits container cleanup first; the finished live-site link wears the section's custom domain when one is set |
 | New Course | Writes the collected answers as `course_config.json`, then runs the real `./setup.sh`, accepting each prompt's default — the wizard re-reads the file as its saved answers, so scaffolding/backups/Quartz patches are all the wizard's own work |
@@ -1879,6 +1879,45 @@ curriculum folder is what let the retired sentence sit unguarded, and the
 banned-word sweep could not stand in for it — a banned word catches only that
 word.
 
+### Curriculum folders: several maps, protection and the offer (#128)
+
+A course has one coverage map per declared curriculum folder that holds
+expectation pages (the rule and its reasons: `05-build-pipeline.md` → "The
+curriculum coverage maps"). Three places in the app follow it, all through
+`CurriculumFolderRule` in `SpecialNames.swift`, which is the build's rule over
+the course's SHARED folders:
+
+- **Protection** (`CurriculumFolderProtection.decide`, asked by Course Settings
+  and the wizard alike): only the LAST folder with a map is refused while the
+  map is on; the others ask first with
+  `SpecialNames.removeCurriculumFolderWithItsMapMessage`, which deliberately
+  does not promise that another map stays. The folders with a map are read
+  from the disk (`CurriculumFolderRule.foldersWithPages`, recursive, the same
+  code rule as the build); the wizard, with nothing on disk yet, counts the
+  payload's folder when its pages are being installed. Course Settings asks
+  once per row, so the disk answer is kept for two seconds per course — long
+  enough to cover one drawing of the lists, short enough that a page added in
+  Obsidian shows up.
+- **"Folders Plantoir uses"** names every curriculum folder with a map and
+  every map page, `whyForSeveral` when there is more than one.
+- **"Curriculum folders"** — checkboxes under the shared folders, in both
+  Course Settings and the wizard, shown only when there are two or more
+  folders to choose between (`CurriculumFoldersOffer`). Ticked are the
+  folders with a map — even on a course that declared nothing, so the first
+  tick writes them FIRST and never drops the map the build's fallback found —
+  then every declared folder, so a folder ticked before its first page is
+  written stays ticked (the review's finding 2); the last ticked folder cannot
+  be unticked. Whatever writes the list also writes its first folder in the
+  legacy `curriculum_folder`, for an older Plantoir on another Mac. The wizard writes
+  `curriculum_folders` only when the teacher touched the list, so every
+  existing wizard path writes the same file as before
+  (`WizardStructureTests`' golden).
+
+The build's `PLANTOIR_MAPS:` line is read by `CoverageMapsBuilt` (console and
+scheduled log) into `curriculum maps built` on the trail, and since this piece
+`BuildMarkerLine` keeps ANY `PLANTOIR_…:` line out of the console, so a marker
+the app has no reader for yet never reaches a teacher as raw JSON.
+
 ## The wizard's Starting Content section, and what governs what
 
 Five toggles can appear there, and their ORDER is their dependency, read
@@ -2206,6 +2245,34 @@ eleven hides and took A's "All Classes" away. Reverting to the file is what
 unreadable file falls back to the old behaviour. Must-fail:
 `TwoWindowSettingsTests.testRevertShowsTheFileAndTheNextSaveDoesNotPutTheOldListBack`.
 
+**A Revert that takes back an exclusion says so** (issue
+[#152](https://github.com/russellgordon/plantoir/issues/152), from #85's third
+item). `item excluded` and `item re-included` are written on the CLICK, saved
+or not, so a folder removed and then Reverted used to leave a trail saying it
+had been excluded and nothing more. The Revert button now goes through
+`CourseSettingsView.revertToFile()`, which counts the names whose exclusion the
+Revert took back (both scopes, either direction), measured against what this
+copy last read or wrote (`savedExcludedItems`), never the file — another
+window's saved exclusion is not this Revert's (review M1,
+`testARevertCountsOnlyThisWindowsUnsavedExclusions`) and writes ONE `exclusions
+reverted` line with the count — never the names, which the click lines beside it
+already carry — and nothing when it took back none.
+
+**Why on the click, and not at the write: Russell's decision of 2026-09-06**
+(`overnight/issues/09-item-excluded-trail-on-click.md`). The trail exists so a
+problem can be looked into next week without asking the teacher to reproduce
+it, so it must hold the ATTEMPT: a teacher who removes a folder and crashes
+before saving must still leave a trace, and the revert line makes the trail
+self-correcting — it shows a change of mind, which is worth knowing. REJECTED,
+with his reasons: recording at the write (a crash before Save leaves nothing),
+and leaving the quirk documented (a line saying something happened when it did
+not is what rule 5 forbids). #152 first built the write-time version, from a
+ruling made without knowing his decision; it was withdrawn the same day. One
+consequence worth knowing: a removal left unsaved and then saved by another
+writer — Add Section from the sidebar — has its line already, from the click.
+Pinned by `excludedItems.recordedOnClick` (9 cases, played through this page by
+`ExcludedItemsContractTests`).
+
 **When both windows changed the sidebar list, the last Save wins — and says
 so** (the review's M2; ruled by the director for Russell, 2026-09-24). The
 merge is per key, so two windows that both changed `hidden` cannot both win;
@@ -2228,6 +2295,18 @@ two lists.
   replaced a change made elsewhere.
 - *A file watcher per window*: a new moving part, for what reload-after-Save and
   reload-on-open already cover.
+
+**`followWrite` reaches WINDOW models only — the assistant reads at the call
+instead** (#322). The assistant's window and the `--mcp-stdio` server each own
+a `WorkspaceModel` that no window shows, and a Save never reached either: they
+held the settings as they were when they started, until a folder deploy was
+refused as "never deployed" and an outside assistant deployed to a
+destination the course had left. They now rediscover the courses on every
+tool call (`WorkspaceModel.readCoursesAsSavedNow()`), which never touches a
+window's model. Two mechanisms on purpose: an in-process follow cannot reach
+another process, and a per-call read must never replace a window's unsaved
+edits. The whole story is docs 10 → "Settings are read at the call, not when
+the window opened (#322)".
 
 **What a Save tells you** (`SettingsSaveNotice`). A preview and a publish read
 the settings once, when their build begins — measured: 20 s after a Save the
@@ -2308,6 +2387,21 @@ unsaved settings` and `preview again after settings saved`.
 `PreviewLeases.active` and `CourseActivity.activePublishes`; no cell of the
 sidebar table asks the course anything while drawn (the #266 rule above).
 
+
+**A Save that affects a scheduled deploy says so** (#323). Since #323 a
+scheduled run reads the course's settings when it fires, so a Save can move or
+break a deploy already set. After a Save, for each section with a deploy set to
+happen on its own in THIS working folder and still to come,
+`SettingsSaveNotice.scheduledDeploysAtSave` decides one sentence:
+`SpecialNames.settingsSaveScheduledDeployCannotGoAheadAsSetNow` when it could
+not go ahead as the course is set now (changed or not), else
+`settingsSaveScheduledDeployGoesWhereTheCourseDeploysNow` when this Save changed
+where the course deploys (the file BEFORE the Save against what it wrote).
+They come before the "saved while publishing" early return, so a Save during a
+publish still says them; nothing is refused or undone. The trail's `settings
+saved` line carries the same facts from `SettingsSaveNotice.scheduledDeploys`.
+Contract: `savingSettings.scheduledDeploys`; the whole story is docs 07, "Where
+it deploys is read when it runs (#323)".
 ## Two programs, one course: the build, preview and publish leases (#156)
 
 Written 2026-09-25 for [issue #156](https://github.com/russellgordon/plantoir/issues/156).
@@ -2626,9 +2720,13 @@ Folder rows in Course Settings carry a pencil. It renames the folder **on
 disk** — in every section that has one — rewrites the qualified links that name
 it, and carries across every `course_config.json` key that mentioned it
 (`shared_folders`/`per_section_folders`, `graded_folders`, `curriculum_folder`,
-`class_folder`, `hidden`, `expandable`, `excluded_items`). Renaming the class
-folder or the curriculum folder also WRITES its key, even on a course that
-never had one — a rename is the one moment Plantoir witnesses the change, and
+`curriculum_folders`, `class_folder`, `hidden`, `expandable`, `excluded_items`).
+Renaming the class folder or ANY curriculum folder also WRITES its key, even on
+a course that never had one — `curriculum_folders`, the declared list (or the
+folders the course resolves to, read from the disk BEFORE the move) with the
+new name in the old one's place, so the primary map keeps its title (#128); the
+legacy `curriculum_folder` is written naming the list's first folder, for an
+older Plantoir that reads only that key — a rename is the one moment Plantoir witnesses the change, and
 without it the guess that finds those folders stops finding them with nobody
 told.
 
@@ -6063,7 +6161,8 @@ Swift decides this from whether the tool has a `plan_` twin, so the model is
 never asked to judge whether something is risky. Four writes have no plan —
 rebuilding the preview, undo, cancelling a scheduled deploy, and deploying,
 which waits on its own separate approval instead, whether or not plan mode is
-on. A Mac running the smaller assistant cannot
+on (a fifth, backing up the course, changes no page; and a model that names a
+tool it was not offered is refused rather than obeyed, #327 — doc 10). A Mac running the smaller assistant cannot
 turn plan mode off; on a 16 GB machine the app offers to stop asking after a
 run of plans the teacher has accepted unchanged. Behind it, every change is
 backed up once per conversation and can be undone.

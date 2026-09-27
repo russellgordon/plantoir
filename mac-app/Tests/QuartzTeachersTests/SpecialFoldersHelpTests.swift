@@ -46,6 +46,16 @@ final class SpecialFoldersHelpTests: XCTestCase {
         if let curriculum = figure["curriculumFolder"] as? String {
             configuration["curriculum_folder"] = curriculum
         }
+        if let curriculumFolders = figure["curriculumFolders"] as? [String] {
+            configuration["curriculum_folders"] = curriculumFolders
+        }
+        // The folders that hold an expectation page (#128), made on disk and
+        // nested, because the sheet reads the disk the way the build does.
+        for folder in figure["withPages"] as? [String] ?? [] {
+            let unit: URL = courseURL.appendingPathComponent(folder).appendingPathComponent("Unit 1")
+            try FileManager.default.createDirectory(at: unit, withIntermediateDirectories: true)
+            try "x".write(to: unit.appendingPathComponent("A1.1.md"), atomically: true, encoding: .utf8)
+        }
 
         let configURL: URL = courseURL.appendingPathComponent("course_config.json")
         try JSONSerialization.data(withJSONObject: configuration, options: [.prettyPrinted])
@@ -162,6 +172,7 @@ final class SpecialFoldersHelpTests: XCTestCase {
         // — which is the shape of the failure this whole file exists to catch.
         var sawResolvedFolder: Bool = false
         var sawPlaceholder: Bool = false
+        var sawSeveralMaps: Bool = false
 
         for figure in cases {
             let name: String = try XCTUnwrap(figure["name"] as? String)
@@ -184,7 +195,14 @@ final class SpecialFoldersHelpTests: XCTestCase {
                 let key: String = try XCTUnwrap(row["key"] as? String)
                 let place: String = "case “\(name)”, row “\(key)”"
                 XCTAssertEqual(entries[index].what, row["what"] as? String, place)
-                XCTAssertEqual(entries[index].why, row["why"] as? String, place)
+                // The coverage row names every map page (#128): with several,
+                // its explanation is the plural one.
+                if key == "coverage" && entries[index].name.contains(" and ") {
+                    XCTAssertEqual(entries[index].why, row["whyForSeveral"] as? String, place)
+                    sawSeveralMaps = true
+                } else {
+                    XCTAssertEqual(entries[index].why, row["why"] as? String, place)
+                }
                 // A fixed row's name is the contract's; a course-named row's is
                 // not, and asserting it here would only restate the cases above.
                 if row["namedFrom"] as? String == "fixed" {
@@ -200,6 +218,7 @@ final class SpecialFoldersHelpTests: XCTestCase {
             }
         }
 
+        XCTAssertTrue(sawSeveralMaps, "no case gives a course two coverage maps, so the plural row went unchecked")
         XCTAssertTrue(
             sawResolvedFolder,
             "no case names a real curriculum folder, so the explanation shown beside "

@@ -739,6 +739,101 @@ final class AssistWindowBindingTests: XCTestCase {
         case noSentenceCalled(String)
     }
 
+    // MARK: - A tool the model was not offered (#327)
+
+    /// A model that names a tool from outside the list it was shown is
+    /// refused, and nothing runs — for a write with a twin, a write whose
+    /// twin was once named wrong, and a plan twin named directly.
+    ///
+    /// **A must-fail row:** before #327 `re_date_classes` was planned and
+    /// `add_curriculum_mentions` RAN, changing the page with no plan at all,
+    /// because the runner can run all thirty-two tools and nothing in the
+    /// agent asked whether this model had been offered the one it named.
+    func testAToolTheModelWasNotOfferedIsRefusedAndNothingRuns() async throws {
+        let cases: [(tool: String, arguments: String)] = [
+            ("re_date_classes", #"{"course": "ICS3U", "section": 1}"#),
+            ("add_curriculum_mentions",
+             #"{"course": "ICS3U", "section": 1, "page": "Loops", "codes": "A1.1"}"#),
+            ("plan_publish_pages", #"{"course": "ICS3U", "section": 1, "pages": "Unit 1, Day 2"}"#),
+        ]
+        for scripted in cases {
+            let made: AssistFixture.Made = try AssistFixture.makeRichSection(for: self)
+            defer { try? FileManager.default.removeItem(at: made.root) }
+            var offered: [String] = []
+            for definition in made.runner.definitions {
+                offered.append(definition.name)
+            }
+            XCTAssertFalse(offered.contains(scripted.tool), "\(scripted.tool) is offered, so nothing was tested.")
+
+            let folderURL: URL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("not-offered-trail-\(UUID().uuidString)", isDirectory: true)
+            try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
+            let previousStore: ProblemReportStore = ActivityTrail.store
+            ActivityTrail.store = ProblemReportStore(folderURL: folderURL)
+            defer {
+                ActivityTrail.store = previousStore
+                try? FileManager.default.removeItem(at: folderURL)
+            }
+
+            let engine: StubEngine = try StubEngine()
+            defer { engine.stop() }
+            engine.serve([
+                Canned.finished(tool: scripted.tool, arguments: scripted.arguments),
+                Canned.text("Done."),
+            ])
+            let loopsBefore: String = try String(
+                contentsOf: made.course.directoryURL.appendingPathComponent("Concepts/Loops.md"),
+                encoding: .utf8
+            )
+
+            // Plan mode OFF: the harder case, where nothing else stands
+            // between the model's choice and the write.
+            let agent: AssistAgent = AssistFixture.makeAgent(
+                tools: made.runner, engineAt: engine.baseURL, asksBeforeChanging: false
+            )
+            let sentence: String = "Sort out whatever needs sorting in this section for me"
+            XCTAssertNil(AssistCardCommand.matching(sentence), "The sentence is answered in code, so nothing was tested.")
+            await agent.say(sentence)
+
+            XCTAssertEqual(engine.requestCount, 1, "\(scripted.tool): the refused turn went back for another lap.")
+            XCTAssertEqual(agent.entries.last?.text, AssistWording.didNotFollowThat, scripted.tool)
+            XCTAssertEqual(toolResults(in: agent), [], "\(scripted.tool) ran.")
+            XCTAssertNil(agent.pendingApproval, "\(scripted.tool) was put in front of a button.")
+            XCTAssertEqual(agent.activity, .idle)
+            XCTAssertEqual(agent.messages.count, 1, "The refused turn was left in the conversation.")
+            let loopsAfter: String = try String(
+                contentsOf: made.course.directoryURL.appendingPathComponent("Concepts/Loops.md"),
+                encoding: .utf8
+            )
+            XCTAssertEqual(loopsAfter, loopsBefore, "\(scripted.tool) changed a page.")
+
+            let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+            XCTAssertTrue(
+                trail.contains(AssistAgent.namedAToolItWasNotOfferedLine(tool: scripted.tool)),
+                "Nothing on the trail says the model reached past its list:\n\(trail)"
+            )
+            XCTAssertFalse(trail.contains("Unit 1, Day 2"), trail)
+        }
+    }
+
+    /// A name that exists NOWHERE is not this refusal: it is still answered
+    /// "There is no tool by that name." to the model, which then gets another
+    /// lap — documented behaviour #327 deliberately left as it was.
+    func testANameThatExistsNowhereStillGoesBackToTheModel() async throws {
+        let made: AssistFixture.Made = try AssistFixture.makeRichSection(for: self)
+        defer { try? FileManager.default.removeItem(at: made.root) }
+        let engine: StubEngine = try StubEngine()
+        defer { engine.stop() }
+        engine.serve([
+            Canned.finished(tool: "tidy_the_section", arguments: #"{"course": "ICS3U", "section": 1}"#),
+            Canned.text("I can't do that."),
+        ])
+        let agent: AssistAgent = AssistFixture.makeAgent(tools: made.runner, engineAt: engine.baseURL)
+        await agent.say("Sort out whatever needs sorting in this section for me")
+        XCTAssertEqual(engine.requestCount, 2, "An unknown name was refused instead of being answered.")
+        XCTAssertNotEqual(agent.entries.last?.text, AssistWording.didNotFollowThat)
+    }
+
     // MARK: - Helpers
 
     private func transcript(of agent: AssistAgent) -> String {
