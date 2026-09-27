@@ -229,12 +229,25 @@ class MarketingScreenshotCase: XCTestCase {
         return bestNumber
     }
 
+    /// A course's row in the sidebar, by the identifier the row carries
+    /// (`sidebar-<CODE>`) or, failing that, by its label. Matching by the
+    /// code alone (`outlines.staticTexts[code]`) stopped finding the row in
+    /// the marketing folder on 2026-09-27 although the tree showed it, label
+    /// and all; the identifier is what the sidebar sets on purpose. The
+    /// first match is the live course, above any reference copy carrying the
+    /// same code.
+    func courseRow(_ code: String, in application: XCUIApplication) -> XCUIElement {
+        return application.outlines.staticTexts.matching(
+            NSPredicate(format: "identifier == %@ OR label == %@", "sidebar-\(code)", code)
+        ).firstMatch
+    }
+
     /// Opens a course's section in the sidebar and returns the main window.
     @discardableResult
     func openSection(_ sectionNumber: Int, ofCourse code: String, in application: XCUIApplication) -> XCUIElement {
-        let courseRow: XCUIElement = application.outlines.staticTexts[code].firstMatch
-        XCTAssertTrue(courseRow.waitForExistence(timeout: 30), "\(code) should be in the sidebar")
-        courseRow.click()
+        let row: XCUIElement = courseRow(code, in: application)
+        XCTAssertTrue(row.waitForExistence(timeout: 30), "\(code) should be in the sidebar")
+        row.click()
         application.typeKey(.rightArrow, modifierFlags: [])
 
         let sectionRow: XCUIElement = application.descendants(matching: .any)
@@ -255,9 +268,9 @@ class MarketingScreenshotCase: XCTestCase {
     func openCourse(_ code: String, in application: XCUIApplication) -> XCUIElement {
         // firstMatch: a reference copy of the course carries the same code
         // further down the sidebar, and the live course is always above it.
-        let courseRow: XCUIElement = application.outlines.staticTexts[code].firstMatch
-        XCTAssertTrue(courseRow.waitForExistence(timeout: 30), "\(code) should be in the sidebar")
-        courseRow.click()
+        let row: XCUIElement = courseRow(code, in: application)
+        XCTAssertTrue(row.waitForExistence(timeout: 30), "\(code) should be in the sidebar")
+        row.click()
         XCTAssertTrue(
             application.textFields["courseNameField"].waitForExistence(timeout: 20),
             "The settings form for \(code) should appear"
@@ -366,7 +379,7 @@ final class MarketingScreenshots: MarketingScreenshotCase {
     func test2NewCourse() throws {
         let application: XCUIApplication = launchApp(workspacePath: try demoWorkspacePath())
         let window: XCUIElement = application.windows.firstMatch
-        XCTAssertTrue(application.outlines.staticTexts["ENG2D"].waitForExistence(timeout: 30))
+        XCTAssertTrue(courseRow("ENG2D", in: application).waitForExistence(timeout: 30))
 
         application.buttons["addCourseButton"].click()
         let codeField: XCUIElement = application.textFields["wizardCourseCodeField"]
@@ -650,7 +663,7 @@ final class DemoWorkspaceProvisioning: MarketingScreenshotCase {
         ]
 
         for course in wanted {
-            if application.outlines.staticTexts[course.code].waitForExistence(timeout: 5) {
+            if courseRow(course.code, in: application).waitForExistence(timeout: 5) {
                 continue
             }
             try createCourse(code: course.code, sections: course.sections, in: application)
@@ -658,7 +671,7 @@ final class DemoWorkspaceProvisioning: MarketingScreenshotCase {
 
         for course in wanted {
             XCTAssertTrue(
-                application.outlines.staticTexts[course.code].waitForExistence(timeout: 60),
+                courseRow(course.code, in: application).waitForExistence(timeout: 60),
                 "\(course.code) should have been created"
             )
         }
@@ -721,7 +734,7 @@ extension MarketingScreenshotCase {
         // Waiting for the row first is a wait that never ends.
         closeButton.click()
 
-        let created: XCUIElement = application.outlines.staticTexts[code]
+        let created: XCUIElement = courseRow(code, in: application)
         XCTAssertTrue(created.waitForExistence(timeout: 180), "\(code) should appear in the sidebar once the panel closes")
         Thread.sleep(forTimeInterval: 2.0)
     }
@@ -766,7 +779,7 @@ final class MarketingScenes: MarketingScreenshotCase {
         let application: XCUIApplication = launchApp(workspacePath: try demoWorkspacePath())
         unfoldReferenceYear(in: application)
         let window: XCUIElement = openCourse(MarketingScenes.course, in: application)
-        XCTAssertTrue(application.outlines.staticTexts[MarketingScenes.secondCourse].exists,
+        XCTAssertTrue(courseRow(MarketingScenes.secondCourse, in: application).exists,
                       "ICS4U should be in the sidebar beside ICS3U")
         settle(2.0)
         save(window, as: "courses")
@@ -776,7 +789,7 @@ final class MarketingScenes: MarketingScreenshotCase {
     func testNewCourse() throws {
         let application: XCUIApplication = launchApp(workspacePath: try demoWorkspacePath())
         let window: XCUIElement = application.windows.firstMatch
-        XCTAssertTrue(application.outlines.staticTexts[MarketingScenes.course].waitForExistence(timeout: 30))
+        XCTAssertTrue(courseRow(MarketingScenes.course, in: application).waitForExistence(timeout: 30))
         openNewCoursePanel(typing: "TEJ3M", sections: "1, 2", in: application)
         settle(1.5)
         save(window, as: "new-course")
@@ -787,7 +800,7 @@ final class MarketingScenes: MarketingScreenshotCase {
     func testClubWizard() throws {
         let application: XCUIApplication = launchApp(workspacePath: try demoWorkspacePath())
         let window: XCUIElement = application.windows.firstMatch
-        XCTAssertTrue(application.outlines.staticTexts[MarketingScenes.course].waitForExistence(timeout: 30))
+        XCTAssertTrue(courseRow(MarketingScenes.course, in: application).waitForExistence(timeout: 30))
         openNewCoursePanel(typing: "CODING", sections: "1", in: application)
 
         let clubToggle: XCUIElement = application.descendants(matching: .any)
@@ -1058,13 +1071,13 @@ final class MarketingFolderProvisioning: MarketingScreenshotCase {
         }
         let wanted: [(code: String, sections: String)] = [("ICS3U", "1, 2"), ("ICS4U", "1")]
         for course in wanted {
-            if application.outlines.staticTexts[course.code].waitForExistence(timeout: 5) {
+            if courseRow(course.code, in: application).waitForExistence(timeout: 5) {
                 continue
             }
             try createCourse(code: course.code, sections: course.sections, in: application)
         }
         for course in wanted {
-            XCTAssertTrue(application.outlines.staticTexts[course.code].waitForExistence(timeout: 60),
+            XCTAssertTrue(courseRow(course.code, in: application).waitForExistence(timeout: 60),
                           "\(course.code) should have been created")
         }
     }
@@ -1072,14 +1085,14 @@ final class MarketingFolderProvisioning: MarketingScreenshotCase {
     /// Keep a Copy for Reference… on ICS3U, filed under 2025–26.
     func testKeepACopyForReference() throws {
         let application: XCUIApplication = launchApp(workspacePath: try demoWorkspacePath())
-        let courseRow: XCUIElement = application.outlines.staticTexts["ICS3U"].firstMatch
-        XCTAssertTrue(courseRow.waitForExistence(timeout: 30))
+        let row: XCUIElement = courseRow("ICS3U", in: application)
+        XCTAssertTrue(row.waitForExistence(timeout: 30))
         let alreadyKept: XCUIElement = application.descendants(matching: .any)
             .matching(NSPredicate(format: "identifier BEGINSWITH %@", "referenceYear-")).firstMatch
         if alreadyKept.waitForExistence(timeout: 5) {
             return
         }
-        courseRow.rightClick()
+        row.rightClick()
         let item: XCUIElement = application.descendants(matching: .any)
             .matching(identifier: "keepACopy-ICS3U").firstMatch
         XCTAssertTrue(item.waitForExistence(timeout: 15), "The course menu should offer Keep a Copy for Reference…")
