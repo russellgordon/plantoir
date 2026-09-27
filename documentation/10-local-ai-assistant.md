@@ -3577,12 +3577,12 @@ backup FILE, which exists only after the change. So the pair is deliberate:
 and the duplicate), `otherClassesMoved` on every REPLY (the duplicate and
 make-room). What #185 was really about is that there be no inline copy, and
 the last one is gone: make-room's reply typed the caveat out in full and then
-"Look the section over in Plantoir before you publish."; it is now
+a tail telling the teacher to look the section over before publishing; it is now
 `otherClassesMoved + " " + lookTheSectionOverBeforePublishing`, byte-identical
 to what it said before (measured against the literal on the unchanged branch
 first).
 
-**Also rejected:** dropping make-room's "Look the section over…" tail so the
+**Also rejected:** dropping make-room's tail (`lookTheSectionOverBeforePublishing`) so the
 two replies match (it changes a shipped sentence Claude Code reads over MCP
 and buys a teacher nothing — naming it costs one key); one combined key for
 caveat plus tail (a second copy of the caveat's text in the contract, which is
