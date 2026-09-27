@@ -80,6 +80,13 @@ enum StartOfYearPreparation {
             courseCode: course.code, sectionNumber: sectionNumber, inWorkingFolder: workspaceURL
         )
 
+        // 0. Not while this app is deploying the course: the sheet may have
+        // been opened before the deploy began (the review's L3).
+        if CourseActivity.coursePublishIsRunning(folderPath: folderPath, courseCode: course.code) {
+            noteNotDone("deployUnderWay", course: course, section: sectionNumber)
+            return .refused(StartOfYearWording.deployUnderWay(course: course.displayCode))
+        }
+
         // 1. Re-plan from disk.
         let planned: Result<StartOfYearPlan, StartOfYearProblem> = StartOfYearPlanner.plan(
             forSection: sectionNumber, in: course, workspaceURL: workspaceURL,

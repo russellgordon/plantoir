@@ -5012,7 +5012,11 @@ For one section, and it only ever HIDES:
   set that no page students will still see links to goes. A folder's own page
   listing it is a listing, not a use; a self-link does not count; the
   section's front page (its own `index.md`) does count, since students land on
-  it and it embeds pages like Help Sessions.
+  it and it embeds pages like Help Sessions. The front page is repointed at
+  the newest visible class AFTER the stray-key pass below, or it would still
+  embed a class that pass has just hidden (implementation review H2,
+  measured); its class embed is not listed among links left pointing at
+  hidden pages, since the write repoints it.
 - Per section, through the existing writer (`AssistPublishPlanner.planHiding`,
   which builds from PAGES rather than titles — two files named "Notes" in two
   folders are decided as themselves). A class carrying a stray
@@ -5074,14 +5078,17 @@ plan code, or every attempt is refused.
   lives, with the usual skip rule.
 - **In the app**, `StartOfYearUndoRegistry`: one per section, shared by every
   window on the folder, offered BESIDE the menu item and always as a sheet that
-  lists what would go back. It **ends** at the section's next deploy (from any
-  window of this app, or the scheduled deploy set at the time reaching its
-  moment), at the next visibility change in the section from anywhere
-  (Obsidian, the assistant, an outside assistant — found by comparing every
-  page's visibility with how the change left it), and **when Plantoir quits**
-  — the sheet says so. After that, the backup is the way back. Not seen: a
-  deploy run by an outside assistant in another process; the skip rule and the
-  sheet's listing still hold.
+  lists what would go back. It **ends** at the section's next deploy — from
+  any window of this app, or a scheduled deploy: the one set at the time
+  reaching its moment, or any whose log shows it ran since the change (the
+  schedule is re-read when the undo sheet opens, so one set AFTER Go counts) —
+  at the next change to the section's pages from anywhere (Obsidian, the
+  assistant, an outside assistant — found by comparing every page's
+  visibility with how the change left it), and **when Plantoir quits** — the
+  sheet says so. Go and Put Them Back both refuse while this app is deploying
+  the course. After that, the backup is the way back. **Not seen:** a deploy
+  run by an outside assistant in another process, and `deploy.sh` run from a
+  terminal; the skip rule and the sheet's listing still hold then.
 - **The assistant window's** "undo that" (`AssistChangeHistory`) never holds
   this change and cannot take it back.
 

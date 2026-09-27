@@ -115,6 +115,10 @@ final class StartOfYearSheetModel {
                 stage = .problem(StartOfYearWording.undoHasEnded)
                 return
             }
+            registry.refreshSchedule(
+                folderPath: workspaceURL.path, courseCode: course.code, sectionNumber: sectionNumber,
+                workingFolder: workspaceURL
+            )
             if registry.whyItEnded(entry, forSection: sectionNumber, in: course, workspaceURL: workspaceURL) != nil {
                 registry.forget(folderPath: workspaceURL.path, courseCode: course.code, sectionNumber: sectionNumber)
                 stage = .problem(
@@ -156,6 +160,18 @@ final class StartOfYearSheetModel {
     /// Press "Put Them Back".
     func undo() async {
         guard case .undoReady(let entry, _, _) = stage else {
+            return
+        }
+        // A deploy that began while this sheet was open ends the undo; the
+        // sheet still holds the entry, so ask again rather than trusting it
+        // (the review's L3).
+        if CourseActivity.coursePublishIsRunning(folderPath: workspaceURL.path, courseCode: course.code)
+            || StartOfYearUndoRegistry.shared.entry(
+                folderPath: workspaceURL.path, courseCode: course.code, sectionNumber: sectionNumber
+            ) == nil {
+            stage = .problem(
+                StartOfYearWording.undoHasEnded + " " + StartOfYearWording.backupHoldsIt(backup: entry.backupFileName)
+            )
             return
         }
         stage = .working
@@ -262,7 +278,7 @@ struct StartOfYearSheet: View {
             Text(notice)
                 .foregroundStyle(.orange)
         }
-        Text(StartOfYearWording.intro(first: first, noun: plan.noun.singular, nouns: plan.noun.plural))
+        Text(StartOfYearWording.intro(first: first, noun: plan.noun.singular))
         ForEach(plan.warnings(), id: \.self) { warning in
             Label(warning, systemImage: "exclamationmark.triangle")
                 .foregroundStyle(.orange)
@@ -280,9 +296,7 @@ struct StartOfYearSheet: View {
         }
         let pageChanges: [StartOfYearDraft] = plan.draftsThatChange(plan.pageDrafts)
         if !pageChanges.isEmpty {
-            DisclosureGroup(StartOfYearWording.pagesHeading(
-                pages: StartOfYearWording.pages(pageChanges.count), nouns: plan.noun.plural
-            )) {
+            DisclosureGroup(StartOfYearWording.pagesHeading(pages: StartOfYearWording.pages(pageChanges.count))) {
                 draftList(pageChanges, first: first, showingPath: true)
             }
         }

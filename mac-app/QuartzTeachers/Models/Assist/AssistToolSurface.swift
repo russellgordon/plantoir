@@ -954,8 +954,8 @@ extension AssistToolRunner {
             // unrunnable through a real MCP client if the schema forbids it.
             "planCode": AssistSchemaProperty(
                 kind: .string,
-                description: "The code on the last line of the plan plan_prepare_for_start_of_year gave, "
-                           + "for example \"3f9a1c07\". Without it, or if the section has changed since, "
+                description: "The code on the line that starts \"Plan code:\" in the plan "
+                           + "plan_prepare_for_start_of_year gave, for example \"3f9a1c07\". Without it, or if the section has changed since, "
                            + "nothing is changed and the current plan comes back instead."
             ),
         ],

@@ -109,6 +109,15 @@ final class StartOfYearTests: XCTestCase {
                     "\(name): “\(title)” was written to"
                 )
             }
+            if let embedded = testCase["expectFrontPageEmbeds"] as? String {
+                let front: String = try String(
+                    contentsOf: SectionIndexPointer.indexURL(forSection: 1, in: made.course), encoding: .utf8
+                )
+                XCTAssertTrue(front.contains("![[\(embedded)]]"), "\(name): the front page reads\n\(front)")
+                for (title, url) in urls where title != embedded && url.deletingLastPathComponent().lastPathComponent == "All Classes" {
+                    XCTAssertFalse(front.contains("![[\(title)]]"), "\(name): the front page still embeds \(title)")
+                }
+            }
             if testCase["runTwice"] as? Bool == true {
                 var once: [String: String] = [:]
                 for (title, url) in urls {
@@ -217,9 +226,9 @@ final class StartOfYearTests: XCTestCase {
             "menuItem": StartOfYearWording.menuItem,
             "undoMenuItem": StartOfYearWording.undoMenuItem,
             "sheetTitle": StartOfYearWording.sheetTitle(course: "{course}", section: "{section}"),
-            "intro": StartOfYearWording.intro(first: "{first}", noun: "{noun}", nouns: "{nouns}"),
+            "intro": StartOfYearWording.intro(first: "{first}", noun: "{noun}"),
             "classesHeading": StartOfYearWording.classesHeading(classes: "{classes}"),
-            "pagesHeading": StartOfYearWording.pagesHeading(pages: "{pages}", nouns: "{nouns}"),
+            "pagesHeading": StartOfYearWording.pagesHeading(pages: "{pages}"),
             "staysHeading": StartOfYearWording.staysHeading(pages: "{pages}"),
             "alreadyInDraft": StartOfYearWording.alreadyInDraft(classes: "{classes}"),
             "reasonLaterClass": StartOfYearWording.reasonLaterClass(first: "{first}"),
@@ -241,6 +250,7 @@ final class StartOfYearTests: XCTestCase {
             "done": StartOfYearWording.done(pages: "{pages}"),
             "undoAvailable": StartOfYearWording.undoAvailable(backup: "{backup}"),
             "changedSinceShown": StartOfYearWording.changedSinceShown,
+            "deployUnderWay": StartOfYearWording.deployUnderWay(course: "{course}"),
             "backupFailed": StartOfYearWording.backupFailed(course: "{course}"),
             "writeFailed": StartOfYearWording.writeFailed(backup: "{backup}"),
             "noFirstClass": StartOfYearWording.noFirstClass(course: "{course}", section: "{section}", noun: "{noun}"),
@@ -424,6 +434,41 @@ final class StartOfYearTests: XCTestCase {
         XCTAssertEqual(plan.danglingSources.first?.page.title, "Marks")
         XCTAssertEqual(plan.danglingSources.first?.hiddenTargets.count, 2)
         XCTAssertTrue(plan.describe().contains(StartOfYearWording.linksLeftLine(page: "Marks", links: "2 links")))
+    }
+
+    /// The front page's class embed is repointed by the write itself, so it
+    /// is not listed as a link left pointing at a hidden page (review L4).
+    func testTheFrontPagesClassEmbedIsNotADanglingLink() throws {
+        let made = try AssistFixture.makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+        try AssistFixture.write(page: "Unit 1, Day 1", publish: "true", date: "2026-09-08", body: "One.", in: made.course)
+        try AssistFixture.write(page: "Unit 4, Day 9", publish: "true", date: "2027-06-10", body: "Last.", in: made.course)
+        try "---\ntitle: Section 1\npublish: true\n---\n# Most Recent Class\n![[Unit 4, Day 9]]\n".write(
+            to: SectionIndexPointer.indexURL(forSection: 1, in: made.course), atomically: true, encoding: .utf8
+        )
+        let plan: StartOfYearPlan = try StartOfYearTests.plan((made.root, made.course, made.runner, made.siteWork))
+        XCTAssertEqual(plan.danglingSources.count, 0, "\(plan.describe())")
+        _ = try StartOfYearPlanner.apply(plan, in: made.course)
+        let front: String = try String(contentsOf: SectionIndexPointer.indexURL(forSection: 1, in: made.course), encoding: .utf8)
+        XCTAssertTrue(front.contains("![[Unit 1, Day 1]]"), front)
+    }
+
+    func testGoRefusesWhileTheCourseIsBeingDeployed() async throws {
+        let made = try StartOfYearTests.aSmallYear()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+        let before: String = try String(contentsOf: made.day2, encoding: .utf8)
+        let model: StartOfYearSheetModel = StartOfYearSheetModel(
+            course: made.course, sectionNumber: 1, workspaceURL: made.root, mode: .getReady
+        )
+        model.load()
+        CourseActivity.beginPublish(folderPath: made.root.path, courseCode: "ICS3U", sectionNumber: 1)
+        await model.goAhead()
+        CourseActivity.endPublish(folderPath: made.root.path, courseCode: "ICS3U", sectionNumber: 1)
+        guard case .problem(let sentence) = model.stage else {
+            return XCTFail("not refused: \(model.stage)")
+        }
+        XCTAssertEqual(sentence, StartOfYearWording.deployUnderWay(course: "ICS3U"))
+        XCTAssertEqual(try String(contentsOf: made.day2, encoding: .utf8), before)
     }
 
     func testAFlagThatCannotBeReadIsWrittenAndAPageWithNoRoomIsNamed() throws {
@@ -751,6 +796,9 @@ final class StartOfYearTests: XCTestCase {
             var body: String = "About \(title)."
             for target in links {
                 body += "\n\nSee [[\(target)]]."
+            }
+            for embedded in page["embeds"] as? [String] ?? [] {
+                body += "\n\n![[\(embedded)]]"
             }
             let flag: String = visible ? "true" : "false"
             let url: URL

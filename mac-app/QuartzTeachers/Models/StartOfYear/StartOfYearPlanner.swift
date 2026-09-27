@@ -241,7 +241,7 @@ struct StartOfYearPlan {
         let first: String = firstClass.displayTitle
         var lines: [String] = []
         lines.append("\(courseCode) Section \(sectionNumber): getting ready for the start of the year.")
-        lines.append(StartOfYearWording.intro(first: first, noun: noun.singular, nouns: noun.plural))
+        lines.append(StartOfYearWording.intro(first: first, noun: noun.singular))
 
         let warned: [String] = warnings()
         if !warned.isEmpty {
@@ -268,9 +268,7 @@ struct StartOfYearPlan {
             let pageChanges: [StartOfYearDraft] = draftsThatChange(pageDrafts)
             if !pageChanges.isEmpty {
                 lines.append("")
-                lines.append(StartOfYearWording.pagesHeading(
-                    pages: StartOfYearWording.pages(pageChanges.count), nouns: noun.plural
-                ) + ":")
+                lines.append(StartOfYearWording.pagesHeading(pages: StartOfYearWording.pages(pageChanges.count)) + ":")
                 for draft in pageChanges {
                     lines.append("• “\(draft.page.displayTitle)” (\(draft.page.relativePath)) — "
                                  + draft.reason.sentence(first: first))
@@ -589,6 +587,12 @@ enum StartOfYearPlanner {
                 guard let linked = graph.page(titled: target), linked.fileURL != page.fileURL else {
                     continue
                 }
+                // The front page's class embed is repointed by the write
+                // itself (at the newest visible class), so it is not a link
+                // left pointing at a hidden page (the review's L4).
+                if linked.isClassPage && page.fileURL.standardizedFileURL == frontPage {
+                    continue
+                }
                 if !linked.isVisibleToStudents || going.contains(linked.fileURL.path) {
                     hiddenTargets.append(linked.displayTitle)
                 }
@@ -669,6 +673,7 @@ enum StartOfYearPlanner {
             plan.publishPlan, forSection: plan.sectionNumber, in: course
         )
         var files: [AssistSavedFile] = applied.change.files
+        var fixedAny: Bool = false
         for planned in plan.publishPlan.changes {
             let url: URL = planned.page.fileURL
             guard let current = try? String(contentsOf: url, encoding: .utf8),
@@ -682,20 +687,17 @@ enum StartOfYearPlanner {
                 continue
             }
             try fixed.text.write(to: url, atomically: true, encoding: .utf8)
-            // The undo must put back the file as it was BEFORE either write,
-            // and must know the file as it is now.
-            var replaced: Bool = false
-            var index: Int = 0
-            while index < files.count {
-                if files[index].fileURL.path == url.path {
-                    files[index] = AssistSavedFile(fileURL: url, before: files[index].before, after: fixed.text)
-                    replaced = true
-                }
-                index += 1
-            }
-            if !replaced {
-                files.append(AssistSavedFile(fileURL: url, before: current, after: fixed.text))
-            }
+            fixedAny = true
+            StartOfYearPlanner.merge(
+                AssistSavedFile(fileURL: url, before: current, after: fixed.text), into: &files
+            )
+        }
+        // The front page was repointed inside `AssistPublishPlanner.apply`,
+        // BEFORE the pass above — while a class carrying the stray key still
+        // read as visible, so it may still embed that class (the review's H2,
+        // measured). Repoint again once the pass has written anything.
+        if fixedAny, let repointed = SectionIndexPointer.repointIndex(forSection: plan.sectionNumber, in: course) {
+            StartOfYearPlanner.merge(repointed, into: &files)
         }
         let change: AssistChange = AssistChange(
             whatHappened: "got Section \(plan.sectionNumber) ready for the start of the year",
@@ -709,6 +711,21 @@ enum StartOfYearPlanner {
     }
 
     // MARK: - Private helpers
+
+    /// One saved file into the change's list: a file already in it keeps its
+    /// FIRST `before` — the undo puts back the file as it was before any
+    /// write — and takes the newest `after`.
+    private static func merge(_ saved: AssistSavedFile, into files: inout [AssistSavedFile]) {
+        var index: Int = 0
+        while index < files.count {
+            if files[index].fileURL.path == saved.fileURL.path {
+                files[index] = AssistSavedFile(fileURL: saved.fileURL, before: files[index].before, after: saved.after)
+                return
+            }
+            index += 1
+        }
+        files.append(saved)
+    }
 
     private static func pageAt(_ url: URL, in graph: AssistSectionGraph) -> AssistSectionPage? {
         let wanted: String = url.standardizedFileURL.path

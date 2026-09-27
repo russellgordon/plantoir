@@ -554,7 +554,7 @@
         "why": "Added with #96. An undo that skips files is a partial undo, and 'some of my pages came back and some did not' needs the skipped count on record."
       },
       {
-        "carries": "the course and section; where it was asked from; the reason: changedSinceShown, backupFailed, writeFailed, noFirstClass, missingPlanCode, or nothingToDo. nothingToDo and missingPlanCode come only from an assistant: the app's Go button is not offered when there is nothing to do, and the app always has the plan it showed.",
+        "carries": "the course and section; where it was asked from; the reason: changedSinceShown, deployUnderWay, backupFailed, writeFailed, noFirstClass, missingPlanCode, or nothingToDo. nothingToDo and missingPlanCode come only from an assistant: the app's Go button is not offered when there is nothing to do, and the app always has the plan it showed.",
         "event": "start of the year not done",
         "line": "{course}/{section} · did not get ready for the start of the year {from …} — nothing was changed ({reason})",
         "why": "Added with #96. 'I pressed the button and nothing happened': a refused Go leaves no file changed, so without this line nothing records that it was pressed."
@@ -11593,11 +11593,11 @@
     "backup": "A FRESH backup of the course for this act, and if it cannot be made nothing is written (wording.backupFailed; over MCP AssistWording.startOfYearNeedsABackup). From the app it is the teacher's (they pressed the button); over MCP it is the assistant's. Backup file names are unchanged (course-management.json).",
     "undo": {
       "whole": "Whole-file copies, and the assistant's skip rule: a file changed since is left as it is and named.",
-      "app": "The app holds one undo per section, shared by every window on the working folder, offered BESIDE the menu item (never in its place) and always as a sheet that lists what would go back. It ends at the section's next deploy, at the next visibility change in the section from anywhere, and when Plantoir quits (wording.undoEndsWhenYouQuit). After that, the backup is the way back.",
+      "app": "The app holds one undo per section, shared by every window on the working folder, offered BESIDE the menu item (never in its place) and always as a sheet that lists what would go back. It ends at the section's next deploy (started from this app, or a scheduled deploy - the one set at the time reaching its moment, or any whose log shows a run since the change; the schedule is re-read when the undo sheet opens), at the next change to the section's pages from anywhere, and when Plantoir quits (wording.undoEndsWhenYouQuit). Go and the undo both refuse while this app is deploying the course (wording.deployUnderWay). Not seen: a deploy by an outside assistant, or deploy.sh run from a terminal. After that, the backup is the way back.",
       "mcp": "undo_last_change, for as long as that MCP session lasts.",
       "separate": "The app's undo, the assistant window's 'undo that' and an outside assistant's undo_last_change are three stores; none reaches another."
     },
-    "howToRunACase": "Lay the course out from `pages`, one section, section 1. kind: class (a class page in the section's classes folder, `publish:`), page (a course-level page, `publishForSection1:`), keyLinks (the section's Key Links page), folderIndex (the index.md of a course-level folder named by the title), curriculum (a page in a course-level folder named Curriculum), sectionFrontPage (the section's own index.md). `visible` sets the flag; `links` are written as `See [[name]].` paragraphs; `date` sets the page's date (default the same day for every page) and `undated` writes none; `strayPublishForSection` adds `publishForSection1: true` to a class page. `naming` sets the course's unit word, scheme and noun. Then plan and write through the MCP pair, passing the plan's code. Every page in expectDraft must read HIDDEN for section 1 by the built site's reading and keep its body byte for byte; every page in expectUntouched must be byte-identical. `expectWarnings` names warnings the plan must carry; `expectIntroContains` a fragment of the plan's intro; `runTwice` runs the pair again and expects wording.nothingToDo with nothing written.",
+    "howToRunACase": "Lay the course out from `pages`, one section, section 1. kind: class (a class page in the section's classes folder, `publish:`), page (a course-level page, `publishForSection1:`), keyLinks (the section's Key Links page), folderIndex (the index.md of a course-level folder named by the title), curriculum (a page in a course-level folder named Curriculum), sectionFrontPage (the section's own index.md). `visible` sets the flag; `links` are written as `See [[name]].` paragraphs; `date` sets the page's date (default the same day for every page) and `undated` writes none; `strayPublishForSection` adds `publishForSection1: true` to a class page; `embeds` writes one `![[name]]` line per entry (the front page's class embed). `naming` sets the course's unit word, scheme and noun. Then plan and write through the MCP pair, passing the plan's code. Every page in expectDraft must read HIDDEN for section 1 by the built site's reading and keep its body byte for byte; every page in expectUntouched must be byte-identical. `expectWarnings` names warnings the plan must carry; `expectIntroContains` a fragment of the plan's intro; `expectFrontPageEmbeds` names the one class the section's front page must embed afterwards; `runTwice` runs the pair again and expects wording.nothingToDo with nothing written.",
     "cases": [
       {
         "name": "the plain year",
@@ -11927,7 +11927,17 @@
             "kind": "class",
             "visible": true,
             "links": [],
-            "strayPublishForSection": true
+            "strayPublishForSection": true,
+            "date": "2026-09-09"
+          },
+          {
+            "title": "Section 1",
+            "kind": "sectionFrontPage",
+            "visible": true,
+            "links": [],
+            "embeds": [
+              "Unit 1, Day 2"
+            ]
           }
         ],
         "expectDraft": [
@@ -11936,7 +11946,8 @@
         "expectUntouched": [
           "Unit 1, Day 1"
         ],
-        "why": "A class page carrying `publishForSection1: true` beside `publish: true`: the build reads the per-section key first, so writing only `publish: false` leaves it published. 'Goes into draft' is asserted by the BUILT SITE's reading of the page, not by which line was written."
+        "why": "A class page carrying `publishForSection1: true` beside `publish: true`: the build reads the per-section key first, so writing only `publish: false` leaves it published. 'Goes into draft' is asserted by the BUILT SITE's reading of the page, not by which line was written. The front page embeds Day 2 and must end up embedding Day 1: it is repointed at the newest visible class only AFTER the stray key is dealt with, or it would still embed the class students can no longer open (implementation review H2, measured).",
+        "expectFrontPageEmbeds": "Unit 1, Day 1"
       },
       {
         "name": "the first class wins over Key Links and over what it links to, for a class",
@@ -12136,9 +12147,9 @@
       "menuItem": "Get Ready for the Start of the Year…",
       "undoMenuItem": "Undo Getting Ready for the Start of the Year…",
       "sheetTitle": "Get {course} Section {section} Ready for the Start of the Year",
-      "intro": "Every {noun} after “{first}” goes into draft, with the pages only later {nouns} use. Students keep “{first}”, the pages it links to, your Key Links and the pages they list. Nothing changes for students until you deploy.",
+      "intro": "Every {noun} after “{first}” goes into draft, with the pages students won't need until a later {noun}, and the pages nothing students can still see links to. Students keep “{first}”, the pages it links to, your Key Links and the pages they list. Nothing changes for students until you deploy.",
       "classesHeading": "Going into draft: {classes}",
-      "pagesHeading": "Also going into draft: {pages} only later {nouns} use",
+      "pagesHeading": "Also going into draft: {pages} students won't need yet",
       "staysHeading": "Staying as they are: {pages}",
       "alreadyInDraft": "Already in draft, and left as they are: {classes}.",
       "reasonLaterClass": "comes after “{first}”",
@@ -12160,6 +12171,7 @@
       "done": "Put into draft: {pages}. Nothing has changed for students yet — that happens when you deploy.",
       "undoAvailable": "You can undo this from this section's menu until the section is next deployed, until any of its pages is next published or put into draft, or until you quit Plantoir. After that, the backup “{backup}” is the way back.",
       "changedSinceShown": "The section changed after this list was made, so nothing was changed. This is the list as it stands now.",
+      "deployUnderWay": "{course} is being deployed right now, so nothing was changed. Try again once the deploy has finished.",
       "backupFailed": "Plantoir could not save a copy of {course} first, so nothing was changed.",
       "writeFailed": "Plantoir could not finish putting the pages into draft. The backup “{backup}” holds the course as it was before you pressed the button.",
       "noFirstClass": "{course} Section {section} has no numbered {noun} yet, so there is no first {noun} to keep. Nothing was changed.",
@@ -12170,7 +12182,7 @@
       "undone": "Put back as they were: {pages}.",
       "undoLeftSome": "Left as they are, because they changed after the section was got ready: {pages}. The backup “{backup}” holds them as they were.",
       "undoButtonAfterward": "Undo…",
-      "undoHasEnded": "This can no longer be undone here: the section has been deployed, or some of its pages published or put into draft, since.",
+      "undoHasEnded": "This can no longer be undone here: the section has been deployed, or its pages have changed, since.",
       "backupHoldsIt": "The backup “{backup}” holds the course as it was before.",
       "undoEndsWhenYouQuit": "This undo is kept only while Plantoir is open. Quitting ends it."
     },

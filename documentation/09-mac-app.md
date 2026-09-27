@@ -6145,9 +6145,13 @@ button. It is always a sheet listing what would go back and what changed since
 and will be left. `StartOfYearUndoRegistry` is process-wide, keyed by folder
 (`FolderIdentity`), course and section like `SectionWindowControllers`, so any
 window on the folder offers it. It ends at the section's next deploy
-(`CourseActivity.beginPublish` tells it), when the scheduled deploy that was set
-at the time reaches its moment, at the next visibility change in the section
-from anywhere (checked when the undo sheet opens), and when Plantoir quits. It
+(`CourseActivity.beginPublish` tells it), at a scheduled deploy (the one set at
+the time reaching its moment, or any whose log shows a run since the change —
+the schedule is re-read when the undo sheet opens), at the next change to the
+section's pages from anywhere (checked when the undo sheet opens), and when
+Plantoir quits. Go and Put Them Back both refuse while this app is deploying the
+course (`deployUnderWay`). A deploy by an outside assistant or `deploy.sh` from
+a terminal is not seen. It
 is offered once: a partial undo is not offered again, and names the backup.
 This undo, the assistant window's "undo that" and an outside assistant's
 `undo_last_change` are three separate stores.

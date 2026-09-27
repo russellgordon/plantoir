@@ -16,8 +16,10 @@ import Observation
 /// made reaching its moment — and at the next visibility write in the section
 /// from ANYWHERE, including an outside assistant or Obsidian, found by
 /// comparing every page's visibility with how the change left it
-/// (`stillOffered`). What this cannot see, stated: a deploy run by an outside
-/// assistant in another process. The skip rule still holds then, and the
+/// (`whyItEnded`), which also reads the scheduled deploy's own log for a run
+/// since the change and re-reads the schedule when the undo sheet opens. What
+/// this cannot see, stated: a deploy run by an outside assistant in another
+/// process, and `deploy.sh` run from a terminal. The skip rule still holds then, and the
 /// undo is always a sheet that lists what it would put back, never one click.
 ///
 /// Three undo stores exist and none reaches another: this one, the assistant
@@ -40,8 +42,12 @@ final class StartOfYearUndoRegistry {
         /// Every page's visibility in the section as the change left it.
         let visibilityAfter: String
 
-        /// The scheduled deploy that was set when the change was made.
-        let scheduledDeploy: Date?
+        /// The scheduled deploy that was set when the change was made — or,
+        /// once the undo sheet has re-read the schedule, the one set now.
+        var scheduledDeploy: Date?
+
+        /// When the change was made, so a scheduled run since can be seen.
+        var madeAt: Date = Date()
     }
 
     /// Why an undo is no longer offered.
@@ -100,6 +106,12 @@ final class StartOfYearUndoRegistry {
         in course: Course,
         workspaceURL: URL?
     ) -> Ended? {
+        if let workspaceURL,
+           StartOfYearUndoRegistry.aScheduledDeployRanSince(
+               entry.madeAt, courseCode: course.code, sectionNumber: sectionNumber, workingFolder: workspaceURL
+           ) {
+            return .deployed
+        }
         let now: String = StartOfYearUndoRegistry.visibilitySnapshot(
             forSection: sectionNumber, in: course, workspaceURL: workspaceURL
         )
@@ -107,6 +119,48 @@ final class StartOfYearUndoRegistry {
             return .visibilityChanged
         }
         return nil
+    }
+
+    /// Re-read this section's scheduled deploy (the review's M1): one set
+    /// AFTER Go is the moment the undo now ends at, as the menu reads it.
+    func refreshSchedule(folderPath: String, courseCode: String, sectionNumber: Int, workingFolder: URL) {
+        let key: SectionWindowControllers.Key = SectionWindowControllers.Key(
+            folderPath: folderPath, courseCode: courseCode, sectionNumber: sectionNumber
+        )
+        guard var entry = entries[key] else {
+            return
+        }
+        let next: Date? = ScheduledDeploy.nextRun(
+            courseCode: courseCode, sectionNumber: sectionNumber, inWorkingFolder: workingFolder
+        )
+        if let next {
+            if let held = entry.scheduledDeploy, held <= next {
+                return
+            }
+            entry.scheduledDeploy = next
+            entries[key] = entry
+        }
+    }
+
+    /// Whether a scheduled deploy of this section has RUN since `moment`: its
+    /// log — keyed by the job's label, this folder's or the one written
+    /// before #237 — was written after it. Catches a schedule set after Go
+    /// that has already fired, which the stored moment cannot.
+    nonisolated static func aScheduledDeployRanSince(
+        _ moment: Date, courseCode: String, sectionNumber: Int, workingFolder: URL
+    ) -> Bool {
+        let labels: [String] = [
+            ScheduledDeploy.agentLabel(courseCode: courseCode, sectionNumber: sectionNumber, workingFolder: workingFolder),
+            ScheduledDeploy.legacyAgentLabel(courseCode: courseCode, sectionNumber: sectionNumber),
+        ]
+        for label in labels {
+            let log: URL = ScheduledDeploy.logURL(label: label)
+            let attributes: [FileAttributeKey: Any]? = try? FileManager.default.attributesOfItem(atPath: log.path)
+            if let written = attributes?[.modificationDate] as? Date, written > moment {
+                return true
+            }
+        }
+        return false
     }
 
     /// Every page's path and whether students see it, one line each, sorted.
