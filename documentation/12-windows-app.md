@@ -427,6 +427,24 @@ while the line explaining it went to the redirected trail, where nobody would
 look. Everything now derives from `AppDataRoot`, so the next thing somebody
 adds inherits the isolation instead of leaking.
 
+**The mac has the same flag, by the same name, on purpose (#154) — worth
+KNOWING, nothing to do.** One word should mean the same thing to a harness on
+either platform. Its root is different: the mac's state is spread across four
+`~/Library` folders, so `--state-dir` there stands in for the whole HOME
+folder rather than one app folder, and preferences need a door of their own
+because macOS's preferences daemon ignores a moved home. The same sharp edge
+applies there (children, the launchers, take the real home), and the mac
+refuses `launchctl`, notifications, the quit-time container stop and its
+updater under the flag; a malformed flag exits 64. Doc 09 → "Testing: the UI
+target keeps its state in `--state-dir`". The mac also now drives the
+new-site DIALOG through the real window (`NewSiteDialogUITests`, with a
+stubbed `deploy.sh`) — the test this platform ruled out, its reason 4 being
+that `ToolchainMirror.RefreshLaunchers` replaces a stub launcher on every
+`Reload()`. The mac's `refreshLaunchersIfNeeded` leaves launchers alone under
+test (a four-line guard; doc 09 → "The first-publish path"), and the same
+guard here would make the same test possible. Optional, and not an issue: if
+Russell wants it, it becomes one.
+
 ## Reading a test run: the exit code cannot tell you what happened
 
 `dotnet test` exits 1 when a test fails. It also exits 1 when the test HOST

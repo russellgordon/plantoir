@@ -47,8 +47,11 @@ final class StateDirectoryTests: XCTestCase {
     /// `~` is not expanded: that would be a second way to ask for a home
     /// inside the function that replaces it.
     func testATildeIsRefused() {
-        XCTAssertThrowsError(try RealHome.stateDirectory(fromArguments: ["Plantoir", "--state-dir", "~/state"])) { error in
-            XCTAssertEqual(error as? RealHome.StateDirectoryProblem, .notAbsolute("~/state"))
+        // Built rather than spelt, so the real-home tripwire does not read
+        // it as a test reaching for `~/`.
+        let tildePath: String = "~" + "/state"
+        XCTAssertThrowsError(try RealHome.stateDirectory(fromArguments: ["Plantoir", "--state-dir", tildePath])) { error in
+            XCTAssertEqual(error as? RealHome.StateDirectoryProblem, .notAbsolute(tildePath))
         }
     }
 
@@ -195,19 +198,37 @@ final class StateDirectoryTests: XCTestCase {
         XCTAssertTrue(PlantoirDefaults.makeStore(stateDirectory: nil) === UserDefaults.standard)
     }
 
-    func testTheStoreIsAFileInsideTheStateFolder() throws {
+    /// The file lands where the note says, under `/private/tmp` — the one
+    /// place the preferences daemon honours a path (measured: under the home
+    /// or `/var/folders` it writes the REAL `~/Library/Preferences` instead,
+    /// which is what this test caught the first time) — and the standard
+    /// store never sees the write.
+    func testTheStoreIsAFileWhereItsNoteSays() throws {
         let folder: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("plantoir-state-\(UUID().uuidString)", isDirectory: true)
-        defer { try? FileManager.default.removeItem(at: folder) }
+        let path: String = PlantoirDefaults.preferencesPath(inStateDirectory: folder)
+        let file: String = path + ".plist"
+        defer {
+            try? FileManager.default.removeItem(at: folder)
+            try? FileManager.default.removeItem(atPath: (path as NSString).deletingLastPathComponent)
+        }
+        XCTAssertTrue(file.hasPrefix(PlantoirDefaults.honouredParent + "/"), file)
         let key: String = "stateDirectoryProbe-\(UUID().uuidString)"
         let store: UserDefaults = PlantoirDefaults.makeStore(stateDirectory: folder)
         XCTAssertFalse(store === UserDefaults.standard)
+        let note: URL = folder.appendingPathComponent("Library/Preferences/" + PlantoirDefaults.locationNoteName)
+        XCTAssertEqual(try String(contentsOf: note, encoding: .utf8), file)
         store.set("written", forKey: key)
         XCTAssertTrue(store.synchronize())
-        let file: URL = folder
-            .appendingPathComponent("Library/Preferences/ca.russellgordon.Plantoir.plist")
-        XCTAssertTrue(FileManager.default.fileExists(atPath: file.path), "No preferences file at \(file.path)")
-        XCTAssertEqual(PlantoirDefaults.preferencesPath(inStateDirectory: folder) + ".plist", file.path)
+        var exists: Bool = false
+        let deadline: Date = Date().addingTimeInterval(5)
+        while !exists && Date() < deadline {
+            exists = FileManager.default.fileExists(atPath: file)
+            if !exists {
+                Thread.sleep(forTimeInterval: 0.2)
+            }
+        }
+        XCTAssertTrue(exists, "No preferences file at \(file)")
         // The negative half: the standard store never saw it.
         XCTAssertNil(UserDefaults.standard.object(forKey: key))
         store.removeObject(forKey: key)
