@@ -1029,6 +1029,20 @@ events Windows has to record or ledger. Re-taken 2026-09-26 at the merge of
 `dev` ff1213ed into this branch: **230** lists on the merged tree (228 on dev plus
 these two), `activityTrail.mustRecord` **91** (83 on dev plus eight). The director
 re-takes both numbers at the merge into `dev`.
+**Re-taken 2026-09-26 with [#97](https://github.com/russellgordon/plantoir/issues/97)**
+(a folder rename follows an angle-bracket Markdown link, `[q](<Tasks/Quiz 1.md>)`),
+counted ON THIS BRANCH (off `dev` ff1213ed): **228** before and after — no new
+list. `specialNames.renameFolder.linkRewriting.cases` grew from 13 to **25**,
+rows in a list both suites already deserialise, and the new
+`linkRewriting.insideAngleBrackets` holds prose plus two lists of STRINGS
+(`characters`, `rejected`), which the walker rightly does not count.
+**Windows fails eleven of the twelve new cases on arrival** (all but the
+page-name guard) in `FolderPathRewriterTests`; the web-address guard among
+them is a LIVE Windows defect today (its anchored `Scheme` test misses
+`<https://…`), which the mirrored fix clears. That is the
+request, owed by the `windows` issue from #97, and a named gap if it cannot
+land in its milestone. `activityTrail.mustRecord` is unchanged at **83** (no
+new event: `folder renamed` records no link counts, so its line stays true).
 
 **Re-take it rather than trusting this paragraph** — a census nobody can repeat
 is a number that rots. A case list is *an array of objects reached through
