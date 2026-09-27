@@ -34,8 +34,9 @@ struct MainWindowView: View {
                 WorkspacePickerView()
             } else {
                 NavigationSplitView {
+                    // At most 320 wide (#213): see `WindowChrome.sidebarMaximumWidth`.
                     SidebarView()
-                        .navigationSplitViewColumnWidth(min: 180, ideal: 220)
+                        .plantoirSidebarColumnWidth()
                 } detail: {
                     // The path bar sits under the content, spanning the
                     // detail column, exactly where Finder puts its own.
