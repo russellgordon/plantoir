@@ -278,6 +278,31 @@ the `…StillWrapsInFullAtRealWidths` tests host the view alone, so they prove
 "not line-limited", not "never truncated". Issue #213; never answer it by
 putting the modifier back.
 
+**#213, resolved 2026-09-26 by capping the sidebar — not by touching the
+console.** Measured with `onGeometryChange` on the note itself (a test-only
+hook, `TaskProgressView.reportsRenderNoteHeight`): at the window's minimum
+(900 × 600) the section column is 672 wide with the sidebar at its ideal and
+712 at its minimum, and the note keeps both lines there with the notice showing
+and details open — 30 of 30. It loses a line only in a column of about 400 or
+less (at 200: 15 points of 90 with the synced-folder notice showing), and the
+only way to reach one was to drag the sidebar: with no maximum it went to 700
+in a 900-wide window. `WindowChrome.sidebarMaximumWidth` is now 320, applied
+through ONE modifier, `plantoirSidebarColumnWidth()`, which the window and
+`SidebarWidthTests` both use; the same drag now stops at 328 and leaves a
+572-wide column (`WindowChrome.narrowestDetailColumn` = 900 − 320 − an 8-point
+gutter, measured). `ProgressViewSizeTests.testTheFolderNoteKeepsEveryLineAtEveryColumnTheWindowAllows`
+pins the note at that width with the synced-folder notice absent, showing and
+with details. The cost: a teacher who liked a very wide sidebar gets 320 at
+most; course codes and section names fit, and long names truncate as they
+already did at 220 (Russell accepted the cap, Q2 of bundle C).
+
+REJECTED, and measured: the console giving up its room (no `minHeight`, lowest
+layout priority) — WORSE at a 560 column, the note whole in 15 of 30; a smaller
+console floor, which only moves the corner; `.fixedSize` on the note, which is
+#211's blank window (`heightClaimedWhenSqueezed` still guards it); and a larger
+window minimum, which costs every teacher on a small display to fix a corner
+only a dragged sidebar reached.
+
 ## The chosen folder's path bar names every folder when there is room (#295)
 
 The folder picker, once a teacher has chosen an EMPTY folder (the offer to set
@@ -6603,19 +6628,19 @@ stub here, and slowing the stub by 30 s changed nothing): Approve runs
 spins re-enters SwiftUI's transaction flush (726 of 732 main-thread samples in
 `NSHostingView.beginTransaction` → lazy-stack placement) — 93 busy one-second
 samples over 122 s, and XCUITest fails with "main thread busy for 30.0s". A
-teacher approving a rollover or re-dating meets the same beachball. It is its
-own issue, [#351](https://github.com/russellgordon/plantoir/issues/351), not fixed here; the
-opt-in rollover test holds it open with a strict `XCTExpectFailure` matched to
-that message, so it turns red the day the backup stops blocking.
+teacher approving a rollover or re-dating meets the same beachball. It was
+its own issue, [#351](https://github.com/russellgordon/plantoir/issues/351),
+fixed in bundle C (see "Every zip is off the main actor" below); the strict
+`XCTExpectFailure` that held the rollover test open is gone, so the freeze
+coming back fails that step.
 
 ### Two things the new-site test found about the real window
 
 - **`CredentialRequestSheet`'s `.accessibilityIdentifier("credentialSheet")`
-  is stamped on every element inside it**, so `credentialField` and
-  `credentialSendButton` never reach the accessibility tree (read off the real
-  tree). The test finds the sheet as `application.sheets` and its one text
-  field; the dead identifiers are left as they are, since nothing else reads
-  them.
+  was stamped on every element inside it**, so `credentialField` and
+  `credentialSendButton` never reached the accessibility tree (read off the
+  real tree). Fixed by #353 — see "An identifier on a container" below — and
+  the test now finds the field and the Send button by identifier.
 - **XCUITest leaves the previous test's app running**, so the redirect test's
   "no other Plantoir" check would skip on its own neighbour: it ends the copy
   `IsolatedLaunch` launched last, and only that one, and counts only this
@@ -7202,4 +7227,111 @@ automated?" differently, and the reason was neither the token nor the Keychain.
 It was a four-line guard in one app's launcher refresh.** Both write-ups spent
 most of their length on credentials, which turned out to be the part the two
 platforms agreed on.
+
+## Every zip is off the main actor (#351)
+
+**What it was.** Every backup and archive ran `/usr/bin/zip` and then
+`Process.waitUntilExit()` on the main thread — the target builds with
+`SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor`, so every caller zipped there. The
+nested run loop `waitUntilExit` spins re-entered SwiftUI's transaction flush:
+approving an assistant change held the window for up to two minutes (#154's
+samples: 726 of 732 main-thread samples in `NSHostingView.beginTransaction`,
+93 busy seconds in 122, on a fixture course a few kilobytes big — so it was
+the re-entered run loop, not the size of the zip). A real course is also slow
+to zip for its own sake: Russell's ICS4U, 9.7 s and 467 MB.
+
+**What it is now.** `CourseArchiver` has ONE door to the zip, `zipping`, and
+it is `@concurrent` (the attribute is load-bearing: under approachable
+concurrency a plain `nonisolated async` function runs on its caller's actor —
+see the four Swift traps measured 2026-09-20). `backUpCourse`, `archiveCourse`,
+`archiveAndRemoveCourse` and `archiveAndRemoveSection` are `async`; only paths
+and names cross, never a `Course` (`@Observable`, not `Sendable`), and
+pruning comes back to the main actor after the await. Every caller awaits it:
+the assistant, Back Up Now, the archive a restore makes first, removing a
+course or a section, the unit-word rename and its sheet, and Copy a Page
+(`CourseArchiver.backingUp`, the zip without the pruning). Russell's ruling on
+bundle C put all of these in the one piece rather than a follow-up.
+`ClassInsertionPlanner.apply` and `PlaceholderClassPlanner.apply` lost a
+`backingUpInto:` parameter that no caller passed — the assistant, their only
+caller, saves its own copy first — rather than going async for a zip that
+never ran. `CourseArchiver.lastZipRanOnTheMainThread` is written inside the
+function that runs the zip, so no path is unobserved, and read by
+`AssistBackupOffTheMainActorTests` only.
+
+**What the assistant's window shows.** `AssistToolRunner.courseBeingBackedUp`
+is set while a copy is saved and cleared on every way out (`defer`, so a
+failed copy never leaves the line claiming one is being made); the window
+shows `AssistWording.backingUpFirst` under the three dots
+(`assistBackingUpLine`). The once-per-conversation copy is shared IN FLIGHT:
+off the main thread, an outside assistant's second write can arrive at the
+await, and without `backupsInFlight` one conversation made two zips of the
+same course. A copy that failed is never remembered, so the next write tries
+again and the write's sentence says nothing about a backup. The
+`back_up_course` tool makes a new copy each call, as it always did, with the
+same line. New trail event "assistant backed up a course": the file name, its
+MB and seconds (or the reason it failed), one line per real zip — the reused
+copy writes nothing.
+
+**The write that waits on it re-reads its page.** `write_how_i_teach` now
+checks, after the copy, that the How I Teach page is still the bytes its plan
+read — a minute is long enough for a teacher to type into it in Obsidian.
+
+**REJECTED:** `terminationHandler` plus a continuation around the same
+`Process` on the main actor — it works, but it is a second door beside the
+copier's proven `@concurrent` one; a fixed "please wait" delay, which is not a
+fix; and a follow-up issue for the non-assistant zips (Q3, overruled by
+Russell: fold discovered work into v1.4.0).
+
+## An identifier on a container: `.contain` first (#353)
+
+SwiftUI applies `.accessibilityIdentifier` on a plain stack to EVERY element
+inside it, so an inner identifier never reaches the tree — measured on the
+credential sheet, whose field and Send button both read "credentialSheet".
+`.accessibilityElement(children: .contain)` before the identifier makes the
+stack an element of its own and keeps its children's. Applied to the credential
+sheet, `backupsGroup` (its `backupsTotal`), `cloudSyncNotice` (its two
+buttons), `settingsSaveNotice` (Preview Again and its note) and
+`copyPageResult` (Show in Finder). Left alone, because they are real
+accessibility elements already: an identifier on a `Button` or `Toggle` whose
+label holds another (its label is part of the control), the sidebar `List` and
+`SearchablePicker`'s `ScrollView`. `NewSiteDialogUITests` finds the sheet's
+field and button by identifier; the opt-in `ContainerIdentifiersUITests` reads
+the Backups total off the real tree. No unit test: in process the tree does not
+reach hosted SwiftUI.
+
+## A field in a labelled row has no title of its own (#354)
+
+In a grouped form a `TextField("Unit", …)` draws its title beside the field, so
+a row already labelled by `LabeledContent` says its label twice: the wizard's
+"What do you call a unit?" showed a stray "Unit". An empty title, the
+placeholder kept with `prompt:` (the club branch's shape since it was written).
+Same fix in Keep a Copy for Reference and the unit-word rename sheet. Course
+Settings' own unit row is a value and Rename…, and was never affected.
+`LabeledFieldTripwireTests` reads `QuartzTeachers/Views` and fails any titled
+field inside a `LabeledContent(…) { … }`, naming file and line; the opt-in
+`UnitWordRowUITests` looks at the drawn wizard row and Course Settings' row.
+REJECTED: `.labelsHidden()` on the field, which hides the row's own label in
+some forms.
+
+## Course Settings: the How I Teach row (#329)
+
+Beside the curriculum folders, for every course the form is drawn for (a course
+kept for reference never reaches it): "How I Teach page", with **Open** when
+the course has a page — found by listing, so the teacher's own spelling counts
+— and **Create and Open** when it has none. Creating writes exactly
+`---\npublish: false\n---\n` (`HowITeachPage.startOrFind`, `withoutOverwriting`;
+a page that appears between the look and the write is the teacher's and is
+what opens) and nothing else: #209 rejected a starter text because an assistant
+reads the page as the teacher's own approach. It opens in Obsidian through
+`FolderActions.openPageInObsidian`, which shares the register/quit/reopen body
+with `openInObsidian` but targets the PAGE — `obsidianTarget` is for folders
+and would open the vault. Disabled, as the toolbar's Open in Obsidian is, when
+Obsidian is not installed. Whether a page is there is read on every drawing and
+redrawn when the window becomes key (#152's `marksWalkGeneration`). Trail:
+"How I Teach page started" (or could not be, and why); opening writes nothing.
+The empty page this makes counts as NOT written for every assistant tool —
+`documentation/10-local-ai-assistant.md` → the How I Teach page. Words and
+cases: `contracts/shared-rules.json` → `howITeachPage.settingsButton`.
+REJECTED: `obsidian://new` (no `publish: false`, nothing recorded); creating
+without opening; a starter text.
 

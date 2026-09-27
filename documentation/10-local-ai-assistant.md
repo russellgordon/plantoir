@@ -4428,6 +4428,18 @@ Two details that make the backups usable rather than merely present:
   the assistant's five, because the two are counted separately.
 - And prune ONLY backups at that: archives and the wizard's own zips live in
   the same folder and their parsers deliberately reject each other's forms.
+- **The zip runs off the main actor, and the window says what the wait is**
+  (#351, 2026-09-26). It used to run on the main thread and hold the window
+  for up to two minutes after the teacher approved a change. Now a line under
+  the three dots names the course being copied (`AssistWording.backingUpFirst`),
+  and a second write arriving while the first copy is still being zipped —
+  which an outside assistant can now do, because the main thread is free —
+  waits for THAT copy rather than making another. A copy that failed is not
+  remembered: the next write tries again, and no write says "backed up" about
+  it. Each real zip leaves one trail line, "assistant backed up a course",
+  with its file name, size and seconds; a reused copy leaves none. How, and
+  what was rejected: [09-mac-app.md](09-mac-app.md) → "Every zip is off the
+  main actor (#351)".
 
 ### Restore is section-scoped, though the zip holds the course
 
@@ -5661,14 +5673,36 @@ settings had LISTED is dropped, so the one transition a teacher will ask about
 page was never on the site leaves no line on every build. Read by the app from
 a run's console and from a scheduled publish's log, as `PLANTOIR_DATED:` is.
 
+### An empty page is not written (#329)
+
+Course Settings' "Create and Open" makes a page with its settings and nothing
+else. Before #329 that page would have been read to an assistant as the
+teacher's account, listed as "How I Teach page: yes", named in the session
+briefing, and a first draft refused with `howITeachAlreadyWritten` — "a
+teacher's own page is never replaced" — about a page with nothing in it. So
+ONE predicate, `HowITeachPage.hasWords` (the body after the settings block,
+without a byte-order mark and whitespace, is not empty), decides it
+everywhere: `read_how_i_teach` answers `howITeachEmpty` and the drafting brief
+(trail: "found an empty How I Teach page"); `list_courses` says "not written
+yet"; the briefing leaves the course out; `plan_write_how_i_teach` plans it as
+new, at the page's own path; `write_how_i_teach` saves into it with no mark,
+keeping its settings block byte for byte (a whitespace-only page with no
+settings is written as a new page). Decided against the bytes read at the
+write, and — since the backup before it now runs off the main actor (#351) —
+re-checked after the backup, so a page the teacher typed into meanwhile is
+refused. A page whose bytes cannot be read as text is never taken to be empty.
+Contract: `howITeachPage.emptyPageIsNotWritten` (Russell accepted, Q1 of
+bundle C). REJECTED: leaving an empty page counted as written.
+
 ### What is deliberately not in this piece
 
 - The section's "— Edited" fingerprint still counts the page, so editing it
   makes the next Publish rebuild although the site would not change — a wire
   format held byte for byte in three implementations; follow-up
   [#330](https://github.com/russellgordon/plantoir/issues/330).
-- A button to open or create the page — a GUI surface on both platforms;
-  follow-up [#329](https://github.com/russellgordon/plantoir/issues/329).
+- A button to open or create the page — was a follow-up; it shipped in
+  [#329](https://github.com/russellgordon/plantoir/issues/329) as Course
+  Settings' How I Teach row (below, and documentation/09).
 - No starter page from the wizard, `setup_course.py` or a payload: a template is
   text an agent would read as the teacher's approach.
 - The local assistant neither reads nor drafts it.
