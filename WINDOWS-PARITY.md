@@ -331,8 +331,9 @@ lands.
 | #94 | **No Windows draft exists.** Container recreation killing live previews is a Docker problem; the Windows preview has no container, so *inferred*: nothing owed | none |
 | #249 | **No Windows draft exists.** The mac's accessibility tests are flaky on a Space that is not showing: mac test hygiene. *Inferred*: nothing owed | none |
 
-The milestone for #167 and #238 is unsettled: each issue says v1.3.2 and a
-comment on it says v1.4.0. Russell decides.
+#167 and #238 were settled on the mac's v1.4.0 milestone and are closed there
+(corrected 2026-09-27; this said the milestone was unsettled between v1.3.2 and
+v1.4.0 — v1.3.2 became v1.4.0).
 
 ---
 
@@ -345,9 +346,13 @@ out?**
 - **The same frontmatter family as Phase 2:** #182 (restore orphans a
   continuation line), #186 (inserting into a block whose first line is
   indented), #188 (an indented `---` read as the closing fence), and #246
-  (the build PUBLISHES a page it cannot parse; `decision`). All four are
-  `mac`+`windows`, on v1.3.2. The mac's half of #181/#182/#186/#188 is on
-  `origin/issue/181-visibility-writers-keep-key-with-value`.
+  (the build PUBLISHES a page it cannot parse; `decision`). All four were
+  `mac`+`windows` and are CLOSED on the mac's v1.4.0 milestone (the mac's half
+  merged as `issue/188-182-186-frontmatter-shapes` and
+  `issue/246-unreadable-settings-hide-the-page-loudly`); the Windows half is
+  now #308 (#188/#182/#186, with #177) and #300 (#246), both on this
+  milestone. Corrected 2026-09-27: this said "on v1.3.2" and pointed at a
+  branch that no longer exists.
 - **Scheduled publishing, as Phase 3:** #212 (a scheduled publish finishes
   silently), #237 (two working folders share ONE scheduled task; #239 and
   #261 both work around it), #137 (a failed build still names a destination).
