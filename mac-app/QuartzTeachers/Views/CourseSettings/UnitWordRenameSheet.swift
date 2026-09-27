@@ -95,7 +95,7 @@ struct UnitWordRenameSheet: View {
             }
 
             LabeledContent(UnitWordRenameWording.fieldLabel) {
-                TextField(ClassPageTerm.standard, text: $proposedWord, prompt: Text(ClassPageTerm.standard))
+                TextField("", text: $proposedWord, prompt: Text(ClassPageTerm.standard))
                     .textFieldStyle(.roundedBorder)
                     .accessibilityIdentifier("unitWordRenameField")
                     .disabled(isRenaming)
