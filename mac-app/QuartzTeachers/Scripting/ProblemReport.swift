@@ -362,10 +362,35 @@ nonisolated enum ProblemReportEnvironment {
             fromProbeOutput: output,
             toolsFolder: toolsFolder,
             secondsWaitedForAHungHelper: secondsWaitedForAHungHelper,
+            installedFrom: installedFrom(toolsFolder: toolsFolder),
             resolvingLinks: { path in
                 return URL(fileURLWithPath: path).resolvingSymlinksInPath().path
             }
         )
+    }
+
+    /// Where each of Plantoir's own programs came from, by the name the
+    /// check asks it by (`colima`, `limactl`, `docker`): `bundled` or
+    /// `downloaded`, read from the install stamp's `source <program> <how>`
+    /// lines beside the tools folder (`tools/.installed`, GitHub #312). Per
+    /// program, because one install can replace one program and leave the
+    /// others as an earlier one set them up. Empty when there is no stamp —
+    /// every Mac set up before the stamp existed.
+    static func installedFrom(toolsFolder: String) -> [String: String] {
+        let stamp: URL = URL(fileURLWithPath: toolsFolder)
+            .deletingLastPathComponent()
+            .appendingPathComponent(".installed")
+        var sources: [String: String] = [:]
+        guard let text = try? String(contentsOf: stamp, encoding: .utf8) else {
+            return sources
+        }
+        for line in text.components(separatedBy: "\n") {
+            let words: [String] = line.components(separatedBy: " ")
+            if words.count == 3 && words[0] == "source" && (words[2] == "bundled" || words[2] == "downloaded") {
+                sources[words[1]] = words[2]
+            }
+        }
+        return sources
     }
 
     /// Measures in the background and remembers the answer for every record
@@ -421,6 +446,7 @@ nonisolated enum ProblemReportEnvironment {
         fromProbeOutput output: String,
         toolsFolder: String,
         secondsWaitedForAHungHelper: Int64? = nil,
+        installedFrom: [String: String] = [:],
         resolvingLinks resolve: (String) -> String = { path in return path }
     ) -> String {
         var rowsByName: [String: [String]] = [:]
@@ -459,7 +485,8 @@ nonisolated enum ProblemReportEnvironment {
                     parts.append(helper.displayName + " not found (would install " + helper.pinnedVersion + ")")
                 } else {
                     parts.append(helper.displayName + " found, version unreadable" + sourceLabel(
-                        path: path, resolvedPath: resolve(path), toolsFolder: toolsFolder
+                        path: path, resolvedPath: resolve(path), toolsFolder: toolsFolder,
+                        installedFrom: installedFrom[helper.probeName]
                     ))
                 }
                 continue
@@ -475,7 +502,10 @@ nonisolated enum ProblemReportEnvironment {
                     text += " (Homebrew)"
                 }
             } else {
-                text += sourceLabel(path: path, resolvedPath: resolve(path), toolsFolder: toolsFolder)
+                text += sourceLabel(
+                    path: path, resolvedPath: resolve(path), toolsFolder: toolsFolder,
+                    installedFrom: installedFrom[helper.probeName]
+                )
             }
             parts.append(text)
         }
@@ -489,8 +519,21 @@ nonisolated enum ProblemReportEnvironment {
     /// `/usr/local/bin` is also where Docker Desktop puts its own link, and
     /// calling that Homebrew would be the same kind of wrong answer this
     /// line exists to stop giving.
-    static func sourceLabel(path: String, resolvedPath: String, toolsFolder: String) -> String {
+    ///
+    /// Plantoir's copy says where it came from when the install stamp
+    /// (`tools/.installed`, GitHub #312) says so: " (Plantoir's copy, from
+    /// inside Plantoir)" or " (Plantoir's copy, downloaded)". Copies set up
+    /// before the stamp existed have no answer, and say only "Plantoir's copy".
+    static func sourceLabel(
+        path: String, resolvedPath: String, toolsFolder: String, installedFrom: String? = nil
+    ) -> String {
         if path.hasPrefix(toolsFolder + "/") {
+            if installedFrom == "bundled" {
+                return " (Plantoir's copy, from inside Plantoir)"
+            }
+            if installedFrom == "downloaded" {
+                return " (Plantoir's copy, downloaded)"
+            }
             return " (Plantoir's copy)"
         }
         if resolvedPath.hasPrefix("/opt/homebrew/")
