@@ -113,6 +113,37 @@ final class ClubNounTests: XCTestCase {
         }
     }
 
+    /// An unpublish that stops at a linked meeting (#201) names it on the
+    /// card as "a meeting of its own", and tells the model "a class of its
+    /// own" — the reason is decided when the plan is made and put into words
+    /// only for its reader, so the noun never reaches the model.
+    func testAClubsUnpublishCardSaysMeetingAndTheModelIsToldClass() async throws {
+        let club = try makeClub(noun: .meeting)
+        defer { try? FileManager.default.removeItem(at: club.root) }
+
+        try AssistFixture.write(page: "Week 3", publish: "true", date: "2026-09-10",
+                                body: "Carry on in [[Week 4]].", in: club.course)
+        try AssistFixture.write(page: "Week 4", publish: "true", date: "2026-09-11",
+                                body: "The words of Week 4.", in: club.course)
+
+        let planned: AssistToolOutcome = await run(
+            club.runner, "plan_unpublish_pages", ["course": "ICS3U", "section": 1, "pages": "Week 3"]
+        )
+
+        // The card says the contract's own sentence.
+        let wording: [String: Any] = try XCTUnwrap(
+            AssistContract.wording()["wording"] as? [String: Any]
+        )
+        let forAMeeting: String = try XCTUnwrap(wording["linkedClassStaysVisibleForAMeeting"] as? String)
+        XCTAssertTrue(planned.forTheCard.contains(forAMeeting), planned.forTheCard)
+
+        let forTheModel: String = AssistPublishPlan.stayingVisibleLine(
+            title: "Week 4", reason: .aClassOfItsOwn, noun: .class
+        )
+        XCTAssertTrue(planned.detail.contains(forTheModel), planned.detail)
+        XCTAssertFalse(planned.detail.contains("meeting"), planned.detail)
+    }
+
     /// The writes: the line the teacher reads says "meeting", the model's
     /// copy does not.
     func testAWriteTellsTheTeacherInTheCoursesNounAndTheModelInTheOrdinaryOne() async throws {

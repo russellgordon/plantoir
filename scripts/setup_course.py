@@ -9,6 +9,7 @@ from pathlib import Path
 import sys as _sys
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
 import class_pages
+import markdown_code
 import page_visibility
 import toolchain_paths
 import re
@@ -1559,12 +1560,18 @@ def first_use_dates(payload_dir: Path, reference,
                 class_date_by_stem[page.stem] = class_date
     class_pages.sort()
 
-    link_target_pattern = re.compile(r"!?\[\[([^\]#|]+)")
+    # The name stops before ], | or #, and before a backslash sitting right
+    # in front of one: [[Worksheet\|w]] (the escaped pipe Obsidian writes for
+    # an alias inside a table) names Worksheet, not "Worksheet\". Shared
+    # contract: contracts/shared-rules.json -> readingALink (#294, #314).
+    # A link inside code is an example, not a link, and dates nothing
+    # (#313, readingALink.whatIsCode; markdown_code is the one mask).
+    link_target_pattern = re.compile(r"!?\[\[([^\]#|]+?)(?=\\?[\]|#])")
     dates = {}
     for ordinal, text in class_pages:
         class_date = semester_class_timestamp(ordinal, reference, weekday_step,
                                               start_school_day)
-        for match in link_target_pattern.finditer(text):
+        for match in markdown_code.matches_outside_code(link_target_pattern, text):
             target = match.group(1).strip().split("/")[-1]
             if target and target != "index" and target not in dates:
                 dates[target] = class_date
@@ -1575,7 +1582,7 @@ def first_use_dates(payload_dir: Path, reference,
     if index_file.is_file():
         with open(index_file, "r", encoding="utf-8") as handle:
             index_text = handle.read()
-        for match in link_target_pattern.finditer(index_text):
+        for match in markdown_code.matches_outside_code(link_target_pattern, index_text):
             target = match.group(1).strip().split("/")[-1]
             if target in class_date_by_stem:
                 dates["index"] = class_date_by_stem[target]
@@ -1676,15 +1683,67 @@ def starting_point_intro(course_code: str, label: str, has_payload: bool) -> str
     )
 
 
-# What a specific expectation's page is called: "A1.1", "D2.3". The same
-# pattern `build_site.py` reads the curriculum coverage map with, and the
-# same sort order — so "the first expectation" means the same thing in the
-# installer and on the map.
+# What a specific expectation's page is called: "A1.1", "D2.3" — the
+# letter-first shape only, the one every payload and skeleton ships (measured:
+# 2,214 of them, and no other shape). Deliberately NOT the wider rule
+# `build_site.is_expectation_code` has read since #128: this picks "the first
+# expectation" by a LEXICAL sort for an install-time rename, and `1.A` sorts
+# before `A1.1`, so widening it here would change which page a skeleton's
+# placeholder becomes the day a payload carried both.
 SPECIFIC_EXPECTATION_STEM = re.compile(r"^([A-Z])(\d+)\.(\d+)$")
 
 # A wiki link or embed, up to the target's own name: "[[A1.1]]",
-# "![[A1.1]]", "[[A1.1|the first one]]", "[[Curriculum/A1.1#Examples]]".
-WIKI_LINK_TARGET = re.compile(r"(!?\[\[)([^\]\[|#]+)")
+# "![[A1.1]]", "[[A1.1|the first one]]", "[[Curriculum/A1.1#Examples]]",
+# "[[A1.1\|words]]". The last is the escaped pipe Obsidian writes for an
+# alias inside a table: the name stops before a backslash sitting right in
+# front of ], | or #, and the lookahead is not consumed, so a rename leaves
+# the backslash where it was (dropping it would split the table cell).
+# Shared contract: contracts/shared-rules.json -> readingALink (#294, #314).
+WIKI_LINK_TARGET = re.compile(r"(!?\[\[)([^\]\[|#]+?)(?=\\?[\]|#])")
+
+
+def primary_curriculum_folder(folders):
+    """The first usable name in a `curriculum_folders` list, or None."""
+    if not isinstance(folders, list):
+        return None
+    for name in folders:
+        if isinstance(name, str) and name:
+            return name
+    return None
+
+
+def curriculum_folders_to_record(saved_config: dict, manifest_folder):
+    """
+    What `curriculum_folders` this run writes, or None to leave it out (#128).
+
+    * A saved list is kept exactly as it is — the app, or a rename, wrote it.
+    * A saved legacy `curriculum_folder` with no list: nothing is written, and
+      the legacy key survives untouched through the saved-keys merge below.
+      This run used to write `curriculum_folder` from the MANIFEST
+      unconditionally, and because that merge only restores keys the fresh
+      dict lacks, re-running setup on a course whose folder a rename had
+      recorded as "Expectations" put the manifest's "Curriculum" (or null)
+      back over it — the rename's whole point undone.
+    * Otherwise the folder the payload or skeleton manifest declares, as a
+      list of one; nothing when it declares none (a course made from
+      scratch), which leaves the build to find its folder by name.
+
+    Whenever the list is written, the legacy `curriculum_folder` is written
+    too, naming the list's FIRST (primary) folder, so an older Plantoir reading
+    only that key still finds the folder its map comes from. A course with only
+    a legacy key keeps it exactly as it is.
+    `contracts/file-formats.json` -> `courseConfigKeys`.
+    """
+    saved_config = saved_config or {}
+    saved_list = saved_config.get("curriculum_folders")
+    if isinstance(saved_list, list):
+        return saved_list
+    legacy = saved_config.get("curriculum_folder")
+    if isinstance(legacy, str) and legacy:
+        return None
+    if isinstance(manifest_folder, str) and manifest_folder:
+        return [manifest_folder]
+    return None
 
 
 def specific_expectation_stems(curriculum_dir: Path) -> list:
@@ -1743,7 +1802,8 @@ def retargeted_expectation_references(text: str, renames: dict) -> str:
     """
     Point every link and embed at the expectation that will actually be
     there. Only the TARGET changes; an alias or a heading after it is left
-    exactly as written.
+    exactly as written. A link shown inside code is an example and is left
+    exactly as written too (#313, readingALink.whenRewritten).
     """
     if not renames:
         return text
@@ -1759,7 +1819,14 @@ def retargeted_expectation_references(text: str, renames: dict) -> str:
         replaced = stripped[:len(stripped) - len(name)] + renames[name]
         return opening + target.replace(stripped, replaced, 1)
 
-    return WIKI_LINK_TARGET.sub(replacement, text)
+    pieces = []
+    carried_to = 0
+    for match in markdown_code.matches_outside_code(WIKI_LINK_TARGET, text):
+        pieces.append(text[carried_to:match.start()])
+        pieces.append(replacement(match))
+        carried_to = match.end()
+    pieces.append(text[carried_to:])
+    return "".join(pieces)
 
 
 def jurisdiction_name(manifest: dict) -> str:
@@ -1858,27 +1925,54 @@ def unlink_curriculum_references(text: str, page_names: set) -> str:
     transclusion line (`![[A1.1]]`) disappears entirely; an inline link
     becomes its visible words (`[[A1.1|the expectation]]` -> the words,
     `[[A1.1]]` -> A1.1).
+
+    The escaped pipe Obsidian writes for an alias inside a table,
+    `[[A1.1\\|the expectation]]`, is the same link (#314): the backslash goes
+    with it, so the cell keeps its words and stays one cell. A link is
+    compared by the page it NAMES, its last path component, so
+    `[[Curriculum/A1.1|words]]` is unlinked too (#326) and an unaliased one
+    reads as the page name, A1.1 — the folder is one the course does not have.
+    Shared contract: contracts/shared-rules.json -> readingALink.
     """
     if not page_names:
         return text
 
     def replace_link(match):
         is_transclusion = match.group(1) == "!"
-        target = match.group(2).strip()
+        page_name = match.group(2).strip().split("/")[-1].strip()
         alias = match.group(4)
-        if target not in page_names:
+        if page_name not in page_names:
             return match.group(0)
         if is_transclusion:
             return ""
         if alias is not None:
             return alias
-        return target
+        return page_name
 
-    link_pattern = re.compile(r"(!?)\[\[([^\]#|]+)(#[^\]|]*)?(?:\|([^\]]*))?\]\]")
+    # Name, then an optional heading, then an optional alias whose pipe may
+    # be escaped. The heading stops at "[" as Quartz's own pattern does, so
+    # a stray "[[" followed by a heading cannot swallow the link after it.
+    # (The name still crosses "[", so a stray "[[" with no "#" before the
+    # next link still can; not widened here, #314's review F1.)
+    link_pattern = re.compile(
+        r"(!?)\[\[([^\]#|]+?)(?=\\?[\]|#])\\?(#[^\[\]|]*)?(?:\\?\|([^\]]*))?\]\]")
 
+    # A link inside code is an example of one, and stays as written (#313,
+    # readingALink.whatIsCode): the mask is taken over the whole page, since
+    # a fence or a span can cross lines, and applied line by line by offset.
+    code = markdown_code.code_ranges(text)
     result_lines = []
+    line_start = 0
     for line in text.split("\n"):
-        replaced = link_pattern.sub(replace_link, line)
+        pieces = []
+        carried_to = 0
+        for match in markdown_code.matches_outside_code(link_pattern, line, code, line_start):
+            pieces.append(line[carried_to:match.start()])
+            pieces.append(replace_link(match))
+            carried_to = match.end()
+        pieces.append(line[carried_to:])
+        replaced = "".join(pieces)
+        line_start += len(line) + 1
         # A line that held only a transclusion (possibly inside a callout)
         # would otherwise linger as an empty shell.
         if replaced != line and replaced.strip() in ("", ">"):
@@ -2947,15 +3041,6 @@ def setup_course(no_backup: bool = False):
         "per_section_files": per_section_files,
         "hidden": hidden_items,
         "expandable": expandable_items,
-        # What this course calls its curriculum folder. Declared by every
-        # payload and skeleton manifest, and until now read only at install
-        # time — so the build fell back to scanning for the word "curriculum"
-        # and would never have found a folder that does not contain it.
-        "curriculum_folder": (
-            (example_manifest or {}).get("curriculum_folder")
-            if prepopulate_example
-            else (skeleton_manifest or {}).get("curriculum_folder")
-        ),
         # NEW: global Explorer expansion behaviour for this course
         "expandOnFolderClick": expand_on_click,
         "footer_html": footer_html,
@@ -2989,6 +3074,25 @@ def setup_course(no_backup: bool = False):
         # NEW: whether the default file names use LCS's own words
         "use_lcs_terminology": use_lcs_terminology,
     }
+    # The course's curriculum folders (#128), written as the LIST
+    # `curriculum_folders` — see curriculum_folders_to_record.
+    recorded_curriculum = curriculum_folders_to_record(
+        saved_config,
+        (example_manifest or {}).get("curriculum_folder")
+        if prepopulate_example
+        else (skeleton_manifest or {}).get("curriculum_folder"),
+    )
+    if recorded_curriculum is not None:
+        config["curriculum_folders"] = recorded_curriculum
+        # And the PRIMARY folder in the legacy key too (Russell's ruling on the
+        # #128 review): an older Plantoir on a second Mac reads only
+        # `curriculum_folder`, and without it would build no map at all for a
+        # folder whose name does not say "curriculum". Harmless here: the
+        # build unions the two, and the list comes first.
+        primary = primary_curriculum_folder(recorded_curriculum)
+        if primary is not None:
+            config["curriculum_folder"] = primary
+
     previous_map = saved_config.get("color_schemes", {}) or {}
     if schemes:
         # Use the choices gathered earlier in this run

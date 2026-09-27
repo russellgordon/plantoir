@@ -47,10 +47,10 @@ The Ministry names four — **spatial significance**, **patterns and
 trends**, **interrelationships**, and **geographic perspective** — and
 tags each strand with the ones it leans on. CGC1W names them but does
 not reprint their definitions; its links point back into the 2018
-document that this course replaced. So the explanation you will find on
-[[The Concepts of Geographic Thinking]] is written in plain words for
-this course rather than quoted, and only the four names are the
-Ministry's.
+document that this course replaced. So wherever this course explains
+them, the explanation is written in plain words for this course rather
+than quoted, and only the four names are the Ministry's; [[A1.5]] is
+the expectation that asks students to use them.
 
 ## Why the codes matter more than they look
 

@@ -148,8 +148,9 @@ Deploys always go to **production** (no draft deploys), matching the
 
 A preview build embeds a live-reload WebSocket client (`ws://localhost:<port>`)
 into generated HTML pages. Deploying those directly would cause students'
-browsers to prompt for local network permissions. `deploy.py` detects this
-signature in any page under `public/` (every `*.html`, since 2026-09-05 — see
+browsers to prompt for local network permissions. `deploy.py` detects the
+client — its script TAG followed by its first statement, not the bare address,
+since #291 — in any page under `public/` (every `*.html`, since 2026-09-05 — see
 "One rule, six readers" below) and automatically re-executes a clean static
 build inside the container-internal workspace (`/tmp/quartz-builds/...`),
 mirroring the production assets back to `public/` before uploading.
@@ -198,14 +199,14 @@ the input is a pipeline.
 Whether a built site is a preview's is asked in six places, and until #136
 they did not agree:
 
-| Reader | Where | What it reads |
-|---|---|---|
-| `BuildFreshness.builtForPreview` (mac) | `mac-app/QuartzTeachers/Models/BuildFreshness.swift` | every `*.html` under `public/`, as bytes — the front page ALONE until #136 |
-| The scheduled publish's own check (mac) | `ScheduledDeploy.oneShotCommand` | `LC_ALL=C grep -rqs --include='*.html'` over `public/` — `index.html` alone until #136 |
-| `deploy.sh`, folder leg | three identical `grep -rq --include='*.html'` lines | the whole tree, since 2026-09-05 |
-| `deploy.py`, Netlify and Cloudflare | `public_dir.rglob("*.html")` | the whole tree, since 2026-09-05 |
-| `deploy.ps1`, folder leg | `Test-CarriesLiveReload` | the whole tree |
-| `BuildFreshness.BuiltForPreview` (Windows) | `Plantoir.Core/Models/BuildFreshness.cs` | the front page alone — owed, see the `windows` issue |
+| Reader | Where | What it reads | What it looks for (#291) |
+|---|---|---|---|
+| `BuildFreshness.builtForPreview` (mac) | `mac-app/QuartzTeachers/Models/BuildFreshness.swift` | every `*.html` under `public/`, as bytes — the front page ALONE until #136 | `carriesLiveReloadClient`: every occurrence of the client, whitespace stepped back over, then the tag |
+| The scheduled publish's own check (mac) | `ScheduledDeploy.oneShotCommand` | `LC_ALL=C grep -rzqs --include='*.html'` over `public/` — `index.html` alone until #136 | `BuildFreshness.liveReloadPattern`, the contract's `asABasicRegex` |
+| `deploy.sh`, folder leg | one `site_carries_preview_client`, called three times | the whole tree, since 2026-09-05 | `LIVE_RELOAD_CLIENT_PATTERN`, under `LC_ALL=C grep -rzqs` |
+| `deploy.py`, Netlify and Cloudflare | `public_dir.rglob("*.html")` | the whole tree, since 2026-09-05, as bytes | the contract's `scriptTag` and `client`, read from the contract |
+| `deploy.ps1`, folder leg | `Test-CarriesLiveReload` | the whole tree, line by line | still the bare address — **owed on [#272](https://github.com/russellgordon/plantoir/issues/272)** |
+| `BuildFreshness.BuiltForPreview` (Windows) | `Plantoir.Core/Models/BuildFreshness.cs` | the front page alone — owed on #272 | still the bare address — owed on #272 |
 
 (Windows' scheduled task builds unconditionally, so it has no check to get
 wrong.)
@@ -224,25 +225,46 @@ already has. `deploy.sh`'s own rerun is kept: it is what protects
 `./preview.sh` followed by `./deploy.sh --to-folder` typed at a command line.
 
 **The rule is data**: `contracts/app-rules.json` → `buildFreshness.previewBuild`
-— the `signature`, `where` it is looked for, and nine `cases`, each a tree of
-pages. The mac suite runs the app's check (`BuildFreshnessTests`) and the
+— the `signature`, `where` it is looked for, and fifteen `cases` (nine until
+#291), each a tree of pages. The mac suite runs the app's check (`BuildFreshnessTests`) and the
 overnight shell (`ScheduledPublishOutcomeTests`) against it;
-`scripts/test_preview_build_detection.py` cuts `deploy.sh`'s check out of the
-launcher and runs it, and runs the real `deploy.py`, against the same list —
+`scripts/test_preview_build_detection.py` cuts `deploy.sh`'s pattern and
+function out of the launcher and runs them under a UTF-8 locale, and runs the real `deploy.py`, against the same list —
 in `verify.sh` and in Windows' `PythonToolchainTests`. `deploy.ps1` is Windows'
 to run against it. Its `notShared` says what the cases deliberately leave out.
 
 **The details each reader has to get right, and why:**
 
-- **Bytes, not text.** A page that is not valid UTF-8 must not change the
+- **Bytes, not text — and so `LC_ALL=C` in every grep, `deploy.sh`'s
+  included (since #291).** A page that is not valid UTF-8 must not change the
   answer. Reading as a Swift `String` would make one such page force a rebuild
-  on every publish forever. **Measured** (macOS 26.6, `/usr/bin/grep`
-  2.6.0-FreeBSD): under a UTF-8 locale `grep` does NOT find the signature on a
-  line that also holds an invalid byte (exit 1); under `LC_ALL=C` it does
-  (exit 0). So the overnight check runs under `LC_ALL=C`; `deploy.sh` run from
-  a Terminal can call such a page clean while every other reader calls it a
-  preview's — the SAFE direction, since the app then rebuilds first, and Quartz
-  only writes UTF-8. `deploy.py` reads with `errors="ignore"` and matches.
+  on every publish forever; `deploy.py` reads `read_bytes()`. **Measured**
+  (macOS 26.6, `/usr/bin/grep` 2.6.0-FreeBSD): under a UTF-8 locale `grep`
+  does NOT find the signature on a line that also holds an invalid byte
+  (exit 1); under `LC_ALL=C` it does (exit 0). Until #291 that miss needed the
+  byte on the SAME line, and it erred safe (a Terminal's `deploy.sh` called
+  such a page clean while the app, reading bytes, rebuilt first), so #136 wrote
+  it down rather than touch the launcher. With `-z` (next bullet) a record is
+  the whole FILE: `LC_ALL=en_US.UTF-8 grep -zq` on a real preview page with
+  `\xff\n` prepended exits **1** and `LC_ALL=C` exits **0**; a stray `E9` just
+  before `<body` gives the same 1 and 0. A bad byte AFTER the client does not
+  cause the miss (0 in both locales). Quartz writes the client at the end of
+  `<body>`, so an invalid byte almost anywhere in a preview's page — anywhere
+  before the client — would read it as clean, and a preview's page read as
+  clean is a preview PUBLISHED. So `deploy.sh` now carries `LC_ALL=C`
+  (`site_carries_preview_client`), and the case is pinned (case 15,
+  `invalidUTF8Before`). The Python test and the overnight test both run their
+  shell under `en_US.UTF-8`, so neither passes by borrowing a C locale from
+  launchd or CI.
+- **One record, not lines (#291).** Quartz writes the client's tag at the end
+  of one line and its first statement, after eight spaces, at the start of the
+  next (measured: lines 131 and 132 of a real preview's `index.html`). A
+  line-by-line reader cannot see the pair at all, so every reader reads a page
+  whole: `grep -z` in the shells, bytes in Swift and Python, and — owed on
+  #272 — `Get-Content -Raw` or `ReadAllBytes` in PowerShell, whose
+  `Select-String` is line-based and case-insensitive. The pattern is a BASIC
+  regex: under `-E` BSD grep refuses it (`parentheses not balanced`, exit 2),
+  because the client holds a literal `(`.
 - **Hidden folders included** — `grep -r` and `rglob` both look inside them, so
   the Swift enumerates without `.skipsHiddenFiles`.
 - **A page that cannot be opened is passed over; a front page that cannot be
@@ -257,7 +279,15 @@ to run against it. Its `notShared` says what the cases deliberately leave out.
 Swift scan run 20 times against real sections (read-only): a clean 244-file /
 230-page section 6.5–7.8 ms warm, 54 ms on the first run in a fresh process; an
 864-file / 353-page section about 12 ms warm, 72–82 ms first. A real preview's
-build answers in 0.1 ms. The front-page-only read it replaced took 0.02 ms. It
+build answers in 0.1 ms. The front-page-only read it replaced took 0.02 ms.
+**Re-measured for #291** (2026-09-26, same machine, `swiftc -O`, 20 runs each,
+old byte search against the new tag-and-client search on the same copy): the
+244-file / 230-page ADA1O section 8.0–9.3 ms median warm for the new rule
+against 9.4–12.7 ms for the old, 10–15 ms first; a 976-file / 920-page tree
+(that section four times over — every file a page, so heavier than the
+353-page section above) 29–36 ms median warm for both, 34–114 ms first. The
+new rule costs nothing measurable: the client is rare, so each page is still
+one `range(of:)` pass. It
 runs once per Publish press, on a path that then builds or uploads for seconds
 to minutes, so it stays synchronous on the main actor.
 
@@ -267,20 +297,108 @@ to minutes, so it stays synchronous on the main actor.
   build question from a destination's: a launcher contract change Windows
   shares, for a fault that was the app's check being narrower.
 - *Removing `deploy.sh`'s rerun*: it is the only guard on the command line.
-- *Adding `LC_ALL=C` and `-s` to `deploy.sh`*: correct, but a publishing-path
-  launcher change for a state Quartz cannot produce; written down instead.
+- ~~*Adding `LC_ALL=C` and `-s` to `deploy.sh`*: correct, but a publishing-path
+  launcher change for a state Quartz cannot produce; written down instead.~~
+  **Reversed by #291**: `-z` made the invalid-byte miss whole-file and in the
+  UNSAFE direction, so `deploy.sh` now carries both (see "Bytes, not text").
 - *Reading pages as `String`*, for the reason above.
 - *Sampling the front page and a few others*: cannot promise the answer, and
   the whole walk costs about 12 ms.
 - *Moving the scan off the main actor*: unnecessary at these numbers.
 - *A home in `shared-rules.json`*: `buildFreshness` already lives in
   `app-rules.json`, and one rule gets one home.
-- *A narrower signature* (`new WebSocket('ws://localhost:`), so a page that
-  merely MENTIONS the address — a networking lesson — is not read as a
-  preview's: it would change all six readers, two of them launchers. That limit
-  is older than #136 and is [issue #291](https://github.com/russellgordon/plantoir/issues/291);
-  what #136 adds to it is only that the app now rebuilds such a course on every
-  publish too, as the launchers already did.
+- *A narrower signature*, left for later at #136 — and taken up by
+  [issue #291](https://github.com/russellgordon/plantoir/issues/291); see
+  "What is looked for" below for what was chosen and which narrower strings
+  were measured and rejected.
+
+#### What is looked for: the client's tag and first statement (GitHub #291, 2026-09-26)
+
+**The fault.** Every reader looked for the bare `ws://localhost:`, and any page
+whose note MENTIONS the address carries that. Measured in a production build of
+stock Quartz v4.5.0: one networking lesson carried it **20 times on 7 lines**
+(title, meta tags, breadcrumb, heading, link, prose, code). So a folder publish of that course waited
+30 s for a clean tree it could never get and refused, every time; on Netlify
+and Cloudflare, and in the app and the overnight check, it rebuilt on every
+publish.
+
+**The rule** (`signature` in the contract): the client's script TAG,
+`<script type="application/javascript">`, then any run of `between` bytes
+(space, tab, LF, VT, FF, CR — POSIX `[[:space:]]` in the C locale, not a
+Unicode `\s`), then the client's first statement,
+`const socket = new WebSocket('ws://localhost:`. Source: Quartz v4.5.0
+`quartz/plugins/index.ts:26-38` (an inline `afterDOMReady` script, a template
+literal with a leading newline and eight spaces) rendered by
+`quartz/util/resources.tsx:26` (`type={moduleType ?? "application/javascript"}`,
+no other attribute). Plantoir passes no `--remoteDevHost`, so the `wss://`
+branch is never taken. `asQuartzWritesIt` holds the bytes verbatim, and every
+test fixture that needs a preview's page READS it rather than retyping one — a
+retyped fixture could pass against a wrong constant.
+
+**Why a page's words cannot produce it.** Quartz writes `<` as `&lt;` in text
+AND in attribute values (measured:
+`content="&lt;script type=&quot;application/javascript&quot;> const socket = …"`
+in a meta description), Shiki splits a `js` or `html` fence into spans, and
+smartypants turns `'` into `‘` in prose. A raw `<script` can only come from raw
+HTML the teacher typed — and a page that holds the client verbatim as raw HTML
+really does open a socket to the reader's machine (`notShared` (3)).
+
+**Narrower strings, measured and rejected** (production pages of the same
+build; "match" is a false positive):
+
+| Looked for | The networking lesson | A page with no description |
+|---|---|---|
+| `ws://localhost:` (until #291) | match | match |
+| `new WebSocket('ws://localhost:` | match — the meta description (`'` is not escaped in attributes), inline `<code>`, an un-languaged fence | match |
+| `const socket = new WebSocket('ws://localhost:` | match — inline `<code>`, the un-languaged fence | match |
+| the tag, whitespace, the client, read as one record | no match | no match |
+
+And *"the tag is present and the client is present"* is wrong too: a
+production page already holds `<script type="application/javascript">` once,
+for Quartz's own inline script, so the networking lesson has both (case 10).
+The Swift therefore tries EVERY occurrence of the client, not the first — a
+preview's networking lesson mentions the statement in its words before Quartz
+writes the real client at the end of the body (case 12).
+
+**Also rejected:**
+
+- *The tag alone at the end of a line*, which a line-based grep could keep:
+  Quartz's own inline script has the same tag, and any future inline resource
+  with a leading newline would match. It marks "an inline script", not the
+  client.
+- *A marker we add* (a Quartz patch writing `data-plantoir-preview`, or a file
+  beside `public/`): every preview build already on a teacher's disk predates
+  it, so the old text rule would have to stay as a fallback — the fault again —
+  and a marker file cannot see the file-by-file mixture #136 exists for.
+- *Detecting by `--serve` in a build record*: the same transition hole, and the
+  launchers keep no such record.
+- *A tag that allows other attributes* (`<script[^>]*>`): Quartz v4.5.0 writes
+  exactly one, and a looser tag only widens what raw teacher HTML can match.
+- *Editing `deploy.ps1` from the mac*: its last mac-written port was true for
+  every site of two or more pages ("A third detail", above), and there is no
+  `pwsh` on this Mac, so it would ship unrun PowerShell on the publishing path.
+  Windows owes it on #272 and keeps the old (safe-direction) fault until then.
+- *A new activity-trail event* ("rebuilt because the site was a preview's"):
+  the piece narrows WHEN an existing behaviour fires, and what a teacher sees
+  change — the folder publish succeeds, Publish skips a needless build — is
+  already recorded by the publish and build events. If it is wanted, it is its
+  own issue on both platforms.
+
+**Jobs already scheduled keep the old line.** The overnight check is written
+into each job's script when it is scheduled, so a job set before #291 still
+greps the bare address, line by line, until it is rescheduled. That errs SAFE —
+a page that mentions the address is rebuilt every morning, as it always was —
+so nothing migrates it.
+
+**Raising Quartz means re-measuring the client's bytes.** If they move, the
+rule matches nothing, every preview reads as production, and a preview is
+PUBLISHED. Two canaries fail on that day: `verify.sh` reads the image's
+Quartz template for the client as one record in the C locale and requires the
+inline script to open with nothing but whitespace before `const socket = new
+WebSocket(` — an ADJACENCY check, so a comment or `"use strict"` inserted first
+fails it (mutation-checked); three separate fixed-string greps, its first form,
+would have passed that change (found by review) — plus the address and the
+tag's type as words (seconds, no serve cycle); and `verify-deploy.sh` reads a real serve-mode page against `asABasicRegex`.
 
 **Cancelling a publish ends it quietly (GitHub #259, 2026-09-25).** The
 progress view's Cancel types a `^C` (`ScriptRunner.cancelByUser`), which reaches
@@ -1629,7 +1747,7 @@ the shape a parser bug would hide.
 by [issue #136](https://github.com/russellgordon/plantoir/issues/136) on
 2026-09-25. **Publishing to a FOLDER, and only to a folder**, reruns the build
 itself: `deploy.sh` greps the section's whole `public/` tree for
-`ws://localhost:` and, finding it, runs `preview.sh --build-only` and passes its
+the live-reload client (`site_carries_preview_client`, #291) and, finding it, runs `preview.sh --build-only` and passes its
 exit 3 straight through (`deploy.sh:472` opens the `TO_FOLDER` branch the rerun
 sits in). The wrapper could only see that as the folder's own question, because
 the exit code is the only thing it gets. Netlify and Cloudflare do not reach it
@@ -2063,6 +2181,21 @@ do. The folder-open sweep asks the same question through the same function; two
 answers to "how late is too late for this course" is one more than anybody can
 keep in step.
 
+**The destination is read the same way, since #323.** Until then it was fixed
+when the deploy was scheduled — `scheduleDeploy` wrote each destination's
+`deploy.sh` arguments into the wrapper — so changing where a course deploys
+after scheduling sent the deploy to the OLD place, and it reported success.
+Now the run reads the course's settings when it fires and writes the wrapper
+afresh; see "Where it deploys is read when it runs (#323)" at the end of this
+page. What is read AT SCHEDULING still matters for the refusals the sheet and
+the assistants give then: since #322 either assistant reads the SAVED file
+(docs 10 → "Settings are read at the call, not when the window opened"), while
+the schedule SHEET uses the window's copy of the course, which follows a Save
+and also carries Course Settings edits not yet saved
+([issue #335](https://github.com/russellgordon/plantoir/issues/335)). Since #323
+that copy decides only what the sheet says and what `PLANTOIR_SCHEDULED_TO`
+records — the run reads the file.
+
 **Finding the course folder is not `fileExists` on a built path, and that is
 measured.** A job written before the course code went into the plist carries it
 only in its LABEL, uppercased with every non-alphanumeric turned into a hyphen —
@@ -2340,7 +2473,9 @@ not in the scan and is left standing — that is the fix.
    the boot-out-then-write sequence whose failure #195 found loses the job; it
    needs the course's CURRENT destinations and Cloudflare account to regenerate
    the wrapper, so it would change what an already-promised deploy does, not
-   only its name; and a pre-v1.2.0 plist carries no `PLANTOIR_SCHEDULED_FOR`,
+   only its name (since #323 every run reads the destinations as they are when
+   it fires, so THIS reason no longer applies; the first and third still do);
+   and a pre-v1.2.0 plist carries no `PLANTOIR_SCHEDULED_FOR`,
    so "the moment kept" would mean inventing a year. All to rename a file that
    expires by itself.
 2. *Rename in place* (rewrite `Label`, move plist/script/log, edit the
@@ -2383,3 +2518,144 @@ February: `plutil -lint` OK, `launchctl bootstrap` exit 0, `launchctl print`
 listed it, `bootout` exit 0, plist deleted, `print` afterwards exit 113 (gone).
 No teacher's job was touched. Every test uses `FakeLaunchControl` and throwaway
 agents folders.
+
+### Where it deploys is read when it runs (#323)
+
+**What was wrong, measured.** Found while planning #322. A throwaway test
+scheduled ICS3U section 1 to Netlify through the real `scheduleDeploy`, then
+rewrote `course_config.json` to a folder as Course Settings' Save does, then
+read back what launchd would run. The PLIST never carried the destination (its
+`ProgramArguments` are the app, the run flag, the wrapper path, the section flag,
+the working folder, the code and the section — which corrects the issue); the
+WRAPPER did. After the Save it still read
+`/bin/bash '…/deploy.sh' 'ICS3U' '1' '--non-interactive'`: a publish to the old
+place at half six, reported as `succeeded`.
+
+**Reading the destination is not enough on its own, and this is the trap.** A
+course switched to a Cloudflare Pages destination never deployed to would, if
+the run only re-read the destination, publish successfully to a project named by
+guesswork: `publish_to_cloudflare` (`scripts/deploy.py`) contains no
+`refuse_to_ask`, discovers a missing account from the token, suggests the name
+deterministically and creates the project. So the run re-applies everything the
+schedule sheet refuses except a time already passed — one function,
+`ScheduledDeploy.destinationRefusal`, asked at scheduling (`problem()`), at the
+run and after a Save.
+
+**What the run does now** (`runScheduled`, in this order):
+
+1. The lateness window (unchanged) — a job too late stands down `tooLateToRun`
+   whatever its settings say.
+2. The wait for the course (#156) — so a Save made while it waited counts.
+3. **The settings** (`readAtTheRun`): the course folder is found the way the
+   lateness window finds it, `course_config.json` is read, `destinationRefusal`
+   asked, and the wrapper built from `deployPlan` — the SAME function scheduling
+   uses, so an unchanged course gets a byte-identical wrapper
+   (`testAnUnchangedCourseGetsTheSameWrapperItWasScheduledWith`).
+4. **Does the job still stand?** (`jobStillStands`, the plan review's M1). Its
+   plist must still exist and still carry this run's `PLANTOIR_SCHEDULED_FOR`.
+   Before #323 a cancelled job's deleted wrapper was what stopped a run that
+   outlived its cancellation; a run that writes its wrapper afresh would bring
+   the cancelled deploy back. If the job no longer stands the run releases its
+   leases and leaves — no record, no notification, and no boot-out (a job
+   scheduled again under the same name must not be booted out).
+5. **The write** (`writeTheRunsWrapper`): over the job's OWN wrapper, and only
+   if it is still there (a cancel deletes the wrapper before the plist). The
+   permissions are not a condition — the run starts `/bin/bash <wrapper>`.
+6. **The decision** (`whatTheRunDoes`, pure and tested): the ONLY way to run is
+   a wrapper just written from the settings; a failed write stands down with
+   its own true reason, never "could not read the settings" (review M2).
+7. For a job set before #237, the record under the old folder-less name is
+   removed before the run (`clearTheOldNamedRecord`, review H1): that job's own
+   wrapper used to clear it first, and without it `fileUnderTheFolder` would
+   move LAST week's record over tonight's — a failed run announced as last
+   week's success. Must-fail: `testAnOldJobsRunIsNotReportedAsLastWeeksSuccess`.
+
+**Standing down.** A refusal releases the leases FIRST (`standDown` never
+returns, and until #323 it was only reached holding none), then records the new
+kind `couldNotRunAsSetNow` with the REASON as the record's second line — a
+clause true at the run (`ScheduledDeployRefusal.reasonClause`), which the
+sentence shows as `{reason}`. The sheet's own sentences stay for the sheet: their
+remedies ("then schedule this again", "it would wait") are false at the run and
+at a Save (review M3). Settings that cannot be read stand down too — the
+opposite of the lateness window's default, because a destination has no safe
+default. A course kept for reference is never deployed, so its stand-down has a
+sentence of its own (`sentences.couldNotRunAsSetNowForAReferenceCourse`) with no
+"deploy it yourself" in it (the #323 review's L-a).
+
+**What the job keeps.** The plist is unchanged but for ONE note,
+`PLANTOIR_SCHEDULED_TO`: the destinations' descriptions the teacher was told,
+as a JSON array. It is never read to decide
+(`testWhereItWasScheduledIsNeverUsedToDecide`); it lets the trail say when the
+run went somewhere else. (`propertyList`'s unused `deployArguments:` parameter
+went.) The wrapper is still written complete at scheduling, so the job on disk
+runs on its own under an older copy of the app.
+
+**Jobs already on disk.** Every plist since v1.2.0 runs the app, so they follow
+the rule at their next run. One set before #323 recorded nothing to compare
+with, so no "went somewhere else" line; one set before #237 keeps its old name
+for its plist, log and success note, and files its record under the folder's
+id; a plist from before v1.2.0 names no section and runs its wrapper as
+written — the one stale path left, effectively extinct. A regenerated wrapper
+also carries any fix made to the wrapper since the job was set, which is
+intended.
+
+**The trail.** New event `scheduled publish read the course's settings`
+(mustRecord), written ONLY when something differs from what the teacher was
+told: shape A, "a scheduled publish was set to deploy to Netlify; the course
+deploys to /Users/…/Sites now, so it is deploying there"; shape B, "a scheduled
+publish could not deploy the way the course is set now (…reason…)", plus where
+it was set to go and where the course deploys now when those differ. The
+stand-down's generic `scheduled deploy turned off` line follows it, the
+`courseWasBusy` precedent. Named "read" rather than "followed" because it also
+carries the runs that stood down (review L3). **Known, accepted (review L2):**
+the `scheduled publish waited … then went ahead` line is written when the wait
+ends, before the settings are read, so a run that waited and then stood down
+over its settings shows "went ahead" followed by the stand-down line.
+
+**Said at Save, while somebody is awake** (Chunk B). After a Save in Course
+Settings, for each section with a deploy set to happen on its own in THIS working
+folder and still to come: `specialNames.settingsSaveScheduledDeployCannotGoAheadAsSetNow`
+when it could not go ahead as set now (changed or not), else
+`…GoesWhereTheCourseDeploysNow` when the Save changed where the course deploys
+(the file before the Save against what it wrote — never against
+`PLANTOIR_SCHEDULED_TO`, which would repeat the sentence on every later Save).
+Nothing is refused or undone. Appended before the "saved while publishing" early
+return; the `settings saved` trail line carries the same facts
+(`SettingsSaveNotice.scheduledDeploys`, not parsed back out of the sentences).
+Contract: `savingSettings.scheduledDeploys`.
+
+**The one claim no unit test reaches, measured (review M6).** The run reads the
+Cloudflare Account ID from the app's own settings. That a launchd-started run
+reads the same defaults domain as the app was measured on 2026-09-26, Apple M4
+Pro, macOS 26.6: a scratch build of this branch, signed by the same team
+(`ca.russellgordon.Plantoir`, C7DL9Y9A7R), with a TEMPORARY flag that printed
+presence only — never a value — was run once from Terminal and once as a launchd
+job labelled `ca.russellgordon.probe323.<uuid>` (outside the deploy prefix, so no
+sweep or badge could see it), bootstrapped from a plist in the session's scratch
+folder, then booted out and confirmed gone (`launchctl print` exit 113). Both
+printed `bundle=ca.russellgordon.Plantoir accountIDPresent=true domainKeys=75`.
+The app is not sandboxed, and `--mcp-stdio` already read the same setting when
+launched by another program.
+
+**Known, not covered (review L1).** A changed Cloudflare Account ID is not
+refused at the run: "deployed before" is kept per destination TYPE, not per
+account, so a swap to another valid ID deploys to a new project in the new
+account and reports success. Attended deploys behave the same; before #323 the
+baked ID kept the old account.
+
+**Rejected** (with reasons in `scheduledDeployCancellation.theDestination.rejected`):
+re-registering the job at Save (reaches only the app's Save, puts #195's
+boot-out-then-write behind a settings button); reading the destination without
+the refusals (the Cloudflare fail-open); teaching the launchers to read the
+destination (a launcher-contract change Windows shares, and a second reader of
+the rules); the arguments in the plist (the same staleness elsewhere); parsing
+the old wrapper; falling back to the scheduled wrapper when settings cannot be
+read (the fault itself); a temporary wrapper file (everything finds the job by
+its wrapper's path); warning at Save alone.
+
+**Windows** has the same fault — `TaskScheduling.WriteWrapperScript` bakes the
+destinations and the Account ID into the `.ps1`, and Task Scheduler runs
+PowerShell with no app alive — and owes `theDestination`, the kind, the event and
+the two Save sentences. How is theirs; the mac's shape (the task launches
+`Plantoir.exe --run-scheduled-deploy`) is the likely best.
+

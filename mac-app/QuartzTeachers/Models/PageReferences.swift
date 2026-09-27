@@ -17,10 +17,14 @@ import Foundation
 /// | `<img src="/Media/x.png">` | 5 | three of them on pages inside shared folders; one is a live 1.1 MB picture |
 /// | `[text](x.png)` | 526, every one `https://` | nothing local to carry today, scanned anyway because the cost is nothing |
 ///
-/// **Fenced code is left alone.** A name inside a ``` block is prose about a
-/// file rather than a use of one, and rewriting it would edit an example a
-/// teacher wrote. Inline code spans are NOT tracked, which is a known and
-/// measured-empty gap: `WikiLinkRewriter` has the same one.
+/// **Code is left alone** — a fenced block of either character, a fence
+/// inside a callout, an inline span. A name inside code is prose about a file
+/// rather than a use of one, and rewriting it would edit an example a teacher
+/// wrote. Where code is comes from `MarkdownCode`, the one definition every
+/// link reader and rewriter on the mac shares (#313,
+/// `readingALink.whatIsCode`): a match of any of the three shapes that STARTS
+/// in code is skipped. Until #313 this walker tracked ``` and ~~~ fences
+/// itself and not inline spans, and saw no fence inside a `>` callout.
 ///
 /// `nonisolated`: pure over its arguments, and run off the main actor by the
 /// copy.
@@ -151,34 +155,40 @@ nonisolated enum PageReferences {
         }
     }
 
-    /// Walks the page a line at a time, skipping fenced code, and hands each
-    /// live line's matches to `handle`.
+    /// Walks the page a line at a time and hands each line's matches — the
+    /// ones that do not start in code — to `handle`. Code is found over the
+    /// WHOLE page, since a fence or a span can cross lines, and applied to
+    /// each line by its offset. Lines stay the unit so that no name is ever
+    /// read across a line break.
     private static func walk(_ text: String, handle: (String, [Match]) -> Void) {
-        let lines: [String] = text.components(separatedBy: "\n")
-        var insideAFence: Bool = false
-        var fenceMarker: String = ""
+        let code: [NSRange] = MarkdownCode.ranges(in: text)
+        let lines: [String] = PageReferences.lines(of: text)
+        var lineOffset: Int = 0
         for line in lines {
-            let trimmed: String = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") {
-                let marker: String = trimmed.hasPrefix("```") ? "```" : "~~~"
-                if insideAFence {
-                    if marker == fenceMarker {
-                        insideAFence = false
-                        fenceMarker = ""
-                    }
-                } else {
-                    insideAFence = true
-                    fenceMarker = marker
-                }
-                handle(line, [])
-                continue
-            }
-            if insideAFence {
-                handle(line, [])
-                continue
-            }
-            handle(line, PageReferences.matches(in: line))
+            handle(line, PageReferences.matches(in: line, code: code, lineOffset: lineOffset))
+            lineOffset += line.utf16.count + 1
         }
+    }
+
+    /// The page split at every `\n`, by UTF-16 code unit, so each line's
+    /// length is exactly its share of the offsets `MarkdownCode` works in. A
+    /// `\r` before the `\n` stays on its line, and joining with `\n` gives
+    /// the page back byte for byte. (Not `split` over `Character`s, where
+    /// `"\r\n"` is one character and never equal to `"\n"`.)
+    private static func lines(of text: String) -> [String] {
+        let units: [UInt16] = Array(text.utf16)
+        var lines: [String] = []
+        var start: Int = 0
+        var index: Int = 0
+        while index < units.count {
+            if units[index] == 0x0A {
+                lines.append(String(decoding: units[start..<index], as: UTF16.self))
+                start = index + 1
+            }
+            index += 1
+        }
+        lines.append(String(decoding: units[start..<units.count], as: UTF16.self))
+        return lines
     }
 
     /// The wikilink shape, `WikiLinkRewriter`'s own, so a target this reads is
@@ -199,19 +209,19 @@ nonisolated enum PageReferences {
     private static let markdownExpression: NSRegularExpression? =
         try? NSRegularExpression(pattern: #"\]\(([^)\s]+)"#)
 
-    private static func matches(in line: String) -> [Match] {
+    private static func matches(in line: String, code: [NSRange], lineOffset: Int) -> [Match] {
         var found: [Match] = []
         PageReferences.collect(
             PageReferences.wikilinkExpression, in: line, groups: [2],
-            kind: .wikilink, into: &found
+            kind: .wikilink, code: code, lineOffset: lineOffset, into: &found
         )
         PageReferences.collect(
             PageReferences.attributeExpression, in: line, groups: [1, 2],
-            kind: .encoded, into: &found
+            kind: .encoded, code: code, lineOffset: lineOffset, into: &found
         )
         PageReferences.collect(
             PageReferences.markdownExpression, in: line, groups: [1],
-            kind: .encoded, into: &found
+            kind: .encoded, code: code, lineOffset: lineOffset, into: &found
         )
         found.sort { first, second in
             return first.range.lowerBound < second.range.lowerBound
@@ -224,13 +234,17 @@ nonisolated enum PageReferences {
         in line: String,
         groups: [Int],
         kind: Reference.Kind,
+        code: [NSRange],
+        lineOffset: Int,
         into found: inout [Match]
     ) {
         guard let expression else {
             return
         }
-        let whole: NSRange = NSRange(line.startIndex..<line.endIndex, in: line)
-        for result in expression.matches(in: line, range: whole) {
+        let live: [NSTextCheckingResult] = MarkdownCode.matches(
+            of: expression, in: line, outside: code, offset: lineOffset
+        )
+        for result in live {
             for group in groups {
                 guard group < result.numberOfRanges,
                       let range = Range(result.range(at: group), in: line) else {
