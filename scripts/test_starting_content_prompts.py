@@ -497,11 +497,17 @@ class ExampleContentIsUnchangedTests(unittest.TestCase):
     same install against that script: 295 files, identical name list,
     identical bytes. Deterministic because the install is given a fixed
     timestamp and no class-date reference.
+
+    Moved ON PURPOSE once since: #331 (2026-09-26) corrected three
+    sentences of the template note in ADA1O's `Tasks/_DUPLICATE ME.md`,
+    which said a link inside a %% comment "still counts as a link". Checked
+    by installing against origin/dev 8c5ff37c and diffing: that one file,
+    those lines, nothing else.
     """
 
     PAYLOAD_FILE_COUNT = 295
     PAYLOAD_NAMES_HASH = "6de9b151539aeb40eae91152641a3c2870d36b9618af02a49aff30e7b516e612"
-    PAYLOAD_CONTENT_HASH = "6a2276dbbedc27c504667ffcbecb7b8f4371f31a23bbc78e50ac553011b277c9"
+    PAYLOAD_CONTENT_HASH = "8800813083c03bc1f24a2ac58a923e58dd596c9e6fda31d73a5ee5253148cf0a"
 
     def test_a_payload_course_is_installed_byte_for_byte_as_it_always_was(self):
         payload = find_example_content_dir("ADA1O")

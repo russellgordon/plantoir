@@ -36,8 +36,28 @@ short:
 3. Within a paragraph a run of N backticks opens a span that closes at the
    next run of EXACTLY N; a run never matched is plain text; outside a span a
    backslash escapes the next character; inside, backslashes are literal.
-4. Nothing else is code: not indented code, not HTML <code>, not math, not
-   %% comments (#331).
+4. Nothing else is code: not indented code, not HTML <code>, not math, and
+   not %% comments - those are masked separately, FIRST (#331, below).
+
+A comment is never a link either (#331; `readingALink.whatIsAComment`).
+Quartz v4.5.0 removes every `%%...%%` from the RAW page before it parses
+anything (`ofm.ts:130`, `:160-163`): lazy, left to right, across lines, code
+or not, and a `%%` with no partner is plain text. So this module does the
+same, in the same order: `comment_ranges` finds the comments on the page as
+written, and `code_ranges` finds code in the page WITH EVERY COMMENT REMOVED,
+mapping the ranges back to the page's own offsets. `not_a_link_ranges` is the
+two merged, and it is what every link reader and rewriter masks with.
+
+`code_ranges` still returns CODE ONLY, and that is load-bearing: the
+curriculum markers `%%curriculum-start%%` / `%%curriculum-end%%` ARE
+comments, and `build_site._curriculum_blocks_outside_code` asks whether a
+marker is in code. Folding comments into `code_ranges` would skip every
+block and empty every coverage map while the build stayed green.
+
+Rejected: finding code on the page as written (simpler). Checked against
+Quartz's order it gets two contract cases wrong - "a fence opened inside a
+comment is not a fence" and "a backtick inside a comment does not pair with
+code after it" - though both agree with Quartz over all 39,570 shipped links.
 
 Rejected: a real Markdown parser. It would judge the edges better, but the
 Swift app and the C# app cannot share it, and three readers that disagree at
@@ -118,11 +138,75 @@ def _spans_in_paragraph(text: str, start: int, end: int, ranges: list) -> None:
         position = closing_end
 
 
+def comment_ranges(text: str) -> list:
+    """
+    Every `%%...%%` comment on the page as written, as sorted (start, end)
+    pairs of code-point offsets, end exclusive, both `%%` included. Scanned
+    left to right: a `%%` opens a comment that closes at the next `%%`, across
+    lines and whether or not either sits in code; a last `%%` with no partner
+    is text. Quartz's lazy comment pattern, applied before anything else.
+    """
+    found = []
+    position = 0
+    while True:
+        start = text.find("%%", position)
+        if start < 0:
+            break
+        end = text.find("%%", start + 2)
+        if end < 0:
+            break
+        found.append((start, end + 2))
+        position = end + 2
+    return found
+
+
 def code_ranges(text: str) -> list:
     """
     Every stretch of `text` that is code, as sorted, non-overlapping
     (start, end) pairs of code-point offsets, end exclusive.
+
+    Code is found in the page with its comments removed (Quartz's order,
+    #331) and mapped back to the page's own offsets. The stripped text never
+    leaves this function: nothing may write it back. Comments are NOT in the
+    result - see the module docstring for why that matters.
     """
+    comments = comment_ranges(text)
+    if not comments:
+        return _code_ranges_as_written(text)
+    kept_pieces = []
+    origin = []
+    last = 0
+    for start, end in comments:
+        kept_pieces.append(text[last:start])
+        origin.extend(range(last, start))
+        last = end
+    kept_pieces.append(text[last:])
+    origin.extend(range(last, len(text)))
+    origin.append(len(text))
+    mapped = []
+    for start, end in _code_ranges_as_written("".join(kept_pieces)):
+        mapped.append((origin[start], origin[end - 1] + 1))
+    return mapped
+
+
+def not_a_link_ranges(text: str) -> list:
+    """
+    Code and comments together, sorted and merged: every stretch of `text` in
+    which a `[[` (or the `!` of `![[`) does not start a link.
+    """
+    both = sorted(code_ranges(text) + comment_ranges(text))
+    merged = []
+    for start, end in both:
+        if merged and start <= merged[-1][1]:
+            if end > merged[-1][1]:
+                merged[-1] = (merged[-1][0], end)
+            continue
+        merged.append((start, end))
+    return merged
+
+
+def _code_ranges_as_written(text: str) -> list:
+    """The #313 rule over `text` exactly as given (no comment removal)."""
     ranges = []
     fence_character = None
     fence_length = 0
@@ -214,14 +298,17 @@ def _range_holding(ranges: list, position: int):
 
 
 def is_in_code(ranges: list, position: int) -> bool:
-    """Whether `position` falls inside one of `ranges` (from `code_ranges`)."""
+    """Whether `position` falls inside one of `ranges` (from `code_ranges`
+    or `not_a_link_ranges`)."""
     return _range_holding(ranges, position) is not None
 
 
 def matches_outside_code(pattern, text: str, ranges: list = None, offset: int = 0):
     """
-    The matches of `pattern` in `text` that do not START inside code - the
-    one mask every link reader applies (readingALink.whatIsCode, rule 5).
+    The matches of `pattern` in `text` that do not START inside code or a
+    `%%` comment - the one mask every link reader applies
+    (readingALink.whatIsCode, rule 5, and whatIsAComment). The name is kept
+    for its callers; the default mask is `not_a_link_ranges` since #331.
 
     A match that starts in code is not merely dropped: the search starts
     again where that code ENDS. Dropping it alone would lose the real link
@@ -236,7 +323,7 @@ def matches_outside_code(pattern, text: str, ranges: list = None, offset: int = 
     reader that works one line at a time.
     """
     if ranges is None:
-        ranges = code_ranges(text)
+        ranges = not_a_link_ranges(text)
     found = []
     position = 0
     length = len(text)

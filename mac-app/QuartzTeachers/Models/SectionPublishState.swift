@@ -46,6 +46,29 @@ import Foundation
 /// The wording the teacher reads was chosen to be true either way: a page
 /// this section uses, or shares, has changed.
 ///
+/// **The fingerprint has a RULE, and the stamp says which (#330).** Rule 1
+/// is every file above; rule 2 is rule 1 less the teacher's How I Teach page
+/// at a reserved place (the top of the course, or of `section<N>/`), which
+/// never reaches the site, so editing it must not mark a section "— Edited".
+/// The fingerprint is a wire format held byte for byte by three
+/// implementations — this one, Windows' C#, and `section_fingerprint.py`,
+/// which Windows' scheduled wrapper runs — and they cannot all change in the
+/// same hour. So the change is VERSIONED rather than made: a stamp records
+/// `fingerprintRule`, a stamp without one means rule 1, and the reader
+/// computes under the rule the stamp names. This app writes rule 2; a stamp
+/// written by an older copy or by a PC is honoured as rule 1, so the upgrade
+/// itself raises no false "Edited". A rule this copy does not know counts as
+/// EDITED, for the same reason an unreadable stamp does: nothing that cannot
+/// be read may claim a section is up to date. For a course with no How I
+/// Teach page at a reserved place the two rules hash identically, which is
+/// what keeps the one accepted window narrow: a folder shared with a PC that
+/// has not yet moved can show a false "Edited" THERE, only for a course with
+/// the page, until the PC publishes (`publishedFreshness.fingerprintRules`).
+/// Rejected: changing all three unversioned (whichever side lands second
+/// gives every teacher with the page a false "Edited", and a shared folder
+/// an argument that never settles), and excluding the page by its content
+/// (the fingerprint reads no page, by design).
+///
 /// **The stamp lives in a HIDDEN folder**, which is load-bearing rather
 /// than tidy: `fingerprint(...)` skips hidden entries, so a stamp written
 /// anywhere visible would itself be content, and publishing would leave
@@ -69,9 +92,21 @@ nonisolated enum SectionPublishState {
         /// pointed somewhere else has not published THERE, and a later
         /// reader of this file should not have to guess.
         let destinations: [String]
+
+        /// The rule `fingerprint` was taken under (#330). Absent in every
+        /// stamp written before it, and by Windows until it moves, which
+        /// means rule 1.
+        var fingerprintRule: Int?
     }
 
     // MARK: - Stored properties
+
+    /// The rule this copy fingerprints and records under (#330).
+    static let currentFingerprintRule: Int = 2
+
+    /// The rules this copy can compute. A stamp naming any other counts as
+    /// edited.
+    static let knownFingerprintRules: Set<Int> = [1, 2]
 
     /// Entries that are not a teacher's content, however they are named.
     ///
@@ -106,7 +141,14 @@ nonisolated enum SectionPublishState {
     ///
     /// Named separately from the walk so the contract can be run against
     /// the RULE rather than against a folder full of fixtures.
-    static func countsTowardFingerprint(relativePath: String, sectionNumber: Int) -> Bool {
+    static func countsTowardFingerprint(
+        relativePath: String,
+        sectionNumber: Int,
+        rule: Int = SectionPublishState.currentFingerprintRule
+    ) -> Bool {
+        if rule >= 2 && HowITeachPage.isAtAReservedPlace(relativePath: relativePath) {
+            return false
+        }
         let parts: [String] = pathParts(relativePath)
         guard let fileName = parts.last else {
             return false
@@ -176,7 +218,8 @@ nonisolated enum SectionPublishState {
     static func fingerprint(
         courseDirectory: URL,
         sectionNumber: Int,
-        excludingRelativePaths: [String] = []
+        excludingRelativePaths: [String] = [],
+        rule: Int = SectionPublishState.currentFingerprintRule
     ) -> String {
         var lines: [String] = []
         let fileManager: FileManager = FileManager.default
@@ -215,7 +258,8 @@ nonisolated enum SectionPublishState {
                     forSymbolicLinkAt: fileURL,
                     relativePath: relativePath,
                     sectionNumber: sectionNumber,
-                    excluding: excludingRelativePaths
+                    excluding: excludingRelativePaths,
+                    rule: rule
                 )
                 continue
             }
@@ -229,7 +273,7 @@ nonisolated enum SectionPublishState {
                 }
                 continue
             }
-            if !countsTowardFingerprint(relativePath: relativePath, sectionNumber: sectionNumber) {
+            if !countsTowardFingerprint(relativePath: relativePath, sectionNumber: sectionNumber, rule: rule) {
                 continue
             }
             lines.append(line(forRelativePath: relativePath, values: values))
@@ -262,13 +306,15 @@ nonisolated enum SectionPublishState {
         sectionNumber: Int,
         fingerprint: String,
         destinations: [String],
+        rule: Int = SectionPublishState.currentFingerprintRule,
         at moment: Date = Date()
     ) -> Bool {
         let url: URL = stampURL(courseDirectory: courseDirectory, sectionNumber: sectionNumber)
         let stamp: Stamp = Stamp(
             fingerprint: fingerprint,
             publishedAt: moment,
-            destinations: destinations
+            destinations: destinations,
+            fingerprintRule: rule
         )
         let encoder: JSONEncoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -306,10 +352,17 @@ nonisolated enum SectionPublishState {
         guard let stamp = stamp(courseDirectory: courseDirectory, sectionNumber: sectionNumber) else {
             return false
         }
+        // Compared under the rule the stamp was taken under: an old stamp,
+        // or a PC's, is rule 1, so upgrading raises no false "Edited" (#330).
+        let rule: Int = stamp.fingerprintRule ?? 1
+        if !knownFingerprintRules.contains(rule) {
+            return true
+        }
         let current: String = fingerprint(
             courseDirectory: courseDirectory,
             sectionNumber: sectionNumber,
-            excludingRelativePaths: excludingRelativePaths
+            excludingRelativePaths: excludingRelativePaths,
+            rule: rule
         )
         return stamp.fingerprint != current
     }
@@ -381,12 +434,13 @@ nonisolated enum SectionPublishState {
         forSymbolicLinkAt linkURL: URL,
         relativePath: String,
         sectionNumber: Int,
-        excluding: [String]
+        excluding: [String],
+        rule: Int
     ) {
         let resolved: URL = linkURL.resolvingSymlinksInPath()
         let values = try? resolved.resourceValues(forKeys: wantedKeys)
         if values?.isRegularFile == true {
-            if countsTowardFingerprint(relativePath: relativePath, sectionNumber: sectionNumber) {
+            if countsTowardFingerprint(relativePath: relativePath, sectionNumber: sectionNumber, rule: rule) {
                 lines.append(line(forRelativePath: relativePath, values: values))
             }
             return
@@ -418,7 +472,7 @@ nonisolated enum SectionPublishState {
             if isExcluded(relativePath: innerRelative, by: excluding) {
                 continue
             }
-            if !countsTowardFingerprint(relativePath: innerRelative, sectionNumber: sectionNumber) {
+            if !countsTowardFingerprint(relativePath: innerRelative, sectionNumber: sectionNumber, rule: rule) {
                 continue
             }
             lines.append(line(forRelativePath: innerRelative, values: innerValues))

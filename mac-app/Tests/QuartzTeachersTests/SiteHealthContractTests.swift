@@ -28,6 +28,58 @@ final class SiteHealthContractTests: XCTestCase {
         siteHealth = try XCTUnwrap(all["siteHealth"] as? [String: Any])
     }
 
+    /// `siteHealth.linksIntoHiddenPages.cases` through the mac's own reader of
+    /// the same question, `AssistSectionGraph.linksIntoHiddenPages` — the one
+    /// check_section answers with (#333). The build's reader runs the same
+    /// cases in `scripts/test_links_into_hidden_pages.py`; if the two stopped
+    /// agreeing, a teacher would be told different things by the build and by
+    /// the assistant about the same links.
+    func testTheLinksIntoHiddenPagesCasesHoldForTheSectionGraph() throws {
+        let block: [String: Any] = try XCTUnwrap(siteHealth["linksIntoHiddenPages"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(block["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 10, "the contract lost cases")
+        for oneCase in cases {
+            let name: String = try XCTUnwrap(oneCase["name"] as? String)
+            let laidOut: [[String: Any]] = try XCTUnwrap(oneCase["pages"] as? [[String: Any]], name)
+            var pages: [AssistSectionPage] = []
+            for laid in laidOut {
+                let path: String = try XCTUnwrap(laid["path"] as? String, name)
+                let body: String = laid["body"] as? String ?? ""
+                let visible: Bool = laid["visible"] as? Bool ?? true
+                let url: URL = URL(fileURLWithPath: "/c/ICS3U/\(path)")
+                var withinSection: String = path
+                if path.hasPrefix("section1/") {
+                    withinSection = String(path.dropFirst("section1/".count))
+                }
+                pages.append(AssistSectionPage(
+                    title: url.deletingPathExtension().lastPathComponent,
+                    displayTitle: url.deletingPathExtension().lastPathComponent,
+                    fileURL: url, relativePath: path,
+                    isSectionLocal: path.hasPrefix("section1/"),
+                    isVisibleToStudents: visible, visibilityIsCertain: true, date: nil,
+                    linkedTitles: AssistSectionGraph.linkTargets(in: body),
+                    classFolderNames: ["All Classes"], pathWithinSection: withinSection
+                ))
+            }
+            let graph: AssistSectionGraph = AssistSectionGraph(courseCode: "ICS3U", sectionNumber: 1, pages: pages)
+            var found: [[String]] = []
+            for link in graph.linksIntoHiddenPages() {
+                var from: String = link.fromRelativePath
+                if from.lowercased().hasSuffix(".md") {
+                    from = String(from.dropLast(3))
+                }
+                found.append([from, link.toTitle])
+            }
+            let expected: [[String]] = try XCTUnwrap(oneCase["expect"] as? [[String]], name)
+            var expectedByTitle: [[String]] = []
+            for pair in expected {
+                let to: String = (pair[1] as NSString).lastPathComponent
+                expectedByTitle.append([pair[0], to])
+            }
+            XCTAssertEqual(found, expectedByTitle, name)
+        }
+    }
+
     func testTheMarkerPrefixMatchesTheContract() throws {
         let marker: [String: Any] = try XCTUnwrap(siteHealth["marker"] as? [String: Any])
         let prefix: String = try XCTUnwrap(marker["prefix"] as? String)
