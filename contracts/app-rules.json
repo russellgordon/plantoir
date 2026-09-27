@@ -1,4 +1,205 @@
 {
+  "builderWarmUp" : {
+    "appliesOn" : [
+      "mac"
+    ],
+    "appliesOnWhy" : "PERMANENT: Windows builds natively. PlantoirSetup.exe carries its whole runtime and nothing is downloaded or built for building (documentation/12-windows-app.md, the like-for-like table), so there is no builder to get ready in the background.",
+    "launcher" : "setup.sh --prepare-builder, run from ~/Library/Application Support/Plantoir/getting-ready, which holds that launcher and a mirror of the recipe made by the same function that mirrors a working folder's .toolchain, so the image built is the one every working folder's launchers look for (its tag is a hash of the recipe). It installs what the builder needs, starts it and builds it, then stops: no courses folder, no workspace, no builds folder. `setup.sh --builder-tag` prints BUILDER_TAG=<name> for the same recipe and starts nothing.",
+    "note" : "Getting the website builder ready in the background at first launch, and at the first launch of each new version, so the first preview is fast (bundle B; Russell's change of 2026-09-26, which replaced a 'decision' issue). The mac only, permanently: Windows carries its runtime and builds natively, with nothing to download or build first (appliesOn).",
+    "readyLine" : "BUILDER_READY=",
+    "record" : "getting-ready/ready-for.txt holds the builder's name ('teaching-quartz:src-55e586fe') from the BUILDER_READY= line of the last run that printed it. A run that did not is not recorded, so the next launch tries again. At launch the app asks `setup.sh --builder-tag` (which starts nothing) for the name the recipe it carries would have, and warms up only when the two differ.",
+    "rejected" : [
+      "Waiting in the app: a preview started from the command line, the assistant's server or a scheduled publish would not wait, and 'the app remembers to' is the kind of rule that is forgotten at the next new entry point. The launchers are where every path meets.",
+      "A status window or a progress bar: background work the teacher did not ask for gets one plain line.",
+      "Waiting for a working folder to be chosen: the folder's .toolchain exists only once it holds a course, and the wizard is the time this spends.",
+      "Stopping it at quit: what it downloaded would be wasted, and #220's quit path already leaves the builder running while any launcher is.",
+      "Asking first: Russell's decision, 2026-09-26, that the download may happen before the teacher asks (the plan had proposed it as a decision)."
+    ],
+    "sequences" : {
+      "cases" : [
+        {
+          "expectBuilds" : 1,
+          "name" : "a preview that arrives mid-build waits, then builds nothing",
+          "steps" : [
+            "the warm-up holds the turn and is building",
+            "a preview asks for the turn and waits, saying the waiting line once",
+            "the warm-up finishes the image and hands the turn back",
+            "the preview takes the turn, finds the image ready, builds nothing, and hands the turn back"
+          ]
+        },
+        {
+          "expectBuilds" : 1,
+          "name" : "course creation that arrives mid-build does the same",
+          "steps" : [
+            "the warm-up holds the turn and is building",
+            "Create's setup.sh waits",
+            "the warm-up hands the turn back",
+            "setup.sh finds the image ready and builds nothing"
+          ]
+        }
+      ]
+    },
+    "startsWhen" : {
+      "cases" : [
+        {
+          "expect" : "start",
+          "expectTrail" : "builder got ready in the background: started",
+          "facts" : {
+            "carriesTheRecipe" : true,
+            "isAnAppLaunch" : true,
+            "network" : "online",
+            "readyForThisRecipe" : false
+          },
+          "name" : "the first launch, online"
+        },
+        {
+          "expect" : "start",
+          "expectTrail" : "builder got ready in the background: started",
+          "facts" : {
+            "carriesTheRecipe" : true,
+            "isAnAppLaunch" : true,
+            "network" : "online",
+            "readyForThisRecipe" : false
+          },
+          "name" : "the first launch with a new recipe",
+          "why" : "The recipe changes only with the app, so a new recipe's builder is a new image; getting it ready now keeps the first preview after an update fast (an existing Mac re-downloads about 130 MB of it, #334). Keyed on the recipe's own hash, not the version: a development build whose version never changes still gets a new recipe ready, and a release with an unchanged recipe starts nothing (implementation review N2)."
+        },
+        {
+          "expect" : "skip",
+          "expectTrail" : null,
+          "facts" : {
+            "carriesTheRecipe" : true,
+            "isAnAppLaunch" : true,
+            "network" : "online",
+            "readyForThisRecipe" : true
+          },
+          "name" : "this recipe's builder is already ready",
+          "why" : "Every later launch. No line: it would be on nearly every launch."
+        },
+        {
+          "expect" : "skip",
+          "expectTrail" : "builder got ready in the background: skipped",
+          "facts" : {
+            "carriesTheRecipe" : true,
+            "isAnAppLaunch" : true,
+            "network" : "offline",
+            "readyForThisRecipe" : false
+          },
+          "name" : "offline",
+          "why" : "Russell, 2026-09-26: offline it says nothing to the teacher, and the old on-demand path runs at the first preview."
+        },
+        {
+          "expect" : "skip",
+          "expectTrail" : "builder got ready in the background: skipped",
+          "facts" : {
+            "carriesTheRecipe" : true,
+            "isAnAppLaunch" : true,
+            "network" : "lowDataMode",
+            "readyForThisRecipe" : false
+          },
+          "name" : "Low Data Mode",
+          "why" : "The teacher has asked apps not to download what they were not asked for, and ~340 MB is exactly that."
+        },
+        {
+          "expect" : "skip",
+          "expectTrail" : null,
+          "facts" : {
+            "carriesTheRecipe" : true,
+            "isAnAppLaunch" : false,
+            "network" : "online",
+            "readyForThisRecipe" : false
+          },
+          "name" : "a headless run (the assistant's server, a scheduled publish, the contract writer)"
+        },
+        {
+          "expect" : "skip",
+          "expectTrail" : null,
+          "facts" : {
+            "carriesTheRecipe" : false,
+            "isAnAppLaunch" : true,
+            "network" : "online",
+            "readyForThisRecipe" : false
+          },
+          "name" : "an app that carries no recipe"
+        },
+        {
+          "expect" : "start",
+          "expectTrail" : "builder got ready in the background: started",
+          "facts" : {
+            "carriesTheRecipe" : true,
+            "isAnAppLaunch" : true,
+            "network" : "online",
+            "readyForThisRecipe" : false
+          },
+          "name" : "a warm-up that did not finish is tried again at the next launch",
+          "why" : "Only a run that printed the ready line writes the version down, so a failed or interrupted one leaves nothing that would stop the next launch trying."
+        }
+      ],
+      "note" : "BuilderWarmUp.decide over these facts. readyForThisRecipe compares the name `setup.sh --builder-tag` prints for the recipe the app carries (the launchers' own hash) with the one getting-ready/ready-for.txt holds. network is 'online', 'offline' (no usable path, or no answer within three seconds) or 'lowDataMode'."
+    },
+    "tagLine" : "BUILDER_TAG=",
+    "turn" : {
+      "cases" : [
+        {
+          "expect" : "takes",
+          "expectWaitingLine" : false,
+          "holder" : "none",
+          "name" : "nobody holds the turn"
+        },
+        {
+          "expect" : "waits, then takes it when the holder hands it back",
+          "expectWaitingLine" : true,
+          "holder" : "running",
+          "name" : "another launcher is getting the builder ready",
+          "why" : "A Create or Preview that arrives while the background warm-up is building waits for it, rather than starting a second build of the same recipe."
+        },
+        {
+          "expect" : "takes",
+          "expectWaitingLine" : false,
+          "holder" : "gone",
+          "name" : "the holder has gone",
+          "why" : "A launcher that was killed, or a Mac restarted mid-build, must not leave every later launcher waiting for ever."
+        },
+        {
+          "expect" : "waits",
+          "expectWaitingLine" : true,
+          "holder" : "unwrittenRecent",
+          "name" : "a turn with no holder written yet, less than a minute old",
+          "why" : "Between making the turn and writing its id there is a moment; a second launcher must not take a turn another has just taken."
+        },
+        {
+          "expect" : "takes",
+          "expectWaitingLine" : false,
+          "holder" : "unwrittenOld",
+          "name" : "a turn with no holder written, more than a minute old"
+        },
+        {
+          "expect" : "takes",
+          "expectWaitingLine" : false,
+          "holder" : "reused",
+          "name" : "the holder's id now belongs to a process that started after the turn was taken",
+          "why" : "A holder that died uncleanly, whose id a long-lived process later reused, would otherwise be waited on for as long as that process lives - a scheduled publish included (implementation review N1)."
+        },
+        {
+          "expect" : "takes",
+          "expectWaitingLine" : false,
+          "holder" : "pastTheCeiling",
+          "name" : "a turn older than the ceiling",
+          "why" : "No builder takes two hours to get ready; the ceiling bounds the wait whatever the id says."
+        }
+      ],
+      "folder" : "~/Library/Application Support/Plantoir/getting-ready.turn",
+      "rule" : "One launcher at a time starts the builder and builds it. The turn is taken (mkdir) before the builder is started and handed back as soon as the image is ready - never held through a build of a site or a publish; deploy.sh hands it back after starting the builder and takes it again only if it has to build the image to make a workspace. It holds the holder's process id. A turn is taken over when its holder is not running, when the process now holding its id started AFTER the turn was taken (the id was reused), or when it is older than a ceiling (two hours); one with no id yet is waited on for a minute. Handed back on any exit.",
+      "where" : "The GETTING-READY TURN BLOCK, identical in setup.sh, preview.sh and deploy.sh, run for real by scripts/test_getting_ready_turn.py."
+    },
+    "why" : "Measured for #334 and #312: a first preview on a new Mac spent 22-27 s starting the builder from the app's disk and 88-137 s building the website builder in a fresh 3-CPU virtual machine (49 s on this M4 Pro), downloading ~340 MB, before any page appeared. The teacher spends that long in the wizard anyway.",
+    "wording" : {
+      "statusLine" : "Getting this Mac ready to build your websites…",
+      "statusLineWhere" : "One line at the foot of the sidebar, while it runs; nothing else is ever shown, and nothing at all when it is skipped or fails.",
+      "waitingLine" : "⏳ Building your website builder — this Mac is already getting it ready, so this waits for that to finish…",
+      "waitingLineWhy" : "Printed once, after a couple of seconds, by a launcher waiting for the turn. It carries 'Building your website builder', the words the app's progress bar matches (milestones), so a waiting Create or Preview shows the step it is really waiting on."
+    }
+  },
   "buildFreshness" : {
     "buildStartedMarker" : {
       "file" : ".build-started",
@@ -3886,6 +4087,72 @@
       ],
       "note" : "Which files a section's fingerprint is taken over, as relative paths inside `courses/<CODE>/`, for section 1. Derived from what is on disk rather than from `shared_folders` / `per_section_folders`: `build_site.py` DISCOVERS new folders at publish time and appends them to those lists AFTERWARDS, so a folder made this morning is a real input the configuration does not know about yet."
     },
+    "filesCountedUnderRule2" : {
+      "cases" : [
+        {
+          "counts" : false,
+          "path" : "How I Teach.md",
+          "why" : "The page, at the top of the course."
+        },
+        {
+          "counts" : false,
+          "path" : "how i teach.md",
+          "why" : "The file system is case-insensitive; the rule folds A-Z."
+        },
+        {
+          "counts" : false,
+          "path" : "HOW I TEACH.MD",
+          "why" : "The extension is folded too."
+        },
+        {
+          "counts" : false,
+          "path" : "section1/How I Teach.md",
+          "why" : "The top of this section's folder, which the build copies to the same place and keeps off too."
+        },
+        {
+          "counts" : true,
+          "path" : "Unit 1/How I Teach.md",
+          "why" : "Inside a folder it is an ordinary page, published unless it says otherwise."
+        },
+        {
+          "counts" : true,
+          "path" : "How I Teach 1.md",
+          "why" : "Obsidian's name for a duplicate is an ordinary page."
+        },
+        {
+          "counts" : true,
+          "path" : "How İ Teach.md",
+          "why" : "A non-ASCII look-alike (dotted capital I). Pinned so both implementations are held to the ASCII-only fold rather than to whatever their own lowercasing does."
+        },
+        {
+          "counts" : true,
+          "path" : "course_config.json",
+          "why" : "Everything rule 1 counts still counts."
+        }
+      ],
+      "note" : "Rule 2 (fingerprintRules), for section 1. filesCounted's cases hold under both rules: none of them is the How I Teach page.",
+      "sectionNumber" : 1
+    },
+    "fingerprintRules" : {
+      "absentMeans" : 1,
+      "current" : 2,
+      "meanwhile" : "Windows alone: unaffected. A course folder shared by a Mac and a PC: the mac reads the PC's stamps correctly as rule 1; the PC reads the mac's rule-2 stamps as rule 1, which is a false '- Edited' only when that course has a How I Teach page at a reserved place, and clears at the PC's next publish. Accepted.",
+      "pythonDefault" : "section_fingerprint.py takes --rule 2 (only before its positional arguments) and DEFAULTS TO 1 until Windows moves the C#, the wrapper and the stamp together: a rule-2 value compared under rule 1 is the false '- Edited' this exists to remove.",
+      "readerAndWriter" : "Compute under the rule the stamp names (absent = 1); a rule this copy does not know counts as EDITED, as an unreadable stamp does. Record the current rule with every fingerprint taken for recording, in the same stamp.",
+      "rejected" : [
+        "Changing all three implementations at once, unversioned (above).",
+        "Excluding the page by its content (frontmatter): the fingerprint deliberately reads no page (SectionPublishState's header).",
+        "Flipping section_fingerprint.py's default to 2 now: it moves the false '- Edited' onto every Windows teacher who schedules."
+      ],
+      "rules" : {
+        "1" : "Every file filesCounted counts.",
+        "2" : "Rule 1 less the teacher's How I Teach page at a reserved place: the top of the course, or the top of section<N>/ (shared-rules.json -> howITeachPage, compared with its matching rule: NFC, then only A-Z folded). Inside any other folder it is an ordinary page and counts; a look-alike name counts."
+      },
+      "stampField" : "fingerprintRule",
+      "unknownMeans" : "edited",
+      "whoComputes" : "The mac: Swift, in-process, interactive and launchd alike (it never runs section_fingerprint.py). Windows interactive: C#. Windows scheduled: scripts/section_fingerprint.py, run by the wrapper, whose value the C# app records and compares. So the coupling that must never break is C# <-> Python, both on Windows.",
+      "why" : "#330. #209 kept the How I Teach page off the site, but it still counted toward the fingerprint, so editing a page students never see marked the section '- Edited'. The fingerprint is a wire format held byte for byte by three implementations that cannot land in the same hour, so the change is versioned: an unversioned change would give whichever side lands second a false '- Edited' for every teacher with the page until their next publish, and a shared folder an argument that never settles. The two rules hash identically for a course with no such page, so an upgrade costs nothing there; a course WITH one pays one '- Edited' on the first edit of that page after the upgrade (its stamp is still rule 1), and the next publish writes rule 2."
+    },
     "marker" : {
       "cases" : [
         {
@@ -3927,6 +4194,51 @@
       "note" : "A course whose 'publish to a folder on this computer' destination points INSIDE its own course folder. deploy.py writes the whole built site there, so counting it would make every publish feed the next one and the window would say \" — Edited\" permanently.",
       "rule" : "Exclude the configured local destination, and everything under it, when it resolves to a path inside the course folder. A destination anywhere else changes nothing."
     },
+    "stampRuleCases" : {
+      "cases" : [
+        {
+          "change" : "nothing",
+          "expectEdited" : false,
+          "name" : "an old stamp and nothing changed",
+          "stampRule" : null,
+          "why" : "An old stamp is read as rule 1 and compared under rule 1, so upgrading raises no false '- Edited'."
+        },
+        {
+          "change" : "howITeachPage",
+          "expectEdited" : true,
+          "name" : "an old stamp and the How I Teach page edited",
+          "stampRule" : null,
+          "why" : "The one-time cost for an upgrading course that has the page: its stamp is rule 1, under which the page counts. The next publish writes rule 2."
+        },
+        {
+          "change" : "howITeachPage",
+          "expectEdited" : false,
+          "name" : "a rule 2 stamp and the How I Teach page edited",
+          "stampRule" : 2,
+          "why" : "The point of #330: a page students never see is not an edit to their site."
+        },
+        {
+          "change" : "lesson",
+          "expectEdited" : true,
+          "name" : "a rule 2 stamp and a lesson edited",
+          "stampRule" : 2
+        },
+        {
+          "change" : "nothing",
+          "expectEdited" : true,
+          "name" : "a stamp naming a rule this copy does not know",
+          "stampRule" : 3,
+          "why" : "Nothing that cannot be read may claim a section is up to date."
+        },
+        {
+          "name" : "a course without the page hashes the same under both rules",
+          "sameUnderBothRules" : true,
+          "why" : "What keeps the upgrade and the shared-folder window narrow.",
+          "withoutTheHowITeachPage" : true
+        }
+      ],
+      "note" : "Each case is a course folder holding 'How I Teach.md' at its top and 'Unit 1/Lesson.md' (unless withoutTheHowITeachPage), published with a stamp taken under stampRule (null = no fingerprintRule field, which means 1), then changed: 'nothing', 'howITeachPage' (the page rewritten with different bytes) or 'lesson'."
+    },
     "whenRecorded" : [
       {
         "expectRecorded" : true,
@@ -3956,6 +4268,12 @@
       {
         "path" : "a deploy scheduled to run overnight records the same way",
         "why" : "FOUND BY REVIEW. A scheduled deploy never goes through the app's deploy runner - launchd runs a generated shell script - so it published perfectly and left the window saying \" — Edited\" until somebody published again by hand, the flagship 'publish tomorrow's class' feature disagreeing with the title bar. The script now tracks every destination's own result and writes a sentinel naming where it went; the app fingerprints BEFORE running the script and records afterwards only if the sentinel is there."
+      },
+      {
+        "alsoRecords" : "fingerprintRule: the rule the fingerprint was taken under (fingerprintRules.current on the mac)",
+        "expectRecorded" : true,
+        "when" : "the stamp is written",
+        "why" : "#330: a reader compares under the stamp's own rule, so an old stamp is never judged by a new rule."
       }
     ],
     "whenShown" : [

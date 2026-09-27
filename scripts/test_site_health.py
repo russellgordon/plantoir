@@ -63,6 +63,8 @@ class SiteHealthTests(unittest.TestCase):
             {"section_index_exists": False},
             {"hand_written_coverage_page": True},
             {"unreadable_pages": [{"page": "Concepts/Arrays", "line": 4}]},
+            {"links_into_hidden_pages": [{"from": "section1/All Classes/Unit 1, Day 2",
+                                          "to": "Concepts/Evidence"}]},
         ):
             broken = dict(HEALTHY)
             broken.update(facts)

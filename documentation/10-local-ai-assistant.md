@@ -2248,8 +2248,8 @@ paragraph on its own), a table row or a rule line such as frontmatter's
 `---` — and a run of N
 backticks closes on the next run of EXACTLY N; a run never closed is plain
 text; outside a span a backslash escapes. Nothing else is code: not indented
-code, not HTML `<code>`, not math, not `%%` comments (a separate question,
-[#331](https://github.com/russellgordon/plantoir/issues/331)). A link is in
+code, not HTML `<code>`, not math, and not `%%` comments — those are masked
+separately, FIRST, and code is found in what is left (#331, below). A link is in
 code when its `[[`, or the `!` of `![[`, starts inside a code range. **And a
 match that starts in code is not merely dropped: the search starts again where
 that code ENDS.** The link pattern crosses a `[`, so in "Type `` `[[` `` to
@@ -2370,8 +2370,8 @@ rewritten become more correct, not untrue.
   tracking rejected above, to "correctly" hide seven links on a page whose
   author plainly meant them.
 - **Stripping `%%` comments in the same change** — not this question and not
-  measured for its effect on publishing:
-  [#331](https://github.com/russellgordon/plantoir/issues/331).
+  measured for its effect on publishing then; done since, measured, as
+  [#331](https://github.com/russellgordon/plantoir/issues/331) (below).
 
 **Not covered, on purpose — readers of one fixed shape, not of links in
 general, named so nobody has to find them again** (from the implementation
@@ -2386,6 +2386,95 @@ counts as "already there" and the real mention is not added; and
 the BUILT copy only, so an example in code is displayed shortened and the
 teacher's file is untouched. Each would take the mask in a line; none has
 shipped content that reaches it.
+
+#### A comment is never a link (#331)
+
+**The rule** (`shared-rules.json` → `readingALink.whatIsAComment` and
+`commentIsNeverALink`). Quartz v4.5.0 removes every `%%…%%` from the RAW page
+before it reads anything (`ofm.ts:130`, in `textTransform` at `:160–163`), so
+nothing written inside a comment is ever drawn — link, embed or example. Every
+reader and rewriter now does the same, in the same order:
+
+1. **Comments first**, over the page as written: a `%%` opens a comment that
+   closes at the NEXT `%%`, across lines, whether or not either sits in code;
+   a last `%%` with no partner is text. (So `%%` inside inline code still
+   opens a comment, as it does in Quartz.)
+2. **Then code** — the #313 rule, unchanged — found in the page WITH EVERY
+   COMMENT REMOVED, and mapped back to the page's own offsets: a range
+   `[s, e)` of the stripped text becomes `[origin[s], origin[e-1]+1)`. The
+   stripped text never leaves the function, so no rewriter can write it back.
+3. **A link is not a link** when its `[[` (or the `!` of `![[`) starts inside a
+   comment or inside code, and the search resumes where that range ends.
+
+On the mac: `MarkdownCode.commentRanges(in:)`, `ranges(in:)` (code only,
+found after comments are removed, in UTF-16 throughout — `%` is ASCII) and
+`notALinkRanges(in:)`, the merge, which `WikiLinkRewriter.linkMatches`,
+`FolderPathRewriter` and `PageReferences` use — so publishing, dating, the
+site check, the links answer, copying, renames and insertion all agree. The
+build's twin is `markdown_code.py` (`comment_ranges`, `code_ranges`,
+`not_a_link_ranges`, and `matches_outside_code`'s default mask).
+
+**The trap, and the reason `ranges(in:)` still returns code only.** The
+curriculum markers `%%curriculum-start%%` / `%%curriculum-end%%` ARE
+comments — Quartz pairs lazily, so each marker is a whole comment and the
+block between them is NOT inside one. A reader that asks "is this MARKER in
+code?" must not see them masked, or every block is skipped and the coverage
+map goes empty while the build succeeds. So the two questions stay separate,
+and `readingALink.cases` → "the curriculum markers are comments, and what
+sits between them is not" pins it.
+
+**Measured** in Quartz's own order (comment removal, then remark-parse 11 +
+gfm 4) over all of `support/`: of 39,570 matches, 37,337 are plain links,
+1,139 in inline code, 750 in fenced code and **344 inside a comment** — all
+in skeletons, naming What This Site Can Do (294) or Help Sessions (50), and
+every reader before #331 followed them. 100 page-to-page edges existed only
+inside comments, none from a class page: no class page of 3,258 in the
+payloads, 600 in the skeletons and 86 in the example course reaches fewer
+pages, and both targets keep plain links, so check_section gains no orphan.
+The rule agrees with Quartz on all 39,570 and on all 21 matches in the 12 new
+cases, and changes none of the 40 existing ones.
+
+**Cases:** `readingALink.cases` 40 → 52; one each in
+`followingLinks.publishing` (an answer key named in a teacher's note is not
+published), `renamingTheUnitWord.linkCases`, `specialNames.renameFolder.linkRewriting`
+(Windows goes red on it until it masks comments) and
+`copyingAPageBetweenCourses`.
+
+**Rejected:**
+- **Finding code on the page as written (R1)** and masking comments too. It is
+  simpler and agrees with Quartz over the whole corpus, but gets two of the
+  twelve cases wrong: a fence opened inside a comment is read as a real fence
+  and swallows the link after it, and a backtick inside a comment pairs with
+  one after it and hides a real link. The cases decide, not the corpus.
+- **Rewriters that keep updating links inside comments**, so a private note
+  stays accurate: two definitions of a link again, and a rename plan counting
+  links publishing does not follow. Obsidian is believed not to index links
+  inside `%%` either — NOT measured.
+- **Treating a curriculum block as one comment**: Quartz pairs lazily, and the
+  block's contents are on the site and are links.
+
+**Found on the way:** AVI1O's and TEJ4M's `Tasks/_DUPLICATE ME.md` wrote
+"%%" in the prose of their teacher note, which closed the comment early and
+put the rest of the note on the site of every copy a teacher published (new
+courses only; the lint now refuses an odd `%%` count); and three template
+notes told teachers a link in a comment "still counts as a link everywhere
+else" — false since #331, and corrected.
+
+#### Markdown-style links to pages (folded into #325)
+
+Until bundle B the walks — publishing, the unpublish referrer test, the links
+question, check_section — read wikilinks only. `AssistSectionGraph.everyLinkAsWritten`
+now also reads `[text](Notes.md)`, `[text](Unit%202/Quiz%201.md#part-a)` and
+`[text](<Unit 2/Worksheet 2.md>)`, each shape by ONE of `FolderPathRewriter`'s
+two patterns, through the same code and comment mask, in page order among the
+wikilinks. A destination is cut at `#` or `?`, percent-decoded, and resolved
+by its last component like a wikilink; one with a scheme (`https:`,
+`mailto:`), one starting `//`, or a bare `#heading` names no page. Rule and
+cases: `shared-rules.json` → `followingLinks.markdownStyleLinks`, +2
+publishing cases, +1 unpublishing case; the build's link check reads the same
+(`_links_as_written_in_order`). Measured at one local Markdown link in
+`support/` (ENL1W's, itself dead, now a wikilink). **Not done:** a page rename
+does not rewrite a Markdown-style link.
 
 ### No booleans, and separate verbs
 
@@ -5727,13 +5816,15 @@ bundle C). REJECTED: leaving an empty page counted as written.
 
 ### What is deliberately not in this piece
 
-- The section's "— Edited" fingerprint still counts the page, so editing it
-  makes the next Publish rebuild although the site would not change — a wire
-  format held byte for byte in three implementations; follow-up
-  [#330](https://github.com/russellgordon/plantoir/issues/330).
-- A button to open or create the page — was a follow-up; it shipped in
+- ~~The section's "— Edited" fingerprint still counts the page~~ — done,
+  versioned, by [#330](https://github.com/russellgordon/plantoir/issues/330):
+  the stamp records `fingerprintRule`, and rule 2 leaves the page out
+  ([05 → The — Edited marker](05-build-pipeline.md)).
+- A button to open or create the page — shipped in
   [#329](https://github.com/russellgordon/plantoir/issues/329) as Course
-  Settings' How I Teach row (below, and documentation/09).
+  Settings' How I Teach row (above, and documentation/09). The page it makes
+  is left out of the "— Edited" fingerprint by #330's rule 2 like any How I
+  Teach page, written or not, so starting one never marks a section edited.
 - No starter page from the wizard, `setup_course.py` or a payload: a template is
   text an agent would read as the teacher's approach.
 - The local assistant neither reads nor drafts it.
@@ -6183,8 +6274,19 @@ Only the assistant's publish is transitive. A teacher who publishes Day 2 by
 changing its page in Obsidian after this ran gets Day 2 live with links to the
 concepts that went into draft — before, those concepts were visible, so the one
 flag was enough. The plan and the sheet say so (`publishingFromNowOn`), and
-[issue #333](https://github.com/russellgordon/plantoir/issues/333) is the fix
-(a build warning, or the app's publish following the assistant's rule).
+[issue #333](https://github.com/russellgordon/plantoir/issues/333) is the fix,
+and since bundle B it is the BUILD WARNING: the next build names every link on
+a page students can see that leads to a page they cannot (`linksIntoHiddenPages`,
+[05 → Links into hidden pages](05-build-pipeline.md)); the app's publish does
+not take pages along. **So the first build after Get Ready lists links, and
+they are true:** the pages Get Ready keeps (Day 1, what it links to, Key Links)
+still link to pages first used by later classes, which it hid — exactly the
+links its own sheet lists under "links left pointing at hidden pages". The
+front page's embed is not among them; Get Ready repoints it. The warning
+clears as those classes are published. Ruled 2026-09-27 (implementation
+review S1): the warning stays, and Get Ready keeps what it keeps. The sheet
+and the build now say the same thing in two places; making the sheet say the
+next build will list them is a wording-pass question, not done here.
 
 ### check_section's third group, "linked but missed"
 

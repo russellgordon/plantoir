@@ -103,6 +103,97 @@ final class MarkdownCodeTests: XCTestCase {
         XCTAssertEqual(renamed, "```\r\n![[a.png]]\r\n```\r\n![[b.png]]\r\n")
     }
 
+    // MARK: - Comments (#331)
+
+    /// `%%` pairs left to right, lazily, across lines; a last `%%` with no
+    /// partner is text.
+    func testCommentRangesPairLeftToRight() {
+        XCTAssertEqual(
+            MarkdownCode.commentRanges(in: "a %%b%% c %%d"),
+            [NSRange(location: 2, length: 5)]
+        )
+        XCTAssertEqual(MarkdownCode.commentRanges(in: "%%\n%%"), [NSRange(location: 0, length: 5)])
+    }
+
+    /// `ranges(in:)` is CODE ONLY. The curriculum markers are comments, and a
+    /// reader asking whether a marker is in code must not see them masked, or
+    /// every block is skipped and the coverage map goes empty.
+    func testCodeRangesHoldCodeOnly() {
+        let text: String = "%%curriculum-start%%\n![[A1.1]]\n%%curriculum-end%%\n"
+        XCTAssertEqual(MarkdownCode.ranges(in: text), [])
+        XCTAssertEqual(MarkdownCode.notALinkRanges(in: text).count, 2)
+        XCTAssertEqual(AssistSectionGraph.linksAsWritten(in: text), ["A1.1"])
+    }
+
+    /// The comment scan and the mapping back are in UTF-16 code units: done
+    /// in `Character`s or scalars, an emoji before a comment would shift every
+    /// range after it by one.
+    func testOffsetsLineUpAfterAnEmojiBeforeAComment() {
+        let text: String = "🙂 %% [[Hidden]] %% `[[Code]]` [[Real]]"
+        XCTAssertEqual(AssistSectionGraph.linksAsWritten(in: text), ["Real"])
+        let code: [NSRange] = MarkdownCode.ranges(in: text)
+        XCTAssertEqual(code.count, 1)
+        XCTAssertEqual((text as NSString).substring(with: code[0]), "`[[Code]]`")
+        let comments: [NSRange] = MarkdownCode.commentRanges(in: text)
+        XCTAssertEqual((text as NSString).substring(with: comments[0]), "%% [[Hidden]] %%")
+    }
+
+    /// A rename leaves a link inside a comment exactly as the teacher wrote it.
+    func testARenameLeavesACommentAlone() {
+        let text: String = "%% was [[Old]] %% now [[Old]]"
+        XCTAssertEqual(
+            WikiLinkRewriter.rewriting(text, renamedPages: ["Old": "New"]),
+            "%% was [[Old]] %% now [[New]]"
+        )
+    }
+
+    /// The copy's reader skips a comment in every shape it reads.
+    func testThePageReferencesInsideACommentAreNotRead() {
+        let text: String = "%% ![[a.png]] <img src=\"c.png\"> [x](d.png) ![](<e f.png>) %%\n![[b.png]]\n"
+        var names: [String] = []
+        for reference in PageReferences.references(in: text) {
+            names.append(reference.lastComponent)
+        }
+        XCTAssertEqual(names, ["b.png"])
+    }
+
+    // MARK: - Markdown-style page links (folded into #325)
+
+    /// The walks read a Markdown-style link to a page in either spelling,
+    /// decoded and with the heading taken off, in page order among the
+    /// wikilinks — and a web address or a bare heading is no page.
+    func testMarkdownStyleLinksAreReadInPageOrder() {
+        let text: String = "[[First]] then [n](Unit%202/Notes.md#top), [w](<Unit 2/Worksheet 2.md>), "
+            + "[web](https://example.com/Key.md), [here](#heading) and [[Last]]."
+        XCTAssertEqual(
+            AssistSectionGraph.linksAsWritten(in: text),
+            ["First", "Unit 2/Notes", "Unit 2/Worksheet 2", "Last"]
+        )
+        XCTAssertEqual(
+            AssistSectionGraph.linkTargets(in: text),
+            ["first", "notes", "worksheet 2", "last"]
+        )
+    }
+
+    /// A destination that does not decode as a whole is kept as written — the
+    /// build's reader gives the same answer (review N7).
+    func testADestinationThatDoesNotDecodeIsKeptAsWritten() {
+        XCTAssertEqual(AssistSectionGraph.linksAsWritten(in: "[x](100%25%zz.md)"), ["100%25%zz"])
+    }
+
+    /// Each Markdown shape is read by ONE pattern, so a link is never read
+    /// twice, and an unterminated `](<…` is not a link.
+    func testAMarkdownLinkIsReadOnceAndAnUnterminatedOneNotAtAll() {
+        XCTAssertEqual(AssistSectionGraph.linkTargets(in: "[w](<Worksheet.md>)"), ["worksheet"])
+        XCTAssertEqual(AssistSectionGraph.linkTargets(in: "[w](<Worksheet.md"), [])
+    }
+
+    /// Code and comments mask Markdown-style links as they mask wikilinks.
+    func testMarkdownStyleLinksInCodeOrACommentAreNotRead() {
+        let text: String = "`[k](Key.md)` %% [k](<Key.md>) %% [w](Worksheet.md)"
+        XCTAssertEqual(AssistSectionGraph.linkTargets(in: text), ["worksheet"])
+    }
+
     /// A page embedded only as an example is not brought along by a copy.
     func testAnEmbedShownInsideCodeBringsNothing() {
         let text: String = "Embed one with `![[Note]]`.\n\n```\n![[Other]]\n```\n![[Third]]\n"

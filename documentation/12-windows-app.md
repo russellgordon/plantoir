@@ -1120,6 +1120,13 @@ Windows figures are the v1.1.0 release assets.
 | Downloaded on a first run, for building | ~857 MB | ~390 MB (the website builder's image build) | none |
 | Update delivery | download the DMG by hand | Sparkle, a delta of 0.1–3.7 MB for a Swift-only release (measured) from the release after v1.4.0 | installer by hand |
 | Downloads checked against a pinned SHA-256 | none | every helper, both kinds of Mac, and the disk | none in `fetch-runtime.ps1` (a build-time fetch, not on a teacher's machine) |
+| When the building downloads happen (bundle B) | at the first preview | in the BACKGROUND at first launch, and again when the recipe changes (`setup.sh --prepare-builder`; one sidebar line, four trail events) | nothing to get ready: `builderWarmUp` and its trail events are `appliesOn: ["mac"]` |
+| The image itself (#334, bundle B) | full Quartz history, a spare scaffold copy, base tag unpinned | Quartz at depth 1 (≈342 MB first download), no `/opt/quartz-site`, base pinned by digest | no image; the runtime is bundled |
+
+Bundle B's two rows are KNOW, not DO: Windows owes nothing for the warm-up
+or the image, because it downloads and builds nothing for building. (The
+bundle's brief assumed otherwise, from a stale line in `CLAUDE.md`, corrected
+the same day.)
 
 1. **The mac installer is now almost twice Windows'**, because the mac still
    needs a Linux virtual machine and Windows does not.

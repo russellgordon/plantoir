@@ -1797,7 +1797,8 @@ enum ScheduledDeploy {
         if let section {
             fingerprintBeforeRunning = SectionPublishState.fingerprint(
                 courseDirectory: section.courseDirectory,
-                sectionNumber: section.sectionNumber
+                sectionNumber: section.sectionNumber,
+                rule: SectionPublishState.currentFingerprintRule
             )
             // launchd APPENDS to this log and nothing truncates it, so where it
             // ends now is where this run's own output begins.
@@ -2749,7 +2750,8 @@ enum ScheduledDeploy {
             courseDirectory: section.courseDirectory,
             sectionNumber: section.sectionNumber,
             fingerprint: fingerprint,
-            destinations: destinations
+            destinations: destinations,
+            rule: SectionPublishState.currentFingerprintRule
         )
     }
 
