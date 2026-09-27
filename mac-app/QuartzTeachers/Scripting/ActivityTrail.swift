@@ -411,6 +411,16 @@ nonisolated enum ActivityTrail {
         /// gone and `scheduled deploy turned off` says so beside this line.
         /// Saying "turned off" for the first would be false — the old job
         /// would still fire — which is why they are told apart.
+        ///
+        /// Since GitHub #322 also written when the deploy was REFUSED before
+        /// anything was written — at the schedule sheet's button, or by
+        /// `schedule_deploy` from either assistant — carrying the destination
+        /// it was refused for (by kind: Netlify, Cloudflare Pages or a
+        /// folder) and the refusal's first sentence. #322 took a code read to
+        /// diagnose; with this line the trail would have shown "never deployed
+        /// to Netlify" just under a Save that made the course a folder. Not
+        /// written by the approval card or `plan_scheduled_deploy`, which are
+        /// advisory and repeat.
         case scheduledDeployCouldNotBeSet = "scheduled deploy could not be set"
         /// A folder or file was removed in Course Settings, excluding it
         /// from previews and deploys.
