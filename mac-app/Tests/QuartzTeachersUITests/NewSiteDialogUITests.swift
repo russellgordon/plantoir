@@ -99,12 +99,13 @@ final class NewSiteDialogUITests: XCTestCase {
         // 1 — Section 1: the surname, once.
         select(section: 1, in: application)
         application.buttons["deployButton"].click()
-        // Found as the SHEET and its one text field, not by identifier: the
-        // sheet's own `credentialSheet` identifier is applied to every element
-        // inside it (read off the real tree, 2026-09-26), so `credentialField`
-        // and `credentialSendButton` never reach the accessibility tree.
-        let sheet: XCUIElement = application.sheets.firstMatch
-        let field: XCUIElement = sheet.textFields.firstMatch
+        // Found by IDENTIFIER (#353). Until then the sheet's own
+        // `credentialSheet` identifier was applied to every element inside it
+        // (read off the real tree, 2026-09-26) and this test had to find the
+        // sheet's first text field instead; the sheet is now a container
+        // element, so the field and the Send button carry their own.
+        let field: XCUIElement = application.textFields["credentialField"]
+        let send: XCUIElement = application.buttons["credentialSendButton"]
         XCTAssertTrue(field.waitForExistence(timeout: 20), "No credential sheet: the surname question was not recognised.")
         XCTAssertTrue(
             text(contract.surnameFieldLabel, in: application).exists,
@@ -112,7 +113,7 @@ final class NewSiteDialogUITests: XCTestCase {
         )
         field.click()
         field.typeText("Testerson")
-        sheet.buttons[sendTitle].click()
+        send.click()
 
         // The next sheet is the website address — not a second surname.
         let addressLabel: XCUIElement = text(contract.siteNameFieldLabel, in: application)
@@ -128,7 +129,7 @@ final class NewSiteDialogUITests: XCTestCase {
         // 2 — the address arrives filled in with exactly what was offered.
         let offered: String = try stub.offeredDefault(forSection: 1)
         XCTAssertEqual(offered, StubDeploy.expectedDefault(section: 1, surname: "testerson"))
-        let addressField: XCUIElement = application.sheets.firstMatch.textFields.firstMatch
+        let addressField: XCUIElement = application.textFields["credentialField"]
         XCTAssertEqual(addressField.value as? String, offered, "The address was not filled in with the launcher's default.")
 
         // 3 — what was typed reaches the launcher, not the default.
@@ -136,7 +137,7 @@ final class NewSiteDialogUITests: XCTestCase {
         addressField.typeKey("a", modifierFlags: .command)
         addressField.typeKey(.delete, modifierFlags: [])
         addressField.typeText("typed-address-154")
-        sheet.buttons[sendTitle].click()
+        send.click()
         let answered: Bool = StateDirectoryUITests.waitUntil(seconds: 10) {
             return stub.answers().contains("section1=typed-address-154")
         }

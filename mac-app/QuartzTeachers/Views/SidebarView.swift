@@ -315,6 +315,10 @@ struct SidebarView: View {
                                     .accessibilityIdentifier("backupsTotal")
                             }
                         }
+                        // A container element with its own identifier (#353): without `.contain`
+                        // SwiftUI applies an identifier on a stack to every element inside it,
+                        // and the inner identifiers (backupsTotal) never reach the tree.
+                        .accessibilityElement(children: .contain)
                         .accessibilityIdentifier("backupsGroup")
                     }
                 }
