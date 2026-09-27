@@ -729,51 +729,13 @@ final class RolloverWebsiteTests: XCTestCase {
 
 
     /// A section with class dates on file and one page sitting on the wrong
-    /// day, built on the shared fixture so the course, its settings and its
-    /// site marker are the ones every other assistant test uses.
+    /// day — the shared fixture, which the card-argument walk uses too (#150).
     @MainActor
     private func makeSectionNeedingReDating(
         withMarker: Bool = false
     ) throws -> (root: URL, course: Course, runner: AssistToolRunner) {
-        let made = try AssistFixture.makeRunner(hasDeployedBefore: withMarker)
-
-        // Point scheduled-publish lookups at a throwaway folder. Without this
-        // `plistURL` resolves to the REAL ~/Library/LaunchAgents, and the
-        // fixture's course is ICS3U — a course a teacher plausibly has
-        // scheduled — so a test could boot out and delete their agent.
-        let agentsDirectory: URL = made.root.appendingPathComponent("LaunchAgents")
-        try FileManager.default.createDirectory(
-            at: agentsDirectory, withIntermediateDirectories: true
-        )
-        ScheduledDeploy.launchAgentsDirectoryOverride = agentsDirectory
-        ScheduledDeploy.scheduledScriptsDirectoryOverride =
-            agentsDirectory.deletingLastPathComponent().appendingPathComponent("scheduled")
-        addTeardownBlock {
-            MainActor.assumeIsolated {
-                ScheduledDeploy.launchAgentsDirectoryOverride = nil
-                ScheduledDeploy.scheduledScriptsDirectoryOverride = nil
-            }
-        }
-
-        let plan: RememberTimetablePlan = try SectionTimetableStore.planRememberTimetable(
-            dates: ["2026-09-08", "2026-09-10"], source: "timetable.xlsx, block H",
-            forSection: 1, in: made.course
-        )
-        try SectionTimetableStore.applyRememberTimetable(plan)
-
-        // Dated a day the section does not meet, so a re-date has something
-        // real to move and does not stop at "already on the right day".
-        let classesURL: URL = made.course.directoryURL
-            .appendingPathComponent("section1/All Classes")
-        try """
-        ---
-        title: Unit 1, Day 1
-        date: 2020-01-15
-        ---
-        Something to move.
-        """.write(
-            to: classesURL.appendingPathComponent("Unit 1, Day 1.md"),
-            atomically: true, encoding: .utf8
+        let made: AssistFixture.Made = try AssistFixture.makeSectionNeedingReDating(
+            withMarker: withMarker, for: self
         )
         return (made.root, made.course, made.runner)
     }

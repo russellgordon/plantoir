@@ -536,7 +536,7 @@ def intercepted(message, window_course=None, window_section=None):
     `narrow-tools.py` went stale for three days without anyone noticing.
     Same tidying as the Swift: trim, strip leading and trailing `.` and `!`,
     lower-case, then EQUALITY — never a substring. Then the parsed families
-    (nine in `cardPhrasings.parsed` since #167), which cannot be listed because
+    (nine families, ten entries in `cardPhrasings.parsed` since #150), which cannot be listed because
     the number, title or TIME in them is unbounded. THREE of them are checked
     against the contract's own rows before any probe is sent — "deploy at
     <time>" by `assert_deploy_at_a_time_matches_contract()`, the hide/unpublish
