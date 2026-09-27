@@ -1085,6 +1085,32 @@ as history, not as what Windows does today.
   mac-only facts now** — Colima still needs them; native Windows has no
   image and no builder of any kind.
 
+### What each platform downloads and carries, like for like (mac #312)
+
+Since #312 the Mac app carries its own helper programs and the Linux
+virtual machine's starting disk, as Windows has always carried its runtime.
+Windows has nothing to DO about it (the contract key
+`app-rules.json → helperBootstrap` and the trail events "helper programs
+installed" and "website builder created" are `appliesOn: ["mac"]`); these are
+the two things it should KNOW. Mac figures measured 2026-09-26 on an M4 Pro;
+Windows figures are the v1.1.0 release assets.
+
+| | macOS v1.3.1 | macOS after #312 | Windows (v1.1.0, latest with an installer) |
+|---|---|---|---|
+| Installer | DMG 58.8 MB | DMG ~410 MB (LZMA; 410,488,446 B at the rehearsal) | PlantoirSetup.exe 235 MB; zip 398 MB |
+| Carried inside | app, llama.cpp (25 MB), the build recipe | + Colima, Lima, Docker CLI, buildx, the Ubuntu disk (Apple silicon) | app, llama.cpp, `plantoir-mcp.exe`, the native runtime (Node 20, Python 3.11 and packages, patched Quartz and its node_modules, wrangler, the emoji font) |
+| Downloaded on a first run, for building | ~857 MB | ~390 MB (the website builder's image build) | none |
+| Update delivery | download the DMG by hand | Sparkle, a delta of 0.1–3.7 MB for a Swift-only release (measured) from the release after v1.4.0 | installer by hand |
+| Downloads checked against a pinned SHA-256 | none | every helper, both kinds of Mac, and the disk | none in `fetch-runtime.ps1` (a build-time fetch, not on a teacher's machine) |
+
+1. **The mac installer is now almost twice Windows'**, because the mac still
+   needs a Linux virtual machine and Windows does not.
+2. **The mac now checks every helper download against a pinned SHA-256**
+   (the launchers' shared first-run block). `fetch-runtime.ps1` fetches Node,
+   Python, get-pip.py and the emoji font without checksums. It runs when the
+   Windows app is BUILT, not on a teacher's PC, so this is a judgement call
+   rather than a defect — the Windows issue from #312 asks for it.
+
 ## Behaviours with platform-specific mechanics
 
 - **Obsidian integration** (entry 80): `obsidian://open?path=…` only works
@@ -1792,10 +1818,15 @@ phrasing made a teacher the caller:
   against "writes the local model can reach". `make_room_for_classes` is
   MCP-only, so it was not in it — and it is the most far-reaching tool on the
   surface, renaming pages a teacher's links point at. Without the entry it
-  would have been the ONE card that ran with nothing shown first. The mac has
-  never had this hole because `AssistToolDefinition.planTwinName` DERIVES the
-  twin from the tool; a list has to be told. If you add a card phrasing, check
-  that map by hand.
+  would have been the ONE card that ran with nothing shown first. If you add a
+  card phrasing, check that map by hand. (This used to say the mac could not
+  have the hole because `planTwinName` DERIVES the twin. It had its own:
+  `add_curriculum_mentions` derived `plan_add_curriculum_mentions`, which does
+  not exist, so the mac's gate ran that write with no plan — reachable only by
+  a model naming a tool it was not offered, which the mac also did not refuse.
+  Both closed in #327: an explicit `irregularPlanTwins` map, and a refusal for
+  any tool the model was not offered — see doc 10, Part 6. `tools.planTwins`
+  now carries the pair.)
 - **A plan twin that returns a bare `string` cannot say it is a plan.** The
   mark is `_meta["plantoir.app/isPlan"]`, set only by `PlantoirTools.Proposing`,
   and `AssistAgent.ShowPlan` reads an unmarked answer as a REFUSAL: it prints
@@ -1806,7 +1837,12 @@ phrasing made a teacher the caller:
   read and never accept. `AssistSurfaceContractTests.EveryPlanTwinTheGateRunsCanSayItIsAPlan`
   now checks the RETURN TYPE of every twin the gate runs, which is the thing
   that makes the mark possible; it unwraps `Task<>`, since an async tool marks
-  just as well.
+  just as well. (The mac pins the same property by RUNNING every `plan_` tool
+  on a happy path, since its return type is always `AssistToolOutcome` — #150,
+  doc 10 → "A plan has to be able to SAY it is a plan". Since #150 the
+  contract also DECLARES "make room for a class at Unit 3, Day 4" in
+  `cardPhrasings.parsed`, so `InsertClassesTests`' local pin of the article
+  form can read the contract instead — optional, not owed.)
 - **A sentence written for a model becomes a sentence a teacher reads.**
   `explain_publishing`'s second answer said "Don't repeat it — carry on with
   what the teacher asked", which was harmless while a model was the only

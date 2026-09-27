@@ -1065,7 +1065,11 @@ final class ScheduledDeployCleanupTests: XCTestCase {
     /// from the job itself when it does not.
     func testTheIntendedMomentIsReadFromTheEnvironmentThenFromTheJob() throws {
         try prepare()
-        let when: Date = Date().addingTimeInterval(-3600)
+        // A WHOLE second, fixed. The environment and the job carry the moment
+        // as ISO 8601 without fractions, and the formatter does not simply
+        // drop a fraction: a moment taken from the clock read back one second
+        // off about one run in two, against a truncated expectation.
+        let when: Date = Date(timeIntervalSince1970: 1_790_000_000)
         try writeAgent(sectionNumber: 1, when: when)
         let label: String = labelFor(sectionNumber: 1)
         let script: String = "/tmp/\(label).sh"

@@ -44,6 +44,30 @@ nonisolated struct AssistToolDefinition: Sendable, Equatable {
     /// cannot undo for them.
     let needsApproval: Bool
 
+    /// The writes whose twin is NOT `plan_` + their own name.
+    ///
+    /// - `schedule_deploy` → `plan_scheduled_deploy`: the plan describes a
+    ///   scheduled deploy rather than the act of scheduling.
+    /// - `add_curriculum_mentions` → `plan_curriculum_mentions` (#327): the
+    ///   plan describes the mentions, not the adding. Until this entry the
+    ///   derivation named `plan_add_curriculum_mentions`, which does not
+    ///   exist, so the window's plan-mode gate found no twin and ran the write
+    ///   at once. Only a model naming a tool it was never offered could reach
+    ///   it — the local model is not shown it and no card sends it — which is
+    ///   why nothing noticed; the contract generator knew (it asked the
+    ///   surface rather than trusting the name) and silently left the pair out
+    ///   of `tools.planTwins`.
+    ///
+    /// Explicit rather than derived for the reason the second entry proves:
+    /// a derivation cannot be wrong about a name it never sees, and this map
+    /// can be READ. `AssistPlanModeTests` walks every write on the full
+    /// surface against it, so a third irregular twin added without an entry
+    /// here fails there by name.
+    static let irregularPlanTwins: [String: String] = [
+        "schedule_deploy": "plan_scheduled_deploy",
+        "add_curriculum_mentions": "plan_curriculum_mentions",
+    ]
+
     // MARK: - Computed properties
 
     /// What this tool's `plan_` twin WOULD be called.
@@ -59,16 +83,14 @@ nonisolated struct AssistToolDefinition: Sendable, Equatable {
     /// - `cancel_scheduled_deploy` calls off an alarm, and re-setting it is
     ///   the whole remedy.
     ///
-    /// One irregular pair: `schedule_deploy`'s twin reads
-    /// `plan_scheduled_deploy` rather than `plan_schedule_deploy`, because
-    /// the plan describes a scheduled deploy rather than the act of
-    /// scheduling. The exception lives here so callers never encode it.
+    /// Two irregular pairs, listed in `irregularPlanTwins` so callers never
+    /// encode them.
     var planTwinName: String? {
         if readOnly {
             return nil
         }
-        if name == "schedule_deploy" {
-            return "plan_scheduled_deploy"
+        if let irregular = AssistToolDefinition.irregularPlanTwins[name] {
+            return irregular
         }
         return "plan_" + name
     }

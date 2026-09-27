@@ -48,6 +48,7 @@ final class RemovalTrailTests: XCTestCase {
             (.perSectionFolders, "the per-section folders"),
             (.perSectionFiles, "the per-section files"),
             (.marks, "the marks list"),
+            (.curriculumFolders, "the curriculum folders"),
         ]
         for (list, words) in expected {
             XCTAssertEqual(list.words, words)

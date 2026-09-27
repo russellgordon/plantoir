@@ -569,6 +569,40 @@ class CourseConfiguration {
         }
     }
 
+    /// The curriculum folders this course DECLARES, in its own order (#128):
+    /// `curriculum_folders`, then the legacy `curriculum_folder` when it is not
+    /// already there — read and unioned forever, so a folder written down by an
+    /// older Plantoir still counts. The first is the primary folder, whose map
+    /// keeps the title "Curriculum Coverage".
+    ///
+    /// Setting it writes `curriculum_folders` (an empty list removes the key)
+    /// AND the legacy `curriculum_folder`, naming the list's first (primary)
+    /// folder — so an older Plantoir on another Mac, which reads only that key,
+    /// keeps its map (Russell's ruling on the #128 review). With an empty list
+    /// the legacy key is removed too, or the union would keep a folder the
+    /// teacher has just unticked. `contracts/file-formats.json` → `courseConfigKeys`.
+    var curriculumFolders: [String] {
+        get {
+            return CurriculumFolderRule.declaredFolders(
+                list: values["curriculum_folders"], legacy: values["curriculum_folder"]
+            )
+        }
+        set {
+            if newValue.isEmpty {
+                values.removeValue(forKey: "curriculum_folders")
+            } else {
+                values["curriculum_folders"] = newValue
+            }
+            if let primary = newValue.first {
+                values["curriculum_folder"] = primary
+            } else {
+                values.removeValue(forKey: "curriculum_folder")
+            }
+        }
+    }
+
+    /// The legacy one-folder key, as written. Kept for the renamer, which
+    /// rewrites it when it names the renamed folder; nothing new writes it.
     var curriculumFolder: String? {
         get { return values["curriculum_folder"] as? String }
         set {
@@ -1398,6 +1432,25 @@ class CourseConfiguration {
             return
         }
         try discardChanges()
+    }
+
+    /// `excluded_items.<scope>` as this copy last read or wrote it — the
+    /// baseline its UNSAVED exclusion changes are measured against. Not the
+    /// file: another window may have saved an exclusion since, and a Revert
+    /// here does not take that back (issue #152's review, M1).
+    func savedExcludedItems(forScope scope: String) -> [String] {
+        guard let saved = CourseConfiguration.decodedDictionary(lastSavedData),
+              let excluded = saved["excluded_items"] as? [String: Any],
+              let entries = excluded[scope] as? [Any] else {
+            return []
+        }
+        var names: [String] = []
+        for entry in entries {
+            if let name = entry as? String {
+                names.append(name)
+            }
+        }
+        return names
     }
 
     /// Reverts all in-memory edits back to the last data read from or

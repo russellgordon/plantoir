@@ -37,6 +37,8 @@ struct RemovalTrail: Equatable {
         case perSectionFolders
         case perSectionFiles
         case marks
+        /// The curriculum folders offered a coverage map each (#128).
+        case curriculumFolders
 
         /// The list as the line names it — Windows' words.
         var words: String {
@@ -51,6 +53,8 @@ struct RemovalTrail: Equatable {
                 return "the per-section files"
             case .marks:
                 return "the marks list"
+            case .curriculumFolders:
+                return "the curriculum folders"
             }
         }
     }

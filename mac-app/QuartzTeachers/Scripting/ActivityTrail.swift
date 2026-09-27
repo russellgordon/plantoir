@@ -145,6 +145,18 @@ nonisolated enum ActivityTrail {
         /// believed. Not `assistant could not answer` either: that is for an
         /// engine that FAILED, and here the engine answered perfectly badly.
         case assistantRepeatedTheRequestBack = "assistant repeated the request back"
+        /// The model named a tool that exists but was not among those it was
+        /// OFFERED in this window, so the turn was refused and nothing ran
+        /// (#327).
+        ///
+        /// Carries the tool, in words — the one fact about this that is not
+        /// already on the turn's own line, which records what the model
+        /// chose without saying it was never on the menu. Never the sentence
+        /// and never the arguments. Its own event rather than `assistant
+        /// repeated the request back`, whose name would be false here: the
+        /// teacher reads the same sentence for both, and only this line
+        /// tells the router reaching past its list apart from an echo.
+        case assistantNamedAToolItWasNotOffered = "assistant named a tool it was not offered"
         /// The model filled in a COURSE that is not the one the window is
         /// for, so the turn was refused and nothing ran.
         ///
@@ -247,6 +259,15 @@ nonisolated enum ActivityTrail {
         /// asked for in so many words, and "why did this page's date change?"
         /// is asked long after the console that said so has gone.
         case pagesDatedByTheBuild = "pages dated by the build"
+
+        /// The curriculum coverage maps a build wrote (#128): one per
+        /// curriculum folder the course declares, each with its title, the
+        /// folder it came from and how many expectations it shows — or that it
+        /// wrote none. Read from the build's `PLANTOIR_MAPS:` line
+        /// (`CoverageMapsBuilt`), printed on every build whose section wants
+        /// the map, so "my second map is missing" has an answer. Course
+        /// structure only, never anything written on a page.
+        case coverageMapsBuilt = "curriculum maps built"
 
         /// A teacher asked for a class to be duplicated, the room for it was
         /// made, and then no copy appeared.
@@ -411,13 +432,48 @@ nonisolated enum ActivityTrail {
         /// gone and `scheduled deploy turned off` says so beside this line.
         /// Saying "turned off" for the first would be false — the old job
         /// would still fire — which is why they are told apart.
+        ///
+        /// Since GitHub #322 also written when the deploy was REFUSED before
+        /// anything was written — at the schedule sheet's button, or by
+        /// `schedule_deploy` from either assistant — carrying the destination
+        /// it was refused for (by kind: Netlify, Cloudflare Pages or a
+        /// folder) and the refusal's first sentence. #322 took a code read to
+        /// diagnose; with this line the trail would have shown "never deployed
+        /// to Netlify" just under a Save that made the course a folder. Not
+        /// written by the approval card or `plan_scheduled_deploy`, which are
+        /// advisory and repeat.
         case scheduledDeployCouldNotBeSet = "scheduled deploy could not be set"
+        /// A scheduled publish read the course's settings when it fired and
+        /// something differed from what the teacher was told (GitHub #323):
+        /// it went ahead to where the course deploys NOW, somewhere other than
+        /// it was set to go; or it could not deploy the way the course is set
+        /// now and stood down, with the reason. Carries where it was set to
+        /// deploy (when that was recorded), where the course deploys now, and
+        /// the reason for a stand-down — never a credential.
+        ///
+        /// Written only when something differs, never on every run:
+        /// `scheduled publish finished` already names where a run went. What
+        /// it adds is that this was not where the teacher was told — the one
+        /// thing a teacher asking "why did it go THERE?" needs, and the thing
+        /// #323's stale deploys hid. Named "read" rather than "followed"
+        /// because it also carries the runs that stood down (plan review L3).
+        case scheduledPublishReadTheSettings = "scheduled publish read the course's settings"
         /// A folder or file was removed in Course Settings, excluding it
-        /// from previews and deploys.
+        /// from previews and deploys. Written on the CLICK, saved or not —
+        /// Russell's decision of 2026-09-06
+        /// (overnight/issues/09-item-excluded-trail-on-click.md): the attempt
+        /// must leave a trace even if the teacher crashes before saving.
+        /// Carries the scope and whether it was a folder or a file.
         case itemExcluded = "item excluded"
         /// A previously excluded folder or file was added back in Course
-        /// Settings, returning it to previews and deploys.
+        /// Settings, returning it to previews and deploys. Written on the
+        /// click, and only for a name that WAS excluded.
         case itemReincluded = "item re-included"
+        /// A Revert in Course Settings took back unsaved exclusion changes —
+        /// the other half of the decision above, so a removal that never
+        /// reached the file is followed by a line saying it was taken back.
+        /// Carries HOW MANY, never the names (issue #152).
+        case exclusionsReverted = "exclusions reverted"
         /// A teacher tried to remove or untick a folder or file that a
         /// feature depends on, and was shown why it cannot go and which
         /// switch to turn off first. Recorded because "I could not remove
@@ -798,6 +854,30 @@ nonisolated enum ActivityTrail {
         /// Mac only, permanently: Windows serves a preview on the PC itself,
         /// with no forward to lose.
         case previewAddressHeldByAnotherAccount = "preview address held by another account"
+        /// Plantoir installed one or more of the website builder's helper
+        /// programs into its tools folder (GitHub #312): which ones, at which
+        /// pinned versions, whether from inside Plantoir or downloaded, why
+        /// (not yet on this Mac, other versions, a damaged copy, or copies
+        /// from before Plantoir kept a record of them), and for a download
+        /// why Plantoir's own copy was not used.
+        ///
+        /// Written by the app, from the line the launchers print
+        /// (`HelperBootstrapReport`), which `ScriptRunner` reads from a run's
+        /// console and `ScheduledDeploy` from the log of a publish launchd
+        /// ran. On the trail because a silent fallback to downloading is the
+        /// failure that reports success: the first run works, only slower.
+        /// Mac only, permanently: Windows carries its runtime and installs no
+        /// helper programs.
+        case helperProgramsInstalled = "helper programs installed"
+        /// The website builder was created on this Mac for the first time
+        /// (GitHub #312): how many seconds it took, and where its starting
+        /// disk came from — inside Plantoir, downloaded, or downloaded
+        /// because starting from Plantoir's copy was refused or failed. Read
+        /// from the launchers' line by `HelperBootstrapReport`, as above. On
+        /// the trail because "the first run took forever" is the report #312
+        /// exists for, and the seconds from the teacher's own Mac are what
+        /// the next decision needs. Mac only, permanently.
+        case websiteBuilderCreated = "website builder created"
 
         /// Whether the teacher was told, with a macOS notification, how a
         /// scheduled publish went (#212) — or why not: notifications turned
@@ -820,6 +900,19 @@ nonisolated enum ActivityTrail {
         /// in the same breath, and this is the line that is still there next
         /// week, when "why is this page still showing?" arrives.
         case pageSettingsLeftAsTheyWere = "page settings left as they were"
+        /// The assistant asked to publish or hide pages and named none this
+        /// section has (#197): only a word meaning every page ("all"), or
+        /// names that match no page. Nothing was changed and the teacher was
+        /// told so. Carries the course and section, the act, and either the
+        /// word (one of the contract's closed list) or how MANY names matched
+        /// nothing — never the names, which are page titles the model wrote.
+        ///
+        /// Without it the trail shows only "assistant chose a tool:
+        /// publish_pages (course, section, pages)", and a teacher reporting
+        /// "it said it needed to know which pages" cannot be looked into: the
+        /// "all" was measured 3 in 3 on one course and 0 in 108 on six others,
+        /// and only the field can say how often it happens.
+        case assistantNamedNoPage = "assistant named no page it could find"
         /// An outside assistant read a course's How I Teach page through
         /// Plantoir (#209), or found there was none: carries the course, and
         /// the word count and whether it was cut short — never the words.
@@ -835,6 +928,34 @@ nonisolated enum ActivityTrail {
         /// LISTED for the website (#209) — one earlier builds published.
         /// Read from the build's `PLANTOIR_KEPT_OFF:` line.
         case howITeachPageKeptOff = "How I Teach page kept off the website"
+        /// A section was got ready for the start of the year (#96): every
+        /// class after the first, and the pages only later classes use, put
+        /// into draft in one act. Carries the course and section, where it
+        /// was asked from (the app, the assistant, an outside assistant),
+        /// how many classes and how many other pages went into draft — the
+        /// other pages counted by reason — how many were left as they were,
+        /// the backup's FILE NAME, and whether the preview was rebuilt.
+        /// Never a page's name: the backup is how anyone finds the pages.
+        ///
+        /// The single largest change the app makes to a teacher's files on
+        /// one press, usually weeks before anybody looks at the site. "Why is
+        /// everything after Day 1 gone?" arrives in September, and without
+        /// this line the trail shows a teacher who never pressed anything.
+        case sectionMadeReadyForTheStartOfTheYear = "section made ready for the start of the year"
+        /// That change taken back (#96), from the app's own undo or an
+        /// outside assistant's. Carries where from, how many pages were put
+        /// back, and how many were left as they are because they had changed
+        /// since — an undo that skips files is a partial undo, and "some came
+        /// back and some did not" needs the count on record.
+        case startOfTheYearChangeUndone = "start of the year change undone"
+        /// Getting a section ready was asked for and NOTHING was written
+        /// (#96). Carries where from and the reason: changedSinceShown,
+        /// backupFailed, writeFailed, noFirstClass, missingPlanCode, or
+        /// nothingToDo — the last only from an outside assistant, since the
+        /// app's button is not offered when there is nothing to do. "I
+        /// pressed the button and nothing happened" leaves no changed file,
+        /// so without this line nothing records that it was pressed.
+        case startOfTheYearNotDone = "start of the year not done"
         /// Plantoir found a new version of itself (#204) — once per version
         /// per launch, and "found" rather than "offered", because the updater
         /// may hold its window back until the app is next in front. Carries
@@ -917,6 +1038,67 @@ nonisolated enum ActivityTrail {
     static func pageSettingsLeftAsTheyWereLine(act: String, pages: Int) -> String {
         let counted: String = pages == 1 ? "1 page" : "\(pages) pages"
         return "left the settings of \(counted) as they were while \(act): no room at the top for a new setting"
+    }
+
+    /// Where a start-of-the-year act was asked from, in the trail's words.
+    static func startOfYearSource(_ source: String) -> String {
+        switch source {
+        case "app":
+            return "from the app"
+        case "mcp":
+            return "from an outside assistant"
+        default:
+            return "from the assistant"
+        }
+    }
+
+    /// The words for `sectionMadeReadyForTheStartOfTheYear` (#96): counts and
+    /// the backup's file name, never a page.
+    static func sectionMadeReadyLine(
+        source: String,
+        classes: Int,
+        otherPagesByReason: [String: Int],
+        leftAsTheyWere: Int,
+        backupFileName: String,
+        previewRebuilt: Bool
+    ) -> String {
+        var other: Int = 0
+        for (_, count) in otherPagesByReason {
+            other += count
+        }
+        let firstUsedLater: Int = otherPagesByReason["firstUsedLater"] ?? 0
+        let unseen: Int = (otherPagesByReason["onlyHiddenPagesLinkToIt"] ?? 0)
+            + (otherPagesByReason["onlyAFolderListsIt"] ?? 0)
+            + (otherPagesByReason["nothingLinksToIt"] ?? 0)
+        let classWord: String = classes == 1 ? "1 class" : "\(classes) classes"
+        let otherWord: String = other == 1 ? "1 other page" : "\(other) other pages"
+        return "made ready for the start of the year \(startOfYearSource(source)) — \(classWord) and "
+             + "\(otherWord) put into draft (\(firstUsedLater) first used later, \(unseen) that nothing "
+             + "students can see links to), \(leftAsTheyWere) left as they were; backup \(backupFileName); "
+             + (previewRebuilt ? "preview rebuilt" : "preview not rebuilt")
+    }
+
+    /// The words for `startOfTheYearChangeUndone` (#96).
+    static func startOfYearUndoneLine(source: String, putBack: Int, leftAsTheyAre: Int) -> String {
+        let pages: String = putBack == 1 ? "1 page" : "\(putBack) pages"
+        return "undid getting ready for the start of the year \(startOfYearSource(source)) — \(pages) put "
+             + "back, \(leftAsTheyAre) left as they are because they had changed since"
+    }
+
+    /// The words for `startOfTheYearNotDone` (#96).
+    static func startOfYearNotDoneLine(source: String, reason: String) -> String {
+        return "did not get ready for the start of the year \(startOfYearSource(source)) — nothing was "
+             + "changed (\(reason))"
+    }
+
+    /// The words for `assistantNamedNoPage`: what was being done, and which
+    /// of the two shapes — never a page's name.
+    static func namedNoPageLine(act: String, everyPageWord: String?, unknownCount: Int) -> String {
+        if let word = everyPageWord {
+            return "named no page while \(act): a word for every page (“\(word)”), so nothing was changed"
+        }
+        let counted: String = unknownCount == 1 ? "1 name that matches" : "\(unknownCount) names that match"
+        return "named no page while \(act): \(counted) no page, so nothing was changed"
     }
 
     static func formatter(timeZone: TimeZone = TimeZone.current) -> DateFormatter {
