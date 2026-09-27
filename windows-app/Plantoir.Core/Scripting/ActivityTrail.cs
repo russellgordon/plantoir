@@ -206,6 +206,15 @@ public static class ActivityTrail
         /// has nowhere to look.
         /// </remarks>
         ScheduledPublishFinished,
+        /// <summary>
+        /// A remembered timetable named a date that cannot be a class date —
+        /// the file was written by this app before #144, on a PC whose
+        /// regional format uses another calendar — and was set aside, so the
+        /// assistant asks for the timetable again and rewrites it. Windows
+        /// only (`appliesOn: ["windows"]`): only this app ever wrote such a
+        /// file.
+        /// </summary>
+        RememberedTimetableSetAside,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -254,6 +263,7 @@ public static class ActivityTrail
         Event.ScheduledPublishNeededAnAnswer => "scheduled publish needed an answer",
         Event.ScheduledPublishDidNotFinish => "scheduled publish did not finish",
         Event.ScheduledPublishFinished => "scheduled publish finished",
+        Event.RememberedTimetableSetAside => "remembered timetable set aside",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 

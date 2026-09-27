@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Plantoir.Core.Models;
+using Plantoir.Core.Scripting;
 
 namespace Plantoir.Core.Assist;
 
@@ -60,18 +61,36 @@ public sealed class TimetableMemory
 
     /// <summary>
     /// The earliest class date a remembered timetable can hold and be
-    /// believed. Plantoir's assistant was written in 2026, so no memory
-    /// names a class before this; the year of slack means a machine whose
-    /// clock is out still writes a memory this accepts.
+    /// believed. Generous on purpose — a teacher may type last year's dates —
+    /// and still centuries clear of every wrong reading a calendar can
+    /// produce: a Buddhist year read as Gregorian is 2569, a Gregorian year
+    /// read as Buddhist is 1483, and an Umm al-Qura one is 1448.
     /// </summary>
-    public static readonly DateOnly EarliestBelievable = new(2025, 1, 1);
+    public static readonly DateOnly EarliestBelievable = new(2000, 1, 1);
 
     /// <summary>
     /// How far past today a remembered class may fall and be believed. A
     /// school year is one; three is generous. The nearest wrong reading is
-    /// 543 years out (below), so any figure between the two works.
+    /// 543 years out, so any figure between the two works.
     /// </summary>
     public const int YearsAheadBelievable = 3;
+
+    /// <summary>
+    /// The first of <paramref name="dates"/> that cannot be a class date —
+    /// before <see cref="EarliestBelievable"/> or more than
+    /// <see cref="YearsAheadBelievable"/> years past <paramref name="today"/> —
+    /// or null when every one of them can. <see cref="Write"/> refuses such a
+    /// list and <see cref="Read"/> disbelieves such a file, so what one
+    /// accepts the other believes: a tool that saved and then read back
+    /// would otherwise find nothing where it had just written.
+    /// </summary>
+    public static DateOnly? Unbelievable(IEnumerable<DateOnly> dates, DateOnly today)
+    {
+        DateOnly ceiling = today.AddYears(YearsAheadBelievable);
+        return dates.Where(date => date < EarliestBelievable || date > ceiling)
+                    .Select(date => (DateOnly?)date)
+                    .FirstOrDefault();
+    }
 
     /// <summary>
     /// What was remembered for this section, or null if nothing was — or if
@@ -96,8 +115,12 @@ public sealed class TimetableMemory
     /// an answer that does not change between one line and the next; the
     /// app leaves it null.
     /// </param>
+    /// <param name="recording">
+    /// Whether setting a file aside leaves a line on the trail. On by
+    /// default; a test that only wants the answer turns it off.
+    /// </param>
     public static TimetableMemory? Read(string workspacePath, string courseCode, int sectionNumber,
-                                        DateOnly? today = null)
+                                        DateOnly? today = null, bool recording = true)
     {
         try
         {
@@ -118,8 +141,15 @@ public sealed class TimetableMemory
             if (unreadable.Count > 0 || dates.Count == 0) return null;
 
             dates.Sort();
-            DateOnly ceiling = (today ?? DateOnly.FromDateTime(DateTime.Now)).AddYears(YearsAheadBelievable);
-            if (dates[0] < EarliestBelievable || dates[^1] > ceiling) return null;
+            if (Unbelievable(dates, today ?? DateOnly.FromDateTime(DateTime.Now)) is { } impossible)
+            {
+                if (recording)
+                    ActivityTrail.Note(ActivityTrail.Event.RememberedTimetableSetAside,
+                        $"remembered timetable set aside: it names {DateText.Iso(impossible)}, which cannot be a " +
+                        "class date; the assistant will ask for the timetable again",
+                        courseCode.ToUpperInvariant(), sectionNumber);
+                return null;
+            }
             return new TimetableMemory
             {
                 Dates = dates,
@@ -143,6 +173,8 @@ public sealed class TimetableMemory
     {
         var ordered = dates.Distinct().OrderBy(date => date).ToList();
         if (ordered.Count == 0) return false;
+        // What Read would not believe is not written: see Unbelievable.
+        if (Unbelievable(ordered, today) is not null) return false;
 
         try
         {
