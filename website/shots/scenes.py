@@ -324,8 +324,14 @@ def dry_run(marketing_folder: Path, ced_pdf: Path | None) -> int:
         second = marketing_folder.apply_file_steps(scratch, pages)
         unexplained: list[str] = []
         for skipped in first.named_and_skipped:
-            if not (pages is None and "no pages were supplied" in skipped):
-                unexplained.append(skipped)
+            if pages is None and "no pages were supplied" in skipped:
+                continue
+            # The dry run stages the payload's SHARED pages only: the app,
+            # not the payload, dates a section's classes, so there is nothing
+            # for the second-semester step to move here.
+            if "no dated pages to move" in skipped:
+                continue
+            unexplained.append(skipped)
         state = "ready" if second.made == 0 and not unexplained else "broken"
         lines.append(DryRunLine("marketing folder file steps", state,
                                 f"first run: {marketing_folder.summary(first)}; second run made {second.made}"))

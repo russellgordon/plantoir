@@ -615,6 +615,35 @@ def kill_orphaned_model_servers() -> None:
             subprocess.run(["kill", pid], capture_output=True)
 
 
+class KeyboardNavigationOff:
+    """Keyboard navigation off for the run, put back afterwards.
+
+    With it on (System Settings › Keyboard › Keyboard navigation, the global
+    `AppleKeyboardUIMode` 2), every sheet opens with a focus ring round its
+    first control — the start-of-year plan's first list, in the 2026-09-27
+    capture. Most teachers have it off, so the pictures should too. Passing
+    `-AppleKeyboardUIMode 0` to the app under test was tried first and did
+    not take: AppKit reads it from the global domain. So the global value is
+    borrowed and restored exactly — including its absence (CLAUDE.md rule 9).
+    """
+
+    def __enter__(self) -> "KeyboardNavigationOff":
+        read = subprocess.run(["defaults", "read", "-g", "AppleKeyboardUIMode"], capture_output=True, text=True)
+        self.saved: str | None = read.stdout.strip() if read.returncode == 0 else None
+        if self.saved not in (None, "0"):
+            subprocess.run(["defaults", "write", "-g", "AppleKeyboardUIMode", "-int", "0"], capture_output=True)
+            print(f"   Keyboard navigation off for the run (was {self.saved}; put back afterwards).")
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> bool:
+        if self.saved is None:
+            subprocess.run(["defaults", "delete", "-g", "AppleKeyboardUIMode"], capture_output=True)
+        elif self.saved != "0":
+            subprocess.run(["defaults", "write", "-g", "AppleKeyboardUIMode", "-int", self.saved], capture_output=True)
+            print(f"   Keyboard navigation put back ({self.saved}).")
+        return False
+
+
 class BackupsSetAside:
     """Keep the teacher's course backups out of frame, without touching them.
 
@@ -1224,7 +1253,7 @@ def run_scenes(folder: Path, chosen: list) -> int:
         shutil.rmtree(staging)
     kill_orphaned_model_servers()
     try:
-        with RememberedWindowFrames(), BackupsSetAside(folder):
+        with RememberedWindowFrames(), BackupsSetAside(folder), KeyboardNavigationOff():
             for dark in (False, True):
                 suffix = "dark" if dark else "light"
                 print(f"   {suffix} appearance")
