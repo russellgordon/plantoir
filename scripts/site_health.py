@@ -165,6 +165,33 @@ def unreadable_settings_finding(facts: dict, course: str, section, table: dict) 
     )
 
 
+def links_into_hidden_pages_finding(facts: dict, course: str, section, table: dict) -> Finding:
+    """
+    ONE finding for every link on a page students can see that leads to a
+    page they cannot (#333), never one per link - both apps key a finding on
+    name, course and section (#246's lesson). At most ten pairs are named,
+    each through `linkLine`, then `andMore`; every value is filled in one pass,
+    so a page named "{course} notes" is named as it is.
+    """
+    entry = table["linksIntoHiddenPages"]
+    pairs = facts.get("links_into_hidden_pages") or []
+    named = []
+    for pair in pairs[:MOST_PAGES_NAMED]:
+        named.append(filled(entry["linkLine"], {"from": pair.get("from", ""), "to": pair.get("to", "")}))
+    if len(pairs) > MOST_PAGES_NAMED:
+        named.append(filled(entry["andMore"], {"count": len(pairs) - MOST_PAGES_NAMED}))
+    extra = {
+        "page": pairs[0].get("to", "") if pairs else "",
+        "count": len(pairs),
+        "links": ", ".join(named),
+    }
+    return finding(
+        "linksIntoHiddenPages", course, section, table,
+        extra_fill=extra,
+        sentence_key="sentence" if len(pairs) == 1 else "sentenceForSeveral",
+    )
+
+
 def findings(facts: dict, course: str, section) -> list:
     """
     Every finding for one section's build.
@@ -188,6 +215,9 @@ def findings(facts: dict, course: str, section) -> list:
                                n or None}], the pages hidden because their
                                settings could not be read (#246)
     * `front_page_unreadable` — is the section's front page one of them?
+    * `links_into_hidden_pages` — [{"from": page, "to": page}], each a link on
+                               a page students can see to one they cannot,
+                               by place in the course folder (#333)
     """
     table = _checks_by_name()
     found = []
@@ -237,6 +267,11 @@ def findings(facts: dict, course: str, section) -> list:
     # examples and #153's console cases are captured in this order.
     if facts.get("unreadable_pages"):
         found.append(unreadable_settings_finding(facts, course, section, table))
+
+    # After everything above, for the same reason: the existing examples keep
+    # their order (#333).
+    if facts.get("links_into_hidden_pages"):
+        found.append(links_into_hidden_pages_finding(facts, course, section, table))
 
     return found
 

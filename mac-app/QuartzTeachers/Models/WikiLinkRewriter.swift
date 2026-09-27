@@ -99,14 +99,14 @@ nonisolated enum WikiLinkRewriter {
     // MARK: - Functions
 
     /// Every link on a page, in order: the pattern's matches, less the ones
-    /// that start inside code (#313). THE one entry point for every reader
-    /// and rewriter of links on the mac — group 1 is `[[` or `![[`, group 2
-    /// the name as written.
+    /// that start inside code (#313) or a `%%` comment (#331). THE one entry
+    /// point for every reader and rewriter of links on the mac — group 1 is
+    /// `[[` or `![[`, group 2 the name as written.
     static func linkMatches(in text: String) -> [NSTextCheckingResult] {
         guard let expression = WikiLinkRewriter.expression else {
             return []
         }
-        return MarkdownCode.matches(of: expression, in: text, outside: MarkdownCode.ranges(in: text))
+        return MarkdownCode.matches(of: expression, in: text, outside: MarkdownCode.notALinkRanges(in: text))
     }
 
     /// The text with every link to a renamed page pointing at its new name.

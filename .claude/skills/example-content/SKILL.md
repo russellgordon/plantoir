@@ -736,11 +736,19 @@ template (like `ADA1O/shared/Tasks/_DUPLICATE ME.md`) places the triangulation
 block after `%%curriculum-end%%` for this reason.
 
 **Plain text only inside the block.** No `[[wikilinks]]` and no
-`![[transclusions]]`: the linter and `build_site.py` read the raw markdown
-without stripping comments, so a `![[C1.2]]` written here would silently
-count as curriculum coverage for an expectation no student page addresses,
-and a `[[Page]]` would satisfy the two-hop reachability check for a page
-nothing visible reaches. Write bare codes as text.
+`![[transclusions]]`. Since #331 a link inside a `%%` comment is not a link
+anywhere — Quartz strips it, and the build, the installer, the linter and the
+app all mask comments first — so it would count for nothing; it is still
+refused, so a teacher copying the note never expects it to work. Write bare
+codes and page names as text. (Before #331 the reason was worse: comment
+links counted as coverage and reachability nobody could see.)
+
+**Never write `%%` in the prose of a comment.** Comments pair left to right,
+so a `%%` inside the note's words CLOSES it: everything after it — the
+teacher's private note — is on the site, followed by a stray `%%`. AVI1O's and
+TEJ4M's task templates did exactly that ("everything between the %% markers
+is stripped") until #331; write "double-percent markers" instead. The linter
+refuses any page with an odd number of `%%`.
 
 ```
 %%

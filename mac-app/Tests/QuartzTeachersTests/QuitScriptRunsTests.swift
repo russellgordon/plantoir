@@ -415,6 +415,30 @@ final class QuitScriptRunsTests: XCTestCase {
         )
     }
 
+    /// The background warm-up (bundle B) holds the shared machine as any
+    /// launcher does, and the trail says it was the warm-up — never "a
+    /// publish or preview", which nobody started.
+    @MainActor
+    func testTheBackgroundWarmUpHoldsTheSharedMachineAndIsNamed() throws {
+        let scratch: Scratch = try makeScratch()
+        defer { try? FileManager.default.removeItem(at: scratch.root) }
+        try writeDockerStandIn(in: scratch, running: false, processesInside: 1, psExitCode: 0)
+        try writeColimaStandIn(in: scratch)
+        try makeSocket(at: colimaSocketPath(in: scratch))
+
+        let trail: String = try run(
+            in: scratch,
+            includingTheSharedSetup: true,
+            processesRunningOnThisMac: [
+                "/bin/bash /Users/someone/Library/Application Support/Plantoir/getting-ready/setup.sh --prepare-builder"
+            ]
+        )
+
+        XCTAssertFalse(callsMade(in: scratch).contains("colima stop"))
+        XCTAssertTrue(trail.contains("still being got ready to build websites, in the background"), trail)
+        XCTAssertFalse(trail.contains("publish or preview"), trail)
+    }
+
     /// A folder's own launcher holds its builder, and a neighbour whose name
     /// it begins with is not held by it — `Teach` is a prefix of `Teach 2`.
     ///
