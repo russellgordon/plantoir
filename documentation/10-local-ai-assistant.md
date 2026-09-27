@@ -6239,10 +6239,15 @@ flag was enough. The plan and the sheet say so (`publishingFromNowOn`), and
 and since bundle B it is the BUILD WARNING: the next build names every link on
 a page students can see that leads to a page they cannot (`linksIntoHiddenPages`,
 [05 → Links into hidden pages](05-build-pipeline.md)); the app's publish does
-not take pages along. Get Ready must therefore leave no visible→hidden link —
-the front page's embed of the newest class included — or that warning fires
-the moment a teacher uses it; the sheet's "says this out loud meanwhile"
-sentence is worth revisiting now that the build says it too.
+not take pages along. **So the first build after Get Ready lists links, and
+they are true:** the pages Get Ready keeps (Day 1, what it links to, Key Links)
+still link to pages first used by later classes, which it hid — exactly the
+links its own sheet lists under "links left pointing at hidden pages". The
+front page's embed is not among them; Get Ready repoints it. The warning
+clears as those classes are published. Ruled 2026-09-27 (implementation
+review S1): the warning stays, and Get Ready keeps what it keeps. The sheet
+and the build now say the same thing in two places; making the sheet say the
+next build will list them is a wording-pass question, not done here.
 
 ### check_section's third group, "linked but missed"
 

@@ -1056,8 +1056,19 @@ not start taking pages with it.
   assistant's publish and unpublish repoint, so after classes are hidden by
   hand the front page embeds a hidden class and the check lists it. Correct,
   and wanted.
-- **#96's interplay.** Get Ready must leave no visible→hidden link — the front
-  page's embed included — or this check fires the moment a teacher uses it.
+- **Get Ready (#96) is the common way a course arrives in this state, and the
+  warning is TRUE there.** Get Ready keeps Day 1, what Day 1 links to directly
+  and Key Links visible, and hides every page first used by a later class — so
+  the pages it keeps still link to pages it hid (its sheet lists them under
+  "links left pointing at hidden pages"). The front page's embed is NOT the
+  cause: Get Ready repoints it after its stray-key pass. So the first build
+  after Get Ready lists those links, ten named and the rest counted, and the
+  warning clears as the classes they lead to are published. Ruled 2026-09-27
+  on the implementation review (S1): the warning stays and #96 does not change
+  what it keeps — keeping what Day 1 reaches was measured and rejected in #96's
+  own plan (16–25 concepts would stay up). The review's rough emulation put
+  the pairs left at 16–44 per payload course (SNC1W 18, ICS3U 44); an estimate,
+  not #96's code.
 - **The build's reading is the site's.** The assistant's check_section reads
   the teacher's folder by title and the build reads merged content by stem,
   so the two may differ on a page whose title is not its file name; the

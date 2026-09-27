@@ -43,7 +43,7 @@ final class BuilderWarmUpTests: XCTestCase {
             let decision: BuilderWarmUp.Decision = BuilderWarmUp.decide(BuilderWarmUp.Facts(
                 isAnAppLaunch: try XCTUnwrap(facts["isAnAppLaunch"] as? Bool, name),
                 carriesTheRecipe: try XCTUnwrap(facts["carriesTheRecipe"] as? Bool, name),
-                readyForThisVersion: try XCTUnwrap(facts["readyForThisVersion"] as? Bool, name),
+                readyForThisRecipe: try XCTUnwrap(facts["readyForThisRecipe"] as? Bool, name),
                 network: network
             ))
             let expected: String = try XCTUnwrap(oneCase["expect"] as? String, name)
@@ -89,29 +89,34 @@ final class BuilderWarmUpTests: XCTestCase {
     func testTheLauncherFlagAndReadyLineAgree() throws {
         let rules: [String: Any] = try BuilderWarmUpTests.rules()
         XCTAssertEqual(BuilderWarmUp.readyLinePrefix, try XCTUnwrap(rules["readyLine"] as? String))
+        XCTAssertEqual(BuilderWarmUp.tagLinePrefix, try XCTUnwrap(rules["tagLine"] as? String))
         let setup: String = try BuilderWarmUpTests.repositoryFile("setup.sh")
         XCTAssertTrue(setup.contains("\(BuilderWarmUp.launcherFlag)) PREPARE_BUILDER=1"))
         XCTAssertTrue(setup.contains("echo \"\(BuilderWarmUp.readyLinePrefix)${IMAGE}\""))
+        XCTAssertTrue(setup.contains("\(BuilderWarmUp.tagFlag)) BUILDER_TAG_ONLY=1"))
+        XCTAssertTrue(setup.contains("echo \"\(BuilderWarmUp.tagLinePrefix)${IMAGE}\""))
+        XCTAssertEqual(
+            BuilderWarmUp.value(after: BuilderWarmUp.tagLinePrefix, in: "noise\nBUILDER_TAG=teaching-quartz:src-1\n"),
+            "teaching-quartz:src-1"
+        )
         XCTAssertTrue(BuilderWarmUp.sawTheReadyLine(in: "🧱 Building…\nBUILDER_READY=teaching-quartz:src-1234abcd\n"))
         XCTAssertFalse(BuilderWarmUp.sawTheReadyLine(in: "❌ Could not build the website builder.\n"))
         XCTAssertFalse(BuilderWarmUp.sawTheReadyLine(in: "echo BUILDER_READY=\n"))
     }
 
-    /// Only the version a finished run wrote down counts as ready.
-    func testTheRecordIsReadForThisVersionOnly() throws {
+    /// Only the builder a finished run wrote down counts as ready, and it is
+    /// keyed on the recipe's name, not the app's version (review N2).
+    func testTheRecordIsReadForThisRecipeOnly() throws {
         let scratch: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("warm-up-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: scratch) }
         let record: URL = BuilderWarmUp.recordURL(inHomeFolder: scratch)
-        XCTAssertFalse(BuilderWarmUp.isReady(forVersion: "1.4.0 (212)", recordURL: record))
+        XCTAssertFalse(BuilderWarmUp.isReady(forRecipe: "teaching-quartz:src-1234abcd", recordURL: record))
         try FileManager.default.createDirectory(at: record.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try "1.4.0 (212)\n".write(to: record, atomically: true, encoding: .utf8)
-        XCTAssertTrue(BuilderWarmUp.isReady(forVersion: "1.4.0 (212)", recordURL: record))
-        XCTAssertFalse(BuilderWarmUp.isReady(forVersion: "1.4.1 (220)", recordURL: record))
-        XCTAssertEqual(
-            BuilderWarmUp.versionIdentity(infoDictionary: ["CFBundleShortVersionString": "1.4.0", "CFBundleVersion": "212"]),
-            "1.4.0 (212)"
-        )
+        try "teaching-quartz:src-1234abcd\n".write(to: record, atomically: true, encoding: .utf8)
+        XCTAssertTrue(BuilderWarmUp.isReady(forRecipe: "teaching-quartz:src-1234abcd", recordURL: record))
+        XCTAssertFalse(BuilderWarmUp.isReady(forRecipe: "teaching-quartz:src-99999999", recordURL: record))
+        XCTAssertFalse(BuilderWarmUp.isReady(forRecipe: "", recordURL: record), "an unknown recipe is never ready")
     }
 
     /// Never under the test suite, whatever the arguments say.

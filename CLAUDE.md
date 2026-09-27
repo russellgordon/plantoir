@@ -896,10 +896,15 @@ changes made there have "no automated gate" at all, which is no longer true:
   eight seconds. They need no Docker, no network and no
   credentials, and until 2026-09-07 Windows ran none of them, so a shared file
   could be broken from that machine with every gate on it staying green.
-- **The IMAGE is still ungated there**, and that part stands: nothing on
-  Windows builds the Docker image or checks the baked files. Verify those by
-  driving a real publish through the app, and re-run `verify.sh` from the mac
-  after the next sync.
+- **The IMAGE is ungated there, because Windows has no image at all**: it
+  carries its own runtime and builds natively (since 2026-08-19,
+  `documentation/12-windows-app.md` → "Nothing here runs in a container"), so
+  a change to the Dockerfile or the baked files made from Windows is gated
+  only when `verify.sh` runs on the mac after the next sync. (This said
+  "verify those by driving a real publish through the app" until 2026-09-27,
+  which on Windows exercises the bundled runtime, not the image; bundle B's
+  review found that stale Windows-builds-an-image reading here had misled a
+  brief.)
 - **Publishing for real is `verify-deploy.ps1`**, the Windows counterpart of
   `verify-deploy.sh` in the row above and opt-in for the same reasons. No suite
   runs either of them; `.githooks/pre-commit` says so when a commit touches the

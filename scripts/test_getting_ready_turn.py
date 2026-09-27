@@ -12,8 +12,9 @@ scratch folder. The end-to-end half runs the real setup.sh in
 PATH that answers from files and writes down every question it was asked:
 nothing is started, built or downloaded.
 
-Skipped where there is no bash that can run a program (Windows), like the
-other launcher tests. Pure stdlib. Run with:
+Skipped off macOS, as the other launcher tests are: the block uses BSD `stat`
+and macOS process ids, which Git Bash on a Windows machine would misread
+(review S2), and Windows has no builder to get ready. Pure stdlib. Run with:
 
     python3 scripts/test_getting_ready_turn.py
 """
@@ -30,7 +31,7 @@ from pathlib import Path
 
 sys.dont_write_bytecode = True
 
-from test_deploy_sh_questions import HAS_BASH, REPOSITORY_ROOT
+from test_deploy_sh_questions import HAS_BASH, ON_A_MAC, REPOSITORY_ROOT
 
 LAUNCHERS = ["setup.sh", "preview.sh", "deploy.sh"]
 START = "# >>> GETTING-READY TURN BLOCK >>>"
@@ -54,7 +55,7 @@ def waiting_line() -> str:
     return the_rules()["wording"]["waitingLine"]
 
 
-@unittest.skipUnless(HAS_BASH, "needs a bash that can run a program")
+@unittest.skipUnless(ON_A_MAC and HAS_BASH, "the turn is a macOS launcher block (BSD stat, macOS ps and pids); Git Bash on Windows cannot run it")
 class TheTurn(unittest.TestCase):
 
     def setUp(self):
@@ -131,12 +132,19 @@ class TheTurn(unittest.TestCase):
                     holder = self.a_running_holder()
                 elif case["holder"] == "gone":
                     self.a_gone_holder()
+                elif case["holder"] == "reused":
+                    holder = self.a_running_holder()
+                    old = time.time() - 120
+                    os.utime(self.turn, (old, old))
+                elif case["holder"] == "pastTheCeiling":
+                    holder = self.a_running_holder()
                 elif case["holder"] in ("unwrittenRecent", "unwrittenOld"):
                     self.turn.mkdir(parents=True)
                     if case["holder"] == "unwrittenOld":
                         old = time.time() - 120
                         os.utime(self.turn, (old, old))
-                waiter = self.start_script('take_the_ready_turn\necho "TOOK $(cat "$READY_TURN/pid")"\n'
+                ceiling = "READY_TURN_CEILING=1\nsleep 2\n" if case["holder"] == "pastTheCeiling" else ""
+                waiter = self.start_script(ceiling + 'take_the_ready_turn\necho "TOOK $(cat "$READY_TURN/pid")"\n'
                                            'give_back_the_ready_turn\n[[ ! -e "$READY_TURN" ]] && echo GAVE_BACK\n')
                 if case["expect"].startswith("waits"):
                     time.sleep(1.5)
@@ -182,7 +190,7 @@ exit 0
 '''
 
 
-@unittest.skipUnless(HAS_BASH, "needs a bash that can run a program")
+@unittest.skipUnless(ON_A_MAC and HAS_BASH, "the turn is a macOS launcher block (BSD stat, macOS ps and pids); Git Bash on Windows cannot run it")
 class ThePrepareMode(unittest.TestCase):
     """The real setup.sh, --prepare-builder, with a pretend docker."""
 
@@ -221,6 +229,16 @@ class ThePrepareMode(unittest.TestCase):
         lines = [line for line in out.splitlines() if line.strip()]
         self.assertTrue(lines[-1].startswith(the_rules()["readyLine"] + "teaching-quartz:src-"), lines[-1])
         self.assertEqual((self.fake / "builds").read_text().count("build"), 1)
+        # --builder-tag names the same builder, and starts nothing.
+        environment = {"HOME": str(self.home), "PATH": self.path, "FAKE": str(self.fake)}
+        asked_while_preparing = (self.fake / "asked").read_text()
+        (self.fake / "asked").unlink(missing_ok=True)
+        tag = subprocess.run([BASH, str(self.place / "setup.sh"), "--builder-tag"], capture_output=True,
+                             text=True, env=environment, cwd=str(self.place), timeout=60)
+        self.assertEqual(tag.returncode, 0, tag.stderr)
+        self.assertEqual(tag.stdout.strip(), "BUILDER_TAG=" + lines[-1][len(the_rules()["readyLine"]):])
+        self.assertFalse((self.fake / "asked").exists(), "--builder-tag asked docker nothing")
+        (self.fake / "asked").write_text(asked_while_preparing)
         self.assertFalse((self.place / "courses").exists(), "no courses folder")
         self.assertFalse((self.home / "Library" / "Application Support" / "Plantoir" / "builds").exists(),
                          "no builds folder")

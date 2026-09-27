@@ -836,11 +836,19 @@ for real by `scripts/test_getting_ready_turn.py`:
   website builder…". When the turn is handed back, it takes it, finds the
   image ready ("✅ Website builder is ready."), and builds nothing.
 - **Abandoned turns are taken over**: a holder whose process is not running
-  (killed, or a Mac restarted mid-build), or a turn with no id written after a
-  minute. Before removing one it checks the id is still the one it judged
+  (killed, or a Mac restarted mid-build); a holder whose id now belongs to a
+  process that STARTED AFTER the turn was taken (`ps -o etime=` against the
+  turn's age — the id was reused by something else, which would otherwise be
+  waited on for as long as it lives, a scheduled publish included; review N1);
+  a turn older than a ceiling (two hours, `READY_TURN_CEILING`); or a turn
+  with no id written after a minute. Before removing one it checks the id is still the one it judged
   gone, so two launchers taking over at once cannot remove a turn a third has
   just taken. (A narrower race remains — the cost of losing it is two builds,
   which is what happened before the turn existed.)
+
+**`setup.sh --builder-tag`** prints `BUILDER_TAG=<name>` — the image name the
+recipe's hash gives — and starts nothing; the app asks it at launch to know
+whether the builder it got ready is still this recipe's.
 
 **`setup.sh --prepare-builder`** is the mode the app runs in the background:
 the tool bootstrap, the builder's start and `build_image_if_missing`, then
@@ -849,7 +857,7 @@ section is skipped), no workspace, no builds folder. The app runs it from its
 own folder holding only that launcher and a mirror of the recipe, so the
 image tag — a hash of the recipe — is the one every working folder looks for.
 
-Cases: `contracts/app-rules.json` → `builderWarmUp.turn.cases` (5) and
+Cases: `contracts/app-rules.json` → `builderWarmUp.turn.cases` (7) and
 `.sequences.cases` (2). Mac only, permanently (`builderWarmUp.appliesOn`):
 Windows carries its runtime and builds natively, with no builder to get ready.
 

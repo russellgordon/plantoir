@@ -149,6 +149,14 @@ class LinksIntoHiddenPagesTests(unittest.TestCase):
             {"path": "Tasks/Evidence.md", "visible": True, "body": "Body\n"}]}
         self.assertEqual(self._pairs(case), [])
 
+    def test_a_destination_that_does_not_decode_is_kept_as_written(self):
+        """Swift's removingPercentEncoding gives nil for the whole string when
+        any escape is invalid, and the mac keeps the raw text; the build must
+        agree (review N7)."""
+        self.assertEqual(build_site._page_named_by_destination("100%25%zz.md"), "100%25%zz.md")
+        self.assertEqual(build_site._page_named_by_destination("%C3%28.md"), "%C3%28.md")
+        self.assertEqual(build_site._page_named_by_destination("Unit%202/Quiz%201.md#a"), "Unit 2/Quiz 1.md")
+
 
 if __name__ == "__main__":
     unittest.main()

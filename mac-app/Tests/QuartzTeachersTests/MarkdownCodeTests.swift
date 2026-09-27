@@ -175,6 +175,12 @@ final class MarkdownCodeTests: XCTestCase {
         )
     }
 
+    /// A destination that does not decode as a whole is kept as written — the
+    /// build's reader gives the same answer (review N7).
+    func testADestinationThatDoesNotDecodeIsKeptAsWritten() {
+        XCTAssertEqual(AssistSectionGraph.linksAsWritten(in: "[x](100%25%zz.md)"), ["100%25%zz"])
+    }
+
     /// Each Markdown shape is read by ONE pattern, so a link is never read
     /// twice, and an unterminated `](<…` is not a link.
     func testAMarkdownLinkIsReadOnceAndAnUnterminatedOneNotAtAll() {

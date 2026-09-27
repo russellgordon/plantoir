@@ -2,9 +2,9 @@ import Foundation
 import Network
 import Observation
 
-/// Getting the website builder ready in the BACKGROUND, at first launch and at
-/// the first launch of each new version, so that a teacher's first preview is
-/// fast (bundle B, Russell's change of 2026-09-26).
+/// Getting the website builder ready in the BACKGROUND, at first launch and
+/// whenever the app's recipe is new, so that a teacher's first preview is fast
+/// (bundle B, Russell's change of 2026-09-26).
 ///
 /// **What it costs a teacher otherwise.** A first course used to spend its
 /// first preview installing the helper programs, starting the builder's
@@ -23,18 +23,25 @@ import Observation
 /// launchers look for. No course, no workspace, no builds folder is made; no
 /// toolchain logic is written in Swift.
 ///
+/// **Keyed on the recipe, not the version** (implementation review N2). The
+/// launcher's own `--builder-tag` names the image for the recipe as it
+/// stands — the same hash every launcher uses — and a finished run writes
+/// that name down. So a development build whose version never changes still
+/// gets a new recipe ready, and a release that changed no recipe does not
+/// start the builder for nothing.
+///
 /// **Two launchers never get the builder ready at once**, and that rule lives
 /// in the launchers, not here: a Create or a Preview that arrives mid-build
 /// waits for this one's turn and then finds the builder ready
-/// (`GETTING-READY TURN BLOCK`, `builderWarmUp.turnCases`). So nothing in the
-/// app has to remember to wait, and a teacher at the command line gets the
-/// same rule.
+/// (`GETTING-READY TURN BLOCK`, `builderWarmUp.turn`). So nothing in the app
+/// has to remember to wait, and a teacher at the command line gets the same
+/// rule.
 ///
 /// **When it does not run** — every case is `contracts/app-rules.json` →
 /// `builderWarmUp.startsWhen`: not in the unit suite or a UI test, not when
 /// this binary is the assistant's server, a scheduled publish or the contract
-/// writer, not when the app carries no recipe, not when this version has
-/// already got it ready, and not offline or in Low Data Mode — then it says
+/// writer, not when the app carries no recipe, not when this recipe's builder
+/// is already ready, and not offline or in Low Data Mode — then it says
 /// NOTHING to the teacher (a line on the trail only) and the builder is got
 /// ready the old way, at the first preview.
 ///
@@ -47,41 +54,6 @@ import Observation
 @MainActor
 @Observable
 final class BuilderWarmUp {
-
-    // MARK: - Nested types
-
-    /// What the network allows, as the decision sees it.
-    enum NetworkState: String, Sendable {
-        case online
-        case offline
-        /// macOS Low Data Mode: the teacher has asked apps not to download
-        /// what they were not asked for, and ~340 MB is exactly that.
-        case lowDataMode
-    }
-
-    /// Everything the decision depends on, as plain values.
-    struct Facts: Equatable, Sendable {
-
-        // MARK: - Stored properties
-
-        /// False in the unit suite, a UI test, or a headless run (the
-        /// assistant's server, a scheduled publish, the contract writer).
-        let isAnAppLaunch: Bool
-
-        /// Whether this app carries the recipe (a test bundle does not).
-        let carriesTheRecipe: Bool
-
-        /// Whether a warm-up has already finished for this version.
-        let readyForThisVersion: Bool
-
-        let network: NetworkState
-    }
-
-    /// What to do, and whether the trail hears about a skip.
-    enum Decision: Equatable, Sendable {
-        case start
-        case skip(reason: String, noteOnTheTrail: Bool)
-    }
 
     // MARK: - Stored properties
 
@@ -97,11 +69,18 @@ final class BuilderWarmUp {
     /// ready (`builderWarmUp.readyLine`).
     nonisolated static let readyLinePrefix: String = "BUILDER_READY="
 
+    /// The line `setup.sh --builder-tag` prints (`builderWarmUp.tagLine`).
+    nonisolated static let tagLinePrefix: String = "BUILDER_TAG="
+
     /// The launcher's flag for this mode.
     nonisolated static let launcherFlag: String = "--prepare-builder"
 
+    /// The launcher's flag that names the builder for the recipe.
+    nonisolated static let tagFlag: String = "--builder-tag"
+
     /// True while the background run is under way; the sidebar's status line
-    /// follows it.
+    /// follows it. Set only once the run is certain to start, so an offline
+    /// launch never flashes it.
     private(set) var isGettingReady: Bool = false
 
     // MARK: - Functions
@@ -114,7 +93,7 @@ final class BuilderWarmUp {
         if !facts.carriesTheRecipe {
             return .skip(reason: "no recipe", noteOnTheTrail: false)
         }
-        if facts.readyForThisVersion {
+        if facts.readyForThisRecipe {
             return .skip(reason: "already ready", noteOnTheTrail: false)
         }
         if facts.network == .offline {
@@ -135,35 +114,40 @@ final class BuilderWarmUp {
             .appendingPathComponent("getting-ready", isDirectory: true)
     }
 
-    /// Where a finished warm-up writes down the version it was for.
+    /// Where a finished warm-up writes down the builder it got ready.
     nonisolated static func recordURL(inHomeFolder homeFolder: URL = RealHome.forFiles) -> URL {
         return folder(inHomeFolder: homeFolder).appendingPathComponent("ready-for.txt")
     }
 
-    /// "1.4.0 (212)": the recipe changes only with the app, so the version
-    /// and build name the recipe well enough to know it is new.
-    nonisolated static func versionIdentity(infoDictionary: [String: Any]) -> String {
-        let version: String = infoDictionary["CFBundleShortVersionString"] as? String ?? "?"
-        let build: String = infoDictionary["CFBundleVersion"] as? String ?? "?"
-        return "\(version) (\(build))"
-    }
-
-    /// Whether a warm-up has already finished for this version.
-    nonisolated static func isReady(forVersion identity: String, recordURL: URL) -> Bool {
+    /// Whether the builder named `tag` has already been got ready.
+    nonisolated static func isReady(forRecipe tag: String, recordURL: URL) -> Bool {
+        if tag.isEmpty {
+            return false
+        }
         guard let recorded = try? String(contentsOf: recordURL, encoding: .utf8) else {
             return false
         }
-        return recorded.trimmingCharacters(in: .whitespacesAndNewlines) == identity
+        return recorded.trimmingCharacters(in: .whitespacesAndNewlines) == tag
+    }
+
+    /// The value after `prefix` on the last line that starts with it, or nil.
+    nonisolated static func value(after prefix: String, in output: String) -> String? {
+        var found: String?
+        for line in output.split(separator: "\n") {
+            if line.hasPrefix(prefix) {
+                let value: String = String(line.dropFirst(prefix.count))
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if !value.isEmpty {
+                    found = value
+                }
+            }
+        }
+        return found
     }
 
     /// Whether a run's output says the builder is ready.
     nonisolated static func sawTheReadyLine(in output: String) -> Bool {
-        for line in output.split(separator: "\n") {
-            if line.hasPrefix(readyLinePrefix) {
-                return true
-            }
-        }
-        return false
+        return value(after: readyLinePrefix, in: output) != nil
     }
 
     /// The flags that make this binary something other than an app.
@@ -183,29 +167,29 @@ final class BuilderWarmUp {
     }
 
     /// Called once, from `applicationDidFinishLaunching`. Never blocks the
-    /// window: the network question and the run are both awaited off it.
+    /// window: the recipe's name, the network question and the run are all
+    /// awaited off it.
     func startIfItShould(arguments: [String] = CommandLine.arguments) {
         if isGettingReady {
             return
         }
-        let identity: String = BuilderWarmUp.versionIdentity(infoDictionary: Bundle.main.infoDictionary ?? [:])
         let isAnApp: Bool = BuilderWarmUp.isAnAppLaunch(arguments: arguments)
         let carries: Bool = Bundle.main.url(forResource: "Dockerfile", withExtension: nil) != nil
             && Bundle.main.url(forResource: "setup.sh", withExtension: nil) != nil
-        let ready: Bool = BuilderWarmUp.isReady(forVersion: identity, recordURL: BuilderWarmUp.recordURL())
-        // Decided once WITHOUT the network first, so a launch that will never
-        // warm up does not even ask the network.
+        // Decided once with what costs nothing, so a launch that will never
+        // warm up does not lay out its folder or ask the network.
         let before: Decision = BuilderWarmUp.decide(Facts(
-            isAnAppLaunch: isAnApp, carriesTheRecipe: carries, readyForThisVersion: ready, network: .online
+            isAnAppLaunch: isAnApp, carriesTheRecipe: carries, readyForThisRecipe: false, network: .online
         ))
         if before != .start {
             return
         }
-        isGettingReady = true
         Task { @MainActor in
-            let network: NetworkState = await BuilderWarmUp.currentNetwork()
+            let tag: String = await BuilderWarmUp.recipeTag()
+            let ready: Bool = BuilderWarmUp.isReady(forRecipe: tag, recordURL: BuilderWarmUp.recordURL())
+            let network: NetworkState = ready ? .online : await BuilderWarmUp.currentNetwork()
             let decision: Decision = BuilderWarmUp.decide(Facts(
-                isAnAppLaunch: isAnApp, carriesTheRecipe: carries, readyForThisVersion: ready, network: network
+                isAnAppLaunch: isAnApp, carriesTheRecipe: carries, readyForThisRecipe: ready, network: network
             ))
             if case .skip(let reason, let noteOnTheTrail) = decision {
                 if noteOnTheTrail {
@@ -214,18 +198,18 @@ final class BuilderWarmUp {
                         "did not get this Mac ready to build websites in the background: \(reason) — it will be done at the first preview"
                     )
                 }
-                isGettingReady = false
                 return
             }
+            isGettingReady = true
             ActivityTrail.note(
                 .builderWarmUpStarted,
-                "started getting this Mac ready to build websites, in the background, for version \(identity)"
+                "started getting this Mac ready to build websites, in the background, for \(tag.isEmpty ? "this recipe" : tag)"
             )
             let started: Date = Date()
-            let outcome: LauncherOutcome = await BuilderWarmUp.runTheLauncher()
+            let outcome: LauncherOutcome = await BuilderWarmUp.runTheLauncher(flag: BuilderWarmUp.launcherFlag)
             let seconds: Int = Int(Date().timeIntervalSince(started).rounded())
-            if outcome.status == 0 && BuilderWarmUp.sawTheReadyLine(in: outcome.output) {
-                BuilderWarmUp.record(identity)
+            if outcome.status == 0, let built = BuilderWarmUp.value(after: BuilderWarmUp.readyLinePrefix, in: outcome.output) {
+                BuilderWarmUp.record(built)
                 ActivityTrail.note(
                     .builderWarmUpFinished,
                     "this Mac is ready to build websites (got ready in the background in \(seconds)s)"
@@ -238,26 +222,6 @@ final class BuilderWarmUp {
             }
             isGettingReady = false
         }
-    }
-
-    // MARK: - Private helpers
-
-    /// How a run ended, in words for the trail.
-    struct LauncherOutcome: Sendable {
-
-        // MARK: - Stored properties
-
-        let status: Int32
-        let output: String
-        let why: String
-    }
-
-    nonisolated private static func record(_ identity: String) {
-        let url: URL = recordURL()
-        try? FileManager.default.createDirectory(
-            at: url.deletingLastPathComponent(), withIntermediateDirectories: true
-        )
-        try? (identity + "\n").write(to: url, atomically: true, encoding: .utf8)
     }
 
     /// Asks the system once whether there is a network, and whether Low Data
@@ -292,11 +256,32 @@ final class BuilderWarmUp {
         }
     }
 
-    /// Lays out the folder (the launcher and a mirror of the recipe) and runs
-    /// `setup.sh --prepare-builder` there, its output kept in `last-run.log`
-    /// beside it for anyone looking into a slow first preview.
+    nonisolated private static func record(_ tag: String) {
+        let url: URL = recordURL()
+        try? FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try? (tag + "\n").write(to: url, atomically: true, encoding: .utf8)
+    }
+
+    /// The name of the builder for the recipe this app carries, asked of the
+    /// launcher itself (`setup.sh --builder-tag`, which starts nothing), after
+    /// laying out the folder. Empty when it cannot be asked, which counts as
+    /// "not ready".
     @concurrent
-    nonisolated private static func runTheLauncher() async -> LauncherOutcome {
+    nonisolated private static func recipeTag() async -> String {
+        let outcome: LauncherOutcome = await runTheLauncher(flag: tagFlag)
+        if outcome.status != 0 {
+            return ""
+        }
+        return value(after: tagLinePrefix, in: outcome.output) ?? ""
+    }
+
+    /// Lays out the folder (the launcher and a mirror of the recipe) and runs
+    /// `setup.sh <flag>` there, its output kept beside it (`last-run.log` for
+    /// the warm-up) for anyone looking into a slow first preview.
+    @concurrent
+    nonisolated private static func runTheLauncher(flag: String) async -> LauncherOutcome {
         let place: URL = folder()
         do {
             try FileManager.default.createDirectory(at: place, withIntermediateDirectories: true)
@@ -309,14 +294,15 @@ final class BuilderWarmUp {
         _ = WorkspaceModel.syncFile(from: launcher, to: place.appendingPathComponent("setup.sh"))
         _ = WorkspaceModel.copyToolchainFiles(into: place)
 
-        let logURL: URL = place.appendingPathComponent("last-run.log")
+        let logName: String = flag == launcherFlag ? "last-run.log" : "recipe-tag.log"
+        let logURL: URL = place.appendingPathComponent(logName)
         FileManager.default.createFile(atPath: logURL.path, contents: nil)
         guard let log = FileHandle(forWritingAtPath: logURL.path) else {
             return LauncherOutcome(status: -1, output: "", why: "could not keep its notes")
         }
         let process: Process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/bash")
-        process.arguments = [place.appendingPathComponent("setup.sh").path, launcherFlag]
+        process.arguments = [place.appendingPathComponent("setup.sh").path, flag]
         process.currentDirectoryURL = place
         process.environment = HelperPrograms.environment()
         process.standardOutput = log
@@ -338,5 +324,53 @@ final class BuilderWarmUp {
         let output: String = (try? String(contentsOf: logURL, encoding: .utf8)) ?? ""
         let why: String = status == -1 ? "could not start" : "stopped with \(status)"
         return LauncherOutcome(status: status, output: output, why: why)
+    }
+}
+
+/// The plain values `BuilderWarmUp` decides over and reports with, kept out
+/// of the class so its sections are the four the house style names.
+extension BuilderWarmUp {
+
+    /// What the network allows, as the decision sees it.
+    enum NetworkState: String, Sendable {
+        case online
+        case offline
+        /// macOS Low Data Mode: the teacher has asked apps not to download
+        /// what they were not asked for, and ~340 MB is exactly that.
+        case lowDataMode
+    }
+
+    /// Everything the decision depends on, as plain values.
+    struct Facts: Equatable, Sendable {
+
+        // MARK: - Stored properties
+
+        /// False in the unit suite, a UI test, or a headless run (the
+        /// assistant's server, a scheduled publish, the contract writer).
+        let isAnAppLaunch: Bool
+
+        /// Whether this app carries the recipe (a test bundle does not).
+        let carriesTheRecipe: Bool
+
+        /// Whether the builder for this recipe has already been got ready.
+        let readyForThisRecipe: Bool
+
+        let network: NetworkState
+    }
+
+    /// What to do, and whether the trail hears about a skip.
+    enum Decision: Equatable, Sendable {
+        case start
+        case skip(reason: String, noteOnTheTrail: Bool)
+    }
+
+    /// How a run ended, in words for the trail.
+    struct LauncherOutcome: Sendable {
+
+        // MARK: - Stored properties
+
+        let status: Int32
+        let output: String
+        let why: String
     }
 }

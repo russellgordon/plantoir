@@ -1885,6 +1885,7 @@ _MARKDOWN_PAGE_LINK = re.compile(r"\]\((?!<)([^)\s]+)")
 _ANGLE_BRACKETED_PAGE_LINK = re.compile(r"\]\(<([^<>\r\n]+)(?=>)")
 _WIKILINK_AS_WRITTEN = re.compile(r"!?\[\[([^\]|#]+?)(?:#[^\[\]|]*)?(?:\\?\|[^\]]*)?\]\]")
 _HAS_A_SCHEME = re.compile(r"^[A-Za-z][A-Za-z0-9+.\-]*:")
+_AN_INVALID_ESCAPE = re.compile(r"%(?![0-9A-Fa-f]{2})")
 
 
 def _page_named_by_destination(destination: str):
@@ -1895,10 +1896,16 @@ def _page_named_by_destination(destination: str):
         return None
     for separator in ("#", "?"):
         text = text.split(separator, 1)[0]
-    try:
-        text = urllib.parse.unquote(text, errors="strict")
-    except Exception:
-        pass
+    # The raw text when it does not decode, as a whole: a `%` not followed by
+    # two hex digits, or escapes that are not UTF-8, keep the destination as
+    # written. The same answer Swift's `removingPercentEncoding` gives (nil,
+    # and the mac keeps the raw text), which `unquote` alone does not — it
+    # decodes the valid escapes around an invalid one (review N7).
+    if not _AN_INVALID_ESCAPE.search(text):
+        try:
+            text = urllib.parse.unquote(text, errors="strict")
+        except UnicodeDecodeError:
+            pass
     text = text.strip()
     return text or None
 
