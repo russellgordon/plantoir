@@ -2566,8 +2566,10 @@ Claude Code is offered a **longer** list than the local model: 37 tools
 against 13 — the twenty-two that exist, plus fifteen served only over MCP
 (#209's three How I Teach tools and #96's start-of-year pair, both 2026-09-26;
 see "Getting a section ready for the start of the year" below).
-(Windows' separate `plantoir-mcp.exe` serves 37; the gap is recorded in
-[issue #66](https://github.com/russellgordon/plantoir/issues/66).) Six of the extra ones ask for judgement about meaning — reading the
+(Windows' separate `plantoir-mcp.exe` also serves 37, but not the same 37 —
+five on each side are the other's; "The two MCP surfaces are not the same
+product" below names them. [Issue #66](https://github.com/russellgordon/plantoir/issues/66),
+which recorded the gap when the counts differed, is closed.) Six of the extra ones ask for judgement about meaning — reading the
 curriculum and deciding which expectations a page addresses, and reading or
 drafting the teacher's How I Teach page (#209, "Telling an outside assistant how
 the course is taught") — which a large model does well and a 4B model does not. Anything shown to the local model has
@@ -3488,9 +3490,10 @@ the 13-tool local surface and the 37-tool MCP one (32 until #209 added three
 How I Teach tools and #96 the start-of-year pair; `toolDescriptions` pins all
 37). (It said 23; corrected
 2026-09-06 when the list was first run against this side. `plantoir-mcp.exe`
-serves 37, and the twelve it has beyond the contract are named in
-`AssistSurfaceContractTests`.) The mac's own test has
-pinned that sum for longer than the prose said so; it is 22 + 10 MCP-only = 32 since all six of the tools sorted as the mac's landed on 2026-09-08. What the two
+serves 37 as well, but not the same 37 — see "The two MCP surfaces are not
+the same product" below; `AssistSurfaceContractTests`' own comment there still
+says "the contract carries the mac's 32", which is Windows' to correct.) The mac's own test has
+pinned that sum for longer than the prose said so; it is 22 + 15 MCP-only = 37: 22 + 10 = 32 once all six of the tools sorted as the mac's landed on 2026-09-08, then #209's three How I Teach tools and #96's start-of-year pair. What the two
 surfaces do and do not share is item 41 and "The two MCP surfaces are not the
 same product" below.
 
@@ -3611,16 +3614,23 @@ half-built mac version of any of them:
 `roll_over_section`, `sync_page_dates`.
 
 **Seven of those twelve are the mac's now**, and the surface was **32** (22 plus
-ten MCP-only) — 35 since #209 added the three How I Teach tools. All six tools this sorting judged the mac should have were built
+ten MCP-only) — 35 since #209 added the three How I Teach tools, and 37 since
+#96 added the start-of-year pair. All six tools this sorting judged the mac should have were built
 on 2026-09-08 — `list_courses`, the `add_classes` pair, the
 `make_room_for_classes` pair, `explain_publishing` and `back_up_course`
-(`GUI-IMPROVEMENTS.md` rows 452–456, and item 46 below). So the set difference
+(`GUI-IMPROVEMENTS.md` rows 452–456, and item 46 below). So Windows' side of the set difference
 is **5**, and the sentence above about none of them existing on the mac
 describes the day it was measured rather than today. What is left is what the
 sorting said to leave: `read_timetable` and `list_recent_changes`, which are
 Windows-shaped by design; `sync_page_dates`, which needs a teacher's problem
 first; and `plan_sync_page_dates` and `roll_over_section`, whose writes are
-covered by decisions recorded elsewhere.
+covered by decisions recorded elsewhere. **The difference runs the other way
+too since 2026-09-26**: the mac's `read_how_i_teach`, the `write_how_i_teach`
+pair (#209) and the `prepare_for_start_of_year` pair (#96) are not in
+`PlantoirTools.cs` yet, and are owed through the `windows` issues those pieces
+opened. Both servers therefore declare 37 names, and five on each side are the
+other's — equal counts, different sets (re-counted 2026-09-27 against
+`assist-cases.json` → `toolSchemas.mcp` and the `[McpServerTool]` names).
 
 **Why neither suite noticed — and how it is now caught.** Not a subset check
 — an earlier write-up said that and was wrong. `Assert.Equal` on `HashSet`s is
