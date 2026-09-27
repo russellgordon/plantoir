@@ -1468,8 +1468,18 @@ def pictures_with_drawn_corners() -> list[str]:
     return problems
 
 
-def refuse_drawn_corners() -> int:
-    problems = pictures_with_drawn_corners()
+def refuse_drawn_corners(only_ids: list[str] | None = None) -> int:
+    """Name every picture with a square or drawn corner, and exit non-zero.
+
+    Pictures written straight to site/img (the class sites, the figures) are
+    already there when this runs: a failure here means "do not commit them",
+    and the exit code says so. Scene pictures are checked earlier, in
+    staging, and a failing one never reaches site/img.
+    """
+    problems: list[str] = []
+    for problem in pictures_with_drawn_corners():
+        if only_ids is None or any(problem.startswith(f"{identifier}-") for identifier in only_ids):
+            problems.append(problem)
     for problem in problems:
         print(f"   ✗ {problem}", file=sys.stderr)
     if problems:
@@ -1586,6 +1596,9 @@ def main() -> int:
             if result == 0 and (arguments.scenes or only_scenes):
                 result = run_scenes(marketing, only_scenes or list(scene_book.SCENES))
                 rebuild_site()
+                announce("Checking every picture's corners")
+                if refuse_drawn_corners() != 0:
+                    result = 1
         finally:
             keeping_awake.terminate()
         return result
@@ -1608,7 +1621,7 @@ def main() -> int:
     if arguments.hero:
         build_hero_figures()
         rebuild_site()
-        return refuse_drawn_corners()
+        return refuse_drawn_corners(["hero"])
 
     if arguments.phone:
         # No preflight: the phone shot is simctl and RocketSim end to end —

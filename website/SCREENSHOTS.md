@@ -80,12 +80,26 @@ cut the notification out of Notification Center's window and drew its
 corners. A banner is now cropped only to the edge of its own shadow, which
 never passes through the card.
 
+The page adds none either: `.shot img` in `assets/style.css` has no
+`border-radius` and no `box-shadow` — its shadow is a `drop-shadow` filter,
+which follows the picture's alpha (until 2026-09-27 a 10px rounded
+box-shadow was drawn round every shot, and round each PAIR as one
+rectangle).
+
 **The gate:** `website/shots/test_native_corners.py` opens every picture the
 pages show a Mac visitor (from `shots.json` and the pages, PNG and WebP) and
-fails on a corner that is square or tighter than any real macOS window;
-`capture.py` runs the same check (`corners.py`) before it promotes a scene
-and at the end of every run. It failed on the committed `colour-schemes` and
-`light-and-dark` before they were retaken, and passes after.
+fails on a corner that is square, or drawn tighter than any real macOS
+window (radius under 0.0155 of the window's height; `corners.py` has the
+measurements). `capture.py` runs the same check on each scene picture in
+staging, so a failing one never reaches `site/img`, and over every picture
+at the end of a run, exiting 1 and naming what not to commit. It failed on
+the committed `colour-schemes` and `light-and-dark` before they were
+retaken, and passes after. **It is a guard, not a proof:** a mask drawn at a
+window's REAL radius reads like the real curve, which is why the code that
+drew them is gone rather than merely checked. The one such picture still on
+the site is `schedule` (its banner was masked at the measured radius on
+2026-09-27); the test lists it in `DRAWN_BUT_NOT_DETECTABLE` and reports a
+skip until it is retaken.
 
 **Windows owes the same rule.** `capture_windows.py` builds
 `light-and-dark-windows` and `colour-schemes-windows` with `composite.py`,

@@ -7,7 +7,11 @@ kept whole. No crop through a window, no corner painted back on, no rounded
 mask drawn by hand. This test opens every picture the pages show a Mac
 visitor — read from `shots.json` and the pages, both PNG and WebP — and fails
 on any corner that is square (a screen grab or a crop) or tighter than any
-real macOS window (a drawn mask). How a corner is read, and the
+real macOS window (a drawn mask of the kind composite.py used). A mask drawn
+at a window's REAL radius cannot be told from the real curve by pixels, so
+this is a guard, not a proof: DRAWN_BUT_NOT_DETECTABLE names any such
+picture still on the site, and the rule itself lives in the code that no
+longer draws. How a corner is read, and the
 measurements behind the thresholds: `corners.py`.
 
 The Windows pictures (`-windows-`) are not judged here: they are taken on
@@ -52,6 +56,30 @@ class CommittedPictures(unittest.TestCase):
             picture = REPO / "site" / "img" / name
             self.assertTrue(corners.corner_problems(picture),
                             f"{name} passes now — take it off NAMED_GAPS ({owner})")
+
+
+# Pictures known to carry a drawn corner that this reader CANNOT see, so the
+# gate above passes them. Each is owed a retake; the list is here so that the
+# pass above is not read as "clean".
+#
+# `schedule`: its banner was cut out of Notification Center's window and a
+# rounded mask drawn over it at the banner's MEASURED radius (2e11471d). The
+# ratio test cannot tell a mask drawn at the real radius from the real curve,
+# and the banner sits inside the same shape as the window below it. The
+# retake with the new crop (scenes.banner_in_window) was paused on
+# 2026-09-27 when Russell was at the Mac.
+DRAWN_BUT_NOT_DETECTABLE: dict[str, str] = {
+    "schedule-light.png": "retake owed: capture.py --only notification-banner, then compose",
+    "schedule-dark.png": "retake owed: capture.py --only notification-banner, then compose",
+}
+
+
+class PicturesStillOwed(unittest.TestCase):
+
+    def test_no_picture_is_known_to_carry_a_drawn_corner(self):
+        if DRAWN_BUT_NOT_DETECTABLE:
+            owed = "; ".join(f"{name}: {why}" for name, why in DRAWN_BUT_NOT_DETECTABLE.items())
+            self.skipTest(f"known drawn corners the reader cannot see — {owed}")
 
 
 class TheCheckItself(unittest.TestCase):

@@ -167,9 +167,12 @@ crop through a window, never a corner re-rounded or a rounded mask drawn,
 never a drawn shadow shape (a shadow is the capture's own alpha, blurred),
 scaling only with Lanczos. A figure that must not show Safari's toolbar is
 taken in a window that has none (`shots/webwindow.swift`), not cut out.
+The page draws no corner or shadow shape either (`.shot img` uses a
+`drop-shadow` filter, which follows the picture's alpha).
 `shots/test_native_corners.py` fails on any picture the pages show whose
-corner is square or drawn, and `capture.py` refuses the same pictures before
-it calls them done. The rule, what was removed and what Windows owes:
+corner is square or drawn tighter than a real window's; `capture.py` keeps a
+failing scene picture out of `site/img` and ends every run by naming any
+picture there that fails, with exit 1. The rule, what was removed and what Windows owes:
 [`SCREENSHOTS.md`](SCREENSHOTS.md), "The one rule".
 
 ```bash

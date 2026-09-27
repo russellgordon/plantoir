@@ -84,22 +84,31 @@ final class PageWindow: NSObject, WKNavigationDelegate {
         webView.load(URLRequest(url: address))
     }
 
-    nonisolated func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+    // A missing page or a server error still "finishes loading", and would be
+    // photographed as if it were the class site. Refuse it by its status.
+    func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse,
+                 decisionHandler: @escaping @MainActor @Sendable (WKNavigationResponsePolicy) -> Void) {
+        let status: Int = (navigationResponse.response as? HTTPURLResponse)?.statusCode ?? 200
+        if navigationResponse.isForMainFrame && status >= 400 {
+            decisionHandler(.cancel)
+            fail("the page answered \(status)")
+            return
+        }
+        decisionHandler(.allow)
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         Task { @MainActor in
             await self.photographWhenSettled()
         }
     }
 
-    nonisolated func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        Task { @MainActor in
-            self.fail("the page did not load: \(error.localizedDescription)")
-        }
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        fail("the page did not load: \(error.localizedDescription)")
     }
 
-    nonisolated func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-        Task { @MainActor in
-            self.fail("the page did not load: \(error.localizedDescription)")
-        }
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        fail("the page did not load: \(error.localizedDescription)")
     }
 
     func photographWhenSettled() async {
@@ -140,7 +149,7 @@ final class PageWindow: NSObject, WKNavigationDelegate {
     }
 
     func fail(_ reason: String) {
-        FileHandle.standardError.write("webwindow: \(reason)\n".data(using: .utf8)!)
+        FileHandle.standardError.write(Data("webwindow: \(reason)\n".utf8))
         exit(1)
     }
 }
@@ -161,7 +170,7 @@ guard arguments.count >= 5,
       let address = URL(string: arguments[1]),
       let width = Double(arguments[2]),
       let height = Double(arguments[3]) else {
-    FileHandle.standardError.write("Usage: swift webwindow.swift <url> <width> <height> <output.png> [settle seconds]\n".data(using: .utf8)!)
+    FileHandle.standardError.write(Data("Usage: swift webwindow.swift <url> <width> <height> <output.png> [settle seconds]\n".utf8))
     exit(1)
 }
 let settleSeconds: Double = arguments.count >= 6 ? (Double(arguments[5]) ?? 3.5) : 3.5
