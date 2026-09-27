@@ -1,3 +1,5 @@
+using Plantoir.Core.Models;
+
 namespace Plantoir.Core.Assist;
 
 /// <summary>
@@ -26,12 +28,12 @@ public static class ClassChangeWording
 
     /// <summary>What the copy is, where it landed, and that nobody can see it yet.</summary>
     public static string CopiedTo(string sourceTitle, string newTitle, DateOnly date) =>
-        $"“{sourceTitle}” was copied to “{newTitle}”, dated {date:yyyy-MM-dd}. It is hidden, so nothing " +
+        $"“{sourceTitle}” was copied to “{newTitle}”, dated {DateText.Iso(date)}. It is hidden, so nothing " +
         "changed on the site — write it, then publish when it is ready.";
 
     /// <summary>The same fact in the future tense, for the plan a teacher agrees to.</summary>
     public static string WouldBeCopiedTo(string sourceTitle, string newTitle, DateOnly date) =>
-        $"“{sourceTitle}” would be copied to “{newTitle}”, dated {date:yyyy-MM-dd}.";
+        $"“{sourceTitle}” would be copied to “{newTitle}”, dated {DateText.Iso(date)}.";
 
     /// <summary>Said in the plan, because "hidden" is the part a teacher would otherwise have to ask about.</summary>
     public const string TheCopyStartsHidden =

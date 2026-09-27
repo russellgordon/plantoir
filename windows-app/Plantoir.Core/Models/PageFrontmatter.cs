@@ -196,7 +196,7 @@ public static class PageFrontmatter
         string pageText, string key, DateOnly date, string fallbackTail = "T07:00:00.000-0400")
     {
         var block = Block.Parse(pageText);
-        string stamp = date.ToString("yyyy-MM-dd");
+        string stamp = DateText.Iso(date);
         string existing = block?.RawValue(key) ?? "";
         string tail = TimeAndOffset(existing) ?? fallbackTail;
         string value = stamp + tail;

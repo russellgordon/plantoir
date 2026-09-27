@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Plantoir.Core.Models;
 
 namespace Plantoir.Core.Assist;
 
@@ -74,8 +75,8 @@ public sealed class ReDatePlan
         var last = LastDay != default ? LastDay : (Dates.Count > 0 ? Dates[^1].New : default);
 
         lines.Add($"{count} {(count == 1 ? "class runs" : "classes run")} from " +
-                  $"{first:yyyy-MM-dd} ({first.DayOfWeek}) to " +
-                  $"{last:yyyy-MM-dd} ({last.DayOfWeek}).");
+                  $"{DateText.Iso(first)} ({first.DayOfWeek}) to " +
+                  $"{DateText.Iso(last)} ({last.DayOfWeek}).");
 
         int spare = SpareDates > 0 ? SpareDates : UnusedMeetings;
         if (spare > 0)
@@ -89,7 +90,7 @@ public sealed class ReDatePlan
             lines.Add($"{Overflowing} {(Overflowing == 1 ? "class has" : "classes have")} no day " +
                       $"of {(Overflowing == 1 ? "its" : "their")} own this year, so " +
                       $"{(Overflowing == 1 ? "it goes" : "they all go")} on " +
-                      $"{last:yyyy-MM-dd} with the last one as {(Overflowing == 1 ? "a draft" : "drafts")}. Move, publish or delete " +
+                      $"{DateText.Iso(last)} with the last one as {(Overflowing == 1 ? "a draft" : "drafts")}. Move, publish or delete " +
                       $"{(Overflowing == 1 ? "it" : "them")} when you have decided what to do.");
         }
         lines.Add("");
@@ -114,18 +115,18 @@ public sealed class ReDatePlan
                 case ReDateReason.AClass:
                     if (move.Unpublishes)
                     {
-                        lines.Add($"“{move.Title}” moves to {move.To:yyyy-MM-dd} and becomes a draft because it has no class date.");
+                        lines.Add($"“{move.Title}” moves to {DateText.Iso(move.To)} and becomes a draft because it has no class date.");
                     }
                     else
                     {
-                        lines.Add($"“{move.Title}” moves to {move.To:yyyy-MM-dd}.");
+                        lines.Add($"“{move.Title}” moves to {DateText.Iso(move.To)}.");
                     }
                     break;
                 case ReDateReason.BroughtBy:
-                    lines.Add($"“{move.Title}” moves to {move.To:yyyy-MM-dd}, with “{move.ClassTitle}”.");
+                    lines.Add($"“{move.Title}” moves to {DateText.Iso(move.To)}, with “{move.ClassTitle}”.");
                     break;
                 case ReDateReason.YearRound:
-                    lines.Add($"“{move.Title}” moves to {move.To:yyyy-MM-dd}, the first day of class, " +
+                    lines.Add($"“{move.Title}” moves to {DateText.Iso(move.To)}, the first day of class, " +
                               "because Key Links points at it.");
                     break;
             }
@@ -171,8 +172,8 @@ public sealed record PlannedDate(
 
     public string Describe() =>
         WillChange
-            ? $"{Title}  {Show(Current)} → {New:yyyy-MM-dd} ({New:ddd}){Meeting}"
-            : $"{Title}  {New:yyyy-MM-dd} ({New:ddd}){Meeting} — unchanged";
+            ? $"{Title}  {Show(Current)} → {DateText.Iso(New)} ({New:ddd}){Meeting}"
+            : $"{Title}  {DateText.Iso(New)} ({New:ddd}){Meeting} — unchanged";
 
-    private static string Show(DateOnly? value) => value is { } date ? date.ToString("yyyy-MM-dd") : "no date";
+    private static string Show(DateOnly? value) => value is { } date ? DateText.Iso(date) : "no date";
 }

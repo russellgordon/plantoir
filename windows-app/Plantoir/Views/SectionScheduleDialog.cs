@@ -385,7 +385,7 @@ public sealed class SectionScheduleDialog : ContentDialog
                     return false;
                 }
 
-                _statusBlock.Text = $"Found {_parsedDates.Count} class {(_parsedDates.Count == 1 ? "date" : "dates")} ({_parsedDates[0]:yyyy-MM-dd} to {_parsedDates[^1]:yyyy-MM-dd}).";
+                _statusBlock.Text = $"Found {_parsedDates.Count} class {(_parsedDates.Count == 1 ? "date" : "dates")} ({DateText.Iso(_parsedDates[0])} to {DateText.Iso(_parsedDates[^1])}).";
                 _statusBlock.Foreground = (Brush)Application.Current.Resources["TextFillColorPrimaryBrush"];
                 return true;
             }

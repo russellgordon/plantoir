@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
+using Plantoir.Core.Models;
 
 namespace Plantoir.Core.Scripting;
 
@@ -30,7 +31,7 @@ public class ProblemReportBuilder
     }
 
     public static string Stamp(DateTime now) =>
-        now.ToString("yyyy-MM-dd 'at' HH.mm.ss");
+        DateText.Invariant(now, "yyyy-MM-dd 'at' HH.mm.ss");
 
     public static string StampedFolderName(DateTime now) =>
         $"{FolderName} {Stamp(now)}";
@@ -54,7 +55,7 @@ public class ProblemReportBuilder
             "What is in this report",
             "======================",
             "",
-            $"Made on {now:yyyy-MM-dd HH:mm:ss zzz}.",
+            $"Made on {DateText.Invariant(now, "yyyy-MM-dd HH:mm:ss zzz")}.",
             "",
             "Everything here is plain text. Open any of it and read it before you",
             "send it — that is what it is for.",

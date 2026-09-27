@@ -58,8 +58,46 @@ public sealed class TimetableMemory
         Path.Combine(Workspace.CoursesDirectory(workspacePath), courseCode.ToUpperInvariant(),
             ".internal", "timetable", $"section{sectionNumber}.json");
 
-    /// <summary>What was remembered for this section, or null if nothing was.</summary>
-    public static TimetableMemory? Read(string workspacePath, string courseCode, int sectionNumber)
+    /// <summary>
+    /// The earliest class date a remembered timetable can hold and be
+    /// believed. Plantoir's assistant was written in 2026, so no memory
+    /// names a class before this; the year of slack means a machine whose
+    /// clock is out still writes a memory this accepts.
+    /// </summary>
+    public static readonly DateOnly EarliestBelievable = new(2025, 1, 1);
+
+    /// <summary>
+    /// How far past today a remembered class may fall and be believed. A
+    /// school year is one; three is generous. The nearest wrong reading is
+    /// 543 years out (below), so any figure between the two works.
+    /// </summary>
+    public const int YearsAheadBelievable = 3;
+
+    /// <summary>
+    /// What was remembered for this section, or null if nothing was — or if
+    /// what was remembered cannot be true.
+    ///
+    /// <para><b>Why a date can be unbelievable.</b> Until #144, <see cref="Write"/>
+    /// rendered each date in the machine's default calendar, so a PC whose
+    /// regional format is Thai wrote <c>2569-09-08</c> for 2026-09-08. This
+    /// reader has always been invariant, and reads that as the Gregorian
+    /// year 2569. Now that the writer is Gregorian too, such a file is still
+    /// on that teacher's disk, and it would still answer "when are my next
+    /// classes?" from five centuries ahead. A memory holding any date before
+    /// <see cref="EarliestBelievable"/> or more than
+    /// <see cref="YearsAheadBelievable"/> years past today is therefore
+    /// treated as no memory at all: the assistant asks for the timetable
+    /// again, and the next <see cref="Write"/> replaces the file with one it
+    /// can read. That is the same shape as <c>ArchiveStamp</c>: a date that
+    /// cannot be true is not allowed to decide anything.</para>
+    /// </summary>
+    /// <param name="today">
+    /// The clock the ceiling is measured against. Passed by tests, which need
+    /// an answer that does not change between one line and the next; the
+    /// app leaves it null.
+    /// </param>
+    public static TimetableMemory? Read(string workspacePath, string courseCode, int sectionNumber,
+                                        DateOnly? today = null)
     {
         try
         {
@@ -80,11 +118,13 @@ public sealed class TimetableMemory
             if (unreadable.Count > 0 || dates.Count == 0) return null;
 
             dates.Sort();
+            DateOnly ceiling = (today ?? DateOnly.FromDateTime(DateTime.Now)).AddYears(YearsAheadBelievable);
+            if (dates[0] < EarliestBelievable || dates[^1] > ceiling) return null;
             return new TimetableMemory
             {
                 Dates = dates,
                 Source = stored.Source ?? "not recorded",
-                Recorded = DateOnly.TryParse(stored.Recorded, out var when) ? when : default,
+                Recorded = DateText.TryReadDay(stored.Recorded, out var when) ? when : default,
             };
         }
         // A memory that cannot be read is a memory we do not have. Nothing here
@@ -111,9 +151,9 @@ public sealed class TimetableMemory
             File.WriteAllText(path, JsonSerializer.Serialize(new Stored
             {
                 Section = sectionNumber,
-                Dates = ordered.Select(date => date.ToString("yyyy-MM-dd")).ToList(),
+                Dates = ordered.Select(date => DateText.Iso(date)).ToList(),
                 Source = source,
-                Recorded = today.ToString("yyyy-MM-dd"),
+                Recorded = DateText.Iso(today),
             }, new JsonSerializerOptions { WriteIndented = true }));
             return true;
         }

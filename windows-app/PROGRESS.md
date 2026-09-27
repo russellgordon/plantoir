@@ -323,6 +323,27 @@ this app's source from the mac, read rather than run — `dotnet` is not
 installed there — so treat it as a starting point, and report anything it gets
 wrong in a `mac` issue.
 
+## Work done from a cloud (Linux) session — 2026-09-27
+
+The first piece of this port built off the Windows PC: [#144](https://github.com/russellgordon/plantoir/issues/144),
+in a Claude Code cloud session (Ubuntu 24.04, no Windows App SDK). What that
+kind of session can do, measured on the day and written for the next one in
+[`WINDOWS-DIRECTOR-PROMPT.md`](../WINDOWS-DIRECTOR-PROMPT.md) → "Working from a
+cloud session":
+
+- `Plantoir.Core`, `Plantoir.Mcp`, `PtyDriver` and `Plantoir.Tests` build and
+  run on Linux with the .NET 10 SDK (Microsoft's apt repository no longer
+  carries 9.0) plus the .NET 9 runtime from `dotnet-install.sh`. `Plantoir/`
+  (WinUI 3) and `Plantoir.UiTests` do not build there at all.
+- `dotnet test` on Linux: **1538 tests, 111 red before the change** — every
+  red one either a Windows path (`C:\Users\…` expected, `CreateFileW` in
+  `FolderContainers`) or a handover the parity plan already lists. The gate
+  for a cloud session is therefore **"no NEW red"**, judged by diffing the
+  failing-test list before and after, not by the totals line alone.
+- The WinUI project's edits (two lines, #144) were NOT compiled. The first
+  `dotnet build Plantoir/Plantoir.csproj -c Debug -p:Platform=x64` on the PC
+  is the check, and "PT - Dev" is stale until then.
+
 ## Known rough edges for the next session
 
 - **The native (containerless) toolchain shipped in v1.1.0 — this is no
