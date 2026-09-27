@@ -237,9 +237,9 @@ class MarketingScreenshotCase: XCTestCase {
     /// first match is the live course, above any reference copy carrying the
     /// same code.
     func courseRow(_ code: String, in application: XCUIApplication) -> XCUIElement {
-        return application.outlines.staticTexts.matching(
-            NSPredicate(format: "identifier == %@ OR label == %@", "sidebar-\(code)", code)
-        ).firstMatch
+        return application.descendants(matching: .any)
+            .matching(identifier: "sidebar-\(code)")
+            .firstMatch
     }
 
     /// Opens a course's section in the sidebar and returns the main window.
@@ -1086,7 +1086,17 @@ final class MarketingFolderProvisioning: MarketingScreenshotCase {
     func testKeepACopyForReference() throws {
         let application: XCUIApplication = launchApp(workspacePath: try demoWorkspacePath())
         let row: XCUIElement = courseRow("ICS3U", in: application)
-        XCTAssertTrue(row.waitForExistence(timeout: 30))
+        if !row.waitForExistence(timeout: 30) {
+            // Say what the queries see, so a row the tree shows and the
+            // query misses can be told apart from a row that is not there.
+            let byIdentifier: Int = application.descendants(matching: .any).matching(identifier: "sidebar-ICS3U").count
+            let outlines: Int = application.outlines.count
+            let outlineTexts: Int = application.outlines.staticTexts.count
+            let windows: Int = application.windows.count
+            XCTFail("ICS3U's row was not found: \(byIdentifier) by identifier, \(outlines) outlines, "
+                    + "\(outlineTexts) texts in them, \(windows) windows")
+            return
+        }
         let alreadyKept: XCUIElement = application.descendants(matching: .any)
             .matching(NSPredicate(format: "identifier BEGINSWITH %@", "referenceYear-")).firstMatch
         if alreadyKept.waitForExistence(timeout: 5) {
@@ -1097,7 +1107,10 @@ final class MarketingFolderProvisioning: MarketingScreenshotCase {
             .matching(identifier: "keepACopy-ICS3U").firstMatch
         XCTAssertTrue(item.waitForExistence(timeout: 15), "The course menu should offer Keep a Copy for Reference…")
         item.click()
-        let year: XCUIElement = application.popUpButtons["School year"].firstMatch
+        // The picker's "School year" is a text BESIDE it, not its label: the
+        // pop-up itself carries only its value (measured 2026-09-27), so it
+        // is found as the sheet's one pop-up.
+        let year: XCUIElement = application.sheets.firstMatch.popUpButtons.firstMatch
         XCTAssertTrue(year.waitForExistence(timeout: 15), "The sheet should ask for the school year")
         year.click()
         application.menuItems[MarketingScenes.referenceYearTitle].firstMatch.click()
