@@ -111,7 +111,13 @@ xcodebuild -project Plantoir.xcodeproj -scheme Plantoir test \
   -only-testing:QuartzTeachersTests/InAppUserInterfaceTests
 
 # 3. CLI-equivalence integration tests (need Docker/Colima and the repo
-#    workspace; build results are compared against command-line runs)
+#    workspace, which must be INSIDE your home folder — the launchers refuse
+#    to mount anything the Colima VM cannot see, #221; build results are
+#    compared against command-line runs). What NewCourseCreatorIntegrationTests
+#    adds is the app's answer-pumping and the real image: which keys a new
+#    course's pages are written with is checked without Docker by
+#    scripts/test_page_visibility.py (NewCourseIsWrittenInTheCurrentKeys), and
+#    the check it makes of them runs in every suite (#139).
 TEST_RUNNER_INTEGRATION_WORKSPACE=/path/to/repo \
 xcodebuild -project Plantoir.xcodeproj -scheme Plantoir test \
   -only-testing:QuartzTeachersTests/ScriptRunnerIntegrationTests \
