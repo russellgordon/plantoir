@@ -77,6 +77,9 @@ struct TranscriptBuilder {
         if PreviewAddressHeldReport.isMarkerLine(currentLine) {
             return ""
         }
+        if HowITeachKeptOffReport.isMarkerLine(currentLine) {
+            return ""
+        }
         return currentLine
     }
 
@@ -186,6 +189,9 @@ struct TranscriptBuilder {
             return
         }
         if PreviewAddressHeldReport.isMarkerLine(line) {
+            return
+        }
+        if HowITeachKeptOffReport.isMarkerLine(line) {
             return
         }
         lines.append(line)
