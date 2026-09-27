@@ -4,23 +4,27 @@
 Every v1.4.0 scene on plantoir.app is taken in ONE working folder that is
 Russell's to keep: ICS3U (sections 1 and 2) and ICS4U (section 1), made from
 their ready-made content by the app's own new-course panel, then REVISED here —
-never the shipped payload — so the ICS3U course also answers to AP Computer
-Science Principles:
+never the shipped payload — so BOTH courses also answer to AP Computer Science
+Principles, each with two curriculum folders:
 
-1. a **College Board Curriculum** folder, one page per learning objective in the
-   College Board's own words (``college_board.py``; the words never enter this
-   repository), kept out of the sidebar like ``Curriculum``;
-2. each activity the correlation names (``csp-correlation.json``) gains an
+1. a **College Board Curriculum** folder in each course, one page per learning
+   objective in the College Board's own words (``college_board.py``; the words
+   never enter this repository), kept out of the sidebar like ``Curriculum``;
+2. each activity the course's correlation names (``csp-correlation.json`` for
+   ICS3U, ``csp-correlation-ics4u.json`` for ICS4U — ``CSP_COURSES``) gains an
    embed per objective inside its existing ``## Curriculum connection`` block,
    after the Ontario embeds, so the second map counts it exactly as the first
    does (coverage counts TRANSCLUSIONS, never plain links);
-3. a **How I Teach** page, in our own words (``marketing/How I Teach.md``);
-4. ICS3U publishes to a FOLDER inside the kept folder, so the scheduled-publish
+3. ICS4U's second curriculum is DECLARED here (``curriculum_folders``), writing
+   what ticking the box in Course Settings writes; ICS3U's is declared through
+   the app by the curriculum-settings scene, because that is the picture;
+4. a **How I Teach** page in ICS3U, in our own words (``marketing/How I Teach.md``);
+5. ICS3U publishes to a FOLDER inside the kept folder, so the scheduled-publish
    scene needs no account, no network, and makes nothing public.
 
-The courses themselves, the reference copy of ICS3U and the declaration of the
-second curriculum are made THROUGH THE APP (``capture.py`` runs the UI tests
-that do it), because those are the features being photographed.
+The courses themselves, the reference copy of ICS3U and the declaration of
+ICS3U's second curriculum are made THROUGH THE APP (``capture.py`` runs the UI
+tests that do it), because those are the features being photographed.
 
 The rules this file keeps, each pinned by ``test_marketing_folder.py``:
 
@@ -49,6 +53,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 DEFAULT_FOLDER = Path.home() / "Plantoir Marketing"
 CORRELATION_FILE = HERE / "csp-correlation.json"
+ICS4U_CORRELATION_FILE = HERE / "csp-correlation-ics4u.json"
 HOW_I_TEACH_SOURCE = HERE / "marketing" / "How I Teach.md"
 HOW_I_TEACH_NAME = "How I Teach.md"
 
@@ -60,6 +65,15 @@ COURSES: list[dict] = [
 ]
 CURRICULUM_COURSE = "ICS3U"
 COLLEGE_BOARD_FOLDER = "College Board Curriculum"
+# The courses that answer to AP CSP as well as Ontario, each with its own
+# correlation (data, never code). `declare`: whether this set-up writes the
+# second curriculum into `curriculum_folders`. ICS3U's is ticked through
+# Course Settings by the curriculum-settings scene, because that tick is the
+# picture; no scene photographs ICS4U's, so the file step writes it.
+CSP_COURSES: list[dict] = [
+    {"code": "ICS3U", "correlation": CORRELATION_FILE, "declare": False},
+    {"code": "ICS4U", "correlation": ICS4U_CORRELATION_FILE, "declare": True},
+]
 # Where the scheduled-publish scene publishes: a folder inside the kept folder.
 # `deploy_target` spells a folder destination "local_folder"
 # (contracts/file-formats.json -> courseConfigKeys).
@@ -205,7 +219,30 @@ def install_college_board_pages(course_dir: Path, pages: dict[str, str], report:
     """One page per learning objective, written only where missing."""
     folder = course_dir / COLLEGE_BOARD_FOLDER
     for code in sorted(pages):
-        write_if_absent(folder / f"{code}.md", pages[code], report, f"{COLLEGE_BOARD_FOLDER}/{code}.md")
+        write_if_absent(folder / f"{code}.md", pages[code], report,
+                        f"{course_dir.name}/{COLLEGE_BOARD_FOLDER}/{code}.md")
+
+
+def declare_curriculum_folder(course_dir: Path, name: str, report: Report) -> None:
+    """Add `name` to the course's `curriculum_folders`, after the folders it
+    already declares — what ticking the box in Course Settings writes
+    (`CurriculumFoldersOffer.ticking`: the ticked folders first, so the
+    primary stays primary). A course with no list yet starts from its legacy
+    `curriculum_folder`, then "Curriculum". The build adds the folder to
+    `shared_folders` and `expandable` itself when it first meets it."""
+    def change(config: dict) -> bool:
+        declared = config.get("curriculum_folders")
+        if isinstance(declared, list) and declared:
+            written: list = list(declared)
+        else:
+            legacy = config.get("curriculum_folder")
+            written = [legacy] if isinstance(legacy, str) and legacy else ["Curriculum"]
+        if name in written:
+            return False
+        written.append(name)
+        config["curriculum_folders"] = written
+        return True
+    update_config(course_dir, change, report, f"{course_dir.name} declares {name} as a second curriculum")
 
 
 def keep_out_of_sidebar(course_dir: Path, name: str, report: Report) -> None:
@@ -257,14 +294,14 @@ def publish_to_folder(course_dir: Path, destination: Path, report: Report) -> No
     update_config(course_dir, change, report, f"{course_dir.name} publishes to {destination}")
 
 
-def link_activity(page_path: Path, codes: list[str], report: Report) -> None:
+def link_activity(page_path: Path, codes: list[str], report: Report, course: str = "") -> None:
     """Add an embed for each code inside the page's curriculum block.
 
     After the LAST embed already in the block, one per line with the blank
     line between them the block already uses. A code already embedded there
     is left alone; a page with no block is named and skipped.
     """
-    label = page_path.name
+    label = f"{course}: {page_path.name}" if course else page_path.name
     if not page_path.is_file():
         report.skip(f"{label} — the page is not in the course")
         return
@@ -317,7 +354,7 @@ def load_correlation(path: Path = CORRELATION_FILE) -> list[dict]:
 
 def link_activities(course_dir: Path, rows: list[dict], report: Report) -> None:
     for row in rows:
-        link_activity(course_dir / f"{row['page']}.md", row["codes"], report)
+        link_activity(course_dir / f"{row['page']}.md", row["codes"], report, course_dir.name)
 
 
 def add_how_i_teach(course_dir: Path, report: Report, source: Path = HOW_I_TEACH_SOURCE) -> None:
@@ -398,25 +435,44 @@ def move_section_to_second_semester(course_dir: Path, report: Report,
 
 
 def apply_file_steps(folder: Path, college_board_pages: dict[str, str] | None,
-                     rows: list[dict] | None = None) -> Report:
+                     rows: dict[str, list[dict]] | None = None) -> Report:
     """Everything that is files rather than the app, in order.
 
-    Needs the ICS3U course to exist already (the app makes it). The College
-    Board pages are passed in, because making them needs the document
-    (`college_board.build_pages`); None skips that step and says so.
+    Needs the courses to exist already (the app makes them); a course that is
+    not there yet is named and skipped. For each course in `CSP_COURSES`: its
+    College Board pages, the folder kept out of the sidebar, the second
+    curriculum declared where this set-up owns that, and its correlation's
+    embeds. Then ICS3U's own steps: How I Teach, the folder destination and
+    the second-semester section.
+
+    The College Board pages are passed in, because making them needs the
+    document (`college_board.build_pages`); None skips that step and says so.
+    `rows` maps a course code to rows used in place of its correlation file.
     """
     refuse_foreign_courses(folder)
     report = Report()
-    course_dir = folder / "courses" / CURRICULUM_COURSE
-    if read_config(course_dir) is None:
-        report.skip(f"{CURRICULUM_COURSE} — the course has not been made yet (the app makes it first)")
-        return report
     if college_board_pages is None:
         report.skip(f"{COLLEGE_BOARD_FOLDER} — no pages were supplied")
-    else:
-        install_college_board_pages(course_dir, college_board_pages, report)
-    keep_out_of_sidebar(course_dir, COLLEGE_BOARD_FOLDER, report)
-    link_activities(course_dir, rows if rows is not None else load_correlation(), report)
+    for course in CSP_COURSES:
+        code = course["code"]
+        course_dir = folder / "courses" / code
+        if read_config(course_dir) is None:
+            report.skip(f"{code} — the course has not been made yet (the app makes it first)")
+            continue
+        if college_board_pages is not None:
+            install_college_board_pages(course_dir, college_board_pages, report)
+        keep_out_of_sidebar(course_dir, COLLEGE_BOARD_FOLDER, report)
+        if course["declare"]:
+            declare_curriculum_folder(course_dir, COLLEGE_BOARD_FOLDER, report)
+        if rows is not None and code in rows:
+            course_rows = rows[code]
+        else:
+            course_rows = load_correlation(course["correlation"])
+        link_activities(course_dir, course_rows, report)
+
+    course_dir = folder / "courses" / CURRICULUM_COURSE
+    if read_config(course_dir) is None:
+        return report
     add_how_i_teach(course_dir, report)
     publish_to_folder(course_dir, folder / PUBLISH_FOLDER_NAME, report)
     move_section_to_second_semester(course_dir, report)
@@ -432,15 +488,18 @@ def summary(report: Report) -> str:
 
 
 def stage_from_payload(folder: Path, support: Path) -> None:
-    """For a DRY RUN only: lay the ICS3U payload out the way a course folder
-    looks after the app installs it, in a throwaway folder, so the file steps
-    can be proven against real pages without the app. Never used on a kept
-    folder.
+    """For a DRY RUN only: lay each CSP course's payload (ICS3U and ICS4U)
+    out the way a course folder looks after the app installs it, in a
+    throwaway folder, so the file steps can be proven against real pages
+    without the app. Never used on a kept folder.
     """
-    payload = support / "example_content" / CURRICULUM_COURSE
     mark_as_ours(folder)
-    course_dir = folder / "courses" / CURRICULUM_COURSE
-    shutil.copytree(payload / "shared", course_dir, dirs_exist_ok=True)
-    manifest = json.loads((payload / "manifest.json").read_text(encoding="utf-8"))
-    config = {"course_code": CURRICULUM_COURSE, "hidden": list(manifest.get("hidden", []))}
-    (course_dir / "course_config.json").write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+    for course in CSP_COURSES:
+        code = course["code"]
+        payload = support / "example_content" / code
+        course_dir = folder / "courses" / code
+        shutil.copytree(payload / "shared", course_dir, dirs_exist_ok=True)
+        manifest = json.loads((payload / "manifest.json").read_text(encoding="utf-8"))
+        config = {"course_code": code, "hidden": list(manifest.get("hidden", [])),
+                  "curriculum_folders": ["Curriculum"]}
+        (course_dir / "course_config.json").write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
