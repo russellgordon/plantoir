@@ -25,8 +25,13 @@ struct UnsavedSettingsNoticeView: View {
 
     // MARK: - Stored properties
 
-    /// The sentence shown.
+    /// The sentence shown: the preview's, or since #335 a deploy's
+    /// (`SpecialNames.deployUsesSavedSettings`).
     let sentence: String
+
+    /// The accessibility identifier: `previewUsesSavedSettingsNotice`, or
+    /// `deployUsesSavedSettingsNotice` when the sentence is a deploy's (#335).
+    var identifier: String = "previewUsesSavedSettingsNotice"
 
     // MARK: - Body
 
@@ -41,7 +46,7 @@ struct UnsavedSettingsNoticeView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .accessibilityIdentifier("previewUsesSavedSettingsNotice")
+            .accessibilityIdentifier(identifier)
             Divider()
         }
     }

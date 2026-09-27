@@ -199,6 +199,20 @@ final class SettingsSaveNoticeTests: XCTestCase {
     }
 
     @MainActor
+    func testADeployOrASchedulingWithUnsavedSettingsSaysSo() {
+        XCTAssertEqual(
+            SettingsSaveNotice.whenDeployStarts(settingsHaveUnsavedChanges: true),
+            SpecialNames.deployUsesSavedSettings
+        )
+        XCTAssertNil(SettingsSaveNotice.whenDeployStarts(settingsHaveUnsavedChanges: false))
+        XCTAssertEqual(
+            SettingsSaveNotice.whenSchedulingOpens(settingsHaveUnsavedChanges: true),
+            SpecialNames.schedulingUsesSavedSettings
+        )
+        XCTAssertNil(SettingsSaveNotice.whenSchedulingOpens(settingsHaveUnsavedChanges: false))
+    }
+
+    @MainActor
     func testAPreviewStartedWithUnsavedSettingsSaysSo() {
         XCTAssertEqual(
             SettingsSaveNotice.whenPreviewStarts(settingsHaveUnsavedChanges: true),
@@ -263,6 +277,9 @@ final class SettingsSaveNoticeTests: XCTestCase {
             "previewUsesSavedSettings": SpecialNames.previewUsesSavedSettings,
             "settingsSaveReplacedSidebarChange": SpecialNames.settingsSaveReplacedSidebarChange,
             "settingsPreviewAgainNothingOpen": SpecialNames.settingsPreviewAgainNothingOpen,
+            "deployUsesSavedSettings": SpecialNames.deployUsesSavedSettings,
+            "schedulingUsesSavedSettings": SpecialNames.schedulingUsesSavedSettings,
+            "settingsCouldNotBeReadToDeploy": SpecialNames.settingsCouldNotBeReadToDeploy(course: "{course}"),
         ]
         for (key, sentence) in expected {
             let entry: [String: Any] = try XCTUnwrap(section[key] as? [String: Any], "specialNames.\(key) is missing")
@@ -279,6 +296,9 @@ final class SettingsSaveNoticeTests: XCTestCase {
             SpecialNames.previewUsesSavedSettings,
             SpecialNames.settingsSaveReplacedSidebarChange,
             SpecialNames.settingsPreviewAgainNothingOpen,
+            SpecialNames.deployUsesSavedSettings,
+            SpecialNames.schedulingUsesSavedSettings,
+            SpecialNames.settingsCouldNotBeReadToDeploy(course: "ICS3U"),
         ]
         let forbidden: [String] = ["toolchain", "script", "docker", "container", "symlink", "vault", "config", "json", "build"]
         for sentence in sentences {
@@ -295,6 +315,7 @@ final class SettingsSaveNoticeTests: XCTestCase {
         var noticeSource: String = ""
         var sectionSource: String = ""
         var settingsSource: String = ""
+        var sheetSource: String = ""
         for fileURL in ActivityTrailWiringTests.swiftFiles(under: productFolderURL) {
             if fileURL.lastPathComponent == "SettingsSaveNotice.swift" {
                 noticeSource = try String(contentsOf: fileURL, encoding: .utf8)
@@ -305,7 +326,20 @@ final class SettingsSaveNoticeTests: XCTestCase {
             if fileURL.lastPathComponent == "CourseSettingsView.swift" {
                 settingsSource = try String(contentsOf: fileURL, encoding: .utf8)
             }
+            if fileURL.lastPathComponent == "ScheduleDeploySheet.swift" {
+                sheetSource = try String(contentsOf: fileURL, encoding: .utf8)
+            }
         }
+        // #335: the deploy and the schedule sheet say it too, and draw it.
+        XCTAssertTrue(noticeSource.contains("SpecialNames.deployUsesSavedSettings"))
+        XCTAssertTrue(noticeSource.contains("SpecialNames.schedulingUsesSavedSettings"))
+        XCTAssertTrue(sectionSource.contains("SettingsSaveNotice.whenDeployStarts("), "A deploy no longer asks about unsaved settings")
+        XCTAssertTrue(sheetSource.contains("SettingsSaveNotice.whenSchedulingOpens("), "The schedule sheet no longer asks about unsaved settings")
+        XCTAssertTrue(sheetSource.contains("Text(notice)"), "The schedule sheet no longer draws the unsaved-settings sentence")
+        XCTAssertTrue(
+            sheetSource.contains("WorkspaceModel.anyCopyHasUnsavedChanges(configFileURL:"),
+            "The schedule sheet no longer asks every window about unsaved settings"
+        )
         XCTAssertTrue(noticeSource.contains("SpecialNames.settingsSavedWhilePreviewing"))
         XCTAssertTrue(noticeSource.contains("SpecialNames.settingsSavedWhilePublishing"))
         XCTAssertTrue(noticeSource.contains("SpecialNames.previewUsesSavedSettings"))
@@ -334,7 +368,10 @@ final class SettingsSaveNoticeTests: XCTestCase {
             "Starting a preview no longer asks every window about unsaved settings"
         )
         XCTAssertTrue(sectionSource.contains("SettingsSaveNotice.whenPreviewStarts("), "Starting a preview no longer asks about unsaved settings")
-        XCTAssertTrue(sectionSource.contains("Text(unsavedSettingsNotice)"), "The section no longer draws the unsaved-settings sentence")
+        XCTAssertTrue(
+            sectionSource.contains("UnsavedSettingsNoticeView(sentence: unsavedSettingsNotice,"),
+            "The section no longer draws the unsaved-settings sentence"
+        )
     }
 
     /// `savingSettings.cases`: the two-window rule as data, run against the

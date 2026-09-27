@@ -1303,6 +1303,10 @@ enum ScheduledDeploy {
     /// previous agent is booted out before the new one is written. The same
     /// section in another working folder is another alarm, and is left alone
     /// (#237).
+    ///
+    /// Pass a course read by `Course.asSavedNow()` or by the runner's fresh
+    /// reading — never a window's copy, which may hold unsaved Course
+    /// Settings edits (#335).
     @discardableResult
     static func scheduleDeploy(
         course: Course,

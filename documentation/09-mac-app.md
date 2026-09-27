@@ -2402,7 +2402,14 @@ served sidebar filter was unchanged. So:
   course's shared configuration and survive leaving the form, so the switches
   and the page could disagree with nothing said. Rejected: saving automatically
   (a half-typed setting would be written) and refusing (previewing the saved
-  settings may be the point).
+  settings may be the point). **Since #335 the same holds for a deploy and
+  for the schedule sheet**: both read the SAVED file at the act
+  (`Course.asSavedNow()`), and say `deployUsesSavedSettings` (in the same
+  banner, identifier `deployUsesSavedSettingsNotice`, owned by the deploy so a
+  preview's end — which clears only a preview's sentence — cannot take it away) or
+  `schedulingUsesSavedSettings` (above the sheet's plan); a file that cannot be
+  read refuses with `settingsCouldNotBeReadToDeploy` — docs 07, "The window's
+  acts read the saved settings too (#335)".
 - *Rejected: rebuilding the preview automatically on every Save* — it kills a
   page the teacher may be reading, for a Save that may have changed only the
   footer, and the preview belongs to another window's runner.
@@ -2412,7 +2419,9 @@ only, compared with the file before the Save), which settings it kept or
 replaced from elsewhere (and, for the sidebar list, that the teacher was told),
 and whether a preview or a publish was running — the
 line that would have settled #265 in one read. New: `preview started with
-unsaved settings` and `preview again after settings saved`.
+unsaved settings` and `preview again after settings saved`; and, since #335,
+`deploy used the saved settings` (which act, the saved destination's kind and
+whether the unsaved edits named a different kind — never a path).
 
 **What the view must not do.** The notice is decided once, in `save()`, from
 `PreviewLeases.active` and `CourseActivity.activePublishes`; no cell of the
@@ -5631,7 +5640,18 @@ to `AppUpdates.teacherAnsweredReady` first.
   record only, because the test host shares an executable with the Debug app
   a teacher opens, whose scheduled publish the live scan would find (the
   slice-1 review's L4). `SameExecutableProcessesTests` exercises the scan on
-  processes it starts itself.
+  processes it starts itself: a copy of `/bin/bash` named `Plantoir` in a
+  temporary folder, **re-signed ad hoc** (`codesign --force --sign -`), held on
+  `read -t 30` with its standard input a pipe the test keeps open (end-of-file
+  would end `read` at once; with no pipe the child would depend on the test
+  host's own standard input), with an assertion after every scan that the child
+  is still alive (#341). Measured on an M4 Pro, macOS 26.6: an unsigned copy of a system
+  binary run from a temporary folder is SIGKILLed within about 1–100 ms (60 of
+  60 copies of `/bin/sh`), so the tests used to pass only by scanning before
+  the kill, and flaked when they scanned after it. The re-signing is the part
+  that matters (a re-signed `/bin/sh` also stayed alive under the test host);
+  the start waits, polling every 10 ms for at most 2 s, until the scan sees
+  the child.
 - **The waiting is event-driven, never on a clock:** `withObservationTracking`
   on `CourseActivity.store`, `ProcessEnding.ends(of:)` for each process being
   waited for (a `DispatchSource` process-exit event — the app's second
@@ -6300,11 +6320,12 @@ implementation's measurements:
 Every tool that changes a page runs in **plan mode**: the assistant states
 what it understood and what it is about to do, and waits for Go or Cancel.
 Swift decides this from whether the tool has a `plan_` twin, so the model is
-never asked to judge whether something is risky. Four writes have no plan —
-rebuilding the preview, undo, cancelling a scheduled deploy, and deploying,
-which waits on its own separate approval instead, whether or not plan mode is
-on (a fifth, backing up the course, changes no page; and a model that names a
-tool it was not offered is refused rather than obeyed, #327 — doc 10). A Mac running the smaller assistant cannot
+never asked to judge whether something is risky. Five writes have no plan —
+rebuilding the preview, undo, cancelling a scheduled deploy, backing up the
+course (it changes no page, and the card "back up this course" reaches it in
+the app, so "four" was wrong, #343), and deploying, which waits on its own
+separate approval instead, whether or not plan mode is on (and a model that
+names a tool it was not offered is refused rather than obeyed, #327 — doc 10). A Mac running the smaller assistant cannot
 turn plan mode off; on a 16 GB machine the app offers to stop asking after a
 run of plans the teacher has accepted unchanged. Behind it, every change is
 backed up once per conversation and can be undone.
