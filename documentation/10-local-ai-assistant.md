@@ -1952,7 +1952,12 @@ page left on its day is counted nowhere, and so is one #186's writer declined
 still names. When no class moved, the reply is
 `AssistWording.reDatedOnlyPagesTheyUse` rather than "Re-dated 0 classes"; the
 undo line names the classes that moved ("re-dated 2 classes and what they
-use", or "re-dated what the classes use"). Windows had the same subtraction in
+use", or "re-dated what the classes use"). When NO date was written — the only
+moves hid an overflow class already on the last day, or were declined — the
+reply is the no-change sentence, `AssistWording.everyPageIsAlreadyOnItsDay`
+(the one a plan that changes nothing gets), or, when a page was declined, the
+declined sentence alone, since that page is not on its day (the
+implementation review's F4; "only the 0 pages" was the first fix's answer). Windows had the same subtraction in
 two places. Cases: `class-planning.json` → `reDatingASection.reportedCounts`.
 
 **What the teacher is told.** The plan and the reply name the linked classes

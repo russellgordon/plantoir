@@ -62,6 +62,7 @@
     "duplicated" : "Duplicated “{page}” as “{copy}”.",
     "everyDateIsSpokenFor" : "Every recorded date is spoken for, so another class cannot be dated until more dates are recorded.",
     "everyDateIsSpokenForForAMeeting" : "Every recorded date is spoken for, so another meeting cannot be dated until more dates are recorded.",
+    "everyPageIsAlreadyOnItsDay" : "Every page in ICS3U Section 1 is already on the day it should be.",
     "everyPageIsNotAPageToHide" : "Nothing was hidden, because I need to know which pages. Say which ones — for example “{example}”.",
     "everyPageIsNotAPageToPublish" : "Nothing was published, because I need to know which pages. Say which ones — for example “{example}”.",
     "howITeachAlreadyWritten" : "Nothing was saved: {course} already has a How I Teach page, and a teacher's own page is never replaced without their agreement. Use plan_write_how_i_teach, show the teacher what it says, and pass the mark it gives as replacing only if they agree to replace their page.",

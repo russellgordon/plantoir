@@ -117,8 +117,17 @@ struct SectionDetailView: View {
     /// Said when a preview starts while Course Settings holds changes nobody
     /// saved (issue #265): the preview reads the saved settings, so the
     /// switches and the page can disagree. Cleared when the preview stops or
-    /// starts again with nothing unsaved.
+    /// starts again with nothing unsaved. Since #335 a deploy says its own
+    /// sentence here too — see `unsavedSettingsNoticeOwner`.
     @State var unsavedSettingsNotice: String? = nil
+
+    /// Whose sentence `unsavedSettingsNotice` is (#335, the implementation
+    /// review's F3). A preview's end clears only the PREVIEW's sentence:
+    /// `releasePreviewLease()` is also reached from the preview's wait loops,
+    /// which poll once a second and can wake after a deploy has set its own
+    /// sentence, so relying on the deploy setting it after the stop was a
+    /// race that usually went the right way. A state, not an ordering.
+    @State var unsavedSettingsNoticeOwner: UnsavedSettingsNoticeOwner? = nil
 
     /// Folder problems the last build reported, shown once when it finishes.
     ///
@@ -261,7 +270,7 @@ struct SectionDetailView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .accessibilityIdentifier(
-                    unsavedSettingsNotice == SpecialNames.deployUsesSavedSettings
+                    unsavedSettingsNoticeOwner == .deploy
                         ? "deployUsesSavedSettingsNotice" : "previewUsesSavedSettingsNotice"
                 )
                 Divider()
@@ -1156,6 +1165,7 @@ struct SectionDetailView: View {
         unsavedSettingsNotice = SettingsSaveNotice.whenPreviewStarts(
             settingsHaveUnsavedChanges: anyWindowHasUnsavedSettings
         )
+        unsavedSettingsNoticeOwner = unsavedSettingsNotice == nil ? nil : .preview
         if unsavedSettingsNotice != nil {
             ActivityTrail.note(
                 .previewStartedWithUnsavedSettings,
@@ -1293,8 +1303,12 @@ struct SectionDetailView: View {
             PreviewLeases.release(lease)
             previewLease = nil
         }
-        // The notice was about the preview that just ended.
-        unsavedSettingsNotice = nil
+        // The notice was about the preview that just ended — unless it is a
+        // deploy's, which a preview ending must not take away (#335, F3).
+        if SectionDetailView.previewEndClearsTheNotice(owner: unsavedSettingsNoticeOwner) {
+            unsavedSettingsNotice = nil
+            unsavedSettingsNoticeOwner = nil
+        }
     }
 
     /// Why this course is never deployed, or nil when it is an ordinary one.
@@ -1358,6 +1372,31 @@ struct SectionDetailView: View {
             ),
             notice: SettingsSaveNotice.whenDeployStarts(settingsHaveUnsavedChanges: anyCopyUnsaved)
         )
+    }
+
+    /// What a deploy's caller is told (#335): when the assistant pressed the
+    /// button and the deploy used the saved settings over unsaved edits, the
+    /// window's sentence is added to the result it reads out, so the
+    /// conversation says what the window says. The button's own result is
+    /// never changed — the window already shows the sentence.
+    static func whatTheAssistantIsTold(
+        _ result: AssistSiteWorkResult, notice: String?, pressedByTheAssistant: Bool
+    ) -> AssistSiteWorkResult {
+        if !pressedByTheAssistant {
+            return result
+        }
+        return AssistSiteWorkResult(
+            succeeded: result.succeeded,
+            message: SettingsSaveNotice.addingTheNotice(notice, to: result.message),
+            isAboutTheDestination: result.isAboutTheDestination,
+            wasBuiltElsewhere: result.wasBuiltElsewhere
+        )
+    }
+
+    /// Whether a preview ending takes the unsaved-settings sentence away:
+    /// only when it is the preview's own, or nobody's (#335, F3).
+    static func previewEndClearsTheNotice(owner: UnsavedSettingsNoticeOwner?) -> Bool {
+        return owner != .deploy
     }
 
     /// The Deploy button. The work itself is `deployAndWait()`, so the
@@ -1524,6 +1563,7 @@ struct SectionDetailView: View {
         // up after this deploy ends — a teacher reading the console must
         // still see why — and the next preview or deploy replaces it.
         unsavedSettingsNotice = uses.notice
+        unsavedSettingsNoticeOwner = uses.notice == nil ? nil : .deploy
         if uses.notice != nil {
             SettingsSaveNotice.noteDeployUsedTheSavedSettings(
                 act: pressedByTheAssistant
@@ -1533,14 +1573,8 @@ struct SectionDetailView: View {
         }
         // What the assistant is told carries the same sentence.
         func said(_ result: AssistSiteWorkResult) -> AssistSiteWorkResult {
-            guard pressedByTheAssistant, let notice = uses.notice else {
-                return result
-            }
-            return AssistSiteWorkResult(
-                succeeded: result.succeeded,
-                message: result.message + "\n\n" + notice,
-                isAboutTheDestination: result.isAboutTheDestination,
-                wasBuiltElsewhere: result.wasBuiltElsewhere
+            return SectionDetailView.whatTheAssistantIsTold(
+                result, notice: uses.notice, pressedByTheAssistant: pressedByTheAssistant
             )
         }
 

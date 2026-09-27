@@ -10,6 +10,12 @@ import Foundation
 /// switches having "no correlation" with the site.
 ///
 /// The decision is kept out of the view so it can be tested without one.
+/// Whose sentence a section window's unsaved-settings banner is (#335).
+enum UnsavedSettingsNoticeOwner: Equatable {
+    case preview
+    case deploy
+}
+
 struct SettingsSaveNotice: Equatable {
 
     // MARK: - Stored properties
@@ -280,6 +286,16 @@ struct SettingsSaveNotice: Equatable {
             return SpecialNames.schedulingUsesSavedSettings
         }
         return nil
+    }
+
+    /// `message` with the unsaved-settings sentence after it, or `message`
+    /// alone when there is none (#335). The one place a deploy's result gains
+    /// the sentence, for the window's assistant and the headless path alike.
+    static func addingTheNotice(_ notice: String?, to message: String) -> String {
+        guard let notice else {
+            return message
+        }
+        return message + "\n\n" + notice
     }
 
     /// The kinds of place a course deploys to, in words for the trail:

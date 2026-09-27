@@ -114,6 +114,19 @@ final class ActsUseTheSavedSettingsTests: XCTestCase {
             }
             XCTAssertEqual(uses.notice, expectedNotice, name)
 
+            // What the caller is told. Case 2 is the assistant pressing the
+            // window's button: the sentence is ADDED to what it reads out.
+            // The button's own result is never changed.
+            let result: AssistSiteWorkResult = AssistSiteWorkResult(succeeded: true, message: "Deployed.")
+            let told: AssistSiteWorkResult = SectionDetailView.whatTheAssistantIsTold(
+                result, notice: uses.notice, pressedByTheAssistant: act == "assistantDeployThroughWindow"
+            )
+            if act == "assistantDeployThroughWindow", let expectedNotice {
+                XCTAssertEqual(told.message, "Deployed.\n\n" + expectedNotice, name)
+            } else {
+                XCTAssertEqual(told.message, "Deployed.", name)
+            }
+
         }
     }
 
@@ -310,6 +323,82 @@ final class ActsUseTheSavedSettingsTests: XCTestCase {
         let sheet: String = try codeLines(of: "ScheduleDeploySheet.swift", from: "struct ScheduleDeploySheet", to: nil)
         XCTAssertFalse(sheet.contains("course: course,"), "the sheet hands the window's course to an act")
         XCTAssertFalse(sheet.contains("course: course\n"), "the sheet hands the window's course to an act")
+    }
+
+    // MARK: - What the assistant is told, and whose sentence the banner is
+
+    /// The implementation review's F2: nothing pinned the assistant's copy of
+    /// the sentence. Both paths add it through ONE function, and the window's
+    /// every return after the sentence is set goes through `said(`.
+    func testTheAssistantIsToldTheSentenceOnBothPaths() throws {
+        let result: AssistSiteWorkResult = AssistSiteWorkResult(
+            succeeded: false, message: "Could not.", isAboutTheDestination: true
+        )
+        let told = SectionDetailView.whatTheAssistantIsTold(
+            result, notice: SpecialNames.deployUsesSavedSettings, pressedByTheAssistant: true
+        )
+        XCTAssertEqual(told.message, "Could not.\n\n" + SpecialNames.deployUsesSavedSettings)
+        XCTAssertFalse(told.succeeded)
+        XCTAssertTrue(told.isAboutTheDestination)
+        XCTAssertEqual(
+            SectionDetailView.whatTheAssistantIsTold(
+                result, notice: SpecialNames.deployUsesSavedSettings, pressedByTheAssistant: false
+            ).message,
+            "Could not.",
+            "the button's own result gains nothing: the window already shows the sentence"
+        )
+        XCTAssertEqual(
+            SectionDetailView.whatTheAssistantIsTold(result, notice: nil, pressedByTheAssistant: true).message,
+            "Could not."
+        )
+        XCTAssertEqual(SettingsSaveNotice.addingTheNotice(nil, to: "x"), "x")
+
+        let window: String = try codeLines(of: "SectionDetailView.swift", from: "struct SectionDetailView", to: nil)
+        XCTAssertTrue(
+            window.contains("deploy: { await deployAndWait(pressedByTheAssistant: true) }"),
+            "the window controller the assistant presses no longer says it is the assistant"
+        )
+        let body: String = try codeLines(
+            of: "SectionDetailView.swift", from: "func deployAndWait(", to: "func openInBrowser("
+        )
+        let noticeSet: Range<String.Index> = try XCTUnwrap(body.range(of: "unsavedSettingsNotice = uses.notice"))
+        var returnsAfter: Int = 0
+        for line in body[noticeSet.upperBound...].components(separatedBy: "\n") {
+            let trimmed: String = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("return ") && !trimmed.hasPrefix("return SectionDetailView.whatTheAssistantIsTold(") {
+                returnsAfter += 1
+                XCTAssertTrue(trimmed.hasPrefix("return said("), "a result that skips the sentence: \(trimmed)")
+            }
+        }
+        XCTAssertGreaterThanOrEqual(returnsAfter, 3)
+
+        let headless: String = try codeLines(
+            of: "AssistSiteWork.swift",
+            from: "    func deploy(course: Course, sectionNumber: Int) async -> AssistSiteWorkResult {",
+            to: nil
+        )
+        XCTAssertEqual(
+            headless.components(separatedBy: "SettingsSaveNotice.addingTheNotice(notice, to: message)").count - 1, 2,
+            "the headless deploy's failure and success results must both carry the sentence"
+        )
+    }
+
+    /// The implementation review's F3: a preview's wait loop can end the
+    /// preview after a deploy has set its own sentence. A state decides what
+    /// that clears, not the order the two happen in.
+    func testAPreviewEndingNeverTakesAwayADeploysSentence() throws {
+        XCTAssertFalse(SectionDetailView.previewEndClearsTheNotice(owner: .deploy))
+        XCTAssertTrue(SectionDetailView.previewEndClearsTheNotice(owner: .preview))
+        XCTAssertTrue(SectionDetailView.previewEndClearsTheNotice(owner: nil))
+
+        let release: String = try codeLines(
+            of: "SectionDetailView.swift", from: "func releasePreviewLease()", to: "static func refusalForAReferenceCourse"
+        )
+        XCTAssertTrue(release.contains("SectionDetailView.previewEndClearsTheNotice(owner: unsavedSettingsNoticeOwner)"))
+        let body: String = try codeLines(
+            of: "SectionDetailView.swift", from: "func deployAndWait(", to: "func openInBrowser("
+        )
+        XCTAssertTrue(body.contains("unsavedSettingsNoticeOwner = uses.notice == nil ? nil : .deploy"))
     }
 
     // MARK: - Helpers

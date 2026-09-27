@@ -2706,11 +2706,19 @@ where the preview's `previewUsesSavedSettings` appears, and the sheet shows
 `schedulingUsesSavedSettings` above its plan. When the assistant pressed the
 button, or deployed with no window, the same deploy sentence is added to what
 it says. For ANY unsaved setting, not only a changed destination — the whole
-site is built from the saved file. **The trap:** the deploy's sentence is set
-AFTER any running preview is stopped, because stopping it runs
-`releasePreviewLease()`, which clears the banner; a source test pins the order.
-It stays up after the deploy ends and is replaced by the next preview or
-deploy. The MCP server says nothing: it is another process with no window
+site is built from the saved file. **The trap:** a preview ending runs
+`releasePreviewLease()`, which used to clear the banner whatever it said — and
+it is reached not only from the stop `deployAndWait` awaits but from the
+preview's own wait loops, which poll once a second and can wake after the
+deploy has set its sentence. Setting the sentence after the stop only made the
+right order likely (the implementation review's F3). So the banner has an OWNER
+(`unsavedSettingsNoticeOwner`, `.preview` or `.deploy`) and a preview's end
+clears only the preview's own sentence
+(`SectionDetailView.previewEndClearsTheNotice`); the sentence is still set after
+the stop, and both are pinned by tests. The assistant's copy goes through one
+function, `SectionDetailView.whatTheAssistantIsTold` (and, headless,
+`SettingsSaveNotice.addingTheNotice`). The banner stays up after the deploy
+ends and is replaced by the next preview or deploy. The MCP server says nothing: it is another process with no window
 models, so nothing unsaved exists that it could see.
 
 **The trail.** `deploy used the saved settings`, written only when some window

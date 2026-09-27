@@ -501,6 +501,7 @@ enum AssistContract {
             "reDated": AssistWording.reDated(count: 12, pagesTheyUse: 5),
             "reDatedForAMeeting": AssistWording.reDated(count: 12, pagesTheyUse: 5, noun: .meeting),
             "reDatedOnlyPagesTheyUse": AssistWording.reDatedOnlyPagesTheyUse(pagesTheyUse: 3),
+            "everyPageIsAlreadyOnItsDay": AssistWording.everyPageIsAlreadyOnItsDay(course: "ICS3U", section: 1),
             "reDatedOnlyPagesTheyUseForAMeeting": AssistWording.reDatedOnlyPagesTheyUse(
                 pagesTheyUse: 3, noun: .meeting
             ),
