@@ -6516,7 +6516,7 @@ in `IsolatedLaunch.swift` and `MarketingScreenshotTests.swift`.
 | `__CFPREFERENCES_AVOID_DAEMON=1` with it? | The write went nowhere at all. Unusable. |
 | `UserDefaults(suiteName: "/abs/path/<name>")`? | **Works** from a probe process: writes `/abs/path/<name>.plist`, creating the folders; reads back. |
 | …with `<name>` = the app's OWN bundle identifier, inside the app? | **No — it is the real domain.** In the unit host, `…/ca.russellgordon.Plantoir` created no file and `UserDefaults.standard` saw the write (caught by `StateDirectoryTests`, 2026-09-26; the probe key was removed and the real domain checked clean). |
-| …anywhere else? | **Only under `/private/tmp`.** A probe with the same name under `/private/tmp` wrote the file at the path; under `$TMPDIR` (`/var/folders/…`) or under the home folder — where a UI runner's temp folder is, inside its container — it silently wrote `~/Library/Preferences/<last component>.plist` instead, the REAL preferences folder. (The litter from that probe was deleted.) So a state folder's preferences live in `/private/tmp`, named by a hash of the state folder's path, and the state folder carries a note saying where (`PlantoirDefaults.honouredParent`, `locationNoteName`). The unit test asserts the file appears where the note says and that the standard store never sees the write. |
+| …anywhere else? | **Only under `/private/tmp`.** A probe with the same name under `/private/tmp` wrote the file at the path; under `$TMPDIR` (`/var/folders/…`) or under the home folder — where a UI runner's temp folder is, inside its container — it silently wrote `~/Library/Preferences/<last component>.plist` instead, the REAL preferences folder. (The litter from that probe was deleted.) So a state folder's preferences live in `/private/tmp`, named by a hash of the state folder's path, and the state folder carries a note saying where (`PlantoirDefaults.honouredParent`, `locationNoteName`). Each launch leaves that small folder behind (`IsolatedLaunch` never deletes it); macOS empties `/private/tmp` at restart, which is all the tidying it needs. The unit test asserts the file appears where the note says and that the standard store never sees the write. |
 | Does a path suite see the argument domain? | Yes: `-assistantAsksBeforeChanging YES` reads, and is not written into the file. |
 | And the global domain? | Yes: `AppleLocale`, `NSQuitAlwaysKeepsWindows`, `AppleInterfaceStyle`. Reading creates no file. |
 | Can the sandboxed UI runner read the real Logs and Preferences? | Its entitlements carry `temporary-exception.files.absolute-path.read-only` for `/`, plus `(allow signal)`. `StateDirectoryUITests` FAILS rather than skips on any read that is refused, so this is re-measured on every run. Measured green on 2026-09-26: every read of the real trail, `runs/`, `scheduled/`, `assist/`, `builds/`, `LaunchAgents` and the real preferences file succeeded. |
@@ -6575,7 +6575,7 @@ spins re-enters SwiftUI's transaction flush (726 of 732 main-thread samples in
 `NSHostingView.beginTransaction` → lazy-stack placement) — 93 busy one-second
 samples over 122 s, and XCUITest fails with "main thread busy for 30.0s". A
 teacher approving a rollover or re-dating meets the same beachball. It is its
-own issue (written up for the director with the stack), not fixed here; the
+own issue, [#351](https://github.com/russellgordon/plantoir/issues/351), not fixed here; the
 opt-in rollover test holds it open with a strict `XCTExpectFailure` matched to
 that message, so it turns red the day the backup stops blocking.
 

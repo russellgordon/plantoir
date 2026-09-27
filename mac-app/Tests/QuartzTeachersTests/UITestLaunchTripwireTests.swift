@@ -24,8 +24,10 @@ final class UITestLaunchTripwireTests: XCTestCase {
         "MarketingScreenshotTests.swift | launchEnvironment[\"UITEST_WORKSPACE\"]": 1,
     ]
 
+    /// `XCUIApplication.init(` is the same call spelt another way.
     static let needles: [String] = [
         "XCUIApplication(",
+        "XCUIApplication.init(",
         "launchEnvironment[\"UITEST_WORKSPACE\"]",
     ]
 

@@ -122,14 +122,13 @@ final class AssistantRolloverUITests: XCTestCase {
         // 122 s, on 2026-09-26. XCUITest reports it as "main thread busy for
         // 30.0s". Strict, and matched to that message only: the day the
         // backup stops blocking the main thread this goes red, and whoever
-        // fixed it removes this wrapper. The issue is written up in
-        // ~/Downloads/plantoir-v1.3.2-run/ready/154.md for the director to open.
+        // fixed it removes this wrapper. The issue is #351.
         let freeze: XCTExpectedFailure.Options = XCTExpectedFailure.Options()
         freeze.isStrict = true
         freeze.issueMatcher = { issue in
             return issue.compactDescription.contains("main thread busy")
         }
-        XCTExpectFailure("The backup's zip blocks the main thread after Approve (#154 R0).", options: freeze)
+        XCTExpectFailure("The backup's zip blocks the main thread after Approve (#351).", options: freeze)
         approve.click()
         let approvedAt: Date = Date()
 
