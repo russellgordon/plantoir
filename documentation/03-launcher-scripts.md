@@ -729,7 +729,7 @@ and GitHub (the Quartz clone). It is now the largest stage by far; trimming it
 is its own follow-up.
 
 The rule, its cases and what was rejected are in `contracts/app-rules.json` →
-`helperBootstrap` (18 install cases and 6 first-start cases, mac-only), run
+`helperBootstrap` (21 install cases and 7 first-start cases, mac-only), run
 for real — every case under `set -euo pipefail` and without it — by
 `scripts/test_helper_bootstrap.py`, which skips on anything that is not a Mac.
 
