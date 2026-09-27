@@ -234,5 +234,52 @@ class PreflightExclusionTests(unittest.TestCase):
         self.assertIn("# Reincluded", cleaned_text)
 
 
+    def test_every_matching_case(self):
+        """excludedItems.matching: exact, case included, on BOTH Python paths (#152).
+
+        Deserialised from contracts/shared-rules.json, never retyped. Each case
+        runs through the real preflight on a fresh course folder, and through
+        `_dropping_excluded_items` — the give-up path of preflight's
+        compare-and-swap — on the same configuration. Until #152 the give-up
+        path lower-cased both sides, so E2 and E4 were red there.
+        """
+        rule = contracts.section("shared-rules", "excludedItems", "matching")
+        cases = rule["cases"]
+        self.assertGreaterEqual(len(cases), 5, "the contract lost excluded-item matching cases")
+        list_keys = ("shared_folders", "shared_files", "per_section_folders", "per_section_files")
+        for index, case in enumerate(cases):
+            with self.subTest(case=case["name"]):
+                config_data = {"course_code": "ICS3U", "hidden": [], "expandable": [],
+                               "excluded_items": case["excludedItems"]}
+                for key in list_keys:
+                    config_data[key] = list(case["lists"][key])
+                expected = {key: case["expectLists"][key] for key in list_keys}
+
+                if "preflight" in case["runThrough"]:
+                    course_dir = self.base / f"matching{index}"
+                    section_dir = course_dir / "section1"
+                    section_dir.mkdir(parents=True)
+                    for relative in case.get("onDisk", []):
+                        target = course_dir / relative
+                        if relative.endswith(".md"):
+                            target.parent.mkdir(parents=True, exist_ok=True)
+                            target.write_text("# page", encoding="utf-8")
+                        else:
+                            target.mkdir(parents=True, exist_ok=True)
+                    config_path = course_dir / "course_config.json"
+                    config_path.write_text(json.dumps(config_data, indent=2), encoding="utf-8")
+                    with patch("sys.stdout", io.StringIO()):
+                        updated = build_site.preflight_update_course_config(
+                            course_dir, section_dir, config_path
+                        )
+                    for key in list_keys:
+                        self.assertEqual(updated[key], expected[key], f"preflight, {key}")
+
+                if "giveUp" in case["runThrough"]:
+                    corrected = build_site._dropping_excluded_items(config_data)
+                    for key in list_keys:
+                        self.assertEqual(corrected[key], expected[key], f"give-up path, {key}")
+
+
 if __name__ == "__main__":
     unittest.main()

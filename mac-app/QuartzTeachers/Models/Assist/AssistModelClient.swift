@@ -229,7 +229,11 @@ struct AssistModelClient: Sendable {
     /// (the twenty-sixth for a section's longest paths). Asked exactly that
     /// way, though, the smaller assistant answered `"pages": "all"` in 35
     /// tokens, three trials of three, and the cap never fired — one model, one
-    /// phrasing, worth that much and no more. A teacher who does meet it is
+    /// phrasing, worth that much and no more. (Re-measured 2026-09-26 for
+    /// #197: on six example payloads it wrote "all" in none of 108 cells, and
+    /// ran every one to the cap instead; and `"pages": "all"`, which was
+    /// answered "Nothing needed changing.", is refused in code since then —
+    /// `AssistToolRunner.pagePlan`.) A teacher who does meet it is
     /// told `AssistWording.answerWasCutOff`, whose advice is followable in
     /// precisely this case. Sizing the cap to the worst imaginable call is a
     /// cap that never fires, which is what this issue was about.

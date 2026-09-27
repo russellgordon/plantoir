@@ -31,39 +31,13 @@ final class ClubNounTests: XCTestCase {
     /// A numbered course with four hidden weeks, Week 2 linking to Week 3,
     /// and a timetable the pages do not sit on — so re-dating moves them.
     private func makeClub(noun: ClassNoun) throws -> (root: URL, course: Course, runner: AssistToolRunner) {
-        let made = try AssistFixture.makeRunner()
-        try setNoun(noun, in: made.course)
-        var day: Int = 8
-        for title in ["Week 1", "Week 2", "Week 3", "Week 4"] {
-            var body: String = "The words of \(title)."
-            if title == "Week 2" {
-                body += " Carry on in [[Week 3]]."
-            }
-            try AssistFixture.write(
-                page: title, publish: "false",
-                date: String(format: "2026-09-%02d", day),
-                body: body, in: made.course
-            )
-            day += 1
-        }
-        try SectionTimetableStore.applyRememberTimetable(
-            try SectionTimetableStore.planRememberTimetable(
-                dates: ["2026-09-08", "2026-09-09", "2026-09-14", "2026-09-16", "2026-09-21",
-                        "2026-09-23", "2026-09-28", "2026-09-30", "2026-10-05"],
-                source: "timetable.xlsx, block H", forSection: 1, in: made.course
-            )
-        )
+        let made: AssistFixture.Made = try AssistFixture.makeClub(noun: noun)
         return (made.root, made.course, made.runner)
     }
 
     /// Writes the course's naming to disk, which is where the runner reads it.
     private func setNoun(_ noun: ClassNoun, in course: Course) throws {
-        course.configuration.unitWord = "Week"
-        course.configuration.classPageScheme = .numbered
-        course.configuration.classNoun = noun
-        try course.configuration.write(
-            to: course.directoryURL.appendingPathComponent("course_config.json")
-        )
+        try AssistFixture.setClubNaming(noun, in: course)
     }
 
     private func run(
