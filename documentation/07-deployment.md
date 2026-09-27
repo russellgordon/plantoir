@@ -2189,12 +2189,12 @@ Now the run reads the course's settings when it fires and writes the wrapper
 afresh; see "Where it deploys is read when it runs (#323)" at the end of this
 page. What is read AT SCHEDULING still matters for the refusals the sheet and
 the assistants give then: since #322 either assistant reads the SAVED file
-(docs 10 → "Settings are read at the call, not when the window opened"), while
-the schedule SHEET uses the window's copy of the course, which follows a Save
-and also carries Course Settings edits not yet saved
-([issue #335](https://github.com/russellgordon/plantoir/issues/335)). Since #323
-that copy decides only what the sheet says and what `PLANTOIR_SCHEDULED_TO`
-records — the run reads the file.
+(docs 10 → "Settings are read at the call, not when the window opened"), and
+since [#335](https://github.com/russellgordon/plantoir/issues/335) the schedule
+SHEET does too — at every redraw and again at the press — and says so when
+Course Settings holds unsaved edits; see "The window's acts read the saved
+settings too (#335)" at the end of this page. The run reads the file again
+when it fires.
 
 **Finding the course folder is not `fileExists` on a built path, and that is
 measured.** A job written before the course code went into the plist carries it
@@ -2659,3 +2659,88 @@ PowerShell with no app alive — and owes `theDestination`, the kind, the event 
 the two Save sentences. How is theirs; the mac's shape (the task launches
 `Plantoir.exe --run-scheduled-deploy`) is the likely best.
 
+### The window's acts read the saved settings too (#335)
+
+**What was wrong, read from the code.** Course Settings keeps its edits in the
+course's SHARED in-memory configuration until Save, and a section window's
+`course` is that copy. Three acts read it: the Deploy button, the local
+assistant's `deploy_section` through an open section window (both are
+`SectionDetailView.deployAndWait()`), and the schedule sheet. Everything else
+about a publish came from the FILE — the launcher's `deploy.py` reads the site
+and any site id or name from it, and the build reads every other setting — so
+an unsaved destination edit made a MIXED publish: `--to-folder` from memory,
+the rest from disk. Since #322 the approval card reads the file, so the card
+could name Netlify while the window deployed to an unsaved folder; since #323
+the scheduled run reads the file when it fires, so the sheet could promise a
+folder while the run went to Netlify, or refuse over a destination nobody had
+saved.
+
+**The rule.** Every act that sends a site somewhere or sets a deploy reads the
+settings as SAVED in the file at that moment — `Course.asSavedNow()`, a new
+`Course` read from `course_config.json`, never assigned back into a window's
+model:
+
+- `deployAndWait` reads it after the busy check and uses it for the
+  destinations, the destination refusal (`deployRefusalReason` is now static
+  only, so nothing can reach the window's copy through an instance property),
+  `BuildFreshness` and `MultiDestinationDeployRunner.run`. The decision is the
+  static `SectionDetailView.whatADeployUses(windowCourse:anyCopyUnsaved:cloudflareAccountID:)`,
+  so the suite can drive it without a view.
+- The sheet reads it on every redraw (`ScheduleDeploySheet.whatTheSheetShows`
+  — one ~2 KB file, and nothing cached, because a cache is #322's bug) and
+  AGAIN at the press (`scheduleFromTheSavedSettings`), since a Save can land
+  between drawing and pressing; the refusal note and `scheduleDeploy` both get
+  the copy read at the press.
+- The headless path (`AssistToolchainWork.deploy`, an in-app assistant with no
+  window) already had #322's fresh copy; it now also SAYS it.
+
+**When the file cannot be read** the act is refused with
+`specialNames.settingsCouldNotBeReadToDeploy` and nothing is deployed or set.
+The window's copy is never used in its place: a destination has no safe
+default, which is #323's rule.
+
+**What the teacher is told.** When the act starts while ANY window on the
+folder holds unsaved edits for the course (`WorkspaceModel.anyCopyHasUnsavedChanges`,
+as the preview asks), the window shows `specialNames.deployUsesSavedSettings`
+where the preview's `previewUsesSavedSettings` appears, and the sheet shows
+`schedulingUsesSavedSettings` above its plan. When the assistant pressed the
+button, or deployed with no window, the same deploy sentence is added to what
+it says. For ANY unsaved setting, not only a changed destination — the whole
+site is built from the saved file. **The trap:** the deploy's sentence is set
+AFTER any running preview is stopped, because stopping it runs
+`releasePreviewLease()`, which clears the banner; a source test pins the order.
+It stays up after the deploy ends and is replaced by the next preview or
+deploy. The MCP server says nothing: it is another process with no window
+models, so nothing unsaved exists that it could see.
+
+**The trail.** `deploy used the saved settings`, written only when some window
+held unsaved edits at the act: which act, the kinds of destination the saved
+settings sent it to, and whether the unsaved edits named a different KIND —
+Netlify, Cloudflare Pages or a folder, never a path or a site name. The
+`settings saved` line is absent in such a report (nothing was saved) and the
+deploy's own line names where it went, so this is the one line that says the
+screen and the act disagreed.
+
+**Rejected:** saving automatically before the act (it writes a half-typed
+setting — #265's precedent); refusing while anything is unsaved (deploying the
+saved settings may be the point); using the unsaved edits for everything (the
+card, both assistants, `deploy.py` and the scheduled run all read the file, and
+the publish would still be mixed); fixing only the sheet (it leaves the worse
+half); a notice only when the destination differs (the preview's notice fires
+for any unsaved edit, and the trail line records the difference); **a Save
+button in the sheet** (the director's ruling on the plan: a second Save path
+would either duplicate Course Settings' validation, after-Save notice and trail
+line or skip them, the unsaved edits may be in another window, and since #323 a
+Save after scheduling is honoured anyway — the sheet's sentence says so);
+refreshing the window's copy from disk before the act (it throws away the
+teacher's unsaved edits). A `SavedCourse` wrapper type that would make passing
+a window's copy to an act a compile error was considered and left for a fourth
+caller; `scheduleDeploy` and `MultiDestinationDeployRunner.run` carry a comment
+saying what to pass.
+
+Contract: `shared-rules.json` → `actsUseTheSavedSettings` (seven cases), the
+three `specialNames` keys and the trail event. Mac tests:
+`ActsUseTheSavedSettingsTests` and the extended `SettingsSaveNoticeTests`.
+**Windows** looks like the same shape (`SidebarPane.xaml.cs` and
+`SectionDetailView.xaml.cs` read `Configuration.AllDeployDestinations` off the
+shared copy) and owes the check, the cases, the keys and the event.
