@@ -21,6 +21,8 @@ _sys.path.insert(0, str(Path(__file__).resolve().parent))
 import site_health
 import contracts
 import class_pages
+import markdown_code
+import how_i_teach
 import page_visibility
 import reference_course
 import stop_preview
@@ -1751,9 +1753,14 @@ def _find_first_class_created(content_root: Path) -> datetime | None:
     return earliest_any_dt
 
 def _extract_wikilink_targets(text: str) -> set[str]:
-    """Extract all normalized wikilink target names from markdown text, excluding code fences and index/meta links."""
-    outside_fences = re.sub(r"```[\s\S]*?```", "", text)
-    outside_fences = re.sub(r"`[^`\n]*`", "", outside_fences)
+    """Extract all normalized wikilink target names from markdown text, excluding links inside code and index/meta links."""
+    # A link whose [[ starts inside code - a fence of either character, a
+    # fence inside a callout, an inline span of any length, across the lines
+    # of a paragraph - is an example, not a link (#313). The mask comes from
+    # markdown_code, the one definition every reader here shares:
+    # contracts/shared-rules.json -> readingALink.whatIsCode. Until #313 this
+    # stripped ``` fences and one-line spans with two regexes, which missed
+    # ~~~ fences, multi-line spans and a ``` held inside ````.
     # Heading BEFORE alias, the order Quartz and Obsidian write them in:
     # [[Page#Heading|words]] and [[Page#Heading\|words]] (the backslash is how
     # an alias pipe is escaped inside a table) are links to Page. Until #294
@@ -1769,9 +1776,14 @@ def _extract_wikilink_targets(text: str) -> set[str]:
     # The lazy target plus '\\?\|' keeps the '\|' backslash off the name,
     # and the rstrip below stays as a second guard. Shared contract:
     # contracts/shared-rules.json -> readingALink.
-    link_pattern = re.compile(r"!?\[\[([^\]|#]+?)(?:#[^\]|]*)?(?:\\?\|[^\]]*)?\]\]")
+    # The heading stops at '[' (#314), as Quartz's own wikilinkRegex does: a
+    # stray "[[" followed by a heading would otherwise run on through the
+    # next real link's name and swallow it. (The name still crosses '[', so
+    # a stray "[[" with no '#' before the next link still can; not widened.)
+    # Measured 0 change over all of support/.
+    link_pattern = re.compile(r"!?\[\[([^\]|#]+?)(?:#[^\[\]|]*)?(?:\\?\|[^\]]*)?\]\]")
     targets = set()
-    for match in link_pattern.finditer(outside_fences):
+    for match in markdown_code.matches_outside_code(link_pattern, text):
         target = match.group(1).strip().rstrip("\\")
         if not target:
             continue
@@ -4685,6 +4697,10 @@ def discover_shared_items(course_dir: Path) -> tuple[list[str], list[str]]:
             elif item.is_file():
                 if name in _IGNORED_SHARED_FILES or name.startswith("hidden_explorer_components") or name.startswith("expandable_explorer_components"):
                     continue
+                # The teacher's How I Teach page is never on the website
+                # (#209, shared-rules.json -> howITeachPage): never listed.
+                if how_i_teach.is_the_how_i_teach_page(name):
+                    continue
                 found_files.append(name)
     except Exception as e:
         print(f"⚠️ Could not scan course root for discovery: {e}")
@@ -4705,6 +4721,11 @@ def discover_section_items(section_dir: Path) -> tuple[list[str], list[str]]:
                 found_folders.append(name)
             elif item.is_file():
                 if name in {".DS_Store", "Thumbs.db", "index.md"}:
+                    continue
+                # A section's top-level files land at the top of the site
+                # exactly as the course's do, so the same name is kept off
+                # here too (#209).
+                if how_i_teach.is_the_how_i_teach_page(name):
                     continue
                 found_files.append(name)
     except Exception as e:
@@ -4758,6 +4779,12 @@ def _dropping_excluded_items(cfg: dict) -> dict:
                 if str(entry).lower() not in names:
                     kept.append(entry)
             corrected[key] = kept
+    # The How I Teach page is never copied, whatever the lists say (#209) —
+    # the same reconciliation preflight makes when it writes.
+    for key in ("shared_files", "per_section_files"):
+        current = corrected.get(key)
+        if isinstance(current, list):
+            corrected[key], _ = how_i_teach.keep_off_the_site(current)
     return corrected
 
 
@@ -4837,6 +4864,18 @@ def preflight_update_course_config(course_dir: Path, section_dir: Path, config_p
                     copy_list.remove(name)
                     reconciled_changed = True
                     print(f"🚫 Dropped excluded {scope_label} {kind} from the copy list: {name} (listed in excluded_items)")
+
+    # The teacher's How I Teach page is never on the website (#209). A course
+    # whose page predates the rule has it LISTED — discovery used to add every
+    # top-level file — so it is dropped here and the configuration written
+    # back without it, the way an excluded name is dropped above.
+    for scope_label, copy_list in (("shared", shared_files), ("per-section", per_section_files)):
+        for name in list(copy_list):
+            if how_i_teach.is_the_how_i_teach_page(str(name)):
+                copy_list.remove(name)
+                reconciled_changed = True
+                print(f"🔒 Took {scope_label} file {name} off the copy list: it is your How I Teach page, "
+                      f"which is never on the website.")
 
     # Discover
     disc_shared_folders, disc_shared_files = discover_shared_items(course_dir)
@@ -5124,9 +5163,20 @@ where they genuinely apply rather than leaving the record silent.
 
 SPECIFIC_CODE = re.compile(r"^([A-Z])(\d+)\.(\d+)$")
 OVERALL_FILE = re.compile(r"^([A-Z]\d+)\.\s")
-CURRICULUM_BLOCK = re.compile(r"%%curriculum-start%%(.*?)%%curriculum-end%%", re.S)
-BLOCK_LINK = re.compile(r"!?\[\[([^\]|#]+?)(?:\\?\|[^\]]*)?(?:#[^\]|]*)?\]\]")
-TRANSCLUSION = re.compile(r"!\[\[([^\]|#]+?)(?:\\?\|[^\]]*)?(?:#[^\]|]*)?\]\]")
+# A curriculum block is found by _curriculum_blocks_outside_code (#313), not
+# by a regex over the raw text: a marker shown inside code is not one.
+# What a link names, for "pages the course teaches" and the coverage count.
+# Heading BEFORE alias, the order Quartz and Obsidian write them in, so
+# [[Page#Heading|words]] and ![[A1.1#Examples\|see]] are links to Page and
+# A1.1 (until #314 the alias came first and neither matched at all). The
+# heading stops at '[', as Quartz's own wikilinkRegex does: the reorder
+# alone let `type [[` in inline code on Tutorials/Scavenger Hunt.md (the
+# example course and every skeleton family, 90 files) run on through a
+# "### Heading" and swallow the real [[Help Sessions|...]] after it. With
+# '[' excluded, 0 differences over all 12,490 pages in support/. Shared
+# contract: contracts/shared-rules.json -> readingALink.
+BLOCK_LINK = re.compile(r"!?\[\[([^\]|#]+?)(?:#[^\[\]|]*)?(?:\\?\|[^\]]*)?\]\]")
+TRANSCLUSION = re.compile(r"!\[\[([^\]|#]+?)(?:#[^\[\]|]*)?(?:\\?\|[^\]]*)?\]\]")
 
 
 def _quartz_slug(relative: Path) -> str:
@@ -5507,9 +5557,9 @@ def _pages_the_course_teaches(content_root: Path, class_folders: list) -> set | 
             text = page.read_text(encoding="utf-8")
         except Exception:
             return set()
-        outside_fences = re.sub(r"```[\s\S]*?```", "", text)
+        # Nothing inside code is a link (#313, readingALink.whatIsCode).
         return {match.group(1).strip().rstrip("\\").split("/")[-1]
-                for match in BLOCK_LINK.finditer(outside_fences)}
+                for match in markdown_code.matches_outside_code(BLOCK_LINK, text)}
 
     first_hop = set()
     for page in class_pages.values():
@@ -5519,6 +5569,34 @@ def _pages_the_course_teaches(content_root: Path, class_folders: list) -> set | 
         if stem in by_stem:
             second_hop |= links_from(by_stem[stem])
     return set(class_pages) | first_hop | second_hop
+
+
+def _curriculum_blocks_outside_code(text: str, code: list) -> list:
+    """
+    The (start, end) of what each `%%curriculum-start%%` ... `%%curriculum-end%%`
+    block holds, for the blocks whose markers are both outside code (#313). A
+    marker shown inside a fence is an example of the syntax: it neither opens
+    a block nor closes one, so a fenced example cannot swallow the real block
+    after it.
+    """
+    start_marker = "%%curriculum-start%%"
+    end_marker = "%%curriculum-end%%"
+    blocks = []
+    position = 0
+    while True:
+        start = text.find(start_marker, position)
+        if start < 0:
+            return blocks
+        position = start + len(start_marker)
+        if markdown_code.is_in_code(code, start):
+            continue
+        end = text.find(end_marker, position)
+        while end >= 0 and markdown_code.is_in_code(code, end):
+            end = text.find(end_marker, end + len(end_marker))
+        if end < 0:
+            return blocks
+        blocks.append((position, end))
+        position = end + len(end_marker)
 
 
 def _coverage_counts(content_root: Path, curriculum_dir: Path, specific: dict,
@@ -5574,11 +5652,18 @@ def _coverage_counts(content_root: Path, curriculum_dir: Path, specific: dict,
         # overall expectation "evaluated" rather than merely "addressed".
         is_assessed = _is_graded_path(relative, graded_folders, graded_was_configured)
 
+        # Nothing inside code counts (#313, readingALink.whatIsCode): a
+        # fenced example of `![[A1.1]]`, or of a whole curriculum block, on a
+        # page that teaches how to write one is not a claim to have covered
+        # anything. A block counts only where its opening marker is outside
+        # code, and a link inside it only where the link is.
+        code = markdown_code.code_ranges(text)
         targets = set()
-        for link in TRANSCLUSION.finditer(text):
+        for link in markdown_code.matches_outside_code(TRANSCLUSION, text, code):
             targets.add(link.group(1).strip().rstrip("\\").split("/")[-1])
-        for block in CURRICULUM_BLOCK.findall(text):
-            for link in BLOCK_LINK.finditer(block):
+        for block_start, block_end in _curriculum_blocks_outside_code(text, code):
+            inside = text[block_start:block_end]
+            for link in markdown_code.matches_outside_code(BLOCK_LINK, inside, code, block_start):
                 targets.add(link.group(1).strip().rstrip("\\").split("/")[-1])
 
         for target in targets:
@@ -5924,6 +6009,20 @@ def build_section_site(
         return
 
     # === Preflight discovery → append into course_config.json =================
+    # Which How I Teach pages the course's settings LISTED before preflight
+    # reconciles them — the ones earlier builds published, and so the ones
+    # the trail is told about when they are kept off (#209,
+    # howITeachPage.keptOffMarker).
+    _, listed_shared_pages = how_i_teach.keep_off_the_site(config.get("shared_files", []))
+    _, listed_section_pages = how_i_teach.keep_off_the_site(config.get("per_section_files", []))
+    how_i_teach_dropped_places = []
+    for name in listed_shared_pages:
+        if (course_dir / str(name)).is_file():
+            how_i_teach_dropped_places.append(how_i_teach.place_in_the_course(str(name)))
+    for name in listed_section_pages:
+        if (section_dir / str(name)).is_file():
+            how_i_teach_dropped_places.append(how_i_teach.place_in_the_course(str(name), section_name))
+
     print("\n🔎 Preflight: discovering new shared and per-section items...")
     config = preflight_update_course_config(course_dir, section_dir, config_file) or config
     # ========================================================================
@@ -5941,9 +6040,12 @@ def build_section_site(
               f"“{chosen_unit_word} 2, Day 3”.")
 
     shared_folders = config.get("shared_folders", [])
-    shared_files = config.get("shared_files", [])
     per_section_folders = config.get("per_section_folders", [])
-    per_section_files = config.get("per_section_files", [])
+    # Filtered where they are READ rather than in each loop, so a copy loop
+    # added later inherits the rule (#209): the How I Teach page is never
+    # copied, even when a hand edit or an older app lists it.
+    shared_files, _ = how_i_teach.keep_off_the_site(config.get("shared_files", []))
+    per_section_files, _ = how_i_teach.keep_off_the_site(config.get("per_section_files", []))
     hidden_list = config.get("hidden", [])
     # teacher preference for reading-time
     show_reading_time = bool(config.get("show_reading_time", False))
@@ -6167,6 +6269,21 @@ def build_section_site(
             rewrite_section_wikilinks(dest)
             print(f"  📄 Copied per-section file: {file_name}")
 
+    # === The teacher's How I Teach page never reaches the site (#209) ========
+    # The final sweep: whatever put it into the merged content, it comes out
+    # here, before any check reads the tree and before Quartz builds it. Top
+    # level only — inside a folder it is an ordinary page.
+    swept = how_i_teach.remove_from_content_root(content_root)
+    for name in swept:
+        print(f"🔒 Removed {name} from the website's pages before building.")
+    how_i_teach.announce(
+        course_code, section_number,
+        found_here=bool(how_i_teach.pages_at_the_top(course_dir)
+                        or how_i_teach.pages_at_the_top(section_dir)),
+        look_alikes=(how_i_teach.look_alikes_at_the_top(course_dir)
+                     + how_i_teach.look_alikes_at_the_top(section_dir)),
+        dropped_places=how_i_teach_dropped_places,
+    )
 
     # === Health of the folders this course depends on =========================
     # Here, and not earlier, because every check is defined over the MERGED

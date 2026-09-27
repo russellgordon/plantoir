@@ -76,7 +76,7 @@ final class BuildFreshnessTests: XCTestCase {
             .appendingPathComponent(".merged_output/section1/public/index.html")
 
         try backdateEverything(in: course.directoryURL, to: Date(timeIntervalSinceNow: -600))
-        try Data("<script>const socket = new WebSocket('ws://localhost:9081')</script>".utf8)
+        try Data(BuildFreshnessTests.clientAsQuartzWritesIt().utf8)
             .write(to: builtIndexURL)
         try setModificationDate(Date(timeIntervalSinceNow: 300), of: builtIndexURL)
 
@@ -274,8 +274,23 @@ final class BuildFreshnessTests: XCTestCase {
         return try XCTUnwrap(freshness["previewBuild"] as? [String: Any])
     }
 
+    /// The contract's `signature` object (issue #291).
+    static func previewSignature() throws -> [String: Any] {
+        let rule: [String: Any] = try previewBuildRule()
+        return try XCTUnwrap(rule["signature"] as? [String: Any], "signature is an object since #291")
+    }
+
+    /// The live-reload client exactly as Quartz writes it into a preview's
+    /// page, read from the contract rather than retyped: a retyped fixture
+    /// could pass against a wrong constant.
+    static func clientAsQuartzWritesIt() throws -> String {
+        let signature: [String: Any] = try previewSignature()
+        return try XCTUnwrap(signature["asQuartzWritesIt"] as? String)
+    }
+
     /// Writes one case's pages under `publicURL` and makes the ones it names
-    /// unreadable. Returns those, so the caller can make them readable again
+    /// unreadable. A page named in `invalidUTF8Before` begins with the bytes
+    /// FF 0A, which are not UTF-8. Returns those, so the caller can make them readable again
     /// and the temporary folder can be removed.
     static func writePages(of testCase: [String: Any], into publicURL: URL) throws -> [URL] {
         let pages: [String: String] = try XCTUnwrap(testCase["pages"] as? [String: String])
@@ -286,6 +301,13 @@ final class BuildFreshnessTests: XCTestCase {
                 withIntermediateDirectories: true
             )
             try Data(text.utf8).write(to: pageURL)
+        }
+        let invalidUTF8Pages: [String] = testCase["invalidUTF8Before"] as? [String] ?? []
+        for relativePath in invalidUTF8Pages {
+            let pageURL: URL = publicURL.appendingPathComponent(relativePath)
+            var bytes: Data = Data([0xFF, 0x0A])
+            bytes.append(try Data(contentsOf: pageURL))
+            try bytes.write(to: pageURL)
         }
         var lockedURLs: [URL] = []
         let unreadable: [String] = testCase["unreadable"] as? [String] ?? []
@@ -326,11 +348,25 @@ final class BuildFreshnessTests: XCTestCase {
     }
 
     /// The signature the app looks for is the one the contract gives, so
-    /// the launchers and the app cannot drift apart on the string itself.
+    /// the launchers and the app cannot drift apart on the rule itself.
     @MainActor
     func testTheSignatureIsTheContracts() throws {
-        let rule: [String: Any] = try BuildFreshnessTests.previewBuildRule()
-        XCTAssertEqual(rule["signature"] as? String, BuildFreshness.liveReloadSignature)
+        let signature: [String: Any] = try BuildFreshnessTests.previewSignature()
+        XCTAssertEqual(signature["scriptTag"] as? String, BuildFreshness.liveReloadScriptTag)
+        XCTAssertEqual(signature["client"] as? String, BuildFreshness.liveReloadClient)
+        XCTAssertEqual(signature["asABasicRegex"] as? String, BuildFreshness.liveReloadPattern)
+        let between: [String] = try XCTUnwrap(signature["between"] as? [String])
+        var betweenBytes: Set<UInt8> = []
+        for character in between {
+            let bytes: [UInt8] = Array(character.utf8)
+            XCTAssertEqual(bytes.count, 1, "each `between` entry is one byte")
+            for byte in bytes {
+                betweenBytes.insert(byte)
+            }
+        }
+        XCTAssertEqual(betweenBytes, BuildFreshness.liveReloadWhitespace)
+        let asQuartzWritesIt: String = try XCTUnwrap(signature["asQuartzWritesIt"] as? String)
+        XCTAssertTrue(BuildFreshness.carriesLiveReloadClient(Data(asQuartzWritesIt.utf8)))
     }
 
     /// The state issue #136 is about, as a course sees it: a clean front page
@@ -364,7 +400,7 @@ final class BuildFreshnessTests: XCTestCase {
             "A clean site newer than every edit is current — the walk must not make every publish rebuild"
         )
 
-        try Data("<script>new WebSocket('ws://localhost:9081')</script>".utf8).write(to: notesURL)
+        try Data(BuildFreshnessTests.clientAsQuartzWritesIt().utf8).write(to: notesURL)
         XCTAssertTrue(
             BuildFreshness.needsRebuild(course: course, sectionNumber: 1),
             "A preview's page behind a clean front page is still a preview's build"
