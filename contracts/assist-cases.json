@@ -3409,9 +3409,36 @@
         "name" : "what a page links to is answered in code, marks the draft, and ends the turn",
         "when" : "say",
         "why" : "Measured on 2026-09-25 (issue #167): \"What does Unit 2, Day 3 link to?\" reached read_page 0 times in 84 on BOTH assistants, across six courses and fourteen dates. It is answered in code now, and the half this case exists for is the END of the turn: a code-matched turn never puts the teacher's sentence into the model's conversation, so handing the answer back would give the model a tool result with no question in front of it - the lap on which the smaller assistant turned this read-only question into a publish plan. The fixture is a published \"Unit 1, Day 1\" whose body links to \"Unit 1, Day 2\", a draft. expectModelRequests counts the requests the engine received over the whole conversation; a transcript cannot show an ABSENCE, so this is the assertion that proves the model was never asked."
+      },
+      {
+        "expectReply" : "wording.startOfYearNeedsItsPlan",
+        "given" : {
+          "visibleClasses" : [
+            "Unit 1, Day 1",
+            "Unit 1, Day 2"
+          ]
+        },
+        "name" : "getting a section ready without the plan's code writes nothing and hands back the plan",
+        "when" : "prepare_for_start_of_year",
+        "why" : "The write is reachable without a code - planCode is deliberately not required in the schema - and its answer is the plan with its code, not an error. A client that skipped the plan must not be able to hide a whole year behind one sentence (#96)."
+      },
+      {
+        "expectReply" : "wording.startOfYearPlanHasChanged",
+        "given" : {
+          "arguments" : {
+            "planCode" : "00000000"
+          },
+          "visibleClasses" : [
+            "Unit 1, Day 1",
+            "Unit 1, Day 2"
+          ]
+        },
+        "name" : "getting a section ready with a code that no longer fits writes nothing",
+        "when" : "prepare_for_start_of_year",
+        "why" : "A code is a promise that the section is still the one the teacher was shown. A page changed between plan and write, or a code from another plan, gets the plan as it stands now and nothing written (#96). '00000000' stands for any code this platform's plan did not issue."
       }
     ],
-    "note" : "What must happen, and in what ORDER. The order is the assertion: every wrong ordering still passes a test that only checks all three events occurred. Event names are this contract's own; map them to whatever your app calls them. `given.saying` is a CONVERSATION — what the teacher types, in order, each turn settled before the next — because some behaviour exists only across turns; when it is absent a single turn is run, using whichever fixed phrasing reaches `given.pending`. `when` says what the teacher does on the LAST turn: \"approve\" presses Go on the card that is waiting (and fails if none is), \"decline\" presses Cancel, \"say\" means the last turn is ANSWERED rather than proposed, so nothing is waiting and a card there is the failure the case exists to catch; anything else is a tool name, called directly. `expectTranscriptContains` matches each named line by speaker PREFIX and sentence SUBSTRING, in order but not necessarily adjacent, and a line may satisfy more than one expectation — one reply often composes several named sentences into a single bubble. A literal line that is not a `wording.` name is matched as written, which is how a case anchors later expectations to a particular TURN. `expectModelRequests`, when present, is how many requests the engine must have received over the WHOLE conversation - 0 means the model was never asked. A transcript cannot show an absence, so a turn that must END in code (and not hand its answer back to the model for another lap) is proved by this count; the mac runs such a case against a stub engine that answers whatever it is sent, so a regression fails on the count rather than hanging."
+    "note" : "What must happen, and in what ORDER. The order is the assertion: every wrong ordering still passes a test that only checks all three events occurred. Event names are this contract's own; map them to whatever your app calls them. `given.saying` is a CONVERSATION — what the teacher types, in order, each turn settled before the next — because some behaviour exists only across turns; when it is absent a single turn is run, using whichever fixed phrasing reaches `given.pending`. `when` says what the teacher does on the LAST turn: \"approve\" presses Go on the card that is waiting (and fails if none is), \"decline\" presses Cancel, \"say\" means the last turn is ANSWERED rather than proposed, so nothing is waiting and a card there is the failure the case exists to catch; anything else is a tool name, called directly. `expectTranscriptContains` matches each named line by speaker PREFIX and sentence SUBSTRING, in order but not necessarily adjacent, and a line may satisfy more than one expectation — one reply often composes several named sentences into a single bubble. A literal line that is not a `wording.` name is matched as written, which is how a case anchors later expectations to a particular TURN. `expectModelRequests`, when present, is how many requests the engine must have received over the WHOLE conversation - 0 means the model was never asked. A transcript cannot show an absence, so a turn that must END in code (and not hand its answer back to the model for another lap) is proved by this count; the mac runs such a case against a stub engine that answers whatever it is sent, so a regression fails on the count rather than hanging. `given.visibleClasses`, when present, lays out those class pages, published, in section 1 before the call (the first is the first class); `given.arguments` is merged into the direct call's arguments, which are otherwise just the course and section (#96)."
   },
   "toolDescriptions" : {
     "descriptions" : {
@@ -3431,6 +3458,7 @@
       "plan_add_next_class" : "TEACHERS SAY: \"what would the next class page be?\", \"which day comes next?\", \"show me before you add it\". Work out which page adding the next class would create and which day it would fall on, WITHOUT changing anything.",
       "plan_curriculum_mentions" : "Work out what adding curriculum transclusions to a page would do, changing nothing. Show the teacher what it says — it quotes each expectation's wording so they can tell whether it fits their lesson without looking it up — then wait for them to agree.",
       "plan_make_room_for_classes" : "Work out what making room part-way through a unit would do, and change nothing. Names every page that would be renamed, every class that would move to a later day, and every link that would be rewritten. Call this first and show the teacher what it said, in full — this moves more pages than anything else here.",
+      "plan_prepare_for_start_of_year" : "Work out what getting a section ready for the start of the year would do, changing nothing. Lists every page that would go into draft and why, what stays, the links that would lead to hidden pages, and the plan code prepare_for_start_of_year needs.",
       "plan_publish_class_on" : "TEACHERS SAY: \"what would publishing tomorrow's class do?\", \"show me before you put Monday up\". Work out what publishing the class taught on a given day would do, WITHOUT changing anything.",
       "plan_publish_pages" : "Work out exactly what publishing pages would do, WITHOUT changing anything.",
       "plan_re_date_classes" : "Work out what re-dating a whole section onto its recorded class dates would do, and change nothing. Shows every page that would move and why.",
@@ -3438,6 +3466,7 @@
       "plan_scheduled_deploy" : "TEACHERS SAY: \"what happens if I schedule it for 6:30?\", \"check before you set that up\". Work out what scheduling a deploy would mean, scheduling nothing.",
       "plan_unpublish_pages" : "TEACHERS SAY: \"what happens if I take that down?\", \"check before you hide Unit 3, Day 2\". Work out exactly what unpublishing pages from students would do, WITHOUT changing anything.",
       "plan_write_how_i_teach" : "Shows where the teacher's How I Teach page would be saved and whether it replaces one they already have, changing nothing. Use it before write_how_i_teach, and show the teacher the whole text.",
+      "prepare_for_start_of_year" : "TEACHERS SAY: \"get ready for the start of the year\", \"put everything after the first class into draft\", \"hide every class past Day 1\". Put every class after the first into draft, with the pages only later classes use, leaving the first class, the pages it links to, Key Links and the pages it lists, folder pages and curriculum pages as they are. Call plan_prepare_for_start_of_year FIRST, show the teacher the whole plan and wait for them to agree; then pass the code the plan gave. The course is backed up first, and undo_last_change takes it back. Nothing reaches students until they deploy.",
       "publish_class_on" : "TEACHERS SAY: \"publish tomorrow's class\", \"put up Monday's lesson\", \"put Unit 2, Day 3 up\", \"make Friday's class visible\", \"post next class\", \"put the class live for students\". Publish the class taught on a given day, along with the pages it links to, then rebuild the section's preview.",
       "publish_pages" : "Make pages visible to students, along with every page they link to, then rebuild the section preview. The linked pages come by themselves — there is nothing to ask for and no way to leave them out, because a published page whose links lead nowhere is the one thing this must never make.",
       "re_date_classes" : "TEACHERS SAY: \"re-date my classes\", \"roll this section over to a new year\", \"put my classes on this year's dates\". Re-date every class in a section onto the class dates on file, by POSITION — the first class takes the first date — and move the pages each class uses onto that class's day with it. Pages this section's Key Links points at move to the first day of class. Curriculum pages are left alone, because Plantoir dates those itself on every build. Set `website` when the teacher is rolling a section over to a NEW YEAR and has said which website they want: \"new\" starts a fresh one, so publishing no longer replaces last year's site, and \"same\" keeps last year's address. Ask them first — never choose for them, and leave it out for an ordinary re-dating.",
@@ -3521,18 +3550,21 @@
       "add_curriculum_mentions",
       "read_how_i_teach",
       "plan_write_how_i_teach",
-      "write_how_i_teach"
+      "write_how_i_teach",
+      "plan_prepare_for_start_of_year",
+      "prepare_for_start_of_year"
     ],
     "needsApproval" : [
       "deploy_section",
       "schedule_deploy"
     ],
-    "note" : "Three lists, deliberately. `all` is what the runner can execute; `local` is what the small model is SHOWN (the plan twins and remember_timetable are taken off, because the model never has to name a plan and dates it supplies are dates it may have invented); `mcpOnly` is the thirteen offered to Claude Code on top of everything — six asking for judgement about meaning (the three curriculum tools and the three for the How I Teach page), the rest either never needed by a model scoped to one section or already reachable by it through a fixed phrasing.",
+    "note" : "Three lists, deliberately. `all` is what the runner can execute; `local` is what the small model is SHOWN (the plan twins and remember_timetable are taken off, because the model never has to name a plan and dates it supplies are dates it may have invented); `mcpOnly` is the fifteen offered to Claude Code on top of everything — six asking for judgement about meaning (the three curriculum tools and the three for the How I Teach page), two that get a whole section ready for the start of the year (a change a person should read in full, with a button of its own in the app), the rest either never needed by a model scoped to one section or already reachable by it through a fixed phrasing.",
     "planTwins" : {
       "add_classes" : "plan_add_classes",
       "add_curriculum_mentions" : "plan_curriculum_mentions",
       "add_next_class" : "plan_add_next_class",
       "make_room_for_classes" : "plan_make_room_for_classes",
+      "prepare_for_start_of_year" : "plan_prepare_for_start_of_year",
       "publish_class_on" : "plan_publish_class_on",
       "publish_pages" : "plan_publish_pages",
       "re_date_classes" : "plan_re_date_classes",
@@ -4961,6 +4993,58 @@
             "required" : [
               "course",
               "text"
+            ],
+            "type" : "object"
+          }
+        },
+        "type" : "function"
+      },
+      {
+        "function" : {
+          "description" : "Work out what getting a section ready for the start of the year would do, changing nothing. Lists every page that would go into draft and why, what stays, the links that would lead to hidden pages, and the plan code prepare_for_start_of_year needs.",
+          "name" : "plan_prepare_for_start_of_year",
+          "parameters" : {
+            "properties" : {
+              "course" : {
+                "description" : "The course code, for example ICS3U.",
+                "type" : "string"
+              },
+              "section" : {
+                "description" : "The section number, for example 1.",
+                "type" : "integer"
+              }
+            },
+            "required" : [
+              "course",
+              "section"
+            ],
+            "type" : "object"
+          }
+        },
+        "type" : "function"
+      },
+      {
+        "function" : {
+          "description" : "TEACHERS SAY: \"get ready for the start of the year\", \"put everything after the first class into draft\", \"hide every class past Day 1\". Put every class after the first into draft, with the pages only later classes use, leaving the first class, the pages it links to, Key Links and the pages it lists, folder pages and curriculum pages as they are. Call plan_prepare_for_start_of_year FIRST, show the teacher the whole plan and wait for them to agree; then pass the code the plan gave. The course is backed up first, and undo_last_change takes it back. Nothing reaches students until they deploy.",
+          "name" : "prepare_for_start_of_year",
+          "parameters" : {
+            "properties" : {
+              "course" : {
+                "description" : "The course code, for example ICS3U.",
+                "type" : "string"
+              },
+              "planCode" : {
+                "description" : "The code on the line that starts \"Plan code:\" in the plan plan_prepare_for_start_of_year gave, for example \"3f9a1c07\". Without it, or if the section has changed since, nothing is changed and the current plan comes back instead.",
+                "type" : "string"
+              },
+              "section" : {
+                "description" : "The section number, for example 1.",
+                "type" : "integer"
+              }
+            },
+            "required" : [
+              "course",
+              "section"
             ],
             "type" : "object"
           }

@@ -327,6 +327,8 @@ final class AssistPlanModeTests: XCTestCase {
             // #209's page, for a course that has none yet — the case a
             // teacher meets first. The rich section's ICS3U has no page.
             "plan_write_how_i_teach": ["text": "I teach by asking first."],
+            // #96: the rich section has later classes to put into draft.
+            "plan_prepare_for_start_of_year": [:],
         ]
 
         var ranCount: Int = 0

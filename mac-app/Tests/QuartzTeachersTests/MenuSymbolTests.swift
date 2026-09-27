@@ -21,6 +21,7 @@ final class MenuSymbolTests: XCTestCase {
             "archivebox",             // Archived
             "books.vertical",         // A course
             "doc.richtext",           // A section
+            "moon.zzz",               // Get Ready for the Start of the Year (#96)
         ]
         for name in symbols {
             XCTAssertNotNil(
