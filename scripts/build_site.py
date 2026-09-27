@@ -5965,13 +5965,18 @@ def _coverage_counts(content_root: Path, curriculum_dirs, specific: dict,
         # page that teaches how to write one is not a claim to have covered
         # anything. A block counts only where its opening marker is outside
         # code, and a link inside it only where the link is.
+        # Two masks, deliberately (#331): the MARKERS are asked about code
+        # only, because a marker is itself a `%%` comment and would otherwise
+        # hide every block; the LINKS are asked about code and comments, so
+        # `%% ![[A1.1]] %%` claims nothing, as Quartz draws nothing for it.
         code = markdown_code.code_ranges(text)
+        not_a_link = markdown_code.not_a_link_ranges(text)
         targets = set()
-        for link in markdown_code.matches_outside_code(TRANSCLUSION, text, code):
+        for link in markdown_code.matches_outside_code(TRANSCLUSION, text, not_a_link):
             targets.add(link.group(1).strip().rstrip("\\").split("/")[-1])
         for block_start, block_end in _curriculum_blocks_outside_code(text, code):
             inside = text[block_start:block_end]
-            for link in markdown_code.matches_outside_code(BLOCK_LINK, inside, code, block_start):
+            for link in markdown_code.matches_outside_code(BLOCK_LINK, inside, not_a_link, block_start):
                 targets.add(link.group(1).strip().rstrip("\\").split("/")[-1])
 
         for target in targets:

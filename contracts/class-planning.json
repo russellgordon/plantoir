@@ -2257,6 +2257,17 @@
           "text": "Type `[[Unit 2, Day 3]]` to link to [[Unit 2, Day 3]].",
           "expect": "Type `[[Unit 2, Day 3]]` to link to [[Module 2, Day 3]].",
           "why": "A link inside code is an example, not a link (shared-rules.json -> readingALink.codeIsNeverALink, #313): Quartz draws none, publishing does not follow it, and a rename plan that counted it would promise to move a link in text nobody follows."
+        },
+        {
+          "name": "a link inside a comment is not renamed",
+          "from": "Unit",
+          "to": "Module",
+          "pageTitles": [
+            "Unit 2, Day 3"
+          ],
+          "text": "%% was [[Unit 2, Day 3]] %% see [[Unit 2, Day 3]].",
+          "expect": "%% was [[Unit 2, Day 3]] %% see [[Module 2, Day 3]].",
+          "why": "A link inside a %% comment is not a link (shared-rules.json -> readingALink.commentIsNeverALink, #331): Quartz removes the comment before reading anything, publishing does not follow it, and a rename plan that counted it would promise to move a link nobody follows."
         }
       ]
     }

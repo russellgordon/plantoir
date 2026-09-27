@@ -17,14 +17,16 @@ import Foundation
 /// | `<img src="/Media/x.png">` | 5 | three of them on pages inside shared folders; one is a live 1.1 MB picture |
 /// | `[text](x.png)` | 526, every one `https://` | nothing local to carry today, scanned anyway because the cost is nothing |
 ///
-/// **Code is left alone** — a fenced block of either character, a fence
-/// inside a callout, an inline span. A name inside code is prose about a file
-/// rather than a use of one, and rewriting it would edit an example a teacher
-/// wrote. Where code is comes from `MarkdownCode`, the one definition every
-/// link reader and rewriter on the mac shares (#313,
-/// `readingALink.whatIsCode`): a match of any of the three shapes that STARTS
-/// in code is skipped. Until #313 this walker tracked ``` and ~~~ fences
-/// itself and not inline spans, and saw no fence inside a `>` callout.
+/// **Code and `%%` comments are left alone** — a fenced block of either
+/// character, a fence inside a callout, an inline span, and (#331) anything
+/// Quartz strips as a comment before drawing the page. A name inside code is
+/// prose about a file rather than a use of one, and rewriting it would edit
+/// an example a teacher wrote. Where code is comes from `MarkdownCode`, the
+/// one definition every link reader and rewriter on the mac shares (#313,
+/// `readingALink.whatIsCode`, and `whatIsAComment` since #331): a match of
+/// any of the three shapes that STARTS in code or a comment is skipped. Until
+/// #313 this walker tracked ``` and ~~~ fences itself and not inline spans,
+/// and saw no fence inside a `>` callout.
 ///
 /// `nonisolated`: pure over its arguments, and run off the main actor by the
 /// copy.
@@ -161,7 +163,7 @@ nonisolated enum PageReferences {
     /// each line by its offset. Lines stay the unit so that no name is ever
     /// read across a line break.
     private static func walk(_ text: String, handle: (String, [Match]) -> Void) {
-        let code: [NSRange] = MarkdownCode.ranges(in: text)
+        let code: [NSRange] = MarkdownCode.notALinkRanges(in: text)
         let lines: [String] = PageReferences.lines(of: text)
         var lineOffset: Int = 0
         for line in lines {

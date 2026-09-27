@@ -1053,6 +1053,40 @@
           "expectVisible": ["Unit 2, Day 3", "Worksheet"],
           "expectUntouched": ["Answer Key"],
           "why": "Quartz draws neither example as a link (readingALink.codeIsNeverALink), so publishing the answer key would put a page in front of students that nothing on the site leads to - and an answer key is exactly the page a teacher writes as an example and does not mean to publish. Worksheet proves the class still publishes what it really links to. #313."
+        },
+        {
+          "name": "a link inside a teacher's comment is not followed",
+          "pages": [
+            {
+              "title": "Unit 2, Day 3",
+              "isClassPage": true,
+              "visible": false,
+              "body": "%% Remember to post [[Answer Key]] after the quiz. %%\n\nToday: [[Worksheet]].\n"
+            },
+            {
+              "title": "Answer Key",
+              "isClassPage": false,
+              "visible": false,
+              "links": []
+            },
+            {
+              "title": "Worksheet",
+              "isClassPage": false,
+              "visible": false,
+              "links": []
+            }
+          ],
+          "publish": [
+            "Unit 2, Day 3"
+          ],
+          "expectVisible": [
+            "Unit 2, Day 3",
+            "Worksheet"
+          ],
+          "expectUntouched": [
+            "Answer Key"
+          ],
+          "why": "Quartz removes every %% comment before it reads a link (readingALink.commentIsNeverALink, #331), so the answer key in the teacher's private note is never drawn as a link: publishing it would put in front of students the one page the note was reminding the teacher NOT to post yet. Worksheet proves the class still publishes what it really links to."
         }
       ]
     },
@@ -1183,12 +1217,21 @@
     "rule": "The name runs from [[ (or ![[) up to the first ], | or #, and a backslash immediately before that character is not part of it. An escaped pipe, [[Ohm's Law\\|Ohm]], is the same link as [[Ohm's Law|Ohm]] wherever it is written. It is most often inside a Markdown table, where Obsidian escapes the alias pipe so that the cell does not end there, but it turns up in ordinary sentences too and is a link there as well. A backslash anywhere else in a name is left alone.",
     "whenRewritten": "A rename changes only the name. The backslash, the alias, the heading and the ! stay exactly where they were: dropping the backslash would split a table cell in two. A link inside code is not a link, so a rename leaves it as written.",
     "codeIsNeverALink": "A [[...]] or ![[...]] whose opening brackets (or the ! of ![[) sit inside a fenced code block or an inline code span is an EXAMPLE of a link, not a link. It is not followed by publishing, the dates a class brings, the site check, the answer to what a page links to, copying, the installer or the coverage map, and it is not rewritten by a page rename, a unit-word rename, a class insertion or a folder rename (#313). This is what Quartz v4.5.0 already does: ofm.ts builds links with mdast-util-find-and-replace over TEXT nodes only (quartz/plugins/transformers/ofm.ts lines 209-378), so code and inlineCode nodes are never searched. Built in real Quartz and checked: no link from `[[X]]`, from ``a ` [[X]] ``, from a span across two lines of one paragraph or in a table cell, from a ``` or ~~~ fence, from ```` holding ```, from a fence inside a > callout, or from a fence never closed; a link IS drawn from an indented line continuing a list item, after a lone unclosed backtick, inside HTML <code>, and after a ``` fence that held a ~~~ line. The pattern is unchanged: the rule is a mask applied to its matches, and the text is never rewritten to apply it.",
+    "commentIsNeverALink": "A [[...]] or ![[...]] whose opening brackets (or the ! of ![[) sit inside a %% comment is not a link, exactly as code is not (#331): not followed by publishing, the dates a class brings, the site check, the answer to what a page links to, copying, the installer or the coverage map, and not rewritten by any rename or insertion. This is what Quartz v4.5.0 does: ofm.ts removes every comment from the RAW page (commentRegex = /%%[\\s\\S]*?%%/g, line 130) in textTransform (lines 160-163), before callouts, wikilinks or remark see anything, so nothing written inside one reaches the site. The text is never rewritten to apply the mask.",
+    "whatIsAComment": [
+      "Applied FIRST, over the RAW page, before code is looked for - Quartz's own order.",
+      "1. Scan the page left to right. A %% opens a comment, which closes at the NEXT %% - across lines, and whether either %% sits in code or not. Scanning resumes after the closing %%. A last %% with no partner is plain text.",
+      "2. Code (whatIsCode) is then found in the page with every comment removed, and each code range [s, e) of that stripped text is mapped back to the page's own offsets as [origin(s), origin(e-1)+1). A comment inside a fence therefore falls inside the mapped range, which is harmless: it is masked anyway.",
+      "3. A link is not a link when its [[ (or the ! of ![[) starts inside a comment or inside code. Apply the pattern to the page as written and skip exactly as whatIsCode rule 5 says, from where the comment or code range ends.",
+      "4. Keep the answer to 'is this in code?' separate from 'is this a link?'. The curriculum markers %%curriculum-start%% and %%curriculum-end%% are themselves comments: a reader that asks whether a MARKER is in code must use the code ranges alone, or it skips every curriculum block and the coverage map goes empty while the build succeeds.",
+      "Every character the rule looks at is ASCII (%), so it can run over UTF-16 code units or code points; the mapping back must be built in the unit of the language's own regular expression, or every range after an emoji is off by one."
+    ],
     "whatIsCode": [
       "The page is read a line at a time. A line ends at \\n; a \\r before it belongs to the line ending, not the line. A line's BODY is the line with any leading blockquote markers removed: spaces or tabs, then >, repeated, then one optional space after the last >. Its DEPTH is how many > markers were removed (0 outside a callout). WHITESPACE means the five ASCII characters space, tab, \\r, form feed and vertical tab, and nothing else (not a no-break space); a line is BLANK when its body is only whitespace.",
       "1. Fenced code. Outside a fence, a line whose body, after leading spaces and tabs, starts with a run of three or more backticks, or three or more tildes, opens a fence at that line's depth - except that a run of backticks followed by another backtick later on the same line is inline code, not a fence. Every line from the opener through the closer, inclusive, is code. Inside a fence, a line at the SAME depth whose body, after leading spaces and tabs, is a run of the SAME character at least as long as the opener's run, with nothing after it but whitespace, closes the fence. A line at a SMALLER depth ends the fence without being part of it (a fence opened in a callout ends with the callout) and is read as an ordinary line; a line at a greater depth is inside the fence. A fence never closed runs to the end of the page.",
       "2. Paragraphs, for code spans only: runs of consecutive lines outside fences. A new paragraph begins at a blank line, at a fence, at a line whose depth is greater than the depth of the paragraph's FIRST line (an unquoted line inside a callout paragraph is a lazy continuation and does not lower it), and at a line whose body, after leading spaces and tabs, begins with a list marker (-, * or + then a space, a tab or the end of the line; one to nine digits 0-9 then . or ) then a space, a tab or the end of the line), a heading (one to six # then a space, a tab or the end of the line), a table pipe (|), or is a rule line (three or more of one of - * _ = with nothing else on the line but spaces and tabs: a thematic break, a setext underline, the --- around frontmatter). Such a line is the first line of the new paragraph. A heading is a paragraph on its own: the line after it begins a new one.",
       "3. Inline code spans, within one paragraph, scanning left to right. Outside a span, a backslash and the character after it are plain text (\\` does not open code, and \\\\ leaves the next backtick live). A run of N backticks opens a span, which closes at the next run of EXACTLY N backticks in the same paragraph; everything from the opening run through the closing run is code. A run never matched is plain text, and scanning carries on after it. Inside a span, backslashes are literal.",
-      "4. Nothing else is code: not indented lines (see whatIsCodeLimits), not HTML <code> or <pre>, not math, and not %% comments (a separate question, #331).",
+      "4. Nothing else is code: not indented lines (see whatIsCodeLimits), not HTML <code> or <pre>, not math, and not %% comments - those are masked separately, FIRST, see whatIsAComment. Code is found in the page with every comment removed, and its ranges are mapped back to the page's own offsets (#331).",
       "5. A link is in code when its [[, or the ! of ![[, starts inside a code range. Apply the link pattern to the page as written, and when a match STARTS in code, skip it and search again from where THAT CODE RANGE ENDS - not from the end of the match. The pattern's name crosses a [, so in \"Type `[[` to start one, then [[Real Page]]\" the match from the example's brackets runs on through the real link; resuming after the match would lose the real link with the example. The text itself is never rewritten to apply the mask, so a rewriter can use the offsets as they are.",
       "Every character the rule looks at is ASCII, so it can be computed over UTF-16 code units (Swift, C#) or code points (Python) and the offsets line up with that language's own regular expression matches. Do not scan user-perceived characters: \\r\\n is ONE grapheme in Swift, so a scan for \\n over Characters misses every line ending of a page written on Windows."
     ],
@@ -1202,7 +1245,7 @@
       "Measured: these limits disagree with Quartz's parser on 0 of the 39,570 links in support/ once TEJ2O is fixed, and on 7 before. On 20,000 random texts built from backticks, tildes, >, list and heading markers, rule lines, indents and [[x]] (no |, no lone \\r), every text in which this rule reads as code a link Quartz draws contains a four-space or tab indent or a list marker - the first two limits."
     ],
     "expectIs": "Each distinct name once, in the order it first appears, as written: spaces inside the brackets trimmed, a trailing .md dropped, capitals and any folder in front kept. A reader that compares names without regard to case or folder (the mac's section graph, the build's dating walk) compares against these the same way it compares against a page's title.",
-    "why": "Found by #167 and filed as #294. The example payloads and skeletons (12,128 files) carry 229 links with an escaped pipe - 142 in tables, 87 in sentences and in code examples; 230 over all of support/, the example course included - and neither app followed one: every reader took the name up to the pipe, so it ended in a backslash and matched no page. By an emulation of the section graph (an estimate, not a measurement), publishing a class with what it links to left about 137 pages behind across about 104 of 3,258 payload classes. Quartz v4.5.0, which draws the site, reads every one of them as a link (quartz/plugins/transformers/ofm.ts lines 117-119 at the tag the image clones, wikilinkRegex: the name excludes a backslash, the alias is \\\\?\\|). Code (#313): over all of support/ (12,490 pages), read with Quartz's own parser (remark-parse 11 + remark-gfm 4), 39,570 links match the pattern: 37,674 outside code, 1,139 in inline code, 757 in fenced code and 0 in indented code. Only 8 page-to-page links existed solely inside code, on 3 pages - six of them TEJ2O's, in code only because its fence was broken - and by an emulation of the section graph no class page, of 3,258 in the payloads and 600 in the skeletons, reaches fewer pages when published. Before #313 the mac's publishing walk followed all 1,896 links in code, its links answer dropped 22 real ones and read 277 examples, Windows read 277 examples, and the build read 7.",
+    "why": "Found by #167 and filed as #294. The example payloads and skeletons (12,128 files) carry 229 links with an escaped pipe - 142 in tables, 87 in sentences and in code examples; 230 over all of support/, the example course included - and neither app followed one: every reader took the name up to the pipe, so it ended in a backslash and matched no page. By an emulation of the section graph (an estimate, not a measurement), publishing a class with what it links to left about 137 pages behind across about 104 of 3,258 payload classes. Quartz v4.5.0, which draws the site, reads every one of them as a link (quartz/plugins/transformers/ofm.ts lines 117-119 at the tag the image clones, wikilinkRegex: the name excludes a backslash, the alias is \\\\?\\|). Code (#313): over all of support/ (12,490 pages), read with Quartz's own parser (remark-parse 11 + remark-gfm 4), 39,570 links match the pattern: 37,674 outside code, 1,139 in inline code, 757 in fenced code and 0 in indented code. Only 8 page-to-page links existed solely inside code, on 3 pages - six of them TEJ2O's, in code only because its fence was broken - and by an emulation of the section graph no class page, of 3,258 in the payloads and 600 in the skeletons, reaches fewer pages when published. Before #313 the mac's publishing walk followed all 1,896 links in code, its links answer dropped 22 real ones and read 277 examples, Windows read 277 examples, and the build read 7. Comments (#331): read in Quartz's order (comments removed, then remark-parse 11 + gfm 4) over all of support/, 344 of the 39,570 matches sit inside a %% comment - all in skeletons, naming What This Site Can Do (294) or Help Sessions (50) - and every reader before #331 followed them. 100 page-to-page edges existed only inside comments, 0 of them from a class page; no class page, of 3,258 in the payloads, 600 in the skeletons and 86 in the example course, reaches fewer pages, and both targets keep plain links, so the site check gains no orphan. 0 of the 344 sit inside a curriculum block.",
     "rejected": [
       {
         "option": "strip the backslash only where publishing reads links",
@@ -1218,6 +1261,18 @@
       {
         "option": "a case for a backslash inside a name, [[a\\b]]",
         "why": "Quartz does not draw it as a link at all, and nobody has chosen what it should mean; a case would assert an answer nobody decided."
+      },
+      {
+        "option": "find code on the page as written, then mask comments too (R1)",
+        "why": "Simpler, and it agrees with Quartz over all 39,570 shipped links, but checked against Quartz's order it gets two of the twelve comment cases wrong: a fence opened inside a comment is read as a real fence and swallows the link after it, and a backtick inside a comment pairs with one after it and hides a real link. The cases decide, not the corpus (#331)."
+      },
+      {
+        "option": "rewriters keep updating links inside comments, so a private note stays accurate",
+        "why": "Two definitions of a link again: a rename plan would count links publishing does not follow, and the ruling was the same rule as code. Obsidian is believed not to index links inside %% either - NOT measured (#331)."
+      },
+      {
+        "option": "treat %%curriculum-start%% ... %%curriculum-end%% as one comment",
+        "why": "Quartz pairs lazily, so each marker is a whole comment and the block's contents ARE on the site and ARE links. The case 'the curriculum markers are comments, and what sits between them is not' pins it."
       }
     ],
     "cases": [
@@ -1260,7 +1315,94 @@
       {"name": "frontmatter's closing --- ends a paragraph", "text": "---\ntitle: It`s here\n---\nSee [[Real Page]] and a ` tick.\n", "expect": ["Real Page"], "why": "A backtick in the frontmatter must not pair with one in the body. The build reads the page after its frontmatter and the mac reads the whole file; the --- breaking a paragraph is what makes them agree. Found in #313's implementation review; checked with Quartz's parser stack (with remark-frontmatter)."},
       {"name": "a heading is a paragraph on its own", "text": "# A `heading\n[[Real Page]] and a ` tick.\n", "expect": ["Real Page"], "why": "A heading is one line, so a backtick in it cannot pair with one on the line below. Added while implementing #313 so that a reader that lets a span run on from a heading goes red; checked with Quartz's parser stack."},
       {"name": "a callout line after a paragraph starts a new one", "text": "A ` tick.\n> [[Real Page]] and a ` tick.\n", "expect": ["Real Page"], "why": "A > line interrupts the paragraph before it, so a span cannot reach from the paragraph into the callout. Added while implementing #313 so that a reader that ignores a deeper quote goes red; checked with Quartz's parser stack."},
-      {"name": "an unquoted line inside a callout paragraph does not end it", "text": "> a `b\nc\n> d` then [[Real Page]] and a ` tick.\n", "expect": ["Real Page"], "why": "The unquoted middle line is a lazy continuation of the callout's paragraph, so the > line after it is not a deeper quote: the span runs from b to d and the link after it is real. Found in #313's second review, where comparing each line's depth with the line before it hid this link; a paragraph is compared with its FIRST line. Checked with Quartz's parser stack."}
+      {"name": "an unquoted line inside a callout paragraph does not end it", "text": "> a `b\nc\n> d` then [[Real Page]] and a ` tick.\n", "expect": ["Real Page"], "why": "The unquoted middle line is a lazy continuation of the callout's paragraph, so the > line after it is not a deeper quote: the span runs from b to d and the link after it is real. Found in #313's second review, where comparing each line's depth with the line before it hid this link; a paragraph is compared with its FIRST line. Checked with Quartz's parser stack."},
+      {
+        "name": "a link inside a comment is not a link",
+        "text": "%% see [[Setup Notes]] %%\nToday: [[Worksheet]].\n",
+        "expect": [
+          "Worksheet"
+        ]
+      },
+      {
+        "name": "a comment runs across lines",
+        "text": "%%\nTeacher: link [[Answer Key]] later.\n%%\n\n[[Worksheet]]\n",
+        "expect": [
+          "Worksheet"
+        ]
+      },
+      {
+        "name": "the curriculum markers are comments, and what sits between them is not",
+        "text": "%%curriculum-start%%\n![[A1.1]]\n%%curriculum-end%%\n",
+        "expect": [
+          "A1.1"
+        ],
+        "why": "Guards the trap that would empty every coverage map while the build stays green: %%curriculum-start%% and %%curriculum-end%% ARE comments (Quartz pairs lazily), and what sits between them is NOT inside one, so the expectations in the block are real links. A reader that folds the comment mask into its code ranges would see each marker as code and skip every block."
+      },
+      {
+        "name": "an unpaired %% is only text",
+        "text": "Up 50%% since [[Worksheet]].\n",
+        "expect": [
+          "Worksheet"
+        ]
+      },
+      {
+        "name": "comments pair left to right",
+        "text": "%% a %% [[Between]] %% b [[Inside]] %%\n",
+        "expect": [
+          "Between"
+        ]
+      },
+      {
+        "name": "a %% inside inline code still opens a comment",
+        "text": "Type `%%` to hide text. [[Hidden]] %% then [[Shown]]\n",
+        "expect": [
+          "Shown"
+        ]
+      },
+      {
+        "name": "a comment inside a fence",
+        "text": "```\n%% [[Example]] %%\n```\n\n[[Worksheet]]\n",
+        "expect": [
+          "Worksheet"
+        ]
+      },
+      {
+        "name": "a fence opened inside a comment is not a fence",
+        "text": "%%\n```\n%%\n[[Worksheet]]\n",
+        "expect": [
+          "Worksheet"
+        ],
+        "why": "Pins the rejected variant R1 (code found on the page as written): R1 reads the ``` inside the comment as a fence and drops the real link after it. Quartz removes the comment first, so the fence never exists."
+      },
+      {
+        "name": "a backtick inside a comment does not pair with code after it",
+        "text": "%% the ` key %% Use `x` then [[Worksheet]] and `y [[Example]]`\n",
+        "expect": [
+          "Worksheet"
+        ],
+        "why": "Pins the rejected variant R1: on the page as written, the backtick inside the comment pairs with the one before Example and hides Worksheet. Quartz removes the comment first, so Worksheet is a link and Example is inline code."
+      },
+      {
+        "name": "a comment in a callout",
+        "text": "> [!note]\n> %% [[Private]] %%\n> [[Worksheet]]\n",
+        "expect": [
+          "Worksheet"
+        ]
+      },
+      {
+        "name": "windows line endings",
+        "text": "%%\r\n[[Private]]\r\n%%\r\n[[Worksheet]]\r\n",
+        "expect": [
+          "Worksheet"
+        ]
+      },
+      {
+        "name": "an embed in a comment",
+        "text": "%% ![[old diagram.png]] %%\n![[new diagram.png]]\n",
+        "expect": [
+          "new diagram.png"
+        ]
+      }
     ]
   },
   "note": "The rule sets both apps need and neither platform owns. The MECHANISMS behind several of them differ completely - launchd against Task Scheduler, AppKit against WinUI, ~/Library/Logs against %LOCALAPPDATA% - which is exactly why the rules are written here instead: what must be refused, matched, stripped, or taken out of a problem report does not change with the machinery that does it.",
@@ -6516,6 +6658,13 @@
             "newName": "All Tasks",
             "expect": "`[q](<Tasks/Quiz 1.md>)` shows the syntax; [q](<All Tasks/Quiz 1.md>) is the link.",
             "why": "The third link style (#97, angle brackets) goes through the same code mask as the other two (#313, readingALink.codeIsNeverALink): the example inside inline code is left exactly as written, and only the real link moves."
+          },
+          {
+            "given": "%% old: [[Tasks/Quiz 1]] and [q](Tasks/Quiz%201.md) %% now [[Tasks/Quiz 1]]",
+            "oldName": "Tasks",
+            "newName": "All Tasks",
+            "expect": "%% old: [[Tasks/Quiz 1]] and [q](Tasks/Quiz%201.md) %% now [[All Tasks/Quiz 1]]",
+            "why": "A link inside a %% comment is not a link (readingALink.commentIsNeverALink, #331): Quartz removes the comment before it reads anything, so a folder rename leaves the teacher's note exactly as written, in both link styles, and moves only the real link after it."
           }
         ]
       },
@@ -12901,6 +13050,53 @@
         "offers": [
           "Concepts/Recursion.md"
         ]
+      },
+      {
+        "name": "a picture named only inside a comment is not carried",
+        "why": "A %% comment is removed before the site is drawn (readingALink.commentIsNeverALink, #331), so a picture named only in the teacher's note is on no page a student sees, and copying it would add a file nothing uses.",
+        "source": {
+          "folder": "ICS4U-2025",
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [
+            {
+              "path": "Concepts/Teaching.md",
+              "text": "%% swap in ![[one.png]] next year %%\nBody\n"
+            }
+          ],
+          "media": [
+            {
+              "name": "one.png",
+              "bytes": "aaa"
+            }
+          ]
+        },
+        "destination": {
+          "folder": "ICS4U",
+          "sections": [
+            1
+          ],
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [],
+          "media": []
+        },
+        "copy": {
+          "page": "Concepts/Teaching.md",
+          "intoFolder": "Concepts"
+        },
+        "expect": {
+          "pages": [
+            "Concepts/Teaching.md"
+          ],
+          "mediaCreated": [],
+          "mediaReused": [],
+          "mediaRenamed": {},
+          "skipped": [],
+          "linksLeadingNowhere": []
+        }
       }
     ]
   },
