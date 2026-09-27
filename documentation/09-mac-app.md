@@ -7729,3 +7729,62 @@ the link is sent, which is the "wait on the file" the ruling asked for, and a
 timed delay was not added. Russell's `obsidian.json` was backed up first,
 restored byte for byte, and his three open vaults reopened.
 
+
+## Telling the Debug build from the release: the Beta ribbon
+
+Russell teaches with the RELEASED Plantoir and develops with the Debug build
+that his Dock icon points at (`~/Library/Developer/Xcode/DerivedData/
+Plantoir-*/Build/Products/Debug/Plantoir.app`). Both carry the same bundle
+identifier and, until 2026-09-27, the same icon, so the two could not be told
+apart at a glance. The Debug build now wears the icon with an orange band
+across its lower third reading **BETA**; a Release build is unchanged.
+
+**What is generated, and from what.** `mac-app/Plantoir-Beta.icon` is a
+second Icon Composer bundle written by `mac-app/make-beta-icon.py`: a copy of
+`Plantoir.icon` — every drawing byte for byte, the same `icon.json` — plus one
+extra group in front holding `beta-ribbon.svg`, drawn by the script. The
+letters are SVG PATHS, not `<text>`, because the icon compiler has no font to
+rely on, and they are chunky block letters so they survive the Dock's 64
+pixels (checked by rendering at 64 and 128 with Icon Composer's own `ictool`).
+It is committed, so `xcodegen generate` and a Debug build produce the ribbon
+with no manual step. **Never edit it in Icon Composer**: edit `Plantoir.icon`
+and re-run `python3 mac-app/make-beta-icon.py`. `BetaIconTests` fails when the
+two have drifted — a changed drawing or `icon.json` — and says to run it.
+
+**How it is selected.** `project.yml` lists both bundles as resources and
+sets, under `configs:`, `ASSETCATALOG_COMPILER_APPICON_NAME: Plantoir-Beta`
+for Debug and `EXCLUDED_SOURCE_FILE_NAMES: Plantoir-Beta.icon` for Release.
+The exclusion matters: with it, a Release build's `actool` call is the same
+command it always was — one input, `--app-icon Plantoir` — so what
+`publish.sh -Sign` ships cannot have picked the Beta icon up by accident.
+Measured on 2026-09-27 against a Release build of `dev` at 2e11471d: the
+compiled `Plantoir.icns` is byte-identical (SHA-1 `fcb0be92…`), the Info.plist
+identical, the signing identity unchanged. `Assets.car` differs byte-wise, but
+so do two `actool` runs on the SAME unchanged `Plantoir.icon` minutes apart —
+it embeds a timestamp and fresh rendition identifiers — so that is not a
+comparison anything can pass.
+
+**The screenshots on plantoir.app are the exception to watch.** They are taken
+from a Debug build, and the notification banner scene shows the app icon, so
+`website/shots/capture.py` passes `ASSETCATALOG_COMPILER_APPICON_NAME=Plantoir`
+to every `xcodebuild` it starts. The side effect: after a capture run, the
+Dock's Debug bundle is ribbonless until the next ordinary Debug build.
+
+**Rejected:** adding "Beta" to the Debug bundle's display name
+(`CFBundleDisplayName`). The About panel reads that key, and so — through
+`kCGWindowOwnerName` — can the window matching in `MarketingScreenshotTests`,
+which looks for windows owned by "Plantoir"; a name that differs by
+configuration is a quiet way to break a capture run. And Finder and the Dock
+use that key only for an app with a localised name (Apple's documentation for
+`CFBundleDisplayName`), which Plantoir is not — the label comes from the file
+name — so the change would have bought almost nothing where it was wanted.
+Not measured by launching, since the Debug bundle is Russell's to launch. The ribbon alone is the fix.
+Also rejected: badging the icon at run time with `NSApp.dockTile` — it shows
+only while the app runs, and the whole point is telling the two apart in the
+Dock before either is launched.
+
+No teacher ever sees a Debug build, so there is no `GUI-IMPROVEMENTS.md` row
+for this and nothing for Windows to mirror (its development copy is a separate
+problem on a separate machine); the note under "The Windows icon derives from
+`mac-app/Plantoir.icon`" in [11. Release strategy](11-release-strategy.md)
+says to re-run the script when the art changes.

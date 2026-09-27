@@ -208,7 +208,11 @@ Icon Composer export into the exe/.ico and About-panel assets, applying
 the macOS rounded-rect silhouette; `site/icon.png` on plantoir.app
 comes from the same export. If the icon art ever changes, tell the
 Windows side so those derived assets are regenerated — nothing updates
-them automatically.
+them automatically. On the mac, also re-run
+`python3 mac-app/make-beta-icon.py`, which rewrites the Debug build's
+ribbon icon from it (`BetaIconTests` fails until you do; see
+[9. The macOS App](09-mac-app.md) → "Telling the Debug build from the
+release: the Beta ribbon").
 
 ---
 
