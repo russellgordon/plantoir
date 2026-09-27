@@ -729,6 +729,8 @@ class ScriptRunner {
                 course: report.course, section: report.section
             )
         }
+        // Which curriculum maps the build wrote (#128), read the same way.
+        CoverageMapsBuilt.noteOnTheTrail(from: text)
         // A launcher that waited for, or refused on, something running in
         // the folder's workspace before remaking it (#94).
         WorkspaceInUseReport.noteOnTheTrail(from: text)
@@ -895,16 +897,9 @@ class ScriptRunner {
     /// `"sentence":` ends in a colon, and would otherwise be offered to the
     /// teacher as something to answer, raw JSON and all.
     static func looksLikeQuestion(_ line: String) -> Bool {
-        if SiteHealthFinding.isMarkerLine(line) || PagesDatedByTheBuild.isMarkerLine(line) {
-            return false
-        }
-        if WorkspaceInUseReport.isMarkerLine(line) {
-            return false
-        }
-        if PreviewAddressHeldReport.isMarkerLine(line) {
-            return false
-        }
-        if HowITeachKeptOffReport.isMarkerLine(line) {
+        // Every marker, by the one rule (#128) that subsumes each reader's own
+        // `isMarkerLine`.
+        if BuildMarkerLine.isMachineLine(line) {
             return false
         }
         if line.hasSuffix(":") || line.hasSuffix("?") || line.hasSuffix(">") {

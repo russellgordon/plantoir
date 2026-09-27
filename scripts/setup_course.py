@@ -1683,10 +1683,13 @@ def starting_point_intro(course_code: str, label: str, has_payload: bool) -> str
     )
 
 
-# What a specific expectation's page is called: "A1.1", "D2.3". The same
-# pattern `build_site.py` reads the curriculum coverage map with, and the
-# same sort order — so "the first expectation" means the same thing in the
-# installer and on the map.
+# What a specific expectation's page is called: "A1.1", "D2.3" — the
+# letter-first shape only, the one every payload and skeleton ships (measured:
+# 2,214 of them, and no other shape). Deliberately NOT the wider rule
+# `build_site.is_expectation_code` has read since #128: this picks "the first
+# expectation" by a LEXICAL sort for an install-time rename, and `1.A` sorts
+# before `A1.1`, so widening it here would change which page a skeleton's
+# placeholder becomes the day a payload carried both.
 SPECIFIC_EXPECTATION_STEM = re.compile(r"^([A-Z])(\d+)\.(\d+)$")
 
 # A wiki link or embed, up to the target's own name: "[[A1.1]]",
@@ -1697,6 +1700,50 @@ SPECIFIC_EXPECTATION_STEM = re.compile(r"^([A-Z])(\d+)\.(\d+)$")
 # the backslash where it was (dropping it would split the table cell).
 # Shared contract: contracts/shared-rules.json -> readingALink (#294, #314).
 WIKI_LINK_TARGET = re.compile(r"(!?\[\[)([^\]\[|#]+?)(?=\\?[\]|#])")
+
+
+def primary_curriculum_folder(folders):
+    """The first usable name in a `curriculum_folders` list, or None."""
+    if not isinstance(folders, list):
+        return None
+    for name in folders:
+        if isinstance(name, str) and name:
+            return name
+    return None
+
+
+def curriculum_folders_to_record(saved_config: dict, manifest_folder):
+    """
+    What `curriculum_folders` this run writes, or None to leave it out (#128).
+
+    * A saved list is kept exactly as it is — the app, or a rename, wrote it.
+    * A saved legacy `curriculum_folder` with no list: nothing is written, and
+      the legacy key survives untouched through the saved-keys merge below.
+      This run used to write `curriculum_folder` from the MANIFEST
+      unconditionally, and because that merge only restores keys the fresh
+      dict lacks, re-running setup on a course whose folder a rename had
+      recorded as "Expectations" put the manifest's "Curriculum" (or null)
+      back over it — the rename's whole point undone.
+    * Otherwise the folder the payload or skeleton manifest declares, as a
+      list of one; nothing when it declares none (a course made from
+      scratch), which leaves the build to find its folder by name.
+
+    Whenever the list is written, the legacy `curriculum_folder` is written
+    too, naming the list's FIRST (primary) folder, so an older Plantoir reading
+    only that key still finds the folder its map comes from. A course with only
+    a legacy key keeps it exactly as it is.
+    `contracts/file-formats.json` -> `courseConfigKeys`.
+    """
+    saved_config = saved_config or {}
+    saved_list = saved_config.get("curriculum_folders")
+    if isinstance(saved_list, list):
+        return saved_list
+    legacy = saved_config.get("curriculum_folder")
+    if isinstance(legacy, str) and legacy:
+        return None
+    if isinstance(manifest_folder, str) and manifest_folder:
+        return [manifest_folder]
+    return None
 
 
 def specific_expectation_stems(curriculum_dir: Path) -> list:
@@ -2994,15 +3041,6 @@ def setup_course(no_backup: bool = False):
         "per_section_files": per_section_files,
         "hidden": hidden_items,
         "expandable": expandable_items,
-        # What this course calls its curriculum folder. Declared by every
-        # payload and skeleton manifest, and until now read only at install
-        # time — so the build fell back to scanning for the word "curriculum"
-        # and would never have found a folder that does not contain it.
-        "curriculum_folder": (
-            (example_manifest or {}).get("curriculum_folder")
-            if prepopulate_example
-            else (skeleton_manifest or {}).get("curriculum_folder")
-        ),
         # NEW: global Explorer expansion behaviour for this course
         "expandOnFolderClick": expand_on_click,
         "footer_html": footer_html,
@@ -3036,6 +3074,25 @@ def setup_course(no_backup: bool = False):
         # NEW: whether the default file names use LCS's own words
         "use_lcs_terminology": use_lcs_terminology,
     }
+    # The course's curriculum folders (#128), written as the LIST
+    # `curriculum_folders` — see curriculum_folders_to_record.
+    recorded_curriculum = curriculum_folders_to_record(
+        saved_config,
+        (example_manifest or {}).get("curriculum_folder")
+        if prepopulate_example
+        else (skeleton_manifest or {}).get("curriculum_folder"),
+    )
+    if recorded_curriculum is not None:
+        config["curriculum_folders"] = recorded_curriculum
+        # And the PRIMARY folder in the legacy key too (Russell's ruling on the
+        # #128 review): an older Plantoir on a second Mac reads only
+        # `curriculum_folder`, and without it would build no map at all for a
+        # folder whose name does not say "curriculum". Harmless here: the
+        # build unions the two, and the list comes first.
+        primary = primary_curriculum_folder(recorded_curriculum)
+        if primary is not None:
+            config["curriculum_folder"] = primary
+
     previous_map = saved_config.get("color_schemes", {}) or {}
     if schemes:
         # Use the choices gathered earlier in this run
