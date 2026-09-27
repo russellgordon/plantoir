@@ -101,8 +101,12 @@ nonisolated enum ScheduledPublishNotice {
     // MARK: - Functions
 
     /// The poster a process starts with.
+    ///
+    /// Quiet under a state folder too (#154): notification permission is a
+    /// Mac-wide setting per bundle identifier, which no folder can redirect,
+    /// so a redirected run must neither ask for it nor post.
     static func defaultPoster() -> any NotificationPosting {
-        if RealHome.isInsideTestBundle {
+        if RealHome.isRedirected {
             return QuietNotifications()
         }
         return SystemNotifications()

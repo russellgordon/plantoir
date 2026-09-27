@@ -44,9 +44,10 @@ enum GradedFolderWording {
     /// over Windows' — it is the closer match to `SpecialFoldersHelpView`'s
     /// already-pinned "Work that counts for marks".
     ///
-    /// **Look before changing it.** `MembershipToggleListView` puts this
-    /// title into the trail line a teacher's blocked untick leaves behind, and
-    /// on Windows it is built into every marks checkbox's automation id.
+    /// **Look before changing it.** On Windows it is built into every marks
+    /// checkbox's automation id. (It no longer reaches the trail: since #171
+    /// a blocked untick's line calls this "the marks list", in Windows' words
+    /// — see `RemovalTrail`.)
     nonisolated static let listTitle: String =
         "Folders whose work counts for marks"
 

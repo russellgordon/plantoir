@@ -29,15 +29,29 @@ import Foundation
 /// genuinely needs one, it is a new function here and a line in the
 /// tripwire, made in a diff somebody reviews.
 ///
-/// **Keyed on XCTest being loaded in THIS process**, not on
-/// `BuildOutputLocation.isRunningTests`, which is also true inside the app a
-/// UI test drives (it reads `UITEST_WORKSPACE`). That app has no XCTest in
-/// it, and the opt-in `AssistantRolloverUITests` needs it to find the real
-/// assistant weights, so moving its home would break the one test that
-/// exercises a real model. The three folders that were already moved for the
-/// UI-tested app too — built websites, scheduled-publish notes, the
-/// assistant's launch files — keep doing that in their own resolvers, which
-/// check `isRunningTests` before they get here.
+/// **Three answers, in this order** (`home(isInsideTestBundle:stateDirectory:systemHome:)`):
+/// the hosted unit suite gets a throwaway home keyed on XCTest being loaded
+/// in THIS process; an app launched with `--state-dir <absolute path>` gets
+/// that folder as its home (#154); everything else gets the real one. The
+/// flag is how a UI test keeps the app it drives out of the teacher's trail,
+/// preferences and Application Support: that app has no XCTest in it, so the
+/// first answer never reaches it. The flag is EXPLICIT — `UITEST_WORKSPACE`
+/// alone still gets the real home, because the marketing captures drive the
+/// real toolchain and need it — and a source scan
+/// (`UITestLaunchTripwireTests`) keeps every other UI test on the flag. The
+/// opt-in rollover test used to rely on the real home to find the
+/// assistant's weights; it now links them into the state folder one file at
+/// a time instead (`IsolatedLaunch`).
+///
+/// Preferences cannot hang off this home — `cfprefsd` resolves the home
+/// itself — so they have a sibling door, `PlantoirDefaults`, which reads the
+/// SAME state folder. One flag, one root, two doors.
+///
+/// The three folders #240 moved for the UI-tested app — built websites,
+/// scheduled-publish notes, the assistant's launch files — ask
+/// `keepsTestStateInThrowawayFolders` before they get here: under a state
+/// folder they answer the real rule inside it, so everything the app keeps
+/// is under the one root a test can inspect.
 ///
 /// **What this cannot see** is written down in `documentation/09-mac-app.md`
 /// → "Testing: the real-home tripwire": a child process takes `HOME` from
@@ -64,16 +78,68 @@ nonisolated enum RealHome {
             isDirectory: true
         )
 
+    /// The flag that hands the app a folder to use as its home (#154). The
+    /// same word Windows' app answers, where it replaces one app folder;
+    /// here it replaces the home, because the mac's state is spread across
+    /// four `~/Library` folders.
+    static let stateDirectoryFlag: String = "--state-dir"
+
+    /// The folder `--state-dir` named, or nil when the flag was not given.
+    /// A malformed flag never gets this far: `QuartzTeachersApp.init` asks
+    /// `stateDirectory(fromArguments:)` first and exits 64, so a redirect
+    /// that silently did not happen cannot report success.
+    static let stateDirectory: URL? = try? stateDirectory(fromArguments: ProcessInfo.processInfo.arguments)
+
+    /// True in the app a UI test launches — the ONE reading of
+    /// `UITEST_WORKSPACE`. `WorkspaceModel`, `WindowFolderMemory` and
+    /// `BuildOutputLocation.isRunningTests` all ask it, rather than each
+    /// reading the environment in its own way.
+    static let isUnderUITest: Bool = ProcessInfo.processInfo.environment["UITEST_WORKSPACE"] != nil
+
+    /// What is wrong with a `--state-dir` that cannot be used.
+    enum StateDirectoryProblem: Error, Equatable {
+        case missingValue
+        case notAbsolute(String)
+        case givenMoreThanOnce
+
+        /// The sentence a developer reads on stderr before the app exits.
+        var explanation: String {
+            switch self {
+            case .missingValue:
+                return "--state-dir needs a folder after it."
+            case .notAbsolute(let value):
+                return "--state-dir needs an absolute path (starting with /), not \"\(value)\"."
+            case .givenMoreThanOnce:
+                return "--state-dir was given more than once; pass one folder."
+            }
+        }
+    }
+
     // MARK: - Computed properties
 
     /// The home folder for anything Plantoir reads, writes, or names to a
     /// child process: the real one in the app, the throwaway one under the
     /// unit suite.
     static var forFiles: URL {
-        if isInsideTestBundle {
-            return homeWhileTesting
-        }
-        return systemHome
+        return home(isInsideTestBundle: isInsideTestBundle, stateDirectory: stateDirectory, systemHome: systemHome)
+    }
+
+    /// True when this process keeps its state anywhere but the real home:
+    /// under the unit suite, or launched with `--state-dir`. What refuses
+    /// the Mac-wide things a redirect cannot move — notifications, the
+    /// updater — asks this.
+    static var isRedirected: Bool {
+        return isInsideTestBundle || stateDirectory != nil
+    }
+
+    /// Whether the folders #240 moved to a throwaway place should still be
+    /// there, for this process.
+    static var keepsTestStateInThrowawayFolders: Bool {
+        return keepsTestStateInThrowawayFolders(
+            isInsideTestBundle: isInsideTestBundle,
+            isUnderUITest: isUnderUITest,
+            stateDirectory: stateDirectory
+        )
     }
 
     /// The system's answer, asked in exactly one line of the product.
@@ -82,6 +148,71 @@ nonisolated enum RealHome {
     }
 
     // MARK: - Functions
+
+    /// Reads `--state-dir <folder>` out of a command line.
+    ///
+    /// Absent is nil. A flag with nothing after it, a value that does not
+    /// start with `/`, or the flag twice all throw: an ambiguous or relative
+    /// redirect is refused rather than guessed at. `~` is NOT expanded —
+    /// that would be a second way to ask for a home inside the one function
+    /// that is supposed to replace it, and a harness passes absolute paths.
+    static func stateDirectory(fromArguments arguments: [String]) throws -> URL? {
+        var found: URL? = nil
+        var index: Int = 0
+        while index < arguments.count {
+            if arguments[index] == stateDirectoryFlag {
+                if found != nil {
+                    throw StateDirectoryProblem.givenMoreThanOnce
+                }
+                let valueIndex: Int = index + 1
+                if valueIndex >= arguments.count {
+                    throw StateDirectoryProblem.missingValue
+                }
+                let value: String = arguments[valueIndex]
+                if value.isEmpty || value.hasPrefix("-") {
+                    throw StateDirectoryProblem.missingValue
+                }
+                if !value.hasPrefix("/") {
+                    throw StateDirectoryProblem.notAbsolute(value)
+                }
+                found = URL(fileURLWithPath: value, isDirectory: true).standardizedFileURL
+                index = valueIndex
+            }
+            index += 1
+        }
+        return found
+    }
+
+    /// Which home a process uses — the rule `forFiles` applies, as a pure
+    /// function. The unit suite wins over a state folder, so a hosted run
+    /// that somehow carried the flag still cannot leave its throwaway home.
+    static func home(isInsideTestBundle: Bool, stateDirectory: URL?, systemHome: URL) -> URL {
+        if isInsideTestBundle {
+            return homeWhileTesting
+        }
+        if let stateDirectory {
+            return stateDirectory
+        }
+        return systemHome
+    }
+
+    /// The rule behind `keepsTestStateInThrowawayFolders`, as a pure
+    /// function. The unit suite: always. A state folder: never — it IS the
+    /// place for them, and the one a test inspects. A UI test without one
+    /// (the marketing captures): yes, as #240 left it.
+    static func keepsTestStateInThrowawayFolders(
+        isInsideTestBundle: Bool,
+        isUnderUITest: Bool,
+        stateDirectory: URL?
+    ) -> Bool {
+        if isInsideTestBundle {
+            return true
+        }
+        if stateDirectory != nil {
+            return false
+        }
+        return isUnderUITest
+    }
 
     /// A path a teacher (or Claude Code) typed, with a leading `~` meaning
     /// the home folder: `~` alone, or `~/` and the rest.

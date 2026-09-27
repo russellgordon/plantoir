@@ -259,21 +259,10 @@ struct SectionDetailView: View {
                 )
             }
             if let unsavedSettingsNotice {
-                HStack(alignment: .firstTextBaseline) {
-                    Image(systemName: "info.circle")
-                        .foregroundStyle(.secondary)
-                    Text(unsavedSettingsNotice)
-                        .font(.callout)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Spacer()
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .accessibilityIdentifier(
-                    unsavedSettingsNoticeOwner == .deploy
-                        ? "deployUsesSavedSettingsNotice" : "previewUsesSavedSettingsNotice"
-                )
-                Divider()
+                // Its own view, and never `fixedSize` — see the view. Since
+                // #335 it may be a deploy's sentence, named for UI tests by
+                // whose it is.
+                UnsavedSettingsNoticeView(sentence: unsavedSettingsNotice, identifier: unsavedSettingsNoticeIdentifier)
             }
             ZStack {
                 // Base layer: always laid out in the normal, safe-area
@@ -1391,6 +1380,14 @@ struct SectionDetailView: View {
             isAboutTheDestination: result.isAboutTheDestination,
             wasBuiltElsewhere: result.wasBuiltElsewhere
         )
+    }
+
+    /// The notice's accessibility identifier, by whose sentence it is (#335).
+    var unsavedSettingsNoticeIdentifier: String {
+        if unsavedSettingsNoticeOwner == .deploy {
+            return "deployUsesSavedSettingsNotice"
+        }
+        return "previewUsesSavedSettingsNotice"
     }
 
     /// Whether a preview ending takes the unsaved-settings sentence away:

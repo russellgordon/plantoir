@@ -94,6 +94,68 @@ final class HelperProgramsTests: XCTestCase {
         )
     }
 
+    // MARK: - The app's own copies (GitHub #312)
+
+    /// The launcher installs from the app only when told where the app's
+    /// copies are, and only an app that carries them may say so.
+    func testTheAppsCopiesAreNamedOnlyWhenTheAppCarriesThem() {
+        let home: URL = URL(fileURLWithPath: "/Users/pretend")
+        let carried: URL = URL(fileURLWithPath: "/Applications/Plantoir.app/Contents/Resources/helpers")
+        let with: [String: String] = HelperPrograms.environment(
+            basedOn: ["HOME": "/Users/pretend"], inHomeFolder: home, bundledHelpers: carried
+        )
+        XCTAssertEqual(with[HelperPrograms.bundledHelpersVariable], carried.path)
+        let without: [String: String] = HelperPrograms.environment(
+            basedOn: ["HOME": "/Users/pretend"], inHomeFolder: home, bundledHelpers: nil
+        )
+        XCTAssertNil(without[HelperPrograms.bundledHelpersVariable])
+        XCTAssertEqual(HelperPrograms.bundledHelpersVariable, "PLANTOIR_BUNDLED_HELPERS",
+                       "the launchers read this exact name")
+    }
+
+    /// A value inherited from some other copy of Plantoir (a scheduled run
+    /// started by an older app, a developer's shell) must never point a
+    /// launcher at a folder that is not this app's.
+    func testAnInheritedValueIsNotPassedOnByAnAppThatCarriesNone() {
+        let inherited: [String: String] = [
+            "HOME": "/Users/pretend",
+            "PLANTOIR_BUNDLED_HELPERS": "/Volumes/Old/Plantoir.app/Contents/Resources/helpers"
+        ]
+        let result: [String: String] = HelperPrograms.environment(
+            basedOn: inherited, inHomeFolder: URL(fileURLWithPath: "/Users/pretend"), bundledHelpers: nil
+        )
+        XCTAssertNil(result[HelperPrograms.bundledHelpersVariable])
+    }
+
+    /// The folder is found inside an app bundle when it is there, and not
+    /// otherwise. A real bundle on disk, because `Bundle` decides where its
+    /// resources are.
+    func testTheFolderIsFoundInsideTheAppAndOnlyWhenPresent() throws {
+        let scratch: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("helpers-bundle-\(UUID().uuidString)", isDirectory: true)
+        defer {
+            try? FileManager.default.removeItem(at: scratch)
+        }
+        let app: URL = scratch.appendingPathComponent("Pretend.app", isDirectory: true)
+        let contents: URL = app.appendingPathComponent("Contents", isDirectory: true)
+        let resources: URL = contents.appendingPathComponent("Resources", isDirectory: true)
+        try FileManager.default.createDirectory(at: resources, withIntermediateDirectories: true)
+        let information: [String: String] = ["CFBundleIdentifier": "ca.example.pretend-\(UUID().uuidString)"]
+        let plist: Data = try PropertyListSerialization.data(fromPropertyList: information, format: .xml, options: 0)
+        try plist.write(to: contents.appendingPathComponent("Info.plist"))
+
+        let empty: Bundle = try XCTUnwrap(Bundle(url: app))
+        XCTAssertNil(HelperPrograms.bundledHelpersDirectory(in: empty))
+
+        let helpers: URL = resources.appendingPathComponent("helpers", isDirectory: true)
+        try FileManager.default.createDirectory(at: helpers, withIntermediateDirectories: true)
+        let carrying: Bundle = try XCTUnwrap(Bundle(url: app))
+        XCTAssertEqual(
+            HelperPrograms.bundledHelpersDirectory(in: carrying)?.standardizedFileURL.path,
+            helpers.standardizedFileURL.path
+        )
+    }
+
     // MARK: - Putting it into a generated script
 
     /// "Application Support" has a space in it, and a home folder can contain

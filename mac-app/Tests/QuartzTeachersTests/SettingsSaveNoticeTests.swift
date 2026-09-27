@@ -368,7 +368,10 @@ final class SettingsSaveNoticeTests: XCTestCase {
             "Starting a preview no longer asks every window about unsaved settings"
         )
         XCTAssertTrue(sectionSource.contains("SettingsSaveNotice.whenPreviewStarts("), "Starting a preview no longer asks about unsaved settings")
-        XCTAssertTrue(sectionSource.contains("Text(unsavedSettingsNotice)"), "The section no longer draws the unsaved-settings sentence")
+        XCTAssertTrue(
+            sectionSource.contains("UnsavedSettingsNoticeView(sentence: unsavedSettingsNotice,"),
+            "The section no longer draws the unsaved-settings sentence"
+        )
     }
 
     /// `savingSettings.cases`: the two-window rule as data, run against the

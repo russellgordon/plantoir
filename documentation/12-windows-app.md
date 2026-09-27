@@ -427,6 +427,24 @@ while the line explaining it went to the redirected trail, where nobody would
 look. Everything now derives from `AppDataRoot`, so the next thing somebody
 adds inherits the isolation instead of leaking.
 
+**The mac has the same flag, by the same name, on purpose (#154) — worth
+KNOWING, nothing to do.** One word should mean the same thing to a harness on
+either platform. Its root is different: the mac's state is spread across four
+`~/Library` folders, so `--state-dir` there stands in for the whole HOME
+folder rather than one app folder, and preferences need a door of their own
+because macOS's preferences daemon ignores a moved home. The same sharp edge
+applies there (children, the launchers, take the real home), and the mac
+refuses `launchctl`, notifications, the quit-time container stop and its
+updater under the flag; a malformed flag exits 64. Doc 09 → "Testing: the UI
+target keeps its state in `--state-dir`". The mac also now drives the
+new-site DIALOG through the real window (`NewSiteDialogUITests`, with a
+stubbed `deploy.sh`) — the test this platform ruled out, its reason 4 being
+that `ToolchainMirror.RefreshLaunchers` replaces a stub launcher on every
+`Reload()`. The mac's `refreshLaunchersIfNeeded` leaves launchers alone under
+test (a four-line guard; doc 09 → "The first-publish path"), and the same
+guard here would make the same test possible. Optional, and not an issue: if
+Russell wants it, it becomes one.
+
 ## Reading a test run: the exit code cannot tell you what happened
 
 `dotnet test` exits 1 when a test fails. It also exits 1 when the test HOST
@@ -1084,6 +1102,32 @@ as history, not as what Windows does today.
 - **BuildKit, the image tag, and "the legacy builder corrupts a layer" are
   mac-only facts now** — Colima still needs them; native Windows has no
   image and no builder of any kind.
+
+### What each platform downloads and carries, like for like (mac #312)
+
+Since #312 the Mac app carries its own helper programs and the Linux
+virtual machine's starting disk, as Windows has always carried its runtime.
+Windows has nothing to DO about it (the contract key
+`app-rules.json → helperBootstrap` and the trail events "helper programs
+installed" and "website builder created" are `appliesOn: ["mac"]`); these are
+the two things it should KNOW. Mac figures measured 2026-09-26 on an M4 Pro;
+Windows figures are the v1.1.0 release assets.
+
+| | macOS v1.3.1 | macOS after #312 | Windows (v1.1.0, latest with an installer) |
+|---|---|---|---|
+| Installer | DMG 58.8 MB | DMG ~410 MB (LZMA; 410,488,446 B at the rehearsal) | PlantoirSetup.exe 235 MB; zip 398 MB |
+| Carried inside | app, llama.cpp (25 MB), the build recipe | + Colima, Lima, Docker CLI, buildx, the Ubuntu disk (Apple silicon) | app, llama.cpp, `plantoir-mcp.exe`, the native runtime (Node 20, Python 3.11 and packages, patched Quartz and its node_modules, wrangler, the emoji font) |
+| Downloaded on a first run, for building | ~857 MB | ~390 MB (the website builder's image build) | none |
+| Update delivery | download the DMG by hand | Sparkle, a delta of 0.1–3.7 MB for a Swift-only release (measured) from the release after v1.4.0 | installer by hand |
+| Downloads checked against a pinned SHA-256 | none | every helper, both kinds of Mac, and the disk | none in `fetch-runtime.ps1` (a build-time fetch, not on a teacher's machine) |
+
+1. **The mac installer is now almost twice Windows'**, because the mac still
+   needs a Linux virtual machine and Windows does not.
+2. **The mac now checks every helper download against a pinned SHA-256**
+   (the launchers' shared first-run block). `fetch-runtime.ps1` fetches Node,
+   Python, get-pip.py and the emoji font without checksums. It runs when the
+   Windows app is BUILT, not on a teacher's PC, so this is a judgement call
+   rather than a defect — the Windows issue from #312 asks for it.
 
 ## Behaviours with platform-specific mechanics
 

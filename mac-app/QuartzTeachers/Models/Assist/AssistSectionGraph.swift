@@ -441,7 +441,15 @@ nonisolated struct AssistSectionGraph {
     /// reach, and students find them anyway through the site's explorer. Folder
     /// landing pages are left out: an `index.md` is the way in to a folder, not
     /// a page anybody was ever going to link to.
-    func visiblePagesNothingLinksTo() -> [AssistSectionPage] {
+    ///
+    /// `leavingOut` is a set of FILE PATHS that are never reported either —
+    /// check_section passes the section's curriculum pages and its Key Links
+    /// page (`pagesNeverInTheAudit`), which is what Windows' `Unreferenced`
+    /// has always left out and what `shared-rules.json` → `sectionCheck` now
+    /// pins for both (#96). A curriculum page is reached through the coverage
+    /// map, not through a link, so "linked from nowhere" said nothing useful
+    /// about it and the two apps disagreed about it for no reason anyone chose.
+    func visiblePagesNothingLinksTo(leavingOut excluded: Set<String> = []) -> [AssistSectionPage] {
         var linkedFromSomewhere: Set<String> = []
         for page in pages {
             for target in page.linkedTitles {
@@ -454,12 +462,103 @@ nonisolated struct AssistSectionGraph {
             if !page.isVisibleToStudents || page.isFolderIndex || page.isClassPage {
                 continue
             }
+            if excluded.contains(page.fileURL.standardizedFileURL.path) {
+                continue
+            }
             if linkedFromSomewhere.contains(page.lowercasedTitle) {
                 continue
             }
             orphans.append(page)
         }
         return orphans
+    }
+
+    /// Visible pages a class students cannot see links to, and no class they
+    /// CAN see links to — the "linked but missed" group (#96).
+    ///
+    /// **The issue's own definition, not the start-of-year rule's**, and that
+    /// independence is the point of it. A bulk change that should have taken
+    /// these pages down with the classes that use them, and did not, leaves
+    /// exactly this shape behind: the classes are hidden, and a page only they
+    /// use is still up. "Its being empty is what proved the job complete" —
+    /// so it must be able to go RED when the start-of-year rule is wrong,
+    /// which it could not if it were the same predicate (the plan review's
+    /// H2, measured: 55 SNC1W and 81 ICS3U pages flagged when the rule leaks,
+    /// 0 when it does not).
+    ///
+    /// Only a CLASS'S link counts, on either side. A visible concept page
+    /// linking to it does not rescue it — the concept web and "How Marks
+    /// Work" are exactly the pages that held concepts up when the first
+    /// start-of-year rule was measured. Class pages and folder landing pages
+    /// are never in this group, and neither is anything in `leavingOut`
+    /// (curriculum pages, Key Links and the pages it lists).
+    ///
+    /// Disjoint from `visiblePagesNothingLinksTo` by construction: a page here
+    /// has a class linking to it.
+    func visiblePagesLinkedButMissed(leavingOut excluded: Set<String> = []) -> [AssistSectionPage] {
+        var linkedByAVisibleClass: Set<String> = []
+        var linkedByAHiddenClass: Set<String> = []
+        for page in pages where page.isClassPage {
+            for target in page.linkedTitles {
+                if target == page.lowercasedTitle {
+                    continue
+                }
+                if page.isVisibleToStudents {
+                    linkedByAVisibleClass.insert(target)
+                } else {
+                    linkedByAHiddenClass.insert(target)
+                }
+            }
+        }
+
+        var missed: [AssistSectionPage] = []
+        for page in pages {
+            if !page.isVisibleToStudents || page.isFolderIndex || page.isClassPage {
+                continue
+            }
+            if excluded.contains(page.fileURL.standardizedFileURL.path) {
+                continue
+            }
+            // Only the page links resolve to: two files with one name share a
+            // title, and the first in path order is the one a link reaches.
+            guard let resolved = pagesByTitle[page.lowercasedTitle],
+                  resolved.fileURL == page.fileURL else {
+                continue
+            }
+            if !linkedByAHiddenClass.contains(page.lowercasedTitle) {
+                continue
+            }
+            if linkedByAVisibleClass.contains(page.lowercasedTitle) {
+                continue
+            }
+            missed.append(page)
+        }
+        return missed
+    }
+
+    /// The pages check_section never reports as linked from nowhere or as
+    /// linked but missed, by file path: the section's curriculum pages, its
+    /// Key Links page, and every page Key Links lists (#96).
+    ///
+    /// Each is reached some other way than by a class's link — the coverage
+    /// map, or the panel on every page — so neither group says anything
+    /// useful about them. The same pages the start-of-year rule never
+    /// touches, less the ones only it knows about (the first class and its
+    /// pages).
+    @MainActor
+    static func pagesNeverInTheAudit(of graph: AssistSectionGraph, in course: Course) -> Set<String> {
+        var paths: Set<String> = []
+        let keyLinks: Set<String> = AssistPublishPlanner.pagesThisSectionCannotDoWithout(graph: graph)
+        for page in graph.pages {
+            if keyLinks.contains(page.lowercasedTitle) && !page.isClassPage {
+                paths.insert(page.fileURL.standardizedFileURL.path)
+                continue
+            }
+            if AssistCurriculumMentions.isCurriculum(pageAt: page.fileURL, in: course) {
+                paths.insert(page.fileURL.standardizedFileURL.path)
+            }
+        }
+        return paths
     }
 
     /// Every wikilink target on a page, lowercased.

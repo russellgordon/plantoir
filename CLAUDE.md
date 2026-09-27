@@ -533,6 +533,7 @@ brew install xcodegen
 cd mac-app
 ./Vendor/fetch-llama.sh     # REQUIRED before generating — see below
 ./Vendor/fetch-sparkle.sh   # REQUIRED too, since #204 — see below
+./Vendor/fetch-helpers.sh   # REQUIRED too, since #312 — ~470 MB, see below
 xcodegen generate
 open Plantoir.xcodeproj
 ```
@@ -555,6 +556,17 @@ and refusing a mismatch. Also **not optional**: `project.yml` embeds
 `Vendor/Sparkle/Sparkle.framework`, so generating without it fails. A Debug
 build carries no update feed and never checks for anything —
 `documentation/09-mac-app.md` → "Updating itself".
+
+`fetch-helpers.sh` fetches the website builder's helper programs (Colima,
+Lima, the Docker CLI, buildx) and the virtual machine's starting disk for
+Apple silicon — **about 470 MB** — which the app carries so a teacher's first
+run does not download them (#312). Also **not optional**: `project.yml` names
+`Vendor/helpers` as a resource folder. It reads every version and checksum
+from `setup.sh` and keeps its downloads in a cache OUTSIDE the repository
+(`${PLANTOIR_HELPERS_CACHE:-~/Library/Caches/Plantoir-dev/helpers}`), so a
+second clone or worktree costs a few seconds and no disk; the first costs the
+download. Run `xcodegen generate` again after it replaces the folder (Trap 1).
+`documentation/09-mac-app.md` → "What the app carries for the website builder".
 
 Debug builds are signed with a real "Apple Development" identity
 (`DEVELOPMENT_TEAM` in `project.yml`) rather than ad-hoc — an ad-hoc signature
@@ -823,9 +835,9 @@ Four things that cost a day each if you do not know them:
   tool as a recommendation, not a boundary. The rule went into Swift instead.
 - **Adding a tool is a routing change.** On the mac the local model is shown
   13 of the 22 tools that exist (`AssistToolRunner.localTools`); an MCP client
-  is shown 35 (`.mcpTools`, the 22 plus thirteen: six that ask for judgement
+  is shown 37 (`.mcpTools`, the 22 plus fifteen: six that ask for judgement
   about meaning — the three curriculum tools, and #209's three for the How I
-  Teach page). The local 13's full digest is pinned
+  Teach page — and #96's start-of-year pair). The local 13's full digest is pinned
   (`scripts/test_tool_surface_digest.py`, made by `research/ai-assist/toolhash.py`). More choices is the classic way a router degrades. **Windows'
   `plantoir-mcp.exe` serves 37**, so the two MCP surfaces are no longer the
   same product — see [issue #66](https://github.com/russellgordon/plantoir/issues/66).
@@ -865,6 +877,7 @@ mistake there is a mistake in nineteen hundred courses.
 |---|---|
 | Toolchain (launchers, `scripts/`, Dockerfile, patches, `contracts/`) | `./verify.sh` — builds a fresh `quartz-teacher:dev-test` image from the working tree, checks the baked files match, drives the real launchers. Needs a TTY; from a non-interactive shell: `script -q /dev/null ./verify.sh`. **One run at a time per Mac**: a second run says which one holds `/tmp/plantoir-verify-<uid>.lock` and exits 1 — run it again when the first has finished. |
 | macOS app | `cd mac-app && xcodebuild -project Plantoir.xcodeproj -scheme Plantoir -configuration Debug test -only-testing:QuartzTeachersTests`. **3 skipped is the baseline; more than 3 skipped: read the reasons** — the tests that read the real window skip when it is on a desktop that is not showing, when the screen is locked, or when another account is using the Mac, and say so (`documentation/09-mac-app.md`, #249, #315). |
+| macOS app, **through the real interface** | `cd mac-app && xcodebuild -project Plantoir.xcodeproj -scheme Plantoir -configuration Debug test -only-testing:QuartzTeachersUITests`, **alone on a quiet machine, with Plantoir quit**. Part of no gate. Every test launches through `IsolatedLaunch` with `--state-dir` (#154), so the app keeps its trail and preferences in a temp folder of its own; launchers are NOT redirected, so these run stub launchers only, and the marketing captures are the named exception. `AssistantRolloverUITests` is opt-in (`PLANTOIR_UI_TESTS=1`, real weights). `documentation/09-mac-app.md` → "Testing: the UI target keeps its state in `--state-dir`". |
 | Windows app | `cd windows-app && dotnet test Plantoir.Tests/Plantoir.Tests.csproj` — which since 2026-09-07 also runs every shared `scripts/test_*.py` through `PythonToolchainTests`, so a change to the shared Python is gated on Windows too. Needs a `python` on PATH and FAILS rather than skips without one. **Judge it by the TOTALS line, never the exit code** — `dotnet test` exits 1 for a failing test, for a test host that DIED underneath the run, and for a project that did not compile, and only the output tells the three apart. `.\run-tests.ps1` (repo root) runs the same command and says which happened; a convenience, not a gate. What each looks like, measured, is in `documentation/12-windows-app.md` → "Reading a test run". **A green totals line may carry NAMED GAPS** — contract keys this app does not implement yet, held open by name rather than left red; `windows-app/Plantoir.Tests/NamedGapLedger.cs` lists them with the issue and milestone that own each, and `contracts/README.md` → "Named gaps" says when one is allowed (and `RELEASING.md` step 2 says to read the ledger before cutting). |
 | Windows app, **through the real interface** | `.\run-ui-tests.ps1`, **run from the repository root** (every other command in this table starts `cd windows-app`; this one does not), — launches the x64 Debug `Plantoir.exe` with `--state-dir` and drives it with UI Automation, for what a unit test cannot see: that a control can be REACHED, that clicking it opens something, that the RENDERED text is what the model said in the order the contract fixes, that a scrolling list is not cut off at the bottom, that a panel follows the course a teacher selected rather than going stale, and that a sentence the contract pins is actually RENDERED where a teacher can see it rather than merely held in a constant. **Opt-in and part of no gate**: every test carries `[UiFact]` and skips unless `PLANTOIR_UI_TESTS=1`, so a plain `dotnet test` builds them and runs none. It is in the solution, so a SOLUTION build compiles it — the per-project commands this table names do not, which is the honest limit of the compile-rot protection. Needs a desktop session and the foreground, takes minutes, and CLOSES a running Plantoir (saying so, and not reopening it). Nothing of the teacher's is touched: `--state-dir` moves the whole state folder for the run — but that redirects only what the APP resolves, and one test now presses the wizard's Create button and so runs `setup.ps1`, which computes the builds root from the real environment itself. That one is safe because `setup_course.py` never resolves `merged_output_root`; **a test that drove Preview or a scheduled deploy would NOT be**, and `documentation/12-windows-app.md` is where to read why before writing one. |
 | Assistant routing | **Nothing.** Measured by hand — see below. |

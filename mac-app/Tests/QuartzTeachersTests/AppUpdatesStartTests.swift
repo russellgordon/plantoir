@@ -15,6 +15,7 @@ final class AppUpdatesStartTests: XCTestCase {
             infoDictionary: AppUpdatesStartTests.releaseShaped,
             arguments: ["/Applications/Plantoir.app/Contents/MacOS/Plantoir"],
             isRunningTests: true,
+            stateDirectory: nil,
             headlessFlags: AppUpdates.headlessFlags
         ))
     }
@@ -30,6 +31,7 @@ final class AppUpdatesStartTests: XCTestCase {
                     infoDictionary: AppUpdatesStartTests.releaseShaped,
                     arguments: ["/Applications/Plantoir.app/Contents/MacOS/Plantoir", flag, "/somewhere"],
                     isRunningTests: false,
+                    stateDirectory: nil,
                     headlessFlags: AppUpdates.headlessFlags
                 ),
                 "\(flag) would start an updater"
@@ -47,6 +49,7 @@ final class AppUpdatesStartTests: XCTestCase {
                 infoDictionary: info,
                 arguments: ["Plantoir"],
                 isRunningTests: false,
+                stateDirectory: nil,
                 headlessFlags: AppUpdates.headlessFlags
             ))
         }
@@ -57,6 +60,20 @@ final class AppUpdatesStartTests: XCTestCase {
             infoDictionary: AppUpdatesStartTests.releaseShaped,
             arguments: ["/Applications/Plantoir.app/Contents/MacOS/Plantoir", "-NSDocumentRevisionsDebugMode", "YES"],
             isRunningTests: false,
+            stateDirectory: nil,
+            headlessFlags: AppUpdates.headlessFlags
+        ))
+    }
+
+    /// A launch keeping its state in a folder of its own (#154) never has
+    /// one, even from a released bundle: the updater writes the REAL
+    /// preferences domain itself, and could replace the app a test drives.
+    func testNeverUnderAStateDirectory() {
+        XCTAssertFalse(AppUpdates.shouldStart(
+            infoDictionary: AppUpdatesStartTests.releaseShaped,
+            arguments: ["/Applications/Plantoir.app/Contents/MacOS/Plantoir", "--state-dir", "/tmp/state"],
+            isRunningTests: false,
+            stateDirectory: URL(fileURLWithPath: "/tmp/state"),
             headlessFlags: AppUpdates.headlessFlags
         ))
     }
