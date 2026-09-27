@@ -702,18 +702,27 @@ struct CourseSettingsView: View {
     /// What the Revert button does: puts the form back to the FILE (issue
     /// #265), and — when that took back exclusion changes whose click lines
     /// are already on the trail — says so, with how many (issue #152).
+    ///
+    /// Counted against what THIS copy last read or wrote, never against the
+    /// file: a Revert discards exactly this copy's unsaved changes, and an
+    /// exclusion another window saved meanwhile is not one of them. Counting
+    /// against the file reported "reverted 1 unsaved exclusion change" for
+    /// a removal this window never made (#152's implementation review, M1).
     func revertToFile() {
-        let sharedBefore: [String] = course.configuration.excludedItems(forScope: FolderScope.shared.exclusionKey)
-        let perSectionBefore: [String] = course.configuration.excludedItems(forScope: FolderScope.perSection.exclusionKey)
+        let sharedUnsaved: Int = CourseSettingsView.namesThatDiffer(
+            course.configuration.excludedItems(forScope: FolderScope.shared.exclusionKey),
+            course.configuration.savedExcludedItems(forScope: FolderScope.shared.exclusionKey)
+        )
+        let perSectionUnsaved: Int = CourseSettingsView.namesThatDiffer(
+            course.configuration.excludedItems(forScope: FolderScope.perSection.exclusionKey),
+            course.configuration.savedExcludedItems(forScope: FolderScope.perSection.exclusionKey)
+        )
         do {
             try course.configuration.revertToFile(at: course.configFileURL)
         } catch {
             return
         }
-        let sharedAfter: [String] = course.configuration.excludedItems(forScope: FolderScope.shared.exclusionKey)
-        let perSectionAfter: [String] = course.configuration.excludedItems(forScope: FolderScope.perSection.exclusionKey)
-        let takenBack: Int = CourseSettingsView.namesThatDiffer(sharedBefore, sharedAfter)
-            + CourseSettingsView.namesThatDiffer(perSectionBefore, perSectionAfter)
+        let takenBack: Int = sharedUnsaved + perSectionUnsaved
         if takenBack > 0 {
             var noun: String = " unsaved exclusion changes"
             if takenBack == 1 {

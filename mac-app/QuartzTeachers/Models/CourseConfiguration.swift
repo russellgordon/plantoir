@@ -1210,7 +1210,6 @@ class CourseConfiguration {
             try data.write(to: url, options: [.atomic])
             lastSavedData = data
             values = toWrite
-
             WorkspaceModel.followWrite(of: self, at: url)
             return result
         }
@@ -1399,6 +1398,25 @@ class CourseConfiguration {
             return
         }
         try discardChanges()
+    }
+
+    /// `excluded_items.<scope>` as this copy last read or wrote it — the
+    /// baseline its UNSAVED exclusion changes are measured against. Not the
+    /// file: another window may have saved an exclusion since, and a Revert
+    /// here does not take that back (issue #152's review, M1).
+    func savedExcludedItems(forScope scope: String) -> [String] {
+        guard let saved = CourseConfiguration.decodedDictionary(lastSavedData),
+              let excluded = saved["excluded_items"] as? [String: Any],
+              let entries = excluded[scope] as? [Any] else {
+            return []
+        }
+        var names: [String] = []
+        for entry in entries {
+            if let name = entry as? String {
+                names.append(name)
+            }
+        }
+        return names
     }
 
     /// Reverts all in-memory edits back to the last data read from or
