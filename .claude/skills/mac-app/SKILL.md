@@ -360,6 +360,12 @@ Ordinary rebuilding does not clear these. Clear them yourself and say so.
   "Root elements for target … should be equal". If agents are running builds,
   wait for them. Run UI tests alone:
   `-only-testing:QuartzTeachersUITests`.
+- **Quit Plantoir before the UI target** — `StateDirectoryUITests` skips
+  while any copy is running, because that copy's writes to the real trail
+  cannot be told from a leak. Every UI test now launches through
+  `IsolatedLaunch` with `--state-dir` (#154), so it no longer writes the real
+  trail or preferences — except the marketing captures, which drive the real
+  toolchain on purpose.
 - **A stray preview server fails the preview tests.** `python3 -m http.server
   8081` left over from earlier work holds the port; `pkill -f "http.server"`.
 - **`verify.sh` needs a terminal**: `script -q /dev/null ./verify.sh`.

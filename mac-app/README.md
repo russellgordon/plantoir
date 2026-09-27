@@ -161,6 +161,20 @@ Automation/Accessibility** (macOS prompts on first attempt from a logged-in
 session). The in-process suite above covers the same flows without that
 requirement.
 
+**Every XCUITest launches the app through `IsolatedLaunch`** (#154), which
+passes `--state-dir <a fresh temp folder>`: the app keeps its trail,
+preferences, scheduled notes, builds and assistant files there instead of in
+your `~/Library`, and refuses `launchctl`, notifications, the updater and the
+quit-time container stop. Launchers are NOT redirected (a child takes `HOME`
+from its environment), so these tests run stub launchers only. The marketing
+captures (`MarketingScreenshotTests`) are the named exception — they drive the
+real toolchain and still write the real trail. `UITestLaunchTripwireTests`, in
+the unit suite, fails if any other UI test creates an `XCUIApplication` itself.
+`StateDirectoryUITests` proves the redirect through the window and SKIPS while
+another Plantoir is running — quit yours first. Why, and what was measured:
+`documentation/09-mac-app.md` → "Testing: the UI target keeps its state in
+`--state-dir` (#154)".
+
 ## Design notes
 
 - `CourseConfiguration` keeps the decoded JSON as a dictionary and edits

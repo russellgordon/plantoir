@@ -45,9 +45,16 @@ struct IsolatedLaunch {
         return stateDirectory.appendingPathComponent("Library/Logs/Plantoir/activity.txt")
     }
 
-    /// The preferences file this launch writes: the redirected one.
-    var preferencesURL: URL {
-        return stateDirectory.appendingPathComponent("Library/Preferences/ca.russellgordon.Plantoir.plist")
+    /// The preferences file this launch writes: the redirected one, which
+    /// lives in `/private/tmp` (the only place the preferences daemon honours
+    /// a path — `PlantoirDefaults.honouredParent`), named by a note the app
+    /// leaves in the state folder. Nil until the app has written the note.
+    var preferencesURL: URL? {
+        let note: URL = stateDirectory.appendingPathComponent("Library/Preferences/plantoir-preferences-location.txt")
+        guard let path = try? String(contentsOf: note, encoding: .utf8) else {
+            return nil
+        }
+        return URL(fileURLWithPath: path.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
     /// Where the assistant looks for its weights under this launch.
@@ -127,7 +134,7 @@ struct IsolatedLaunch {
 
     /// The redirected preferences, as a dictionary; empty when not written yet.
     func preferences() -> [String: Any] {
-        guard let data = try? Data(contentsOf: preferencesURL) else {
+        guard let preferencesURL, let data = try? Data(contentsOf: preferencesURL) else {
             return [:]
         }
         let parsed: Any? = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil)

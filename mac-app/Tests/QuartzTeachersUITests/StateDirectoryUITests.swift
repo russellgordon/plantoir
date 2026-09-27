@@ -100,7 +100,7 @@ final class StateDirectoryUITests: XCTestCase {
         }
         XCTAssertTrue(
             redirectedHasTheSetting,
-            "The redirected preferences at \(launch.preferencesURL.path) never held assistantAsksBeforeChanging: "
+            "The redirected preferences at \(launch.preferencesURL?.path ?? "(no location note in the state folder)") never held assistantAsksBeforeChanging: "
             + "the app is not keeping its preferences there."
         )
 
