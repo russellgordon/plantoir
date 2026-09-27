@@ -2274,7 +2274,8 @@ that vetoed both 3B models.
 published is decided by what the BUILT SITE does with its flag, not by whether
 the line reads `true` — so `publish: maybe`, `publish: on` and `publish: true
 # covered Tuesday` are all pages students can already see. Asked to publish one
-of those, the assistant answers `It's already been published.` and leaves the
+of those, the assistant answers `AssistWording.alreadyPublishedOne` (in
+`contracts/assist-wording.json`) and leaves the
 file exactly as the teacher wrote it: tidying the value would be an edit nobody
 asked for, in a file Obsidian very likely has open. Asked to HIDE the same
 page, it changes and the odd value goes. Settled 2026-09-18 (issue #140); the
@@ -2882,6 +2883,13 @@ different in WinUI.
 is shared and must be, because `build_site.py` decides what ships and an app
 that disagreed would report coverage the site does not have. What a coverage
 plan SAYS to a teacher, and how it is offered, is the app's own.
+Since #128 the code rule admits the College Board's `1.A` (skills) and
+`CRD-1.A` (learning objectives) beside `A1.1`, so the assistant offers those
+pages as a course's expectations too — they are what the second coverage map
+counts. What it does NOT yet follow is a declared curriculum folder whose name
+does not mention "curriculum" (an `AP CSP` folder has a map but its pages are
+not offered): `curriculumRules.isCurriculumPage.note` says so, and it is left
+for its own issue.
 
 ### The working-folder path bar — reported missing in use, 2026-08-16
 
@@ -3861,6 +3869,63 @@ counting renames alone printed no line at all in exactly the shape that
 re-dates a teacher's whole year, and that is the card they agree to. The
 number is `expectOtherClassesMoving` in each contract case.
 
+#### The PLAN says it too (#185)
+
+**A duplicate that moves other classes now warns on its plan card that "Undo
+that" will not take it back — before Go, where a teacher can still say no.**
+Added 2026-09-26 ([#185](https://github.com/russellgordon/plantoir/issues/185)).
+Make-room's plan has said so since it was written; the duplicate's plan said
+how many later classes would move and nothing about the undo, although a
+duplicate that moves other classes IS a make-room (the table above), and the
+reply then told the teacher after the fact. The warning is
+`AssistWording.makingRoomCannotBeUndone(noun:)` — the SAME key make-room's plan
+says, not a new one — appended in `duplicateClassPlan` under exactly
+`ClassInsertionPlan.movesAnythingElse`, the property `duplicateClass` reads to
+withhold the undo. So the card warns exactly when the undo will be refused and
+never when it will be offered, and the contract pins that per case:
+`contracts/class-planning.json` → `duplication.undoRule.planWarns` (with
+`replySaysWhenWithheld` and `replySaysWhenOffered` for the reply), asserted in
+both directions by `testDuplicatingMatchesTheContract` through each case's
+`expectUndoOffered` — cases 1, 2 and 4 warn, 3 and 5 do not. The card takes
+the course's own noun (`makingRoomCannotBeUndoneForAMeeting` in a club); the
+model's copy of the plan says "class" whatever the course calls them, as every
+#267 plan does, and `ClubNounTests.testTheNounNeverReachesWhatTheModelReads`
+already runs a club duplicate whose later weeks move, so it checks the new line
+without a test of its own.
+
+**One sentence per TENSE, not one sentence.** The issue asked for "one
+sentence" for the caveat, and the literal reading — a single tense-neutral
+sentence for plans and replies — was rejected: it would have changed two
+sentences teachers already read, "moved" is false on a plan (nothing has moved
+yet) and "move" reads oddly after the fact, and Windows' reply form names the
+backup FILE, which exists only after the change. So the pair is deliberate:
+`makingRoomCannotBeUndone` on every PLAN that moves other classes (make-room
+and the duplicate), `otherClassesMoved` on every REPLY (the duplicate and
+make-room). What #185 was really about is that there be no inline copy, and
+the last one is gone: make-room's reply typed the caveat out in full and then
+a tail telling the teacher to look the section over before publishing; it is now
+`otherClassesMoved + " " + lookTheSectionOverBeforePublishing`, byte-identical
+to what it said before (measured against the literal on the unchanged branch
+first).
+
+**Also rejected:** dropping make-room's tail (`lookTheSectionOverBeforePublishing`) so the
+two replies match (it changes a shipped sentence Claude Code reads over MCP
+and buys a teacher nothing — naming it costs one key); one combined key for
+caveat plus tail (a second copy of the caveat's text in the contract, which is
+the thing #185 is about); a new key for the duplicate's warning (identical text
+to `makingRoomCannotBeUndone` — two keys with one value is how they drift);
+renaming `makingRoomCannotBeUndone` to something generic (a rename changes the
+generated file for no gain, and Windows owes the key under its current name in
+#274).
+
+**What Windows owes** is in the `windows` issue opened for #185:
+`DuplicateClassPlan.Describe()` adds `MakingRoomCannotBeUndone` when
+`MovesOtherClasses`, and `Duplication_MatchesContract` reads
+`undoRule.planWarns`. Nothing goes red there when this is pulled —
+`Duplication_MatchesContract` reads fields by name — so it is unrun there,
+not failing. The trap: `OtherClassesMoved` is the past tense and must not go
+on a plan.
+
 #### Three things the duplicate did that nothing was watching
 
 All three were found from the Windows side and closed on the mac in #163.
@@ -4747,6 +4812,150 @@ the trail, against a rule `contracts/shared-rules.json` states with its
 reasoning. The published date is in what the teacher was told instead
 ("Published the class on 2026-09-09."), which is why that sentence names the
 day it settled on rather than the word it was sent.
+
+### Settings are read at the call, not when the window opened (#322)
+
+Written on the mac, 2026-09-26. The same failure shape as the clock above, one
+level up: the day was read once per conversation, and so were the course
+SETTINGS.
+
+**What was reported.** Russell, in the #204 rehearsal: he set ICS3U to deploy
+to a folder, deployed it by hand (the launcher went `--to-folder`), then asked
+the assistant to "deploy at 3:54 PM" and was refused — "has never been
+deployed, so deploying it asks what to call the website". Nothing about a
+folder deploy asks that.
+
+**The cause, reproduced in a test before designing.** `AssistSession.beginConversation`
+and `AssistMCPServer.serve` each build their OWN `WorkspaceModel`, and
+`reloadCourses()` runs once, so each course's `CourseConfiguration` was read
+once — when the assistant's window opened, or when the `--mcp-stdio` server
+started. Every tool reads its course from that list. #265's `followWrite`
+brings other copies up to date after a Save, but it walks WINDOW models only
+(the assistant's and the server's are deliberately not windows —
+`isShownInAWindow` exists to tell them apart), and the server is another
+process that nothing in-process could reach anyway. There is no file watcher.
+The repro, with the fixture's ICS3U (no target, so Netlify, never deployed) and
+a Save from a second copy of the file, gave Russell's sentence word for word —
+and two worse things the report did not name:
+
+- **the approval card said "to Netlify"** for a course that now deploys to a
+  folder;
+- **an outside assistant's deploy went to the OLD destination and reported
+  success.** `--mcp-stdio` with no section window runs the headless
+  `AssistToolchainWork.deploy`, which takes `allDeployDestinations` from the
+  course it is handed. A Claude Code session started before the teacher moved
+  a course from Netlify to Cloudflare published to the old Netlify site and
+  said "deployed". Fail-open, which is why this is more than a wrong refusal.
+
+It also mattered because **a scheduled deploy's destination was written into
+the job when it was SET** (`ScheduledDeploy.scheduleDeploy` wrote each
+destination's `deploy.sh` arguments into the one-shot command, and only the
+lateness window was read when it fired). So "read at scheduling" had to mean
+"read from disk", or the stale destination was baked into a job that ran at
+06:30 with nobody watching. Since #323 the run reads the settings again itself
+(docs 07); what is read at scheduling still decides the refusal and the card.
+
+**What landed.**
+
+- `WorkspaceModel.discoverCourses(in:)` — the one answer to "which folders are
+  courses", the same shape as Windows' `Workspace.DiscoverCourses`.
+  `reloadCourses()` uses it, unchanged in behaviour.
+- `WorkspaceModel.readCoursesAsSavedNow()` rediscovers the courses into a model
+  NO WINDOW SHOWS, and does nothing else — no launcher refresh, no
+  reference-course upkeep, no staging sweep, no `.merged_output` placement, no
+  backup listing or measuring. It refuses a window's model outright: that
+  model's `CourseConfiguration` objects hold Course Settings' UNSAVED edits,
+  and replacing them would throw those away. The guard makes that impossible
+  rather than unlikely (`AssistSettingsFreshnessTests.testReadingAtTheCallNeverTouchesAWindowsCopy`).
+- `AssistToolRunner.coursesAsSavedNow` reads it, and is the ONLY way the runner
+  reads the course list: every read goes through it — eleven when #322 landed, twelve since #209's How I Teach briefing (`coursesWithAHowITeachPage`) was routed through it at #323's merge — (`locate`,
+  `course(withCode:)`, the card's `explain`, `list_courses`, the
+  reference-course gates, the briefing lines…). Structural rather than one
+  call at the top of `run`, because there are six public ways in and a seventh
+  added later would be a stale reader nobody noticed; a source test
+  (`testTheRunnerReadsCoursesOnlyThroughTheFreshReading`) holds the file to it.
+- The never-deployed refusal now **names its destination**
+  (`scheduledDeployRefusals.wording.neverDeployed`): Russell read the old
+  sentence as "it thinks I am deploying to Netlify" and had to guess. After
+  this fix it appears only when that IS the destination, and saying so lets a
+  teacher who expected a folder see the disagreement at once. The schedule
+  sheet shows the same `problem()` sentence.
+- The trail's `scheduled deploy could not be set` now also records a refusal
+  at the ACT — `schedule_deploy`, or the sheet's button — naming the
+  destination by kind (Netlify, Cloudflare Pages, a folder; never a path) and
+  the refusal's first sentence. #322 took a code read to diagnose; with this
+  line the contradiction would have sat two lines under "saved the settings".
+  Not written by the card or `plan_scheduled_deploy`, which are advisory and
+  repeat.
+
+**What it costs.** One directory listing and one small JSON read per course,
+per read — and one tool call can read more than once (the card, then `locate`,
+then a reference gate). Measured 2026-09-26 on an Apple M4 Pro, Debug build,
+warm cache: **0.40 ms per reading** of a folder of ten courses, each with a
+~1.8 KB `course_config.json` (200 readings averaged). The calls are human-paced. If it ever
+mattered, the fallback is one snapshot per `run`; not done, because a
+structural rule beats a micro-optimisation. Two readings inside one call are
+both fresh, and nothing in the runner compares `Course` objects by identity:
+history and backups are keyed by CODE (`AssistChangeHistory`), so an undo finds
+its course by code in whatever the latest reading is.
+
+**Rejected**, and why:
+
+- *One observable `Course` shared by the main window and the assistant* —
+  cannot reach the MCP server (another process, and the worse half), cannot see
+  a build's own writes, and ties the assistant's life to a window's.
+- *Adding the assistant's model to `followWrite`'s list* — the same process
+  hole, misses writers outside the app, and would be a second answer to "how
+  fresh is the assistant".
+- *A file watcher* — `write(to:)` is atomic, so each Save replaces the inode
+  and a vnode watcher loses the file; and a watcher is still a race between the
+  event and the call. Reading at the call is exact.
+- *`reloadCourses()` per call* — rewrites launchers, sweeps staging leftovers,
+  re-links `.merged_output`, lists and measures backups: folder-level work, on
+  every call, from two surfaces.
+- *Re-reading only the courses already known* — smaller, and fixes #322, but a
+  course created after the server started stays invisible, which Windows does
+  not do.
+- *Refreshing only inside `locate`* — misses the card, `list_courses` and the
+  reference gate, which read the list directly.
+
+**Windows** already rediscovers on every lookup (`AssistWorkspace.Courses()` →
+`Workspace.DiscoverCourses`), so it very probably never had this bug. Do not
+add a cache there "for speed": that cache is this bug. What they owe is in the
+contract: `shared-rules.json` → `assistantReadsSettingsAtTheCall` (seven cases;
+case 2 is their approval card, the one most likely to be read from a
+snapshot), and the named refusal sentence, compared WHOLE, because
+`Contains("has never been deployed to")` now matches both the primary's and an
+additional destination's refusal.
+
+**Known limits, left as they are.**
+
+- **A destination changed AFTER a deploy is scheduled** used to go to the old
+  one — the destination was written into the job. Fixed by
+  [issue #323](https://github.com/russellgordon/plantoir/issues/323): the run
+  now reads the course's settings when it fires (docs 07, "Where it deploys is
+  read when it runs"). What the assistant reads at scheduling still decides its
+  refusal and card, and what the job records it was told.
+- **Settings saved between the card and the Approve press**: the act reads
+  fresh, so it may differ from what the card said. The `schedule_deploy` result
+  names the destination it used, so the teacher sees it.
+- **The local assistant's deploy through an OPEN section window** runs
+  `window.deploy()`, which uses that window's copy of the course — including
+  Course Settings edits not yet saved — while the card, which reads the saved
+  file, may name the saved destination. The schedule sheet has the same shape.
+  Pre-existing (before #322 the card read an even older copy):
+  [issue #335](https://github.com/russellgordon/plantoir/issues/335).
+- **A config mid-write or malformed at the call** drops that course for that
+  call ("no such course") — fail-closed, and what `reloadCourses` and Windows
+  do too.
+- **`AssistSession.classNoun` / `classPageNaming`** are read once, when the
+  session starts, and used only for the window's own chrome (suggestions, the
+  dates offer). Stale after a mid-conversation change of the class noun;
+  display-only.
+- **The refusal's first sentence on the trail** is cut at the first ". ". A
+  time written with a full stop and a space ("6:30 p. m.") would be cut early;
+  no stock format measured on this Mac (en_CA, en_AU, es_ES, en_GB, fr_CA)
+  writes one, and the line carries the moment anyway. Left as it is.
 
 ## The other doors: handing a course to an assistant the teacher already has
 

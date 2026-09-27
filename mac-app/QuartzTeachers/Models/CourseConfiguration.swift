@@ -569,6 +569,40 @@ class CourseConfiguration {
         }
     }
 
+    /// The curriculum folders this course DECLARES, in its own order (#128):
+    /// `curriculum_folders`, then the legacy `curriculum_folder` when it is not
+    /// already there — read and unioned forever, so a folder written down by an
+    /// older Plantoir still counts. The first is the primary folder, whose map
+    /// keeps the title "Curriculum Coverage".
+    ///
+    /// Setting it writes `curriculum_folders` (an empty list removes the key)
+    /// AND the legacy `curriculum_folder`, naming the list's first (primary)
+    /// folder — so an older Plantoir on another Mac, which reads only that key,
+    /// keeps its map (Russell's ruling on the #128 review). With an empty list
+    /// the legacy key is removed too, or the union would keep a folder the
+    /// teacher has just unticked. `contracts/file-formats.json` → `courseConfigKeys`.
+    var curriculumFolders: [String] {
+        get {
+            return CurriculumFolderRule.declaredFolders(
+                list: values["curriculum_folders"], legacy: values["curriculum_folder"]
+            )
+        }
+        set {
+            if newValue.isEmpty {
+                values.removeValue(forKey: "curriculum_folders")
+            } else {
+                values["curriculum_folders"] = newValue
+            }
+            if let primary = newValue.first {
+                values["curriculum_folder"] = primary
+            } else {
+                values.removeValue(forKey: "curriculum_folder")
+            }
+        }
+    }
+
+    /// The legacy one-folder key, as written. Kept for the renamer, which
+    /// rewrites it when it names the renamed folder; nothing new writes it.
     var curriculumFolder: String? {
         get { return values["curriculum_folder"] as? String }
         set {
