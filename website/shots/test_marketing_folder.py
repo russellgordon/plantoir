@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
 Tests for the kept marketing folder's set-up (marketing_folder.py), the
-ICS3U -> AP CSP correlation it applies, and the College Board extraction.
+ICS3U and ICS4U -> AP CSP correlations it applies, and the College Board
+extraction.
 
-Stdlib only, no app and no network: the file steps run against the ICS3U
-payload laid out in a temporary folder the way the app installs it. The
+Stdlib only, no app and no network: the file steps run against the ICS3U and
+ICS4U payloads laid out in a temporary folder the way the app installs it. The
 extraction test runs only when the Course and Exam Description is on this Mac
 (the kept folder's .sources/, or PLANTOIR_CED_PDF), and says so when it skips.
 
@@ -189,49 +190,119 @@ class FileStepTests(unittest.TestCase):
 
 
 class CorrelationTests(unittest.TestCase):
+    """Each course's correlation, against that course's own payload. ICS3U
+    and ICS4U are held to the same rules: every page real, taught and
+    published, every code an objective's shape, every evidence phrase on
+    its page, and no page both kept and dropped."""
 
     def test_correlation_names_real_pages_and_codes(self):
-        rows = mf.load_correlation()
-        shared = SUPPORT / "example_content" / "ICS3U" / "shared"
-        self.assertGreater(len(rows), 40)
-        for row in rows:
-            page = shared / f"{row['page']}.md"
-            self.assertTrue(page.is_file(), row["page"])
-            self.assertIn("## Curriculum connection", page.read_text(encoding="utf-8"), row["page"])
-            self.assertTrue(row["codes"], row["page"])
-            for code in row["codes"]:
-                self.assertRegex(code, r"^(CRD|AAP|DAT|CSN|IOC)-\d\.[A-Z]$", row["page"])
-            self.assertTrue(row["reason"].strip())
-            self.assertTrue(row["evidence"].strip())
+        for course in mf.CSP_COURSES:
+            rows = mf.load_correlation(course["correlation"])
+            shared = SUPPORT / "example_content" / course["code"] / "shared"
+            self.assertGreater(len(rows), 40, course["code"])
+            for row in rows:
+                label = f"{course['code']} {row['page']}"
+                page = shared / f"{row['page']}.md"
+                self.assertTrue(page.is_file(), label)
+                self.assertIn("## Curriculum connection", page.read_text(encoding="utf-8"), label)
+                self.assertTrue(row["codes"], label)
+                self.assertEqual(len(row["codes"]), len(set(row["codes"])), label)
+                for code in row["codes"]:
+                    self.assertRegex(code, r"^(CRD|AAP|DAT|CSN|IOC)-\d\.[A-Z]$", label)
+                self.assertTrue(row["reason"].strip())
+                self.assertTrue(row["evidence"].strip())
 
     def test_every_evidence_phrase_is_on_its_page(self):
-        shared = SUPPORT / "example_content" / "ICS3U" / "shared"
-        for row in mf.load_correlation():
-            # Emphasis and link brackets are formatting, not words.
-            text = (shared / f"{row['page']}.md").read_text(encoding="utf-8")
-            text = re.sub(r"(?m)^\s*>\s?", "", text)  # a callout's quote marks
-            text = re.sub(r"[*_`\[\]]", "", text)
-            text = re.sub(r"\s+", " ", text)
-            evidence = re.sub(r"\s+", " ", re.sub(r"[*_`\[\]]", "", row["evidence"])).strip()
-            self.assertIn(evidence.lower(), text.lower(), f"{row['page']}: {evidence!r}")
+        for course in mf.CSP_COURSES:
+            shared = SUPPORT / "example_content" / course["code"] / "shared"
+            for row in mf.load_correlation(course["correlation"]):
+                # Emphasis and link brackets are formatting, not words.
+                text = (shared / f"{row['page']}.md").read_text(encoding="utf-8")
+                text = re.sub(r"(?m)^\s*>\s?", "", text)  # a callout's quote marks
+                text = re.sub(r"[*_`\[\]]", "", text)
+                text = re.sub(r"\s+", " ", text)
+                evidence = re.sub(r"\s+", " ", re.sub(r"[*_`\[\]]", "", row["evidence"])).strip()
+                self.assertIn(evidence.lower(), text.lower(), f"{course['code']} {row['page']}: {evidence!r}")
 
     def test_every_linked_page_is_published_and_taught(self):
         # An embed on a page the course does not teach, or does not publish,
         # counts for nothing on the map.
         import build_site
-        payload = SUPPORT / "example_content" / "ICS3U"
-        taught = build_site._pages_the_course_teaches(payload, ["All Classes"])
-        for row in mf.load_correlation():
-            stem = row["page"].split("/")[-1]
-            self.assertIn(stem, taught, row["page"])
-            text = (payload / "shared" / f"{row['page']}.md").read_text(encoding="utf-8")
-            self.assertRegex(text, r"(?m)^publish: true$", row["page"])
+        for course in mf.CSP_COURSES:
+            payload = SUPPORT / "example_content" / course["code"]
+            taught = build_site._pages_the_course_teaches(payload, ["All Classes"])
+            for row in mf.load_correlation(course["correlation"]):
+                label = f"{course['code']} {row['page']}"
+                stem = row["page"].split("/")[-1]
+                self.assertIn(stem, taught, label)
+                text = (payload / "shared" / f"{row['page']}.md").read_text(encoding="utf-8")
+                self.assertRegex(text, r"(?m)^publish: true$", label)
 
     def test_no_page_is_both_kept_and_dropped(self):
-        data = json.loads(mf.CORRELATION_FILE.read_text(encoding="utf-8"))
-        kept = {row["page"] for row in data["rows"]}
-        dropped = {row["page"] for row in data["dropped"]}
-        self.assertEqual(kept & dropped, set())
+        for course in mf.CSP_COURSES:
+            data = json.loads(course["correlation"].read_text(encoding="utf-8"))
+            self.assertEqual(data["course"], course["code"])
+            self.assertEqual(data["folder"], mf.COLLEGE_BOARD_FOLDER)
+            kept = {row["page"] for row in data["rows"]}
+            dropped = {row["page"] for row in data["dropped"]}
+            self.assertEqual(kept & dropped, set(), course["code"])
+            self.assertEqual(len(kept), len(data["rows"]), f"{course['code']}: a page listed twice")
+
+    def test_every_ics4u_activity_page_was_read_and_decided(self):
+        # ICS4U's correlation was made by reading EVERY published activity
+        # page that carries a curriculum block: each is either tagged or
+        # dropped with a reason. A page added to the payload later fails
+        # here until somebody reads it and decides.
+        data = json.loads(mf.ICS4U_CORRELATION_FILE.read_text(encoding="utf-8"))
+        shared = SUPPORT / "example_content" / "ICS4U" / "shared"
+        with_a_block: set = set()
+        for page in shared.rglob("*.md"):
+            relative = page.relative_to(shared).with_suffix("").as_posix()
+            if relative.startswith("Curriculum/") or page.stem == "_DUPLICATE ME":
+                continue
+            text = page.read_text(encoding="utf-8")
+            if "## Curriculum connection" in text and re.search(r"(?m)^publish: true$", text):
+                with_a_block.add(relative)
+        decided: set = set()
+        for row in data["rows"]:
+            decided.add(row["page"])
+        for row in data["dropped"]:
+            self.assertTrue(row["why"].strip(), row["page"])
+            decided.add(row["page"])
+        self.assertEqual(with_a_block - decided, set(), "pages nobody has decided about")
+        self.assertEqual(decided - with_a_block, set(), "decisions about pages that are not activity pages")
+
+
+class Ics4uFileStepTests(unittest.TestCase):
+
+    def test_ics4u_gets_the_pages_the_embeds_and_a_declared_second_curriculum(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = staged_folder(Path(temporary))
+            mf.apply_file_steps(folder, FAKE_PAGES)
+            course = folder / "courses" / "ICS4U"
+            config = json.loads((course / "course_config.json").read_text(encoding="utf-8"))
+            page = (course / "Warm-Ups" / "Trace It.md").read_text(encoding="utf-8")
+            board_page = course / mf.COLLEGE_BOARD_FOLDER / "AAP-2.A.md"
+            ics3u = json.loads((folder / "courses" / "ICS3U" / "course_config.json").read_text(encoding="utf-8"))
+            how_i_teach = course / mf.HOW_I_TEACH_NAME
+            self.assertTrue(board_page.is_file())
+            self.assertFalse(how_i_teach.exists(), "How I Teach is ICS3U's alone")
+        self.assertEqual(config["curriculum_folders"], ["Curriculum", mf.COLLEGE_BOARD_FOLDER])
+        self.assertIn(mf.COLLEGE_BOARD_FOLDER, config["hidden"])
+        self.assertNotIn("deploy_target", config, "ICS4U's publishing is left alone")
+        # ICS3U's tick is the curriculum-settings scene's to make, through the app.
+        self.assertEqual(ics3u["curriculum_folders"], ["Curriculum"])
+        block = page[page.index("## Curriculum connection"):]
+        self.assertIn("![[C2.1]]\n\n![[AAP-3.A]]", block)
+
+    def test_a_course_not_made_yet_is_named_and_skipped(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = staged_folder(Path(temporary))
+            (folder / "courses" / "ICS4U" / "course_config.json").unlink()
+            report = mf.apply_file_steps(folder, FAKE_PAGES)
+            ics3u_page = folder / "courses" / "ICS3U" / mf.HOW_I_TEACH_NAME
+            self.assertTrue(ics3u_page.exists(), "ICS3U's steps still run")
+        self.assertTrue(any(line.startswith("ICS4U") for line in report.named_and_skipped), report.named_and_skipped)
 
 
 def cached_ced() -> Path | None:
@@ -259,8 +330,9 @@ class ExtractionTests(unittest.TestCase):
         objectives = set(extraction.pages) | set(extraction.needs_a_person)
         self.assertEqual(len(objectives), 66)
         codes_used: set = set()
-        for row in mf.load_correlation():
-            codes_used.update(row["codes"])
+        for course in mf.CSP_COURSES:
+            for row in mf.load_correlation(course["correlation"]):
+                codes_used.update(row["codes"])
         self.assertEqual(codes_used - objectives, set(), "the correlation names an objective the document lacks")
         for code, page in extraction.pages.items():
             self.assertIn(" ^text\n", page, code)
