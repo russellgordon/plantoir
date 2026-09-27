@@ -281,8 +281,8 @@ class DryRunLine:
 def dry_run(marketing_folder: Path, ced_pdf: Path | None) -> int:
     """Prove each scene's set-up is reachable, launching nothing.
 
-    - The folder's FILE steps are run for real against the ICS3U payload laid
-      out in a throwaway folder (never the kept one): College Board pages from
+    - The folder's FILE steps are run for real against the ICS3U and ICS4U
+      payloads laid out in a throwaway folder (never the kept one): College Board pages from
       the document when it is on this Mac, every correlation embed, How I
       Teach, the publish destination — and run twice, to prove the second run
       changes nothing.

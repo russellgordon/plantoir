@@ -296,9 +296,10 @@ first and fall back to the PNG.
 python3 website/shots/capture.py --provision   # makes it when absent, reuses it when present
 ```
 
-It makes ICS3U and ICS4U through the app, adds the College Board pages from
-the public document (kept in `.sources/`, never committed), links the
-activities, writes How I Teach, and keeps a copy of ICS3U for reference. It
+It makes ICS3U and ICS4U through the app, adds the College Board pages to
+both from the public document (kept in `.sources/`, never committed), links
+each course's activities from its own correlation file, declares ICS4U's
+second curriculum, writes How I Teach, and keeps a copy of ICS3U for reference. It
 never overwrites a file you changed and refuses a folder holding any other
 course. Ten learning objectives quote drawn code and are set out by a person
 from drafts it writes — it says which, and exits non-zero until they are there.

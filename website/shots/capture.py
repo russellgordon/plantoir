@@ -1123,11 +1123,12 @@ def provision_marketing(folder: Path) -> int:
     In order, each step saying "made" or "already there":
     the launchers and build recipe; ICS3U (1, 2) and ICS4U (1) through the
     app; the College Board pages from the public document (fetched once into
-    .sources/, hash-checked); the correlation's embeds, How I Teach and the
-    folder destination (marketing_folder.py); and a reference copy of ICS3U
-    for 2025–26, through the app. Declaring the second curriculum is NOT here:
-    the curriculum-settings scene does it through Course Settings, because
-    that is the picture.
+    .sources/, hash-checked), into both courses; each course's correlation
+    embeds, ICS4U's declared second curriculum, How I Teach and the folder
+    destination (marketing_folder.py); and a reference copy of ICS3U for
+    2025–26, through the app. Declaring ICS3U's second curriculum is NOT
+    here: the curriculum-settings scene does it through Course Settings,
+    because that is the picture.
     """
     import marketing_folder
     import college_board
@@ -1396,7 +1397,7 @@ def main() -> int:
                         help="the demo working folder (must be inside your home folder)")
     parser.add_argument("--provision", action="store_true",
                         help="make or reuse the kept marketing folder (ICS3U, ICS4U, the College Board "
-                             "pages and the correlation) for the v1.4.0 scenes")
+                             "pages and both courses' correlations) for the v1.4.0 scenes")
     parser.add_argument("--provision-demo", action="store_true",
                         help="only create the demo courses (ENG2D, MCV4U, SCH3U) in the demo folder")
     parser.add_argument("--scenes", action="store_true", help="photograph every v1.4.0 scene")

@@ -71,7 +71,7 @@ never copied by `build.py`.
 | `layout/base.html` | The page skeleton every page is poured into — head tags, top bar, footer. |
 | `assets/style.css` | The whole stylesheet, copied to `site/assets/`. |
 | `pages/*.html` | One file per page: a front matter block, then the body. The file name is the URL (`features.html` → `/features`), except `index.html`, which is the front page. |
-| `shots/` | The screenshot harness. See below. `shots/scenes.py` lists the v1.4.0 scenes; `shots/marketing_folder.py` sets up the kept marketing folder; `shots/csp-correlation.json` says which ICS3U activities reach which AP CSP learning objectives; `shots/marketing/` holds the College Board source's address and hash (never its text) and the How I Teach page. |
+| `shots/` | The screenshot harness. See below. `shots/scenes.py` lists the v1.4.0 scenes; `shots/marketing_folder.py` sets up the kept marketing folder; `shots/csp-correlation.json` and `shots/csp-correlation-ics4u.json` say which ICS3U and ICS4U activities reach which AP CSP learning objectives; `shots/marketing/` holds the College Board source's address and hash (never its text) and the How I Teach page. |
 
 ## Writing a page
 
@@ -249,8 +249,8 @@ minute; answer both and walk away.
 kept. `--provision` makes ICS3U and ICS4U through the app when they are
 missing, then, in the folder only — never the shipped payload:
 
-- a **College Board Curriculum** folder with one page per AP CSP *learning
-  objective* (`CRD-1.A` …), the objective's exact text with its essential
+- in BOTH ICS3U and ICS4U (`CSP_COURSES`), a **College Board Curriculum**
+  folder with one page per AP CSP *learning objective* (`CRD-1.A` …), the objective's exact text with its essential
   knowledge statements verbatim beneath (`college_board.py`). The words are
   read from the College Board's public Course and Exam Description, fetched
   into the folder's `.sources/` and checked against the SHA-256 in
@@ -267,9 +267,17 @@ missing, then, in the folder only — never the shipped payload:
   words drawn with nesting shown by indentation, the drawn boxes around
   arguments left out and a box standing for a list or an index written as
   `[ ]`;
-- an embed per objective in each activity `shots/csp-correlation.json` names,
-  inside its existing `## Curriculum connection` block after the Ontario ones
-  (the map counts transclusions, never plain links);
+- an embed per objective in each activity the course's correlation names
+  (`shots/csp-correlation.json` for ICS3U, `shots/csp-correlation-ics4u.json`
+  for ICS4U), inside its existing `## Curriculum connection` block after the
+  Ontario ones (the map counts transclusions, never plain links). Each is data:
+  a row per page with its codes, a reason in our own words and an evidence
+  phrase the tests find on the page; pages read and not tagged are listed
+  under `dropped` with the reason. ICS4U's was made on 2026-09-27 by reading
+  every page of the payload; a test fails if an ICS4U activity page with a
+  curriculum block is neither tagged nor dropped;
+- ICS4U's second curriculum DECLARED (`curriculum_folders` gains
+  `College Board Curriculum` after `Curriculum`, what ticking the box writes);
 - `How I Teach.md` (our own words, `shots/marketing/`), and a folder
   destination (`School Web Space`) so the scheduled publish makes nothing
   public. The new-course panel writes `deploy_target: netlify` for every
@@ -286,8 +294,9 @@ missing, then, in the folder only — never the shipped payload:
 Every step says "made" or "already there", a second run changes nothing, a file
 you changed is "left as you changed it", and a folder holding any course but
 ICS3U, ICS4U and their reference copies is refused before anything is written.
-Declaring the second curriculum is not a set-up step: the `curriculum-settings`
-scene does it in Course Settings, because that is the picture.
+Declaring ICS3U's second curriculum is not a set-up step: the
+`curriculum-settings` scene does it in Course Settings, because that is the
+picture. No scene photographs ICS4U's, so for ICS4U the set-up writes it.
 
 **The scenes** are listed in `website/shots/scenes.py` with what each sets up.
 Most are `MarketingScenes` UI tests; the notification banner is a REAL
