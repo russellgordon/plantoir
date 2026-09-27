@@ -233,7 +233,12 @@ def picture_element(shot: dict, problems: list[str], modifier: str, up: str) -> 
     display_width = width // 2
     display_height = height // 2
 
-    has_windows = win_light.exists() and win_dark.exists()
+    # `windows: false` says Windows has no such scene yet, so a Windows
+    # visitor sees the Mac picture — with the alt text and caption that were
+    # written for it. Only the image is swapped on Windows, never the words,
+    # so an older Windows capture left on disk would sit under a caption about
+    # a different picture (website-B review M1: courses and new-course).
+    has_windows = shot.get("windows") is not False and win_light.exists() and win_dark.exists()
     win_prefix = f"{identifier}-windows-" if has_windows else ""
 
     sources: list[str] = []
@@ -285,7 +290,9 @@ def awaiting_capture_notes(shots: dict) -> list[str]:
         if light.exists() and dark.exists():
             notes.append(f"'{identifier}' is captured but still marked awaiting_capture in shots.json — remove the flag")
         else:
-            notes.append(f"'{identifier}' is not captured yet, so its page shows no picture there "
+            issue = waiting_on_issue(shot)
+            owner = f", waiting on {issue}" if issue else ""
+            notes.append(f"'{identifier}' is not captured yet, so its page shows no picture there{owner} "
                          f"(capture.py --only {shot.get('capture', {}).get('scene', identifier)})")
     return notes
 
@@ -295,7 +302,7 @@ def static_element(shot: dict, problems: list[str], modifier: str, up: str) -> s
     identifier = shot["id"]
     source = IMAGE_DIR / f"{identifier}.png"
     win_source = IMAGE_DIR / f"{identifier}-windows.png"
-    has_windows = win_source.exists()
+    has_windows = shot.get("windows") is not False and win_source.exists()
 
     classes = "shot shot-static"
     if modifier:
@@ -604,6 +611,14 @@ def version_tuple(text: str) -> tuple:
     return tuple(parts)
 
 
+def waiting_on_issue(shot: dict) -> str | None:
+    """The GitHub issue a still-missing shot waits on (`waiting_on: "#367"`),
+    or None. Only an issue reference counts: a bare word is not a promise
+    anybody can close."""
+    reference = str(shot.get("waiting_on", ""))
+    return reference if re.fullmatch(r"#\d+", reference) else None
+
+
 def release_readiness_refusal(site: dict, shots: dict) -> str | None:
     """Why the site must not go live yet, or None.
 
@@ -622,6 +637,11 @@ def release_readiness_refusal(site: dict, shots: dict) -> str | None:
     waiting: list[str] = []
     for shot in shots.get("shots", []):
         if not shot.get("awaiting_capture"):
+            continue
+        # A shot whose capture waits on a NAMED issue goes out without its
+        # picture: the section's text stands on its own, and the issue is
+        # where the obligation lives (#367 — Focus and Obsidian, not code).
+        if waiting_on_issue(shot):
             continue
         light = IMAGE_DIR / f"{shot['id']}-light.png"
         dark = IMAGE_DIR / f"{shot['id']}-dark.png"

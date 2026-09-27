@@ -94,13 +94,14 @@ SCENES: list[Scene] = [
         identifiers=["referenceYear-", "copyAPage-", "copyPageDestinationCourse", "copyPageChecklist",
                      "copyPageRefusal"],
         what_it_sets_up="Reference Courses › 2025–26 unfolded; Copy a Page from the reference ICS3U, "
-                        "\"The Unplugged Algorithm\" into ICS4U, with its linked pages listed; cancelled.",
+                        "\"The Unplugged Algorithm\" into ICS4U with its linked pages coming too, before Copy is pressed; cancelled.",
     ),
     Scene(
         name="start-of-year", produces=["start-of-year"], kind="ui-test", test="testGetReadyForTheStartOfTheYear",
-        identifiers_pending={"startOfYear-": "#96", "startOfYearSheet": "#96", "startOfYearGo": "#96"},
-        what_it_sets_up="ICS3U section 2 → Get Ready for the Start of the Year…, the plan listed with its "
-                        "reasons; cancelled, so nothing is put into draft.",
+        # #96 has landed: a missing identifier is now a broken scene, not a wait.
+        identifiers=["startOfYear-", "startOfYearGo"],
+        what_it_sets_up="ICS3U section 2 → Get Ready for the Start of the Year…, the plan with its draft "
+                        "lists unfolded to show each page's reason; cancelled, so nothing is put into draft.",
     ),
     Scene(
         name="curriculum-settings", produces=["curriculum-settings"], kind="ui-test",
@@ -138,7 +139,7 @@ SCENES: list[Scene] = [
         name="club", produces=["club"], kind="ui-test", test="testClubWizard",
         identifiers=["addCourseButton", "wizardCourseCodeField", "clubToggle", "clubFrontPageHeadingField",
                      "wizardCloseButton"],
-        what_it_sets_up="The New Course panel for CODING with \"This is a club\" ticked; cancelled.",
+        what_it_sets_up="The New Course panel for CODING with \"This is a club\" ticked, framed at the top of the panel; cancelled.",
     ),
 ]
 
@@ -323,8 +324,14 @@ def dry_run(marketing_folder: Path, ced_pdf: Path | None) -> int:
         second = marketing_folder.apply_file_steps(scratch, pages)
         unexplained: list[str] = []
         for skipped in first.named_and_skipped:
-            if not (pages is None and "no pages were supplied" in skipped):
-                unexplained.append(skipped)
+            if pages is None and "no pages were supplied" in skipped:
+                continue
+            # The dry run stages the payload's SHARED pages only: the app,
+            # not the payload, dates a section's classes, so there is nothing
+            # for the second-semester step to move here.
+            if "no dated pages to move" in skipped:
+                continue
+            unexplained.append(skipped)
         state = "ready" if second.made == 0 and not unexplained else "broken"
         lines.append(DryRunLine("marketing folder file steps", state,
                                 f"first run: {marketing_folder.summary(first)}; second run made {second.made}"))
@@ -545,15 +552,48 @@ class ObsidianRegistryKept:
         self.was_running: bool = subprocess.run(["pgrep", "-x", "Obsidian"], capture_output=True).returncode == 0
         return self
 
+    def register(self, vault: Path) -> bool:
+        """Make `vault` a known vault, so `obsidian://open?path=` can find it.
+
+        Opening a note by path works ONLY for a folder already in the list:
+        otherwise Obsidian says "Vault not found" (measured 2026-09-27, two
+        such dialogs left over a teacher's windows). The entry is written
+        only while Obsidian is NOT running — it keeps the list in memory and
+        would overwrite it — and goes when the saved list is put back. With
+        Obsidian already open, the scene is refused: somebody's open notes
+        are theirs, and quitting it is not the capture's to do.
+        """
+        if self.was_running:
+            return False
+        import secrets
+        registry = json.loads(OBSIDIAN_REGISTRY.read_text(encoding="utf-8")) if OBSIDIAN_REGISTRY.exists() else {}
+        vaults = registry.setdefault("vaults", {})
+        for entry in vaults.values():
+            if entry.get("path") == str(vault):
+                return True
+        vaults[secrets.token_hex(8)] = {"path": str(vault), "ts": int(time.time() * 1000), "open": True}
+        OBSIDIAN_REGISTRY.parent.mkdir(parents=True, exist_ok=True)
+        OBSIDIAN_REGISTRY.write_text(json.dumps(registry), encoding="utf-8")
+        return True
+
+    @staticmethod
+    def quit_obsidian() -> None:
+        """Quit Obsidian and WAIT for it to be gone: it writes its list of
+        vaults back as it quits, so anything put back before then is lost."""
+        subprocess.run(["osascript", "-e", 'quit app "Obsidian"'], capture_output=True)
+        for _ in range(40):
+            if subprocess.run(["pgrep", "-x", "Obsidian"], capture_output=True).returncode != 0:
+                break
+            time.sleep(0.25)
+
     def __exit__(self, exc_type, exc_value, traceback) -> bool:
         if self.saved is None:
+            if not self.was_running and OBSIDIAN_REGISTRY.exists():
+                ObsidianRegistryKept.quit_obsidian()
+                OBSIDIAN_REGISTRY.unlink()
             return False
         if not self.was_running:
-            subprocess.run(["osascript", "-e", 'quit app "Obsidian"'], capture_output=True)
-            for _ in range(40):
-                if subprocess.run(["pgrep", "-x", "Obsidian"], capture_output=True).returncode != 0:
-                    break
-                time.sleep(0.25)
+            ObsidianRegistryKept.quit_obsidian()
             OBSIDIAN_REGISTRY.write_bytes(self.saved)
         if OBSIDIAN_REGISTRY.read_bytes() != self.saved:
             print("   ✗ Obsidian's list of vaults is not as it was (Obsidian was already open, so it was "

@@ -1,5 +1,5 @@
 {
-  "note": "One entry per screenshot on plantoir.app. `build.py` reads alt and caption to write the <picture> element; `website/shots/capture.py` reads `capture` to know how each is produced. Every shot is taken twice, once with the Mac in light appearance and once in dark, and saved as site/img/<id>-light.png and -dark.png. Paths are lowercase because Quartz serves lowercase URLs and 301s anything else — a capitalised address would be photographed mid-redirect. Since v1.4.0: `capture.scene` names the scene in capture.py that makes the shot (`capture.py --only <scene>`); `capture.workspace` says which working folder it is taken in ('marketing' = ~/Plantoir Marketing, ICS3U; 'demo' = ~/Desktop/Teaching, the three published demo courses); `expectText` lists words the finished picture must show, read back with Vision text recognition, so a picture of the wrong state fails its scene; `awaiting_capture` marks a shot the pages already name whose capture waits for the release it photographs (build.py renders nothing for it meanwhile); `windows: true` marks the ids capture_windows.py also takes.",
+  "note": "One entry per screenshot on plantoir.app. `build.py` reads alt and caption to write the <picture> element; `website/shots/capture.py` reads `capture` to know how each is produced. Every shot is taken twice, once with the Mac in light appearance and once in dark, and saved as site/img/<id>-light.png and -dark.png. Paths are lowercase because Quartz serves lowercase URLs and 301s anything else — a capitalised address would be photographed mid-redirect. Since v1.4.0: `capture.scene` names the scene in capture.py that makes the shot (`capture.py --only <scene>`); `capture.workspace` says which working folder it is taken in ('marketing' = ~/Plantoir Marketing, ICS3U; 'demo' = ~/Desktop/Teaching, the three published demo courses); `expectText` lists words the finished picture must show, read back with Vision text recognition, so a picture of the wrong state fails its scene; `awaiting_capture` marks a shot the pages already name whose capture waits for the release it photographs (build.py renders nothing for it meanwhile); `waiting_on: \"#<issue>\"` beside it names the GitHub issue a capture waits on for a reason that is not the release — `--deploy` lets such a shot through, and the capture removes both flags; `windows: true` marks the ids capture_windows.py also takes; `windows: false` marks a scene Windows does not have yet, so its visitors are shown the Mac picture and any older `-windows` file is ignored.",
   "shots": [
     {
       "id": "hero",
@@ -18,46 +18,34 @@
       "id": "courses",
       "capture": {
         "kind": "app-window",
-        "test": "testCourseList",
+        "test": "testCourses",
         "scene": "courses",
         "workspace": "marketing"
       },
-      "alt": "The Plantoir window listing three courses in a sidebar, with one section open beside it.",
-      "caption": "Every course you teach and every class section, in one window.",
-      "windows": true,
-      "retake": {
-        "test": "testCourses",
-        "alt": "The Plantoir window: ICS3U and ICS4U in the sidebar, last year's ICS3U filed under Reference Courses, and ICS3U's settings open beside them.",
-        "caption": "Every course you teach, and last year's beside them.",
-        "expectText": [
-          "ICS3U",
-          "ICS4U",
-          "Reference Courses",
-          "2025"
-        ],
-        "why": "The image on the site still shows the v1.1.0 interface; the capture takes the new one and promotes these words in the same change, so the words never describe a picture that is not there yet."
-      }
+      "alt": "The Plantoir window: ICS3U and ICS4U in the sidebar, last year's ICS3U filed under Reference Courses, and ICS3U's settings open beside them.",
+      "caption": "Every course you teach, and last year's beside them.",
+      "windows": false,
+      "expectText": [
+        "ICS3U",
+        "ICS4U",
+        "Reference Courses",
+        "2025"
+      ]
     },
     {
       "id": "new-course",
       "capture": {
         "kind": "app-window",
-        "test": "testNewCourseWizard",
+        "test": "testNewCourse",
         "scene": "new-course",
         "workspace": "marketing"
       },
-      "alt": "The new course panel, with a course code entered and a summary of the pages about to be created.",
-      "caption": "Adding a course takes one panel and about a minute.",
-      "windows": true,
-      "retake": {
-        "test": "testNewCourse",
-        "alt": "The New Course panel with TEJ3M entered, offering its ready-made pages, folders and curriculum expectations.",
-        "caption": "A course code is enough to start.",
-        "expectText": [
-          "TEJ3M"
-        ],
-        "why": "As for courses: promoted when the new picture is taken."
-      }
+      "alt": "The New Course panel with TEJ3M entered and its suggested course names offered beneath.",
+      "caption": "A course code is enough to start.",
+      "windows": false,
+      "expectText": [
+        "TEJ3M"
+      ]
     },
     {
       "id": "progress",
@@ -208,7 +196,8 @@
           ]
         }
       },
-      "awaiting_capture": true
+      "awaiting_capture": true,
+      "waiting_on": "#367"
     },
     {
       "id": "reference",
@@ -218,15 +207,14 @@
         "scene": "reference",
         "test": "testReferenceAndCopyAPage"
       },
-      "alt": "The Plantoir sidebar with last year's ICS3U under Reference Courses, 2025–26, and a sheet copying one of its pages into ICS4U, with the pages it links to ticked.",
+      "alt": "The Plantoir sidebar with last year's ICS3U under Reference Courses, 2025–26, and a sheet about to copy one of its pages into ICS4U, with \"Also copy the pages this page links to\" ticked.",
       "caption": "Last year's course, to read and borrow from — never published.",
       "expectText": [
         "Reference Courses",
         "2025",
         "The Unplugged Algorithm",
         "ICS4U"
-      ],
-      "awaiting_capture": true
+      ]
     },
     {
       "id": "start-of-year",
@@ -241,8 +229,7 @@
       "expectText": [
         "ICS3U",
         "Draft"
-      ],
-      "awaiting_capture": true
+      ]
     },
     {
       "id": "two-maps",
@@ -274,8 +261,7 @@
             "CRD-2"
           ]
         }
-      },
-      "awaiting_capture": true
+      }
     },
     {
       "id": "curriculum-settings",
@@ -290,8 +276,7 @@
       "expectText": [
         "Curriculum",
         "College Board Curriculum"
-      ],
-      "awaiting_capture": true
+      ]
     },
     {
       "id": "both-curricula",
@@ -307,8 +292,7 @@
         "Curriculum connection",
         "B3.1",
         "AAP-2.A"
-      ],
-      "awaiting_capture": true
+      ]
     },
     {
       "id": "how-i-teach",
@@ -323,7 +307,8 @@
       "expectText": [
         "How I Teach"
       ],
-      "awaiting_capture": true
+      "awaiting_capture": true,
+      "waiting_on": "#367"
     },
     {
       "id": "club",
@@ -333,13 +318,12 @@
         "scene": "club",
         "test": "testClubWizard"
       },
-      "alt": "The New Course panel with \"This is a club\" ticked for CODING: meetings in \"All Meetings\", pages named Week 1, Week 2, and a front page headed \"Most Recent Meeting\".",
+      "alt": "The New Course or Club panel with CODING entered and \"This is a club\" switched on, explaining that a club's pages are numbered one after another, it has no curriculum, and it starts with a page for its first meeting.",
       "caption": "Clubs start the way clubs do.",
       "expectText": [
         "CODING",
-        "Most Recent Meeting"
-      ],
-      "awaiting_capture": true
+        "This is a club"
+      ]
     }
   ]
 }

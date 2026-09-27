@@ -42,6 +42,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
+from datetime import date, timedelta
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -221,6 +222,16 @@ def keep_out_of_sidebar(course_dir: Path, name: str, report: Report) -> None:
     update_config(course_dir, change, report, f"{name} kept out of the sidebar")
 
 
+def netlify_site_recorded(course_dir: Path) -> bool:
+    """True when deploy.py has recorded a Netlify site for this course."""
+    if (course_dir / ".netlify_sites").exists():
+        return True
+    for marker in course_dir.glob("section*/.netlify_site.json"):
+        if marker.is_file():
+            return True
+    return False
+
+
 def publish_to_folder(course_dir: Path, destination: Path, report: Report) -> None:
     """Make the course publish to a folder — but only a course that has not
     been pointed anywhere else: a destination somebody chose is left alone."""
@@ -229,9 +240,14 @@ def publish_to_folder(course_dir: Path, destination: Path, report: Report) -> No
         path = str(config.get("deploy_folder_path", ""))
         if target == FOLDER_DESTINATION and path == str(destination):
             return False
-        # Only a course nobody has pointed anywhere: an empty target. "netlify"
-        # written out is a choice somebody made, and is left alone.
-        if target != "" or (path and path != str(destination)):
+        # Only a course nobody has pointed anywhere. The new-course panel
+        # writes "netlify" for every course it makes (measured on the first
+        # real set-up, 2026-09-27), so the word alone is not a choice: Netlify
+        # counts as chosen once a site is recorded for the course
+        # (deploy.py's `.netlify_sites/` marker, or a section's older
+        # `.netlify_site.json`). Anything else written out is left alone.
+        unchosen: bool = target == "" or (target == "netlify" and not netlify_site_recorded(course_dir))
+        if not unchosen or (path and path != str(destination)):
             report.skip(f"{course_dir.name} publishes to {target or 'Netlify'} {path}; left as it is")
             return False
         config["deploy_target"] = FOLDER_DESTINATION
@@ -309,6 +325,78 @@ def add_how_i_teach(course_dir: Path, report: Report, source: Path = HOW_I_TEACH
                     f"{course_dir.name}/{HOW_I_TEACH_NAME}")
 
 
+# The start-of-year scene is "the week before school starts" for section 2,
+# so section 2 is a SECOND-SEMESTER section: its classes begin on this day.
+# Measured 2026-09-27: the payload's classes run from 2026-09-08, so on the
+# day of the capture 13 of them were "dated before today" and the sheet led
+# with an orange warning about students losing classes already taught — a
+# true sentence about the wrong story. Section 1 keeps the payload's dates:
+# the maps, the preview and the scheduled publish are all section 1.
+SECOND_SEMESTER_SECTION = 2
+SECOND_SEMESTER_STARTS = date(2027, 2, 1)
+DATE_LINE = re.compile(r"^(?P<key>created|createdSection\d+): (?P<day>\d{4}-\d{2}-\d{2})(?P<rest>T.*)?$")
+
+
+def section_dates(course_dir: Path, section: int) -> list[tuple[Path, str]]:
+    """Every page carrying a date for `section`, with the key that carries it:
+    `created:` on the section's own pages, `createdSection<N>:` on shared ones."""
+    found: list[tuple[Path, str]] = []
+    own = course_dir / f"section{section}"
+    for page in sorted(course_dir.rglob("*.md")):
+        if COLLEGE_BOARD_FOLDER in page.parts:
+            continue
+        key = "created" if own in page.parents else f"createdSection{section}"
+        found.append((page, key))
+    return found
+
+
+def move_section_to_second_semester(course_dir: Path, report: Report,
+                                    section: int = SECOND_SEMESTER_SECTION,
+                                    starts: date = SECOND_SEMESTER_STARTS) -> None:
+    """Shift every date `section` carries by whole weeks, so its first class
+    falls in the week of `starts` and every class keeps its weekday.
+
+    Idempotent: nothing moves once the earliest date is on or after the start
+    of that week. Only the date lines change; the rest of each page is left
+    byte for byte.
+    """
+    pages = section_dates(course_dir, section)
+    earliest: date | None = None
+    for page, key in pages:
+        for line in page.read_text(encoding="utf-8").split("\n"):
+            match = DATE_LINE.match(line)
+            if match and match.group("key") == key:
+                day = date.fromisoformat(match.group("day"))
+                earliest = day if earliest is None or day < earliest else earliest
+    week_start = starts - timedelta(days=starts.weekday())
+    if earliest is None:
+        report.skip(f"{course_dir.name} section {section} — no dated pages to move")
+        return
+    if earliest >= week_start:
+        report.note("already there", f"{course_dir.name} section {section} starts {earliest.isoformat()}")
+        return
+    weeks = ((week_start - (earliest - timedelta(days=earliest.weekday()))).days) // 7
+    shift = timedelta(weeks=weeks)
+    moved = 0
+    for page, key in pages:
+        text = page.read_text(encoding="utf-8")
+        lines = text.split("\n")
+        changed = False
+        for index, line in enumerate(lines):
+            match = DATE_LINE.match(line)
+            if not match or match.group("key") != key:
+                continue
+            day = date.fromisoformat(match.group("day")) + shift
+            lines[index] = f"{key}: {day.isoformat()}{match.group('rest') or ''}"
+            changed = True
+        if changed:
+            page.write_text("\n".join(lines), encoding="utf-8")
+            moved += 1
+    first = earliest + shift
+    report.note("made", f"{course_dir.name} section {section} moved {weeks} weeks to a second semester "
+                        f"starting {first.isoformat()} ({moved} pages)")
+
+
 def apply_file_steps(folder: Path, college_board_pages: dict[str, str] | None,
                      rows: list[dict] | None = None) -> Report:
     """Everything that is files rather than the app, in order.
@@ -331,6 +419,7 @@ def apply_file_steps(folder: Path, college_board_pages: dict[str, str] | None,
     link_activities(course_dir, rows if rows is not None else load_correlation(), report)
     add_how_i_teach(course_dir, report)
     publish_to_folder(course_dir, folder / PUBLISH_FOLDER_NAME, report)
+    move_section_to_second_semester(course_dir, report)
     return report
 
 

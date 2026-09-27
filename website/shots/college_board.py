@@ -94,7 +94,14 @@ def fetch_ced(sources: Path, codes: dict | None = None) -> Path:
         print(f"   Downloading the Course and Exam Description from {source['url']}")
         partial = destination.with_suffix(".partial")
         try:
-            with urllib.request.urlopen(source["url"], timeout=120) as response, partial.open("wb") as handle:
+            # The College Board's server answers Python's own User-Agent with
+            # 403 Forbidden (measured 2026-09-27); a browser's is served the
+            # same file, and the hash below is what says it is the right one.
+            request = urllib.request.Request(source["url"], headers={
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 "
+                              "(KHTML, like Gecko) Version/18.0 Safari/605.1.15",
+            })
+            with urllib.request.urlopen(request, timeout=120) as response, partial.open("wb") as handle:
                 while True:
                     block = response.read(1 << 20)
                     if not block:

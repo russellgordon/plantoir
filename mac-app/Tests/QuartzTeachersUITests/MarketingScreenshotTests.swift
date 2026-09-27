@@ -229,12 +229,25 @@ class MarketingScreenshotCase: XCTestCase {
         return bestNumber
     }
 
+    /// A course's row in the sidebar, by the identifier the row carries
+    /// (`sidebar-<CODE>`) or, failing that, by its label. Matching by the
+    /// code alone (`outlines.staticTexts[code]`) stopped finding the row in
+    /// the marketing folder on 2026-09-27 although the tree showed it, label
+    /// and all; the identifier is what the sidebar sets on purpose. The
+    /// first match is the live course, above any reference copy carrying the
+    /// same code.
+    func courseRow(_ code: String, in application: XCUIApplication) -> XCUIElement {
+        return application.descendants(matching: .any)
+            .matching(identifier: "sidebar-\(code)")
+            .firstMatch
+    }
+
     /// Opens a course's section in the sidebar and returns the main window.
     @discardableResult
     func openSection(_ sectionNumber: Int, ofCourse code: String, in application: XCUIApplication) -> XCUIElement {
-        let courseRow: XCUIElement = application.outlines.staticTexts[code].firstMatch
-        XCTAssertTrue(courseRow.waitForExistence(timeout: 30), "\(code) should be in the sidebar")
-        courseRow.click()
+        let row: XCUIElement = courseRow(code, in: application)
+        XCTAssertTrue(row.waitForExistence(timeout: 30), "\(code) should be in the sidebar")
+        row.click()
         application.typeKey(.rightArrow, modifierFlags: [])
 
         let sectionRow: XCUIElement = application.descendants(matching: .any)
@@ -255,9 +268,9 @@ class MarketingScreenshotCase: XCTestCase {
     func openCourse(_ code: String, in application: XCUIApplication) -> XCUIElement {
         // firstMatch: a reference copy of the course carries the same code
         // further down the sidebar, and the live course is always above it.
-        let courseRow: XCUIElement = application.outlines.staticTexts[code].firstMatch
-        XCTAssertTrue(courseRow.waitForExistence(timeout: 30), "\(code) should be in the sidebar")
-        courseRow.click()
+        let row: XCUIElement = courseRow(code, in: application)
+        XCTAssertTrue(row.waitForExistence(timeout: 30), "\(code) should be in the sidebar")
+        row.click()
         XCTAssertTrue(
             application.textFields["courseNameField"].waitForExistence(timeout: 20),
             "The settings form for \(code) should appear"
@@ -273,21 +286,95 @@ class MarketingScreenshotCase: XCTestCase {
     /// back showing the top of the form as though nothing had been asked for.
     @discardableResult
     func scrollSettings(in application: XCUIApplication, to identifier: String) -> Bool {
-        let window: XCUIElement = application.windows.firstMatch
         let target: XCUIElement = application.descendants(matching: .any)
             .matching(identifier: identifier).firstMatch
-        for _ in 0..<25 {
-            if target.exists && target.isHittable && window.frame.contains(target.frame) {
+        return scrollForm(in: application, until: target)
+    }
+
+    /// Scroll the form under the pointer until `target` sits inside the
+    /// window with `margin` points to spare below it — "on screen" by a
+    /// sliver is a picture with the subject cut off at the bottom edge.
+    func scrollForm(in application: XCUIApplication, until target: XCUIElement, margin: CGFloat = 140) -> Bool {
+        let window: XCUIElement = application.windows.firstMatch
+        // Judged by the frame alone: a table (or a row in one) can be on
+        // screen and still report itself not hittable, and waiting for that
+        // scrolled the curriculum table 1,900 points past the window. An
+        // element off screen reports a zero frame outside the window.
+        func placed() -> Bool {
+            guard target.exists else {
+                return false
+            }
+            let frame: CGRect = target.frame
+            return window.frame.contains(frame) && frame.maxY <= window.frame.maxY - margin
+        }
+        for _ in 0..<40 {
+            if placed() {
                 return true
             }
-            // swipeUp rather than scroll(byDeltaX:deltaY:): the delta form
-            // is accepted and does nothing on these SwiftUI scroll views, so
-            // the capture came back showing the top of the form as though
-            // nothing had been asked for.
-            window.swipeUp()
+            // A real scroll-wheel event, posted where the pointer is. Neither
+            // scroll(byDeltaX:deltaY:) nor swipeUp() moves these SwiftUI forms
+            // (measured again 2026-09-27: the curriculum table stayed 950
+            // points below the window through 25 swipes). The pointer is put
+            // over the form first — the right-hand part of the window, clear
+            // of the sidebar — because a wheel event scrolls what is under it.
+            let overForm: XCUICoordinate = window.coordinate(withNormalizedOffset: CGVector(dx: 0.62, dy: 0.55))
+            overForm.hover()
+            // Back up when the target has gone past the top of the window.
+            let isAbove: Bool = target.exists && target.frame.height > 0 && target.frame.maxY < window.frame.minY + 60
+            scrollWheel(lines: isAbove ? 4 : -4)
             Thread.sleep(forTimeInterval: 0.35)
         }
-        return target.exists && target.isHittable
+        return placed()
+    }
+
+    /// Where text containing `words` is on a web page, or nil.
+    ///
+    /// Read from ONE snapshot of the web view and searched here, in Swift. A
+    /// web view gives its text as a value as often as a label, some values
+    /// are numbers, and a query predicate's CONTAINS on a number THROWS
+    /// rather than being false (measured 2026-09-27) — while `containing`
+    /// asks about descendants, which could not find "B3.1" on a map that
+    /// plainly showed it.
+    @MainActor
+    func webTextFrame(containing words: String, in webView: XCUIElement) -> CGRect? {
+        guard let root = try? webView.snapshot() else {
+            return nil
+        }
+        // The LOWEST match on the page: the same words can also be in a
+        // table of contents near the top, and stopping at that one left the
+        // real heading below the window.
+        var lowest: CGRect?
+        var pending: [XCUIElementSnapshot] = [root]
+        while let node = pending.popLast() {
+            let value: String = node.value as? String ?? ""
+            if node.label.contains(words) || value.contains(words) {
+                if lowest == nil || node.frame.minY > lowest!.minY {
+                    lowest = node.frame
+                }
+            }
+            pending.append(contentsOf: node.children)
+        }
+        return lowest
+    }
+
+    /// Wait up to `timeout` seconds for text containing `words`.
+    @MainActor
+    func waitForWebText(_ words: String, in webView: XCUIElement, timeout: TimeInterval) -> Bool {
+        let deadline: Date = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if webTextFrame(containing: words, in: webView) != nil {
+                return true
+            }
+            Thread.sleep(forTimeInterval: 0.5)
+        }
+        return false
+    }
+
+    /// One scroll-wheel event at the pointer; negative lines scroll down.
+    func scrollWheel(lines: Int32) {
+        let event: CGEvent? = CGEvent(scrollWheelEvent2Source: nil, units: .line, wheelCount: 1,
+                                      wheel1: lines, wheel2: 0, wheel3: 0)
+        event?.post(tap: .cghidEventTap)
     }
 
     /// True when the Mac is set to dark appearance.
@@ -366,7 +453,7 @@ final class MarketingScreenshots: MarketingScreenshotCase {
     func test2NewCourse() throws {
         let application: XCUIApplication = launchApp(workspacePath: try demoWorkspacePath())
         let window: XCUIElement = application.windows.firstMatch
-        XCTAssertTrue(application.outlines.staticTexts["ENG2D"].waitForExistence(timeout: 30))
+        XCTAssertTrue(courseRow("ENG2D", in: application).waitForExistence(timeout: 30))
 
         application.buttons["addCourseButton"].click()
         let codeField: XCUIElement = application.textFields["wizardCourseCodeField"]
@@ -650,7 +737,7 @@ final class DemoWorkspaceProvisioning: MarketingScreenshotCase {
         ]
 
         for course in wanted {
-            if application.outlines.staticTexts[course.code].waitForExistence(timeout: 5) {
+            if courseRow(course.code, in: application).waitForExistence(timeout: 5) {
                 continue
             }
             try createCourse(code: course.code, sections: course.sections, in: application)
@@ -658,7 +745,7 @@ final class DemoWorkspaceProvisioning: MarketingScreenshotCase {
 
         for course in wanted {
             XCTAssertTrue(
-                application.outlines.staticTexts[course.code].waitForExistence(timeout: 60),
+                courseRow(course.code, in: application).waitForExistence(timeout: 60),
                 "\(course.code) should have been created"
             )
         }
@@ -721,7 +808,7 @@ extension MarketingScreenshotCase {
         // Waiting for the row first is a wait that never ends.
         closeButton.click()
 
-        let created: XCUIElement = application.outlines.staticTexts[code]
+        let created: XCUIElement = courseRow(code, in: application)
         XCTAssertTrue(created.waitForExistence(timeout: 180), "\(code) should appear in the sidebar once the panel closes")
         Thread.sleep(forTimeInterval: 2.0)
     }
@@ -766,7 +853,7 @@ final class MarketingScenes: MarketingScreenshotCase {
         let application: XCUIApplication = launchApp(workspacePath: try demoWorkspacePath())
         unfoldReferenceYear(in: application)
         let window: XCUIElement = openCourse(MarketingScenes.course, in: application)
-        XCTAssertTrue(application.outlines.staticTexts[MarketingScenes.secondCourse].exists,
+        XCTAssertTrue(courseRow(MarketingScenes.secondCourse, in: application).exists,
                       "ICS4U should be in the sidebar beside ICS3U")
         settle(2.0)
         save(window, as: "courses")
@@ -776,7 +863,7 @@ final class MarketingScenes: MarketingScreenshotCase {
     func testNewCourse() throws {
         let application: XCUIApplication = launchApp(workspacePath: try demoWorkspacePath())
         let window: XCUIElement = application.windows.firstMatch
-        XCTAssertTrue(application.outlines.staticTexts[MarketingScenes.course].waitForExistence(timeout: 30))
+        XCTAssertTrue(courseRow(MarketingScenes.course, in: application).waitForExistence(timeout: 30))
         openNewCoursePanel(typing: "TEJ3M", sections: "1, 2", in: application)
         settle(1.5)
         save(window, as: "new-course")
@@ -787,7 +874,7 @@ final class MarketingScenes: MarketingScreenshotCase {
     func testClubWizard() throws {
         let application: XCUIApplication = launchApp(workspacePath: try demoWorkspacePath())
         let window: XCUIElement = application.windows.firstMatch
-        XCTAssertTrue(application.outlines.staticTexts[MarketingScenes.course].waitForExistence(timeout: 30))
+        XCTAssertTrue(courseRow(MarketingScenes.course, in: application).waitForExistence(timeout: 30))
         openNewCoursePanel(typing: "CODING", sections: "1", in: application)
 
         let clubToggle: XCUIElement = application.descendants(matching: .any)
@@ -797,11 +884,13 @@ final class MarketingScenes: MarketingScreenshotCase {
             clubToggle.click()
         }
         XCTAssertEqual(clubToggle.value as? Int, 1, "The club toggle should be ticked before the picture")
-        // The club's own fields sit lower in the panel. A form XCUITest cannot
-        // scroll is photographed only when the field is on screen; anything
-        // else would be a picture of the top of the panel filed as a club.
-        XCTAssertTrue(scrollSettings(in: application, to: "clubFrontPageHeadingField"),
-                      "The club's front-page heading should be on screen")
+        // Framed at the top of the panel: CODING and the ticked switch, with
+        // the switch's own explanation under it, are what say "club". The
+        // meeting fields sit a screen further down and cannot share the
+        // frame; a picture of them alone read as the ordinary course panel
+        // (website-B review M3), since that part still says Units and Create
+        // Course (#368).
+        XCTAssertTrue(clubToggle.isHittable, "The club switch should be on screen")
         settle(1.5)
         save(window, as: "club")
         application.buttons["wizardCloseButton"].click()
@@ -826,6 +915,10 @@ final class MarketingScenes: MarketingScreenshotCase {
         let toggle: XCUIElement = table.descendants(matching: .any)
             .matching(identifier: "toggle-\(MarketingScenes.collegeBoardFolder)").firstMatch
         XCTAssertTrue(toggle.waitForExistence(timeout: 10), "College Board Curriculum should be in the list")
+        // The table can be on screen with its rows still below the edge: a
+        // row off screen reports a zero frame and cannot be clicked.
+        XCTAssertTrue(scrollForm(in: application, until: toggle),
+                      "College Board Curriculum's tick box should be on screen")
         if (toggle.value as? Int ?? 0) != 1 {
             toggle.click()
         }
@@ -852,13 +945,37 @@ final class MarketingScenes: MarketingScreenshotCase {
         XCTAssertTrue(item.waitForExistence(timeout: 15), "The section menu should offer to get ready (#96)")
         item.click()
 
-        let go: XCUIElement = application.buttons["startOfYearGo"]
+        // The sheet's own identifier is set on its whole stack, and SwiftUI
+        // hands that to every child in place of the children's own —
+        // `startOfYearGo` never reaches the accessibility tree (measured:
+        // Cancel and Go both read `startOfYearSheet`). So Go is the sheet's
+        // button that is not Cancel, and the plan is ready when it exists.
+        let sheet: XCUIElement = application.sheets.firstMatch
+        let go: XCUIElement = sheet.buttons
+            .matching(NSPredicate(format: "label != %@", "Cancel")).firstMatch
         XCTAssertTrue(go.waitForExistence(timeout: 60), "The plan should appear")
         // An empty plan photographed as the feature is the failure this
-        // guards: the button counts the pages, and is disabled at none.
+        // guards: the button is disabled when the plan changes nothing (#96).
         XCTAssertTrue(go.isEnabled, "There should be pages to put into draft")
-        XCTAssertTrue(go.label.range(of: "[1-9]", options: .regularExpression) != nil,
-                      "The button should count the pages it will put into draft; it says \(go.label)")
+        // The plan's lists arrive folded: "going into draft" (classes, then
+        // pages) and, last, "staying as they are". The page's copy says the
+        // plan gives each page's reason, so unfold every list but the last.
+        let triangles: XCUIElementQuery = sheet.disclosureTriangles
+        XCTAssertGreaterThanOrEqual(triangles.count, 2,
+                                    "The plan should list what goes into draft and what stays")
+        // Unfold ONE list, the pages: their reasons ("first used in …") are
+        // what the copy promises, and the classes' list above it is 80-odd
+        // rows of "comes after …" that would push everything else out of
+        // the sheet. The lists come in order — classes, pages, what stays,
+        // links left — so the pages are the second when both are there.
+        let pagesList: XCUIElement = triangles.count >= 3
+            ? triangles.element(boundBy: 1)
+            : triangles.element(boundBy: 0)
+        // Its frame begins left of the chevron and runs over the label, and a
+        // click on the label does not unfold it: the chevron is drawn about
+        // 26 points in (measured on the capture).
+        pagesList.coordinate(withNormalizedOffset: CGVector(dx: 0.0, dy: 0.5))
+            .withOffset(CGVector(dx: 26, dy: 0)).click()
         settle(1.5)
         save(window, as: "start-of-year")
         application.buttons["Cancel"].firstMatch.click()
@@ -883,21 +1000,49 @@ final class MarketingScenes: MarketingScreenshotCase {
         picker.click()
         picker.typeText(MarketingScenes.pageToBorrow)
         settle(1.0)
-        application.typeKey(.return, modifierFlags: [])
+        // Choose the page from the picker's own list. Return left the list
+        // open over the destination pop-up, which then could not be clicked
+        // (measured: the row at y 484–526 covering the pop-up at y 500).
+        let row: XCUIElement = application.buttons
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier CONTAINS %@",
+                                  "copyPageRow-", MarketingScenes.pageToBorrow)).firstMatch
+        if row.waitForExistence(timeout: 10) {
+            row.click()
+        } else {
+            application.typeKey(.return, modifierFlags: [])
+        }
+        settle(1.0)
 
         let destination: XCUIElement = application.popUpButtons["copyPageDestinationCourse"]
         XCTAssertTrue(destination.waitForExistence(timeout: 10))
         destination.click()
         application.menuItems[MarketingScenes.secondCourse].firstMatch.click()
 
-        let checklist: XCUIElement = application.descendants(matching: .any)
-            .matching(identifier: "copyPageChecklist").firstMatch
-        XCTAssertTrue(checklist.waitForExistence(timeout: 20), "The pages it links to should be listed")
+        // The checklist is the sheet's SECOND step: the first press of Copy
+        // only works out what the copy would do and lists the linked pages;
+        // nothing is written until Copy is pressed again, which this never
+        // does. (A page that links to nothing is copied on the first press —
+        // The Unplugged Algorithm links three pages ICS4U does not have,
+        // checked in the folder on 2026-09-27.)
+        //
+        // It is NOT pressed here. Measured on 2026-09-27 in the marketing
+        // folder, the checklist for this page ran to 70-odd lines of "sits
+        // outside the course's folders" and "is already in this course" —
+        // the links are followed page to page, the College Board embeds among
+        // them — and the sheet grew taller than the screen, Cancel with it.
+        // That is a finding for the app, not a picture; the scene shows the
+        // question the sheet asks instead: which page, into which course,
+        // and whether to bring the pages it links to.
+        let copyButton: XCUIElement = application.buttons["copyPageButton"]
+        XCTAssertTrue(copyButton.waitForExistence(timeout: 10) && copyButton.isEnabled,
+                      "Copy should be allowed once a page and a course are chosen")
+        XCTAssertEqual(application.checkBoxes["copyPageAlsoLinked"].value as? Int, 1,
+                       "The pages it links to should be coming too")
         XCTAssertFalse(application.descendants(matching: .any).matching(identifier: "copyPageRefusal").firstMatch.exists,
                        "Copying into ICS4U should not be refused")
         settle(1.5)
         save(window, as: "reference")
-        application.buttons["Cancel"].firstMatch.click()
+        application.typeKey(.escape, modifierFlags: [])
     }
 
     /// The Schedule Deploy sheet, with its plan line. Cancelled: the real
@@ -920,6 +1065,7 @@ final class MarketingScenes: MarketingScreenshotCase {
     }
 
     /// Both coverage maps, and one lesson counted on both, from ONE preview.
+    @MainActor
     func testTwoMapsAndBothCurricula() throws {
         let application: XCUIApplication = launchApp(workspacePath: try demoWorkspacePath())
         let window: XCUIElement = openSection(1, ofCourse: MarketingScenes.course, in: application)
@@ -934,8 +1080,7 @@ final class MarketingScenes: MarketingScreenshotCase {
         openInSite("Curriculum Coverage", in: application)
         // Search also finds "College Board Curriculum Coverage"; the Ontario
         // map is the one listing an Ontario code, and it must be THIS page.
-        XCTAssertTrue(webView.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "B3.1")).firstMatch
-                        .waitForExistence(timeout: 10),
+        XCTAssertTrue(waitForWebText("B3.1", in: webView, timeout: 10),
                       "The first map photographed should be the Ontario one")
         save(window, as: "map-ontario")
 
@@ -943,16 +1088,27 @@ final class MarketingScenes: MarketingScreenshotCase {
         // An EMPTY second map is the failure that reports success: the page
         // exists, every step is green, and nothing is shaded. A code the
         // correlation links must be on it.
-        XCTAssertTrue(webView.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "AAP-2.A")).firstMatch
-                        .waitForExistence(timeout: 10),
+        XCTAssertTrue(waitForWebText("AAP-2.A", in: webView, timeout: 10),
                       "The College Board map should list the objectives its pages reach")
         save(window, as: "map-college-board")
 
         openInSite(MarketingScenes.pageToBorrow, in: application)
-        let connection: XCUIElement = webView.staticTexts["Curriculum connection"].firstMatch
-        XCTAssertTrue(connection.waitForExistence(timeout: 10), "The lesson should have its curriculum connection")
-        // A web view scrolls where a SwiftUI form does not.
-        for _ in 0..<12 where !connection.isHittable {
+        XCTAssertTrue(waitForWebText("Curriculum connection", in: webView, timeout: 10),
+                      "The lesson should have its curriculum connection")
+        // Up into the top third of the window, so the quoted expectations
+        // under it are in the picture too (merely hittable left the heading
+        // on the bottom edge and both codes below it).
+        let top: CGFloat = window.frame.minY + window.frame.height * 0.3
+        func connectionIsHigh() -> Bool {
+            guard let frame = webTextFrame(containing: "Curriculum connection", in: webView) else {
+                return false
+            }
+            return frame.minY > window.frame.minY && frame.minY < top
+        }
+        for _ in 0..<30 where !connectionIsHigh() {
+            // XCUITest's own scroll here: it moves a web view (a posted
+            // wheel event does not — measured, thirty of them, no movement),
+            // where it does nothing to a SwiftUI form.
             webView.scroll(byDeltaX: 0, deltaY: -120)
             settle(0.3)
         }
@@ -964,7 +1120,7 @@ final class MarketingScenes: MarketingScreenshotCase {
         application.typeKey("k", modifierFlags: .command)
         application.typeText("How I Teach")
         settle(2.0)
-        XCTAssertFalse(webView.links.containing(NSPredicate(format: "label CONTAINS %@", "How I Teach")).firstMatch.exists,
+        XCTAssertFalse(webView.links.matching(NSPredicate(format: "label CONTAINS %@", "How I Teach")).firstMatch.exists,
                        "How I Teach must not be on the built site")
         application.typeKey(.escape, modifierFlags: [])
 
@@ -998,20 +1154,72 @@ final class MarketingScenes: MarketingScreenshotCase {
     func unfoldReferenceYear(in application: XCUIApplication) {
         let year: XCUIElement = application.descendants(matching: .any)
             .matching(NSPredicate(format: "identifier BEGINSWITH %@", "referenceYear-")).firstMatch
+        // The group itself starts folded in a fresh window (the app remembers
+        // it open only for a window it restores), and a folded group shows
+        // no year at all. Its header is a sidebar SECTION, whose chevron
+        // appears on hover.
+        if !year.waitForExistence(timeout: 5) {
+            expandReferenceGroup(in: application)
+        }
         XCTAssertTrue(year.waitForExistence(timeout: 30), "Reference Courses should have a school year in it")
         if !referenceCourseRow(in: application).exists {
-            year.click()
-            application.typeKey(.rightArrow, modifierFlags: [])
+            // The year's own disclosure triangle, in the outline row that
+            // holds it: a click on the year's label selects nothing and
+            // unfolds nothing (the first capture showed 2025–26 still shut).
+            let yearRow: XCUIElement = application.outlineRows
+                .containing(NSPredicate(format: "identifier BEGINSWITH %@", "referenceYear-")).firstMatch
+            let triangle: XCUIElement = yearRow.disclosureTriangles.firstMatch
+            if triangle.exists {
+                triangle.click()
+            } else {
+                year.click()
+                application.typeKey(.rightArrow, modifierFlags: [])
+            }
             settle(1.0)
         }
+        XCTAssertTrue(referenceCourseRow(in: application).waitForExistence(timeout: 10),
+                      "Last year's ICS3U should be showing under 2025–26")
+    }
+
+    /// Open the sidebar's "Reference Courses" section. The header is found by
+    /// its row in the sidebar outline — the row after the live courses — and
+    /// its chevron, which SwiftUI draws only while the pointer is over it.
+    func expandReferenceGroup(in application: XCUIApplication) {
+        let sidebar: XCUIElement = application.descendants(matching: .any)
+            .matching(identifier: "coursesSidebar").firstMatch
+        let header: XCUIElement = sidebar.outlineRows
+            .containing(NSPredicate(format: "label == %@", "Reference Courses")).firstMatch
+        XCTAssertTrue(header.waitForExistence(timeout: 20), "The sidebar should show the Reference Courses group")
+        // A section header row reports itself not hittable, so it is reached
+        // by coordinate. The chevron sits at the row's trailing end.
+        header.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
+        settle(0.6)
+        let chevron: XCUIElement = header.descendants(matching: .any)
+            .matching(NSPredicate(format: "elementType == %d OR elementType == %d",
+                                  XCUIElement.ElementType.button.rawValue,
+                                  XCUIElement.ElementType.disclosureTriangle.rawValue)).firstMatch
+        if chevron.exists && chevron.isHittable {
+            chevron.click()
+        } else {
+            // No chevron exposed to accessibility: click where it is drawn.
+            header.coordinate(withNormalizedOffset: CGVector(dx: 0.0, dy: 0.5))
+                .withOffset(CGVector(dx: header.frame.width - 14, dy: 0)).click()
+        }
+        settle(1.0)
     }
 
     /// Last year's ICS3U: the course row under the reference group, which is
     /// the SECOND row the sidebar shows for that code.
     func referenceCourseRow(in application: XCUIApplication) -> XCUIElement {
-        let rows: XCUIElementQuery = application.outlines.staticTexts.matching(
-            NSPredicate(format: "label BEGINSWITH %@", MarketingScenes.course)
-        )
+        // By the identifier the sidebar sets (`sidebar-<code>`), never through
+        // `outlines.staticTexts`, which missed rows the tree showed. A
+        // reference copy's code may be its folder name (ICS3U-2025), so both
+        // spellings count; section rows (`…-section1`) do not.
+        let code: String = MarketingScenes.course
+        let rows: XCUIElementQuery = application.descendants(matching: .any).matching(NSPredicate(
+            format: "identifier == %@ OR (identifier BEGINSWITH %@ AND NOT (identifier CONTAINS %@))",
+            "sidebar-\(code)", "sidebar-\(code)-", "-section"
+        ))
         if rows.count > 1 {
             return rows.element(boundBy: rows.count - 1)
         }
@@ -1020,6 +1228,14 @@ final class MarketingScenes: MarketingScreenshotCase {
 
     /// Open a page of the previewed site through its own search (Command-K).
     func openInSite(_ title: String, in application: XCUIApplication) {
+        // The site's search listens inside the page: Command-K reaches it only
+        // when the web view has focus, and after selecting a section the
+        // sidebar has it (measured 2026-09-27: every search stayed on the
+        // home page). A click in the empty band above the page title gives the web
+        // view focus without following a link.
+        let webView: XCUIElement = application.webViews.firstMatch
+        webView.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.03)).click()
+        settle(0.5)
         application.typeKey("k", modifierFlags: .command)
         settle(0.8)
         application.typeText(title)
@@ -1046,13 +1262,13 @@ final class MarketingFolderProvisioning: MarketingScreenshotCase {
         }
         let wanted: [(code: String, sections: String)] = [("ICS3U", "1, 2"), ("ICS4U", "1")]
         for course in wanted {
-            if application.outlines.staticTexts[course.code].waitForExistence(timeout: 5) {
+            if courseRow(course.code, in: application).waitForExistence(timeout: 5) {
                 continue
             }
             try createCourse(code: course.code, sections: course.sections, in: application)
         }
         for course in wanted {
-            XCTAssertTrue(application.outlines.staticTexts[course.code].waitForExistence(timeout: 60),
+            XCTAssertTrue(courseRow(course.code, in: application).waitForExistence(timeout: 60),
                           "\(course.code) should have been created")
         }
     }
@@ -1060,19 +1276,32 @@ final class MarketingFolderProvisioning: MarketingScreenshotCase {
     /// Keep a Copy for Reference… on ICS3U, filed under 2025–26.
     func testKeepACopyForReference() throws {
         let application: XCUIApplication = launchApp(workspacePath: try demoWorkspacePath())
-        let courseRow: XCUIElement = application.outlines.staticTexts["ICS3U"].firstMatch
-        XCTAssertTrue(courseRow.waitForExistence(timeout: 30))
+        let row: XCUIElement = courseRow("ICS3U", in: application)
+        if !row.waitForExistence(timeout: 30) {
+            // Say what the queries see, so a row the tree shows and the
+            // query misses can be told apart from a row that is not there.
+            let byIdentifier: Int = application.descendants(matching: .any).matching(identifier: "sidebar-ICS3U").count
+            let outlines: Int = application.outlines.count
+            let outlineTexts: Int = application.outlines.staticTexts.count
+            let windows: Int = application.windows.count
+            XCTFail("ICS3U's row was not found: \(byIdentifier) by identifier, \(outlines) outlines, "
+                    + "\(outlineTexts) texts in them, \(windows) windows")
+            return
+        }
         let alreadyKept: XCUIElement = application.descendants(matching: .any)
             .matching(NSPredicate(format: "identifier BEGINSWITH %@", "referenceYear-")).firstMatch
         if alreadyKept.waitForExistence(timeout: 5) {
             return
         }
-        courseRow.rightClick()
+        row.rightClick()
         let item: XCUIElement = application.descendants(matching: .any)
             .matching(identifier: "keepACopy-ICS3U").firstMatch
         XCTAssertTrue(item.waitForExistence(timeout: 15), "The course menu should offer Keep a Copy for Reference…")
         item.click()
-        let year: XCUIElement = application.popUpButtons["School year"].firstMatch
+        // The picker's "School year" is a text BESIDE it, not its label: the
+        // pop-up itself carries only its value (measured 2026-09-27), so it
+        // is found as the sheet's one pop-up.
+        let year: XCUIElement = application.sheets.firstMatch.popUpButtons.firstMatch
         XCTAssertTrue(year.waitForExistence(timeout: 15), "The sheet should ask for the school year")
         year.click()
         application.menuItems[MarketingScenes.referenceYearTitle].firstMatch.click()

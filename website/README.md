@@ -161,7 +161,12 @@ companions, and rebuilds the site.
 ### What it borrows and puts back
 
 The Mac's appearance, the app's remembered window sizes, the frontmost
-application, and any Safari window it opened. It holds off sleep while it runs
+application, and any Safari window it opened — and, for a `--scenes` run,
+the Mac-wide Keyboard navigation setting (`AppleKeyboardUIMode`), switched
+off so no sheet photographs with a focus ring and put back exactly after,
+including on SIGTERM/SIGHUP. Check it with
+`defaults read -g AppleKeyboardUIMode` after a run that died; the run prints
+the value to restore when it starts. It holds off sleep while it runs
 so a capture started at night survives the displays going dark — but the Mac
 itself has to stay awake and unlocked.
 
@@ -233,8 +238,11 @@ python3 website/build.py && python3 website/build.py --check
 **Before starting:** the screen unlocked and left alone for about an hour,
 Focus off, Plantoir's notifications allowed, the Safari profile `⎚` present,
 nothing else using Xcode, and the app built from the tree you are releasing
-(the Dock rebuild — `capture.py` photographs the newest Debug build in
-DerivedData). The run asks for Safari and UI-automation permission in its first
+(the Dock rebuild — `capture.py` tests the project in the checkout it sits in,
+and copies launchers from THAT checkout's Debug build, found by the
+`WorkspacePath` DerivedData records; until 2026-09-27 it took whichever
+`Plantoir-*` folder sorted last, which on a Mac with several clones was
+another clone's two-day-old bundle). The run asks for Safari and UI-automation permission in its first
 minute; answer both and walk away.
 
 **The marketing folder** (`website/shots/marketing_folder.py`) is made once and
@@ -251,13 +259,28 @@ missing, then, in the folder only — never the shipped payload:
   no reading of the columns can set out faithfully: `--provision` writes a draft
   of each into `.sources/College Board Curriculum drafts/`, and a person sets it
   out from the document into `.sources/College Board Curriculum/`, which is
-  then used as it is;
+  then used as it is (checked only for the objective's words and every EK
+  code — so READ the document's pages, not the draft: the drafts lose the
+  `←` arrows, even in statements not flagged as drawn, and miss a bullet
+  that runs onto the next page). The ten set out on 2026-09-27 put each
+  Text and Block form in its own fenced code block, the Block form as the
+  words drawn with nesting shown by indentation, the drawn boxes around
+  arguments left out and a box standing for a list or an index written as
+  `[ ]`;
 - an embed per objective in each activity `shots/csp-correlation.json` names,
   inside its existing `## Curriculum connection` block after the Ontario ones
   (the map counts transclusions, never plain links);
 - `How I Teach.md` (our own words, `shots/marketing/`), and a folder
   destination (`School Web Space`) so the scheduled publish makes nothing
-  public;
+  public. The new-course panel writes `deploy_target: netlify` for every
+  course, so `netlify` with no site recorded (`.netlify_sites/`, or a
+  section's older `.netlify_site.json`) is not a choice and is replaced; any
+  other destination, or Netlify once a site is recorded, is left alone;
+- ICS3U section 2 moved to a second semester (its dates shifted by whole
+  weeks so its first class is in the week of 2027-02-01; section 1 keeps the
+  payload's dates), so the start-of-year scene is the week before school
+  rather than a semester already under way with 13 classes "dated before
+  today";
 - a reference copy of ICS3U for 2025–26, through the app.
 
 Every step says "made" or "already there", a second run changes nothing, a file
@@ -279,7 +302,8 @@ named, when a picture it owes is missing, when the text Vision reads on it
 behind it was wrong (an empty plan, a refused copy, an empty second map). The
 count is the exit code now.
 
-It puts back the Mac's appearance, window sizes, Obsidian's list of vaults and
+It puts back the Mac's appearance, window sizes, Obsidian's list of vaults,
+Keyboard navigation (`defaults read -g AppleKeyboardUIMode` to check) and
 the frontmost app, and cancels any schedule it set that has not run. **It
 leaves** one notification in Notification Center (a script cannot withdraw
 another app's), ordinary lines in the activity trail
@@ -297,7 +321,11 @@ under `retake`. Pictures are checked in a staging folder and only those that
 pass are promoted; a shot taken in both appearances then loses
 `awaiting_capture`, and a retake's words are promoted with its picture
 (`capture.py → promote_captured_shots`), so the words never describe a
-picture that is not there. `--check` also reports a link to `page/#section`
+picture that is not there. A shot that cannot be taken for a reason that is
+not the release — the Mac's Focus, somebody's open Obsidian — carries
+`waiting_on: "#<issue>"` as well: `--deploy` lets it through, the section goes
+out on its text alone, and the issue says how to take it (the first two were
+`schedule` and `how-i-teach`, #367). Only an issue reference counts. `--check` also reports a link to `page/#section`
 whose section does not exist.
 
 ## What the pages read from data
