@@ -508,7 +508,7 @@ through these classes in
 | `specialNames` — the blocked and confirmed names, `renameFolder.carriesAcross`, `renameFolder.problems`, `curriculumFolderResolution` | `SpecialNamesContractTests`, `SpecialFolderRenamerTests`, `GradedFolderContractTests` |
 | `specialNames.contentStructureTip` (proposed from Windows 2026-09-07 and adopted here 2026-09-09, [#72](https://github.com/russellgordon/plantoir/issues/72); the mac runs it in `SharedRulesContractTests`, so both platforms now go red for it) | `SpecialNamesContractTests`. Whether a teacher can actually SEE it is `CourseSettingsCaptionUiTests`, which is in `Plantoir.UiTests/` rather than this project, carries `[UiFact]`, and runs only under `PLANTOIR_UI_TESTS=1` — so it is part of no gate |
 | `specialNames.renameFolder.materialisesOnRename`, `addCreatesTheFolder`, `removeLeavesTheFolderOnDisk`, `renameFolder.interruptedRename` (proposed from Windows 2026-09-07) | `FolderRenameApplyTests` |
-| `specialNames.renameFolder.linkRewriting` — every case, plus `escapingSet.leaveUnescaped` character by character | `FolderPathRewriterTests`. **RED on pull since [#313](https://github.com/russellgordon/plantoir/issues/313) (2026-09-26), deliberately**: the fourteenth case shows a wikilink and a Markdown link inside inline code, which a rename must leave as written, and `FolderPathRewriter.cs` applies no code mask yet — a request, owed by the `windows` issue opened from #313, not damage |
+| `specialNames.renameFolder.linkRewriting` — every case, plus `escapingSet.leaveUnescaped` character by character | `FolderPathRewriterTests`. **RED on pull since [#313](https://github.com/russellgordon/plantoir/issues/313) (2026-09-26), deliberately**: the fourteenth case shows a wikilink and a Markdown link inside inline code, and the last (after #97's twelve) an angle-bracket link inside inline code, which a rename must leave as written, and `FolderPathRewriter.cs` applies no code mask yet — a request, owed by the `windows` issue opened from #313, not damage |
 | `siteHealth.repair.reportedOncePerFinding` (both cases, built as `howToRunACase` says) and `siteHealth.repair.refusedWhenSomethingIsInTheWay` (the sentence, word for word) | `SiteHealthRepairTests`, `SiteHealthContractTests` |
 **Two notes on the `specialNames` rows** — there are four of them now, and the
 two this note is about are the first and the `linkRewriting` one — because they
@@ -1039,10 +1039,27 @@ none is a new list: `readingALink.cases` (10 → 40), `readingALink.rejected`
 (4 → 6), `followingLinks.publishing.cases` (1 → 2),
 `renamingTheUnitWord.linkCases.cases` (4 → 5),
 `specialNames.renameFolder.linkRewriting.cases` (13 → 14 — RED on Windows until
-it applies the mask, see its row above) and `copyingAPageBetweenCourses.cases`
+it applies the mask, see its row above; 27 after #97 merged in, whose twelve
+angle-bracket cases plus one #313 case for an angle-bracket link inside code
+make 13 → 27) and `copyingAPageBetweenCourses.cases`
 (28 → 29). `activityTrail.mustRecord` is unchanged at **83** (no new event).
 Re-taken at the merge of `origin/dev` (with #204) into this branch: **230** lists
 on the merged tree (unchanged by #313), `activityTrail.mustRecord` **91**.
+
+**Re-taken 2026-09-26 with [#97](https://github.com/russellgordon/plantoir/issues/97)**
+(a folder rename follows an angle-bracket Markdown link, `[q](<Tasks/Quiz 1.md>)`),
+counted ON THIS BRANCH (off `dev` ff1213ed): **228** before and after — no new
+list. `specialNames.renameFolder.linkRewriting.cases` grew from 13 to **25**,
+rows in a list both suites already deserialise, and the new
+`linkRewriting.insideAngleBrackets` holds prose plus two lists of STRINGS
+(`characters`, `rejected`), which the walker rightly does not count.
+**Windows fails eleven of the twelve new cases on arrival** (all but the
+page-name guard) in `FolderPathRewriterTests`; the web-address guard among
+them is a LIVE Windows defect today (its anchored `Scheme` test misses
+`<https://…`), which the mirrored fix clears. That is the
+request, owed by the `windows` issue from #97, and a named gap if it cannot
+land in its milestone. `activityTrail.mustRecord` is unchanged at **83** (no
+new event: `folder renamed` records no link counts, so its line stays true).
 
 **Re-take it rather than trusting this paragraph** — a census nobody can repeat
 is a number that rots. A case list is *an array of objects reached through

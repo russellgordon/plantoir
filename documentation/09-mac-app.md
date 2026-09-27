@@ -2642,15 +2642,17 @@ Four things about it are deliberate:
 - **It runs off the main actor.** The move is quick; reading every page in the
   course to rewrite links is not, on an iCloud-backed vault where an evicted
   file downloads on read.
-- **The new name is spelled differently in the two kinds of link**, and this
-  is measured rather than chosen. A Markdown destination ends at the first
+- **The new name is spelled differently in the three kinds of link**, and
+  this is measured rather than chosen. A Markdown destination ends at the first
   space, so a name containing one is percent-encoded on the way in
   (`[q](All%20Tasks/Quiz.md)`); a wikilink keeps the plain spelling, because
-  `[[All Tasks/Quiz 1]]` is exactly how Obsidian writes one. Which characters
+  `[[All Tasks/Quiz 1]]` is exactly how Obsidian writes one; and inside angle
+  brackets, `[q](<All Tasks/Quiz 1.md>)`, the name goes in plain too, unless it
+  holds a `<`, a `>` or a line break (#97). Which characters
   are encoded is fixed by what the built site can decode, not by any general
   URL rule — `&` and `,` are left alone on purpose, and a name needing nothing
   is left exactly as the teacher typed it. The rule, the measurements and the
-  twelve cases both apps run are in
+  cases both apps run are in
   [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
   `specialNames.renameFolder.linkRewriting`, and which suite deserialises them
   is recorded in [`contracts/README.md`](../contracts/README.md) rather than
