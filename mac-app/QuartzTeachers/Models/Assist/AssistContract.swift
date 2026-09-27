@@ -263,6 +263,25 @@ enum AssistContract {
             // render, and `backedUpCourse` above already passes a real file
             // name for the same reason.
             "duplicated": AssistWording.duplicated(page: pagePlaceholder, as: copyPlaceholder),
+            // The How I Teach page (#209): shared-rules.json -> howITeachPage.
+            "howITeachRead": AssistWording.howITeachRead(course: course, text: "{text}"),
+            "howITeachMissing": AssistWording.howITeachMissing(course: course),
+            "howITeachDraftingBrief": AssistWording.howITeachDraftingBrief,
+            "howITeachCutShort": AssistWording.howITeachCutShort(course: course, path: "{path}"),
+            "howITeachPlanCreates": AssistWording.howITeachPlanCreates(course: course, path: "{path}"),
+            "howITeachPlanReplaces": AssistWording.howITeachPlanReplaces(
+                course: course, path: "{path}", words: "{words}", changed: "{changed}", mark: "{mark}"
+            ),
+            "howITeachAlreadyWritten": AssistWording.howITeachAlreadyWritten(course: course),
+            "howITeachChangedSincePlanned": AssistWording.howITeachChangedSincePlanned(course: course),
+            "howITeachNeedsWords": AssistWording.howITeachNeedsWords,
+            "howITeachTooLong": AssistWording.howITeachTooLong,
+            "howITeachCarriesNoSettings": AssistWording.howITeachCarriesNoSettings,
+            "howITeachSaved": AssistWording.howITeachSaved(course: course),
+            "howITeachIsNeverPublished": AssistWording.howITeachIsNeverPublished(course: course),
+            "howITeachBriefing": AssistWording.howITeachBriefing(courses: [course]),
+            "howITeachListedAsWritten": AssistWording.howITeachListedAsWritten,
+            "howITeachListedAsNotWritten": AssistWording.howITeachListedAsNotWritten,
             // "What does <page> link to?", answered in code (#167).
             "pageLinksTo": AssistWording.pageLinksTo(page: pagePlaceholder),
             "pageLinksToNothing": AssistWording.pageLinksToNothing(page: pagePlaceholder),
@@ -713,9 +732,10 @@ enum AssistContract {
             "note": "Three lists, deliberately. `all` is what the runner can execute; `local` is what the "
                   + "small model is SHOWN (the plan twins and remember_timetable are taken off, because "
                   + "the model never has to name a plan and dates it supplies are dates it may have "
-                  + "invented); `mcpOnly` is the ten offered to Claude Code on top of everything — three "
-                  + "asking for judgement about meaning, the rest either never needed by a model "
-                  + "scoped to one section or already reachable by it through a fixed phrasing.",
+                  + "invented); `mcpOnly` is the thirteen offered to Claude Code on top of everything — six "
+                  + "asking for judgement about meaning (the three curriculum tools and the three "
+                  + "for the How I Teach page), the rest either never needed by a model scoped to "
+                  + "one section or already reachable by it through a fixed phrasing.",
             "all": all,
             "local": local,
             "mcpOnly": mcpOnly,
