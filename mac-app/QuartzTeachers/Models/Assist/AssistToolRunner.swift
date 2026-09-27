@@ -3403,12 +3403,18 @@ final class AssistToolRunner {
 
             let change: AssistChange
             var leftAlone: [String] = []
+            var classesReDated: Int = 0
+            var pagesTheyUseReDated: Int = 0
             do {
-                let applied: (change: AssistChange, leftAlone: [String]) = try SectionReDatePlanner.apply(
+                let applied: (
+                    change: AssistChange, leftAlone: [String], classesReDated: Int, pagesTheyUseReDated: Int
+                ) = try SectionReDatePlanner.apply(
                     asked.plan, forSection: asked.located.sectionNumber, in: asked.located.course
                 )
                 change = applied.change
                 leftAlone = applied.leftAlone
+                classesReDated = applied.classesReDated
+                pagesTheyUseReDated = applied.pagesTheyUseReDated
             } catch {
                 return AssistToolOutcome.refused(
                     "Nothing was changed: \(error.localizedDescription)"
@@ -3416,14 +3422,15 @@ final class AssistToolRunner {
             }
             history.record(change)
 
-            let moved: Int = asked.plan.moves.count
             // The model's copy says "class" whatever the course calls them;
             // only the line the teacher reads takes the course's noun (#267).
-            let summary: String = AssistWording.reDated(
-                count: asked.plan.classCount, pagesTheyUse: moved - asked.plan.classCount
+            // Both counts are what was WRITTEN, each from its own kind (#343):
+            // never one subtracted from the other.
+            let summary: String = AssistToolRunner.sayingWhatWasReDated(
+                classes: classesReDated, pagesTheyUse: pagesTheyUseReDated, noun: .class
             )
-            let teacherSummary: String = AssistWording.reDated(
-                count: asked.plan.classCount, pagesTheyUse: moved - asked.plan.classCount,
+            let teacherSummary: String = AssistToolRunner.sayingWhatWasReDated(
+                classes: classesReDated, pagesTheyUse: pagesTheyUseReDated,
                 noun: asked.located.course.configuration.classNoun
             )
             var detail: String = summary
@@ -3442,8 +3449,8 @@ final class AssistToolRunner {
             // it is the part a teacher has to answer, and `detail` is not shown
             // to them at all for a write.
             var said: String = teacherSummary
-            // Pages the re-date could not date, named — they are not among
-            // the classes it moved, whatever the count above says (#186).
+            // Pages the re-date could not date, named — and counted nowhere
+            // above, since the counts are of dates written (#186, #343).
             if !leftAlone.isEmpty {
                 let declined: String = AssistPublishPlan.sayingPagesWhoseNewDateCouldNotBeSet(named: leftAlone)
                 said += " " + declined
@@ -3459,6 +3466,16 @@ final class AssistToolRunner {
             }
             return AssistToolOutcome.wrote(said, detail: detail)
         }
+    }
+
+    /// The line a teacher reads after a re-date (#343). When every class was
+    /// already on its day and only what they use moved, "Re-dated 0 classes"
+    /// would read as nothing happening, so that case has its own sentence.
+    static func sayingWhatWasReDated(classes: Int, pagesTheyUse: Int, noun: ClassNoun) -> String {
+        if classes == 0 {
+            return AssistWording.reDatedOnlyPagesTheyUse(pagesTheyUse: pagesTheyUse, noun: noun)
+        }
+        return AssistWording.reDated(count: classes, pagesTheyUse: pagesTheyUse, noun: noun)
     }
 
     /// The whole question, in ONE place, because it is said from two.

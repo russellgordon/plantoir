@@ -6158,11 +6158,12 @@ implementation's measurements:
 Every tool that changes a page runs in **plan mode**: the assistant states
 what it understood and what it is about to do, and waits for Go or Cancel.
 Swift decides this from whether the tool has a `plan_` twin, so the model is
-never asked to judge whether something is risky. Four writes have no plan —
-rebuilding the preview, undo, cancelling a scheduled deploy, and deploying,
-which waits on its own separate approval instead, whether or not plan mode is
-on (a fifth, backing up the course, changes no page; and a model that names a
-tool it was not offered is refused rather than obeyed, #327 — doc 10). A Mac running the smaller assistant cannot
+never asked to judge whether something is risky. Five writes have no plan —
+rebuilding the preview, undo, cancelling a scheduled deploy, backing up the
+course (it changes no page, and the card "back up this course" reaches it in
+the app, so "four" was wrong, #343), and deploying, which waits on its own
+separate approval instead, whether or not plan mode is on (and a model that
+names a tool it was not offered is refused rather than obeyed, #327 — doc 10). A Mac running the smaller assistant cannot
 turn plan mode off; on a 16 GB machine the app offers to stop asking after a
 run of plans the teacher has accepted unchanged. Behind it, every change is
 backed up once per conversation and can be undone.
