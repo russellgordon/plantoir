@@ -47,6 +47,10 @@ final class SiteHealthContractTests: XCTestCase {
             let sentence: String = try XCTUnwrap(check["sentence"] as? String)
                 .replacingOccurrences(of: "{course}", with: "ICS3U")
                 .replacingOccurrences(of: "{section}", with: "1")
+                .replacingOccurrences(of: "{page}", with: "College Board Curriculum Coverage")
+            // Filled as the build fills it, so nothing is left in braces (#128
+            // gave handWrittenCoveragePage a {page} of its own).
+            XCTAssertFalse(sentence.contains("{page}"), name)
             let detail: String = try XCTUnwrap(check["detail"] as? String)
             let fixable: Bool = try XCTUnwrap(check["fixable"] as? Bool)
 

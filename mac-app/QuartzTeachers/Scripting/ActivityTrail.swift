@@ -248,6 +248,15 @@ nonisolated enum ActivityTrail {
         /// is asked long after the console that said so has gone.
         case pagesDatedByTheBuild = "pages dated by the build"
 
+        /// The curriculum coverage maps a build wrote (#128): one per
+        /// curriculum folder the course declares, each with its title, the
+        /// folder it came from and how many expectations it shows — or that it
+        /// wrote none. Read from the build's `PLANTOIR_MAPS:` line
+        /// (`CoverageMapsBuilt`), printed on every build whose section wants
+        /// the map, so "my second map is missing" has an answer. Course
+        /// structure only, never anything written on a page.
+        case coverageMapsBuilt = "curriculum maps built"
+
         /// A teacher asked for a class to be duplicated, the room for it was
         /// made, and then no copy appeared.
         ///
