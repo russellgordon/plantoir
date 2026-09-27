@@ -1250,6 +1250,14 @@ grows from 99 to **101** (`assistant backed up a course`, `How I Teach page
 started`, both owed by Windows), and the `How I Teach page read` line gains its
 empty variant. Still **forty-one** rule sets — both new keys sit inside
 `howITeachPage`.
+Re-taken at the merge of `origin/dev` bd1f571d (bundle B, row 604) into this
+branch, with the walker: **265** lists on the merged tree (263 on dev plus
+bundle C's two), `activityTrail.mustRecord` **111** (dev's 109 plus bundle C's
+two), **forty-four** rule sets. The review round added no list:
+`quittingWhileWorkIsUnderWay.cases` gained a ninth case and every case a
+`copiesBeingSaved` field, which is owed by the same `windows` issue — the new
+case goes red there until Windows counts a zip under way (a Windows run that
+ignores the field asks nothing and fails that case, by design).
 
 **Re-taken 2026-09-26 with [#96](https://github.com/russellgordon/plantoir/issues/96)**
 (Get Ready for the Start of the Year, and check_section's third group), counted
