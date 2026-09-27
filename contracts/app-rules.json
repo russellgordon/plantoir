@@ -21,8 +21,8 @@
           "expectPreview" : true,
           "name" : "a preview's build",
           "pages" : {
-            "index.html" : "<script>new WebSocket('ws://localhost:9081')</script>",
-            "notes/day-1.html" : "<script>new WebSocket('ws://localhost:9081')</script>"
+            "index.html" : "<html><body><script type=\"application/javascript\">\n        const socket = new WebSocket('ws://localhost:9081')\n        // reload(true) ensures resources like images and scripts are fetched again in firefox\n        socket.addEventListener('message', () => document.location.reload(true))\n      </script></body></html>",
+            "notes/day-1.html" : "<html><body><script type=\"application/javascript\">\n        const socket = new WebSocket('ws://localhost:9081')\n        // reload(true) ensures resources like images and scripts are fetched again in firefox\n        socket.addEventListener('message', () => document.location.reload(true))\n      </script></body></html>"
           }
         },
         {
@@ -30,14 +30,14 @@
           "name" : "a clean front page in front of a preview's page (#136)",
           "pages" : {
             "index.html" : "<html><body>Welcome</body></html>",
-            "notes/day-1.html" : "<script>new WebSocket('ws://localhost:9081')</script>"
+            "notes/day-1.html" : "<html><body><script type=\"application/javascript\">\n        const socket = new WebSocket('ws://localhost:9081')\n        // reload(true) ensures resources like images and scripts are fetched again in firefox\n        socket.addEventListener('message', () => document.location.reload(true))\n      </script></body></html>"
           }
         },
         {
           "expectPreview" : true,
           "name" : "a preview's page deep in the tree",
           "pages" : {
-            "a/b/c/page.html" : "<script>new WebSocket('ws://localhost:9083')</script>",
+            "a/b/c/page.html" : "<html><body><script type=\"application/javascript\">\n        const socket = new WebSocket('ws://localhost:9083')\n        // reload(true) ensures resources like images and scripts are fetched again in firefox\n        socket.addEventListener('message', () => document.location.reload(true))\n      </script></body></html>",
             "index.html" : "<html><body>Welcome</body></html>"
           }
         },
@@ -45,7 +45,7 @@
           "expectPreview" : true,
           "name" : "a preview's page in a hidden folder",
           "pages" : {
-            ".cache/page.html" : "<script>new WebSocket('ws://localhost:9081')</script>",
+            ".cache/page.html" : "<html><body><script type=\"application/javascript\">\n        const socket = new WebSocket('ws://localhost:9081')\n        // reload(true) ensures resources like images and scripts are fetched again in firefox\n        socket.addEventListener('message', () => document.location.reload(true))\n      </script></body></html>",
             "index.html" : "<html><body>Welcome</body></html>"
           }
         },
@@ -54,7 +54,7 @@
           "name" : "the address only in files that are not pages",
           "pages" : {
             "index.html" : "<html><body>Welcome</body></html>",
-            "postscript.js" : "new WebSocket('ws://localhost:9081')",
+            "postscript.js" : "<script type=\"application/javascript\">\n        const socket = new WebSocket('ws://localhost:9081')\n        // reload(true) ensures resources like images and scripts are fetched again in firefox\n        socket.addEventListener('message', () => document.location.reload(true))\n      </script>",
             "static/contentIndex.json" : "{\"socket\": \"ws://localhost:9081\"}"
           }
         },
@@ -70,7 +70,7 @@
           "name" : "a page that cannot be read is passed over",
           "pages" : {
             "index.html" : "<html><body>Welcome</body></html>",
-            "locked.html" : "<script>new WebSocket('ws://localhost:9081')</script>"
+            "locked.html" : "<html><body><script type=\"application/javascript\">\n        const socket = new WebSocket('ws://localhost:9081')\n        // reload(true) ensures resources like images and scripts are fetched again in firefox\n        socket.addEventListener('message', () => document.location.reload(true))\n      </script></body></html>"
           },
           "unreadable" : [
             "locked.html"
@@ -82,17 +82,83 @@
           "pages" : {
             "index.html" : "<html><body>Welcome</body></html>",
             "locked.html" : "<html><body>Locked</body></html>",
-            "notes/day-1.html" : "<script>new WebSocket('ws://localhost:9081')</script>"
+            "notes/day-1.html" : "<html><body><script type=\"application/javascript\">\n        const socket = new WebSocket('ws://localhost:9081')\n        // reload(true) ensures resources like images and scripts are fetched again in firefox\n        socket.addEventListener('message', () => document.location.reload(true))\n      </script></body></html>"
           },
           "unreadable" : [
             "locked.html"
           ]
+        },
+        {
+          "expectPreview" : false,
+          "name" : "a page that mentions the address in its title, description, words and code (#291)",
+          "pages" : {
+            "index.html" : "<html><body>Welcome</body></html>",
+            "lessons/networking.html" : "<html><head><title>Networking ws://localhost:8080</title><meta name=\"description\" content=\"Connect to ws://localhost:9081 and new WebSocket('ws://localhost:9081')\"/><meta property=\"og:description\" content=\"Connect to ws://localhost:9081 and new WebSocket('ws://localhost:9081')\"/><script type=\"application/javascript\">function o(){}</script></head><body><nav class=\"breadcrumb\"><a href=\"./\">Networking ws://localhost:8080</a></nav><p>Connect to ws://localhost:8080.</p><p><code>const socket = new WebSocket('ws://localhost:9081')</code></p><pre><code>const socket = new WebSocket('ws://localhost:9081')\n</code></pre></body></html>"
+          }
+        },
+        {
+          "expectPreview" : false,
+          "name" : "the client's own tag, written into a page's words the way Quartz escapes it",
+          "pages" : {
+            "index.html" : "<html><body>Welcome</body></html>",
+            "lessons/the-client.html" : "<html><head><meta name=\"description\" content=\"&lt;script type=&quot;application/javascript&quot;> const socket = new WebSocket('ws://localhost:9081')\"/></head><body><pre><code>&lt;script type=&quot;application/javascript&quot;>\n        const socket = new WebSocket('ws://localhost:9081')\n&lt;/script></code></pre></body></html>"
+          }
+        },
+        {
+          "expectPreview" : true,
+          "name" : "a preview's page that also mentions the address in its words",
+          "pages" : {
+            "index.html" : "<html><body>Welcome</body></html>",
+            "lessons/networking.html" : "<html><head><title>Networking ws://localhost:8080</title><meta name=\"description\" content=\"Connect to ws://localhost:9081 and new WebSocket('ws://localhost:9081')\"/><meta property=\"og:description\" content=\"Connect to ws://localhost:9081 and new WebSocket('ws://localhost:9081')\"/><script type=\"application/javascript\">function o(){}</script></head><body><nav class=\"breadcrumb\"><a href=\"./\">Networking ws://localhost:8080</a></nav><p>Connect to ws://localhost:8080.</p><p><code>const socket = new WebSocket('ws://localhost:9081')</code></p><pre><code>const socket = new WebSocket('ws://localhost:9081')\n</code></pre><script type=\"application/javascript\">\n        const socket = new WebSocket('ws://localhost:9081')\n        // reload(true) ensures resources like images and scripts are fetched again in firefox\n        socket.addEventListener('message', () => document.location.reload(true))\n      </script></body></html>"
+          }
+        },
+        {
+          "expectPreview" : true,
+          "name" : "the tag and the client with nothing between",
+          "pages" : {
+            "index.html" : "<html><body>Welcome</body></html>",
+            "notes/day-1.html" : "<html><body><script type=\"application/javascript\">const socket = new WebSocket('ws://localhost:9081')</script></body></html>"
+          }
+        },
+        {
+          "expectPreview" : true,
+          "name" : "the tag and the client split by a carriage return, a line feed and a tab",
+          "pages" : {
+            "index.html" : "<html><body>Welcome</body></html>",
+            "notes/day-1.html" : "<html><body><script type=\"application/javascript\">\r\n\tconst socket = new WebSocket('ws://localhost:9081')\r\n</script></body></html>"
+          }
+        },
+        {
+          "expectPreview" : true,
+          "invalidUTF8Before" : [
+            "notes/day-1.html"
+          ],
+          "name" : "a preview's page that also holds a byte that is not UTF-8",
+          "pages" : {
+            "index.html" : "<html><body>Welcome</body></html>",
+            "notes/day-1.html" : "<html><body><script type=\"application/javascript\">\n        const socket = new WebSocket('ws://localhost:9081')\n        // reload(true) ensures resources like images and scripts are fetched again in firefox\n        socket.addEventListener('message', () => document.location.reload(true))\n      </script></body></html>"
+          }
         }
       ],
-      "note" : "One rule for 'this built site is a preview's', read by every checker: BuildFreshness in each app, the mac's scheduled publish (its own shell check, because the app is closed when it runs), deploy.sh (three times), deploy.py and deploy.ps1. Serve mode bakes the live-reload client into EVERY page and the built tree is replaced file by file, so a clean front page in front of a preview's pages is a real state — deploy.sh found it on 2026-09-05 and has read the whole tree since, as has deploy.py. The apps read the front page alone until issue #136: they called that state deploy-fresh, skipped their build, and the LAUNCHER then rebuilt under the destination's leg — the build's milestones missing from the panel, and on the mac a question the build asked overnight reported as the destination's. A reader narrower than the launchers is the fault, whichever side it is on. Each case is a tree under the section's public/ folder; `unreadable` names pages that exist but cannot be opened.",
-      "notShared" : "Three things are deliberately NOT cases. (1) A front page that is MISSING or cannot be READ: the apps rebuild (`rules` → 'the built index cannot be read'), while the launchers stop at the copy instead — a different rule, pinned where it lives. (2) A page that is not valid UTF-8: measured 2026-09-25 on macOS 26.6, /usr/bin/grep 2.6.0-FreeBSD under a UTF-8 locale does NOT find the signature on a line that also holds an invalid byte (exit 1), and under LC_ALL=C it does (exit 0), so deploy.sh run from a Terminal can call such a page clean while the apps (bytes), the scheduled check (LC_ALL=C) and deploy.py (errors='ignore') call it a preview's. The error is in the SAFE direction — the app rebuilds first — and Quartz only writes UTF-8, so it is written down rather than pinned. (3) Upper-case .HTML, and a public/ that is ITSELF a symbolic link (neither FileManager's enumerator nor grep -r descends into one; a link further up, such as the mac's .merged_output, is followed by both — measured): Quartz produces neither. deploy.ps1 also matches the signature without regard to case (Select-String's default), which no case here can tell apart.",
-      "signature" : "ws://localhost:",
-      "where" : "Every file whose name ends .html anywhere under the section's built public/ folder, hidden folders included, compared as bytes; the front page first, so a real preview's build answers from one file. A page that cannot be opened is passed over, as every launcher does."
+      "note" : "One rule for 'this built site is a preview's', read by every checker: BuildFreshness in each app, the mac's scheduled publish (its own shell check, because the app is closed when it runs), deploy.sh (three times), deploy.py and deploy.ps1. Serve mode bakes the live-reload client into EVERY page and the built tree is replaced file by file, so a clean front page in front of a preview's pages is a real state — deploy.sh found it on 2026-09-05 and has read the whole tree since, as has deploy.py. The apps read the front page alone until issue #136: they called that state deploy-fresh, skipped their build, and the LAUNCHER then rebuilt under the destination's leg — the build's milestones missing from the panel, and on the mac a question the build asked overnight reported as the destination's. A reader narrower than the launchers is the fault, whichever side it is on. Issue #291 then narrowed WHAT is looked for: the bare address matched any page that mentions it, and the rule is now the client's tag and first statement (`signature`). Each case is a tree under the section's public/ folder; `unreadable` names pages that exist but cannot be opened; `invalidUTF8Before` names pages that begin with the bytes FF 0A, which are not UTF-8.",
+      "notShared" : "Three things are deliberately NOT cases. (1) A front page that is MISSING or cannot be READ: the apps rebuild (`rules` → 'the built index cannot be read'), while the launchers stop at the copy instead — a different rule, pinned where it lives. (2) Upper-case .HTML, and a public/ that is ITSELF a symbolic link (neither FileManager's enumerator nor grep -r descends into one; a link further up, such as the mac's .merged_output, is followed by both — measured): Quartz produces neither. deploy.ps1 still matches its old signature without regard to case (Select-String's default); once it adopts this rule it must match case-SENSITIVELY, which is owed on #272. (3) A page whose teacher typed the client verbatim as raw HTML (the tag and the client, unescaped): that page really does open a socket to the reader's machine, so calling it a preview's is not wrong, and no fixture would say anything cases 13 and 14 do not. (A page that is not valid UTF-8 used to be listed here, erring safe; with a whole-page read the miss erred UNSAFE, so it is case 15 since #291.)",
+      "signature" : {
+        "asABasicRegex" : "<script type=\"application/javascript\">[[:space:]]*const socket = new WebSocket('ws://localhost:",
+        "asQuartzWritesIt" : "<script type=\"application/javascript\">\n        const socket = new WebSocket('ws://localhost:9081')\n        // reload(true) ensures resources like images and scripts are fetched again in firefox\n        socket.addEventListener('message', () => document.location.reload(true))\n      </script>",
+        "between" : [
+          " ",
+          "\t",
+          "\n",
+          "\u000b",
+          "\f",
+          "\r"
+        ],
+        "betweenNote" : "Any run of these bytes, including none, and nothing else: POSIX [[:space:]] in the C locale. Not a Unicode \\s, which in .NET and in Python's str patterns also takes non-breaking and other spaces.",
+        "client" : "const socket = new WebSocket('ws://localhost:",
+        "scriptTag" : "<script type=\"application/javascript\">",
+        "why" : "(#291) The bare address ws://localhost: was the rule until 2026-09-26, and it is in ANY page whose note mentions it: measured in a production build of stock Quartz v4.5.0, one networking lesson carried it 20 times on 7 lines (title, meta tags, breadcrumb, heading, prose, code), so a folder publish refused after 30 s every time and every other publish rebuilt. The rule is now the client's script TAG followed by its first statement with only `between` bytes in between. A page's words cannot produce that: Quartz writes < as &lt; in text AND in attribute values (measured: content=\"&lt;script type=&quot;…\"), so a raw <script can only come from raw HTML a teacher typed. Narrower strings were measured and rejected: new WebSocket('ws://localhost: matches a meta description (' is not escaped in attributes), inline code and an un-languaged fence; const socket = new WebSocket('ws://localhost: matches inline code and the fence; 'the tag and the client both appear somewhere' is wrong because a production page already holds the same tag for Quartz's own inline script (case 10). Quartz writes the tag and the client on DIFFERENT lines, so a line reader must read each page as ONE record (grep -z, PowerShell -Raw), and grep -z needs LC_ALL=C: under a UTF-8 locale BSD grep -z misses the client in a file holding an invalid byte anywhere BEFORE the client — in practice nearly the whole page, since Quartz writes the client at the end of <body> (case 15), which is the unsafe direction. Source: Quartz v4.5.0 quartz/plugins/index.ts:26-38 and quartz/util/resources.tsx:26; raising Quartz means re-measuring this, and verify.sh and verify-deploy.sh fail when those bytes move."
+      },
+      "where" : "Every file whose name ends .html anywhere under the section's built public/ folder, hidden folders included, compared as bytes and read as ONE record, not line by line: the tag and the client are on different lines. The front page first, so a real preview's build answers from one file. A page that cannot be opened is passed over, as every launcher does."
     },
     "rules" : [
       {
@@ -1535,12 +1601,15 @@
     ],
     "courseIsNamedInTheGreetingOnly" : "The server is given the WORKING FOLDER, never a course, so every course in the folder is reachable from either door. The only thing that points a session at one course is the greeting. This is a real difference from the assistant Plantoir carries itself, whose window is bound to one section and refuses any other course (assist-cases.json -> windowBinding), and it is stated here because a reader who assumed otherwise would give a door a narrowing it does not have.",
     "greetingCarriesNoDoubleQuotes" : "The greeting is passed as one shell argument, so double quotes are replaced with apostrophes before it goes anywhere near a command line.",
+    "greetingHowITeachSentence" : "Then read my How I Teach page for this course, and keep to it in anything you write for me.",
+    "greetingHowITeachSentenceWhy" : "GitHub #209. The sentence is the same whether or not a page exists (the read tool's answer handles a missing one, and offers a draft), so it is one string both platforms pin and neither has to look at the disk when the menu item is clicked. It names no tool, because the teacher sees the greeting in their terminal as their own words. It is the LOAD-BEARING channel for the page: measured for the Codex door (documentation/10, 'What was MEASURED for the Codex door'), a tool whose description says 'call first' was deferred, while the greeting was acted on at once. Comes straight after the sentence about listing the sections. See shared-rules.json -> howITeachPage.",
     "greetingIsTheSameForEveryAgent" : true,
     "greetingMustSay" : [
       "the course it is about, by code, and its name when that differs",
       "that the plantoir tools are the way to do anything to do with this course",
       "that the session should start by listing the course's sections",
-      "that before anything is changed the matching plan tool is used first, shown to the teacher in plain words, and agreed to"
+      "that before anything is changed the matching plan tool is used first, shown to the teacher in plain words, and agreed to",
+      "that the session should read the teacher's How I Teach page for the course and keep to it (greetingHowITeachSentence, verbatim)"
     ],
     "handedToATerminal" : "The mac writes an executable .command script into the app's own data directory and hands it to iTerm (when it is already running) or Terminal, through LaunchServices rather than AppleScript so that no Automation permission is asked for. Windows has no such file: it hands the command line straight to `wt.exe -d <folder> cmd /k …`, or to cmd when Windows Terminal is absent. The SCRIPT is therefore the mac's mechanism, which is why it is listed separately from what is written for the CONNECTION.",
     "hiddenWhenNotInstalled" : true,
