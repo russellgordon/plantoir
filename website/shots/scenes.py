@@ -98,9 +98,10 @@ SCENES: list[Scene] = [
     ),
     Scene(
         name="start-of-year", produces=["start-of-year"], kind="ui-test", test="testGetReadyForTheStartOfTheYear",
-        identifiers_pending={"startOfYear-": "#96", "startOfYearSheet": "#96", "startOfYearGo": "#96"},
-        what_it_sets_up="ICS3U section 2 → Get Ready for the Start of the Year…, the plan listed with its "
-                        "reasons; cancelled, so nothing is put into draft.",
+        # #96 has landed: a missing identifier is now a broken scene, not a wait.
+        identifiers=["startOfYear-", "startOfYearGo"],
+        what_it_sets_up="ICS3U section 2 → Get Ready for the Start of the Year…, the plan with its draft "
+                        "lists unfolded to show each page's reason; cancelled, so nothing is put into draft.",
     ),
     Scene(
         name="curriculum-settings", produces=["curriculum-settings"], kind="ui-test",
