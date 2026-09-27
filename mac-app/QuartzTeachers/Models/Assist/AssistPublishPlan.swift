@@ -27,12 +27,50 @@ struct AssistPublishChange {
 /// links to has to stay, or that other class is left pointing at nothing.
 struct AssistPublishKept {
 
+    /// Why a linked page stays: decided when the plan is made, and put into
+    /// words only when the plan is DESCRIBED.
+    ///
+    /// A reason rather than a finished string because one of them names the
+    /// course's noun (#201), and the noun belongs to the reader, not to the
+    /// plan: the model is always given "class", while a club's card says
+    /// "meeting" (#267, `AssistPublishPlan.describe(mostListed:noun:)`). A
+    /// clause baked at plan time would put "meeting" in the model's text.
+    ///
+    /// The four clauses that were strings before #201 are byte-identical to
+    /// what they were — the Windows suite pins the referrer line.
+    enum Reason: Equatable {
+        case folderLandingPage
+        case keyLinks
+        case curriculum
+        case aClassOfItsOwn
+        case stillLinkedFrom(String)
+
+        // MARK: - Functions
+
+        /// The clause that finishes "“Ohm's Law” stays visible, because …",
+        /// ending with its own full stop.
+        func finishing(noun: ClassNoun) -> String {
+            switch self {
+            case .folderLandingPage:
+                return "it is a folder's landing page, which following links never takes down."
+            case .keyLinks:
+                return "it is in this section's Key Links."
+            case .curriculum:
+                return "it is a curriculum page."
+            case .aClassOfItsOwn:
+                return AssistWording.aLinkedClassStaysBecause(noun: noun)
+            case .stillLinkedFrom(let referrer):
+                return "“\(referrer)” still links to it."
+            }
+        }
+    }
+
     // MARK: - Stored properties
 
     let page: AssistSectionPage
 
-    /// The clause that finishes "“Ohm's Law” stays: …".
-    let reason: String
+    /// Why it stays; `Reason.finishing(noun:)` puts it into words.
+    let reason: Reason
 }
 
 /// One page whose date would move onto the class's day.
@@ -101,13 +139,19 @@ struct AssistPublishPlan {
     /// with the reason. Always empty when publishing: publishing takes every
     /// page it reaches, and the one thing it does not reach is said in
     /// `linkedClassesLeftAlone` instead.
+    ///
+    /// Since #201 this includes a linked CLASS students can see, with the
+    /// reason "it is a class of its own": an unpublish stops at a class the
+    /// way publishing does, and says so here.
     let kept: [AssistPublishKept]
 
     /// The other classes this publish followed a link onto and left alone —
     /// only the ones students cannot already see.
     ///
-    /// Always empty when unpublishing, whose reach did not change in #173 and
-    /// is the sibling decision held for #201.
+    /// Always empty when unpublishing. An unpublish stops at a class too
+    /// (#201, 2026-09-26), but a class it stopped at is said in `kept`, with
+    /// its own reason, because the sentence this list is said with — "publish
+    /// it when you get to that class" — would be false about it.
     ///
     /// A teacher is told about these because the alternative is a plan quietly
     /// smaller than the one they pictured: a link on the page they just
@@ -163,6 +207,17 @@ struct AssistPublishPlan {
     }
 
     // MARK: - Functions
+
+    /// One line of the "N linked pages stay visible:" list — the single place
+    /// that frame is written, so `AssistContract` renders the contract's
+    /// `linkedClassStaysVisible` through the same code the plan uses. The
+    /// reasons are written to finish this sentence, and each ends with its
+    /// own full stop.
+    static func stayingVisibleLine(title: String,
+                                   reason: AssistPublishKept.Reason,
+                                   noun: ClassNoun) -> String {
+        return "“\(title)” stays visible, because \(reason.finishing(noun: noun))"
+    }
 
     /// The plan in words, meant to be read aloud to a teacher.
     ///
@@ -268,10 +323,9 @@ struct AssistPublishPlan {
                     lines.append("…and \(kept.count - listed) more.")
                     break
                 }
-                // The reasons are written to finish this sentence, and each
-                // ends with its own full stop.
-                lines.append("“\(staying.page.displayTitle)” stays visible, "
-                             + "because \(staying.reason)")
+                lines.append(AssistPublishPlan.stayingVisibleLine(
+                    title: staying.page.displayTitle, reason: staying.reason, noun: noun
+                ))
                 listed += 1
             }
         }
@@ -380,8 +434,9 @@ struct AssistPublishPlan {
 /// * **Unpublishing takes a linked page only when nothing else needs it** — no
 ///   other page links to it, and it is not one of the pages a section cannot do
 ///   without. Hiding a concept page that Unit 3, Day 2 also links to would
-///   break that class to tidy this one. Its reach does NOT stop at a class
-///   today; that is the sibling decision, held for #201.
+///   break that class to tidy this one. And, since #201 (2026-09-26), it stops
+///   at another class exactly as publishing does: a class comes down when the
+///   teacher names it, and a linked class that stays is named in the plan.
 enum AssistPublishPlanner {
 
     // MARK: - Functions
@@ -679,6 +734,16 @@ enum AssistPublishPlanner {
     /// somewhere other than a lesson, so a link count says nothing useful about
     /// whether it is still needed.
     ///
+    /// A fourth never, of a different kind (#201): another CLASS page. It is
+    /// not one of the contract's `neverTakenDownByFollowingLinks` — those are
+    /// exclusions, pages reached from somewhere other than a lesson — but a
+    /// STOP in the walk, the same stop publishing and date-moving make, so it
+    /// is written once in `followingLinks.stopsAtAClassPage.appliesTo`. The
+    /// walk still REACHES the class (`pagesLinkedFrom` does not filter it):
+    /// it has to arrive at the `kept` pass, or the teacher is never told it
+    /// stayed. `reasonToKeep` is where it stops, so a class is neither
+    /// collected nor entered.
+    ///
     /// Worked out to a fixed point rather than in one pass: when a page joins
     /// the ones coming down, the pages only IT linked to become free to follow
     /// as well, and stopping after one lap would leave half a chain published.
@@ -703,7 +768,7 @@ enum AssistPublishPlanner {
                 if goingDown.contains(candidate.lowercasedTitle) {
                     continue
                 }
-                let reason: String? = reasonToKeep(
+                let reason: AssistPublishKept.Reason? = reasonToKeep(
                     candidate, mustStay: mustStay, referrers: referrers,
                     goingDown: goingDown, graph: graph, in: course
                 )
@@ -738,6 +803,32 @@ enum AssistPublishPlanner {
 
     /// Why this page is being left published, or nil when nothing stands in
     /// the way of taking it down with the rest.
+    ///
+    /// **An unpublish stops at another class** (issue #201, decided by
+    /// Russell 2026-09-26 to mirror #173's publishing rule): a class is hidden
+    /// when the teacher names it, and a link from the class coming down
+    /// neither takes another class with it nor reaches THROUGH it to that
+    /// class's own material. The pages the teacher named are never stopped —
+    /// they are in `goingDown` before this is ever asked — so "unpublish Unit
+    /// 4" and an unpublish by dates lose nothing. The rule is shared as
+    /// `followingLinks.stopsAtAClassPage` in `contracts/shared-rules.json`.
+    ///
+    /// The order is load-bearing, both ways:
+    /// - the class test sits BELOW the three exclusions, so a class Key Links
+    ///   points at still says Key Links, and `theOrderIsLoadBearing` is
+    ///   untouched;
+    /// - and ABOVE the referrer test, because "a class of its own" is the
+    ///   unconditional reason and "X still links to it" a contingent one: said
+    ///   about a class, it tells the teacher the class would follow X down the
+    ///   day X is hidden, and it would not.
+    ///
+    /// REJECTED: stopping in `pagesLinkedFrom` instead (right about what comes
+    /// down, and SILENT — the class never reaches the `kept` pass, so nothing
+    /// tells the teacher); walking past the class to the material beyond it
+    /// (that material is the class's, and hiding it breaks a class nobody
+    /// named); and a fourth entry in `neverTakenDownByFollowingLinks` (a class
+    /// is a stop, not an exclusion). documentation/10-local-ai-assistant.md →
+    /// "Unpublishing stops there too (#201)".
     private static func reasonToKeep(
         _ page: AssistSectionPage,
         mustStay: Set<String>,
@@ -745,22 +836,25 @@ enum AssistPublishPlanner {
         goingDown: Set<String>,
         graph: AssistSectionGraph,
         in course: Course
-    ) -> String? {
+    ) -> AssistPublishKept.Reason? {
         if page.isFolderIndex {
-            return "it is a folder's landing page, which following links never takes down."
+            return .folderLandingPage
         }
         if mustStay.contains(page.lowercasedTitle) {
-            return "it is in this section's Key Links."
+            return .keyLinks
         }
         // `build_site.py`'s own rule: any FOLDER segment containing
         // "curriculum", so a course whose folder is called "Ontario
         // Curriculum" is covered exactly as a plain one is.
         if AssistCurriculumMentions.isCurriculum(pageAt: page.fileURL, in: course) {
-            return "it is a curriculum page."
+            return .curriculum
+        }
+        if page.isClassPage {
+            return .aClassOfItsOwn
         }
         if let stillLinking = pageStillLinking(to: page, referrers: referrers,
                                                goingDown: goingDown, graph: graph) {
-            return "“\(stillLinking)” still links to it."
+            return .stillLinkedFrom(stillLinking)
         }
         return nil
     }
@@ -798,14 +892,12 @@ enum AssistPublishPlanner {
             // published with it, and the plan says so. So a page taken down
             // here comes back the moment anything visible needs it again.
             //
-            // **With one exception since #173, and it is the strongest
-            // argument for #201.** Publishing now stops at a class page, so a
-            // CLASS taken down by this sweep does not come back by publishing
-            // the page that referred to it. The exception exists because the
-            // two reaches were decided apart: publishing and date-moving stop
-            // at a class (v1.2.0), unpublishing does not yet (#201, v1.3.0).
-            // Closing #201 — an unpublish that stops at a class too — removes
-            // the exception rather than adding a rule.
+            // That held with one exception from #173 (publishing stops at a
+            // class, so a CLASS this sweep took down did not come back by
+            // publishing the page that referred to it) until #201 closed it
+            // on 2026-09-26: this sweep no longer takes a class down at all,
+            // so both reaches stop in the same place and the argument holds
+            // without an exception.
             if !referrer.isVisibleToStudents {
                 continue
             }
