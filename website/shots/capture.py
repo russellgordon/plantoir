@@ -923,6 +923,12 @@ def capture_phone(dark: bool) -> None:
     run(["xcrun", "simctl", "openurl", udid, url], capture_output=True)
     time.sleep(9)
     dismiss_safari_onboarding(udid)
+    # The site remembers a light/dark choice in Mobile Safari's own storage,
+    # which outranks the simulator's appearance: the committed "light" phone
+    # shot had been dark all along (median luminance 18, measured
+    # 2026-09-27). Tapping the site's own switch through RocketSim by its
+    # label ("Light mode") was tried and did nothing, so the shot is checked
+    # below and named when it is wrong, rather than filed as right.
 
     destination = IMAGE_DIR / f"site-phone-{suffix}.png"
     with destination.open("wb") as handle:
@@ -942,6 +948,12 @@ def capture_phone(dark: bool) -> None:
         run(["xcrun", "simctl", "io", udid, "screenshot", str(destination)],
             capture_output=True)
     prepare(destination, WIDEST_PHONE_PIXELS)
+    from safari import page_is_dark
+    if page_is_dark(destination) != dark:
+        print(f"   ✗ {destination.name} came out {'light' if dark else 'dark'}: the site has the other "
+              "theme saved in the simulator's Safari. Open it there, tap the site's light/dark switch "
+              "until it follows the phone, and re-take with --phone. Do not commit this one.",
+              file=sys.stderr)
     print(f"   saved {destination.name}")
 
     if not was_booted:
