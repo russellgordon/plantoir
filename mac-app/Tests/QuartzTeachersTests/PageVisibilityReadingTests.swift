@@ -1002,6 +1002,34 @@ final class PageVisibilityReadingTests: XCTestCase {
         XCTAssertFalse(trail.contains("Day 2"), "never which page: \(trail)")
     }
 
+    /// A page whose new date could not be set is counted nowhere (#343): the
+    /// counts are of dates WRITTEN, so the declined class is not among the
+    /// classes the reply says it moved.
+    func testADeclinedPageIsCountedNowhere() throws {
+        let made = try AssistFixture.makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        let dates: RememberTimetablePlan = try SectionTimetableStore.planRememberTimetable(
+            dates: ["2026-09-08", "2026-09-10"], source: "timetable.xlsx, block H", forSection: 1,
+            in: made.course
+        )
+        try SectionTimetableStore.applyRememberTimetable(dates)
+        try AssistFixture.write(page: "Unit 1, Day 1", publish: "true", date: "2026-09-01", body: "one", in: made.course)
+        try AssistFixture.write(page: "Unit 1, Day 2", publish: "true", date: "2026-09-02", body: "two", in: made.course)
+        let reDate: SectionReDatePlan = try SectionReDatePlanner.plan(
+            forSection: 1, in: made.course, workspaceURL: made.root
+        )
+        XCTAssertEqual(reDate.moves.count, 2)
+        let noRoom: URL = AssistFixture.pageURL(of: "Unit 1, Day 2", in: made.course)
+        try "---\n  a: 1\n---\ntwo\n".write(to: noRoom, atomically: true, encoding: .utf8)
+
+        let applied = try SectionReDatePlanner.apply(reDate, forSection: 1, in: made.course)
+        XCTAssertEqual(applied.leftAlone, ["Unit 1, Day 2"])
+        XCTAssertEqual(applied.classesReDated, 1, "the declined class was counted as moved")
+        XCTAssertEqual(applied.pagesTheyUseReDated, 0)
+        XCTAssertTrue(applied.change.whatHappened.contains("re-dated 1 class "), applied.change.whatHappened)
+    }
+
     /// Reading does not depend on where the page lives — the build consults
     /// all four keys on every page it copies. This was the mac's own blind
     /// spot until 2026-09-18.

@@ -53,8 +53,8 @@ final class AssistCurriculumMentionsTests: XCTestCase {
             mcpNames.insert(tool.name)
         }
 
-        // The thirteen MCP-only tools, and WHY each is off the local list —
-        // three different reasons, which is why this cannot be one sentence.
+        // The fifteen MCP-only tools, and WHY each is off the local list —
+        // four different reasons, which is why this cannot be one sentence.
         //
         // * The curriculum three, and the How I Teach three (#209), ask for a
         //   judgement about MEANING, which a large model does well and a 4B
@@ -68,6 +68,9 @@ final class AssistCurriculumMentionsTests: XCTestCase {
         //   through phrasings matched in code — so publishing their schemas
         //   would spend routing accuracy to buy it a route it already has.
         //
+        // * The start-of-year pair (#96) is a whole-section change a person
+        //   should read in full, and the app has its own button for it.
+        //
         // What they share is only the test that matters: none costs the
         // thirteen-tool surface the routing figures were measured against.
         let added: Set<String> = [
@@ -77,6 +80,7 @@ final class AssistCurriculumMentionsTests: XCTestCase {
             "explain_publishing", "back_up_course",
             "list_curriculum_expectations", "plan_curriculum_mentions", "add_curriculum_mentions",
             "read_how_i_teach", "plan_write_how_i_teach", "write_how_i_teach",
+            "plan_prepare_for_start_of_year", "prepare_for_start_of_year",
         ]
         for name in added {
             XCTAssertFalse(localNames.contains(name), "\(name) must not reach the local model.")

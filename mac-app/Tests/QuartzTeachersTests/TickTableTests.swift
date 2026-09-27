@@ -102,7 +102,7 @@ final class TickTableTests: XCTestCase {
         let box: ListBox = ListBox(["Tasks"], second: [])
         let host: TableHost = TableHost(
             VStack {
-                MembershipToggleListView(title: "Marks", allItems: ["Concepts", "Tasks", "Tests"], members: box.binding)
+                MembershipToggleListView(title: "Marks", removalTrail: RemovalTrail.inCourseSettings(courseCode: "SNC4M", list: .marks), allItems: ["Concepts", "Tasks", "Tests"], members: box.binding)
                 SidebarVisibilityTableView(allItems: ["Concepts", "Tasks"], hidden: box.binding, expandable: box.secondBinding)
             }
         )
@@ -132,6 +132,7 @@ final class TickTableTests: XCTestCase {
         return TableHost(
             MembershipToggleListView(
                 title: GradedFolderWording.listTitle,
+                removalTrail: RemovalTrail.inCourseSettings(courseCode: "SNC4M", list: .marks),
                 allItems: ["Concepts", "Tasks", "Tests", "Tasks"],
                 members: members.binding,
                 protection: { folder in
@@ -176,7 +177,12 @@ final class TickTableTests: XCTestCase {
 
         host.clickCell(of: table, column: 0, row: 1)
         XCTAssertEqual(members.names, ["Tasks"])
-        XCTAssertTrue(trailText().contains("was told Tasks cannot be unticked under " + GradedFolderWording.listTitle))
+        XCTAssertTrue(
+            trailText().contains(
+                "SNC4M: could not remove “Tasks” from the marks list — " + SpecialNames.lastGradedFolderBlocked
+            ),
+            trailText()
+        )
     }
 
     /// A protection that a tick BRINGS ABOUT holds at once. Since issue #266's
@@ -191,6 +197,7 @@ final class TickTableTests: XCTestCase {
         let host: TableHost = TableHost(
             MembershipToggleListView(
                 title: GradedFolderWording.listTitle,
+                removalTrail: RemovalTrail.inCourseSettings(courseCode: "SNC4M", list: .marks),
                 allItems: ["Concepts", "Tasks"],
                 members: members.binding,
                 protection: { folder in
@@ -209,14 +216,20 @@ final class TickTableTests: XCTestCase {
         host.pump()
         host.clickCell(of: table, column: 0, row: 1)
         XCTAssertEqual(members.names, ["Tasks"], "Tasks is now the last member, and the click is refused")
-        XCTAssertTrue(trailText().contains("was told Tasks cannot be unticked under " + GradedFolderWording.listTitle))
+        XCTAssertTrue(
+            trailText().contains(
+                "SNC4M: could not remove “Tasks” from the marks list — " + SpecialNames.lastGradedFolderBlocked
+            ),
+            trailText()
+        )
     }
 
     /// Every box draws exactly what the list holds.
     func testEveryBoxDrawsWhatTheListHolds() {
         let members: ListBox = ListBox(["Tasks", "Legacy"])
         let list: MembershipToggleListView = MembershipToggleListView(
-            title: "Marks", allItems: ["Concepts", "Tasks", "Tests"], members: members.binding
+            title: "Marks", removalTrail: RemovalTrail.inCourseSettings(courseCode: "SNC4M", list: .marks),
+            allItems: ["Concepts", "Tasks", "Tests"], members: members.binding
         )
         for item in ["Concepts", "Tasks", "Tests"] {
             XCTAssertEqual(
@@ -240,7 +253,8 @@ final class TickTableTests: XCTestCase {
         XCTAssertEqual(members.names, ["Tasks", "Tests"])
 
         let list: MembershipToggleListView = MembershipToggleListView(
-            title: GradedFolderWording.listTitle, allItems: ["Tasks"], members: members.binding,
+            title: GradedFolderWording.listTitle, removalTrail: RemovalTrail.inCourseSettings(courseCode: "SNC4M", list: .marks),
+            allItems: ["Tasks"], members: members.binding,
             protection: { folder in
                 return .blocked(reason: SpecialNames.lastGradedFolderBlocked)
             }
@@ -254,7 +268,7 @@ final class TickTableTests: XCTestCase {
     func testADisabledTableIgnoresSpace() throws {
         let members: ListBox = ListBox([])
         let host: TableHost = TableHost(
-            MembershipToggleListView(title: "Marks", allItems: ["Concepts", "Tasks"], members: members.binding)
+            MembershipToggleListView(title: "Marks", removalTrail: RemovalTrail.inCourseSettings(courseCode: "SNC4M", list: .marks), allItems: ["Concepts", "Tasks"], members: members.binding)
                 .disabled(true)
         )
         defer { host.close() }

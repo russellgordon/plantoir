@@ -300,20 +300,23 @@ enum ScheduledDeployCleanup {
         }
         // A reference course's pages are locked, and `FileManager.removeItem`
         // refuses a locked tree outright ("Operation not permitted"). Unlocked
-        // AFTER the cancel and BEFORE the archive, so the one thing that can
-        // still stop a removal is the cancel — and so a course whose removal
-        // fails for some other reason is left unlocked rather than half
-        // frozen; the next folder read locks it again.
+        // AFTER the zip and immediately before the delete (#351): the zip
+        // reads a locked tree perfectly well, and it is off the main actor
+        // now, so a folder read during it — which locks a reference course
+        // again — would have re-locked a course unlocked before it, and the
+        // delete would fail after the archive was made. A zip that fails
+        // leaves the course locked, which is where it started.
         //
         // The teacher is told nothing about this. A delete confirmation that
         // mentioned the lock would be the app talking about its own plumbing.
-        if course.isKeptForReference {
-            ReferenceLock.unlock(courseDirectory: course.directoryURL)
-        }
         do {
             try await CourseArchiver.archiveAndRemoveCourse(
                 course, coursesDirectoryURL: coursesDirectoryURL
-            )
+            ) {
+                if course.isKeptForReference {
+                    ReferenceLock.unlock(courseDirectory: course.directoryURL)
+                }
+            }
         } catch {
             return RemovalResult(
                 stoppedSections: outcome.stopped,

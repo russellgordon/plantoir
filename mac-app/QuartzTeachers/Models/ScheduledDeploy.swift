@@ -1303,6 +1303,10 @@ enum ScheduledDeploy {
     /// previous agent is booted out before the new one is written. The same
     /// section in another working folder is another alarm, and is left alone
     /// (#237).
+    ///
+    /// Pass a course read by `Course.asSavedNow()` or by the runner's fresh
+    /// reading — never a window's copy, which may hold unsaved Course
+    /// Settings edits (#335).
     @discardableResult
     static func scheduleDeploy(
         course: Course,
@@ -2578,6 +2582,10 @@ enum ScheduledDeploy {
         // from the log for the same reason as the line above: nobody is
         // watching a console at half six in the morning.
         WorkspaceInUseReport.noteOnTheTrail(from: text)
+        // A scheduled run is started by Plantoir itself, so it carries the
+        // app's helpers folder and can install from it, or create the
+        // website builder, while nobody is watching (#312).
+        HelperBootstrapReport.noteOnTheTrail(from: text)
         // A How I Teach page kept off the website this run (#209) — the same
         // reader as the console's, for the same reason as the lines above.
         HowITeachKeptOffReport.noteOnTheTrail(from: text)

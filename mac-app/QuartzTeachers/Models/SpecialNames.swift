@@ -173,7 +173,29 @@ enum SpecialNames {
     nonisolated static let previewUsesSavedSettings: String =
         "Course Settings has changes you have not saved, so this preview uses the settings as they were last saved."
 
+    /// The same, for a deploy (#335): the Deploy button, and the local
+    /// assistant pressing it or deploying with no window open. A deploy reads
+    /// the saved file for where it goes and for everything it builds.
+    /// `specialNames.deployUsesSavedSettings`.
+    nonisolated static let deployUsesSavedSettings: String =
+        "Course Settings has changes you have not saved, so this deploy uses the settings as they were last saved."
+
+    /// The same, in the schedule sheet (#335). The second sentence is true
+    /// since #323 — the run reads the file when it fires — and is the whole
+    /// of "save first" without a second Save button.
+    /// `specialNames.schedulingUsesSavedSettings`.
+    nonisolated static let schedulingUsesSavedSettings: String =
+        "Course Settings has changes you have not saved, so what is shown here is worked out from the settings as they were last saved. A deploy set now uses whatever is saved when it runs."
+
     // MARK: - Functions
+
+    /// Why a deploy, or setting one, was refused (#335): the settings file
+    /// could not be read at the act, and a window's unsaved copy is never
+    /// used in its place. `specialNames.settingsCouldNotBeReadToDeploy`.
+    nonisolated static func settingsCouldNotBeReadToDeploy(course: String) -> String {
+        return "\(course)’s settings could not be read just now, so there is no telling where to deploy it. "
+            + "Open Course Settings, check them and save, then try again."
+    }
 
     nonisolated static func curriculumFolderBlockedByCurriculumPages(jurisdiction: String) -> String {
         return "This folder holds your curriculum expectations. To remove it, turn off “Include \(jurisdiction) curriculum pages” first."

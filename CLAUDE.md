@@ -533,6 +533,7 @@ brew install xcodegen
 cd mac-app
 ./Vendor/fetch-llama.sh     # REQUIRED before generating — see below
 ./Vendor/fetch-sparkle.sh   # REQUIRED too, since #204 — see below
+./Vendor/fetch-helpers.sh   # REQUIRED too, since #312 — ~470 MB, see below
 xcodegen generate
 open Plantoir.xcodeproj
 ```
@@ -555,6 +556,17 @@ and refusing a mismatch. Also **not optional**: `project.yml` embeds
 `Vendor/Sparkle/Sparkle.framework`, so generating without it fails. A Debug
 build carries no update feed and never checks for anything —
 `documentation/09-mac-app.md` → "Updating itself".
+
+`fetch-helpers.sh` fetches the website builder's helper programs (Colima,
+Lima, the Docker CLI, buildx) and the virtual machine's starting disk for
+Apple silicon — **about 470 MB** — which the app carries so a teacher's first
+run does not download them (#312). Also **not optional**: `project.yml` names
+`Vendor/helpers` as a resource folder. It reads every version and checksum
+from `setup.sh` and keeps its downloads in a cache OUTSIDE the repository
+(`${PLANTOIR_HELPERS_CACHE:-~/Library/Caches/Plantoir-dev/helpers}`), so a
+second clone or worktree costs a few seconds and no disk; the first costs the
+download. Run `xcodegen generate` again after it replaces the folder (Trap 1).
+`documentation/09-mac-app.md` → "What the app carries for the website builder".
 
 Debug builds are signed with a real "Apple Development" identity
 (`DEVELOPMENT_TEAM` in `project.yml`) rather than ad-hoc — an ad-hoc signature
@@ -823,9 +835,9 @@ Four things that cost a day each if you do not know them:
   tool as a recommendation, not a boundary. The rule went into Swift instead.
 - **Adding a tool is a routing change.** On the mac the local model is shown
   13 of the 22 tools that exist (`AssistToolRunner.localTools`); an MCP client
-  is shown 35 (`.mcpTools`, the 22 plus thirteen: six that ask for judgement
+  is shown 37 (`.mcpTools`, the 22 plus fifteen: six that ask for judgement
   about meaning — the three curriculum tools, and #209's three for the How I
-  Teach page). The local 13's full digest is pinned
+  Teach page — and #96's start-of-year pair). The local 13's full digest is pinned
   (`scripts/test_tool_surface_digest.py`, made by `research/ai-assist/toolhash.py`). More choices is the classic way a router degrades. **Windows'
   `plantoir-mcp.exe` serves 37**, so the two MCP surfaces are no longer the
   same product — see [issue #66](https://github.com/russellgordon/plantoir/issues/66).

@@ -62,7 +62,15 @@ The assistant's engine is not committed — 25 MB of llama.cpp build output
 ```bash
 ./Vendor/fetch-llama.sh
 ./Vendor/fetch-sparkle.sh
+./Vendor/fetch-helpers.sh
 ```
+
+The third (#312) fetches the website builder's helper programs and its
+starting disk for Apple silicon, about 470 MB, into `Vendor/helpers`, which the
+app carries as `Contents/Resources/helpers`; its versions and checksums come
+from `../setup.sh`, and its downloads are cached outside the repository
+(`PLANTOIR_HELPERS_CACHE`, default `~/Library/Caches/Plantoir-dev/helpers`).
+Run `xcodegen generate` again whenever it replaces the folder.
 
 The second fetches Sparkle 2.9.6 (#204), which a released Plantoir finds and
 installs its own updates with — pinned by version and SHA-256, never committed,
@@ -103,7 +111,13 @@ xcodebuild -project Plantoir.xcodeproj -scheme Plantoir test \
   -only-testing:QuartzTeachersTests/InAppUserInterfaceTests
 
 # 3. CLI-equivalence integration tests (need Docker/Colima and the repo
-#    workspace; build results are compared against command-line runs)
+#    workspace, which must be INSIDE your home folder — the launchers refuse
+#    to mount anything the Colima VM cannot see, #221; build results are
+#    compared against command-line runs). What NewCourseCreatorIntegrationTests
+#    adds is the app's answer-pumping and the real image: which keys a new
+#    course's pages are written with is checked without Docker by
+#    scripts/test_page_visibility.py (NewCourseIsWrittenInTheCurrentKeys), and
+#    the check it makes of them runs in every suite (#139).
 TEST_RUNNER_INTEGRATION_WORKSPACE=/path/to/repo \
 xcodebuild -project Plantoir.xcodeproj -scheme Plantoir test \
   -only-testing:QuartzTeachersTests/ScriptRunnerIntegrationTests \

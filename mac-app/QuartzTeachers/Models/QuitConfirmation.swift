@@ -113,7 +113,8 @@ enum QuitConfirmation {
         return workUnderWay(
             publishes: CourseActivity.activePublishes,
             previews: PreviewLeases.active,
-            previewBuilds: CourseActivity.activePreviewBuilds
+            previewBuilds: CourseActivity.activePreviewBuilds,
+            copies: CourseActivity.activeCopies
         )
     }
 
@@ -134,7 +135,8 @@ enum QuitConfirmation {
     static func workUnderWay(
         publishes: [CourseActivity.PublishRecord],
         previews: [PreviewLeases.Lease],
-        previewBuilds: [CourseActivity.PreviewBuildRecord] = []
+        previewBuilds: [CourseActivity.PreviewBuildRecord] = [],
+        copies: [CourseActivity.CopyRecord] = []
     ) -> String? {
         _ = previews
         if publishes.count == 1 {
@@ -150,6 +152,15 @@ enum QuitConfirmation {
         }
         if previewBuilds.count > 1 {
             return "building \(previewBuilds.count) previews"
+        }
+        // A copy being zipped (#351): a backup, or the archive before a
+        // restore or a removal. Asked about because a quit mid-zip leaves a
+        // half-written copy, and a restore or removal that never happened.
+        if copies.count == 1 {
+            return "saving a copy of \(copies[0].courseCode)"
+        }
+        if copies.count > 1 {
+            return "saving \(copies.count) copies"
         }
         return nil
     }

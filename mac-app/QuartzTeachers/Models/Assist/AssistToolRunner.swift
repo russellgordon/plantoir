@@ -543,6 +543,10 @@ final class AssistToolRunner {
             return planWriteHowITeach(arguments)
         case "write_how_i_teach":
             return await writeHowITeach(arguments)
+        case "plan_prepare_for_start_of_year":
+            return planPrepareForStartOfYear(arguments)
+        case "prepare_for_start_of_year":
+            return await prepareForStartOfYear(arguments)
         default:
             return AssistToolOutcome.couldNotRead(
                 "There is no tool called “\(call.function.name)”."
@@ -795,7 +799,14 @@ final class AssistToolRunner {
             workspaceURL: workspace.workspaceURL
         )
         let dangling: [AssistSectionLink] = graph.linksIntoHiddenPages()
-        let orphans: [AssistSectionPage] = graph.visiblePagesNothingLinksTo()
+        // Curriculum pages and Key Links (with what it lists) are left out of
+        // groups 2 and 3, as Windows has always left them out of group 2
+        // (`shared-rules.json` → `sectionCheck`, #96).
+        let neverInTheAudit: Set<String> = AssistSectionGraph.pagesNeverInTheAudit(
+            of: graph, in: located.course
+        )
+        let orphans: [AssistSectionPage] = graph.visiblePagesNothingLinksTo(leavingOut: neverInTheAudit)
+        let missed: [AssistSectionPage] = graph.visiblePagesLinkedButMissed(leavingOut: neverInTheAudit)
 
         let visible: Int = graph.visiblePageCount
         let pageWord: String = visible == 1 ? "page" : "pages"
@@ -842,6 +853,31 @@ final class AssistToolRunner {
                 lines.append("• " + page.relativePath)
                 listed += 1
             }
+            paragraphs.append(lines.joined(separator: "\n"))
+        }
+
+        // The third group (#96), silent when empty for the same reason: a
+        // page a class students cannot see links to, and no class they CAN
+        // see links to, is a page a bulk change should have taken down with
+        // those classes and did not. Its being empty is what proves "Get
+        // Ready for the Start of the Year" — or anything else — finished.
+        if !missed.isEmpty {
+            var lines: [String] = []
+            let word: String = missed.count == 1 ? "page is" : "pages are"
+            lines.append("\(missed.count) visible \(word) linked only from classes students cannot see "
+                         + "yet, and from no class they can. Students can still open these through the "
+                         + "site's explorer:")
+            var listed: Int = 0
+            for page in missed {
+                if listed == AssistToolRunner.mostListed {
+                    lines.append("…and \(missed.count - listed) more.")
+                    break
+                }
+                lines.append("• " + page.relativePath)
+                listed += 1
+            }
+            lines.append("Put each one into draft until the class that uses it is published, or link "
+                         + "it from a class students can already see.")
             paragraphs.append(lines.joined(separator: "\n"))
         }
 
@@ -1645,8 +1681,12 @@ final class AssistToolRunner {
         guard let backupURL = savedURL else {
             return false
         }
-        conversationBackups[code] = backupURL
-        conversationBackupURL = backupURL
+        // Another door (start of the year) may have saved one while this was
+        // zipping; the first copy stays the conversation's way back.
+        if conversationBackups[code] == nil {
+            conversationBackups[code] = backupURL
+            conversationBackupURL = backupURL
+        }
         return true
     }
 
@@ -1696,6 +1736,18 @@ final class AssistToolRunner {
             )
             throw error
         }
+    }
+
+    /// What a write says when the section changed while its copy was being
+    /// saved (#351): the copy is off the main actor now and can take a minute,
+    /// so the plan the write was about to carry out is worked out again after
+    /// it, and a plan that no longer matches is refused rather than applied.
+    /// The rule: documentation/10 → "The gap between a plan and its write".
+    private static func changedWhileSavingACopy(_ located: Located) -> AssistToolOutcome {
+        let said: String = AssistWording.changedWhileSavingACopy(
+            course: located.course.code, section: String(located.sectionNumber)
+        )
+        return AssistToolOutcome.refused(said)
     }
 
     /// A file's size in bytes, or 0 when it cannot be read.
@@ -2168,6 +2220,20 @@ final class AssistToolRunner {
         // (b) Put the files back.
         let result: AssistUndoResult = history.undo()
 
+        // Getting a section ready for the start of the year is one act with
+        // its own line, and so is taking it back (#96).
+        if pending.kind == .startOfYear {
+            ActivityTrail.note(
+                .startOfTheYearChangeUndone,
+                ActivityTrail.startOfYearUndoneLine(
+                    source: startOfYearSource,
+                    putBack: result.restored.count,
+                    leftAsTheyAre: result.skipped.count
+                ),
+                course: pending.courseCode, section: pending.sectionNumber
+            )
+        }
+
         if result.restored.isEmpty && result.skipped.isEmpty {
             return AssistToolOutcome.refused(result.description)
         }
@@ -2208,6 +2274,217 @@ final class AssistToolRunner {
         detail += "\n\n" + AssistWording.undoDoesNotReachTheLiveSite
 
         return AssistToolOutcome.wrote(summary, detail: detail)
+    }
+
+    // MARK: - Getting a section ready for the start of the year (#96)
+
+    /// Why the plan could not be made: the sentence, and the trail's reason.
+    private struct StartOfYearRefusal: Error {
+        let message: String
+        let reason: String
+    }
+
+    /// Where this runner's start-of-year acts are recorded as coming from.
+    private var startOfYearSource: String {
+        switch surface {
+        case .mcp:
+            return "mcp"
+        case .local:
+            return "assistant"
+        }
+    }
+
+    /// The plan, worked out afresh from disk.
+    private func startOfYearPlan(
+        _ arguments: [String: Any]
+    ) -> Result<(located: Located, plan: StartOfYearPlan), StartOfYearRefusal> {
+        let found: Result<Located, AssistToolRefusal> = locate(arguments)
+        guard case .success(let located) = found else {
+            return .failure(StartOfYearRefusal(message: refusal(from: found).message, reason: "noSuchSection"))
+        }
+        var scheduled: Date? = nil
+        if let folder = workspace.workspaceURL {
+            scheduled = ScheduledDeploy.nextRun(
+                courseCode: located.course.code, sectionNumber: located.sectionNumber,
+                inWorkingFolder: folder
+            )
+        }
+        let planned: Result<StartOfYearPlan, StartOfYearProblem> = StartOfYearPlanner.plan(
+            forSection: located.sectionNumber, in: located.course,
+            workspaceURL: workspace.workspaceURL, today: today, scheduledDeploy: scheduled
+        )
+        switch planned {
+        case .failure(let problem):
+            return .failure(StartOfYearRefusal(message: problem.sentence, reason: problem.trailReason))
+        case .success(let plan):
+            return .success((located, plan))
+        }
+    }
+
+    /// What getting the section ready would do. Changes nothing.
+    private func planPrepareForStartOfYear(_ arguments: [String: Any]) -> AssistToolOutcome {
+        switch startOfYearPlan(arguments) {
+        case .failure(let problem):
+            return AssistToolOutcome.couldNotRead(problem.message)
+        case .success(let found):
+            if found.plan.changesNothing {
+                let nothing: String = StartOfYearWording.nothingToDo(
+                    first: found.plan.firstClass.displayTitle, nouns: found.plan.noun.plural
+                )
+                return AssistToolOutcome.wrote(nothing, detail: found.plan.describe())
+            }
+            return AssistToolOutcome.planned(
+                "Worked out what getting \(found.located.course.code) Section "
+                    + "\(found.located.sectionNumber) ready for the start of the year would do.",
+                plan: found.plan.describe()
+            )
+        }
+    }
+
+    /// Carry the plan out — only when the code given is the code of the plan
+    /// as it stands NOW, and only with a fresh backup of the course.
+    ///
+    /// **A fresh backup for this act, and a refusal without one** (the plan
+    /// review's M2). `carryOut` goes ahead when its once-per-conversation
+    /// backup fails, and that backup may predate earlier changes in the
+    /// conversation; this is the largest single write the app makes, and the
+    /// app's own button refuses without one, so this refuses too. It is
+    /// `.assistant`'s — the file-name form is unchanged.
+    private func prepareForStartOfYear(_ arguments: [String: Any]) async -> AssistToolOutcome {
+        let source: String = startOfYearSource
+        let found: (located: Located, plan: StartOfYearPlan)
+        switch startOfYearPlan(arguments) {
+        case .failure(let problem):
+            if problem.reason == "noFirstClass", case .success(let located) = locate(arguments) {
+                ActivityTrail.note(
+                    .startOfTheYearNotDone,
+                    ActivityTrail.startOfYearNotDoneLine(source: source, reason: problem.reason),
+                    course: located.course.code, section: located.sectionNumber
+                )
+            }
+            return AssistToolOutcome.refused(problem.message)
+        case .success(let planned):
+            found = planned
+        }
+        let course: Course = found.located.course
+        let sectionNumber: Int = found.located.sectionNumber
+        let plan: StartOfYearPlan = found.plan
+        let code: String = text("planCode", in: arguments).trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if code.isEmpty || code.lowercased() != plan.fingerprint {
+            let reason: String = code.isEmpty ? "missingPlanCode" : "changedSinceShown"
+            ActivityTrail.note(
+                .startOfTheYearNotDone,
+                ActivityTrail.startOfYearNotDoneLine(source: source, reason: reason),
+                course: course.code, section: sectionNumber
+            )
+            let said: String = code.isEmpty
+                ? AssistWording.startOfYearNeedsItsPlan(course: course.code, section: String(sectionNumber))
+                : AssistWording.startOfYearPlanHasChanged(course: course.code, section: String(sectionNumber))
+            return AssistToolOutcome(
+                summary: said, detail: said + "\n\n" + plan.describe(), shouldContinue: false
+            )
+        }
+
+        if plan.changesNothing {
+            ActivityTrail.note(
+                .startOfTheYearNotDone,
+                ActivityTrail.startOfYearNotDoneLine(source: source, reason: "nothingToDo"),
+                course: course.code, section: sectionNumber
+            )
+            let nothing: String = StartOfYearWording.nothingToDo(
+                first: plan.firstClass.displayTitle, nouns: plan.noun.plural
+            )
+            return AssistToolOutcome.wrote(nothing, detail: nothing)
+        }
+
+        // A copy of its OWN, always, through the assistant's one door
+        // (`savingACopy`, #351): off the main actor, with the window's line
+        // while it runs and "assistant backed up a course" on the trail.
+        var savedCopy: URL? = nil
+        if let coursesDirectoryURL = workspace.coursesDirectoryURL {
+            savedCopy = try? await savingACopy(
+                of: course, forSection: sectionNumber, coursesDirectoryURL: coursesDirectoryURL
+            )
+        }
+        guard let backupURL = savedCopy else {
+            ActivityTrail.note(
+                .startOfTheYearNotDone,
+                ActivityTrail.startOfYearNotDoneLine(source: source, reason: "backupFailed"),
+                course: course.code, section: sectionNumber
+            )
+            return AssistToolOutcome.refused(AssistWording.startOfYearNeedsABackup(course: course.code))
+        }
+        // The conversation's way back, if it had none yet: the Restore banner
+        // offers the copy from before this conversation changed anything.
+        if conversationBackups[course.code] == nil {
+            conversationBackups[course.code] = backupURL
+            conversationBackupURL = backupURL
+        }
+
+        // The copy can take a minute, and the teacher can edit in Obsidian
+        // meanwhile: held again to the plan the call was given (the rule in
+        // documentation/10 → "The gap between a plan and its write").
+        if case .success(let afterTheBackup) = startOfYearPlan(arguments),
+           afterTheBackup.plan.fingerprint != plan.fingerprint {
+            ActivityTrail.note(
+                .startOfTheYearNotDone,
+                ActivityTrail.startOfYearNotDoneLine(source: source, reason: "changedSinceShown"),
+                course: course.code, section: sectionNumber
+            )
+            let said: String = AssistWording.startOfYearPlanHasChanged(course: course.code, section: String(sectionNumber))
+            return AssistToolOutcome(
+                summary: said, detail: said + "\n\n" + afterTheBackup.plan.describe(), shouldContinue: false
+            )
+        }
+
+        let previewCanBeRebuilt: Bool = whatBlocksABuild(of: course) == nil
+        _ = await stopThePreviewBeforeWriting(for: course, sectionNumber: sectionNumber)
+
+        let change: AssistChange
+        var leftAlone: [String] = []
+        do {
+            let applied: (change: AssistChange, leftAlone: [String]) = try StartOfYearPlanner.apply(
+                plan, in: course
+            )
+            change = applied.change
+            leftAlone = applied.leftAlone
+        } catch {
+            ActivityTrail.note(
+                .startOfTheYearNotDone,
+                ActivityTrail.startOfYearNotDoneLine(source: source, reason: "writeFailed"),
+                course: course.code, section: sectionNumber
+            )
+            return AssistToolOutcome.refused(
+                StartOfYearWording.writeFailed(backup: backupURL.lastPathComponent)
+            )
+        }
+        history.record(change)
+
+        let written: Int = max(0, plan.changeCount - leftAlone.count)
+        ActivityTrail.note(
+            .sectionMadeReadyForTheStartOfTheYear,
+            ActivityTrail.sectionMadeReadyLine(
+                source: source,
+                classes: plan.classChangeCount,
+                otherPagesByReason: plan.otherChangesByReason,
+                leftAsTheyWere: plan.publishPlan.noRoomForAKey.count + leftAlone.count,
+                backupFileName: backupURL.lastPathComponent,
+                previewRebuilt: previewCanBeRebuilt
+            ),
+            course: course.code, section: sectionNumber
+        )
+
+        var said: String = StartOfYearWording.done(pages: StartOfYearWording.pages(written))
+        if !leftAlone.isEmpty {
+            said += " " + AssistPublishPlan.sayingPagesWithNoRoomForAKey(named: leftAlone)
+        }
+        var detail: String = said
+        detail += "\n\n" + StartOfYearWording.publishingFromNowOn(noun: plan.noun.singular)
+        detail += "\n\nundo_last_change takes this back while this session lasts. The course was backed up "
+                + "first, as “\(backupURL.lastPathComponent)”, which is the way back after that."
+        detail += "\n\n" + (await bringThePreviewUpToDate(for: course, sectionNumber: sectionNumber))
+        return AssistToolOutcome.wrote(said, detail: detail)
     }
 
     /// What to call the pages a class-page add created, for the sentence an
@@ -2836,6 +3113,11 @@ final class AssistToolRunner {
             let backedUp: Bool = await backUpOnceForThisConversation(
                 asked.located.course, forSection: asked.located.sectionNumber
             )
+            // Held again to the plan after the copy (#351's plan/write gap).
+            guard case .success(let again) = timetablePlan(arguments),
+                  again.plan.description == asked.plan.description else {
+                return AssistToolRunner.changedWhileSavingACopy(asked.located)
+            }
             do {
                 try SectionTimetableStore.applyRememberTimetable(asked.plan)
             } catch {
@@ -3025,6 +3307,14 @@ final class AssistToolRunner {
         let backedUp: Bool = await backUpOnceForThisConversation(
             request.located.course, forSection: request.located.sectionNumber
         )
+        // Held again to the plan after the copy (#351's plan/write gap): the
+        // source's words are compared too, since they are what is copied.
+        guard case .success(let again)? = duplicateAsked(arguments),
+              again.plan.description == request.plan.description,
+              again.sourceText == request.sourceText,
+              again.newURL == request.newURL else {
+            return AssistToolRunner.changedWhileSavingACopy(request.located)
+        }
 
         let outcome: ClassChangeOutcome
         do {
@@ -3404,8 +3694,9 @@ final class AssistToolRunner {
             let websiteAnswer: String = text("website", in: arguments).lowercased()
             let isRollover: Bool = isARollover(arguments)
             if asked.plan.changesNothing {
-                let already: String = "Every page in \(asked.located.course.code) Section "
-                                    + "\(asked.located.sectionNumber) is already on the day it should be."
+                let already: String = AssistWording.everyPageIsAlreadyOnItsDay(
+                    course: asked.located.course.code, section: asked.located.sectionNumber
+                )
                 guard isRollover else {
                     return AssistToolOutcome.wrote(already, detail: already)
                 }
@@ -3466,8 +3757,9 @@ final class AssistToolRunner {
             return AssistToolOutcome.refused(problem.localizedDescription)
         case .success(let asked):
             if asked.plan.changesNothing {
-                let already: String = "Every page in \(asked.located.course.code) Section "
-                                    + "\(asked.located.sectionNumber) is already on the day it should be."
+                let already: String = AssistWording.everyPageIsAlreadyOnItsDay(
+                    course: asked.located.course.code, section: asked.located.sectionNumber
+                )
                 // The website is settled HERE TOO, and this is the SECOND TURN
                 // of the whole conversation. A teacher answers the website
                 // question by saying one of the two sentences, which comes back
@@ -3503,12 +3795,18 @@ final class AssistToolRunner {
 
             let change: AssistChange
             var leftAlone: [String] = []
+            var classesReDated: Int = 0
+            var pagesTheyUseReDated: Int = 0
             do {
-                let applied: (change: AssistChange, leftAlone: [String]) = try SectionReDatePlanner.apply(
+                let applied: (
+                    change: AssistChange, leftAlone: [String], classesReDated: Int, pagesTheyUseReDated: Int
+                ) = try SectionReDatePlanner.apply(
                     asked.plan, forSection: asked.located.sectionNumber, in: asked.located.course
                 )
                 change = applied.change
                 leftAlone = applied.leftAlone
+                classesReDated = applied.classesReDated
+                pagesTheyUseReDated = applied.pagesTheyUseReDated
             } catch {
                 return AssistToolOutcome.refused(
                     "Nothing was changed: \(error.localizedDescription)"
@@ -3516,15 +3814,20 @@ final class AssistToolRunner {
             }
             history.record(change)
 
-            let moved: Int = asked.plan.moves.count
             // The model's copy says "class" whatever the course calls them;
             // only the line the teacher reads takes the course's noun (#267).
-            let summary: String = AssistWording.reDated(
-                count: asked.plan.classCount, pagesTheyUse: moved - asked.plan.classCount
+            // Both counts are what was WRITTEN, each from its own kind (#343):
+            // never one subtracted from the other.
+            let summary: String = AssistToolRunner.sayingWhatWasReDated(
+                classes: classesReDated, pagesTheyUse: pagesTheyUseReDated, noun: .class,
+                course: asked.located.course.code, section: asked.located.sectionNumber,
+                anyDeclined: !leftAlone.isEmpty
             )
-            let teacherSummary: String = AssistWording.reDated(
-                count: asked.plan.classCount, pagesTheyUse: moved - asked.plan.classCount,
-                noun: asked.located.course.configuration.classNoun
+            let teacherSummary: String = AssistToolRunner.sayingWhatWasReDated(
+                classes: classesReDated, pagesTheyUse: pagesTheyUseReDated,
+                noun: asked.located.course.configuration.classNoun,
+                course: asked.located.course.code, section: asked.located.sectionNumber,
+                anyDeclined: !leftAlone.isEmpty
             )
             var detail: String = summary
             if backedUp {
@@ -3542,11 +3845,11 @@ final class AssistToolRunner {
             // it is the part a teacher has to answer, and `detail` is not shown
             // to them at all for a write.
             var said: String = teacherSummary
-            // Pages the re-date could not date, named — they are not among
-            // the classes it moved, whatever the count above says (#186).
+            // Pages the re-date could not date, named — and counted nowhere
+            // above, since the counts are of dates written (#186, #343).
             if !leftAlone.isEmpty {
                 let declined: String = AssistPublishPlan.sayingPagesWhoseNewDateCouldNotBeSet(named: leftAlone)
-                said += " " + declined
+                said += said.isEmpty ? declined : " " + declined
                 detail += "\n\n" + declined
                 AssistToolRunner.notePagesLeftAsTheyWere(
                     leftAlone.count, act: "re-dating classes",
@@ -3559,6 +3862,34 @@ final class AssistToolRunner {
             }
             return AssistToolOutcome.wrote(said, detail: detail)
         }
+    }
+
+    /// The line a teacher reads after a re-date (#343). When every class was
+    /// already on its day and only what they use moved, "Re-dated 0 classes"
+    /// would read as nothing happening, so that case has its own sentence.
+    ///
+    /// **When no date at all was written** — a plan whose only moves hid an
+    /// overflow class already on the last day, or were declined (#186) — the
+    /// reply is the same sentence a plan that changes nothing gets,
+    /// `AssistWording.everyPageIsAlreadyOnItsDay`, never "only the 0 pages"
+    /// (the implementation review's F4). Except when a page was DECLINED: it
+    /// is not on its day, so saying every page is would be the same kind of
+    /// untruth #343 fixes; the reply is then the declined sentence alone
+    /// (empty here, and the caller adds it).
+    static func sayingWhatWasReDated(
+        classes: Int, pagesTheyUse: Int, noun: ClassNoun,
+        course: String, section: Int, anyDeclined: Bool
+    ) -> String {
+        if classes == 0 && pagesTheyUse == 0 {
+            if anyDeclined {
+                return ""
+            }
+            return AssistWording.everyPageIsAlreadyOnItsDay(course: course, section: section)
+        }
+        if classes == 0 {
+            return AssistWording.reDatedOnlyPagesTheyUse(pagesTheyUse: pagesTheyUse, noun: noun)
+        }
+        return AssistWording.reDated(count: classes, pagesTheyUse: pagesTheyUse, noun: noun)
     }
 
     /// The whole question, in ONE place, because it is said from two.
@@ -3934,6 +4265,11 @@ final class AssistToolRunner {
             let backedUp: Bool = await backUpOnceForThisConversation(
                 asked.located.course, forSection: asked.located.sectionNumber
             )
+            // Held again to the plan after the copy (#351's plan/write gap).
+            guard case .planned(let again) = roomPlan(arguments),
+                  again.plan.description == asked.plan.description else {
+                return AssistToolRunner.changedWhileSavingACopy(asked.located)
+            }
             let outcome: ClassChangeOutcome
             do {
                 outcome = try ClassInsertionPlanner.apply(asked.plan, in: asked.located.course)
@@ -4240,6 +4576,13 @@ final class AssistToolRunner {
             let backedUp: Bool = await backUpOnceForThisConversation(
                 asked.located.course, forSection: asked.located.sectionNumber
             )
+            // Held again to the plan after the copy (#351's plan/write gap) —
+            // and a course removed meanwhile is not locatable, so its section
+            // folder is never made again by the apply.
+            guard case .success(let again) = nextClassPlan(arguments),
+                  again.plan.description == asked.plan.description else {
+                return AssistToolRunner.changedWhileSavingACopy(asked.located)
+            }
 
             let outcome: ClassChangeOutcome
             do {
@@ -4421,6 +4764,11 @@ final class AssistToolRunner {
             let backedUp: Bool = await backUpOnceForThisConversation(
                 asked.located.course, forSection: asked.located.sectionNumber
             )
+            // Held again to the plan after the copy (#351's plan/write gap).
+            guard case .success(let again) = mentionsPlan(arguments),
+                  again.plan.describe() == asked.plan.describe() else {
+                return AssistToolRunner.changedWhileSavingACopy(asked.located)
+            }
 
             let change: AssistChange
             do {
