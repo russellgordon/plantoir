@@ -11,6 +11,7 @@ import subprocess
 import signal
 import json
 import re
+import urllib.parse
 from pathlib import Path
 
 # The embeddable Python used by the native Windows runtime replaces
@@ -1875,6 +1876,133 @@ def _pages_a_page_links_to(post, pages_by_stem, pages_by_rel) -> list[Path]:
             if target_fp not in linked:
                 linked.append(target_fp)
     return linked
+
+
+# The two Markdown-style link shapes, each read by ONE pattern: the plain
+# destination refuses one opening with "<", which is the angle-bracket shape's
+# (#97). The same two patterns the mac's FolderPathRewriter uses.
+_MARKDOWN_PAGE_LINK = re.compile(r"\]\((?!<)([^)\s]+)")
+_ANGLE_BRACKETED_PAGE_LINK = re.compile(r"\]\(<([^<>\r\n]+)(?=>)")
+_WIKILINK_AS_WRITTEN = re.compile(r"!?\[\[([^\]|#]+?)(?:#[^\[\]|]*)?(?:\\?\|[^\]]*)?\]\]")
+_HAS_A_SCHEME = re.compile(r"^[A-Za-z][A-Za-z0-9+.\-]*:")
+
+
+def _page_named_by_destination(destination: str):
+    """What a Markdown destination names as a page, decoded, or None when it
+    names nothing in the course: a scheme, `//`, or only a `#heading`."""
+    text = destination.strip()
+    if not text or text.startswith("#") or text.startswith("//") or _HAS_A_SCHEME.match(text):
+        return None
+    for separator in ("#", "?"):
+        text = text.split(separator, 1)[0]
+    try:
+        text = urllib.parse.unquote(text, errors="strict")
+    except Exception:
+        pass
+    text = text.strip()
+    return text or None
+
+
+def _links_as_written_in_order(text: str) -> list:
+    """
+    Every link on a page, in page order, as written: each wikilink's name
+    (links and embeds alike) and each Markdown-style link's destination in
+    either shape, decoded. All three go through the one mask, code and %%
+    comments (`markdown_code.not_a_link_ranges`, #313 and #331). The mac's
+    `AssistSectionGraph.everyLinkAsWritten` is the same reading
+    (`followingLinks.markdownStyleLinks`).
+    """
+    mask = markdown_code.not_a_link_ranges(text)
+    located = []
+    for match in markdown_code.matches_outside_code(_WIKILINK_AS_WRITTEN, text, mask):
+        located.append((match.start(), match.group(1).strip().rstrip("\\")))
+    for pattern in (_MARKDOWN_PAGE_LINK, _ANGLE_BRACKETED_PAGE_LINK):
+        for match in markdown_code.matches_outside_code(pattern, text, mask):
+            name = _page_named_by_destination(match.group(1))
+            if name:
+                located.append((match.start(), name))
+    located.sort(key=lambda entry: entry[0])
+    names = []
+    for _, name in located:
+        names.append(name)
+    return names
+
+
+def _links_into_hidden_pages(content_root: Path) -> list:
+    """
+    Every link on a page students can see that leads to a page they cannot
+    (#333; `siteHealth.linksIntoHiddenPages` in contracts/shared-rules.json),
+    as [{"from": ..., "to": ...}], each pair once, in page order. Names are
+    places in the course folder without .md: never anything written on a page.
+
+    A target is resolved by its path first, then by its name. When a name
+    belongs to several pages it is listed only if EVERY one of them is hidden:
+    which of two same-named pages Quartz picks is not this check's to guess,
+    so it warns only when it is certain. Embeds count (a hidden page shown
+    inside a visible one is the same dead end); pictures and files do not,
+    since only `.md` pages are looked up; a page that does not exist is not
+    listed (check_section does not list one either); and the How I Teach page
+    has already been REMOVED from the content by the time this runs, so a
+    link to it resolves to nothing.
+
+    Deliberately NOT `_extract_wikilink_targets`: that drops links to index,
+    Key Links and the coverage maps, returns a set with no source page, and
+    reads no Markdown-style link.
+    """
+    all_pages, pages_by_stem, pages_by_rel = _read_pages_for_linking(content_root)
+    hidden_by_page = {}
+    text_by_page = {}
+    for page in all_pages:
+        try:
+            text = page.read_text(encoding="utf-8")
+        except Exception:
+            continue
+        text_by_page[page] = text
+        hidden_by_page[page] = _is_draft(text)
+
+    def name_of(page: Path) -> str:
+        source = _vault_sources.get(page)
+        if source is not None:
+            return _name_in_the_course(source[0])
+        relative = page.relative_to(content_root).as_posix()
+        return relative[:-3] if relative.lower().endswith(".md") else relative
+
+    listed = []
+    seen_pairs = set()
+    for page in sorted(text_by_page, key=lambda each: each.relative_to(content_root).as_posix()):
+        if hidden_by_page[page]:
+            continue
+        for target in _links_as_written_in_order(text_by_page[page]):
+            path_form = target.lower()
+            if path_form.endswith(".md"):
+                path_form = path_form[:-3].strip()
+            candidates = []
+            if path_form in pages_by_rel:
+                candidates = [pages_by_rel[path_form]]
+            else:
+                stem = path_form.split("/")[-1].strip()
+                candidates = list(pages_by_stem.get(stem, []))
+                if not candidates and stem in pages_by_rel:
+                    # A folder's own index or Key Links, named from the top.
+                    candidates = [pages_by_rel[stem]]
+            known = []
+            for candidate in candidates:
+                if candidate in hidden_by_page:
+                    known.append(candidate)
+            if not known:
+                continue
+            every_one_hidden = True
+            for candidate in known:
+                if not hidden_by_page[candidate]:
+                    every_one_hidden = False
+            if not every_one_hidden:
+                continue
+            pair = (name_of(page), name_of(known[0]))
+            if pair in seen_pairs:
+                continue
+            seen_pairs.add(pair)
+            listed.append({"from": pair[0], "to": pair[1]})
+    return listed
 
 
 def _find_class_reachable_pages(content_root: Path) -> set[Path]:
@@ -6751,6 +6879,10 @@ def build_section_site(
         # their names in the course folder, and whether the front page is one.
         "unreadable_pages": _unreadable_page_facts(),
         "front_page_unreadable": _front_page_cannot_be_published(content_root),
+        # Links on pages students can see that lead to pages they cannot
+        # (#333). After the How I Teach sweep above, so a link to that page
+        # resolves to nothing rather than to a hidden page.
+        "links_into_hidden_pages": _links_into_hidden_pages(content_root),
     }
     if health_facts["front_page_unreadable"]:
         front_line = _front_page_line(content_root)

@@ -774,6 +774,22 @@ else
   cat /tmp/verify_unreadable_page_settings_test.log
 fi
 
+# ---- build_site.py: links students would find dead (#333) ----
+# Every case in contracts/shared-rules.json -> siteHealth.linksIntoHiddenPages
+# through the build's own reader, in the image because it imports build_site
+# (python-frontmatter): a link on a page students can see into one they
+# cannot, named by its place in the course folder, once, and ONE finding.
+echo ""
+echo "🔎 Checking that links into hidden pages are named…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/test_links_into_hidden_pages.py" /opt/scripts/test_links_into_hidden_pages.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_links_into_hidden_pages.py >/tmp/verify_links_into_hidden_pages_test.log 2>&1; then
+  pass "build_site.py: a link on a page students can see into a hidden page is named (scripts/test_links_into_hidden_pages.py, #333)"
+else
+  fail "build_site.py: a link on a page students can see into a hidden page is named (scripts/test_links_into_hidden_pages.py, #333)"
+  cat /tmp/verify_links_into_hidden_pages_test.log
+fi
+
 # ---- Whether the site shows a page: the contract, run down the REAL chain ----
 # The one check here that is not about a rule being implemented right — it is
 # about the rule being TRUE. Both apps are tested against
