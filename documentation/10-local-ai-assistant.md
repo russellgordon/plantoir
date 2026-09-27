@@ -1948,8 +1948,10 @@ Windows skip them, publishing does not), with its own measurement —
 [#313](https://github.com/russellgordon/plantoir/issues/313). A contract case
 for `[[a\b]]`: Quartz does not draw it as a link, and nobody has decided what it
 should mean. The install-time readers in `setup_course.py` and the
-curriculum-coverage patterns share the cause but not the feature —
-[#314](https://github.com/russellgordon/plantoir/issues/314).
+curriculum-coverage patterns shared the cause but not the feature, and were
+fixed separately in
+[#314](https://github.com/russellgordon/plantoir/issues/314) — see
+[05 → Which shapes are links](05-build-pipeline.md#dates-drive-everything).
 
 ### No booleans, and separate verbs
 
