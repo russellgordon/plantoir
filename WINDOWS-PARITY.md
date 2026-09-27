@@ -1,4 +1,4 @@
-# Windows parity with mac v1.3.2: the strategy
+# Windows parity with mac v1.4.0: the strategy
 
 **Where this sits in the reading order.** `CLAUDE.md` comes first, as its
 own list says, and `WINDOWS-BOOTSTRAP.md` is the brief. Read this file when
@@ -13,7 +13,7 @@ instead of a pile.
 **This file expires.** It was written for `dev` = `68214a6c` on 2026-09-25,
 and it carries perishable state: red lists, counts, and "not touched since".
 That kind of state is what made `WINDOWS-HANDOFF.md` rot. **When the
-milestone "Windows: parity with mac v1.3.2" closes, delete this file** and the
+milestone "Windows: parity with mac v1.4.0" closes, delete this file** and the
 pointers to it in `WINDOWS-BOOTSTRAP.md` and `CLAUDE.md`. Do not keep it up to
 date past that point.
 
@@ -27,10 +27,10 @@ be found out from here at all.
 
 ## 1. The goal, and how "done" is measured
 
-**The goal.** Everything a teacher can do in the mac app through v1.3.2, a
+**The goal.** Everything a teacher can do in the mac app through v1.4.0, a
 Windows teacher can do too, and it behaves the same way wherever the contract
 says it must. The work is the 46 open issues on the milestone **"Windows:
-parity with mac v1.3.2"**, plus the batch-4 pieces still landing on the mac
+parity with mac v1.4.0"**, plus the batch-4 pieces still landing on the mac
 (section 5), which join the milestone as they land. It is judged against the
 shared contract, not against the Swift. Nothing in this plan asks a Windows
 session to read Swift. Where an issue points at a Swift file, that is a
@@ -259,7 +259,7 @@ item 5).
 | **#278** | Carry the unfinished line between output chunks (the measurement shows three cut points that capture a WRONG port), drop the `RecentText(8000)` fallback, never start from the container port. When the server starts and no address was ever announced, stop at once, unless the teacher has just pressed Stop. **Windows' capture-as-it-arrives design was the model the mac copied**; this issue is the part that design was missing | MATCH | `app-rules.json` → `previewPorts.announcedAddress`, `.whenThePreviewNeverAppears.whenNoAddressWasAnnounced`; doc 09 → "Where the address comes from"; fixture `mac-app/Tests/Goldens/235-preview-first-build.json` |
 | **#233** | Bound the QUIET, not the run: 45 s from `Started a Quartz server`, **re-measured on Windows before you adopt it**. Three verdicts, not two. An honest state after giving up. `preview did not appear`. **After #278**, because they share the wait | MATCH + measure | `app-rules.json` → `previewPorts.whenThePreviewNeverAppears`; doc 09 → "A preview that never appears" |
 | **#286** | `preview.ps1` walks 40 blocks (site port plus websocket) from the requested port. It prints the new sentence word for word and exits 1. Adds a launcher trail line. Run only the `hostBlockCases` made of `busyBlocks`. The contract says "this Mac": **propose a Windows line in the contract; do not reword it locally** | MATCH | `app-rules.json` → `previewPorts.hostBlock*`, `.whenNoBlockIsFree`; doc 03 → "How a folder finds its ports, and when it cannot" |
-| **#272** (+ #136 folded in) | Freshness compares against the START of the build (the 6th rule, `.build-started`). **Without it, the app reports "up to date" while wrong.** `BuiltForPreview` reads every `*.html` including dot folders, ordinal. `deploy.ps1`'s `Test-CarriesLiveReload` against the 9 cases (a likely throw on an unreadable page, and case-insensitivity). The two-window Save rule (first, measure whether a WinUI window holds its own copy of the settings), Revert reads the file, five sentences, re-running `fetch-runtime.ps1` (no named helper inside `filterFn`), 2 events. **Retitle the issue**: its title still begins "DRAFT" | MATCH | `app-rules.json` → `buildFreshness` (+ `previewBuild`, 9); `shared-rules.json` → `savingSettings` (5), `specialNames`; doc 05 (preflight, Stage 4), 07 → "One rule, six readers", 09 → "Two windows, one course" |
+| **#272** (+ #136 folded in) | Freshness compares against the START of the build (the 6th rule, `.build-started`). **Without it, the app reports "up to date" while wrong.** `BuiltForPreview` reads every `*.html` including dot folders, ordinal. **Since #291 the rule is no longer the bare `ws://localhost:`** but the `signature` OBJECT: `scriptTag`, then any run of the `between` bytes, then `client` — see the comment on #272. `BuiltForPreview` takes it as bytes over every page; `deploy.ps1`'s `Test-CarriesLiveReload` reads each page as ONE record (`Get-Content -Raw` / `ReadAllBytes`, not line-based `Select-String`), matches `-CaseSensitive` / `-cmatch` with an explicit byte class (not `\s`), and runs against the 15 cases incl. `invalidUTF8Before` (a likely throw on an unreadable page). The trap: "tag present AND client present" fails case 10. The two-window Save rule (first, measure whether a WinUI window holds its own copy of the settings), Revert reads the file, five sentences, re-running `fetch-runtime.ps1` (no named helper inside `filterFn`), 2 events. **Retitle the issue**: its title still begins "DRAFT" | MATCH | `app-rules.json` → `buildFreshness` (+ `previewBuild`, 15 since #291); `shared-rules.json` → `savingSettings` (5), `specialNames`; doc 05 (preflight, Stage 4), 07 → "One rule, six readers" and "What is looked for" (#291), 09 → "Two windows, one course" |
 
 ### Phase 5: the assistant (13 issues, plus #167). A chain through `AssistAgent`
 

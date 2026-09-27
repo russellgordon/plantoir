@@ -13,6 +13,54 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
+# Where a page's code is: the toolchain's own definition (#313), so the linter
+# reads links exactly as the build does. A link inside code is an example.
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+import markdown_code  # noqa: E402
+
+
+def fence_lines_that_fall_out(text: str) -> list:
+    """
+    The line numbers (1-based) where a fence opened on an INDENTED line -
+    inside a list item, say - has a non-blank line indented less than the
+    opener before its closer.
+
+    CommonMark cannot continue a fence lazily: that line ends the list item
+    and the fence with it, so the fence's own closer then OPENS a new fence
+    that runs to the end of the page, and the site shows everything after
+    the program as code - links and the curriculum block included. The
+    toolchain's code rule (readingALink.whatIsCodeLimits) cannot see this
+    either, which is why it is refused here, at the source. Found on TEJ2O's
+    "Control Something with Code" (#313).
+    """
+    fence = re.compile(r"^([ \t]*)(`{3,}|~{3,})(.*)$")
+    fallen = []
+    lines = text.split("\n")
+    index = 0
+    while index < len(lines):
+        opener = fence.match(lines[index].rstrip("\r"))
+        if not opener or (opener.group(2)[0] == "`" and "`" in opener.group(3)):
+            index += 1
+            continue
+        indent = len(opener.group(1).expandtabs(4))
+        run = opener.group(2)
+        index += 1
+        while index < len(lines):
+            line = lines[index].rstrip("\r")
+            closer = fence.match(line)
+            if closer and closer.group(2)[0] == run[0] and len(closer.group(2)) >= len(run) \
+                    and closer.group(3).strip() == "":
+                if indent > 0 and len(closer.group(1).expandtabs(4)) < indent:
+                    fallen.append(index + 1)
+                index += 1
+                break
+            if indent > 0 and line.strip() != "":
+                leading = len(line) - len(line.lstrip(" \t"))
+                if len(line[:leading].expandtabs(4)) < indent:
+                    fallen.append(index + 1)
+            index += 1
+    return fallen
+
 # An Ontario credit is 110 hours of scheduled time. A semestered day school
 # runs 75-minute periods, so a full credit is about 86 periods plus a
 # three-hour final evaluation — the tolerance either side is one week of
@@ -29,6 +77,32 @@ DEFAULT_FINAL_EVALUATION_HOURS = 3
 # One week of classes either side of the target, scaled to the credit.
 HOURS_TOLERANCE = 6
 MINIMUM_REVIEW_CLASSES = 3
+
+
+def curriculum_links_outside_folder(text, curriculum_root, curriculum_folder, link_pattern):
+    """
+    Every link or embed on a curriculum page whose target is not a page in
+    the curriculum folder itself (#253). Code spans and fenced blocks are
+    skipped: a link written as an example is not a link. A target is inside
+    the folder when it names one of the folder's pages by its stem, or by a
+    path that starts with the folder's own name.
+    """
+    stems = {"index"}
+    for folder_page in curriculum_root.rglob("*.md"):
+        stems.add(folder_page.stem)
+    without_fences = re.sub(r"(`{3,})[\s\S]*?\1", "", text)
+    without_code = re.sub(r"`[^`\n]*`", "", without_fences)
+    outside = []
+    for link in link_pattern.finditer(without_code):
+        target = link.group(1).strip().rstrip("\\")
+        if "/" in target:
+            prefix, _, rest = target.partition("/")
+            inside = prefix == curriculum_folder and rest.split("/")[-1] in stems
+        else:
+            inside = target in stems
+        if not inside:
+            outside.append(target)
+    return outside
 
 
 def lint(course_code: str) -> int:
@@ -188,17 +262,27 @@ def lint(course_code: str) -> int:
                 bulky_pies.append((rel, len(values)))
 
         # The whole link graph, so reachability can be checked below.
-        outside_fences = re.sub(r"```[\s\S]*?```", "", text)
+        # Nothing inside code is a link (#313): the toolchain's own mask.
+        code = markdown_code.code_ranges(text)
         page_links[page.stem] = {
             link.group(1).strip().rstrip("\\").split("/")[-1]
-            for link in link_pattern.finditer(outside_fences)
+            for link in markdown_code.matches_outside_code(link_pattern, text, code)
         }
+
+        fallen = fence_lines_that_fall_out(text)
+        if fallen:
+            problems.append(
+                f"{rel}: a fence opened inside a list has lines that fall back "
+                f"out of it (line {', '.join(str(number) for number in fallen[:5])}) - "
+                f"indent every line up to the closing fence as far as the "
+                f"opening one, or the site shows the rest of the page as code")
 
         # A wikilink split by the 80-column wrap still parses, but the
         # target it builds contains a newline and so matches no page. The
         # prose reads correctly, which is exactly why this survives review;
         # the per-line scan below cannot see it at all.
-        for match in re.finditer(r"!?\[\[[^\[\]]*\n[^\[\]]*\]\]", outside_fences):
+        for match in markdown_code.matches_outside_code(
+                re.compile(r"!?\[\[[^\[\]]*\n[^\[\]]*\]\]"), text, code):
             wrapped = " ".join(match.group(0).split())
             problems.append(f"{rel}: wikilink split across lines: {wrapped}")
 
@@ -206,7 +290,7 @@ def lint(course_code: str) -> int:
         if class_match:
             class_ordinals.append(int(class_match.group(1)))
             class_pages.add(page.stem)
-            for link in link_pattern.finditer(text):
+            for link in markdown_code.matches_outside_code(link_pattern, text, code):
                 linked_from_classes.add(link.group(1).strip().split("/")[-1])
             # A class page is a schedule, not a destination. Expectations
             # belong on the pages the agenda links to — the investigation,
@@ -249,15 +333,14 @@ def lint(course_code: str) -> int:
                        for c in comment_pattern.finditer(text)):
                 missing_triangulation.append(rel)
 
-        in_fence = False
+        # Links inside code are examples (#313): the same mask as above,
+        # applied line by line by offset.
+        line_start = 0
         for line in text.split("\n"):
+            offset = line_start
+            line_start += len(line) + 1
             stripped = line.strip()
-            if stripped.startswith("```") or stripped.startswith("````"):
-                in_fence = not in_fence
-                continue
-            if in_fence or "`" in line:
-                continue
-            for match in link_pattern.finditer(line):
+            for match in markdown_code.matches_outside_code(link_pattern, line, code, offset):
                 target = match.group(1).strip().rstrip("\\")
                 if "/" in target:
                     known = target in qualified_names
@@ -265,7 +348,8 @@ def lint(course_code: str) -> int:
                     known = target in page_names
                 if not known:
                     problems.append(f"{rel}: unknown link [[{target}]]")
-            if stripped.startswith("|") and re.search(r"\[\[[^\]]*[^\\]\|[^\]]*\]\]", line):
+            if stripped.startswith("|") and markdown_code.matches_outside_code(
+                    re.compile(r"\[\[[^\]]*[^\\]\|[^\]]*\]\]"), line, code, offset):
                 problems.append(f"{rel}: unescaped pipe in table: {stripped[:60]}")
 
     # Folder index pages must be titled after their folder — a literal
@@ -294,6 +378,23 @@ def lint(course_code: str) -> int:
             text = page.read_text(encoding="utf-8")
             if "^text" in text and text.split("^text", 1)[1].strip():
                 problems.append(f"shared/{curriculum_folder}/{page.name}: content after the ^text anchor — expectation pages carry the verbatim wording only")
+
+    # A curriculum page links only inside its own folder (#253). Since #251
+    # this folder is installed into SKELETON courses too, when a teacher
+    # declines the ready-made pages, so a link from it to a lesson, a task or
+    # a project page points at a page that course does not have. Point at an
+    # expectation page instead, or say it in plain words that are true
+    # without the payload.
+    if curriculum_folder:
+        curriculum_root = root / "shared" / curriculum_folder
+        for page in sorted(curriculum_root.rglob("*.md")):
+            text = page.read_text(encoding="utf-8")
+            for target in curriculum_links_outside_folder(text, curriculum_root, curriculum_folder, link_pattern):
+                problems.append(
+                    f"shared/{curriculum_folder}/{page.relative_to(curriculum_root)}: links to "
+                    f"[[{target}]], outside the curriculum folder. Since #251 this folder "
+                    f"is installed into skeleton courses too, where {target} does not exist (#253)"
+                )
 
     # Exercises answer callouts carry no repeated "(click to expand)"
     # hint — the Exercises index opens with the how-to message instead.

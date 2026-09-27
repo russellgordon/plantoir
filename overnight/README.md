@@ -152,7 +152,8 @@ moves on.
 
 - Working tree clean (the driver refuses otherwise, ignoring `overnight/`).
 - `mac-app/Vendor/llama` present, or `xcodegen` fails — `cd mac-app &&
-  ./Vendor/fetch-llama.sh`.
+  ./Vendor/fetch-llama.sh`. The same for `mac-app/Vendor/Sparkle` since #204 —
+  `./Vendor/fetch-sparkle.sh`.
 - Quit Plantoir. The driver quits it for you, because `xcodebuild test` would
   terminate it anyway.
 - 18 sessions × (work + a full mac suite) is a real number of hours and a real
