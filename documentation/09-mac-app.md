@@ -7258,6 +7258,27 @@ never ran. `CourseArchiver.lastZipRanOnTheMainThread` is written inside the
 function that runs the zip, so no path is unobserved, and read by
 `AssistBackupOffTheMainActorTests` only.
 
+**What actually held the window: a lazy stack placing itself for good.**
+Moving the zip off the main actor did NOT make the rollover UI test pass: it
+still failed "main thread busy for 30.0s", and one-second samples after
+Approve showed the main thread 98% inside SwiftUI placing the conversation's
+`LazyVStack` (`LazySubviewPlacements`, `LazyStack.measureEstimates`, the
+`ForEach` over the transcript) — with the zip already made in two seconds and
+its result never read, because nothing else on the main actor ran. #154's
+samples had the same frames beside the zip (495 in `AssistTranscriptLine`
+alone); the zip was real, and slow on a real course, but it was not what held
+the window. Measured on the rollover UI test, 2026-09-26: with the lazy stack
+it passed 0 runs in 6, and 2 in 7 with the conversation's animated scroll
+removed as well; removing the typing dots' animation, the dots, the new backup
+line or showing the scroll bars always changed nothing. With a plain `VStack`
+it passed **8 runs in 8** (4 with the animated scroll put back), the question
+arriving **1.05–1.07 s** after Approve. A conversation is dozens of lines, so
+laziness bought nothing. `AssistConversationStackTests` holds the window's
+source to a plain stack, and the rollover UI test asserts the question arrives
+within 30 s (XCUITest's own busy limit). REJECTED: dropping the scroll's
+animation (2 in 7 — not the cause); `.scrollIndicators(.visible)` (0 in 1);
+a delay before scrolling (a guessed duration standing in for the dependency).
+
 **What the assistant's window shows.** `AssistToolRunner.courseBeingBackedUp`
 is set while a copy is saved and cleared on every way out (`defer`, so a
 failed copy never leaves the line claiming one is being made); the window

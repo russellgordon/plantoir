@@ -4437,9 +4437,12 @@ Two details that make the backups usable rather than merely present:
   waits for THAT copy rather than making another. A copy that failed is not
   remembered: the next write tries again, and no write says "backed up" about
   it. Each real zip leaves one trail line, "assistant backed up a course",
-  with its file name, size and seconds; a reused copy leaves none. How, and
-  what was rejected: [09-mac-app.md](09-mac-app.md) → "Every zip is off the
-  main actor (#351)".
+  with its file name, size and seconds; a reused copy leaves none. **What
+  froze the window after Approve was not the zip, though**: it was the
+  conversation's LAZY stack, placing itself in a loop that never ended and
+  kept the main thread for good; the conversation is a plain stack now.
+  How, measured, and what was rejected: [09-mac-app.md](09-mac-app.md) →
+  "Every zip is off the main actor (#351)".
 
 ### Restore is section-scoped, though the zip holds the course
 
