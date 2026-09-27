@@ -455,6 +455,36 @@ nonisolated enum AssistWording {
         + "It may still try to publish, and it has no way to ask what the new website should be "
         + "called — turn it off from the section's menu."
 
+    // MARK: - Getting a section ready for the start of the year (#96)
+
+    /// An outside assistant called `prepare_for_start_of_year` without the
+    /// code its plan gave. Nothing is written; the reply carries the plan as
+    /// it stands and its code, so the next call can be the right one.
+    ///
+    /// Only an MCP client meets this (the tool is MCP-only), which is why it
+    /// may name the tool: it is read by the assistant, which then shows the
+    /// teacher the plan.
+    static func startOfYearNeedsItsPlan(course: String, section: String) -> String {
+        return "Nothing was changed. Getting \(course) Section \(section) ready for the start of the "
+             + "year needs the code from its plan. Show the teacher the plan below, and when they "
+             + "agree, call prepare_for_start_of_year again with its code."
+    }
+
+    /// The code given no longer matches the plan — a page changed after the
+    /// plan was made, or the code belongs to another plan. Nothing is written.
+    static func startOfYearPlanHasChanged(course: String, section: String) -> String {
+        return "Nothing was changed. \(course) Section \(section) is not what that plan described any "
+             + "more, so its code no longer fits. Show the teacher the plan below, which is how things "
+             + "stand now, and pass its code when they agree."
+    }
+
+    /// The fresh backup this write needs could not be made, so nothing was
+    /// written — the app's button refuses the same way.
+    static func startOfYearNeedsABackup(course: String) -> String {
+        return "Nothing was changed. Plantoir could not save a copy of \(course) first, and this "
+             + "change is too large to make without one."
+    }
+
     /// There is nothing on the list at all.
     ///
     /// "No PAGES", not "nothing", and the distinction is load-bearing. The old

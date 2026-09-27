@@ -73,7 +73,8 @@ struct AssistWindowView: View {
         ))
         _storedHistory = AppStorage(
             wrappedValue: "",
-            "AssistPromptHistory-\(courseCode)-\(sectionNumber)"
+            "AssistPromptHistory-\(courseCode)-\(sectionNumber)",
+            store: PlantoirDefaults.shared
         )
     }
 

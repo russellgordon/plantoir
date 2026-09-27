@@ -40,6 +40,7 @@ final class NameTableTests: XCTestCase {
     func makeEditor(_ box: ListBox) -> StringListEditorView {
         return StringListEditorView(
             title: "Per-section folders",
+            removalTrail: RemovalTrail.inCourseSettings(courseCode: "SNC4M", list: .perSectionFolders),
             items: box.binding,
             protection: { folder in
                 if folder == "All Classes" {

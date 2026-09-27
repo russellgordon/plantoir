@@ -64,7 +64,10 @@ enum WindowFolderMemory {
     /// real preferences — so before #311 every XCUITest run wrote its
     /// fixture folders into the teacher's remembered windows. Nothing is
     /// read or written from it now.
-    static let isUnderUITest: Bool = ProcessInfo.processInfo.environment["UITEST_WORKSPACE"] != nil
+    /// `RealHome.isUnderUITest` is the one reading of the environment; this
+    /// name stays because a UI test's state folder (#154) does not lift the
+    /// rule — see `documentation/09-mac-app.md` for what that would take.
+    static let isUnderUITest: Bool = RealHome.isUnderUITest
 
     /// Entries not yet taken by a window this launch.
     private static var unclaimed: [Entry] = []
@@ -93,7 +96,7 @@ enum WindowFolderMemory {
         if let overridden = systemRestoresWindowsOverride {
             return overridden
         }
-        return UserDefaults.standard.bool(forKey: "NSQuitAlwaysKeepsWindows")
+        return PlantoirDefaults.shared.bool(forKey: "NSQuitAlwaysKeepsWindows")
     }
 
     // MARK: - Functions
@@ -102,7 +105,7 @@ enum WindowFolderMemory {
     /// one. macOS reopens windows in an order of its own choosing, so the
     /// frame — which it restores faithfully — is what pairs each window
     /// with ITS folder.
-    static func claimEntry(matchingFrame frame: String, defaults: UserDefaults = UserDefaults.standard) -> Entry? {
+    static func claimEntry(matchingFrame frame: String, defaults: UserDefaults = PlantoirDefaults.shared) -> Entry? {
         if Date() > claimsOpenUntil {
             return nil
         }
@@ -120,7 +123,7 @@ enum WindowFolderMemory {
     }
 
     /// Whether any remembered windows are still waiting to be claimed.
-    static func hasEntriesToClaim(defaults: UserDefaults = UserDefaults.standard) -> Bool {
+    static func hasEntriesToClaim(defaults: UserDefaults = PlantoirDefaults.shared) -> Bool {
         loadIfNeeded(defaults: defaults)
         return !unclaimed.isEmpty
     }
@@ -130,7 +133,7 @@ enum WindowFolderMemory {
     /// this holds, a window with no folder should wait quietly rather
     /// than flash the folder picker it is about to replace.
     static func aClaimMayStillArrive(asOf now: Date = Date(),
-                                     defaults: UserDefaults = UserDefaults.standard) -> Bool {
+                                     defaults: UserDefaults = PlantoirDefaults.shared) -> Bool {
         if now > claimsOpenUntil {
             return false
         }
@@ -139,7 +142,7 @@ enum WindowFolderMemory {
 
     /// The next remembered window, in order — a gone folder included, so
     /// its window can say what happened to it (#311).
-    static func claimNextEntry(defaults: UserDefaults = UserDefaults.standard) -> Entry? {
+    static func claimNextEntry(defaults: UserDefaults = PlantoirDefaults.shared) -> Entry? {
         if Date() > claimsOpenUntil {
             return nil
         }
@@ -151,7 +154,7 @@ enum WindowFolderMemory {
     }
 
     /// Records the open windows as folder-and-frame pairs, in order.
-    static func record(_ entries: [Entry], defaults: UserDefaults = UserDefaults.standard) {
+    static func record(_ entries: [Entry], defaults: UserDefaults = PlantoirDefaults.shared) {
         if WindowFolderMemory.mayNotTouch(defaults) {
             return
         }
@@ -255,7 +258,7 @@ enum WindowFolderMemory {
         if WindowFolderMemory.isUnderUITest {
             return true
         }
-        if WorkspaceModel.isRunningTests && defaults == UserDefaults.standard {
+        if WorkspaceModel.isRunningTests && defaults === PlantoirDefaults.shared {
             return true
         }
         return false

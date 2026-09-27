@@ -139,6 +139,20 @@ sentence needs about one line per character.
 | 2026-09-05 | the synced-folder notice (`CloudSyncNoticeView`) | 1,548 points, and the same 1,548 whether 700 points or nothing was proposed | the `fixedSize` deleted; `CloudSyncNoticeLayoutTests` written |
 | 2026-09-19 | the folder-publish Done panel and the scheduled-publish notice (issue #211) | **1,980**, **3,100** and **1,372** points | the `fixedSize` deleted; seven cases added to `ProgressViewSizeTests` |
 
+**A fifth was caught before it reached a teacher**, 2026-09-26: the line that
+says Course Settings has unsaved changes, so the preview uses the saved ones
+(`SpecialNames.previewUsesSavedSettings`, #265), sat in the detail column
+above the site's stack with `.fixedSize(horizontal: false, vertical: true)` on
+its sentence. Squeezed it claimed **1,337** points; in a real
+`NavigationSplitView` window at the 900 × 600 minimum (a standalone replica,
+not Plantoir itself) the area under it where the site sits was laid out
+**1,305** points tall inside a 600-point window, against 525 without the
+modifier. Found by the #213 planner, fixed in the same piece: the notice is its
+own view, `UnsavedSettingsNoticeView`, with no `fixedSize`, and
+`UnsavedSettingsNoticeLayoutTests` pins the squeeze, the wrapping and — read
+from the source, since `SectionDetailView` cannot be mounted in a unit test —
+that nothing in `SectionDetailView.swift` is `.fixedSize(` at all.
+
 The fourth is the one to learn from, because the third had already produced a
 rule, a comment and a test file, and the fault still shipped twice more in the
 same window. The comment lived on the view it was written for; the test file
@@ -794,7 +808,9 @@ The MCP server, a scheduled run and `--write-contracts` (all exit in
 (`WindowFolderMemory.mayNotTouch` refuses the real store); the app a UI test
 drives (`UITEST_WORKSPACE` — **new here**: before #311 every XCUITest run
 wrote its fixture folders into the real `openWindowFolders`, harmless while
-gone folders were skipped and a "can't be found" sentence after); and any
+gone folders were skipped and a "can't be found" sentence after; since #154
+that app's preferences are its own state folder's, and the guard still
+stands — lifting it is a separate change); and any
 model no window shows (`rememberAsTheLastWorkingFolder` and the trail lines
 need `isShownInAWindow`).
 
@@ -2057,7 +2073,22 @@ first: ordinary removes; consequential asks (the existing confirmation);
 blocked removes nothing, shows the SAME named reason from the − button and
 notes `removalBlocked` with the SAME trail line the row's info button writes.
 Nothing new is recorded on the trail — what is written did not change, only
-which control triggers it. A fixed gesture script (`ListGestureScript.swift`)
+which control triggers it. **What that line SAYS changed with #171**
+(2026-09-26): it names the course and the screen, in Windows' words —
+`new course SNC4M: could not remove “Tasks” from the shared folders — <reason>`
+in the New Course wizard, `SNC4M: could not remove …` in Course Settings, and
+"the marks list" for an untick ("the curriculum folders" for #128's
+coverage-map ticks) — built by `RemovalTrail`, which both editors
+take as a REQUIRED parameter. Before, it named no course, and three of the
+five list titles are the same on both screens, so a refusal while a course
+was being made could not be told from the same refusal in one that exists.
+REJECTED: an optional context with a course-less fallback (a new call site
+that forgets it brings #171 back without a sound); pinning the words in the
+contract (only a line with two writers is pinned — `lineWhy`; the `carries`
+of `activityTrail.mustRecord` → "removal blocked" says what it holds);
+copying Windows' " - " separator, which is its own outlier among its trail
+lines. `ListTableGoldenTests.testTheInfoButtonWritesTheSameLineAsABlockedRemoval`
+holds the two paths to one line, which until then nothing did. A fixed gesture script (`ListGestureScript.swift`)
 was run through the OLD code before the redraw and captured into
 `Tests/Goldens/266-course-settings-gestures.json` and `266-wizard-gestures.json`;
 `ListTableGoldenTests` runs it through the new entry points and demands the
@@ -5365,6 +5396,109 @@ this is the app-side wiring.
   installed copy share the bundle identifier, so the answer given to one is the
   answer for both.
 
+## What the app carries for the website builder (#312)
+
+**The payload.** `Contents/Resources/helpers`: Colima, limactl with its `lima`
+wrapper, the Docker CLI and buildx, Lima's Linux guest agent and templates,
+and the Ubuntu disk Colima creates its virtual machine from — Apple silicon
+only, about 470 MB (135 MB of programs, 332 MB of disk) — with a `MANIFEST`.
+The launchers install the programs into
+`~/Library/Application Support/Plantoir/tools` and create the virtual machine
+from the disk; how, and every rule about when, is in
+`documentation/03-launcher-scripts.md` → "Where the helper programs come
+from", and the cases are `contracts/app-rules.json` → `helperBootstrap`. The
+app itself does ONE thing: `HelperPrograms.environment` sets
+`PLANTOIR_BUNDLED_HELPERS` to the folder when the app carries it, and removes
+an inherited value when it does not, so every launcher the app starts — from
+the window, the MCP server, and the publishes launchd starts through Plantoir
+— can install from it. No installer in Swift: neither app carries toolchain
+logic of its own.
+
+**Measured, 2026-09-26, M4 Pro.** A first run used to download ~857 MB (the
+launcher said 600): 135 MB of programs, the 332 MB disk, ~390 MB building the
+website builder. Now only the build is downloaded. The disk-seeded start of
+the virtual machine takes 22–27 s. Estimated for an 8 GB M1 at 25 Mbit/s:
+about 4.5 minutes rather than 7; at 10 Mbit/s about 7.5 rather than 14. The
+app bundle grows from ~125 MB to ~600 MB (599 MB signed); the DMG from 58.8 MB
+to **410,488,446 bytes** with LZMA (ULMO), which publish.sh now uses — the
+planner measured 466 MB with zlib and 432 MB with LZMA on an earlier app, and
+converting took 29 s at the rehearsal; macOS 15, the minimum, reads it. At the
+#312 rehearsal (two `-Sign` builds, 2026-09-26): upload to the notary about
+35 s each, **accepted after 625 s and 203 s** from submission, no issues in the
+notary log (nothing about `vm/*.raw.gz` or the Linux guest agent), stapled,
+and `spctl` accepted it; the whole `publish.sh -Sign` run took 783 s and 359 s.
+
+**Why Apple silicon only.** A universal payload would add ~135 MB of Intel
+programs and the 358 MB Intel disk to every Apple-silicon teacher's download.
+An Intel Mac downloads as before — each download is now checked against its
+own pinned SHA-256 — and the app's MANIFEST says `arch arm64`, which the
+launcher compares with `uname -m`.
+
+**Fetched, never committed.** `mac-app/Vendor/fetch-helpers.sh` (required
+before `xcodegen generate`, like fetch-llama.sh and fetch-sparkle.sh) reads
+every version and checksum from `setup.sh` rather than carrying its own —
+`HelperVersionsTests` fails if one is written into it — refuses any file that
+does not hash to its pin, and refuses a Colima that does not carry the disk's
+SHA-512 (Colima refuses any other disk, so a Colima bump without a disk bump
+would otherwise surface as a slow download at a teacher's first start). Its
+cache is outside the repository, under
+`${PLANTOIR_HELPERS_CACHE:-~/Library/Caches/Plantoir-dev/helpers}`, keyed by
+SHA-256, and the folder is made with clones, so a second worktree costs
+seconds and no disk. **Trap 1 applies**: run `xcodegen generate` after a
+re-fetch. `HelperVersionsTests.testTheAppsCopiesCarryTheLaunchersPins` asks
+the fetched folder AND the app the suite runs in whether their MANIFEST's pins
+are setup.sh's; the launcher refuses a copy whose are not.
+
+**Signing.** `publish.sh -Sign` runs `release/sign-helpers.sh` after the
+updater, the dylibs and llama-server and before the app: each program with
+`--options runtime --timestamp` under a fixed identifier
+(`ca.russellgordon.Plantoir.helper.<name>`; the Docker CLI's upstream one is
+`a.out`), limactl with `release/limactl.entitlements` — upstream's own set,
+`com.apple.security.virtualization` plus `network.client` and
+`network.server`, never the app's — and the others with none. Signing changes
+the bytes, so it then writes the `MANIFEST` again, and the app's signature
+seals it. `release/check-signatures.sh` refuses, before notarization, a helper
+off the team, without the runtime or a timestamp, carrying the app's
+`disable-library-validation`, carrying any entitlement it does not need, a
+limactl without the virtualization entitlement (a hardened limactl cannot
+start a vz machine without it — found otherwise only at a teacher's first
+start), a `MANIFEST` that no longer matches the signed programs (every
+teacher's Mac would refuse the copy and download instead), and an app with no
+helpers at all. `codesign --verify --deep --strict` sees none of this: it does
+not look inside `Resources`.
+
+**Nothing writes inside the app.** A Sparkle delta requires the installed
+bundle to be byte-for-byte what was shipped; a chmod or a quarantine strip
+inside it would silently turn every update into a full download. The
+launchers copy OUT and strip quarantine from the copies only, and
+`scripts/test_helper_bootstrap.py` checks the app's copy is unchanged after
+every case.
+
+**Updates stay small.** At the #312 rehearsal, Sparkle 2.9.6's `BinaryDelta`
+between the two signed, notarized rehearsal builds (one Swift string apart,
+every helper program signed again, so all four differ in bytes) made a
+**106,054-byte** delta in 6 s; applied to a copy of build 1 in 4 s, the result
+was byte-identical to build 2, verified `--deep --strict` and was accepted by
+`spctl` as Notarized Developer ID. The planner's earlier measurement between
+two real signed apps further apart: 3,658,602 bytes without the payload, 3,658,626 with an
+identical payload in both, 3,733,870 with the four programs' signatures
+changed. A version bump of one program costs roughly that file's binary
+difference; a new disk (rare: colima-core ships one with Colima releases)
+costs close to its 332 MB. `website/update_feed.py` therefore makes deltas
+from the three newest builds in the feed — reversing #204's decision, see
+"Updating itself" below.
+
+**What a teacher who already has Plantoir gains: nothing on the first run,**
+which they have had. They pay ~410 MB once, for v1.4.0, by hand (it is the
+first release with the updater); at their next start of the website builder
+the app's signed copies replace the downloaded ones ("replacing copies set up
+before Plantoir kept a record of them" on the trail) and the existing virtual
+machine starts with them.
+
+**Rejected, beyond what 03 lists:** a universal payload (above); carrying the
+website builder's image too — Russell's decision was to keep building it on
+the Mac; and running the programs from inside the app (03).
+
 ## Updating itself: what is held, what is not, and why (#204)
 
 From v1.4.0 a released Plantoir finds and installs its own new versions, with
@@ -5749,9 +5883,17 @@ R1 repeats it on Plantoir's own signed build, with must-fail (b).
 
 **The feed** is built by `website/update_feed.py` at the cut, checked and
 copied by `website/update_feeds.py` — `website/README.md` → "The update feeds"
-and `RELEASING.md` → "The update feed (macOS)". *Rejected:* deltas (each is
-another asset on the GitHub release under a name that would have to stay
-stable, to save part of a ~59 MB download once a release); generating the feed
+and `RELEASING.md` → "The update feed (macOS)". **Deltas were rejected here
+by #204 and turned on by #312**, and the reversal is the point of the note: the
+rejection (each is another asset on the GitHub release under a name that would
+have to stay stable, to save part of a ~59 MB download once a release) was
+sound for a 59 MB DMG. Since #312 the DMG carries the website builder's helper
+programs and starting disk and is ~410 MB, and a Swift-only update measured
+106 KB as a delta between the two signed rehearsal builds with or without that payload — so every update without
+deltas would be a 410 MB download. How they are made, and the rewrite of
+earlier items `generate_appcast` does that `update_feed.py` has to undo, is in
+"What the app carries for the website builder (#312)" below and in
+`RELEASING.md` → "The update feed (macOS)". Still rejected: generating the feed
 in `publish.sh` (the feed needs the APPROVED notes, which do not exist until the
 cut, and must follow the release being published); a feed parsed and rewritten
 by `build.py` (breaks its signature).
@@ -6225,6 +6367,59 @@ the reasoning and a Windows-porting note per entry — is
 instructions (XcodeGen + Xcode), and the test suite are documented in
 [`mac-app/README.md`](../mac-app/README.md).
 
+## Get Ready for the Start of the Year (#96)
+
+A section's context menu carries **"Get Ready for the Start of the Year…"**
+(`StartOfYearWording.menuItem`), after Schedule/Cancel Deploy. It is not drawn
+on a course kept for reference, and it is disabled — with "Available once
+deploy completed" under it, the shape "Add Section…" uses — while this app is
+deploying the course. A running PREVIEW does not disable it: Go stops the
+preview and starts it again. The rule itself, the plan code and the
+measurements are `documentation/10-local-ai-assistant.md` → "Getting a section
+ready for the start of the year"; the contract is `shared-rules.json` →
+`startOfYear`.
+
+**The sheet** (`Views/Section/StartOfYearSheet.swift`, logic in the
+`@Observable` `StartOfYearSheetModel`, tested without a window) shows, before
+anything is written: the intro; the warnings (classes dated before today that
+are going into draft; this folder's scheduled deploy for the section, which
+would put the change in front of students; a first class that is itself in
+draft); every class and every other page going into draft, each with its
+reason, in disclosure groups; what stays; the links left on pages students will
+see that will lead to hidden pages, grouped by page with a count; the sentence
+that publishing a class by hand after this leaves it with dead links (issue
+#333); and that the undo ends when Plantoir quits. Go is disabled when there is
+nothing to do.
+
+**Go** (`StartOfYearPreparation.carryOut`), in order: re-plan from disk and,
+if the plan differs from the one on screen, write nothing and show the new one
+with `changedSinceShown`; back the course up as the TEACHER's
+(`CourseArchiver.backUpCourse(madeBy: .teacher)`, file name unchanged) and
+refuse if that fails; stop the preview if one is running and no other program
+holds the course (#156 — then the preview is left up and the result says it
+was not rebuilt); write; hold the undo; write the trail line; start the preview
+again. **Why the app refuses without a backup when the assistant's ordinary
+writes do not:** this is the largest single write the app makes, on one press,
+usually weeks before anyone looks at the site, and the undo does not survive a
+quit — the backup is the only way back that does.
+
+**The undo** is offered BESIDE the menu item ("Undo Getting Ready for the
+Start of the Year…"), never in its place, and from the result's own Undo…
+button. It is always a sheet listing what would go back and what changed since
+and will be left. `StartOfYearUndoRegistry` is process-wide, keyed by folder
+(`FolderIdentity`), course and section like `SectionWindowControllers`, so any
+window on the folder offers it. It ends at the section's next deploy
+(`CourseActivity.beginPublish` tells it), at a scheduled deploy (the one set at
+the time reaching its moment, or any whose log shows a run since the change —
+the schedule is re-read when the undo sheet opens), at the next change to the
+section's pages from anywhere (checked when the undo sheet opens), and when
+Plantoir quits. Go and Put Them Back both refuse while this app is deploying the
+course (`deployUnderWay`). A deploy by an outside assistant or `deploy.sh` from
+a terminal is not seen. It
+is offered once: a partial undo is not offered again, and names the backup.
+This undo, the assistant window's "undo that" and an outside assistant's
+`undo_last_change` are three separate stores.
+
 ## Testing: the real-home tripwire (#264)
 
 **One place asks where the home folder is, and a test fails if anything else
@@ -6271,18 +6466,25 @@ to ask.
   real home, that is a new function in `RealHome` and a line in the tripwire,
   made in a diff somebody reviews.
 
-**Keyed on XCTest being loaded in THIS process** (`RealHome.isInsideTestBundle`,
-`NSClassFromString("XCTestCase")`), not on `BuildOutputLocation.isRunningTests`,
-which is also true inside the app a UI test drives (it reads
-`UITEST_WORKSPACE`). That app has no XCTest in it — XCTest lives in the UI
-test's runner, a separate process — and the opt-in `AssistantRolloverUITests`
-needs it to load the real assistant weights. The three folders #240 already
-moved for the UI-tested app too (built websites, scheduled-publish notes, the
-assistant's launch files) keep that: their resolvers check `isRunningTests`
-before they fall through to `forFiles`. `WorkspaceModel.isRunningTests` and
-`ProblemReportStore.isRunningTests` now ask `RealHome.isInsideTestBundle` too;
-the second used to read `XCTestConfigurationFilePath` from the environment, a
-third definition of "under test".
+**Three answers, in order** (`RealHome.home(isInsideTestBundle:stateDirectory:systemHome:)`).
+The unit suite gets the throwaway home, keyed on XCTest being loaded in THIS
+process (`RealHome.isInsideTestBundle`, `NSClassFromString("XCTestCase")`). An
+app launched with `--state-dir <absolute path>` gets that folder (#154, below).
+Everything else gets the real home. The app a UI test drives has no XCTest in
+it — XCTest lives in the runner, a separate process — so the first answer never
+reaches it, and until #154 it got the REAL home: the opt-in
+`AssistantRolloverUITests` relied on that to load the real weights. It now
+launches with a state folder and links the weights in one file at a time. The
+three folders #240 moved for the UI-tested app (built websites,
+scheduled-publish notes, the assistant's launch files) still go to throwaway
+folders for a UI test WITHOUT a state folder — the marketing captures — and to
+the real rule inside the state folder when there is one
+(`RealHome.keepsTestStateInThrowawayFolders`). `WorkspaceModel.isRunningTests`
+and `ProblemReportStore.isRunningTests` ask `RealHome.isInsideTestBundle`; the
+second used to read `XCTestConfigurationFilePath` from the environment, a third
+definition of "under test". "Under a UI test" has one definition too since
+#154, `RealHome.isUnderUITest`, which `WorkspaceModel`, `WindowFolderMemory`
+and `BuildOutputLocation.isRunningTests` all read.
 
 What went through it — every product lookup of the home folder that existed on
 `dev` at 43d8e853:
@@ -6467,6 +6669,208 @@ failures**, led by "found no product source" and "found no test source".
 it, and the scheduled-publish path registers a real Task Scheduler task. The
 `windows` issue for this asks for the intent — redirect `AppDataRoot` in the
 test assembly and add a source-scan test — not the Swift mechanism.
+
+## Testing: the UI target keeps its state in `--state-dir` (#154)
+
+**Read this first: the launchers the app runs are NOT redirected.** A child
+takes `HOME` from its environment, and that is the real one — so a UI test
+running a REAL `preview.sh` or `deploy.sh` under `--state-dir` would still
+build into the real builds folder and could fetch helper programs into the
+real `tools/`. Every UI test that launches through `IsolatedLaunch` runs stub
+launchers only (`StubLaunchers.writeStubPreviewScript`, the stub `deploy.sh`
+in `NewSiteDialogUITests`). The one exception is the marketing captures
+(`MarketingScreenshotTests`, `AssistantTreeDump`), which drive the REAL
+toolchain — a real preview, real helper programs on the PATH — and so do not
+take a state folder at all: they still write the real trail, run by
+`website/shots/capture.py`, by hand, rarely. Windows documents the same edge
+for its own `--state-dir` (doc 12).
+
+### What was wrong
+
+The app an XCUITest drives did not know it was under test, because XCTest is
+loaded in the runner, not in the app. So it wrote the real breadcrumb trail
+and task records (`~/Library/Logs/Plantoir`), the real preferences —
+`AppSettings` refused only under the unit suite, and both `@AppStorage` uses
+had no store — and could use the real notification centre. On 2026-09-26 the
+real `ca.russellgordon.Plantoir` domain held `AssistPromptHistory-EXC2O-1` and
+`AssistantWindowFrame-EXC2O-1`, EXC2O being the UI fixture's course:
+consistent with the rollover UI test having written there. (Key NAMES only
+were read, never values.)
+
+### The shape: a fake HOME, and a sibling door for preferences
+
+`--state-dir <absolute path>` makes that folder stand in for the home folder
+for everything the app itself resolves. Windows' flag of the same name
+replaces `%LOCALAPPDATA%\Plantoir`, one app folder; the mac's state is spread
+across four `~/Library` folders, so its natural single root is a home:
+
+| Under the state folder | What |
+|---|---|
+| `Library/Logs/Plantoir/activity.txt`, `runs/` | the trail and task records |
+| `Library/Preferences/plantoir-preferences-location.txt` | a NOTE naming where the preferences went: `/private/tmp/plantoir-state-preferences-<16 hex of the state path>/preferences.plist` — beside the state folder, not in it, see below |
+| `Library/LaunchAgents/` | agents (written; `launchctl` still refused) |
+| `Library/Application Support/Plantoir/{builds,scheduled,assist,models,tools}` | built sites, scheduled notes, launch files, weights, helpers |
+| `Library/Application Support/obsidian/obsidian.json` | Obsidian's vault list, read and written |
+
+Everything hangs off `RealHome.forFiles`, so the next resolver inherits the
+redirect — Windows' lesson ("redirect ONE root rather than a list of places").
+Preferences cannot hang off the home, so they have their own door,
+`PlantoirDefaults.shared`, which reads the SAME flag: the standard store
+without it (so every `=== UserDefaults.standard`-style guard keeps its
+meaning), a path suite in `/private/tmp` named after the state folder with it
+(the one place a path suite is honoured — measured below), and a note in the
+state folder naming it. A source scan,
+`PreferencesSeamTripwireTests`, fails the suite on any other
+`UserDefaults.standard`, `NSUserDefaults`, `CFPreferences`,
+`UserDefaults(suiteName:` or `.defaultAppStorage(` in the product, and on an
+`AppStorage(` whose arguments (read across lines) lack `store:`. Its one
+allowance is the old-name migration's read of `ca.russellgordon.QuartzTeachers`,
+which is skipped under a state folder so a fresh run never imports the
+teacher's old preferences into it.
+
+**Refused under the flag**, each with a pure predicate the unit suite pins:
+`launchctl` (`LaunchControl.mayReachLaunchd` — a plist written under a state
+folder and handed to the real launchd would fire a real publish at a real
+time); notifications (`ScheduledPublishNotice.defaultPoster` and the
+notification delegate follow `RealHome.isRedirected` — permission is a
+Mac-wide setting per bundle identifier); the quit-time container stop
+(`FolderContainers.mayFreeContainersAtQuit`, which also refuses under ANY UI
+test now — the quit script has a `colima stop` branch, CLAUDE.md rule 7); and
+the updater (`AppUpdates.shouldStart` — Sparkle opens the host bundle's
+defaults itself, past `PlantoirDefaults`, and could replace the app a test
+drives). **A malformed flag ends the launch**: a missing value, a relative
+path, `~/…` (not expanded, deliberately) or the flag twice prints to stderr
+and exits 64 in `QuartzTeachersApp.init`, before the server, the scheduled run
+or `--write-contracts` — a redirect that silently did not happen is a test
+that reports success while writing the real trail.
+
+**The flag is explicit; there is no fallback.** `UITEST_WORKSPACE` alone keeps
+the old behaviour, which the marketing captures need. What keeps every OTHER
+UI test on the flag is `UITestLaunchTripwireTests`, a scan of the UI target:
+`XCUIApplication(` and `launchEnvironment["UITEST_WORKSPACE"]` may appear only
+in `IsolatedLaunch.swift` and `MarketingScreenshotTests.swift`.
+
+### What was measured (2026-09-26, this Mac)
+
+| Question | Result |
+|---|---|
+| Does `CFFIXED_USER_HOME` move the home? | For Foundation, yes: `homeDirectoryForCurrentUser`, `NSHomeDirectory`, Application Support. |
+| Does it move preferences? | **No.** A suite write still landed in the REAL `~/Library/Preferences` — `cfprefsd` resolves the home itself. |
+| `__CFPREFERENCES_AVOID_DAEMON=1` with it? | The write went nowhere at all. Unusable. |
+| `UserDefaults(suiteName: "/abs/path/<name>")`? | **Works** from a probe process: writes `/abs/path/<name>.plist`, creating the folders; reads back. |
+| …with `<name>` = the app's OWN bundle identifier, inside the app? | **No — it is the real domain.** In the unit host, `…/ca.russellgordon.Plantoir` created no file and `UserDefaults.standard` saw the write (caught by `StateDirectoryTests`, 2026-09-26; the probe key was removed and the real domain checked clean). |
+| …anywhere else? | **Only under `/private/tmp`.** A probe with the same name under `/private/tmp` wrote the file at the path; under `$TMPDIR` (`/var/folders/…`) or under the home folder — where a UI runner's temp folder is, inside its container — it silently wrote `~/Library/Preferences/<last component>.plist` instead, the REAL preferences folder. (The litter from that probe was deleted.) So a state folder's preferences live in `/private/tmp`, named by a hash of the state folder's path, and the state folder carries a note saying where (`PlantoirDefaults.honouredParent`, `locationNoteName`). Each launch leaves that small folder behind (`IsolatedLaunch` never deletes it); macOS empties `/private/tmp` at restart, which is all the tidying it needs. The unit test asserts the file appears where the note says and that the standard store never sees the write. |
+| Does a path suite see the argument domain? | Yes: `-assistantAsksBeforeChanging YES` reads, and is not written into the file. |
+| And the global domain? | Yes: `AppleLocale`, `NSQuitAlwaysKeepsWindows`, `AppleInterfaceStyle`. Reading creates no file. |
+| Can the sandboxed UI runner read the real Logs and Preferences? | Its entitlements carry `temporary-exception.files.absolute-path.read-only` for `/`, plus `(allow signal)`. `StateDirectoryUITests` FAILS rather than skips on any read that is refused, so this is re-measured on every run. Measured green on 2026-09-26: every read of the real trail, `runs/`, `scheduled/`, `assist/`, `builds/`, `LaunchAgents` and the real preferences file succeeded. |
+
+### The redirect, proved through the window: `StateDirectoryUITests`
+
+It snapshots the real trail (size and time), the real `runs/`, `scheduled/`,
+`assist/` and `builds/` (names and times), the real `ca.russellgordon.Plantoir*`
+agents, and the real preferences' keys and values — never contents into a
+result. It launches through `IsolatedLaunch` WITHOUT pinning the ask-first
+setting, flips that setting twice in Settings (so the teacher's value is never
+at stake), selects a section and quits with ⌘Q so the quit path runs. Then the
+POSITIVE controls: the redirected trail has lines, the redirected preferences
+(found through the note) hold `assistantAsksBeforeChanging` (polled 10 s: `cfprefsd` flushes lazily).
+Then the negative half: every real item unchanged, polled the same 10 s. It
+skips when another Plantoir is running — that copy's writes could not be told
+apart from a leak — and never quits the teacher's copy to make room.
+
+**The residual it tolerates, by name:** AppKit and SwiftUI write their own
+bookkeeping — `NSWindow Frame …`, `NSSplitView Subview Frames …`, open/save
+panel keys — straight to `UserDefaults.standard`, whatever the app does. So a
+UI test can still move where the teacher's main window next opens. The allowed
+prefixes are `StateDirectoryUITests.realPreferenceKeysAppKitOwns`; any other
+real key that changes is red. `-ApplePersistenceIgnoreState YES` (passed by
+`IsolatedLaunch`) keeps the app from restoring the teacher's windows.
+The real domain's key NAMES were read around each UI run on 2026-09-26 (75
+before and after, none added or removed); values of AppKit's keys may still
+change, which is why they are allowed by prefix rather than listed.
+
+### The assistant's weights under a state folder
+
+`IsolatedLaunch.launch(linkRealAssistantWeights: true)` links each real
+`*.gguf` into the state folder's `models/` as its own symbolic link — never
+the folder: with a folder link, Settings ▸ Remove would delete the real
+weights and a download would land in the real folder. It passes the real
+`assistantModelChoice`, read from the real preferences FILE and never written,
+through the argument domain; if that read fails it passes nothing and says the
+automatic tier was used.
+
+**Weights through a link needed one product change.** `AssistModelStore.isReady`
+measured the file with `attributesOfItem`, which reports a symbolic link's OWN
+size (135 bytes), so a linked model read as a truncated download and the
+assistant never became ready. It now resolves the link first (and so does
+`bytesOnDisk`); `AssistModelStoreLinkTests` pins it with a sparse file of the
+exact size.
+
+### #88's "main thread busy ~30 s": a product freeze, not the fixture
+
+Measured 2026-09-26 by sampling the app under test once a second through the
+rollover. The stall is NOT the fixture's missing container (the preview is a
+stub here, and slowing the stub by 30 s changed nothing): Approve runs
+`AssistToolRunner.backUpOnceForThisConversation`, which calls
+`CourseArchiver.archive`, which runs `/usr/bin/zip` and then
+`Process.waitUntilExit()` ON THE MAIN THREAD. The nested run loop that call
+spins re-enters SwiftUI's transaction flush (726 of 732 main-thread samples in
+`NSHostingView.beginTransaction` → lazy-stack placement) — 93 busy one-second
+samples over 122 s, and XCUITest fails with "main thread busy for 30.0s". A
+teacher approving a rollover or re-dating meets the same beachball. It is its
+own issue, [#351](https://github.com/russellgordon/plantoir/issues/351), not fixed here; the
+opt-in rollover test holds it open with a strict `XCTExpectFailure` matched to
+that message, so it turns red the day the backup stops blocking.
+
+### Two things the new-site test found about the real window
+
+- **`CredentialRequestSheet`'s `.accessibilityIdentifier("credentialSheet")`
+  is stamped on every element inside it**, so `credentialField` and
+  `credentialSendButton` never reach the accessibility tree (read off the real
+  tree). The test finds the sheet as `application.sheets` and its one text
+  field; the dead identifiers are left as they are, since nothing else reads
+  them.
+- **XCUITest leaves the previous test's app running**, so the redirect test's
+  "no other Plantoir" check would skip on its own neighbour: it ends the copy
+  `IsolatedLaunch` launched last, and only that one, and counts only this
+  ACCOUNT's copies (a fast-user-switched account's Plantoir is not a reason to
+  skip).
+
+### Rejected
+
+- **`CFFIXED_USER_HOME` as the redirect** — measured not to move preferences,
+  and inherited by children; #264 had rejected it for the unit suite because
+  it hides a reach instead of reporting one.
+- **`__CFPREFERENCES_AVOID_DAEMON`** — private, and measured to lose the write.
+- **A separate domain name** (`….Plantoir.uitest`) — still in the real
+  `~/Library/Preferences`, as litter, and outside the root a test inspects.
+- **More per-resolver `UITEST_WORKSPACE` checks** — the list of places Windows
+  measured leaking; every new resolver would have to remember.
+- **Redirecting whenever `UITEST_WORKSPACE` is set** — safe by construction,
+  but it breaks the marketing captures, which need real children and fail far
+  from the cause in a harness run by hand. The explicit flag plus the launch
+  scan gives the same guarantee for every other test.
+- **A second `RealHome` door for installed programs** (weights, tools) that
+  stays real under the flag — #264 deleted a second door on review; the
+  exception belongs in the test, visible and per file.
+- **Linking the whole models folder** — see above.
+- **Lifting the UI-test guards on window memory and "remember my folder"** now
+  that preferences are redirected. It would let a UI test exercise #311 for
+  real, and it is the next step this enables — but it changes behaviour
+  beyond this piece.
+- **Setting `HOME` for children to the state folder** — Colima mounts only the
+  real `$HOME`, and the Docker socket and `~/.colima` live there; every real
+  launcher would break.
+- **Quitting the teacher's running Plantoir before the redirect test** — rules
+  9 and 10 make that copy his; the test skips instead.
+- **Expanding `~` in the flag**, and **accepting it twice** — an ambiguous or
+  home-relative redirect is refused, not guessed at.
+- **Making the new-site test opt-in** — it is stubbed, needs no model and
+  takes under a minute, the standing of its neighbours.
+
+**Open, not claimed:** `--mcp-stdio` under `--state-dir` works by construction
+(the flag is read before the server starts) and is untested — a cheap
+follow-up for verify-deploy's headless refresh.
 
 ## Testing: the tests that read the real window, and a window on another Space or a locked screen (#249, #315)
 
@@ -6977,7 +7381,7 @@ Keychain never comes into it, because the real launcher never runs.
 | Layer | Covered? |
 |---|---|
 | The launcher's own prompts (surname, site name, the fallback when a saved site was deleted) | **Yes, today.** `verify-deploy.sh` drives every deploy through `expect` and answers by prompt TEXT (`:110-136`). Opt-in, real credentials, real sites — deliberately. |
-| The app's DIALOG — surname sheet once, address pre-filled, Cancel cancels, typed name is what is sent, trail records the ask | **Not covered, and automatable.** Needs a UI test with a stubbed `deploy.sh`. |
+| The app's DIALOG — surname sheet once, address pre-filled, Cancel cancels, typed name is what is sent, trail records the ask | **Covered since #154** by `NewSiteDialogUITests`, with a stubbed `deploy.sh` whose prompts are read from `contracts/app-rules.json`. In the UI target, which is part of no gate. |
 | A publish with a genuinely invalid saved token | **Not covered and not automatable**, for the Keychain reason above. |
 
 The first row used to be the reverse of Windows: `verify-deploy.ps1` redirected
@@ -6987,7 +7391,8 @@ that platform with no launcher-level coverage of first publish at all. That was
 on 2026-09-09 — Windows now drives every launcher through `PtyDriver` under a
 pseudoconsole and answers by prompt text, the same technique this side has used
 through `expect` for months. **The two platforms cover the same row the same
-way now**, and the second row — the DIALOG — remains uncovered on both.
+way now**, and the second row — the DIALOG — was uncovered on both until
+#154 covered it on the mac.
 
 Two things from that work are worth knowing here rather than being rediscovered.
 Windows carries **no `(y/n)` catch-all**, which this side's `expect` block does:
@@ -7004,7 +7409,7 @@ The UI test is a real piece of work — a stub that prints the right prompts in
 the right order, and assertions about a dialog nobody has driven before — and
 it belongs in its own change with its own review. What #75 asked for was the
 CHECK, and this is it. The test is
-[#125](https://github.com/russellgordon/plantoir/issues/125).
+[#125](https://github.com/russellgordon/plantoir/issues/125). **Done in #154**, which #125 was folded into: `NewSiteDialogUITests`.
 
 The thing worth not re-deriving: **two platforms answered "can this be
 automated?" differently, and the reason was neither the token nor the Keychain.
