@@ -35,6 +35,9 @@ Then check, in this order:
    already produced one "failing" unit test that passed perfectly on its own.
 2. **The test target compiles.**
    `cd mac-app && xcodebuild -project Plantoir.xcodeproj -scheme Plantoir -configuration Debug build-for-testing`
+   (A plain Debug build wears the "BETA" ribbon icon. `capture.py` passes
+   `ASSETCATALOG_COMPILER_APPICON_NAME=Plantoir` to every build it starts,
+   so the pictures carry the real icon — keep that if you add a build to it.)
 3. **The demo folder exists** — `~/Desktop/Teaching` (NOT `~/Teaching`,
    which holds real courses now), with ENG2D, MCV4U and SCH3U in
    `courses/`. If it does not, that is a provisioning run

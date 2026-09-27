@@ -71,6 +71,14 @@ SCRATCH = Path(os.environ.get("TMPDIR", "/tmp")) / "plantoir-marketing-shots"
 MAC_APP = REPO / "mac-app"
 APP_BUNDLE_DEFAULTS_DOMAIN = "ca.russellgordon.Plantoir"
 
+# The Debug build wears the "BETA" ribbon icon so Russell can tell it from the
+# released app in his Dock (mac-app/project.yml). The screenshots are taken
+# from a Debug build and the notification banner shows the app icon, so every
+# build this script starts names the plain icon instead. The side effect is
+# that the Dock's Debug bundle is ribbonless after a capture run until the
+# next ordinary build.
+PLAIN_APP_ICON = "ASSETCATALOG_COMPILER_APPICON_NAME=Plantoir"
+
 # ~/Desktop/Teaching, not ~/Teaching: the plain ~/Teaching folder on this
 # Mac now holds REAL courses (ADA1O, MCR3U), and a default pointing there
 # would provision demo courses into a teacher's actual working folder.
@@ -265,6 +273,7 @@ def run_ui_test(test_identifier: str, workspace: Path, label: str,
             "-project", str(MAC_APP / "Plantoir.xcodeproj"),
             "-scheme", "Plantoir",
             "-configuration", "Debug",
+            PLAIN_APP_ICON,
             "test",
             *only_flags,
             "-resultBundlePath", str(bundle),
@@ -1108,7 +1117,7 @@ def preflight_permissions() -> None:
 
     smoke_command: list[str] = [
         "xcodebuild", "-project", str(MAC_APP / "Plantoir.xcodeproj"),
-        "-scheme", "Plantoir", "-configuration", "Debug", "test",
+        "-scheme", "Plantoir", "-configuration", "Debug", PLAIN_APP_ICON, "test",
         "-only-testing:QuartzTeachersUITests/QuartzTeachersUITests/testSidebarShowsExampleCourse",
     ]
     print(f"   $ {' '.join(smoke_command)}  (in the background)")
