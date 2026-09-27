@@ -34,6 +34,24 @@ final class NewSiteDialogUITests: XCTestCase {
 
     private var deployPIDFileURL: URL?
 
+    /// The sheet's answer button while a publish waits on it
+    /// (`CredentialRequestSheet.confirmTitle`'s default).
+    private let sendTitle: String = "Continue"
+
+    /// The app under test, so a failure can print what was on screen.
+    private var applicationUnderTest: XCUIApplication?
+
+    /// Prints the element tree at the first failure: a dialog nobody had
+    /// driven before is read off the real tree, not assumed.
+    override func record(_ issue: XCTIssue) {
+        if issue.type == .assertionFailure, let applicationUnderTest {
+            print("=== NEW SITE DIALOG TREE AT FAILURE ===")
+            print(applicationUnderTest.debugDescription)
+            self.applicationUnderTest = nil
+        }
+        super.record(issue)
+    }
+
     // MARK: - Setting up and tearing down
 
     /// Stops at the first failure: each step drives the next, so a red step
@@ -65,43 +83,52 @@ final class NewSiteDialogUITests: XCTestCase {
                 to: publicURL.appendingPathComponent("index.html"), atomically: true, encoding: .utf8
             )
         }
+        // A preview launcher that does nothing, in case a deploy decides to
+        // rebuild first: under a state folder only stubs may run, and the
+        // fixture's copy of the REAL preview.sh would resolve the real home.
+        let quietPreview: URL = fixtureURL.appendingPathComponent("preview.sh")
+        try "#!/bin/bash\necho \"Build finished (stub)\"\nexit 0\n".write(to: quietPreview, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: quietPreview.path)
         let stub: StubDeploy = try StubDeploy.write(in: fixtureURL, contract: contract)
         deployPIDFileURL = stub.pidFileURL
 
         let launch: IsolatedLaunch = try IsolatedLaunch.launch(workspace: fixtureURL)
         let application: XCUIApplication = launch.application
+        applicationUnderTest = application
 
         // 1 — Section 1: the surname, once.
         select(section: 1, in: application)
         application.buttons["deployButton"].click()
-        let sheet: XCUIElement = application.descendants(matching: .any)
-            .matching(identifier: "credentialSheet").firstMatch
-        XCTAssertTrue(sheet.waitForExistence(timeout: 20), "No credential sheet: the surname question was not recognised.")
+        // Found as the SHEET and its one text field, not by identifier: the
+        // sheet's own `credentialSheet` identifier is applied to every element
+        // inside it (read off the real tree, 2026-09-26), so `credentialField`
+        // and `credentialSendButton` never reach the accessibility tree.
+        let sheet: XCUIElement = application.sheets.firstMatch
+        let field: XCUIElement = sheet.textFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 20), "No credential sheet: the surname question was not recognised.")
         XCTAssertTrue(
-            sheet.staticTexts[contract.surnameFieldLabel].exists,
+            text(contract.surnameFieldLabel, in: application).exists,
             "The first sheet is not the \(contract.surnameFieldLabel) one."
         )
-        let field: XCUIElement = sheet.descendants(matching: .any).matching(identifier: "credentialField").firstMatch
         field.click()
         field.typeText("Testerson")
-        sheet.buttons["credentialSendButton"].click()
+        sheet.buttons[sendTitle].click()
 
         // The next sheet is the website address — not a second surname.
-        let addressLabel: XCUIElement = application.staticTexts[contract.siteNameFieldLabel]
+        let addressLabel: XCUIElement = text(contract.siteNameFieldLabel, in: application)
         XCTAssertTrue(
             addressLabel.waitForExistence(timeout: 20),
             "The website address was never asked for after the surname."
         )
         XCTAssertFalse(
-            application.staticTexts[contract.surnameFieldLabel].exists,
+            text(contract.surnameFieldLabel, in: application).exists,
             "The surname was asked a second time."
         )
 
         // 2 — the address arrives filled in with exactly what was offered.
         let offered: String = try stub.offeredDefault(forSection: 1)
         XCTAssertEqual(offered, StubDeploy.expectedDefault(section: 1, surname: "testerson"))
-        let addressField: XCUIElement = application.descendants(matching: .any)
-            .matching(identifier: "credentialField").firstMatch
+        let addressField: XCUIElement = application.sheets.firstMatch.textFields.firstMatch
         XCTAssertEqual(addressField.value as? String, offered, "The address was not filled in with the launcher's default.")
 
         // 3 — what was typed reaches the launcher, not the default.
@@ -109,7 +136,7 @@ final class NewSiteDialogUITests: XCTestCase {
         addressField.typeKey("a", modifierFlags: .command)
         addressField.typeKey(.delete, modifierFlags: [])
         addressField.typeText("typed-address-154")
-        application.buttons["credentialSendButton"].click()
+        sheet.buttons[sendTitle].click()
         let answered: Bool = StateDirectoryUITests.waitUntil(seconds: 10) {
             return stub.answers().contains("section1=typed-address-154")
         }
@@ -127,19 +154,18 @@ final class NewSiteDialogUITests: XCTestCase {
         select(section: 2, in: application)
         application.buttons["deployButton"].click()
         XCTAssertTrue(
-            application.staticTexts[contract.siteNameFieldLabel].waitForExistence(timeout: 20),
+            text(contract.siteNameFieldLabel, in: application).waitForExistence(timeout: 20),
             "Section 2 was not asked for its website address."
         )
         XCTAssertFalse(
-            application.staticTexts[contract.surnameFieldLabel].exists,
+            text(contract.surnameFieldLabel, in: application).exists,
             "Section 2 was asked for the surname."
         )
 
         // 5 — Cancel stops it. The address question offers no cancel option,
         // so Cancel has to stop the task itself.
         let deployPID: Int32 = try stub.recordedProcessID()
-        application.descendants(matching: .any).matching(identifier: "credentialSheet").firstMatch
-            .buttons["Cancel"].click()
+        application.sheets.firstMatch.buttons["Cancel"].click()
         XCTAssertTrue(
             application.descendants(matching: .any).matching(identifier: "cancelledNotice").firstMatch
                 .waitForExistence(timeout: 10),
@@ -181,6 +207,14 @@ final class NewSiteDialogUITests: XCTestCase {
     }
 
     // MARK: - Functions
+
+    /// A piece of text on screen, EXACTLY — SwiftUI exposes a `Text` as a
+    /// static text whose VALUE is the words, so matching on the label alone
+    /// finds nothing. Exact, so "Surname" is not the title "Teacher Surname".
+    private func text(_ words: String, in application: XCUIApplication) -> XCUIElement {
+        let exactly: NSPredicate = NSPredicate(format: "value == %@ OR label == %@", words, words)
+        return application.staticTexts.matching(exactly).firstMatch
+    }
 
     private func select(section: Int, in application: XCUIApplication) {
         let courseRow: XCUIElement = application.outlines.staticTexts["EXC2O"]
