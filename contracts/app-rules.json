@@ -1,7 +1,11 @@
 {
   "builderWarmUp" : {
+    "appliesOn" : [
+      "mac"
+    ],
+    "appliesOnWhy" : "PERMANENT: Windows builds natively. PlantoirSetup.exe carries its whole runtime and nothing is downloaded or built for building (documentation/12-windows-app.md, the like-for-like table), so there is no builder to get ready in the background.",
     "launcher" : "setup.sh --prepare-builder, run from ~/Library/Application Support/Plantoir/getting-ready, which holds that launcher and a mirror of the recipe made by the same function that mirrors a working folder's .toolchain, so the image built is the one every working folder's launchers look for (its tag is a hash of the recipe). It installs what the builder needs, starts it and builds it, then stops: no courses folder, no workspace, no builds folder.",
-    "note" : "Getting the website builder ready in the background at first launch, and at the first launch of each new version, so the first preview is fast (bundle B; Russell's change of 2026-09-26, which replaced a 'decision' issue). The mac only: Windows builds its image too and is owed the same (the windows issue drafted with bundle B).",
+    "note" : "Getting the website builder ready in the background at first launch, and at the first launch of each new version, so the first preview is fast (bundle B; Russell's change of 2026-09-26, which replaced a 'decision' issue). The mac only, permanently: Windows carries its runtime and builds natively, with nothing to download or build first (appliesOn).",
     "readyLine" : "BUILDER_READY=",
     "record" : "getting-ready/ready-for.txt holds the version and build ('1.4.0 (212)') of the last run that printed the ready line. A run that did not is not recorded, so the next launch tries again.",
     "rejected" : [

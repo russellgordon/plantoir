@@ -664,25 +664,41 @@
         "event": "builder got ready in the background: started",
         "carries": "the app's version and build",
         "line": "started getting this Mac ready to build websites, in the background, for version {version (build)}",
-        "why": "Added with bundle B's background warm-up. 'My first preview took five minutes' and 'my first preview was instant' are both answered by whether, and when, this ran."
+        "why": "Added with bundle B's background warm-up. 'My first preview took five minutes' and 'my first preview was instant' are both answered by whether, and when, this ran.",
+        "appliesOn": [
+          "mac"
+        ],
+        "appliesOnWhy": "PERMANENT: Windows builds natively. PlantoirSetup.exe carries its whole runtime and nothing is downloaded or built for building (documentation/12-windows-app.md, the like-for-like table), so there is no builder to get ready in the background (app-rules.json -> builderWarmUp.appliesOn)."
       },
       {
         "event": "builder got ready in the background: finished",
         "carries": "how many seconds it took",
         "line": "this Mac is ready to build websites (got ready in the background in {N}s)",
-        "why": "Added with bundle B. The seconds are the wait the feature exists to take off the teacher's first preview, measured on the teacher's own Mac and network."
+        "why": "Added with bundle B. The seconds are the wait the feature exists to take off the teacher's first preview, measured on the teacher's own Mac and network.",
+        "appliesOn": [
+          "mac"
+        ],
+        "appliesOnWhy": "PERMANENT: Windows builds natively. PlantoirSetup.exe carries its whole runtime and nothing is downloaded or built for building (documentation/12-windows-app.md, the like-for-like table), so there is no builder to get ready in the background (app-rules.json -> builderWarmUp.appliesOn)."
       },
       {
         "event": "builder got ready in the background: did not finish",
         "carries": "how it ended (could not start, stopped with an exit status) and after how many seconds",
         "line": "did not finish getting this Mac ready in the background ({how}, after {N}s) — it will be done at the first preview",
-        "why": "Added with bundle B. Nothing is said to the teacher when it fails - the first preview does it the old way - so this line is the only record that it was tried."
+        "why": "Added with bundle B. Nothing is said to the teacher when it fails - the first preview does it the old way - so this line is the only record that it was tried.",
+        "appliesOn": [
+          "mac"
+        ],
+        "appliesOnWhy": "PERMANENT: Windows builds natively. PlantoirSetup.exe carries its whole runtime and nothing is downloaded or built for building (documentation/12-windows-app.md, the like-for-like table), so there is no builder to get ready in the background (app-rules.json -> builderWarmUp.appliesOn)."
       },
       {
         "event": "builder got ready in the background: skipped",
         "carries": "the reason: no internet connection, or Low Data Mode is on",
         "line": "did not get this Mac ready to build websites in the background: {reason} — it will be done at the first preview",
-        "why": "Added with bundle B. The other reasons not to start (already ready for this version, a headless run, the test suite) leave no line, because they are true on nearly every launch and would bury the trail."
+        "why": "Added with bundle B. The other reasons not to start (already ready for this version, a headless run, the test suite) leave no line, because they are true on nearly every launch and would bury the trail.",
+        "appliesOn": [
+          "mac"
+        ],
+        "appliesOnWhy": "PERMANENT: Windows builds natively. PlantoirSetup.exe carries its whole runtime and nothing is downloaded or built for building (documentation/12-windows-app.md, the like-for-like table), so there is no builder to get ready in the background (app-rules.json -> builderWarmUp.appliesOn)."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty.",
