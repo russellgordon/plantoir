@@ -192,13 +192,19 @@ caption already says "red in September, greener as the year goes on".
 skeleton-without-expectations keeps its two placeholder pages; a teacher
 who wants the real ones deletes the course and remakes it.
 
-**One thing left undone, deliberately.** Four payloads' `About These …`
-explainer links once to a payload page a skeleton course will not have —
-ICS4U to `[[The Software Project]]`, ICS3U to `[[The Community App]]`,
-CGC1W to `[[The Concepts of Geographic Thinking]]`, MDM4U to `[[The
-Culminating Investigation]]`. It was left alone here rather than rewritten
-at install: it is an example-content fix, its own small piece, and the
-skeletons already ship illustrative unresolved links of their own.
+**The explainers' links, since #253.** Four payloads' `About These …`
+explainer used to link once to a payload page a skeleton course does not
+have — ICS4U to `The Software Project`, ICS3U to `The Community App`,
+CGC1W to `The Concepts of Geographic Thinking`, MDM4U to `The Culminating
+Investigation`. Each sentence now points at an expectation page in the
+same folder (B2, B4, A1.5 and E1) and says only what is true with or
+without the ready-made pages; unlinking alone would have left a sentence
+describing pages the course does not have. `lint_payload.py` refuses a
+curriculum page that links outside its folder, and
+`test_starting_content_prompts.py` checks every payload's curriculum links
+after the real double install. Not retroactive either: a course already
+created keeps the teacher's copy of the page, since those files are theirs
+now.
 
 The old note that the skeleton's `Curriculum/index.md` and its expectation
 pages install "even though the app writes `include_curriculum_pages:
