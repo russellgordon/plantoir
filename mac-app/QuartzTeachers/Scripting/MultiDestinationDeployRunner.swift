@@ -243,7 +243,8 @@ class MultiDestinationDeployRunner {
                     excludingRelativePaths: SectionPublishState.selfPublishingSubpaths(
                         courseDirectory: course.directoryURL,
                         destinations: destinations
-                    )
+                    ),
+                    rule: SectionPublishState.currentFingerprintRule
                 )
             }
 
@@ -334,7 +335,8 @@ class MultiDestinationDeployRunner {
             courseDirectory: course.directoryURL,
             sectionNumber: sectionNumber,
             fingerprint: fingerprint,
-            destinations: destinations
+            destinations: destinations,
+            rule: SectionPublishState.currentFingerprintRule
         )
         // The failure branch is recorded too, and matters MORE than the
         // success: the marker is derived, so a section that stayed

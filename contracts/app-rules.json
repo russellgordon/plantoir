@@ -2968,6 +2968,117 @@
       ],
       "note" : "Which files a section's fingerprint is taken over, as relative paths inside `courses/<CODE>/`, for section 1. Derived from what is on disk rather than from `shared_folders` / `per_section_folders`: `build_site.py` DISCOVERS new folders at publish time and appends them to those lists AFTERWARDS, so a folder made this morning is a real input the configuration does not know about yet."
     },
+    "fingerprintRules": {
+      "current": 2,
+      "stampField": "fingerprintRule",
+      "absentMeans": 1,
+      "unknownMeans": "edited",
+      "rules": {
+        "1": "Every file filesCounted counts.",
+        "2": "Rule 1 less the teacher's How I Teach page at a reserved place: the top of the course, or the top of section<N>/ (shared-rules.json -> howITeachPage, compared with its matching rule: NFC, then only A-Z folded). Inside any other folder it is an ordinary page and counts; a look-alike name counts."
+      },
+      "readerAndWriter": "Compute under the rule the stamp names (absent = 1); a rule this copy does not know counts as EDITED, as an unreadable stamp does. Record the current rule with every fingerprint taken for recording, in the same stamp.",
+      "whoComputes": "The mac: Swift, in-process, interactive and launchd alike (it never runs section_fingerprint.py). Windows interactive: C#. Windows scheduled: scripts/section_fingerprint.py, run by the wrapper, whose value the C# app records and compares. So the coupling that must never break is C# <-> Python, both on Windows.",
+      "pythonDefault": "section_fingerprint.py takes --rule 2 (only before its positional arguments) and DEFAULTS TO 1 until Windows moves the C#, the wrapper and the stamp together: a rule-2 value compared under rule 1 is the false '- Edited' this exists to remove.",
+      "meanwhile": "Windows alone: unaffected. A course folder shared by a Mac and a PC: the mac reads the PC's stamps correctly as rule 1; the PC reads the mac's rule-2 stamps as rule 1, which is a false '- Edited' only when that course has a How I Teach page at a reserved place, and clears at the PC's next publish. Accepted.",
+      "why": "#330. #209 kept the How I Teach page off the site, but it still counted toward the fingerprint, so editing a page students never see marked the section '- Edited'. The fingerprint is a wire format held byte for byte by three implementations that cannot land in the same hour, so the change is versioned: an unversioned change would give whichever side lands second a false '- Edited' for every teacher with the page until their next publish, and a shared folder an argument that never settles. The two rules hash identically for a course with no such page, so an upgrade costs nothing there; a course WITH one pays one '- Edited' on the first edit of that page after the upgrade (its stamp is still rule 1), and the next publish writes rule 2.",
+      "rejected": [
+        "Changing all three implementations at once, unversioned (above).",
+        "Excluding the page by its content (frontmatter): the fingerprint deliberately reads no page (SectionPublishState's header).",
+        "Flipping section_fingerprint.py's default to 2 now: it moves the false '- Edited' onto every Windows teacher who schedules."
+      ]
+    },
+    "filesCountedUnderRule2": {
+      "note": "Rule 2 (fingerprintRules), for section 1. filesCounted's cases hold under both rules: none of them is the How I Teach page.",
+      "sectionNumber": 1,
+      "cases": [
+        {
+          "path": "How I Teach.md",
+          "counts": false,
+          "why": "The page, at the top of the course."
+        },
+        {
+          "path": "how i teach.md",
+          "counts": false,
+          "why": "The file system is case-insensitive; the rule folds A-Z."
+        },
+        {
+          "path": "HOW I TEACH.MD",
+          "counts": false,
+          "why": "The extension is folded too."
+        },
+        {
+          "path": "section1/How I Teach.md",
+          "counts": false,
+          "why": "The top of this section's folder, which the build copies to the same place and keeps off too."
+        },
+        {
+          "path": "Unit 1/How I Teach.md",
+          "counts": true,
+          "why": "Inside a folder it is an ordinary page, published unless it says otherwise."
+        },
+        {
+          "path": "How I Teach 1.md",
+          "counts": true,
+          "why": "Obsidian's name for a duplicate is an ordinary page."
+        },
+        {
+          "path": "How İ Teach.md",
+          "counts": true,
+          "why": "A non-ASCII look-alike (dotted capital I). Pinned so both implementations are held to the ASCII-only fold rather than to whatever their own lowercasing does."
+        },
+        {
+          "path": "course_config.json",
+          "counts": true,
+          "why": "Everything rule 1 counts still counts."
+        }
+      ]
+    },
+    "stampRuleCases": {
+      "note": "Each case is a course folder holding 'How I Teach.md' at its top and 'Unit 1/Lesson.md' (unless withoutTheHowITeachPage), published with a stamp taken under stampRule (null = no fingerprintRule field, which means 1), then changed: 'nothing', 'howITeachPage' (the page rewritten with different bytes) or 'lesson'.",
+      "cases": [
+        {
+          "name": "an old stamp and nothing changed",
+          "stampRule": null,
+          "change": "nothing",
+          "expectEdited": false,
+          "why": "An old stamp is read as rule 1 and compared under rule 1, so upgrading raises no false '- Edited'."
+        },
+        {
+          "name": "an old stamp and the How I Teach page edited",
+          "stampRule": null,
+          "change": "howITeachPage",
+          "expectEdited": true,
+          "why": "The one-time cost for an upgrading course that has the page: its stamp is rule 1, under which the page counts. The next publish writes rule 2."
+        },
+        {
+          "name": "a rule 2 stamp and the How I Teach page edited",
+          "stampRule": 2,
+          "change": "howITeachPage",
+          "expectEdited": false,
+          "why": "The point of #330: a page students never see is not an edit to their site."
+        },
+        {
+          "name": "a rule 2 stamp and a lesson edited",
+          "stampRule": 2,
+          "change": "lesson",
+          "expectEdited": true
+        },
+        {
+          "name": "a stamp naming a rule this copy does not know",
+          "stampRule": 3,
+          "change": "nothing",
+          "expectEdited": true,
+          "why": "Nothing that cannot be read may claim a section is up to date."
+        },
+        {
+          "name": "a course without the page hashes the same under both rules",
+          "withoutTheHowITeachPage": true,
+          "sameUnderBothRules": true,
+          "why": "What keeps the upgrade and the shared-folder window narrow."
+        }
+      ]
+    },
     "marker" : {
       "cases" : [
         {
@@ -3038,6 +3149,12 @@
       {
         "path" : "a deploy scheduled to run overnight records the same way",
         "why" : "FOUND BY REVIEW. A scheduled deploy never goes through the app's deploy runner - launchd runs a generated shell script - so it published perfectly and left the window saying \" — Edited\" until somebody published again by hand, the flagship 'publish tomorrow's class' feature disagreeing with the title bar. The script now tracks every destination's own result and writes a sentinel naming where it went; the app fingerprints BEFORE running the script and records afterwards only if the sentinel is there."
+      },
+      {
+        "when": "the stamp is written",
+        "expectRecorded": true,
+        "alsoRecords": "fingerprintRule: the rule the fingerprint was taken under (fingerprintRules.current on the mac)",
+        "why": "#330: a reader compares under the stamp's own rule, so an old stamp is never judged by a new rule."
       }
     ],
     "whenShown" : [

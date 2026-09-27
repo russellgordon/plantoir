@@ -224,6 +224,13 @@ else
   cat /tmp/verify_site_health_test.log
 fi
 
+if (cd scripts && python3 test_section_fingerprint.py) >/tmp/verify_section_fingerprint_test.log 2>&1; then
+  pass "section_fingerprint.py: the \"— Edited\" fingerprint's rule 2 leaves How I Teach out, and the default stays rule 1 until Windows moves (scripts/test_section_fingerprint.py, #330)"
+else
+  fail "section_fingerprint.py: the \"— Edited\" fingerprint's rule 2 leaves How I Teach out, and the default stays rule 1 until Windows moves (scripts/test_section_fingerprint.py, #330)"
+  cat /tmp/verify_section_fingerprint_test.log
+fi
+
 if (cd scripts && python3 test_recipe_folders.py) >/tmp/verify_recipe_folders_test.log 2>&1; then
   pass "the toolchain recipe's folder list agrees everywhere it is copied (scripts/test_recipe_folders.py)"
 else
