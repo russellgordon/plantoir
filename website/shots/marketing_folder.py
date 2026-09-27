@@ -221,6 +221,16 @@ def keep_out_of_sidebar(course_dir: Path, name: str, report: Report) -> None:
     update_config(course_dir, change, report, f"{name} kept out of the sidebar")
 
 
+def netlify_site_recorded(course_dir: Path) -> bool:
+    """True when deploy.py has recorded a Netlify site for this course."""
+    if (course_dir / ".netlify_sites").exists():
+        return True
+    for marker in course_dir.glob("section*/.netlify_site.json"):
+        if marker.is_file():
+            return True
+    return False
+
+
 def publish_to_folder(course_dir: Path, destination: Path, report: Report) -> None:
     """Make the course publish to a folder — but only a course that has not
     been pointed anywhere else: a destination somebody chose is left alone."""
@@ -229,9 +239,14 @@ def publish_to_folder(course_dir: Path, destination: Path, report: Report) -> No
         path = str(config.get("deploy_folder_path", ""))
         if target == FOLDER_DESTINATION and path == str(destination):
             return False
-        # Only a course nobody has pointed anywhere: an empty target. "netlify"
-        # written out is a choice somebody made, and is left alone.
-        if target != "" or (path and path != str(destination)):
+        # Only a course nobody has pointed anywhere. The new-course panel
+        # writes "netlify" for every course it makes (measured on the first
+        # real set-up, 2026-09-27), so the word alone is not a choice: Netlify
+        # counts as chosen once a site is recorded for the course
+        # (deploy.py's `.netlify_sites/` marker, or a section's older
+        # `.netlify_site.json`). Anything else written out is left alone.
+        unchosen: bool = target == "" or (target == "netlify" and not netlify_site_recorded(course_dir))
+        if not unchosen or (path and path != str(destination)):
             report.skip(f"{course_dir.name} publishes to {target or 'Netlify'} {path}; left as it is")
             return False
         config["deploy_target"] = FOLDER_DESTINATION
