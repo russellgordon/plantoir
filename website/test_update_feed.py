@@ -91,6 +91,8 @@ class UpdateFeedTests(unittest.TestCase):
         cls.key, cls.public = make_key(cls.folder)
         cls.dmg_one = make_dmg(cls.folder, "1.3.2", "3100", cls.public)
         cls.dmg_two = make_dmg(cls.folder, "1.3.3", "3150", cls.public)
+        cls.dmg_three = make_dmg(cls.folder, "1.3.4", "3200", cls.public)
+        cls.dmg_four = make_dmg(cls.folder, "1.3.5", "3250", cls.public)
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -104,7 +106,8 @@ class UpdateFeedTests(unittest.TestCase):
     def earlier(self, item: dict, folder: Path) -> Path:
         """An earlier release's DMG, handed over rather than downloaded."""
         self.fetched.append(item["build"])
-        return {"3100": self.dmg_one, "3150": self.dmg_two}[item["build"]]
+        return {"3100": self.dmg_one, "3150": self.dmg_two, "3200": self.dmg_three,
+                "3250": self.dmg_four}[item["build"]]
 
     def cut(self, version: str, dmg: Path, notes: str, required: bool = False) -> Path:
         self.fetched = []
@@ -167,6 +170,26 @@ class UpdateFeedTests(unittest.TestCase):
         self.assertEqual(str(written.stat().st_size), deltas[0]["length"])
         self.assertEqual(update_feeds.problems_with(feed), [])
         written.unlink()
+
+    def test_four_cuts_keep_every_item_unchanged(self) -> None:
+        """generate_appcast keeps three versions by default and dropped the oldest from the
+        fourth cut on (the implementation review's M1): every release stays in the feed."""
+        items: dict[str, bytes] = {}
+        feed = None
+        for version, dmg in [("1.3.2", self.dmg_one), ("1.3.3", self.dmg_two),
+                             ("1.3.4", self.dmg_three), ("1.3.5", self.dmg_four)]:
+            feed = self.cut(version, dmg, f"- {version}.")
+            now = update_feed.items_by_build(feed)
+            for build, item in items.items():
+                self.assertIn(build, now, f"cutting {version} dropped build {build}")
+                self.assertEqual(now[build], item, f"cutting {version} changed build {build}")
+            items = now
+            for delta in update_feed.deltas_of(feed, max(now)):
+                (dmg.parent / delta["url"].rsplit("/", 1)[-1]).unlink(missing_ok=True)
+        self.assertEqual(sorted(items), ["3100", "3150", "3200", "3250"])
+        self.assertEqual(sorted(delta["from"] for delta in update_feed.deltas_of(feed, "3250")),
+                         ["3100", "3150", "3200"])
+        self.assertTrue(self.verifies(feed))
 
     def test_a_delta_that_is_not_under_its_own_release_is_refused_by_the_check(self) -> None:
         self.cut("1.3.2", self.dmg_one, "- First.")

@@ -606,15 +606,18 @@ keeps the copy it started with. The whole install is about two seconds, most
 of it two SHA-256 passes over 135 MB.
 
 **The install stamp, `tools/.installed`,** records the pins line (the four
-versions and the disk's SHA-512), where the copies came from, and the SHA-256
-of each program as installed. It is read as three separate questions, and only
+versions and the disk's SHA-512), where EACH program came from (`source
+<program> <bundled|downloaded>`, per program, because one install can replace
+one program and leave the rest as an earlier install set them up), and the
+SHA-256 of each program as installed. It is read as three separate questions, and only
 for Plantoir's own copies:
 
 - **different** — the stamp's pins are not this launcher's. Replaced, from the
   app or by downloading. Before #312 presence was the only test, so a pin bump
   never reached a Mac that already had tools; now it does.
 - **damaged** — a program no longer hashes to what was installed. Only that
-  program is replaced.
+  program is replaced. A program of Plantoir's that the stamp has NO line for
+  is unrecorded, below, not damaged: nothing says what it was.
 - **unrecorded** — no stamp at all, which is every Mac set up before #312.
   Replaced from the app when the app carries a usable copy (so the installed
   base moves onto the signed copies at its next slow start), and otherwise
@@ -664,6 +667,16 @@ file moved away both worked — so the app can move afterwards. Rejected:
 seeding `~/Library/Caches/colima/caches/<sha256 of the URL>` (Colima's private
 layout; `--disk-image` is the documented flag and brings the check with it),
 and copying the disk into Application Support (needed exactly once).
+
+**When both starts fail.** The launcher falls through to its wait and
+restart, as a failed start of an existing builder does. If nothing survived
+the two failures, that restart creates the virtual machine, so it passes
+Plantoir's own size then, never a bare `colima start`, which would create one
+at Colima's default (implementation review L2; a first-start case). An archive
+that unpacks without a file its program needs is refused before anything is
+moved into place ("❌ Could not set up what your website builder needs."), and
+`check-signatures.sh` refuses an app whose helpers lack any of the five
+program files or carry other versions than `setup.sh` pins (L1, L3).
 
 **One start in five took 255 s instead of about 25**, two ssh waits of exactly
 two minutes each, while this was measured. Not reproduced with the same

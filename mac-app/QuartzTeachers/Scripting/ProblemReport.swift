@@ -369,25 +369,28 @@ nonisolated enum ProblemReportEnvironment {
         )
     }
 
-    /// `bundled` or `downloaded`: the `source` line of the install stamp
-    /// beside the tools folder (`tools/.installed`, GitHub #312), or nil when
-    /// there is no stamp — every Mac set up before the stamp existed.
-    static func installedFrom(toolsFolder: String) -> String? {
+    /// Where each of Plantoir's own programs came from, by the name the
+    /// check asks it by (`colima`, `limactl`, `docker`): `bundled` or
+    /// `downloaded`, read from the install stamp's `source <program> <how>`
+    /// lines beside the tools folder (`tools/.installed`, GitHub #312). Per
+    /// program, because one install can replace one program and leave the
+    /// others as an earlier one set them up. Empty when there is no stamp —
+    /// every Mac set up before the stamp existed.
+    static func installedFrom(toolsFolder: String) -> [String: String] {
         let stamp: URL = URL(fileURLWithPath: toolsFolder)
             .deletingLastPathComponent()
             .appendingPathComponent(".installed")
+        var sources: [String: String] = [:]
         guard let text = try? String(contentsOf: stamp, encoding: .utf8) else {
-            return nil
+            return sources
         }
         for line in text.components(separatedBy: "\n") {
-            if line == "source bundled" {
-                return "bundled"
-            }
-            if line == "source downloaded" {
-                return "downloaded"
+            let words: [String] = line.components(separatedBy: " ")
+            if words.count == 3 && words[0] == "source" && (words[2] == "bundled" || words[2] == "downloaded") {
+                sources[words[1]] = words[2]
             }
         }
-        return nil
+        return sources
     }
 
     /// Measures in the background and remembers the answer for every record
@@ -443,7 +446,7 @@ nonisolated enum ProblemReportEnvironment {
         fromProbeOutput output: String,
         toolsFolder: String,
         secondsWaitedForAHungHelper: Int64? = nil,
-        installedFrom: String? = nil,
+        installedFrom: [String: String] = [:],
         resolvingLinks resolve: (String) -> String = { path in return path }
     ) -> String {
         var rowsByName: [String: [String]] = [:]
@@ -483,7 +486,7 @@ nonisolated enum ProblemReportEnvironment {
                 } else {
                     parts.append(helper.displayName + " found, version unreadable" + sourceLabel(
                         path: path, resolvedPath: resolve(path), toolsFolder: toolsFolder,
-                        installedFrom: installedFrom
+                        installedFrom: installedFrom[helper.probeName]
                     ))
                 }
                 continue
@@ -500,7 +503,8 @@ nonisolated enum ProblemReportEnvironment {
                 }
             } else {
                 text += sourceLabel(
-                    path: path, resolvedPath: resolve(path), toolsFolder: toolsFolder, installedFrom: installedFrom
+                    path: path, resolvedPath: resolve(path), toolsFolder: toolsFolder,
+                    installedFrom: installedFrom[helper.probeName]
                 )
             }
             parts.append(text)

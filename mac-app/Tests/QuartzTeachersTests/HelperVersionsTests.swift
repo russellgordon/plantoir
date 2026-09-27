@@ -369,6 +369,29 @@ final class HelperVersionsTests: XCTestCase {
         }
     }
 
+    /// The helpers line says where EACH of Plantoir's copies came from, from
+    /// the stamp's per-program lines: a Mac that downloaded everything and
+    /// later had one damaged program replaced from inside Plantoir must not
+    /// call the rest "from inside Plantoir" (the implementation review's L5).
+    func testEachCopySaysWhereItCameFrom() throws {
+        let tools: URL = stubFolderURL.appendingPathComponent("tools", isDirectory: true)
+        try FileManager.default.createDirectory(at: tools.appendingPathComponent("bin"), withIntermediateDirectories: true)
+        try "pins v0.10.3 2.2.0 29.7.2 v0.36.1 x\nsource colima downloaded\nsource limactl downloaded\nsource docker bundled\n"
+            .write(to: tools.appendingPathComponent(".installed"), atomically: true, encoding: .utf8)
+        let binFolder: String = tools.appendingPathComponent("bin").path
+        let sources: [String: String] = ProblemReportEnvironment.installedFrom(toolsFolder: binFolder)
+        XCTAssertEqual(sources, ["colima": "downloaded", "limactl": "downloaded", "docker": "bundled"])
+        let output: String = [
+            "colima\tcolima version 0.10.3\t" + binFolder + "/colima",
+            "docker\tDocker version 29.7.2, build x\t" + binFolder + "/docker"
+        ].joined(separator: "\n")
+        let helpers: String = ProblemReportEnvironment.helperDescription(
+            fromProbeOutput: output, toolsFolder: binFolder, installedFrom: sources
+        )
+        XCTAssertTrue(helpers.contains("Colima 0.10.3 (Plantoir's copy, downloaded)"), helpers)
+        XCTAssertTrue(helpers.contains("Docker CLI 29.7.2 (Plantoir's copy, from inside Plantoir)"), helpers)
+    }
+
     private static func repositoryFile(_ relative: String) -> URL {
         return URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()

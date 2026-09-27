@@ -79,6 +79,21 @@ if [[ -f "${HELPERS}/MANIFEST" ]]; then
     echo "MANIFEST DOES NOT MATCH THE SIGNED HELPERS: Contents/Resources/helpers/MANIFEST (run release/sign-helpers.sh, which writes it again)"
     faults=$((faults + 1))
   fi
+  # Every program must be THERE and in the MANIFEST: a missing one passes
+  # every check above, and every teacher's Mac would then refuse the app's
+  # copy and quietly download instead (#312 implementation review, L1).
+  for required in bin/colima bin/limactl bin/lima bin/docker cli-plugins/docker-buildx; do
+    if [[ ! -f "${HELPERS}/${required}" ]] || ! grep -q "^[0-9a-f]\{64\}  ${required}$" "${HELPERS}/MANIFEST"; then
+      echo "MISSING FROM THE HELPERS: Contents/Resources/helpers/${required}"
+      faults=$((faults + 1))
+    fi
+  done
+  # And its versions must be the launchers' own, or they refuse the copy.
+  want_pins="$("$(dirname "${BASH_SOURCE[0]}")/../Vendor/fetch-helpers.sh" --pins-line 2>/dev/null)"
+  if [[ -z "${want_pins}" ]] || ! grep -qxF "${want_pins}" "${HELPERS}/MANIFEST"; then
+    echo "THE HELPERS ARE NOT THE VERSIONS setup.sh PINS: Contents/Resources/helpers/MANIFEST (run Vendor/fetch-helpers.sh, xcodegen generate, and build again)"
+    faults=$((faults + 1))
+  fi
 else
   echo "NO HELPER PROGRAMS: ${HELPERS} is missing (Vendor/fetch-helpers.sh before the build)"
   faults=$((faults + 1))

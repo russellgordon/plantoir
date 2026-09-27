@@ -102,6 +102,12 @@ case "$1" in
     printf 'colima start' >> "$log"
     for word in "$@"; do printf ' [%s]' "$word" >> "$log"; done
     printf '\\n' >> "$log"
+    failed=$(cat "$HOME/.stub-failed" 2>/dev/null || echo 0)
+    if [ "$failed" -lt "${{STUB_FAILS:-0}}" ]; then
+      echo $((failed + 1)) > "$HOME/.stub-failed"
+      echo "FATA[0000] could not start"
+      exit 1
+    fi
     case " $* " in
       *" --disk-image "*)
         case "${{STUB_SEED:-accepted}}" in
@@ -159,6 +165,10 @@ name=$(printf '%s' "$url" | tr '/:' '__')
 cp "$STUB_SERVED/$name" "$destination"
 """
 
+SLEEP_STUB = """#!/bin/bash
+exit 0
+"""
+
 UNAME_STUB = """#!/bin/bash
 if [ "$1" = "-m" ]; then echo "${STUB_ARCH:-arm64}"; exit 0; fi
 exec /usr/bin/uname "$@"
@@ -193,7 +203,7 @@ class HelperBootstrapTests(unittest.TestCase):
     def test_the_printed_words_are_the_contracts(self):
         text = "\n".join(self.block)
         printed = self.contract["printed"]
-        for key in ["preparingHelpers", "keptTheCopyHere", "firstStartSeeded", "firstStartDownloading"]:
+        for key in ["preparingHelpers", "keptTheCopyHere", "firstStartSeeded", "firstStartDownloading", "setUpFailed"]:
             self.assertIn('echo "' + printed[key] + '"', text, key)
         self.assertIn('echo "📦 Downloading ${label}…"', text)
         self.assertEqual(printed["downloadingHelper"], "📦 Downloading what your website builder needs ({n} of 4)…")
@@ -242,6 +252,8 @@ class HelperBootstrapTests(unittest.TestCase):
             world[key].mkdir(parents=True)
         write_executable(world["stubs"] / "curl", CURL_STUB)
         write_executable(world["stubs"] / "uname", UNAME_STUB)
+        # The block's waits sleep between looks; a case must not wait minutes.
+        write_executable(world["stubs"] / "sleep", SLEEP_STUB)
         return world
 
     def program_files(self, origin, arch="arm64"):
@@ -292,6 +304,8 @@ class HelperBootstrapTests(unittest.TestCase):
             staging = folder / "lima"
             for relative in ["bin/limactl", "bin/lima", "share/lima/lima-guestagent.Linux-aarch64.gz",
                              "share/lima/templates/default.yaml"]:
+                if serves == "incomplete" and relative == "bin/lima":
+                    continue
                 write_executable(staging / relative, files[relative])
             write_executable(staging / "libexec" / "lima" / "limactl-mcp", "#!/bin/bash\n")
             (staging / "share" / "doc" / "lima").mkdir(parents=True)
@@ -356,7 +370,9 @@ class HelperBootstrapTests(unittest.TestCase):
                 write_executable(world["elsewhere"] / relative[len("bin/"):], files[relative])
 
     def write_stamp(self, world, tools, pins):
-        lines = [pins, "source downloaded"]
+        lines = [pins]
+        for tool in tools:
+            lines.append("source " + tool + " downloaded")
         for tool in tools:
             for relative in {"colima": ["bin/colima"], "limactl": ["bin/limactl", "bin/lima"], "docker": ["bin/docker"]}[tool]:
                 lines.append(sha256_of(world["tools"] / relative) + "  " + relative)
@@ -371,6 +387,8 @@ class HelperBootstrapTests(unittest.TestCase):
             elif state in ["current", "damaged", "unrecorded"]:
                 self.install_tool(world, tool, "old")
                 stamped.append(tool)
+            elif state == "unlisted":
+                self.install_tool(world, tool, "old")
         if before["stamp"] == "current":
             self.write_stamp(world, stamped, self.pins["line"])
         elif before["stamp"] == "different":
@@ -506,7 +524,7 @@ class HelperBootstrapTests(unittest.TestCase):
 
         # What was printed.
         printed = self.contract["printed"]
-        for key in ["preparingHelpers", "keptTheCopyHere"]:
+        for key in ["preparingHelpers", "keptTheCopyHere", "setUpFailed"]:
             self.assertEqual(printed[key] in output, key in expect["printed"], key + "\n" + output)
         self.assertEqual("❌ Could not download what your website builder needs (" in output,
                          "downloadFailed" in expect["printed"], output)
@@ -527,7 +545,10 @@ class HelperBootstrapTests(unittest.TestCase):
         else:
             text = stamp.read_text(encoding="utf-8")
             self.assertIn(self.pins["line"] + "\n", text)
-            self.assertIn("source " + expect["stamp"] + "\n", text)
+            for tool in ["colima", "limactl", "docker"]:
+                if expect["tools"][tool] in ["bundled", "downloaded"]:
+                    self.assertIn("source " + tool + " " + expect["tools"][tool] + "\n", text, text)
+            self.assertIn("source ", text)
             checked = subprocess.run(["shasum", "-a", "256", "-c", "--status", str(stamp)], cwd=world["tools"])
             self.assertEqual(checked.returncode, 0, "the stamp does not describe what was installed:\n" + text)
 
@@ -555,7 +576,8 @@ class HelperBootstrapTests(unittest.TestCase):
             (world["home"] / ".colima" / "default").mkdir(parents=True)
         bundle_before = self.tree_fingerprint(world["bundle"])
 
-        result = self.run_block(world, strict, case["bundle"] != "absent", overrides, {"STUB_SEED": case["seed"]})
+        result = self.run_block(world, strict, case["bundle"] != "absent", overrides,
+                                {"STUB_SEED": case["seed"], "STUB_FAILS": str(case.get("startsThatFail", 0))})
         output = result.stdout + result.stderr
         self.assertEqual(result.returncode, 0, output)
         self.assertIn("BLOCK-FINISHED", output)

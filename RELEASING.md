@@ -362,8 +362,10 @@ the release side.
     measured: the earlier item's download moved to the NEW release and lost
     its notes, even with `--versions` — so `update_feed.py` puts every earlier
     item back exactly as it was, signs the feed again with the same key (the
-    Keychain asks once more), and refuses the cut if any earlier item still
-    differs.
+    Keychain asks once more), and refuses the cut if any earlier item is
+    missing or still differs. `--maximum-versions 0` keeps every release in
+    the feed: generate_appcast's default keeps three and dropped the oldest
+    from the fourth cut on (measured by the implementation review).
   - **v1.4.0, the first release with Sparkle, has no deltas**: nothing before
     it is in the feed. Its teachers download the whole DMG once, by hand; the
     saving starts with the release after it.
