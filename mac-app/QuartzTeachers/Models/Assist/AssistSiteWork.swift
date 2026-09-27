@@ -119,6 +119,13 @@ final class AssistToolchainWork: AssistSiteWork {
                 succeeded: false, message: AssistToolRefusal.noWorkingFolder.message
             )
         }
+        // Not while a copy of the course is being zipped (#351): a removal
+        // waiting on that zip deletes the folder this would build from.
+        if CourseActivity.courseIsBeingCopied(folderPath: workspaceURL.path, courseCode: course.code) {
+            return AssistSiteWorkResult(
+                succeeded: false, message: AssistWording.courseIsBeingCopied(course: course.code)
+            )
+        }
 
         // Recorded for ⌘Q (issue #232): the delegate cannot see this runner,
         // and a quit in the middle of it is a quit through a preview build.
@@ -202,6 +209,12 @@ final class AssistToolchainWork: AssistSiteWork {
         guard let workspaceURL = workspace.workspaceURL else {
             return AssistSiteWorkResult(
                 succeeded: false, message: AssistToolRefusal.noWorkingFolder.message
+            )
+        }
+        if CourseActivity.courseIsBeingCopied(folderPath: workspaceURL.path, courseCode: course.code) {
+            return AssistSiteWorkResult(
+                succeeded: false,
+                message: AssistWording.courseIsBeingCopied(course: course.code)
             )
         }
         if CourseActivity.busyDescription(folderPath: workspaceURL.path, courseCode: course.code) != nil {

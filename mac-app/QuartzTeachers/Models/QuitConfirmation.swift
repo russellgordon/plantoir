@@ -157,7 +157,7 @@ enum QuitConfirmation {
         // restore or a removal. Asked about because a quit mid-zip leaves a
         // half-written copy, and a restore or removal that never happened.
         if copies.count == 1 {
-            return "saving a copy of \(copies[0].courseCode)"
+            return "saving a copy of \(copies[0].displayCode)"
         }
         if copies.count > 1 {
             return "saving \(copies.count) copies"

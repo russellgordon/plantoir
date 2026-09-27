@@ -44,7 +44,7 @@ enum CourseArchiver {
         madeBy maker: BackupMaker = .teacher
     ) async throws -> URL {
         let workingFolderPath: String = coursesDirectoryURL.deletingLastPathComponent().path
-        CourseActivity.beginCopy(folderPath: workingFolderPath, courseCode: course.code)
+        CourseActivity.beginCopy(folderPath: workingFolderPath, courseCode: course.code, displayCode: course.displayCode)
         defer {
             CourseActivity.endCopy(folderPath: workingFolderPath, courseCode: course.code)
         }
@@ -144,7 +144,7 @@ enum CourseArchiver {
     @discardableResult
     static func archiveCourse(_ course: Course, coursesDirectoryURL: URL) async throws -> URL {
         let workingFolderPath: String = coursesDirectoryURL.deletingLastPathComponent().path
-        CourseActivity.beginCopy(folderPath: workingFolderPath, courseCode: course.code)
+        CourseActivity.beginCopy(folderPath: workingFolderPath, courseCode: course.code, displayCode: course.displayCode)
         defer {
             CourseActivity.endCopy(folderPath: workingFolderPath, courseCode: course.code)
         }
@@ -158,19 +158,20 @@ enum CourseArchiver {
 
     /// Archives and removes an entire course folder.
     /// Returns the archive that was written.
-    @discardableResult
     ///
     /// `beforeRemoving` runs after the zip and before the folder is deleted:
     /// a reference course is unlocked THERE (#351) — unlocked before the zip,
     /// a folder read during it could lock it again and the delete would fail
-    /// after the archive was made.
+    /// after the archive was made — and a removal refuses there, by throwing,
+    /// when the course became busy during the zip. The archive stays.
+    @discardableResult
     static func archiveAndRemoveCourse(
         _ course: Course,
         coursesDirectoryURL: URL,
-        beforeRemoving: () -> Void = {}
+        beforeRemoving: () throws -> Void = {}
     ) async throws -> URL {
         let archiveURL: URL = try await archiveCourse(course, coursesDirectoryURL: coursesDirectoryURL)
-        beforeRemoving()
+        try beforeRemoving()
         try FileManager.default.removeItem(at: course.directoryURL)
         // The built website lives OUTSIDE the working folder now, so removing
         // the course folder no longer removes it — see `BuildOutputLocation`.
@@ -187,24 +188,18 @@ enum CourseArchiver {
 
     /// Archives and removes one section folder, and takes that section
     /// out of the course's saved settings so it stops being listed.
+    /// `beforeRemoving` runs after the zip and before anything is deleted, as
+    /// for a whole course.
     @discardableResult
     static func archiveAndRemoveSection(
         _ sectionNumber: Int,
         from course: Course,
-        coursesDirectoryURL: URL
+        coursesDirectoryURL: URL,
+        beforeRemoving: () throws -> Void = {}
     ) async throws -> URL {
         let sectionURL: URL = course.sectionDirectoryURL(forSection: sectionNumber)
-        let workingFolderPath: String = coursesDirectoryURL.deletingLastPathComponent().path
-        CourseActivity.beginCopy(folderPath: workingFolderPath, courseCode: course.code)
-        defer {
-            CourseActivity.endCopy(folderPath: workingFolderPath, courseCode: course.code)
-        }
-        let archiveURL: URL = try await zipping(
-            folderPath: sectionURL.path,
-            archiveName: timestampedName(prefix: "\(course.code)-section\(sectionNumber)"),
-            courseCode: course.code,
-            coursesDirectoryPath: coursesDirectoryURL.path
-        )
+        let archiveURL: URL = try await archivingSection(sectionNumber, of: course, coursesDirectoryURL: coursesDirectoryURL)
+        try beforeRemoving()
         if FileManager.default.fileExists(atPath: sectionURL.path) {
             try FileManager.default.removeItem(at: sectionURL)
         }
@@ -229,6 +224,28 @@ enum CourseArchiver {
         try course.configuration.write(to: course.configFileURL)
 
         return archiveURL
+    }
+
+    /// The section's zip, recorded as a copy for exactly as long as it runs —
+    /// ended BEFORE `beforeRemoving` asks whether the course is busy, or the
+    /// removal would find its own copy in the way.
+    private static func archivingSection(
+        _ sectionNumber: Int,
+        of course: Course,
+        coursesDirectoryURL: URL
+    ) async throws -> URL {
+        let sectionURL: URL = course.sectionDirectoryURL(forSection: sectionNumber)
+        let workingFolderPath: String = coursesDirectoryURL.deletingLastPathComponent().path
+        CourseActivity.beginCopy(folderPath: workingFolderPath, courseCode: course.code, displayCode: course.displayCode)
+        defer {
+            CourseActivity.endCopy(folderPath: workingFolderPath, courseCode: course.code)
+        }
+        return try await zipping(
+            folderPath: sectionURL.path,
+            archiveName: timestampedName(prefix: "\(course.code)-section\(sectionNumber)"),
+            courseCode: course.code,
+            coursesDirectoryPath: coursesDirectoryURL.path
+        )
     }
 
     /// Things that are rebuilt rather than written, and so are left out of
