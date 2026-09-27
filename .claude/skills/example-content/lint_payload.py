@@ -307,15 +307,14 @@ def lint(course_code: str) -> int:
                        for c in comment_pattern.finditer(text)):
                 missing_triangulation.append(rel)
 
-        in_fence = False
+        # Links inside code are examples (#313): the same mask as above,
+        # applied line by line by offset.
+        line_start = 0
         for line in text.split("\n"):
+            offset = line_start
+            line_start += len(line) + 1
             stripped = line.strip()
-            if stripped.startswith("```") or stripped.startswith("````"):
-                in_fence = not in_fence
-                continue
-            if in_fence or "`" in line:
-                continue
-            for match in link_pattern.finditer(line):
+            for match in markdown_code.matches_outside_code(link_pattern, line, code, offset):
                 target = match.group(1).strip().rstrip("\\")
                 if "/" in target:
                     known = target in qualified_names
@@ -323,7 +322,8 @@ def lint(course_code: str) -> int:
                     known = target in page_names
                 if not known:
                     problems.append(f"{rel}: unknown link [[{target}]]")
-            if stripped.startswith("|") and re.search(r"\[\[[^\]]*[^\\]\|[^\]]*\]\]", line):
+            if stripped.startswith("|") and markdown_code.matches_outside_code(
+                    re.compile(r"\[\[[^\]]*[^\\]\|[^\]]*\]\]"), line, code, offset):
                 problems.append(f"{rel}: unescaped pipe in table: {stripped[:60]}")
 
     # Folder index pages must be titled after their folder — a literal
