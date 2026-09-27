@@ -2444,7 +2444,7 @@ final class AssistToolRunnerTests: XCTestCase {
         let outcome: AssistToolOutcome = await made.runner.run(call: call(
             "unpublish_pages", arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4"]
         ))
-        XCTAssertEqual(outcome.summary, "Unit 4 is already hidden.")
+        XCTAssertEqual(outcome.summary, AssistWording.unitAlreadyHidden(unitWord: "Unit", unit: 4))
     }
 
     /// A unit nobody has is said plainly.
@@ -2597,8 +2597,8 @@ final class AssistToolRunnerTests: XCTestCase {
             let outcome: AssistToolOutcome = await made.runner.run(call: call(
                 tool, arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4, Day 23"]
             ))
-            XCTAssertEqual(outcome.summary, "It's already been published.", tool)
-            XCTAssertEqual(outcome.detail, "It's already been published.", tool)
+            XCTAssertEqual(outcome.summary, AssistWording.alreadyPublishedOne, tool)
+            XCTAssertEqual(outcome.detail, AssistWording.alreadyPublishedOne, tool)
             XCTAssertFalse(outcome.isPlan, "\(tool) asked to approve a no-op")
             // None of the plan's furniture.
             for furniture in ["would change", "Shall I", "Nothing needed changing",
@@ -2635,7 +2635,7 @@ final class AssistToolRunnerTests: XCTestCase {
             let outcome: AssistToolOutcome = await made.runner.run(call: call(
                 "publish_pages", arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4, Day 23"]
             ))
-            XCTAssertEqual(outcome.summary, "It's already been published.", "publish: \(value)")
+            XCTAssertEqual(outcome.summary, AssistWording.alreadyPublishedOne, "publish: \(value)")
             XCTAssertEqual(
                 try String(contentsOf: url, encoding: .utf8), before,
                 "publish: \(value) — the teacher's own line is left alone"
@@ -2696,7 +2696,7 @@ final class AssistToolRunnerTests: XCTestCase {
     /// Each of these hides the page on the built site, and the reader calls
     /// every one of them `cannot tell` rather than guessing. Reporting treats
     /// that as visible, which is the mild mistake — but a PLAN that believed
-    /// it answered "It's already been published." and wrote nothing, while
+    /// it answered `AssistWording.alreadyPublishedOne` and wrote nothing, while
     /// students could not see the page. That is the failure that reports
     /// success, and it is the one this whole issue exists to remove.
     @MainActor
@@ -2758,7 +2758,8 @@ final class AssistToolRunnerTests: XCTestCase {
             "publish_pages", arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4"]
         ))
         XCTAssertFalse(
-            outcome.detail.contains("already been published"),
+            outcome.detail.contains(AssistWording.alreadyPublishedOne)
+                || outcome.detail.contains(AssistWording.unitAlreadyPublished(unitWord: "Unit", unit: 4)),
             "A page whose flag cannot be read is not one that needs no change: \(outcome.detail)"
         )
         let after: String = try String(
@@ -2782,7 +2783,7 @@ final class AssistToolRunnerTests: XCTestCase {
         let outcome: AssistToolOutcome = await made.runner.run(call: call(
             "unpublish_pages", arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4, Day 23"]
         ))
-        XCTAssertEqual(outcome.summary, "It's already hidden.")
+        XCTAssertEqual(outcome.summary, AssistWording.alreadyHiddenOne)
     }
 
     /// A page whose settings have no place a new line can go is NOT "already
@@ -2880,6 +2881,48 @@ final class AssistToolRunnerTests: XCTestCase {
         XCTAssertEqual(declinedClass, AssistPublishPlan.sayingPagesWithNoRoomForAKey(named: ["Unit 4, Day 1"]))
     }
 
+    /// Every "already the way you asked" reply is the contract's own sentence,
+    /// on the PLAN path as well as the path that writes, for publishing and
+    /// hiding alike (#174). Only the executing hide of a whole unit used to be
+    /// asserted; the plan-path and publish-path copies are the ones that would
+    /// drift without anybody noticing.
+    @MainActor
+    func testEveryAlreadySentenceIsTheContractsWord() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        try write(page: "Unit 4, Day 1", publish: "true", date: "2026-09-08",
+                  body: "One.", in: made.course)
+        try write(page: "Unit 4, Day 2", publish: "true", date: "2026-09-09",
+                  body: "Two.", in: made.course)
+        try write(page: "Unit 5, Day 1", publish: "false", date: "2026-09-10",
+                  body: "Three.", in: made.course)
+        try write(page: "Unit 5, Day 2", publish: "false", date: "2026-09-11",
+                  body: "Four.", in: made.course)
+
+        // (what is asked for, publishing?, the sentence that must come back)
+        let expectations: [(pages: String, publishing: Bool, sentence: String)] = [
+            (pages: "Unit 4, Day 1", publishing: true, sentence: AssistWording.alreadyPublishedOne),
+            (pages: "Unit 5, Day 1", publishing: false, sentence: AssistWording.alreadyHiddenOne),
+            (pages: "Unit 4, Day 1; Unit 4, Day 2", publishing: true, sentence: AssistWording.alreadyPublishedSeveral),
+            (pages: "Unit 5, Day 1; Unit 5, Day 2", publishing: false, sentence: AssistWording.alreadyHiddenSeveral),
+            (pages: "Unit 4", publishing: true, sentence: AssistWording.unitAlreadyPublished(unitWord: "Unit", unit: 4)),
+            (pages: "Unit 5", publishing: false, sentence: AssistWording.unitAlreadyHidden(unitWord: "Unit", unit: 5))
+        ]
+        for expectation in expectations {
+            let tools: [String] = expectation.publishing
+                ? ["plan_publish_pages", "publish_pages"]
+                : ["plan_unpublish_pages", "unpublish_pages"]
+            for tool in tools {
+                let outcome: AssistToolOutcome = await made.runner.run(call: call(
+                    tool, arguments: ["course": "ICS3U", "section": 1, "pages": expectation.pages]
+                ))
+                XCTAssertEqual(outcome.summary, expectation.sentence, "\(tool) \(expectation.pages)")
+                XCTAssertEqual(outcome.detail, expectation.sentence, "\(tool) \(expectation.pages)")
+            }
+        }
+    }
+
     /// Two pages, both already done, get the plural.
     @MainActor
     func testTwoPagesAlreadyPublishedGetThePlural() async throws {
@@ -2895,7 +2938,7 @@ final class AssistToolRunnerTests: XCTestCase {
             "publish_pages",
             arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 1, Day 1; Unit 1, Day 2"]
         ))
-        XCTAssertEqual(outcome.summary, "They have already been published.")
+        XCTAssertEqual(outcome.summary, AssistWording.alreadyPublishedSeveral)
     }
 
     /// A page that does NOT exist still gets the full answer — "already done"
@@ -2912,7 +2955,7 @@ final class AssistToolRunnerTests: XCTestCase {
             "publish_pages",
             arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4, Day 23; Bananas"]
         ))
-        XCTAssertNotEqual(outcome.summary, "It's already been published.")
+        XCTAssertNotEqual(outcome.summary, AssistWording.alreadyPublishedOne)
         XCTAssertTrue(outcome.detail.contains("Bananas"),
                       "The page nobody has was not mentioned: \(outcome.detail)")
     }
