@@ -3489,6 +3489,92 @@ final class AssistToolRunnerTests: XCTestCase {
         }
     }
 
+    /// What a re-date SAYS it did (#343): the classes and the pages they use
+    /// whose dates were written, each counted from its own list, never one
+    /// subtracted from the other. The old reply read "Re-dated 14 classes and
+    /// -4 pages they use" whenever some classes were already on their days.
+    @MainActor
+    func testReDatingReportsWhatMovedAsTheContractSays() async throws {
+        for testCase in try AssistToolRunnerTests.cases(
+            in: "contracts/class-planning.json", section: "reDatingASection",
+            key: "reportedCounts"
+        ) {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+
+            let made = try makeRunner()
+            defer { try? FileManager.default.removeItem(at: made.root) }
+
+            for entry in try XCTUnwrap(testCase["classes"] as? [[String: Any]]) {
+                try writeContractPage(
+                    title: try XCTUnwrap(entry["title"] as? String), isClassPage: true, visible: true,
+                    links: entry["links"] as? [String] ?? [],
+                    dated: try XCTUnwrap(entry["date"] as? String), in: made.course
+                )
+            }
+            for entry in try XCTUnwrap(testCase["pages"] as? [[String: Any]]) {
+                try writeContractPage(
+                    title: try XCTUnwrap(entry["title"] as? String), isClassPage: false,
+                    visible: entry["visible"] as? Bool ?? false,
+                    links: entry["links"] as? [String] ?? [],
+                    dated: try XCTUnwrap(entry["date"] as? String), in: made.course
+                )
+            }
+            let timetable: [String] = try XCTUnwrap(testCase["timetable"] as? [String])
+            _ = await made.runner.run(call: call(
+                "remember_timetable",
+                arguments: ["course": "ICS3U", "section": 1,
+                            "dates": timetable.joined(separator: "; ")]
+            ))
+            let outcome: AssistToolOutcome = await made.runner.run(call: call(
+                "re_date_classes", arguments: ["course": "ICS3U", "section": 1]
+            ))
+
+            let expect: [String: Any] = try XCTUnwrap(testCase["expect"] as? [String: Any])
+            let classes: Int = try XCTUnwrap(expect["classesReDated"] as? Int)
+            let pages: Int = try XCTUnwrap(expect["pagesTheyUseReDated"] as? Int)
+            let sentence: String = try XCTUnwrap(expect["sentence"] as? String)
+            let rendered: String
+            if sentence == "reDatedOnlyPagesTheyUse" {
+                rendered = AssistWording.reDatedOnlyPagesTheyUse(pagesTheyUse: pages)
+            } else {
+                XCTAssertEqual(sentence, "reDated", name)
+                rendered = AssistWording.reDated(count: classes, pagesTheyUse: pages)
+            }
+            XCTAssertTrue(
+                outcome.summary.hasPrefix(rendered),
+                "\(name): expected the reply to begin “\(rendered)”, got: \(outcome.summary)"
+            )
+            XCTAssertNil(
+                outcome.summary.range(of: "-[0-9]", options: .regularExpression),
+                "\(name): a negative count: \(outcome.summary)"
+            )
+        }
+    }
+
+    /// The undo line names the classes that MOVED (#343), not every class in
+    /// the section.
+    @MainActor
+    func testUndoingAReDatingNamesWhatMoved() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        try write(page: "Unit 1, Day 1", publish: "true", date: "2026-09-08", body: "One.", in: made.course)
+        try write(page: "Unit 1, Day 2", publish: "true", date: "2025-09-10", body: "Two.", in: made.course)
+        try write(page: "Unit 1, Day 3", publish: "true", date: "2025-09-14", body: "Three.", in: made.course)
+        _ = await made.runner.run(call: call(
+            "remember_timetable",
+            arguments: ["course": "ICS3U", "section": 1,
+                        "dates": "2026-09-08; 2026-09-10; 2026-09-14"]
+        ))
+        _ = await made.runner.run(call: call(
+            "re_date_classes", arguments: ["course": "ICS3U", "section": 1]
+        ))
+
+        let undone: AssistToolOutcome = await made.runner.run(call: call("undo_last_change"))
+        XCTAssertTrue(undone.summary.contains("re-dated 2 classes"), undone.summary)
+        XCTAssertFalse(undone.summary.contains("3 classes"), undone.summary)
+    }
+
     /// The teacher is TOLD which linked class was left alone — on the plan card
     /// they agree to, and in the reply after it ran.
     ///

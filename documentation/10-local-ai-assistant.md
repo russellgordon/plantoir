@@ -2414,15 +2414,16 @@ assistant states what it understood and what it is about to do, and waits for
 Go or Cancel. This is applied by Swift, from whether the tool has a `plan_`
 twin — the model is not asked to decide whether something is risky.
 
-Four of the window's writes have no twin and no plan, deliberately:
+Five writes have no twin and no plan, deliberately (`tools.planTwinsNote` said
+"four" until #343):
 `rebuild_preview` (changes no page), `undo_last_change` (is the remedy),
 `cancel_scheduled_deploy` (re-scheduling is the remedy), and `deploy_section` —
 which instead waits on its own separate approval, in the teacher's words and
 naming the real destination, whether or not plan mode is on. Deploying is the
-one act that reaches students, so it never rides on a general setting. On the
-full thirty-two-tool surface a fifth has none: `back_up_course`, reached by the
-card "back up this course", writes a zip beside the course, changes no page and
-is its own safety net. `AssistPlanModeTests` pins all five, walking every write
+one act that reaches students, so it never rides on a general setting. The
+fifth is `back_up_course`: not among the local model's tools, but reached in
+the window by the card "back up this course" as well as over MCP, it writes a
+zip beside the course, changes no page and is its own safety net. `AssistPlanModeTests` pins all five, walking every write
 on the whole surface since #327 (it used to walk the twenty-two in `tools`,
 and the one write whose twin was named wrong — `add_curriculum_mentions` — was
 in the other ten).
