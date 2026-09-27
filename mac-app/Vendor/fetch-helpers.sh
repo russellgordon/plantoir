@@ -33,6 +33,7 @@
 # resource folder, so generating without it fails — and run `xcodegen generate`
 # again after it replaces the folder (Trap 1 in CLAUDE.md).
 #
+# `fetch-helpers.sh --pins-line` prints the pins line setup.sh gives.
 # `fetch-helpers.sh --manifest-only <helpers folder>` writes that folder's
 # MANIFEST again from the files as they are now. publish.sh uses it after it
 # signs the programs, which changes their bytes.
@@ -80,6 +81,13 @@ write_manifest() {
   } > "${next}"
   mv -f "${next}" "${folder}/MANIFEST"
 }
+
+# The pins line setup.sh gives, for release/check-signatures.sh to hold a
+# signed app's MANIFEST to.
+if [[ "${1:-}" == "--pins-line" ]]; then
+  echo "${PINS_LINE}"
+  exit 0
+fi
 
 if [[ "${1:-}" == "--manifest-only" ]]; then
   if [[ -z "${2:-}" || ! -d "${2}" ]]; then

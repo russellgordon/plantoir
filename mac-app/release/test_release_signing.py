@@ -251,6 +251,28 @@ class ReleaseSigningTests(unittest.TestCase):
         self.assertEqual(refused.returncode, 1, refused.stdout)
         self.assertIn("MANIFEST DOES NOT MATCH THE SIGNED HELPERS", refused.stdout)
 
+    def test_a_missing_program_is_refused(self) -> None:
+        app = self.fake_app("helpers-no-limactl")
+        self.sign_the_release_way(app)
+        helpers = app / "Contents" / "Resources" / "helpers"
+        (helpers / "bin" / "limactl").unlink()
+        run(str(FETCH_HELPERS), "--manifest-only", str(helpers))
+        self.resign_app(app)
+        refused = self.check(app, "--ad-hoc-for-tests")
+        self.assertEqual(refused.returncode, 1, refused.stdout)
+        self.assertIn("MISSING FROM THE HELPERS: Contents/Resources/helpers/bin/limactl", refused.stdout)
+
+    def test_helpers_of_other_versions_are_refused(self) -> None:
+        app = self.fake_app("helpers-other-pins")
+        self.sign_the_release_way(app)
+        manifest = app / "Contents" / "Resources" / "helpers" / "MANIFEST"
+        text = manifest.read_text(encoding="utf-8")
+        manifest.write_text(text.replace("pins v", "pins v9.", 1), encoding="utf-8")
+        self.resign_app(app)
+        refused = self.check(app, "--ad-hoc-for-tests")
+        self.assertEqual(refused.returncode, 1, refused.stdout)
+        self.assertIn("NOT THE VERSIONS setup.sh PINS", refused.stdout)
+
     def test_an_app_without_helpers_is_refused(self) -> None:
         app = self.fake_app("helpers-none")
         shutil.rmtree(app / "Contents" / "Resources" / "helpers")

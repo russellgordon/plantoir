@@ -35,8 +35,10 @@ What it does, in order — and what it refuses:
    item of every archive it is given — measured with --versions: the earlier
    item's download pointed at THIS release and lost its notes — so each
    earlier item is put back exactly as it was in the feed, the feed is signed
-   again with the same key, and every earlier item must then compare equal
-   to the one that was there, or the cut is refused. The
+   again with the same key, and every earlier item must then be there and
+   compare equal to the one that was, or the cut is refused.
+   `--maximum-versions 0` keeps every item: its default (3) dropped the oldest
+   from the fourth cut on, measured by the implementation review. The
    `.delta` files are written beside the DMG, to be uploaded to the same
    release (their addresses use the same prefix). A Swift-only release's
    delta measured 106 KB between two signed builds of a 410 MB DMG.
@@ -436,6 +438,10 @@ def build_feed(version: str, dmg: Path, notes_markdown: str, required_warning: b
             "--download-url-prefix", prefix,
             "--link", "https://plantoir.app/",
             "--maximum-deltas", str(MAXIMUM_DELTAS),
+            # Keep EVERY item: by default generate_appcast keeps the newest
+            # three and drops the rest, which from the fourth cut removed the
+            # oldest item without a word (the implementation review's M1).
+            "--maximum-versions", "0",
             # Write THIS item only; the earlier DMGs are delta sources, and
             # without this generate_appcast infers items for them too, with
             # this release's download prefix (the plan review's H4).
@@ -466,8 +472,11 @@ def build_feed(version: str, dmg: Path, notes_markdown: str, required_warning: b
         # Every item that was in the feed and is still in it is unchanged.
         after = items_by_build(output)
         for earlier_build, earlier_xml in before.items():
-            if earlier_build == build or earlier_build not in after:
+            if earlier_build == build:
                 continue
+            if earlier_build not in after:
+                raise Refusal(f"generate_appcast removed the item for build {earlier_build}; "
+                              f"a cut must never drop an earlier release from the feed.")
             if after[earlier_build] != earlier_xml:
                 raise Refusal(f"generate_appcast changed the item for build {earlier_build}; "
                               f"only this release's item may change.")

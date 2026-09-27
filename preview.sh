@@ -977,7 +977,7 @@ _stage_downloads() {
   else
     lima_arch="x86_64"; docker_arch="x86_64"; buildx_arch="amd64"
   fi
-  mkdir -p "$staging/bin"
+  mkdir -p "$staging/bin" || return 1
   # In the order the teacher is told about them: 1 of 4, 2 of 4, and so on.
   for tool in limactl colima docker buildx; do
     case " $* " in
@@ -994,20 +994,30 @@ _stage_downloads() {
         ;;
       colima)
         _download "https://github.com/abiosoft/colima/releases/download/${COLIMA_VERSION}/colima-Darwin-${arch}" "$staging/bin/colima" "$(_helper_sha256 COLIMA)" "what your website builder needs (2 of 4)" || return 1
-        chmod +x "$staging/bin/colima"
+        chmod +x "$staging/bin/colima" || return 1
         ;;
       docker)
         _download "https://download.docker.com/mac/static/stable/${docker_arch}/docker-${DOCKER_CLI_VERSION}.tgz" "$staging/docker.tar.gz" "$(_helper_sha256 DOCKER_CLI)" "what your website builder needs (3 of 4)" || return 1
         tar xzf "$staging/docker.tar.gz" -C "$staging" || return 1
-        mv -f "$staging/docker/docker" "$staging/bin/docker"
+        mv -f "$staging/docker/docker" "$staging/bin/docker" || return 1
         rm -rf "$staging/docker" "$staging/docker.tar.gz"
         ;;
       buildx)
-        mkdir -p "$staging/cli-plugins"
+        mkdir -p "$staging/cli-plugins" || return 1
         _download "https://github.com/docker/buildx/releases/download/${BUILDX_VERSION}/buildx-${BUILDX_VERSION}.darwin-${buildx_arch}" "$staging/cli-plugins/docker-buildx" "$(_helper_sha256 BUILDX)" "what your website builder needs (4 of 4)" || return 1
-        chmod +x "$staging/cli-plugins/docker-buildx"
+        chmod +x "$staging/cli-plugins/docker-buildx" || return 1
         ;;
     esac
+  done
+  # Every file each program brings is there: an archive laid out differently
+  # after a version bump must not install half a program (#312 review L3).
+  for tool in "$@"; do
+    for path in $(_helper_paths "$tool"); do
+      if [[ ! -e "$staging/$path" ]]; then
+        echo "❌ Could not set up what your website builder needs."
+        return 1
+      fi
+    done
   done
 }
 
@@ -1026,14 +1036,17 @@ _move_into_place() {
 # every program of Plantoir's that it can vouch for — the ones just installed,
 # and the ones an up-to-date stamp already vouched for.
 _write_stamp() {
-  local how="$1" stamp="$TOOLS_DIR/.installed" next tool carried=""
+  local how="$1" stamp="$TOOLS_DIR/.installed" next tool carried="" sources=""
   shift
   next="$TOOLS_DIR/.installed.next.$$"
   for tool in colima limactl docker; do
     case " $* " in
-      *" $tool "*) ;;
+      *" $tool "*)
+        sources="${sources}source ${tool} ${how}"$'\n'
+        ;;
       *)
         if [[ -f "$stamp" ]] && grep -qxF "$(_helper_pins)" "$stamp"; then
+          sources="${sources}$(grep "^source ${tool} " "$stamp" || true)"$'\n'
           # shellcheck disable=SC2046
           carried="${carried}$(_helper_hash_lines "$stamp" $(_helper_stamped_paths "$tool"))"$'\n'
         fi
@@ -1042,7 +1055,9 @@ _write_stamp() {
   done
   {
     _helper_pins
-    echo "source ${how}"
+    # Where EACH program came from, so a report never calls a downloaded
+    # program one from inside Plantoir because a later install was.
+    printf '%s' "$sources" | grep -v '^$' || true
     printf '%s' "$carried" | grep -v '^$' || true
     # shellcheck disable=SC2046
     (cd "$TOOLS_DIR" && shasum -a 256 $(_helper_stamped_paths "$@"))
@@ -1086,9 +1101,34 @@ _note_helpers_installed() {
   fi
 }
 
+# Says, on the line the app reads, what one install did for each reason.
+_note_helper_groups() {
+  local how="$1" why_not="$2" missing="$3" different="$4" damaged="$5" unrecorded="$6"
+  # shellcheck disable=SC2086  # word lists, by construction
+  if [[ -n "$missing" ]]; then _note_helpers_installed "$how" missing "$why_not" $missing; fi
+  # shellcheck disable=SC2086
+  if [[ -n "$different" ]]; then _note_helpers_installed "$how" different "$why_not" $different; fi
+  # shellcheck disable=SC2086
+  if [[ -n "$damaged" ]]; then _note_helpers_installed "$how" damaged "$why_not" $damaged; fi
+  # shellcheck disable=SC2086
+  if [[ -n "$unrecorded" ]]; then _note_helpers_installed "$how" unrecorded "$why_not" $unrecorded; fi
+  return 0
+}
+
+# True when the stamp has a line for every file the program brings.
+_helper_stamp_lists() {
+  local stamp="$1" path
+  for path in $(_helper_stamped_paths "$2"); do
+    if ! grep -q "^[0-9a-f]\{64\}  ${path}$" "$stamp"; then
+      return 1
+    fi
+  done
+  return 0
+}
+
 ensure_local_tools() {
   mkdir -p "$TOOLS_DIR/bin"
-  local stamp="$TOOLS_DIR/.installed" tool where missing="" ours="" refresh="" why="" why_not
+  local stamp="$TOOLS_DIR/.installed" tool where missing="" ours="" different="" damaged="" unrecorded="" why_not
 
   # Which programs are Plantoir's to look after: the ones not on this Mac
   # at all, and the ones in its own folder. Anything else is used as found.
@@ -1101,33 +1141,32 @@ ensure_local_tools() {
     fi
   done
 
+  # The stamp's three questions, program by program. A program the stamp
+  # has no line for is unrecorded, not damaged: nothing says what it was.
   if [[ -n "$ours" ]]; then
-    if [[ ! -f "$stamp" ]]; then
-      why="unrecorded"
-    elif ! grep -qxF "$(_helper_pins)" "$stamp"; then
-      why="different"
+    if [[ -f "$stamp" ]] && ! grep -qxF "$(_helper_pins)" "$stamp"; then
+      different="$ours"
     else
-      # Only the programs that no longer hash to what was installed.
       for tool in $ours; do
+        if [[ ! -f "$stamp" ]] || ! _helper_stamp_lists "$stamp" "$tool"; then
+          unrecorded="${unrecorded} ${tool}"
         # shellcheck disable=SC2046
-        if ! _helper_hashes_hold "$TOOLS_DIR" "$stamp" $(_helper_stamped_paths "$tool"); then
-          why="damaged"
-          refresh="${refresh} ${tool}"
+        elif ! _helper_hashes_hold "$TOOLS_DIR" "$stamp" $(_helper_stamped_paths "$tool"); then
+          damaged="${damaged} ${tool}"
         fi
       done
-    fi
-    if [[ "$why" == "different" || "$why" == "unrecorded" ]]; then
-      refresh="$ours"
     fi
   fi
 
   # shellcheck disable=SC2086  # word lists, by construction
-  why_not="$(_bundle_problem $missing $refresh)"
-  if [[ "$why" == "unrecorded" && -n "$why_not" ]]; then
+  why_not="$(_bundle_problem $missing $different $damaged $unrecorded)"
+  if [[ -n "$unrecorded" && -n "$why_not" ]]; then
     # No copy of Plantoir's own to replace them with: keep what works.
-    refresh=""
+    unrecorded=""
+    # shellcheck disable=SC2086
+    why_not="$(_bundle_problem $missing $different $damaged)"
   fi
-  if [[ -z "${missing}${refresh}" ]]; then
+  if [[ -z "${missing}${different}${damaged}${unrecorded}" ]]; then
     ensure_buildx
     return 0
   fi
@@ -1135,31 +1174,22 @@ ensure_local_tools() {
   if [[ -z "$why_not" ]]; then
     echo "📦 Getting what your website builder needs ready…"
     # shellcheck disable=SC2086
-    if _install_helpers bundled "" $missing $refresh; then
-      if [[ -n "$missing" ]]; then
-        # shellcheck disable=SC2086
-        _note_helpers_installed bundled missing "" $missing
-      fi
-      if [[ -n "$refresh" ]]; then
-        # shellcheck disable=SC2086
-        _note_helpers_installed bundled "$why" "" $refresh
-      fi
+    if _install_helpers bundled "" $missing $different $damaged $unrecorded; then
+      _note_helper_groups bundled "" "$missing" "$different" "$damaged" "$unrecorded"
       ensure_buildx
       return 0
     fi
     why_not="bundle-check-failed"
+    unrecorded=""
+  fi
+  if [[ -z "${missing}${different}${damaged}" ]]; then
+    ensure_buildx
+    return 0
   fi
 
   # shellcheck disable=SC2086
-  if _install_helpers downloaded "$why_not" $missing $refresh; then
-    if [[ -n "$missing" ]]; then
-      # shellcheck disable=SC2086
-      _note_helpers_installed downloaded missing "$why_not" $missing
-    fi
-    if [[ -n "$refresh" ]]; then
-      # shellcheck disable=SC2086
-      _note_helpers_installed downloaded "$why" "$why_not" $refresh
-    fi
+  if _install_helpers downloaded "$why_not" $missing $different $damaged; then
+    _note_helper_groups downloaded "$why_not" "$missing" "$different" "$damaged" ""
   elif [[ -n "$missing" ]]; then
     exit 1
   else
@@ -1180,27 +1210,27 @@ ensure_buildx() {
   if docker buildx version >/dev/null 2>&1; then
     return 0
   fi
-  local plugins="$HOME/.docker/cli-plugins" staging why_not
+  local plugins="$HOME/.docker/cli-plugins" staging="" why_not
   if [[ -L "$plugins/docker-buildx" ]]; then
     return 0
   fi
-  mkdir -p "$plugins"
-  staging="$(mktemp -d "$plugins/.staging.XXXXXX")"
+  if ! mkdir -p "$plugins" 2>/dev/null || ! staging="$(mktemp -d "$plugins/.staging.XXXXXX" 2>/dev/null)"; then
+    echo "❌ Could not set up what your website builder needs."
+    exit 1
+  fi
   why_not="$(_bundle_problem buildx)"
   if [[ -z "$why_not" ]]; then
-    if _stage_from_bundle "$staging" buildx; then
-      mv -f "$staging/cli-plugins/docker-buildx" "$plugins/docker-buildx"
+    if _stage_from_bundle "$staging" buildx && mv -f "$staging/cli-plugins/docker-buildx" "$plugins/docker-buildx"; then
       rm -rf "$staging"
       _note_helpers_installed bundled missing "" buildx
       return 0
     fi
     why_not="bundle-check-failed"
   fi
-  if ! _stage_downloads "$staging" buildx; then
+  if ! _stage_downloads "$staging" buildx || ! mv -f "$staging/cli-plugins/docker-buildx" "$plugins/docker-buildx"; then
     rm -rf "$staging"
     exit 1
   fi
-  mv -f "$staging/cli-plugins/docker-buildx" "$plugins/docker-buildx"
   rm -rf "$staging"
   _note_helpers_installed downloaded missing "$why_not" buildx
 }
@@ -1301,7 +1331,13 @@ ensure_container_runtime() {
   # (documentation/03-launcher-scripts.md).
   echo "🔁 The website builder isn't answering yet — restarting it…"
   colima stop --force >/dev/null 2>&1 || true
-  colima start >/dev/null 2>&1 || true
+  if [[ -d "$HOME/.colima/default" ]]; then
+    colima start >/dev/null 2>&1 || true
+  else
+    # Nothing survived a failed first start, so this start creates it: at
+    # Plantoir's size, never Colima's default (#312 review L2).
+    colima start --cpu "$(_colima_cpus)" --memory "$(_colima_memory_gb)" --vm-type vz >/dev/null 2>&1 || true
+  fi
   _wait_for_docker 60 && return 0
 
   # For a developer, the by-hand recovery is

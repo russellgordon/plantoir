@@ -828,9 +828,52 @@
         "seed" : "accepted",
         "vmExists" : true,
         "why" : "Starting an existing builder never uses the starting disk and writes no line."
+      },
+      {
+        "bundle" : "present",
+        "expect" : {
+          "marker" : null,
+          "printed" : [
+            "firstStartSeeded",
+            "firstStartDownloading"
+          ],
+          "starts" : [
+            [
+              "--cpu",
+              "{cpus}",
+              "--memory",
+              "{memory}",
+              "--vm-type",
+              "vz",
+              "--disk-image",
+              "{bundle}/vm/{image}"
+            ],
+            [
+              "--cpu",
+              "{cpus}",
+              "--memory",
+              "{memory}",
+              "--vm-type",
+              "vz"
+            ],
+            [
+              "--cpu",
+              "{cpus}",
+              "--memory",
+              "{memory}",
+              "--vm-type",
+              "vz"
+            ]
+          ]
+        },
+        "name" : "Both first starts fail and nothing is left behind",
+        "seed" : "fails",
+        "startsThatFail" : 2,
+        "vmExists" : false,
+        "why" : "The restart that follows creates the website builder when nothing survived, so it keeps Plantoir's size; a bare `colima start` there would create one at Colima's default (the implementation review's L2). No line is written: creating it did not succeed in the first-start step."
       }
     ],
-    "firstStartCasesNote" : "expect.starts lists the argument lists `colima start` is called with, in order: {cpus} and {memory} are the launcher's own sizing, {bundle} the app's helpers folder, {image} VM_IMAGE_NAME. seed is what Colima does with --disk-image: accepted, refused (checksum mismatch, leaving its folder behind) or fails (any other failure). marker is the PLANTOIR_BUILDER_CREATED line after the prefix, {seconds} a whole number.",
+    "firstStartCasesNote" : "expect.starts lists the argument lists `colima start` is called with, in order: {cpus} and {memory} are the launcher's own sizing, {bundle} the app's helpers folder, {image} VM_IMAGE_NAME. seed is what Colima does with --disk-image: accepted, refused (checksum mismatch, leaving its folder behind) or fails (any other failure). marker is the PLANTOIR_BUILDER_CREATED line after the prefix, {seconds} a whole number. startsThatFail, when present, is how many `colima start` calls fail before one succeeds.",
     "installCases" : [
       {
         "arch" : "arm64",
@@ -1415,9 +1458,105 @@
         },
         "name" : "A download that is not what was pinned",
         "why" : "Refused as a failed download: the file is deleted and nothing is installed."
+      },
+      {
+        "arch" : "arm64",
+        "before" : {
+          "buildx" : "present",
+          "colima" : "current",
+          "docker" : "current",
+          "limactl" : "unlisted",
+          "stamp" : "current"
+        },
+        "bundle" : "absent",
+        "dockerAnswers" : false,
+        "downloadsServe" : "pinned",
+        "expect" : {
+          "downloads" : 0,
+          "exit" : 0,
+          "markers" : [
+
+          ],
+          "printed" : [
+
+          ],
+          "stamp" : "unchanged",
+          "tools" : {
+            "buildx" : "unchanged",
+            "colima" : "unchanged",
+            "docker" : "unchanged",
+            "limactl" : "unchanged"
+          }
+        },
+        "name" : "A program Plantoir's stamp has no line for, and no copy in the app",
+        "why" : "Nothing says what that program was, so it is unrecorded, not damaged, and a Mac with no copy of Plantoir's own keeps it (the implementation review's L6)."
+      },
+      {
+        "arch" : "arm64",
+        "before" : {
+          "buildx" : "present",
+          "colima" : "current",
+          "docker" : "current",
+          "limactl" : "unlisted",
+          "stamp" : "current"
+        },
+        "bundle" : "present",
+        "dockerAnswers" : false,
+        "downloadsServe" : "pinned",
+        "expect" : {
+          "downloads" : 0,
+          "exit" : 0,
+          "markers" : [
+            "bundled unrecorded limactl {pins}"
+          ],
+          "printed" : [
+            "preparingHelpers"
+          ],
+          "stamp" : "bundled",
+          "tools" : {
+            "buildx" : "unchanged",
+            "colima" : "unchanged",
+            "docker" : "unchanged",
+            "limactl" : "bundled"
+          }
+        },
+        "name" : "A program Plantoir's stamp has no line for, with the app's copy"
+      },
+      {
+        "arch" : "arm64",
+        "before" : {
+          "buildx" : "missing",
+          "colima" : "missing",
+          "docker" : "missing",
+          "limactl" : "missing",
+          "stamp" : "none"
+        },
+        "bundle" : "absent",
+        "dockerAnswers" : false,
+        "downloadsServe" : "incomplete",
+        "expect" : {
+          "downloads" : 3,
+          "exit" : 1,
+          "markers" : [
+
+          ],
+          "printed" : [
+            "downloadingHelper",
+            "setUpFailed"
+          ],
+          "stamp" : "none",
+          "tools" : {
+            "buildx" : "none",
+            "colima" : "none",
+            "docker" : "none",
+            "limactl" : "none"
+          }
+        },
+        "name" : "A download whose archive lacks a file the program needs",
+        "why" : "An archive laid out differently after a version bump must not install half a program and stamp it (the implementation review's L3). Lima's archive here has no `lima` wrapper; the three downloads before the check are made, and nothing is moved into place."
       }
     ],
-    "installCasesNote" : "Each case is one start of the website builder with the state in `before`. A tool is missing (not on this Mac), elsewhere (found outside Plantoir's folder), current/damaged/unrecorded (Plantoir's own copy: recorded by the stamp, recorded but no longer hashing to it, or with no stamp at all). stamp is none, current or different (other pins). bundle: present, absent (PLANTOIR_BUNDLED_HELPERS unset), damaged (a file no longer matches the MANIFEST), otherArch, otherPins (a MANIFEST of other versions), resigned (the same versions with different bytes and a MANIFEST that agrees). downloadsServe: pinned (the pinned bytes), wrongBytes, nothing (no internet). expect.tools: bundled, downloaded, asFound, unchanged or none, per program; markers carry {pins} for the versions word; downloads counts every download started. Every case is run under `set -euo pipefail` AND without it, and afterwards the app's copy must be byte-for-byte what it was, with no staging folder left behind.",
+    "installCasesNote" : "Each case is one start of the website builder with the state in `before`. A tool is missing (not on this Mac), elsewhere (found outside Plantoir's folder), current/damaged/unrecorded/unlisted (Plantoir's own copy: recorded by the stamp, recorded but no longer hashing to it, with no stamp at all, or with a stamp that has no line for it). stamp is none, current or different (other pins); expect.stamp names where the programs just installed came from, and the stamp must carry a `source <program> <how>` line for each. bundle: present, absent (PLANTOIR_BUNDLED_HELPERS unset), damaged (a file no longer matches the MANIFEST), otherArch, otherPins (a MANIFEST of other versions), resigned (the same versions with different bytes and a MANIFEST that agrees). downloadsServe: pinned (the pinned bytes), wrongBytes, nothing (no internet), incomplete (Lima's archive without its `lima` wrapper, re-pinned so it downloads cleanly). expect.tools: bundled, downloaded, asFound, unchanged or none, per program; markers carry {pins} for the versions word; downloads counts every download started. Every case is run under `set -euo pipefail` AND without it, and afterwards the app's copy must be byte-for-byte what it was, with no staging folder left behind.",
     "markersAre" : "Pinned where the events are: shared-rules.json → activityTrail.mustRecord, \"helper programs installed\" and \"website builder created\", each with its marker.",
     "printed" : {
       "buildingFirstTime" : "🧱 Building your website builder — the first time downloads about 400 MB and takes a few minutes…",
@@ -1426,7 +1565,8 @@
       "firstStartDownloading" : "   About 350 MB is downloaded once; this can take several minutes.",
       "firstStartSeeded" : "   This takes about a minute.",
       "keptTheCopyHere" : "   Carrying on with what is already on this Mac.",
-      "preparingHelpers" : "📦 Getting what your website builder needs ready…"
+      "preparingHelpers" : "📦 Getting what your website builder needs ready…",
+      "setUpFailed" : "❌ Could not set up what your website builder needs."
     },
     "printedNote" : "Words pinned by scripts/test_helper_bootstrap.py against the launchers. buildingFirstTime is printed only when no website builder has been built on this Mac before (a rebuild after an update keeps the older line); the first-start sentences follow the unchanged line that names the CPUs and memory. firstStartDownloading says 350 MB because the Intel disk is 358 MB and the Apple-silicon one 332 MB; it replaced a line that said 600 MB for the whole first run.",
     "rejected" : [
@@ -1442,7 +1582,7 @@
     "stamp" : {
       "file" : "~/Library/Application Support/Plantoir/tools/.installed",
       "manifest" : "Contents/Resources/helpers/MANIFEST: arch <arm64>, the same pins line, image vm/<name>, then one <sha256>  <path> line for every file but the starting disk, which Colima checks itself. Written by mac-app/Vendor/fetch-helpers.sh and written again by publish.sh after it signs the programs.",
-      "shape" : "the pins line (pins <colima> <lima> <docker> <buildx> <starting disk SHA-512>), then source <bundled|downloaded>, then one <sha256>  <path> line per program file it vouches for (bin/colima, bin/limactl, bin/lima, bin/docker)"
+      "shape" : "the pins line (pins <colima> <lima> <docker> <buildx> <starting disk SHA-512>), then one source <program> <bundled|downloaded> line per program it vouches for (per program since the implementation review's L5: one install can replace one program and leave the others as an earlier install set them up), then one <sha256>  <path> line per program file it vouches for (bin/colima, bin/limactl, bin/lima, bin/docker). A program of Plantoir's with no line is UNRECORDED, not damaged (L6)."
     },
     "why" : "GitHub #312. A first run downloaded about 857 MB before the first site existed: 135 MB of programs, a 332 MB starting disk, and about 390 MB while building the website builder — and the launcher said 600 MB. The first two now come inside the app, so a first run downloads only the build, and a school filter that blocks GitHub releases no longer stops Plantoir. Russell's decision (issue comment, 2026-09-26): carry the helpers AND the disk, keep building the website builder on the Mac, and rely on Sparkle deltas to keep updates small."
   },
