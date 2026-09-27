@@ -253,6 +253,15 @@ def build_windows_static_figures() -> None:
         print("   ✓ saved light-and-dark-windows.png + WebP")
 
 
+def windows_shot_ids() -> list:
+    manifest = json.loads((WEBSITE / "shots.json").read_text(encoding="utf-8"))
+    ids = []
+    for shot in manifest["shots"]:
+        if shot.get("windows"):
+            ids.append(shot["id"])
+    return ids
+
+
 def main() -> int:
     announce("Photographing Full Windows Suite (App + Edge Browser)")
     IMAGE_DIR.mkdir(parents=True, exist_ok=True)
@@ -265,7 +274,9 @@ def main() -> int:
     capture_app_windows(plantoir_exe)
 
     # 3. Optimize App Windows
-    shot_ids = ["courses", "new-course", "progress", "preview", "assistant"]
+    # The ids Windows takes are marked `windows: true` in shots.json, the one
+    # list both harnesses read — this used to be a list of its own here.
+    shot_ids = windows_shot_ids()
     for shot_id in shot_ids:
         for theme in ("light", "dark"):
             png_path = IMAGE_DIR / f"{shot_id}-windows-{theme}.png"

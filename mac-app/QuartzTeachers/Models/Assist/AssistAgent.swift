@@ -119,6 +119,12 @@ final class AssistAgent {
         return named
     }
 
+    /// The course whose copy the assistant is saving right now, for the line
+    /// under the three dots (#351); nil the rest of the time.
+    var courseBeingBackedUp: String? {
+        return tools.courseBeingBackedUp
+    }
+
     /// Whether a teacher can type right now.
     var isBusy: Bool {
         return activity != .idle
@@ -194,9 +200,38 @@ final class AssistAgent {
             wholeLine: true
         )
 
+        // "What does Unit 2, Day 3 in SPH3U section 1 link to?", typed in
+        // another course's window (#167). A card binds THIS window's course
+        // into its call unconditionally, so the question is refused here, in
+        // code, with the sentence a model-named course gets — nothing is read,
+        // and the model is not asked.
+        if case .anotherCourse(let named) = AssistCardCommand.linksQuestion(
+            trimmed, windowCourse: courseCode, windowSection: sectionNumber
+        ) {
+            sayALinksQuestionNamedAnotherCourse(named)
+            return
+        }
+
         // The fixed shapes never reach the model — see AssistCardCommand for
         // the measurement that decided this.
-        if let command = AssistCardCommand.matching(trimmed) {
+        var matched: AssistCardCommand? = AssistCardCommand.matching(
+            trimmed,
+            numberedPageWord: tools.numberedPageWord(forCourse: courseCode),
+            windowCourse: courseCode,
+            windowSection: sectionNumber
+        )
+        // "What does The Water Cycle link to?" — a phrase beginning "the" is a
+        // page title when this section has a page called that, and is then
+        // answered in code like any other; otherwise it is a description
+        // ("the quiz") and goes to the model (#167 fix review F2).
+        if matched == nil,
+           case .onlyIfAPageIsCalled(let title) = AssistCardCommand.linksQuestion(
+               trimmed, windowCourse: courseCode, windowSection: sectionNumber
+           ),
+           tools.sectionHasAPage(called: title, course: courseCode, section: sectionNumber) {
+            matched = AssistCardCommand.readLinks(of: title)
+        }
+        if let command = matched {
             // Built and SETTLED before the line is written, and then run
             // without being settled again. The order is the whole point: the
             // matcher is clock-free, so "deploy at 6:30 am" arrives here as
@@ -224,6 +259,58 @@ final class AssistAgent {
             return
         }
 
+        // "Deploy at 6:30" — morning or evening, and nobody can tell which.
+        // Asked here, in code, rather than handed to the model, which answered
+        // that shape of sentence with an IMMEDIATE deploy on the smaller
+        // assistant (issue #194). The teacher's sentence and the question go
+        // into the transcript only — never into `messages` — so the model
+        // never sees either, on this turn or any later one: the answer is one
+        // of the two sentences the question names, and that turn matches in
+        // code above. Nothing is waiting afterwards, so there is no state to
+        // clear if the teacher asks something else instead.
+        if let question = AssistCardCommand.morningOrEvening(trimmed) {
+            entries.append(Entry(
+                speaker: .assistant,
+                text: AssistWording.morningOrEvening(
+                    clock: question.clock,
+                    sayMorning: question.sayMorning,
+                    sayEvening: question.sayEvening
+                )
+            ))
+            ActivityTrail.note(
+                .assistantMatchedAFixedPhrase,
+                AssistAgent.askedMorningOrEveningLine,
+                course: courseCode,
+                section: sectionNumber
+            )
+            return
+        }
+
+        // "Deploy at 6.30 pm", "deploy at 6:30 tonight" — a time the app can
+        // read but does not set, answered with the one sentence to type
+        // instead (issue #277). The same shape as the question above, for the
+        // same reason: every such sentence reached deploy_section 10 of 10 on
+        // the smaller assistant. Transcript only, never `messages`; nothing is
+        // set, and nothing waits for the answer — the sentence it names
+        // matches in code on the next turn.
+        if let respelling = AssistCardCommand.timeToSayAs(trimmed) {
+            entries.append(Entry(
+                speaker: .assistant,
+                text: AssistWording.sayTheTimeAs(
+                    written: respelling.written,
+                    say: respelling.say,
+                    onlyDifference: respelling.onlyDifference
+                )
+            ))
+            ActivityTrail.note(
+                .assistantMatchedAFixedPhrase,
+                AssistAgent.askedToSayTheTimeAsLine,
+                course: courseCode,
+                section: sectionNumber
+            )
+            return
+        }
+
         // The date goes on the END of the message. Prepended, the same line
         // cost 15 points of routing accuracy on the Windows measurements —
         // the position really is the finding, not the presence.
@@ -233,9 +320,13 @@ final class AssistAgent {
 
     /// The teacher declined to give their class dates. Said back in the
     /// transcript, so a conversation reads as one somebody took part in.
-    func noteDatesDeclined() {
+    ///
+    /// `noun` is what the course calls one of its pages (#267). The line goes
+    /// into the transcript only — never into `messages` — so a club's
+    /// "meeting" never reaches the model.
+    func noteDatesDeclined(noun: ClassNoun = .class) {
         entries.append(Entry(speaker: .teacher, text: AssistWording.cancelled))
-        entries.append(Entry(speaker: .assistant, text: AssistWording.datesNotGivenYet))
+        entries.append(Entry(speaker: .assistant, text: AssistWording.datesNotGivenYet(for: noun)))
     }
 
     /// Approve the waiting deploy.
@@ -335,6 +426,32 @@ final class AssistAgent {
             }
 
             if let calls = reply.toolCalls, let first = calls.first {
+                // A tool that EXISTS but was not on the list this model was
+                // shown (#327): refused before anything else looks at the
+                // call. The window offers the local model thirteen tools; the
+                // runner can run thirty-two, because the same runner answers
+                // Claude Code over MCP. Until this, a name from the other
+                // nineteen simply ran — `add_curriculum_mentions` with no plan
+                // at all, since its twin's name was derived wrong, and
+                // `re_date_classes`, kept off the local list precisely
+                // because re-dating two hundred pages is too large a change to
+                // reach through a router that is right four times in five.
+                // What the model was not offered is not an answer, whatever
+                // its arguments say, so this sits above the readability and
+                // course gates rather than letting them word the refusal.
+                //
+                // A name that exists NOWHERE is left alone, deliberately: it
+                // still reaches "There is no tool by that name." below, which
+                // is documented behaviour this issue did not set out to
+                // change. Cards never pass through here — a matched phrasing
+                // goes straight to `run(settledCall:)` — so the tools only a
+                // card reaches keep working.
+                if tools.definition(named: first.function.name) != nil,
+                   !wasOffered(toolNamed: first.function.name) {
+                    sayTheModelNamedAToolItWasNotOffered(first.function.name)
+                    return
+                }
+
                 // Arguments that cannot be read, with the turn finishing
                 // normally: a small model writing bad JSON of its own accord.
                 // Same answer — running a call whose arguments were lost means
@@ -631,13 +748,51 @@ final class AssistAgent {
         activity = .idle
     }
 
+    /// Whether this tool was on the list the model was shown in this window.
+    private func wasOffered(toolNamed name: String) -> Bool {
+        for definition in tools.definitions where definition.name == name {
+            return true
+        }
+        return false
+    }
+
+    /// The model reached past the list it was given (#327): refused, and the
+    /// turn wound back, as for an echo.
+    ///
+    /// **The sentence is `didNotFollowThat`, reused on purpose.** From the
+    /// teacher's side this is a misroute — they asked for something and the
+    /// assistant picked a tool that is not its to pick — and that sentence
+    /// already says both halves that are true: nothing was changed, and
+    /// saying it another way is the remedy. A sentence of its own would have
+    /// to explain a tool list to somebody who has never seen one, which rule
+    /// 1 forbids. The TRAIL line is where the two are told apart.
+    private func sayTheModelNamedAToolItWasNotOffered(_ tool: String) {
+        windTheTurnBack()
+        entries.append(Entry(speaker: .assistant, text: AssistWording.didNotFollowThat))
+        ActivityTrail.note(
+            .assistantNamedAToolItWasNotOffered,
+            AssistAgent.namedAToolItWasNotOfferedLine(tool: tool),
+            course: courseCode,
+            section: sectionNumber
+        )
+        activity = .idle
+    }
+
+    /// The trail's line for a tool the model was not offered. Named so a test
+    /// can assert it without retyping it.
+    static func namedAToolItWasNotOfferedLine(tool: String) -> String {
+        return "the assistant chose " + inWords(tool) + ", which it is not offered in this window — "
+            + "nothing was run from it, and the turn was taken back out of the conversation"
+    }
+
     /// Take the whole turn back out of the conversation, down to where it
     /// began.
     ///
-    /// Shared by the three places that abandon a turn — an answer that did
-    /// not finish, a request that named another course, and a reply that was
-    /// the request back again — because they make the same claim about the
-    /// history and the three must not drift. What the teacher can SEE is
+    /// Shared by the four places that abandon a turn — an answer that did
+    /// not finish, a request that named another course, a reply that was
+    /// the request back again, and a tool the model was not offered (#327) —
+    /// because they make the same claim about the history and the four must
+    /// not drift. What the teacher can SEE is
     /// untouched: `entries` keeps their sentence on every path.
     ///
     /// Two reasons it is the whole turn rather than the reply alone, and both
@@ -751,6 +906,41 @@ final class AssistAgent {
             section: sectionNumber
         )
         activity = .idle
+    }
+
+    /// A links question named another course (#167): refused in code, with
+    /// the same two sentences `sayTheRequestNamedAnotherCourse` chooses
+    /// between, and nothing read.
+    ///
+    /// Its own function rather than a call to that one, because that one's
+    /// trail line says what the MODEL chose, and here no model was asked. The
+    /// event is the same — the teacher's side of it is the same refusal.
+    private func sayALinksQuestionNamedAnotherCourse(_ otherCourse: String) {
+        var said: String = AssistWording.askedAboutACourseThatIsNotHere(
+            course: courseCode, otherCourse: otherCourse
+        )
+        if let known = tools.knownCourseCode(matching: otherCourse) {
+            said = AssistWording.askedAboutAnotherCourse(course: courseCode, otherCourse: known)
+        }
+        entries.append(Entry(speaker: .assistant, text: said))
+        ActivityTrail.note(
+            .assistantWasAskedAboutAnotherCourse,
+            AssistAgent.linksQuestionNamedAnotherCourseLine(
+                otherCourse: otherCourse, windowCourse: courseCode
+            ),
+            course: courseCode,
+            section: sectionNumber
+        )
+        activity = .idle
+    }
+
+    /// The trail's line for a links question refused because it named another
+    /// course (#167). Both codes, as the other one was TYPED — the evidence the
+    /// event's entry asks for — and never the page title.
+    static func linksQuestionNamedAnotherCourseLine(otherCourse: String, windowCourse: String) -> String {
+        return "the assistant was asked about " + otherCourse + " in this window, which is for "
+            + windowCourse + " — matched in code, not sent to the model: a question about what a "
+            + "page links to; nothing was read"
     }
 
     /// A tool's name as somebody reading the trail would say it.
@@ -965,6 +1155,28 @@ final class AssistAgent {
         return withTheMomentSettled(withTheDaySettled(boundToThisSection(rawCall)))
     }
 
+    /// The trail's line for a time asked about rather than answered.
+    ///
+    /// No clock in it, deliberately: "6:30" is something the teacher wrote,
+    /// and the trail never carries that (`assistantAsked` already has the
+    /// sentence, which is where it belongs). "Nothing was set" is the half a
+    /// reader of the trail needs — the line sits where a scheduled deploy's
+    /// line would, and must not be mistaken for one.
+    static let askedMorningOrEveningLine: String =
+        "matched in code, not sent to the model — asked whether the time was morning or evening; "
+        + "nothing was set"
+
+    /// The trail's line for a time answered with the spelling to use
+    /// (issue #277).
+    ///
+    /// No clock and nothing the teacher wrote, for the reason
+    /// `askedMorningOrEveningLine` gives: `assistantAsked` already carries
+    /// the sentence. "Nothing was set" because the line sits where a
+    /// scheduled deploy's would, and must not be mistaken for one.
+    static let askedToSayTheTimeAsLine: String =
+        "matched in code, not sent to the model — asked for the time in a spelling it can set; "
+        + "nothing was set"
+
     /// The trail line for a sentence answered in code, naming the tool — and
     /// the MOMENT, when the sentence carried one.
     ///
@@ -1037,10 +1249,11 @@ final class AssistAgent {
         // has a `plan_` twin that works the change out and changes nothing,
         // so this is the assistant answering "what would that do?" in words
         // before it does it.
-        // The twin has to actually exist. Four writes are their own reversal
+        // The twin has to actually exist. Five writes are their own reversal
         // and have none — rebuild_preview changes no page, undo_last_change
-        // IS the undo, deploy_section already waits on its own button, and
-        // cancelling a scheduled deploy is remedied by scheduling it again.
+        // IS the undo, deploy_section already waits on its own button,
+        // cancelling a scheduled deploy is remedied by scheduling it again,
+        // and back_up_course writes a copy outside the course (#343).
         // Asking the surface rather than assuming keeps that list in ONE
         // place: without this check, plan mode would ask for a tool that is
         // not there and show the teacher an error where their plan should be.

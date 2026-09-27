@@ -16,11 +16,24 @@ import Foundation
 /// | `[[x.pdf]]` links at a FILE | 250, of which 235 PDFs | a link, not an embed — and the biggest single thing a scan of embeds alone would drop |
 /// | `<img src="/Media/x.png">` | 5 | three of them on pages inside shared folders; one is a live 1.1 MB picture |
 /// | `[text](x.png)` | 526, every one `https://` | nothing local to carry today, scanned anyway because the cost is nothing |
+/// | `[text](<x y.png>)` | 0 in `support/` | #97's third link style (#325): a teacher can type it, and before #325 the plain pattern read `<x` and named nothing, so the copy silently left the picture behind |
 ///
-/// **Fenced code is left alone.** A name inside a ``` block is prose about a
-/// file rather than a use of one, and rewriting it would edit an example a
-/// teacher wrote. Inline code spans are NOT tracked, which is a known and
-/// measured-empty gap: `WikiLinkRewriter` has the same one.
+/// Each Markdown shape is read by exactly ONE pattern, and both are
+/// REFERENCES to `FolderPathRewriter`'s constants rather than copies:
+/// `markdownLinkPattern`, whose `(?!<)` leaves a `<…>` destination alone, and
+/// `angleBracketedLinkPattern`, whose closing `>` is a lookahead so the
+/// rewrite never eats it.
+///
+/// **Code and `%%` comments are left alone** — a fenced block of either
+/// character, a fence inside a callout, an inline span, and (#331) anything
+/// Quartz strips as a comment before drawing the page. A name inside code is
+/// prose about a file rather than a use of one, and rewriting it would edit
+/// an example a teacher wrote. Where code is comes from `MarkdownCode`, the
+/// one definition every link reader and rewriter on the mac shares (#313,
+/// `readingALink.whatIsCode`, and `whatIsAComment` since #331): a match of
+/// any of the four shapes that STARTS in code or a comment is skipped. Until
+/// #313 this walker tracked ``` and ~~~ fences itself and not inline spans,
+/// and saw no fence inside a `>` callout.
 ///
 /// `nonisolated`: pure over its arguments, and run off the main actor by the
 /// copy.
@@ -38,6 +51,11 @@ nonisolated enum PageReferences {
             case wikilink
             /// An HTML attribute or a Markdown link — percent-encoded.
             case encoded
+            /// A Markdown destination in angle brackets, `](<one pic.png>)`
+            /// (#325). Read like `.encoded` — the site's Markdown reader
+            /// resolves `<a%20b.png>` and `<a b.png>` to the same address
+            /// (#97's measurement) — but written back PLAIN, #97's rule.
+            case angleBracketed
         }
 
         // MARK: - Stored properties
@@ -148,41 +166,55 @@ nonisolated enum PageReferences {
                 withAllowedCharacters: CharacterSet.urlPathAllowed
             ) ?? newName.text
             return prefix + encoded
+        case .angleBracketed:
+            var oldSegment: String = reference.target
+            if let lastSlash = reference.target.lastIndex(of: "/") {
+                oldSegment = String(reference.target[reference.target.index(after: lastSlash)...])
+            }
+            return prefix + FolderPathRewriter.spelledInsideAngleBrackets(newName.text, likeThe: oldSegment)
         }
     }
 
-    /// Walks the page a line at a time, skipping fenced code, and hands each
-    /// live line's matches to `handle`.
+    /// Walks the page a line at a time and hands each line's matches — the
+    /// ones that do not start in code — to `handle`. Code is found over the
+    /// WHOLE page, since a fence or a span can cross lines, and applied to
+    /// each line by its offset. Lines stay the unit so that no name is ever
+    /// read across a line break.
     private static func walk(_ text: String, handle: (String, [Match]) -> Void) {
-        let lines: [String] = text.components(separatedBy: "\n")
-        var insideAFence: Bool = false
-        var fenceMarker: String = ""
+        let code: [NSRange] = MarkdownCode.notALinkRanges(in: text)
+        let lines: [String] = PageReferences.lines(of: text)
+        var lineOffset: Int = 0
         for line in lines {
-            let trimmed: String = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") {
-                let marker: String = trimmed.hasPrefix("```") ? "```" : "~~~"
-                if insideAFence {
-                    if marker == fenceMarker {
-                        insideAFence = false
-                        fenceMarker = ""
-                    }
-                } else {
-                    insideAFence = true
-                    fenceMarker = marker
-                }
-                handle(line, [])
-                continue
-            }
-            if insideAFence {
-                handle(line, [])
-                continue
-            }
-            handle(line, PageReferences.matches(in: line))
+            handle(line, PageReferences.matches(in: line, code: code, lineOffset: lineOffset))
+            lineOffset += line.utf16.count + 1
         }
+    }
+
+    /// The page split at every `\n`, by UTF-16 code unit, so each line's
+    /// length is exactly its share of the offsets `MarkdownCode` works in. A
+    /// `\r` before the `\n` stays on its line, and joining with `\n` gives
+    /// the page back byte for byte. (Not `split` over `Character`s, where
+    /// `"\r\n"` is one character and never equal to `"\n"`.)
+    private static func lines(of text: String) -> [String] {
+        let units: [UInt16] = Array(text.utf16)
+        var lines: [String] = []
+        var start: Int = 0
+        var index: Int = 0
+        while index < units.count {
+            if units[index] == 0x0A {
+                lines.append(String(decoding: units[start..<index], as: UTF16.self))
+                start = index + 1
+            }
+            index += 1
+        }
+        lines.append(String(decoding: units[start..<units.count], as: UTF16.self))
+        return lines
     }
 
     /// The wikilink shape, `WikiLinkRewriter`'s own, so a target this reads is
-    /// exactly a target a rename would rewrite.
+    /// exactly a target a rename would rewrite. A picture sized inside a table,
+    /// `![[circuit.png\|300]]`, reads as `circuit.png` and a rename writes
+    /// only that range, leaving the backslash the table needs (#294).
     private static let wikilinkExpression: NSRegularExpression? =
         try? NSRegularExpression(pattern: WikiLinkRewriter.pattern)
 
@@ -193,23 +225,33 @@ nonisolated enum PageReferences {
     )
 
     /// A Markdown link's destination: `](…)`, up to a space or the closing
-    /// bracket, so a link carrying a title is still read.
+    /// bracket, so a link carrying a title is still read — and never one that
+    /// opens with `<`, which is the next shape's (group 2).
     private static let markdownExpression: NSRegularExpression? =
-        try? NSRegularExpression(pattern: #"\]\(([^)\s]+)"#)
+        try? NSRegularExpression(pattern: FolderPathRewriter.markdownLinkPattern)
 
-    private static func matches(in line: String) -> [Match] {
+    /// A Markdown destination in angle brackets, `](<…>)`, which may hold
+    /// spaces (group 2; the `>` is a lookahead).
+    private static let angleBracketedExpression: NSRegularExpression? =
+        try? NSRegularExpression(pattern: FolderPathRewriter.angleBracketedLinkPattern)
+
+    private static func matches(in line: String, code: [NSRange], lineOffset: Int) -> [Match] {
         var found: [Match] = []
         PageReferences.collect(
             PageReferences.wikilinkExpression, in: line, groups: [2],
-            kind: .wikilink, into: &found
+            kind: .wikilink, code: code, lineOffset: lineOffset, into: &found
         )
         PageReferences.collect(
             PageReferences.attributeExpression, in: line, groups: [1, 2],
-            kind: .encoded, into: &found
+            kind: .encoded, code: code, lineOffset: lineOffset, into: &found
         )
         PageReferences.collect(
-            PageReferences.markdownExpression, in: line, groups: [1],
-            kind: .encoded, into: &found
+            PageReferences.markdownExpression, in: line, groups: [2],
+            kind: .encoded, code: code, lineOffset: lineOffset, into: &found
+        )
+        PageReferences.collect(
+            PageReferences.angleBracketedExpression, in: line, groups: [2],
+            kind: .angleBracketed, code: code, lineOffset: lineOffset, into: &found
         )
         found.sort { first, second in
             return first.range.lowerBound < second.range.lowerBound
@@ -222,13 +264,17 @@ nonisolated enum PageReferences {
         in line: String,
         groups: [Int],
         kind: Reference.Kind,
+        code: [NSRange],
+        lineOffset: Int,
         into found: inout [Match]
     ) {
         guard let expression else {
             return
         }
-        let whole: NSRange = NSRange(line.startIndex..<line.endIndex, in: line)
-        for result in expression.matches(in: line, range: whole) {
+        let live: [NSTextCheckingResult] = MarkdownCode.matches(
+            of: expression, in: line, outside: code, offset: lineOffset
+        )
+        for result in live {
             for group in groups {
                 guard group < result.numberOfRanges,
                       let range = Range(result.range(at: group), in: line) else {
@@ -265,7 +311,7 @@ nonisolated enum PageReferences {
         if let lastSlash = text.lastIndex(of: "/") {
             text = String(text[text.index(after: lastSlash)...])
         }
-        if kind == .encoded {
+        if kind == .encoded || kind == .angleBracketed {
             for separator in ["?", "#"] {
                 if let cut = text.firstIndex(of: Character(separator)) {
                     text = String(text[..<cut])

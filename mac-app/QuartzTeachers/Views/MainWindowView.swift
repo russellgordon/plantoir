@@ -30,12 +30,13 @@ struct MainWindowView: View {
                     .controlSize(.small)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .accessibilityIdentifier("restoringFolderPlaceholder")
-            } else if workspace.workspaceURL == nil || workspace.workspaceProblem != nil || workspace.workspaceCanBeInitialized || workspace.workspaceIsUnrecognized || workspace.needsCloudSyncDecision {
+            } else if workspace.isShowingPicker {
                 WorkspacePickerView()
             } else {
                 NavigationSplitView {
+                    // At most 320 wide (#213): see `WindowChrome.sidebarMaximumWidth`.
                     SidebarView()
-                        .navigationSplitViewColumnWidth(min: 180, ideal: 220)
+                        .plantoirSidebarColumnWidth()
                 } detail: {
                     // The path bar sits under the content, spanning the
                     // detail column, exactly where Finder puts its own.
@@ -57,6 +58,10 @@ struct MainWindowView: View {
         .sheet(isPresented: $workspace.isShowingNewCourseWizard) {
             NewCourseWizardView()
         }
+        // A chosen folder the website builder cannot reach, refused while
+        // this window goes on showing its own folder (#290): said over the
+        // folder the teacher is still in, which stays exactly as it was.
+        .modifier(RefusedFolderAlert())
         .fileImporter(
             isPresented: $workspace.isChoosingWorkspace,
             allowedContentTypes: [.folder]
@@ -153,21 +158,24 @@ struct MainWindowView: View {
                 ContentUnavailableView {
                     Label(item.title, systemImage: item.symbolName)
                 } description: {
-                    Text("\(item.subtitle). A saved copy of \(item.courseCode) — restore it to put the course back the way it was then. \(item.keptDescription) You can delete any of them yourself.")
+                    Text("\(item.subtitle)\(backupSizeClause(for: item)). A saved copy of \(item.courseCode) — restore it to put the course back the way it was then. \(item.keptDescription) You can delete any of them yourself.")
                 } actions: {
                     Button("Restore…") {
                         workspace.backupRestoreRequest = item
                     }
                     .buttonStyle(.borderedProminent)
+                    .disabled(workspace.isBeingCopied(item.courseCode))
                     .accessibilityIdentifier("restoreBackupButton")
                     Button("Delete Backup…") {
-                        workspace.backupDeleteRequest = item
+                        workspace.requestDeleteBackup(item)
                     }
                     .accessibilityIdentifier("deleteBackupButton")
                 }
             } else {
                 missingSelectionView
             }
+        case .allBackups:
+            AllBackupsView()
         case nil:
             // Telling someone to choose from an empty list is a dead end.
             if workspace.courses.isEmpty {
@@ -190,6 +198,14 @@ struct MainWindowView: View {
                 )
             }
         }
+    }
+
+    /// " · 15.9 MB" once a backup has been measured, and nothing before.
+    func backupSizeClause(for item: BackupItem) -> String {
+        guard let size = workspace.sizeDescription(of: item) else {
+            return ""
+        }
+        return " · " + size
     }
 
     var missingSelectionView: some View {
@@ -227,5 +243,50 @@ struct MainWindowView: View {
             }
         }
         return nil
+    }
+}
+
+/// The alert for a chosen folder that was refused while the window kept its
+/// own folder (#290). A modifier of its own to keep `body` within what the
+/// type-checker takes in one go.
+struct RefusedFolderAlert: ViewModifier {
+
+    // MARK: - Stored properties
+
+    @Environment(WorkspaceModel.self) var workspace
+
+    // MARK: - Computed properties
+
+    var isPresented: Binding<Bool> {
+        return Binding<Bool>(
+            get: {
+                return workspace.folderNotOpened?.isShownAsAlert == true
+            },
+            set: { newValue in
+                if !newValue && workspace.folderNotOpened?.isShownAsAlert == true {
+                    workspace.folderNotOpened = nil
+                }
+            }
+        )
+    }
+
+    // MARK: - Functions
+
+    func body(content: Content) -> some View {
+        content
+            .alert(
+                workspace.folderNotOpened?.headline ?? "",
+                isPresented: isPresented
+            ) {
+                Button(CloudSyncWording.chooseDifferentFolderButton) {
+                    workspace.folderNotOpened = nil
+                    workspace.isChoosingWorkspace = true
+                }
+                Button(WorkingFolderReachWording.alertOKButton, role: .cancel) {
+                    workspace.folderNotOpened = nil
+                }
+            } message: {
+                Text(workspace.folderNotOpened?.detail ?? "")
+            }
     }
 }

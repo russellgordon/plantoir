@@ -215,7 +215,7 @@ final class SectionTimetableTests: XCTestCase {
     /// the app: back the course up, lose the folder, restore, and the class
     /// dates are still there.
     @MainActor
-    func testTheTimetableTravelsThroughBackupAndRestore() throws {
+    func testTheTimetableTravelsThroughBackupAndRestore() async throws {
         let (root, coursesURL, course) = try makeWorkspace()
         defer { try? FileManager.default.removeItem(at: root) }
 
@@ -224,7 +224,7 @@ final class SectionTimetableTests: XCTestCase {
         )
         try SectionTimetableStore.applyRememberTimetable(plan)
 
-        let backupURL: URL = try CourseArchiver.backUpCourse(course, coursesDirectoryURL: coursesURL)
+        let backupURL: URL = try await CourseArchiver.backUpCourse(course, coursesDirectoryURL: coursesURL)
 
         // The teacher wipes the remembered dates — or moves machines, or an
         // Obsidian sync eats the hidden folder.

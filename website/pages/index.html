@@ -19,32 +19,10 @@ body_class: home
 <section>
   <h2>Download</h2>
   <div class="downloads">
-    <!-- releases/latest/download/ is EVERGREEN: GitHub serves the newest
-         release's asset as long as the asset NAME stays stable. Never rename
-         an asset without updating these hrefs (and vice versa) — the names
-         are pinned in RELEASING.md.
-
-         BOTH cards are evergreen again as of 2026-08-20, when the macOS DMG
-         joined v1.1.0. The macOS card had been PINNED to v1.0.0 while that
-         release carried no DMG, because the evergreen URL 404s for a platform
-         whose asset is missing from the newest release. If a platform ever
-         lags a tag again: pin its card to the last release that HAS the
-         asset, say so on the card, and un-pin it the moment the platform
-         catches up — see RELEASING.md, "Two platforms, one version series".
-
-         The WINDOWS card is PINNED to v1.1.0 as of 2026-09-19: v1.2.0 went up
-         carrying the macOS DMG only, so the evergreen URL would 404 for
-         PlantoirSetup.exe. When the Windows installer joins v1.2.0, put this
-         card back on releases/latest/download/ and delete "version 1.1.0"
-         from its meta line. -->
-    <a class="dl" href="{{repo_url}}/releases/latest/download/Plantoir-macOS.dmg">
-      <span class="platform">macOS</span>
-      <span class="meta">macOS 15 or later, Apple silicon</span>
-    </a>
-    <a class="dl" href="{{repo_url}}/releases/download/v1.1.0/PlantoirSetup.exe">
-      <span class="platform">Windows</span>
-      <span class="meta">Windows 10 or 11, 64-bit &middot; version 1.1.0</span>
-    </a>
+    <!-- The cards come from site.json -> downloads, including which one is
+         PINNED to an older release and why: see website/README.md,
+         "Download cards". -->
+{{download_cards}}
   </div>
   <!-- AUTO-UPDATED when a release is cut: the version and date come from
        website/site.json, which the cut-release skill rewrites. -->
@@ -75,6 +53,13 @@ body_class: home
 <hr class="rule">
 
 <section>
+  <h2>New this year</h2>
+  {{new_in}}
+</section>
+
+<hr class="rule">
+
+<section>
   <h2>What students see</h2>
   <p>Quick, searchable, and readable using a laptop or a phone.</p>
   <p>Mathematics is typeset properly. Diagrams are drawn from your notes rather than pasted in as pictures. Every page can link to every other.</p>
@@ -88,6 +73,7 @@ body_class: home
   <p>Every course has curriculum expectations to cover, and tracking which ones you have addressed takes ongoing planning.</p>
   <p>Plantoir answers that from the material itself. Tag a lesson with the expectations it addresses, and each build draws a map of the whole course — every expectation shaded by how many pages reach it.</p>
   {{shot:coverage}}
+  <p>A course that answers to two curricula — the Ontario expectations and an AP framework, say — gets a map for each.</p>
   <p>Because it's built from your own pages each time the site is built, it can't drift from the course the way a planning spreadsheet does. Useful throughout the school year, and ready whenever a department head or principal asks.</p>
 </section>
 

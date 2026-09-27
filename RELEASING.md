@@ -3,8 +3,11 @@
 **One product, one version series, one GitHub release carrying both platforms'
 assets.** The product version lives in ONE place — `<Version>` in
 `windows-app/Plantoir/Plantoir.csproj` — and `MARKETING_VERSION` in
-`mac-app/project.yml` must say the same number. The About panels read them and
-the git tag must match.
+`mac-app/project.yml` must say the same number once both platforms have
+shipped it. The About panels read them, and every platform whose asset a cut
+attaches must match the tag; a platform that ships nothing in a cut keeps its
+lower number until it passes that version's contracts ("Two platforms, one
+version series", below).
 
 > **Which repository?** plantoir.app's download links resolve against
 > `github.com/russellgordon/plantoir`, which matches `origin`. Pass
@@ -41,6 +44,8 @@ sentences and rules regardless of their OS. Three consequences:
   old version from a button that looks perfectly healthy, which is why the
   un-pinning is the half that gets forgotten. Done first for v1.1.0
   (Windows only), 2026-08-20; the procedure is in the `cut-release` skill.
+  Since v1.4.0 the pin is DATA — `website/site.json` → `downloads[].pinned`
+  — not an edited link in `index.html`.
 - **"No code changes" does not exempt a platform from the gate.** A mac DMG
   gets the 1.1.0 label only when a mac session has made its suite green
   against the 1.1.0 contracts. An unchanged binary re-badged with a new
@@ -105,8 +110,71 @@ whether a teacher will notice, and whether both platforms have it.
 **Clear this list when the tag goes up**, in the same commit that moves the
 version line. A list that survives its own release is worse than no list.
 
+Filled 2026-09-27 for v1.4.0 from `GUI-IMPROVEMENTS.md` rows 539–605 (every
+row since the v1.3.1 cut) and the closed v1.4.0 milestone — one line per piece.
+
+**What a teacher notices** (macOS; the Windows installer is not part of
+v1.4.0 — its half of each is tracked on the milestone "Windows: parity with
+mac v1.4.0"). "Shared toolchain" marks a change in the shared scripts, which a
+Windows teacher gets with the next Windows release.
+
 | Landed | What a teacher sees | Platforms | Log |
 |---|---|---|---|
+| 2026-09-25 | Plantoir finds its own new versions, asks first, and never installs while it is working (#204). | macOS | 581 |
+| 2026-09-26 | The first course on a new Mac no longer waits minutes for downloads: the app carries its website builder's helpers (#312). | macOS | 600 |
+| 2026-09-27 | A smaller first build of the website builder, which is got ready in the background at first launch (#334). | macOS | 604 |
+| 2026-09-26 | "Get Ready for the Start of the Year…" puts every class after the first into draft, previewed and undoable (#96). | macOS | 599 |
+| 2026-09-26 | A How I Teach page per course that Claude and Codex read, with a Course Settings row to open or create it (#209, #329). | macOS | 587, 605 |
+| 2026-09-26 | A course with two curriculum folders gets two coverage maps, and College Board codes count (#128). | macOS; shared toolchain | 590 |
+| 2026-09-24 | "This is a club" in the New Course wizard: weekly pages, a club front page, "meeting" in the assistant (#267, #268). | macOS | 541–543 |
+| 2026-09-24 | Ready-made example content for TAS2O (#270, #271). | shared toolchain | — |
+| 2026-09-24 | Every folder and file list in Course Settings and the wizard is a table with checkboxes (#266). | macOS | 539 |
+| 2026-09-24 | "Hide from the site's sidebar" and the built sidebar agree, across two windows and a running preview (#265). | macOS | 540 |
+| 2026-09-26 | Plantoir reopens on the last working folder, and refuses one the website builder cannot reach (#311, #290). | macOS | 579 |
+| 2026-09-25 | A publish set for later says how it went in a notification, even with Plantoir closed (#212); clicking it opens the section (#306). | macOS | 569, 580 |
+| 2026-09-25 | Two working folders holding the same course each keep their own scheduled publish (#237). | macOS | 573 |
+| 2026-09-26 | A scheduled publish goes where the course publishes when it runs, and every publish uses the settings as SAVED (#323, #335). | macOS | 592, 603 |
+| 2026-09-26 | The assistant reads a course's settings when it acts, not when its window opened (#322). | macOS | 589 |
+| 2026-09-25 | A scheduled publish whose build failed no longer names a destination nobody reached (#137). | macOS | 560 |
+| 2026-09-25 | "Deploy at 6:30" and other times it cannot place are asked about instead of deploying now (#194, #277). | macOS | 548, 554 |
+| 2026-09-25 | "What does Unit 2, Day 3 link to?" is answered straight from the page (#167). | macOS | 567 |
+| 2026-09-26 | "Publish all of those" asks which pages; "Publish all the classes in Unit 2." publishes the unit (#197, #114). | macOS | 597 |
+| 2026-09-26 | Duplicating a class that moves others warns on its card that Undo will not take it back (#185, #174, #147). | macOS | 591 |
+| 2026-09-26 | Unpublishing a class no longer hides another class it links to (#201). | macOS | 588 |
+| 2026-09-26 | Publishing follows links written with an escaped pipe, in angle brackets or Markdown style, and never a link inside code or a `%%` comment (#294, #314, #326, #97, #325, #313, #331). | macOS; shared toolchain | 577, 582, 584, 586, 604 |
+| 2026-09-27 | The build warns when a published class links to pages students cannot see yet (#333). | shared toolchain | 604 |
+| 2026-09-25 | The front page and every page a class links to carry their class's date (#275, #276). | macOS; shared toolchain | 549 |
+| 2026-09-25 | A page whose settings the build cannot read is hidden and named, instead of published or stopping the build (#246). | shared toolchain | 563 |
+| 2026-09-25 | Pages with unusually written settings are no longer read as hidden, broken by a restore, or skipped (#188, #182, #186); moving or renaming a class leaves no half-date behind (#199). | macOS; shared toolchain | 571, 547 |
+| 2026-09-25 | Adding a section no longer publishes a page the teacher hid (#175). | macOS | 546 |
+| 2026-09-25 | The Backups list says what each backup takes, and several can be deleted at once (#242). | macOS | 550 |
+| 2026-09-26 | Approving an assistant change no longer freezes the window while the course is backed up (#351). | macOS | 605 |
+| 2026-09-26 | Marks-pool and exclusion edges settled; a course from example content records which folders count for marks; a setup re-run keeps the pool (#152, #292, #192). | macOS; shared toolchain | 593, 576, 556 |
+| 2026-09-25 | Preview: the address is never lost, a Mac that cannot reach the builder stops in seconds, a folder finds room for its previews, and two accounts on one Mac no longer see each other's (#235, #234, #280, #310). | macOS | 545, 559, 552, 578 |
+| 2026-09-25 | Remaking a folder's website builder waits for a build or publish, and refuses while a preview is open (#94). | macOS | 572 |
+| 2026-09-25 | The window, the assistant, a scheduled publish and an outside assistant never build one course at once (#156). | macOS | 553 |
+| 2026-09-25 | A publish to a folder lands where it says, or says it did not (#227); Cancel during a publish ends quietly (#259). | macOS; shared toolchain | 566, 544 |
+| 2026-09-25 | A site is recognised as a preview's by any page, and a page merely mentioning `ws://localhost:` is not (#136, #291). | shared toolchain | 558, 585 |
+| 2026-09-25 | Folder problems tell the truth, and the first-run lines say "your website builder" (#153, #263). | macOS | 562, 557 |
+| 2026-09-25 | Reference copies and imports leave a course's Obsidian add-ons behind (#255). | macOS | 561 |
+| 2026-09-25 | One working folder, one spelling: an accented or re-cased path no longer gets a second website builder (#189). | macOS | 570 |
+| 2026-09-25 | A course cannot be called "work" (#101); the path under a chosen folder names every folder (#295). | macOS | 568, 564 |
+| 2026-09-26 | One unreadable character no longer empties the problem report (#301). | macOS | 575 |
+| 2026-09-26 | Wording: skeleton pages no longer say "{subject}", the skeleton toggle says "an English skeleton", the wizard's unit row loses a stray "Unit", and the folder note keeps its lines (#328, #336, #354, #213). | macOS; shared toolchain | 594, 595, 605 |
+| 2026-09-26 | Four ready-made curriculum explainers no longer link to pages a skeleton course lacks (#253). | shared toolchain | 585 |
+
+**Under the hood** (nothing a teacher sees; listed so the notes can leave
+them out on purpose):
+
+| Landed | What changed | Platforms | Log |
+|---|---|---|---|
+| 2026-09-25 | The activity trail keeps every line when several programs write at once (#238); import refusals and lease edges are recorded (#287, #245). | macOS | 565, 555, 551 |
+| 2026-09-26 | Every `plan_` tool proved on a happy path; `add_curriculum_mentions` is gated by plan mode (#150, #327). | macOS | 596 |
+| 2026-09-26 | The folder-removal order is pinned by tests (#183); the wizard's blocked-removal trail line names its course (#171, #139). | macOS | 574, 602 |
+| 2026-09-26 | UI tests keep their state in their own folder, and skip rather than fail on a locked or hidden screen (#154, #249, #315). | macOS | 601 |
+| 2026-09-25 | Test and gate fixes: #243, #264, #273, #293, #341, #353. | macOS; toolchain | — |
+| 2026-09-26 | plantoir.app rewritten for v1.4.0, with a scene for every new picture (website half A). | website | 598 |
+| 2026-09-26 | documentation/03's Windows docker path corrected (#229). | docs | — |
 
 ## Warnings the release notes MUST carry
 
@@ -120,6 +188,19 @@ commit that moves the version line.
 
 | Added | The warning | Why it cannot be left out |
 |---|---|---|
+| 2026-09-27 | **The Mac download is now about 410 MB** (it was about 60 MB), because Plantoir carries its own copies of the helper programs it used to download the first time it ran. | A teacher on a school connection sees a download seven times the size they remember and may think it is the wrong file. The first run is faster for it (#312). 410,488,446 bytes at the #312 rehearsal; no v1.4.0 candidate DMG existed on 2026-09-27, so **re-measure the signed DMG at the cut** and write that number. |
+| 2026-09-27 | **This is the last release you install by hand.** From v1.4.0, Plantoir on the Mac checks for new versions itself and asks before installing one. | Teachers on v1.3.1 or earlier have no updater, so this release reaches them only if they download it; the next one reaches them only if they have this one (#204). |
+| 2026-09-27 | **A publish you scheduled before updating still happens as set**, and keeps its old name until it runs. | It is shown, cancelled and run as before, but under its old name; rescheduling it in its own folder retires the old one (#237; `shared-rules.json` → `scheduledDeployCancellation.theDestination.setBeforeTheUpdate`). A teacher who sees an unfamiliar-looking entry should not think the update broke it. |
+
+**`--required-warning` for v1.4.0: do NOT pass it**, although the table above
+has rows — the one exception to "The update feed (macOS)"'s rule, and why:
+all three warnings are for a teacher installing v1.4.0 BY HAND, from the
+release notes and the download page. No installed Plantoir has an updater
+below v1.4.0, so no update window will ever offer this release, and the flag
+would be inert (`update_feed.critical_version` would mark it critical from
+every version, for no app that can read the feed) while leaving v1.4.0 marked
+important in `macos-notes.html` for good. From v1.4.1 on, the rule applies
+as written.
 
 ## The short version
 
@@ -131,17 +212,38 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    gaps, and step 2 says what to check in it. Then **actually publish a
    section from an app** — see step 2 for why that is not optional.
 2. **Check the version** in `windows-app/Plantoir/Plantoir.csproj` and
-   `mac-app/project.yml`; they must match each other and the tag you are about
-   to cut.
+   `mac-app/project.yml`: **every platform whose asset this cut attaches must
+   read the tag's number**, set BEFORE its bundle is built; a platform that
+   ships nothing in this cut keeps its lower number (see "Two platforms, one
+   version series" above, and the `cut-release` skill's step 5). For v1.4.0,
+   a mac-only cut: `MARKETING_VERSION` goes to 1.4.0 before `publish.sh
+   -Sign`, and the csproj stays at 1.1.0.
 3. **Build the signed Windows bundle**: `az login`, then
    `cd windows-app; powershell -File publish.ps1 -Sign`. It fails fast with the
    remedy if anything is missing. Output lands in `windows-app\dist\PlantoirSetup.exe`
    (and `Plantoir-win-x64.zip`).
 4. **Build the signed & notarized macOS bundle**:
    `cd mac-app; ./publish.sh -Sign`. Output lands in `mac-app/dist/Plantoir-macOS.dmg`.
+   Since #204 it also signs the updater inside the app item by item and REFUSES
+   a bundle whose updater is not on the app's own team, before notarization.
+   Since #312 it also fetches and signs the website builder's helper programs
+   (Vendor/fetch-helpers.sh, release/sign-helpers.sh), and the DMG is about
+   **410 MB** (ULMO; 410,488,446 bytes at the #312 rehearsal) rather than 59 MB — the notarization upload takes
+   correspondingly longer ("The update feed (macOS)" → "Deltas" for why
+   updates stay small).
+4a. **Take the marketing screenshots, BEFORE anything is published**: the
+   `marketing-screenshots` skill (`python3 website/shots/capture.py --scenes`,
+   both colour schemes) against the build being released; commit the images;
+   `python3 website/build.py --check` clean with no awaiting-capture note
+   other than one "waiting on #<n>" (a shot shipped without its picture by
+   decision, `waiting_on` in shots.json — read that issue first).
+   `build.py --deploy` refuses without them, and it runs AFTER the release is
+   public — checklist step 4a says what that would leave behind.
 5. **Tell Claude "cut the release."** It drafts teacher-friendly notes, adds the
    SHA-256 table, creates the GitHub Draft Release, uploads the assets, publishes
-   the release, updates the site's version line, redraws the brand images, and pushes to `main`.
+   the release, **builds and signs the mac's update feed from the exact DMG it
+   uploaded** (only after the release is public — "The update feed (macOS)"
+   below), updates the site's version line, redraws the brand images, and pushes to `main`.
 
 ## The checklist, with the reasons
 
@@ -174,8 +276,9 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > inside the app, and the xUnit suite deliberately never touches Docker — so
    > a green test run says nothing about the thing teachers actually run.
    > `verify.sh`, the real toolchain gate, is bash and expects `docker` on
-   > `PATH`, which does not hold on Windows where Docker Engine lives in WSL2.
-   > **On Windows the hand smoke is the only DOCKER verification there is.**
+   > `PATH`, which does not hold on Windows, where there is no Docker at all
+   > since 2026-08-19. **On Windows the hand smoke is the only check of the
+   > bundled runtime there is.**
    > (It is no longer the only toolchain verification: since 2026-09-07
    > `PythonToolchainTests` runs EVERY shared `scripts/test_*.py` file inside
    > `dotnet test` — the same files `verify.sh` runs on the mac, which nothing
@@ -233,11 +336,51 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    - Developer ID Application certificate installed in Keychain Access
    - Credentials stored in notarytool: `xcrun notarytool store-credentials "notarytool-profile" --apple-id <email> --team-id <team-id> --password <app-specific-password>`
 
-   The script builds Release, signs dylibs and executables bottom-up with Hardened Runtime,
+   The script builds Release, checks the BUILT bundle's update keys
+   (`release/check-update-keys.sh`: the feed, the public key, ask-first), signs
+   the updater's own code item by item (`release/sign-updater.sh`: Autoupdate,
+   Updater.app, the framework last — never `--deep`, never the app's
+   entitlements), then dylibs and executables bottom-up with Hardened Runtime,
+   then the app; refuses unless every updater item and the app are on the
+   app's own team with the runtime (`release/check-signatures.sh` —
+   `codesign --verify --deep --strict` cannot see a helper left ad-hoc); then
    creates a drag-and-drop DMG, signs the DMG, notarizes with Apple, staples the ticket,
    and verifies Gatekeeper acceptance.
 
+   **Before the first `-Sign` of a cut, run the two release test files** —
+   `python3 mac-app/release/test_release_signing.py` and
+   `python3 website/test_update_feed.py`. Both are macOS-only, sign only
+   ad-hoc or with a throwaway key, and are in no suite. The positive half of
+   the team check (a Developer ID bundle passing) is not provable ad-hoc; the
+   dress rehearsal below measured it once.
+
+   **Do not rebuild, re-sign or re-staple the DMG after this step** — the
+   update feed is signed against its exact bytes (publish.sh says so too).
+
    Output: **`mac-app/dist/Plantoir-macOS.dmg`** + SHA-256.
+
+4a. **Marketing screenshots — before the tag, not after.** `python3
+   website/build.py --deploy` (step 6) refuses while any `website/shots.json`
+   entry marked `awaiting_capture` lacks `site/img/<id>-light.png` or
+   `-dark.png` (`release_readiness_refusal`). Step 6 runs after the release
+   is public and the mac's update feed is built, so a refusal there leaves a
+   published release, a feed that is not live, and a site still offering the
+   old version. Before step 5: run the `marketing-screenshots` skill
+   (`python3 website/shots/capture.py --scenes`, which takes every scene in
+   BOTH colour schemes) against the build being released; commit the
+   promoted images and bring them to `main` with everything else (CLAUDE.md
+   rule 6); run `python3 website/build.py --check` and read its output for
+   any awaiting-capture note — there must be none, except one ending
+   "waiting on #<n>", which marks a shot `waiting_on` an issue and is let
+   through by `--deploy` (read the issue: v1.4.0 shipped with #367 open for
+   schedule and how-i-teach); and dry-run the refusal
+   with the new version, from `website/`: `python3 -c 'import json,build;
+   s=json.load(open("site.json")); s["version"]="<version>";
+   print(build.release_readiness_refusal(s, json.load(open("shots.json"))))'`
+   must print `None`. On 2026-09-27 it named eight shots (schedule,
+   reference, start-of-year, two-maps, curriculum-settings, both-curricula,
+   how-i-teach, club). `website/README.md` → "Until the release it
+   photographs exists" has the rule from the site's side.
 
 5. **Tag and release** — ask Claude to "cut the release". Since the branch
    model arrived (CLAUDE.md rule 6), a release starts by merging `dev` into
@@ -278,6 +421,169 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    from the `containerized-quartz-netlify` Keychain item, the site id from
    `website/site.json`). The Netlify site is NOT connected to GitHub —
    pushing this repository deploys nothing, which is why this step exists.
+
+## The update feed (macOS)
+
+Since #204 a released Plantoir on a Mac asks
+`https://plantoir.app/updates/macos.xml` once a day for a new version. The
+rules a teacher is promised are `contracts/shared-rules.json` → `appUpdates`;
+the app's side is `documentation/09-mac-app.md` → "Updating itself". This is
+the release side.
+
+- **Where it lives:** `website/updates/macos.xml`, committed, copied into
+  `site/updates/` byte for byte by `website/build.py`. One file per platform
+  (Windows adds `updates/windows.xml` with NetSparkleUpdater, and its own
+  `.signature` file), never a GitHub release asset — `releases/latest/download`
+  404s whenever a platform lags.
+- **Signed with the `plantoir-macos` key**, the feed AND each download. The key
+  lives in this Mac's Keychain (backed up in Russell's Passwords app); Sparkle's
+  `generate_appcast` and `sign_update` read it — the Keychain asks, once for each
+  tool (so twice a cut) — answer **Allow**, not "Always Allow" — and nothing prints it. The public half is `SUPublicEDKey` in
+  `mac-app/project.yml`. A re-serialised feed breaks its signature, and the app
+  then refuses it: silently on the daily check.
+- **Built only at a cut, from the EXACT DMG uploaded, and only AFTER the
+  release is published** — `python3 website/update_feed.py macos --version <v>
+  --dmg mac-app/dist/Plantoir-macOS.dmg --notes <approved notes>
+  [--required-warning]`. It refuses a DMG of another version, prepends this
+  release's notes to the cumulative `website/updates/macos-notes.html`, signs,
+  verifies, and checks the new item points at `…/releases/download/v<v>/
+  Plantoir-macOS.dmg` with the DMG's length. **Order is load-bearing**: a feed
+  deployed before its download exists offers every teacher an update that 404s.
+- **Deltas, since #312 — which REVERSED #204's decision.** #204 rejected
+  deltas (`--maximum-deltas 0`) "to save part of a ~59 MB download once a
+  release"; since #312 the DMG carries the website builder's helper programs
+  and starting disk and is ~410 MB, so without deltas every update would be a
+  410 MB download, which defeats the reason the payload was allowed into the
+  app at all (Russell's decision on #312 relies on it). Measured with Sparkle
+  2.9.6's `BinaryDelta`: between the two signed #312 rehearsal builds (one
+  Swift string apart, every helper re-signed) the delta was **106,054 bytes**,
+  and applied, gave build 2 byte for byte; between v1.3.1 and #204's
+  rehearsal build it was ~3.7 MB with or without the 467 MB payload inside both apps (3,658,602 B without, 3,658,626
+  B with; 3,733,870 B with the four programs' signatures changed). So
+  `update_feed.py` now asks for deltas from the **three newest builds in the
+  feed** — not the newest three tags: releases before Sparkle and Windows-only
+  tags are not in the feed, and no app older than the feed can ask for a
+  delta. What that costs at the cut:
+  - **Each earlier DMG is downloaded** from the address its own feed item
+    gives — the exact bytes teachers installed, so no copy needs keeping — and
+    checked for length and build: up to 3 × ~410 MB, plus
+    `~/Library/Caches/Sparkle_generate_appcast`, which can grow to a few GB and
+    may be emptied afterwards.
+  - **Each `.delta` lands beside the DMG** (`mac-app/dist/Plantoir<new>-<old>.delta`)
+    and **must be uploaded to the SAME release** as the DMG, BEFORE the feed is
+    deployed. `build.py --deploy`'s live check follows every delta the newest
+    item offers and prints ❌ for a missing one — AFTER the deploy
+    (`update_feeds.verify_live`), so it reports rather than refuses: upload
+    first, and read that line. Sparkle would fall back to the full download
+    without a word.
+  - `generate_appcast` rewrites the item of every archive it is given —
+    measured: the earlier item's download moved to the NEW release and lost
+    its notes, even with `--versions` — so `update_feed.py` puts every earlier
+    item back exactly as it was, signs the feed again with the same key (the
+    Keychain asks once more), and refuses the cut if any earlier item is
+    missing or still differs. `--maximum-versions 0` keeps every release in
+    the feed: generate_appcast's default keeps three and dropped the oldest
+    from the fourth cut on (measured by the implementation review).
+  - **v1.4.0, the first release with Sparkle, has no deltas**: nothing before
+    it is in the feed. Its teachers download the whole DMG once, by hand; the
+    saving starts with the release after it.
+- **A REQUIRED warning makes the release important.** Pass `--required-warning`
+  when "Warnings the release notes MUST carry" has a row for this release: the
+  update window then has no Skip and no Remind Me Later, and the notes carry
+  every release newer than the teacher's own, so skipping a release never
+  loses its warning. A later release keeps the earlier one important for
+  teachers still below it, by itself.
+- **A Windows-only cut leaves `macos.xml` alone**, and so does any cut that
+  attaches no mac DMG. `build.py --deploy` refuses when the feed's newest
+  version is not `MARKETING_VERSION` — after a mac cut the two agree, and a
+  Windows-only cut moves neither.
+- **After deploying**, `--deploy` (and `--verify-deploy`) fetch the live feed,
+  compare its SHA-256 with `site/`, and follow its newest download to a 200 of
+  the right length. **Do not report a mac release complete until that line is ✅.**
+- **A release that publishes a DMG without updating the feed ships an update
+  nobody is offered.** Teachers on v1.3.1 or earlier — the last release without an updater — have no updater at all and
+  install the first release that carries one by hand.
+
+## The dress rehearsal (#204 — once, before the first release with an updater)
+
+Two real, signed builds, one updating to the other, in a **throwaway STANDARD
+(non-admin) macOS account** that Russell creates for it and deletes after —
+so nothing touches his own defaults, window state, working folders or activity
+log (the plan review's H2), and so the administrator-password path a school
+Mac meets is measured rather than read from source. Tags: **[LOCAL]** nothing
+leaves the Mac · **[IDENTITY]** Russell's Developer ID, notarytool or the
+`plantoir-macos` key — his word first · **[OUTWARD]** public — his word first,
+at that moment.
+
+**Russell's own `/Applications/Plantoir.app` is NEVER touched** (the slice-2
+review's H1). The rehearsal builds are installed into their own folder,
+`/Applications/Plantoir Rehearsal/`, made with `sudo` so it is root-owned: a
+standard account cannot write it, which is exactly what makes the updater ask
+for an administrator — the case being measured — while his app stays where it
+is. Installing over `/Applications/Plantoir.app` instead would put an
+issue-branch build, with the same bundle identifier, in the path everything in
+HIS account opens (Launchpad, Spotlight, any scheduled publish set from it)
+until the cleanup, and the cleanup would then leave him with no Plantoir at
+all. The builds keep the real bundle identifier on purpose: the updater keys
+on it, and what is rehearsed must be what ships. The rehearsal version string
+and the `…-REHEARSAL.dmg` name already say what they are.
+
+**The standard account's first run is a real first run** (the slice-2
+review's M2): it has none of this Mac's tools, its own Colima virtual machine
+and its own image, and it downloads and builds all of them the first time a
+preview is asked for — plan on several minutes, most of it waiting. What was
+measured on this Mac, 2026-09-25: the image built with no layer cache in 60.6
+seconds (`./verify.sh --no-cache`, 45 steps, the base image already present —
+a new account's VM also has to download that base image, which was NOT
+measured); `colima start` on a first run takes about 40 seconds
+(`documentation/09-mac-app.md`). The tool download was not measured here,
+where the tools come from Homebrew. Start the first preview before anything
+else in the account, and time it: that number belongs in this paragraph. Its virtual machine sees only its own
+containers, and Russell's containers hold their host ports whether or not a
+preview is open (measured 2026-09-25: ten `teaching-quartz-*` containers on
+8101–8254). The rehearsal's daemon cannot see them, so it may pick a block he
+holds — and then `localhost:<port>` in the rehearsal browser answers from HIS
+container, showing his real course. So R0 records his ports and V2 checks the
+preview shows EXC2O; quitting Plantoir in his account releases its containers
+if he prefers (Colima itself is never stopped — CLAUDE.md rule 7).
+
+**The rehearsal build is reachable from Russell's account until C2**, because
+`/Applications` is shared by every account: Spotlight and Launchpad list two
+"Plantoir"s, and a launch by bundle identifier — clicking a scheduled
+publish's notification while Plantoir is closed, say — can open the rehearsal
+copy, whose build number is higher. An accidental launch would run an
+issue-branch build against his real folders and, since it has an updater,
+write `SU…` keys into his real defaults. So from R6 to C2 **Russell opens
+Plantoir only from his Dock**, and R0/C3 record and re-check his defaults and
+Spotlight's list.
+
+| Step | Tag | What |
+|---|---|---|
+| R0 | LOCAL | Record Russell's app: `defaults read /Applications/Plantoir.app/Contents/Info.plist CFBundleShortVersionString` and `CFBundleVersion`, and `codesign -dvvv /Applications/Plantoir.app 2>&1 \| grep CDHash=` — written down, for C3. Also written down: `defaults read ca.russellgordon.Plantoir 2>/dev/null \| grep -c '"\?SU'` (0 on 1.3.1, which has no updater), `mdfind "kMDItemCFBundleIdentifier == 'ca.russellgordon.Plantoir'"` (his copies today), and `DOCKER_HOST=unix://$HOME/.colima/default/docker.sock docker ps --format '{{.Names}} {{.Ports}}'` (the ports his containers hold). Russell creates a standard account of his choosing and writes its short name down here as `<account>` (this run: `plantoir`); C2 and C3 use that name. |
+| R1 | IDENTITY | In Russell's account, on the issue branch: `./publish.sh -Sign --rehearsal-feed https://plantoir.app/updates/rehearsal-204/macos.xml` → build **A** (version `<v>-rehearsal.<build>`, `dist/Plantoir-macOS-REHEARSAL.dmg`; keep a copy as A). Record build, size, SHA-256, the notarization id. **The positive team check, and must-fail (b):** the run passing `check-signatures.sh` is the first. Then, BEFORE R2 (whose `publish.sh` run `rm -rf`s `mac-app/build/`): `ditto mac-app/build/Plantoir.app /tmp/r1b/Plantoir.app`, and with `ID` the identity publish.sh printed: `codesign --force --sign - --options runtime /tmp/r1b/Plantoir.app/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate`; `codesign --force --timestamp --options runtime --sign "$ID" /tmp/r1b/Plantoir.app/Contents/Frameworks/Sparkle.framework`; `codesign --force --timestamp --options runtime --entitlements mac-app/QuartzTeachers/QuartzTeachers.entitlements --sign "$ID" /tmp/r1b/Plantoir.app`; then `mac-app/release/check-signatures.sh /tmp/r1b/Plantoir.app` must exit 1 naming `Autoupdate` twice (WRONG TEAM and NO SECURE TIMESTAMP) and nothing else. Delete `/tmp/r1b` after. |
+| R2 | IDENTITY | One commit later, build **B** the same way. Then `rm -rf mac-app/build` so no Release build is left registered with Launch Services in his account. |
+| R3 | IDENTITY | Twice, A first then B: `python3 website/update_feed.py macos --version <A's or B's own version, the "-rehearsal.<build>" string> --dmg <that DMG> --notes <a short notes file> --rehearsal website/updates/rehearsal-204/macos.xml --download-prefix https://github.com/russellgordon/plantoir/releases/download/v<v>-rehearsal-204/` — B's run with `--required-warning` and a fake warning in its notes, so the feed holds both items and both sections of notes. `--version` must be the rehearsal string or the DMG is refused as "built before the version was raised" (which here only means the wrong string was typed). Both items name the same download address, and only B is uploaded: harmless, since A is the version installed and never offered. The Keychain asks twice each run — **Allow**, not "Always Allow". Never committed (`.gitignore`). |
+| R4 | OUTWARD | `gh release create v<v>-rehearsal-204 --prerelease --target <the issue branch's commit> -R russellgordon/plantoir` with B's DMG (`Plantoir-macOS-REHEARSAL.dmg`). `--target` keeps the tag off `main`. Then V9. |
+| R5 | OUTWARD | From a worktree at `origin/main`: `python3 website/build.py`, drop the rehearsal feed into `site/updates/rehearsal-204/macos.xml` (not committed), `python3 website/netlify_deploy.py`; `curl` it back, SHA-256 equal. |
+| R6 | LOCAL | Russell, in his account: `sudo mkdir "/Applications/Plantoir Rehearsal"` and `sudo ditto <A>/Plantoir.app "/Applications/Plantoir Rehearsal/Plantoir.app"`. From now until C2, Russell opens Plantoir in his own account only from his Dock — never Spotlight, Launchpad or a notification. Then, logged in as the rehearsal account: open it from THAT path (never by name), let the first run finish (above), and make a scratch working folder `~/rehearsal-work` with the example course (the wizard's EXC2O). |
+| V1 | LOCAL | Check for Updates…: B offered as important — no Skip, no Remind Me Later — B's notes shown and A's hidden (screenshot). Trail: `update found`. |
+| V2 | LOCAL | **The administrator prompt comes at "Install Update"**, while the update is being extracted and before "Ready to Install" (the review's L5; `SPUCoreBasedUpdateDriver.m` :235 → `SPUInstallerDriver.m` :468-484). Press Install Update and **cancel** the prompt → our `needsAdministrator…` notice, trail `update stopped` [4007]. Check again, start a preview BUILD of EXC2O section 1 — confirm the page that appears is EXC2O's, not one of Russell's courses (the port note above) — press Install Update and give the password → Ready to Install → Install and Relaunch while the preview is still building → our held notice naming the preview build; the menu item brings it back; when the preview answers, Plantoir restarts by itself as B. Trail: `update answered`, `update held…`, `update installing … now that it is no longer …`, then `app updated … by its own updater`. |
+| V3 | LOCAL | **Reinstall A** — from Russell's account, with Plantoir quit in the rehearsal account: `sudo rm -rf "/Applications/Plantoir Rehearsal/Plantoir.app"`, then R6's `sudo ditto`, then `codesign --verify --deep --strict` on it and read its version (a `ditto` over B would MERGE, leaving B's files in A and breaking its seal). Schedule EXC2O to a FOLDER destination (nothing public) two minutes ahead; once `pgrep -f run-scheduled-deploy` shows it, Install and Relaunch → held "…on its schedule" → the run finishes → B. While the run posts its notification, `NSWorkspace` running applications does not list it (doc 09 → the Quit-event caution). |
+| V4 | LOCAL | **Reinstall A** — from Russell's account, with Plantoir quit in the rehearsal account: `sudo rm -rf "/Applications/Plantoir Rehearsal/Plantoir.app"`, then R6's `sudo ditto`, then `codesign --verify --deep --strict` on it and read its version (a `ditto` over B would MERGE, leaving B's files in A and breaking its seal). Install Update, and at "Ready to Install" press ⌘Q with nothing running: A quits, B is installed without relaunching. **V4b:** the same while a scheduled run is going — the quit SETS IT ASIDE: A is still A afterwards, the run completes, the trail says `update set aside`, and the next check offers B again. This is the one thing about the stand-down only a real installer can show. |
+| V5 | LOCAL | On installed B: `codesign --verify --deep --strict`; `spctl -a -vv -t exec` (accepted, Notarized Developer ID); no quarantine; `Autoupdate` on the app's team; and, **from Russell's admin account** (`log` refuses some subcommands to a standard one; the unified log is system-wide), `log show --last 15m --predicate 'process == "Autoupdate"'` has no "Skipping atomic rename/swap". |
+| V6 | LOCAL | Run A from its mounted DMG; Check → Sparkle's own "…read-only or a temporary location" window; trail `update stopped` [1003]. |
+| V7 | LOCAL | `".../Plantoir Rehearsal/Plantoir.app/Contents/MacOS/Plantoir" --write-contracts <tmp>` and `--mcp-stdio ~/rehearsal-work` (initialize, close stdin): no `Autoupdate`/`Updater` process, `SULastCheckTime` unchanged. |
+| V8 | LOCAL | The Debug build: `SUFeedURL` empty, no Check for Updates… item. |
+| V9 | LOCAL (read) | After R4: `curl -sI https://github.com/russellgordon/plantoir/releases/latest/download/Plantoir-macOS.dmg` still 302s to the last real release. |
+| V10 | LOCAL | In the rehearsal account: `defaults write ca.russellgordon.Plantoir SUEnableAutomaticChecks -bool false`, delete `SULastCheckTime`, launch A: no check; the menu item still works — the support page's IT opt-out, confirmed. |
+| C1 | OUTWARD | `gh release delete v<v>-rehearsal-204 --cleanup-tag --yes -R russellgordon/plantoir`; on every clone `git tag -d v<v>-rehearsal-204` (a stray tag would make the next cut's `git describe` start from it; `git fetch --prune-tags` alone prunes nothing, and with `--prune` would also delete local-only tags, so it is not used). In R5's worktree: `rm -rf site/updates/rehearsal-204` (`build.py` never clears `site/`), then `python3 website/netlify_deploy.py`, then `git worktree remove` it. |
+| C2 | LOCAL | In the rehearsal account: quit Plantoir (which rests its builder) and **log out**, which stops its virtual machine and its launchd jobs; from Russell's account `pgrep -U <account>` (the name R0 wrote down) must then print nothing. Russell deletes the account in System Settings choosing **"Delete the home folder"** (otherwise its `~/.colima` disk and tools stay in `/Users/Deleted Users`). Then `sudo rm -rf "/Applications/Plantoir Rehearsal"`, both DMGs and the kept copy of A, `website/updates/rehearsal-204/`, and `~/Library/Caches/Sparkle_generate_appcast` in his account. iTerm to the front. |
+| C3 | LOCAL (read) | **The end state, checked rather than asserted:** `git ls-remote --tags origin \| grep rehearsal` is empty; `gh release view v<v>-rehearsal-204 -R russellgordon/plantoir` fails as not found; `curl -sI https://plantoir.app/updates/rehearsal-204/macos.xml` is 404; `id <account>` fails and `dscl . list /Users` has no `<account>` (the name R0 wrote down); `/Users/Deleted Users` has nothing of it; `/Applications/Plantoir Rehearsal` is gone; `mdfind "kMDItemCFBundleIdentifier == 'ca.russellgordon.Plantoir'"` lists no rehearsal path (only what R0 listed); the `SU…` count in his defaults is what R0 wrote down; and **Russell's `/Applications/Plantoir.app` has the version, build and CDHash R0 wrote down.** If any of those differ, do not report the machine as put back — say what differs. |
+
+**What it cannot cover:** Intel Macs (the app is universal, the assistant's
+engine arm64-only — unchanged by #204); a feed signature failure end to end
+(the throwaway-key tamper test in `website/test_update_feed.py`, plus
+Sparkle's own validation, is the evidence).
 
 ## Bundle format
 

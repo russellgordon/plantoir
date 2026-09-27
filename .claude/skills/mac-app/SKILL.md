@@ -249,7 +249,10 @@ Clean when you have changed:
 - **anything inside a FOLDER-REFERENCE resource.** `Vendor/llama` is copied
   as a whole folder (`type: folder`), and Xcode does not notice when its
   CONTENTS change. Re-running `Vendor/fetch-llama.sh` and rebuilding gets you
-  the old binaries.
+  the old binaries. The same holds for `Vendor/helpers` (#312): after
+  `Vendor/fetch-helpers.sh` replaces it, run `xcodegen generate` before
+  building, or the app carries the old programs — and the launchers then
+  REFUSE that copy (its pins are not theirs) and quietly download instead.
 - **bundled toolchain files** the app carries — `../scripts`, `../support`,
   `../patches`, `../Dockerfile`, the launchers in all three forms (`../*.sh`,
   `../*.bat`, `../*.ps1` — setup, preview and deploy of each), and the two
@@ -360,6 +363,12 @@ Ordinary rebuilding does not clear these. Clear them yourself and say so.
   "Root elements for target … should be equal". If agents are running builds,
   wait for them. Run UI tests alone:
   `-only-testing:QuartzTeachersUITests`.
+- **Quit Plantoir before the UI target** — `StateDirectoryUITests` skips
+  while any copy is running, because that copy's writes to the real trail
+  cannot be told from a leak. Every UI test now launches through
+  `IsolatedLaunch` with `--state-dir` (#154), so it no longer writes the real
+  trail or preferences — except the marketing captures, which drive the real
+  toolchain on purpose.
 - **A stray preview server fails the preview tests.** `python3 -m http.server
   8081` left over from earlier work holds the port; `pkill -f "http.server"`.
 - **`verify.sh` needs a terminal**: `script -q /dev/null ./verify.sh`.
@@ -474,6 +483,14 @@ comments should too. The rule is about what appears on screen.
 - **`Vendor/llama` is not committed.** A fresh clone must run
   `mac-app/Vendor/fetch-llama.sh` once or the assistant reports its engine is
   missing. The app still builds and runs without it.
+- **`Vendor/Sparkle` is not committed either** (#204), and without it the app
+  does NOT build: `project.yml` embeds the framework, so `xcodegen generate`
+  fails. Run `mac-app/Vendor/fetch-sparkle.sh` once per clone or worktree. A
+  Debug build has no update feed, so it never checks for or installs anything.
+- **`Vendor/helpers` is not committed either** (#312), and without it
+  `xcodegen generate` fails too. `mac-app/Vendor/fetch-helpers.sh` once per
+  clone or worktree: ~470 MB the first time on a Mac, seconds after that
+  (the cache is outside the repository).
 - **The assistant's model is not bundled** — it downloads to Application
   Support on first use. Changing the tier means the old file is still there
   under its own name; see the table above.

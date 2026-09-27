@@ -37,5 +37,21 @@
 	<string>Plantoir reads and writes the course notes in your working folder, so it can build your class websites.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>MIT License</string>
+	<key>SUAllowsAutomaticUpdates</key>
+	<false/>
+	<key>SUAutomaticallyUpdate</key>
+	<false/>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string>$(PLANTOIR_UPDATE_FEED_URL)</string>
+	<key>SUPublicEDKey</key>
+	<string>lYt8VK8iKB4jMy+b06j1m+GAedeTChAbX5NkMW2FSMw=</string>
+	<key>SURequireSignedFeed</key>
+	<true/>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
+	<key>SUVerifyUpdateBeforeExtraction</key>
+	<true/>
 </dict>
 </plist>

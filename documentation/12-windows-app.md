@@ -427,6 +427,24 @@ while the line explaining it went to the redirected trail, where nobody would
 look. Everything now derives from `AppDataRoot`, so the next thing somebody
 adds inherits the isolation instead of leaking.
 
+**The mac has the same flag, by the same name, on purpose (#154) — worth
+KNOWING, nothing to do.** One word should mean the same thing to a harness on
+either platform. Its root is different: the mac's state is spread across four
+`~/Library` folders, so `--state-dir` there stands in for the whole HOME
+folder rather than one app folder, and preferences need a door of their own
+because macOS's preferences daemon ignores a moved home. The same sharp edge
+applies there (children, the launchers, take the real home), and the mac
+refuses `launchctl`, notifications, the quit-time container stop and its
+updater under the flag; a malformed flag exits 64. Doc 09 → "Testing: the UI
+target keeps its state in `--state-dir`". The mac also now drives the
+new-site DIALOG through the real window (`NewSiteDialogUITests`, with a
+stubbed `deploy.sh`) — the test this platform ruled out, its reason 4 being
+that `ToolchainMirror.RefreshLaunchers` replaces a stub launcher on every
+`Reload()`. The mac's `refreshLaunchersIfNeeded` leaves launchers alone under
+test (a four-line guard; doc 09 → "The first-publish path"), and the same
+guard here would make the same test possible. Optional, and not an issue: if
+Russell wants it, it becomes one.
+
 ## Reading a test run: the exit code cannot tell you what happened
 
 `dotnet test` exits 1 when a test fails. It also exits 1 when the test HOST
@@ -905,7 +923,7 @@ What replaces the old container concepts:
   container name.** All three launchers still compute `$WORKDIR_ID` — the
   first 8 hex characters of SHA-256 over the folder's physical path (via
   `GetFinalPathNameByHandleW`, the same Win32 call as before) plus a
-  newline, matching the mac's `pwd -P | shasum -a 256` derivation. A
+  newline, matching the mac's `/bin/pwd -P | shasum -a 256` derivation. A
   `$CONTAINER_NAME = "teaching-quartz-$WORKDIR_ID"` variable is still
   assigned in each script for parity with the mac's naming scheme, but
   nothing native reads it — the real use of `$WORKDIR_ID` today is naming a
@@ -914,10 +932,54 @@ What replaces the old container concepts:
   entirely **out of the working folder**, because teachers keep working
   folders in OneDrive and a build's thousands of small files would sync and
   lock in place there.
+
+  **One folder, one spelling — what the mac learned, for Windows to KNOW
+  (GitHub #189, 2026-09-25).** The mac found that its launchers and its app
+  named one working folder two ways: bash's built-in `pwd -P` keeps the TYPED
+  case and Unicode form (é as one character or as e + accent), while the app
+  asked the disk — so a folder reached in the wrong case, or with an accented
+  name stored the Terminal way, had two containers and two builds folders
+  that cleared each other's builds. The fix there is `cd "$(/bin/pwd -P)"` in
+  each launcher and one Swift function (`FolderIdentity.canonicalPath`) used
+  for the hash AND every comparison of two folder paths; the reasoning is in
+  [03](03-launcher-scripts.md) → "One folder, one spelling" and
+  [09](09-mac-app.md) → "One folder, however it is spelled". **Windows has no
+  `pwd -P` to get wrong**: `GetFinalPathNameByHandleW` already returns the
+  disk's own casing, and NTFS is case-insensitive, so it is the Windows twin
+  of `/bin/pwd` and nothing needs to change on the strength of this note.
+  The trap, if a new derivation of a folder id or a new folder comparison is
+  ever written on that side: take the OS's own name for the folder, never the
+  string that was typed or passed on a command line — and use the same
+  function for the id and for the comparison, so they cannot disagree. (Git
+  Bash's and WSL's `pwd -P` are bash's built-in and keep the typed case.)
+  Whether the two already agree on one spelling is a check, not a change; the
+  `windows` issue opened with #189 asks for it.
+
+  **A remake never ends live work — what the mac learned, for Windows to KNOW
+  (GitHub #94, 2026-09-25).** The mac's launchers used to remove a folder's
+  container to remake it (after an update, for a new mount, for a stale
+  connection) without looking at what ran inside it, which killed an open
+  preview or a publish half-way through its upload. They now wait for a build
+  or publish, refuse while a preview whose launcher is still running is open,
+  and remove by id ([03](03-launcher-scripts.md) → "Before a workspace is
+  remade"). **Nothing is owed here**: Windows builds natively, so there is no
+  container to remake, and `contracts/app-rules.json` →
+  `previewPorts.whenTheWorkspaceIsInUse` and the `workspace was in use` trail
+  event are both `appliesOn: ["mac"]`, permanently. The trap, if Windows ever
+  gains something long-lived that is shared by a folder's runs and replaced
+  when it goes stale (a warm builder process, a per-folder server): look at
+  what is using it before replacing it, and tell a live user from an orphan by
+  whether the program that started it is still running — an orphan counted as
+  live refuses for ever.
 - **Concurrent previews are still isolated by port, exactly as before.**
   `preview.ps1` still probes a free host port block (8081/8091/8101/8111/8121/8131,
   base..base+3 for the site, base+1000..+1003 for Quartz's live-reload
-  websocket) and prints the exact "Preview will be available at:" line the
+  websocket — six blocks, where the mac launchers walk forty since GitHub
+  #280 and `preview.ps1` owes the same walk: `contracts/app-rules.json` →
+  `previewPorts.hostBlockCases`, and 03 → "How a folder finds its ports, and
+  when it cannot"; whether its probe sees ANOTHER signed-in account's
+  listeners is the open question the mac answered for itself in #310 — the
+  `windows` issue from #310 asks for the two-account measurement) and prints the exact "Preview will be available at:" line the
   app watches for. What changed is only what is listening on that port: a
   Node process running directly on the PC, bound to `127.0.0.1` (patched at
   runtime-build time in `fetch-runtime.ps1`, native-only — see the favicon
@@ -972,7 +1034,10 @@ as history, not as what Windows does today.
   matching the mac's naming scheme, but nothing native reads it today —
   don't build app logic around a container name existing.
 - **Port blocks**: `preview.ps1` still probes a free host port block
-  (bases 8081, 8091, 8101, 8111, 8121, 8131): base..base+3 for the preview
+  (bases 8081, 8091, 8101, 8111, 8121, 8131 — the mac's six until GitHub #280
+  made it forty, 8081 … 8471; `preview.ps1` owes that walk, and
+  `build_site.py`'s own native re-probe already walks forty blocks from the
+  port it is given): base..base+3 for the preview
   site (four concurrent previews per folder) and base+1000..+1003 for
   Quartz's live-reload websockets. What is listening on those ports is now
   a native Node process bound to `127.0.0.1`, not a container's forwarded
@@ -1038,6 +1103,39 @@ as history, not as what Windows does today.
   mac-only facts now** — Colima still needs them; native Windows has no
   image and no builder of any kind.
 
+### What each platform downloads and carries, like for like (mac #312)
+
+Since #312 the Mac app carries its own helper programs and the Linux
+virtual machine's starting disk, as Windows has always carried its runtime.
+Windows has nothing to DO about it (the contract key
+`app-rules.json → helperBootstrap` and the trail events "helper programs
+installed" and "website builder created" are `appliesOn: ["mac"]`); these are
+the two things it should KNOW. Mac figures measured 2026-09-26 on an M4 Pro;
+Windows figures are the v1.1.0 release assets.
+
+| | macOS v1.3.1 | macOS after #312 | Windows (v1.1.0, latest with an installer) |
+|---|---|---|---|
+| Installer | DMG 58.8 MB | DMG ~410 MB (LZMA; 410,488,446 B at the rehearsal) | PlantoirSetup.exe 235 MB; zip 398 MB |
+| Carried inside | app, llama.cpp (25 MB), the build recipe | + Colima, Lima, Docker CLI, buildx, the Ubuntu disk (Apple silicon) | app, llama.cpp, `plantoir-mcp.exe`, the native runtime (Node 20, Python 3.11 and packages, patched Quartz and its node_modules, wrangler, the emoji font) |
+| Downloaded on a first run, for building | ~857 MB | ~390 MB (the website builder's image build) | none |
+| Update delivery | download the DMG by hand | Sparkle, a delta of 0.1–3.7 MB for a Swift-only release (measured) from the release after v1.4.0 | installer by hand |
+| Downloads checked against a pinned SHA-256 | none | every helper, both kinds of Mac, and the disk | none in `fetch-runtime.ps1` (a build-time fetch, not on a teacher's machine) |
+| When the building downloads happen (bundle B) | at the first preview | in the BACKGROUND at first launch, and again when the recipe changes (`setup.sh --prepare-builder`; one sidebar line, four trail events) | nothing to get ready: `builderWarmUp` and its trail events are `appliesOn: ["mac"]` |
+| The image itself (#334, bundle B) | full Quartz history, a spare scaffold copy, base tag unpinned | Quartz at depth 1 (≈342 MB first download), no `/opt/quartz-site`, base pinned by digest | no image; the runtime is bundled |
+
+Bundle B's two rows are KNOW, not DO: Windows owes nothing for the warm-up
+or the image, because it downloads and builds nothing for building. (The
+bundle's brief assumed otherwise, from a stale line in `CLAUDE.md`, corrected
+the same day.)
+
+1. **The mac installer is now almost twice Windows'**, because the mac still
+   needs a Linux virtual machine and Windows does not.
+2. **The mac now checks every helper download against a pinned SHA-256**
+   (the launchers' shared first-run block). `fetch-runtime.ps1` fetches Node,
+   Python, get-pip.py and the emoji font without checksums. It runs when the
+   Windows app is BUILT, not on a teacher's PC, so this is a judgement call
+   rather than a defect — the Windows issue from #312 asks for it.
+
 ## Behaviours with platform-specific mechanics
 
 - **Obsidian integration** (entry 80): `obsidian://open?path=…` only works
@@ -1064,7 +1162,14 @@ as history, not as what Windows does today.
   way: resolve claims on the platform's restoration-complete signal
   rather than polling, and while a claim may still arrive show a quiet
   loading state, never the folder picker the claim is about to replace.
-  The scenario test suite in the macOS app is the porting spec. **The
+  The scenario test suite in the macOS app is the porting spec. **Since #311
+  the FOLDER comes back whatever happens to the window set** — the first
+  window reopens the last working folder (the one last in FRONT, not last
+  chosen), and a failed reopen says why in one sentence and is kept:
+  `contracts/shared-rules.json` → `reopeningTheLastWorkingFolder`, whose
+  `launchCases` and `folderCases` are the acceptance list; the reasoning is
+  in [`09-mac-app.md`](09-mac-app.md) → "Reopening on the last working
+  folder (#311)". **The
   other half of that — what a window lets GO of when it is pointed at a
   different folder** — is `contracts/shared-rules.json` →
   `workingFolderSelection`, and since 2026-09-19 all four of its cases run
@@ -1078,12 +1183,25 @@ as history, not as what Windows does today.
 - **New windows** (entry 84): inherit the folder of the window that was
   key when the command ran; with no windows open, show the folder picker.
   Decide the folder BEFORE first paint or the picker flashes.
-- **Updates**: WinSparkle, with its own feed at `site/appcast-windows.xml`
-  alongside the mac's `site/appcast-macos.xml` — **per-platform file names from
-  the start**, so the two update feeds can never collide. (An earlier draft of
-  this line said the two would share one appcast; that is exactly the collision
-  the mac side asked to avoid. Deferred on both platforms until the first
-  release.)
+- **Updates** (#204): **NetSparkleUpdater**, not WinSparkle — corrected
+  2026-09-25, when the mac shipped Sparkle and the Windows half was drafted as
+  its own `windows` issue (milestone v1.4.0). NetSparkle reads the same feed
+  format and can run the per-user Inno installer silently
+  (`PrivilegesRequired=lowest`, so no administrator prompt — unlike a standard
+  account on a Mac). Its OWN feed, `https://plantoir.app/updates/windows.xml`
+  (never a GitHub release asset, never shared with the mac's
+  `updates/macos.xml`), signed with its OWN key, with NetSparkle's separate
+  `.signature` file beside it. What is owed is the promise, not the mechanism:
+  `contracts/shared-rules.json` → `appUpdates` (ask first; once a day; never
+  install while this app is publishing or building a preview, or a scheduled
+  publish of this install is running — Task Scheduler's run is the counterpart
+  of the mac's launchd one; never refuse a quit), and the eight trail events it
+  added to `activityTrail.mustRecord`. NetSparkle gathers the notes of every
+  newer release itself, so a skipped release's warning is not lost the way it
+  would be on the mac without the cumulative notes; each Windows item carries
+  only its own. The mac's reasoning: [`09-mac-app.md`](09-mac-app.md) →
+  "Updating itself". (Earlier drafts of this line said WinSparkle with
+  `site/appcast-windows.xml`, and before that one shared appcast.)
 - **Stable code signing** (entry from the signing fix): sign dev builds
   with a stable identity or Windows will re-prompt for permissions —
   same class of problem as macOS ad-hoc signing.
@@ -1311,10 +1429,15 @@ VISIBILITY writer — and that qualifier is load-bearing, because two other
 finders are still hand-rolled and were deliberately left alone:
 `CourseRestorer.FrontmatterBounds` (strict here, lenient on the mac since
 #140, so a restore reaches different pages on the two platforms — that is
-[issue #177](https://github.com/russellgordon/plantoir/issues/177), a
-`decision`) and `SectionAdder.FrontmatterLines` (strict on BOTH platforms, so
-the section carry agrees with itself — parity, not a divergence, and
-documented rather than filed). Four finders, two unified. Check which one you
+[issue #177](https://github.com/russellgordon/plantoir/issues/177), which
+Russell decided on 2026-09-19: adopt the shared finder; it is owed together
+with #182's carry-the-value-lines restore, see the `windows` issue from #182)
+and `SectionAdder.FrontmatterLines` (strict here; it was strict
+on the mac too until #175, 2026-09-25, when that strictness was measured to
+PUBLISH a page hidden in section 1 into a newly added section — the mac now
+uses the shared finder and splices by line, and this one owes the same, see
+`documentation/08-course-config-reference.md` → "A writer must find the BLOCK").
+Four finders, two unified here, three on the mac. Check which one you
 are looking at before "tidying" any of them.
 
 A third fault was shared with the mac and **was fixed here first, on
@@ -1406,7 +1529,9 @@ should mirror it:
   test target is app-hosted (`TEST_HOST`), so the host app writes its launch
   lines before any test-bundle code loads. Instead the redirect lives in the
   product (`ProblemReportStore.standard` returns a throwaway folder when
-  `XCTestConfigurationFilePath` is in the environment), and
+  XCTest is loaded in the process — `RealHome.isInsideTestBundle` since
+  #264; it read `XCTestConfigurationFilePath` from the environment before),
+  and
   `testTheSuiteWritesToAThrowawayTrail` pins it so a refactor cannot lose it
   silently. Worth a matching pin on Windows: one test asserting the trail
   path is the redirected one, so the module initializer's presence is itself
@@ -1718,10 +1843,15 @@ phrasing made a teacher the caller:
   against "writes the local model can reach". `make_room_for_classes` is
   MCP-only, so it was not in it — and it is the most far-reaching tool on the
   surface, renaming pages a teacher's links point at. Without the entry it
-  would have been the ONE card that ran with nothing shown first. The mac has
-  never had this hole because `AssistToolDefinition.planTwinName` DERIVES the
-  twin from the tool; a list has to be told. If you add a card phrasing, check
-  that map by hand.
+  would have been the ONE card that ran with nothing shown first. If you add a
+  card phrasing, check that map by hand. (This used to say the mac could not
+  have the hole because `planTwinName` DERIVES the twin. It had its own:
+  `add_curriculum_mentions` derived `plan_add_curriculum_mentions`, which does
+  not exist, so the mac's gate ran that write with no plan — reachable only by
+  a model naming a tool it was not offered, which the mac also did not refuse.
+  Both closed in #327: an explicit `irregularPlanTwins` map, and a refusal for
+  any tool the model was not offered — see doc 10, Part 6. `tools.planTwins`
+  now carries the pair.)
 - **A plan twin that returns a bare `string` cannot say it is a plan.** The
   mark is `_meta["plantoir.app/isPlan"]`, set only by `PlantoirTools.Proposing`,
   and `AssistAgent.ShowPlan` reads an unmarked answer as a REFUSAL: it prints
@@ -1732,7 +1862,12 @@ phrasing made a teacher the caller:
   read and never accept. `AssistSurfaceContractTests.EveryPlanTwinTheGateRunsCanSayItIsAPlan`
   now checks the RETURN TYPE of every twin the gate runs, which is the thing
   that makes the mark possible; it unwraps `Task<>`, since an async tool marks
-  just as well.
+  just as well. (The mac pins the same property by RUNNING every `plan_` tool
+  on a happy path, since its return type is always `AssistToolOutcome` — #150,
+  doc 10 → "A plan has to be able to SAY it is a plan". Since #150 the
+  contract also DECLARES "make room for a class at Unit 3, Day 4" in
+  `cardPhrasings.parsed`, so `InsertClassesTests`' local pin of the article
+  form can read the contract instead — optional, not owed.)
 - **A sentence written for a model becomes a sentence a teacher reads.**
   `explain_publishing`'s second answer said "Don't repeat it — carry on with
   what the teacher asked", which was harmless while a model was the only

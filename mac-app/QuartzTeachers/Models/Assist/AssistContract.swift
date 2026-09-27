@@ -18,9 +18,11 @@ import Foundation
 /// no longer matches, so a changed sentence fails HERE, in the same test run
 /// that changed it — not on a Windows machine three weeks later.
 ///
-/// **What it deliberately does NOT generate.** Five top-level keys of the
+/// **What it deliberately does NOT generate.** Ten top-level keys of the
 /// cases file are hand-written and are preserved on every run: `nearMisses`,
-/// `scenarios`, `promptHistory`, `deployAtATime` and `windowBinding`. Nothing
+/// `scenarios`, `promptHistory`, `deployAtATime`, `windowBinding`,
+/// `hideIsUnpublish`, `echoedRequest`, `linksQuestion` (#167),
+/// `pagesNamingNoPage` (#197) and `toolDescriptions` (#114). Nothing
 /// in the code says which near-miss phrasings are worth guarding, which ORDER
 /// events must happen in, which spellings of a time a teacher actually types,
 /// or which arguments a window takes back from the model and which it refuses
@@ -66,6 +68,13 @@ enum AssistContract {
     /// What the copy of that page is called.
     static let copyPlaceholder: String = "{copy}"
 
+    /// Something the teacher can type next, in the every-page refusals (#197).
+    static let examplePlaceholder: String = "{example}"
+
+    /// Two or more names, already quoted and joined with "or", in the
+    /// refusal for names that match no page (#197).
+    static let pagesPlaceholder: String = "{pages}"
+
     static let wordingFileName: String = "assist-wording.json"
     static let casesFileName: String = "assist-cases.json"
 
@@ -83,6 +92,29 @@ enum AssistContract {
 
     // MARK: - Functions
 
+    /// The question "deploy at 6:30" is answered with, rendered through the
+    /// same two functions the assistant calls.
+    static func morningOrEveningForSixThirty() -> String {
+        guard let question = AssistCardCommand.morningOrEvening("deploy at 6:30") else {
+            return ""
+        }
+        return AssistWording.morningOrEvening(
+            clock: question.clock, sayMorning: question.sayMorning, sayEvening: question.sayEvening
+        )
+    }
+
+    /// The answer to "deploy at 6.30 pm", and the form it takes when a comma
+    /// is all that stood in the way — each rendered
+    /// through the same two functions the assistant calls (issue #277).
+    static func sayTheTimeAs(for sentence: String) -> String {
+        guard let respelling = AssistCardCommand.timeToSayAs(sentence) else {
+            return ""
+        }
+        return AssistWording.sayTheTimeAs(
+            written: respelling.written, say: respelling.say, onlyDifference: respelling.onlyDifference
+        )
+    }
+
     /// The wording file's contents.
     ///
     /// Every value here comes from calling the real function with the
@@ -96,6 +128,19 @@ enum AssistContract {
             "deployQuestion": AssistWording.deployQuestion,
             "scheduleQuestion": AssistWording.scheduleQuestion,
             "planQuestion": AssistWording.planQuestion,
+            // Rendered through the REAL question for "deploy at 6:30", not
+            // from placeholders, so the sentence in the contract is the one a
+            // teacher reads for that input — and the scenario that types it can
+            // match it as written. The answer sentences for every other input
+            // are in assist-cases.json → deployAtATime.asked (issue #194).
+            "morningOrEvening": AssistContract.morningOrEveningForSixThirty(),
+            // The same, for a time written a way the family can read but does
+            // not set (issue #277): the sentence for "deploy at 6.30 pm", and
+            // the form a comma alone gives it. What every other
+            // input is answered with is in assist-cases.json →
+            // deployAtATime.sayItAs.
+            "sayTheTimeAs": AssistContract.sayTheTimeAs(for: "deploy at 6.30 pm"),
+            "sayTheTimeAsWithoutTheComma": AssistContract.sayTheTimeAs(for: "deploy at 6:30 pm,"),
             "deployAccepted": AssistWording.deployAccepted,
             "planAccepted": AssistWording.planAccepted,
             "cancelled": AssistWording.cancelled,
@@ -137,9 +182,46 @@ enum AssistContract {
             "linkedClassesWereLeftAlone": AssistWording.linkedClassesWereLeftAlone(
                 AssistPublishPlan.listing(["Unit 2, Day 4", "Unit 2, Day 5"]), count: 2
             ),
+            // A linked class an unpublish stopped at and left visible (#201),
+            // rendered through the plan's own line so what Windows matches is
+            // the frame, the curly quotes and the page name as well as the
+            // reason — literal names, for the reason given just above.
+            "linkedClassStaysVisible": AssistPublishPlan.stayingVisibleLine(
+                title: "Unit 2, Day 4", reason: .aClassOfItsOwn, noun: .class
+            ),
+            "backingUpFirst": AssistWording.backingUpFirst(course: course),
+            "changedWhileSavingACopy": AssistWording.changedWhileSavingACopy(course: course, section: section),
             "backedUpCourse": AssistWording.backedUpCourse(
                 course: course, to: "{course}_backup_2026-09-08_190000.zip"
             ),
+            // Two keys for one function again, for the same reason, and
+            // with literal page names for the reason `linkedClassWasLeftAlone`
+            // gives: half of what the other platform has to match is the
+            // LISTING (#186).
+            "pagesWhoseSettingsCannotBeAddedTo": AssistWording.pagesWhoseSettingsCannotBeAddedTo(
+                AssistPublishPlan.listingAFew(["Unit 2, Day 4"]), count: 1
+            ),
+            "pagesWhoseSettingsCannotBeAddedToNamingSeveral": AssistWording.pagesWhoseSettingsCannotBeAddedTo(
+                AssistPublishPlan.listingAFew(
+                    ["Unit 2, Day 4", "Unit 2, Day 5", "Unit 2, Day 6", "Unit 2, Day 7", "Unit 2, Day 8"]
+                ),
+                count: 5
+            ),
+            "pageWhoseNewDateCouldNotBeSet": AssistWording.pagesWhoseNewDateCouldNotBeSet(
+                AssistPublishPlan.listingAFew(["Unit 2, Day 4"]), count: 1
+            ),
+            "pagesWhoseNewDatesCouldNotBeSet": AssistWording.pagesWhoseNewDateCouldNotBeSet(
+                AssistPublishPlan.listingAFew(["Unit 2, Day 4", "Unit 2, Day 5"]), count: 2
+            ),
+            // Two keys for one function: the sentence changes every pronoun
+            // in it between one page and several, and one rendering cannot
+            // show both (#182).
+            "sharedPageWhoseSettingCouldNotBePutBack":
+                AssistWording.sharedPagesWhoseSettingsCouldNotBePutBack(count: 1, section: section),
+            "sharedPagesWhoseSettingsCouldNotBePutBack":
+                AssistWording.sharedPagesWhoseSettingsCouldNotBePutBack(count: 2, section: section),
+            "backupSizeCouldNotBeRead": AssistWording.backupSizeCouldNotBeRead,
+            "backupSizeCouldNotBeReadShort": AssistWording.backupSizeCouldNotBeReadShort,
             "planWasCancelled": AssistWording.planWasCancelled,
             "deployed": AssistWording.deployed(course: course, section: section),
             "couldNotBuildBeforeDeploying": AssistWording.couldNotBuildBeforeDeploying(
@@ -148,6 +230,8 @@ enum AssistContract {
             "deployDidNotFinish": AssistWording.deployDidNotFinish(course: course, section: section),
             "sectionIsBusy": AssistWording.sectionIsBusy(course: course, section: section),
             "courseIsBusy": AssistWording.courseIsBusy(course: course),
+            "courseIsBeingCopied": AssistWording.courseIsBeingCopied(course: course),
+            "courseIsBeingBuiltElsewhere": AssistWording.courseIsBeingBuiltElsewhere(course: course),
             "previewIsRebuilding": AssistWording.previewIsRebuilding(course: course, section: section),
             "builtWithNoWindowOpen": AssistWording.builtWithNoWindowOpen(course: course, section: section),
             "rebuiltForACallerWithNoWindow": AssistWording.rebuiltForACallerWithNoWindow(
@@ -156,6 +240,15 @@ enum AssistContract {
             "previewDidNotBuild": AssistWording.previewDidNotBuild(course: course, section: section),
             "whereTheOutputIs": AssistWording.whereTheOutputIs,
             "nothingToDo": AssistWording.nothingToDo,
+            // "Already the way you asked" (#174): one key per branch, and the
+            // whole-unit forms with a concrete unit, the way `wouldMakeRoom`
+            // shows a concrete position — neither runner substitutes {unit}.
+            "alreadyPublishedOne": AssistWording.alreadyPublishedOne,
+            "alreadyHiddenOne": AssistWording.alreadyHiddenOne,
+            "alreadyPublishedSeveral": AssistWording.alreadyPublishedSeveral,
+            "alreadyHiddenSeveral": AssistWording.alreadyHiddenSeveral,
+            "unitAlreadyPublished": AssistWording.unitAlreadyPublished(unitWord: "Unit", unit: 4),
+            "unitAlreadyHidden": AssistWording.unitAlreadyHidden(unitWord: "Unit", unit: 4),
             "answerWasCutOff": AssistWording.answerWasCutOff,
             "answerLeftOutWhatItWasFor": AssistWording.answerLeftOutWhatItWasFor,
             "noCourseNamed": AssistWording.noCourseNamed,
@@ -189,6 +282,11 @@ enum AssistContract {
             "couldNotUndo": AssistWording.couldNotUndo(changePlaceholder, leftAlone: 2),
             "undoIsStillAvailable": AssistWording.undoIsStillAvailable,
             "nothingToUndo": AssistWording.nothingToUndo,
+            "startOfYearNeedsItsPlan": AssistWording.startOfYearNeedsItsPlan(course: course, section: section),
+            "startOfYearPlanHasChanged": AssistWording.startOfYearPlanHasChanged(
+                course: course, section: section
+            ),
+            "startOfYearNeedsABackup": AssistWording.startOfYearNeedsABackup(course: course),
             "undoDoesNotReachTheLiveSite": AssistWording.undoDoesNotReachTheLiveSite,
             "aCreatedPageCanBeTakenBack": AssistWording.aCreatedPageCanBeTakenBack,
             // Duplicating a class. The date is a LITERAL rather than a
@@ -197,6 +295,48 @@ enum AssistContract {
             // render, and `backedUpCourse` above already passes a real file
             // name for the same reason.
             "duplicated": AssistWording.duplicated(page: pagePlaceholder, as: copyPlaceholder),
+            // The How I Teach page (#209): shared-rules.json -> howITeachPage.
+            "howITeachRead": AssistWording.howITeachRead(course: course, text: "{text}"),
+            "howITeachMissing": AssistWording.howITeachMissing(course: course),
+            "howITeachEmpty": AssistWording.howITeachEmpty(course: course),
+            "howITeachDraftingBrief": AssistWording.howITeachDraftingBrief,
+            "howITeachCutShort": AssistWording.howITeachCutShort(course: course, path: "{path}"),
+            "howITeachPlanCreates": AssistWording.howITeachPlanCreates(course: course, path: "{path}"),
+            "howITeachPlanReplaces": AssistWording.howITeachPlanReplaces(
+                course: course, path: "{path}", words: "{words}", changed: "{changed}", mark: "{mark}"
+            ),
+            "howITeachAlreadyWritten": AssistWording.howITeachAlreadyWritten(course: course),
+            "howITeachChangedSincePlanned": AssistWording.howITeachChangedSincePlanned(course: course),
+            "howITeachNeedsWords": AssistWording.howITeachNeedsWords,
+            "howITeachTooLong": AssistWording.howITeachTooLong,
+            "howITeachCarriesNoSettings": AssistWording.howITeachCarriesNoSettings,
+            "howITeachSaved": AssistWording.howITeachSaved(course: course),
+            "howITeachIsNeverPublished": AssistWording.howITeachIsNeverPublished(course: course),
+            "howITeachBriefing": AssistWording.howITeachBriefing(courses: [course]),
+            "howITeachListedAsWritten": AssistWording.howITeachListedAsWritten,
+            "howITeachListedAsNotWritten": AssistWording.howITeachListedAsNotWritten,
+            // "What does <page> link to?", answered in code (#167).
+            "pageLinksTo": AssistWording.pageLinksTo(page: pagePlaceholder),
+            "pageLinksToNothing": AssistWording.pageLinksToNothing(page: pagePlaceholder),
+            "linkedPageIsADraft": AssistWording.linkedPageIsADraft,
+            "linkedPageIsMissing": AssistWording.linkedPageIsMissing,
+            "noPageCalled": AssistWording.noPageCalled(
+                page: pagePlaceholder, course: course, section: section
+            ),
+            // A publish or a hide that named no page (#197).
+            "noPagesCalled": AssistWording.noPagesCalled(
+                pages: pagesPlaceholder, course: course, section: section
+            ),
+            "everyPageIsNotAPageToPublish": AssistWording.everyPageIsNotAPageToPublish(
+                example: examplePlaceholder
+            ),
+            "everyPageIsNotAPageToHide": AssistWording.everyPageIsNotAPageToHide(
+                example: examplePlaceholder
+            ),
+            "morePagesThanOneAreCalled": AssistWording.morePagesThanOneAreCalled(
+                page: pagePlaceholder, course: course, section: section
+            ),
+            "pageCouldNotBeRead": AssistWording.pageCouldNotBeRead(page: pagePlaceholder),
             "copiedTo": AssistWording.copiedTo(
                 page: pagePlaceholder, as: copyPlaceholder, on: "2026-09-14"
             ),
@@ -231,6 +371,149 @@ enum AssistContract {
                     page: pagePlaceholder, as: copyPlaceholder,
                     backupNamed: "{course}_backup_2026-09-08_190000.zip"
                 ),
+            // A club's noun (#267). Every sentence a teacher reads that says
+            // "class" in a club course has a `…ForAMeeting` twin here, rendered
+            // from the same function with `noun: .meeting`, beside the "class"
+            // form it has always had — some of which are keys for the first
+            // time, having been typed inline in a planner until now. Both forms
+            // take the SAME inputs apart from the noun and, where a page is
+            // named, the page's shape ("Unit 3, Day 4" against "Week 5"), so
+            // the difference between the two keys is the noun and nothing else.
+            // None of the twins is ever part of what a model reads; see
+            // documentation/10-local-ai-assistant.md.
+            "otherClassesWouldMoveAndLinksFollowForAMeeting": AssistWording.otherClassesWouldMove(
+                moving: 2, renaming: 1, noun: .meeting
+            ),
+            "otherClassesWouldMoveKeepingTheirNamesForAMeeting": AssistWording.otherClassesWouldMove(
+                moving: 2, renaming: 0, noun: .meeting
+            ),
+            "linkedClassWasLeftAloneForAMeeting": AssistWording.linkedClassesWereLeftAlone(
+                AssistPublishPlan.listing(["Week 4"]), count: 1, noun: .meeting
+            ),
+            "linkedClassesWereLeftAloneForAMeeting": AssistWording.linkedClassesWereLeftAlone(
+                AssistPublishPlan.listing(["Week 4", "Week 5"]), count: 2, noun: .meeting
+            ),
+            "linkedClassStaysVisibleForAMeeting": AssistPublishPlan.stayingVisibleLine(
+                title: "Week 4", reason: .aClassOfItsOwn, noun: .meeting
+            ),
+            "mayIAskForYourDates": AssistWording.mayIAskForYourDates(for: .class),
+            "mayIAskForYourDatesForAMeeting": AssistWording.mayIAskForYourDates(for: .meeting),
+            "datesNotGivenYet": AssistWording.datesNotGivenYet(for: .class),
+            "datesNotGivenYetForAMeeting": AssistWording.datesNotGivenYet(for: .meeting),
+            "wouldMakeRoom": AssistWording.wouldMakeRoom(
+                count: 2, at: "Unit 3, Day 4", course: course, section: section
+            ),
+            "wouldMakeRoomForAMeeting": AssistWording.wouldMakeRoom(
+                count: 2, at: "Week 5", course: course, section: section, noun: .meeting
+            ),
+            "movedToLaterDays": AssistWording.movedToLaterDays(count: 3),
+            "movedToLaterDaysForAMeeting": AssistWording.movedToLaterDays(count: 3, noun: .meeting),
+            "makingRoomCannotBeUndone": AssistWording.makingRoomCannotBeUndone(),
+            "makingRoomCannotBeUndoneForAMeeting": AssistWording.makingRoomCannotBeUndone(noun: .meeting),
+            // Make-room's reply ends with this after `otherClassesMoved`
+            // (#185), so the caveat has no inline copy anywhere.
+            "lookTheSectionOverBeforePublishing": AssistWording.lookTheSectionOverBeforePublishing,
+            "madeRoom": AssistWording.madeRoom(count: 1, at: "Unit 3, Day 4"),
+            "madeRoomForAMeeting": AssistWording.madeRoom(count: 1, at: "Week 5", noun: .meeting),
+            "publishedTheClassOn": AssistWording.publishedTheClassOn("2026-09-14"),
+            "publishedTheClassOnForAMeeting": AssistWording.publishedTheClassOn(
+                "2026-09-14", noun: .meeting
+            ),
+            "wouldAddPages": AssistWording.wouldAddPages(
+                count: 1, to: "Unit 4 of \(course) Section \(section)"
+            ),
+            "wouldAddPagesForAMeeting": AssistWording.wouldAddPages(
+                count: 1, to: "\(course) Section \(section)", noun: .meeting
+            ),
+            "spareDatesAfterThese": AssistWording.spareDatesAfterThese(
+                count: 3, source: "timetable.xlsx, block H"
+            ),
+            "spareDatesAfterTheseForAMeeting": AssistWording.spareDatesAfterThese(
+                count: 3, source: "timetable.xlsx, block H", noun: .meeting
+            ),
+            "sharingTheLastDay": AssistWording.sharingTheLastDay(count: 1),
+            "sharingTheLastDayForAMeeting": AssistWording.sharingTheLastDay(count: 1, noun: .meeting),
+            "addedTheNextPage": AssistWording.addedTheNextPage(),
+            "addedTheNextPageForAMeeting": AssistWording.addedTheNextPage(noun: .meeting),
+            "reDatingOntoTheDatesOnFile": AssistWording.reDatingOntoTheDatesOnFile(
+                course: course, section: section
+            ),
+            "reDatingOntoTheDatesOnFileForAMeeting": AssistWording.reDatingOntoTheDatesOnFile(
+                course: course, section: section, noun: .meeting
+            ),
+            "pagesRunFrom": AssistWording.pagesRunFrom(
+                count: 12, first: "2026-09-08 (Tuesday)", last: "2026-12-15 (Tuesday)"
+            ),
+            "pagesRunFromForAMeeting": AssistWording.pagesRunFrom(
+                count: 12, first: "2026-09-08 (Tuesday)", last: "2026-12-15 (Tuesday)", noun: .meeting
+            ),
+            "pagesWithNoDayOfTheirOwn": AssistWording.pagesWithNoDayOfTheirOwn(
+                count: 2, lastDay: "2026-12-15"
+            ),
+            "pagesWithNoDayOfTheirOwnForAMeeting": AssistWording.pagesWithNoDayOfTheirOwn(
+                count: 2, lastDay: "2026-12-15", noun: .meeting
+            ),
+            "movesAndBecomesADraft": AssistWording.movesAndBecomesADraft(
+                page: pagePlaceholder, to: "2026-12-15"
+            ),
+            "movesAndBecomesADraftForAMeeting": AssistWording.movesAndBecomesADraft(
+                page: pagePlaceholder, to: "2026-12-15", noun: .meeting
+            ),
+            "movesToTheFirstDay": AssistWording.movesToTheFirstDay(
+                page: pagePlaceholder, to: "2026-09-08"
+            ),
+            "movesToTheFirstDayForAMeeting": AssistWording.movesToTheFirstDay(
+                page: pagePlaceholder, to: "2026-09-08", noun: .meeting
+            ),
+            "datesToFindADaysPage": AssistWording.datesToFindADaysPage(),
+            "datesToFindADaysPageForAMeeting": AssistWording.datesToFindADaysPage(noun: .meeting),
+            "datesToReplace": AssistWording.datesToReplace(for: "\(course) Section \(section)"),
+            "datesToReplaceForAMeeting": AssistWording.datesToReplace(
+                for: "\(course) Section \(section)", noun: .meeting
+            ),
+            "datesForTheNextPage": AssistWording.datesForTheNextPage(),
+            "datesForTheNextPageForAMeeting": AssistWording.datesForTheNextPage(noun: .meeting),
+            "datesToDuplicate": AssistWording.datesToDuplicate(),
+            "datesToDuplicateForAMeeting": AssistWording.datesToDuplicate(noun: .meeting),
+            "datesToReDate": AssistWording.datesToReDate(),
+            "datesToReDateForAMeeting": AssistWording.datesToReDate(noun: .meeting),
+            "theSemesterBegins": AssistWording.theSemesterBegins(
+                on: "Tuesday, 2026-09-08", showing: 3
+            ),
+            "theSemesterBeginsForAMeeting": AssistWording.theSemesterBegins(
+                on: "Tuesday, 2026-09-08", showing: 3, noun: .meeting
+            ),
+            "allScheduledDatesHaveConcluded": AssistWording.allScheduledDatesHaveConcluded(
+                count: 12, for: "\(course) Section \(section)", last: "Tuesday, 2026-12-15"
+            ),
+            "allScheduledDatesHaveConcludedForAMeeting": AssistWording.allScheduledDatesHaveConcluded(
+                count: 12, for: "\(course) Section \(section)", last: "Tuesday, 2026-12-15", noun: .meeting
+            ),
+            "yourNextUpcoming": AssistWording.yourNextUpcoming(
+                count: 3, for: "\(course) Section \(section)"
+            ),
+            "yourNextUpcomingForAMeeting": AssistWording.yourNextUpcoming(
+                count: 3, for: "\(course) Section \(section)", noun: .meeting
+            ),
+            "pagesAcrossTheDates": AssistWording.pagesAcrossTheDates(
+                for: "\(course) Section \(section)", pages: 4, dates: 12, spare: 8
+            ),
+            "pagesAcrossTheDatesForAMeeting": AssistWording.pagesAcrossTheDates(
+                for: "\(course) Section \(section)", pages: 4, dates: 12, spare: 8, noun: .meeting
+            ),
+            "everyDateIsSpokenFor": AssistWording.everyDateIsSpokenFor(),
+            "everyDateIsSpokenForForAMeeting": AssistWording.everyDateIsSpokenFor(noun: .meeting),
+            "theNextWouldFallOn": AssistWording.theNextWouldFallOn("2026-09-14 (Monday)"),
+            "theNextWouldFallOnForAMeeting": AssistWording.theNextWouldFallOn(
+                "2026-09-14 (Monday)", noun: .meeting
+            ),
+            "reDated": AssistWording.reDated(count: 12, pagesTheyUse: 5),
+            "reDatedForAMeeting": AssistWording.reDated(count: 12, pagesTheyUse: 5, noun: .meeting),
+            "reDatedOnlyPagesTheyUse": AssistWording.reDatedOnlyPagesTheyUse(pagesTheyUse: 3),
+            "everyPageIsAlreadyOnItsDay": AssistWording.everyPageIsAlreadyOnItsDay(course: "ICS3U", section: 1),
+            "reDatedOnlyPagesTheyUseForAMeeting": AssistWording.reDatedOnlyPagesTheyUse(
+                pagesTheyUse: 3, noun: .meeting
+            ),
         ]
         return [
             "note": "Generated from mac-app AssistWording by `Plantoir --write-contracts`. "
@@ -249,8 +532,17 @@ enum AssistContract {
                         + "written the way the scheduled card writes its own moment "
                         + "(day, date and time in this Mac's own style), e.g. "
                         + "Friday 25 September, 6:30 AM",
-                "page": "the page being copied, e.g. Unit 3, Day 2",
+                "page": "a page's title, e.g. Unit 3, Day 2 — the page being copied, or one a "
+                      + "re-date moves",
                 "copy": "what the copy is called, e.g. Unit 3, Day 3",
+                "example": "something a teacher can type next, built from the section's own pages: "
+                         + "Publish (or Hide) and the lowest unit that has class pages, named the "
+                         + "course's way (Publish Unit 3, Hide Module 2); in a numbered course its "
+                         + "first class page (Publish Week 1). See pagesNamingNoPage in "
+                         + "assist-cases.json",
+                "pages": "two or more names that match no page, each in curly quotes, joined "
+                       + "with commas and a final \"or\" — at most three named and the rest "
+                       + "counted: “Unit 9, Day 9” or “Unit 9, Day 10”; “a”, “b”, “c” or 2 others",
                 "moving": "how many later classes move, counted once each even when a page is "
                         + "both renamed and re-dated — here 2",
                 "renaming": "how many of those are also renamed, here 1 in the "
@@ -428,14 +720,20 @@ enum AssistContract {
         }
         var parsed: [[String: Any]] = []
         for shape in AssistCardCommand.everyParsedShape {
-            parsed.append([
+            var family: [String: Any] = [
                 "shape": shape.shape,
                 "tool": shape.tool,
                 "fills": shape.fills,
                 "example": shape.example,
                 "notThis": shape.notThis,
                 "becauseNotThis": shape.becauseNotThis,
-            ])
+            ]
+            // Only the family that reads the window's course carries it, so
+            // every other family is byte-for-byte what it was (#267).
+            if let word = shape.numberedPageWord {
+                family["inANumberedCourseWhosePagesAre"] = word
+            }
+            parsed.append(family)
         }
         return [
             "note": "Matched in CODE and never sent to the model. Trimmed, case-folded, trailing . and ! "
@@ -449,7 +747,10 @@ enum AssistContract {
                         + "integer or a title off a fixed shape is not a judgement anybody needs a "
                         + "language model for. `notThis` is the near-miss each family must REFUSE, "
                         + "and it is the half that stops a family swallowing requests that belong "
-                        + "to the model.",
+                        + "to the model. A family carrying `inANumberedCourseWhosePagesAre` matches "
+                        + "only in a window whose course names its pages with one number and that "
+                        + "word (#267): a runner passes the word to its matcher for the example AND "
+                        + "the near miss, and the family matches nothing in any other course.",
             "parsed": parsed,
         ]
     }
@@ -480,10 +781,11 @@ enum AssistContract {
             if tool.needsApproval {
                 needsApproval.append(tool.name)
             }
-            // A twin's NAME is not a twin's existence: `add_curriculum_mentions`
-            // would name `plan_add_curriculum_mentions`, and the tool that
-            // actually exists is `plan_curriculum_mentions`. Plan mode asks the
-            // surface for exactly this reason, and so does this.
+            // A twin's NAME is not a twin's existence, so this asks the
+            // surface too, as plan mode does. It is how this list once left
+            // `add_curriculum_mentions` out without a word: its name derived
+            // to `plan_add_curriculum_mentions`, which does not exist, until
+            // #327 listed the pair in `AssistToolDefinition.irregularPlanTwins`.
             if let twin = tool.planTwinName, everyName.contains(twin) {
                 twins[tool.name] = twin
             }
@@ -493,18 +795,22 @@ enum AssistContract {
             "note": "Three lists, deliberately. `all` is what the runner can execute; `local` is what the "
                   + "small model is SHOWN (the plan twins and remember_timetable are taken off, because "
                   + "the model never has to name a plan and dates it supplies are dates it may have "
-                  + "invented); `mcpOnly` is the ten offered to Claude Code on top of everything — three "
-                  + "asking for judgement about meaning, the rest either never needed by a model "
-                  + "scoped to one section or already reachable by it through a fixed phrasing.",
+                  + "invented); `mcpOnly` is the fifteen offered to Claude Code on top of everything — six "
+                  + "asking for judgement about meaning (the three curriculum tools and the three "
+                  + "for the How I Teach page), two that get a whole section ready for the start of "
+                  + "the year (a change a person should read in full, with a button of its own in the "
+                  + "app), the rest either never needed by a model scoped to one section or already "
+                  + "reachable by it through a fixed phrasing.",
             "all": all,
             "local": local,
             "mcpOnly": mcpOnly,
             "needsApproval": needsApproval.sorted(),
             "planTwins": twins,
-            "planTwinsNote": "A write with a twin is shown as a plan first. Four writes have none, "
+            "planTwinsNote": "A write with a twin is shown as a plan first. Five writes have none, "
                            + "deliberately: rebuild_preview changes no page, undo_last_change IS the "
-                           + "remedy, deploy_section waits on its own button whatever plan mode says, and "
-                           + "a cancelled scheduled deploy is remedied by scheduling it again.",
+                           + "remedy, deploy_section waits on its own button whatever plan mode says, "
+                           + "a cancelled scheduled deploy is remedied by scheduling it again, and "
+                           + "back_up_course writes a copy outside the course and changes no page.",
         ]
     }
 
@@ -531,7 +837,9 @@ enum AssistContract {
             "note": "These top-level keys are written by `Plantoir --write-contracts` from the app's own "
                   + "types and will be overwritten: " + generatedCaseKeys.joined(separator: ", ")
                   + ". Every other top-level key — nearMisses, scenarios, promptHistory, "
-                  + "deployAtATime, windowBinding, hideIsUnpublish, echoedRequest — is hand-written "
+                  + "deployAtATime, windowBinding, hideIsUnpublish, echoedRequest, linksQuestion, "
+                  + "pagesNamingNoPage, toolDescriptions — "
+                  + "is hand-written "
                   + "intent and is PRESERVED by a regeneration, so "
                   + "a case may be proposed from either platform. Listing them rather than naming "
                   + "two: the list was already two short when this was noticed, and a key nobody "

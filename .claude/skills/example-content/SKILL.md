@@ -125,10 +125,17 @@ specific expectation named for its code (`A1.1.md`, `D2.3.md`) and one per
 overall expectation (`A1. Something.md`). Two consequences worth knowing
 while authoring:
 
-- **A curriculum page that links OUT of the folder will dangle** in a
-  skeleton course, which has none of the payload's task pages. Four payloads
-  do this once each, in `About These Expectations.md` — CGC1W, ICS3U, ICS4U,
-  MDM4U — and it is a known, unfixed fault rather than a pattern to copy.
+- **A curriculum page links only inside its own folder.** A link OUT of it
+  dangles in a skeleton course, which has none of the payload's task,
+  lesson or project pages. `lint_payload.py` refuses one (links and embeds
+  alike; code spans and fences are skipped), and
+  `scripts/test_starting_content_prompts.py` checks every payload after the
+  real double install. Point at an expectation page in the folder instead
+  (`[[B2. Software Project Contribution|B2]]`), or use plain words that are
+  true without the payload. Four `About These Expectations.md` pages broke
+  this until GitHub issue #253 — CGC1W, ICS3U, ICS4U, MDM4U — and were
+  reworded so the sentence is true in either kind of course, not merely
+  unlinked.
 - **The first specific expectation, by filename order, is what the
   skeleton's template pages embed** when the payload has no `A1.1` of its
   own (MCMPR11 starts at `D1.1`, MTH1W at `B1.1`). Nothing to do while
@@ -449,7 +456,14 @@ visible but not expandable). Layout: `shared/` → course root;
 puts the ring on a cell in the Curriculum Coverage map, and what answers
 Ontario's ask that every overall expectation be evaluated at least once.
 Normally `["Tasks"]`. The linter refuses a payload without it, and refuses
-a name that is not one of the course's own folders.
+a name that is not one of the course's own folders. It reaches a course by
+TWO routes — the command line's `setup_course.graded_folders_for`, and each
+app reading the manifest itself when its wizard writes the new course's file
+(#292, `gradedFolders.newCourse`, which sweeps every payload through both) —
+and that linter check is what keeps the two identical: an exact folder name
+means neither route has anything to respell or drop (except `Media`, which
+the linter accepts as a shared folder and both routes drop from the pool —
+so do not declare it).
 
 Declare it rather than letting it be inferred. Inference is a SUBSTRING
 ("does the folder mention tasks?") while the build matches a pooled name
@@ -722,11 +736,19 @@ template (like `ADA1O/shared/Tasks/_DUPLICATE ME.md`) places the triangulation
 block after `%%curriculum-end%%` for this reason.
 
 **Plain text only inside the block.** No `[[wikilinks]]` and no
-`![[transclusions]]`: the linter and `build_site.py` read the raw markdown
-without stripping comments, so a `![[C1.2]]` written here would silently
-count as curriculum coverage for an expectation no student page addresses,
-and a `[[Page]]` would satisfy the two-hop reachability check for a page
-nothing visible reaches. Write bare codes as text.
+`![[transclusions]]`. Since #331 a link inside a `%%` comment is not a link
+anywhere — Quartz strips it, and the build, the installer, the linter and the
+app all mask comments first — so it would count for nothing; it is still
+refused, so a teacher copying the note never expects it to work. Write bare
+codes and page names as text. (Before #331 the reason was worse: comment
+links counted as coverage and reachability nobody could see.)
+
+**Never write `%%` in the prose of a comment.** Comments pair left to right,
+so a `%%` inside the note's words CLOSES it: everything after it — the
+teacher's private note — is on the site, followed by a stray `%%`. AVI1O's and
+TEJ4M's task templates did exactly that ("everything between the %% markers
+is stripped") until #331; write "double-percent markers" instead. The linter
+refuses any page with an odd number of `%%`.
 
 ```
 %%
@@ -942,6 +964,20 @@ the linter.
    from boilerplate, and boilerplate is the failure mode this block has —
    which only shows up when you compare two of them. Check the days named
    are days that task actually runs on.
+
+   **Two things the linter reads the way the site does (#313).** A link
+   written inside code — a fence of either character, a fence inside a
+   callout, an inline span — is an example of the syntax, not a link: it
+   reaches nothing and dates nothing, because Quartz draws none. The linter
+   finds code with the toolchain's own `scripts/markdown_code.py`, so a page
+   reachable only through a link shown in code is reported as unreached.
+   And it REFUSES a fence opened inside a list item (`   ```python` under
+   "4.") whose lines fall back to column 0 before the closer: Markdown ends
+   the fence with the list item there, the closer then opens a new fence,
+   and the site shows the rest of the page as code, links and curriculum
+   block included. Indent every line up to the closing fence as far as the
+   opening one. TEJ2O's "Control Something with Code" shipped that way and
+   was fixed in #313.
 2. Installer E2E without Docker: import `scripts/setup_course.py` via
    importlib, call `install_example_content` into a temp dir for both
    curriculum states; assert no curriculum folder/links remain when
@@ -1028,6 +1064,17 @@ than hand-written:
   `__COURSE_NAME__`.
 - `lint_skeletons.py` is the gate — every link resolves, every page is
   titled, no template token survived. Run it after every generation.
+  The generator's tokens are `%PERCENT%` ones, so a `{brace}` placeholder
+  is never filled and ships as written — every Concepts page said
+  "{subject}" until #328 — and the linter refuses one. `%SUBJECT%` reads
+  after a preposition ("in music"); in front of a noun use
+  `%A_SUBJECT_COURSE%` or `%A_SUBJECT_CLASS_START%`, which carry the
+  article ("an English course", "this course" — never "a this course
+  course"), and the linter refuses the misfit. "a"/"an" follows the
+  first SOUND (`article_for`: "a unit", "a European", "an hour"), and the
+  linter checks every article by that rule. It tests its own rules against
+  `MUST_BE_ACCEPTED` / `MUST_BE_REFUSED` before every run and exits 2 if
+  one misbehaves — add a shape there when widening a check.
 - The sidebar is a RULE, not a list: the `Curriculum` folder is never
   visible, every other visible shared folder carries a chevron (including
   one the teacher adds), and per-section folders — `All Classes` — stay

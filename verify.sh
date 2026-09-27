@@ -55,7 +55,7 @@ cd "$(dirname "$0")"
 
 DEV_TEST_IMAGE="quartz-teacher:dev-test"
 # The launchers name their container after the working folder.
-CONTAINER_NAME="teaching-quartz-$(pwd -P | shasum -a 256 | cut -c1-8)"
+CONTAINER_NAME="teaching-quartz-$(/bin/pwd -P | shasum -a 256 | cut -c1-8)"
 # The launchers' own way of naming a folder they hand to a container, loaded
 # out of the block the three of them share rather than spelled a second way
 # here. `-v src:dst` splits on ':', so a working folder called
@@ -106,6 +106,106 @@ if [[ ! -t 0 ]]; then
   exit 1
 fi
 
+# -------------------- 0.2. One verify.sh at a time on this Mac --------------------
+# >>> VERIFY LOCK >>> — extracted between these markers and run by
+# scripts/test_verify_lock.py. Keep the markers.
+#
+# Two runs at once corrupt each other, and not only through the image tag:
+# at least six things here are shared by every run on a Mac — the
+# quartz-teacher:dev-test image, 78 fixed /tmp/verify_*.log paths (some are
+# grepped for PASS/FAIL), $HOME/.plantoir-verify-26:27 and its workspace,
+# $HOME/.plantoir-verify-locked, and the prune fixtures. Two agents' gates
+# running together on 2026-09-24 was how GitHub #280 was found. A per-run
+# image tag was REJECTED: it fixes one of the six, breaks --skip-build (the
+# tag it would reuse is deleted at the end), and makes every document that
+# names quartz-teacher:dev-test wrong.
+#
+# A second run does not wait: it says who holds the lock and exits 1. A gate
+# that silently queues hides the contention it is waiting on; one that fails
+# at once says so. /tmp rather than $TMPDIR because sessions carry different
+# TMPDIRs, and per user because /tmp is shared.
+#
+# The lock is a directory (mkdir is the atomic test) holding one file, the
+# holder's pid, folder and start time. A lock with NO such file yet is HELD —
+# its maker may be between mkdir and the write — and never taken over; a lock
+# whose pid is gone is stale and is taken over, saying so. It is released on
+# every exit, Ctrl-C, a kill and a hang-up included (`script` and pty.spawn
+# send HUP when their parent goes), and only by the run whose pid is in it. A
+# SIGKILL cannot be caught and leaves it behind: the refusal names the path.
+# (Measured under /bin/bash 3.2: the EXIT trap alone already runs on INT,
+# TERM and HUP — scripts/test_verify_lock.py passes with the three signal
+# traps removed and fails with the EXIT trap removed. The three are kept so
+# the exit status says which signal ended the run.)
+VERIFY_LOCK="${PLANTOIR_VERIFY_LOCK:-/tmp/plantoir-verify-$(id -u).lock}"
+
+release_verify_lock() {
+  local holder=""
+  if [[ -f "$VERIFY_LOCK/holder" ]]; then
+    holder="$(cut -d' ' -f1 "$VERIFY_LOCK/holder" 2>/dev/null || true)"
+  fi
+  if [[ "$holder" == "$$" ]]; then
+    rm -f "$VERIFY_LOCK/holder"
+    rmdir "$VERIFY_LOCK" 2>/dev/null || true
+  fi
+}
+
+take_verify_lock() {
+  local holder_line holder_pid
+  if ! mkdir "$VERIFY_LOCK" 2>/dev/null; then
+    holder_line=""
+    if [[ -f "$VERIFY_LOCK/holder" ]]; then
+      holder_line="$(cat "$VERIFY_LOCK/holder" 2>/dev/null || true)"
+    fi
+    holder_pid="${holder_line%% *}"
+    # A pause between reading the holder and acting on it, for
+    # scripts/test_verify_lock.py only: it is how the takeover race is made
+    # to happen every time rather than once in a thousand. Unset, nothing.
+    if [[ -n "${PLANTOIR_VERIFY_LOCK_TEST_PAUSE:-}" ]]; then
+      sleep "$PLANTOIR_VERIFY_LOCK_TEST_PAUSE"
+    fi
+    if [[ -n "$holder_pid" ]] && ! kill -0 "$holder_pid" 2>/dev/null; then
+      # Taken over under a second lock, so that two runs finding the same
+      # dead holder cannot both win: without it, B's rmdir removed the new,
+      # still-empty lock A had just made, and both held it. Inside, the
+      # holder is read AGAIN and the lock is removed only if it still names
+      # the dead run.
+      local took_over="false"
+      if mkdir "$VERIFY_LOCK.takeover" 2>/dev/null; then
+        if [[ "$(cat "$VERIFY_LOCK/holder" 2>/dev/null || true)" == "$holder_line" ]]; then
+          echo "🧹 A verify.sh that is no longer running (pid $holder_pid) left its lock behind; taking it over."
+          rm -f "$VERIFY_LOCK/holder"
+          rmdir "$VERIFY_LOCK" 2>/dev/null || true
+          if mkdir "$VERIFY_LOCK" 2>/dev/null; then
+            took_over="true"
+          fi
+        fi
+        rmdir "$VERIFY_LOCK.takeover" 2>/dev/null || true
+      fi
+      if [[ "$took_over" != "true" ]]; then
+        echo "❌ Another verify.sh took the lock at the same moment; run this one again when it has finished."
+        echo "   If nothing is running, remove $VERIFY_LOCK (and $VERIFY_LOCK.takeover if it is there)."
+        exit 1
+      fi
+    else
+      echo "❌ Another verify.sh is already running on this Mac, and two at once corrupt each other."
+      if [[ -n "$holder_pid" ]]; then
+        echo "   Held by pid $holder_pid: ${holder_line#* }"
+      else
+        echo "   Its holder has not written its name yet."
+      fi
+      echo "   Run this one again when it has finished. If nothing is running, remove $VERIFY_LOCK"
+      exit 1
+    fi
+  fi
+  trap release_verify_lock EXIT
+  trap 'exit 129' HUP
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  printf '%s %s (started %s)\n' "$$" "$(pwd -P)" "$(date '+%Y-%m-%d %H:%M:%S')" > "$VERIFY_LOCK/holder"
+}
+# <<< VERIFY LOCK <<<
+take_verify_lock
+
 # -------------------- 0.5. Pure-Python unit tests (no Docker needed) --------------------
 # Fast, dependency-free checks that don't need the image — run first so a
 # broken script.py change fails in milliseconds instead of after a full
@@ -124,6 +224,20 @@ else
   cat /tmp/verify_site_health_test.log
 fi
 
+if (cd scripts && python3 test_getting_ready_turn.py) >/tmp/verify_getting_ready_turn_test.log 2>&1; then
+  pass "Launchers: one at a time gets the website builder ready, and setup.sh --prepare-builder does only that (scripts/test_getting_ready_turn.py, bundle B)"
+else
+  fail "Launchers: one at a time gets the website builder ready, and setup.sh --prepare-builder does only that (scripts/test_getting_ready_turn.py, bundle B)"
+  cat /tmp/verify_getting_ready_turn_test.log
+fi
+
+if (cd scripts && python3 test_section_fingerprint.py) >/tmp/verify_section_fingerprint_test.log 2>&1; then
+  pass "section_fingerprint.py: the \"— Edited\" fingerprint's rule 2 leaves How I Teach out, and the default stays rule 1 until Windows moves (scripts/test_section_fingerprint.py, #330)"
+else
+  fail "section_fingerprint.py: the \"— Edited\" fingerprint's rule 2 leaves How I Teach out, and the default stays rule 1 until Windows moves (scripts/test_section_fingerprint.py, #330)"
+  cat /tmp/verify_section_fingerprint_test.log
+fi
+
 if (cd scripts && python3 test_recipe_folders.py) >/tmp/verify_recipe_folders_test.log 2>&1; then
   pass "the toolchain recipe's folder list agrees everywhere it is copied (scripts/test_recipe_folders.py)"
 else
@@ -136,6 +250,34 @@ if (cd scripts && python3 test_starting_content_prompts.py) >/tmp/verify_startin
 else
   fail "setup_course.py: what a teacher who declined the ready-made pages is told, and what lands in the course (scripts/test_starting_content_prompts.py)"
   cat /tmp/verify_starting_content_test.log
+fi
+
+if (cd scripts && python3 test_install_link_readers.py) >/tmp/verify_install_link_readers_test.log 2>&1; then
+  pass "setup_course.py and the coverage map: every link shape the contract names is read by the installer's and the map's link readers (scripts/test_install_link_readers.py)"
+else
+  fail "setup_course.py and the coverage map: every link shape the contract names is read by the installer's and the map's link readers (scripts/test_install_link_readers.py)"
+  cat /tmp/verify_install_link_readers_test.log
+fi
+
+if (cd scripts && python3 test_markdown_code.py) >/tmp/verify_markdown_code_test.log 2>&1; then
+  pass "markdown_code.py: a link written inside code is not a link, for the build's and the installer's readers and the coverage map (scripts/test_markdown_code.py, #313)"
+else
+  fail "markdown_code.py: a link written inside code is not a link, for the build's and the installer's readers and the coverage map (scripts/test_markdown_code.py, #313)"
+  cat /tmp/verify_markdown_code_test.log
+fi
+
+if (cd scripts && python3 test_graded_folders_rerun.py) >/tmp/verify_graded_rerun_test.log 2>&1; then
+  pass "setup_course.py: a re-run writes a saved marks pool back as it was (scripts/test_graded_folders_rerun.py)"
+else
+  fail "setup_course.py: a re-run writes a saved marks pool back as it was (scripts/test_graded_folders_rerun.py)"
+  cat /tmp/verify_graded_rerun_test.log
+fi
+
+if (cd scripts && python3 test_graded_folders_new_course.py) >/tmp/verify_graded_new_course_test.log 2>&1; then
+  pass "setup_course.py: a new course is written its marks pool, as both apps write it (scripts/test_graded_folders_new_course.py)"
+else
+  fail "setup_course.py: a new course is written its marks pool, as both apps write it (scripts/test_graded_folders_new_course.py)"
+  cat /tmp/verify_graded_new_course_test.log
 fi
 
 if (cd scripts && python3 test_contracts.py) >/tmp/verify_contracts_test.log 2>&1; then
@@ -194,6 +336,25 @@ else
   cat /tmp/verify_reference_course_test.log
 fi
 
+# The teacher's How I Teach page is never on the website (#209): the name
+# rule against the contract's nameCases, discovery, preflight, the lists the
+# copy loops read and the final sweep. The real build is checked further down.
+if (cd scripts && python3 test_how_i_teach.py) >/tmp/verify_how_i_teach_test.log 2>&1; then
+  pass "the How I Teach page is never listed, copied or left in a site's pages (scripts/test_how_i_teach.py)"
+else
+  fail "the How I Teach page is never listed, copied or left in a site's pages (scripts/test_how_i_teach.py)"
+  cat /tmp/verify_how_i_teach_test.log
+fi
+
+# What the LOCAL model is shown has not moved a byte (#209's plan review):
+# the full digest of toolSchemas.local, made by research/ai-assist/toolhash.py.
+if (cd scripts && python3 test_tool_surface_digest.py) >/tmp/verify_tool_digest_test.log 2>&1; then
+  pass "the local assistant's thirteen tools are the ones routing was measured against (scripts/test_tool_surface_digest.py)"
+else
+  fail "the local assistant's thirteen tools are the ones routing was measured against (scripts/test_tool_surface_digest.py)"
+  cat /tmp/verify_tool_digest_test.log
+fi
+
 # RUNS deploy.sh, where the test above only reads it. That distinction is the
 # reason this exists: the flag was written on a machine with no bash, and
 # starting the script found two things in prompt_for_cf_account that reading it
@@ -216,11 +377,120 @@ else
   cat /tmp/verify_preview_sh_questions_test.log
 fi
 
+if (cd scripts && python3 test_port_blocks.py) >/tmp/verify_port_blocks_test.log 2>&1; then
+  pass "the launchers walk forty blocks for a folder's preview addresses, skip any another folder holds, and say so truthfully when none is free (scripts/test_port_blocks.py)"
+else
+  fail "the launchers walk forty blocks for a folder's preview addresses, skip any another folder holds, and say so truthfully when none is free (scripts/test_port_blocks.py)"
+  cat /tmp/verify_port_blocks_test.log
+fi
+
+if (cd scripts && python3 test_trail_lock.py) >/tmp/verify_trail_lock_test.log 2>&1; then
+  pass "every launcher adds its line to the activity trail holding the app's lock, so a trim never loses it (scripts/test_trail_lock.py)"
+else
+  fail "every launcher adds its line to the activity trail holding the app's lock, so a trim never loses it (scripts/test_trail_lock.py)"
+  cat /tmp/verify_trail_lock_test.log
+fi
+
+# RUNS deploy.sh's folder publish from a working folder whose own name has a
+# colon, to relative folders with colons in them (GitHub issue #227): where
+# each one lands, and that a copy that did not finish is never "Published".
+if (cd scripts && python3 test_deploy_folder_target.py) >/tmp/verify_deploy_folder_target_test.log 2>&1; then
+  pass "deploy.sh: a publish to a folder lands in the folder it names, and a copy that did not finish says so (scripts/test_deploy_folder_target.py)"
+else
+  fail "deploy.sh: a publish to a folder lands in the folder it names, and a copy that did not finish says so (scripts/test_deploy_folder_target.py)"
+  cat /tmp/verify_deploy_folder_target_test.log
+fi
+
+if (cd scripts && python3 test_verify_lock.py) >/tmp/verify_lock_test.log 2>&1; then
+  pass "verify.sh lets one run at a time hold this Mac, names the holder to a second, and lets go on every exit (scripts/test_verify_lock.py)"
+else
+  fail "verify.sh lets one run at a time hold this Mac, names the holder to a second, and lets go on every exit (scripts/test_verify_lock.py)"
+  cat /tmp/verify_lock_test.log
+fi
+
+# preview.sh announces the address the app opens, or says it cannot and stops;
+# it never announces a port it guessed (GitHub #235). Runs the launcher's own
+# functions with docker answering as told, so it needs no Docker at all.
+if (cd scripts && python3 test_preview_address.py) >/tmp/verify_preview_address_test.log 2>&1; then
+  pass "preview.sh announces the preview's real address or stops, never a guessed one (scripts/test_preview_address.py)"
+else
+  fail "preview.sh announces the preview's real address or stops, never a guessed one (scripts/test_preview_address.py)"
+  cat /tmp/verify_preview_address_test.log
+fi
+
+# preview.sh makes sure this Mac can reach the builder before it builds, and
+# stops in seconds when every try is refused (GitHub #234). Runs the launcher's
+# own functions with docker, curl and sleep answering as told — no Docker, no
+# network, no waiting. The previews verify.sh runs are --build-only, which
+# asks nothing, so none of them exercises the probe against a real forward;
+# a serving preview checked by hand is that proof (documentation/03).
+if (cd scripts && python3 test_preview_reach.py) >/tmp/verify_preview_reach_test.log 2>&1; then
+  pass "preview.sh checks this Mac can reach the builder before building, and stops only on a refusal (scripts/test_preview_reach.py)"
+else
+  fail "preview.sh checks this Mac can reach the builder before building, and stops only on a refusal (scripts/test_preview_reach.py)"
+  cat /tmp/verify_preview_reach_test.log
+fi
+
+# The first-run block every launcher shares, RUN against every case in
+# contracts/app-rules.json → helperBootstrap (GitHub #312): the helper programs
+# copied out of the Mac app or downloaded and checked, the install stamp, and
+# the website builder created from the app's starting disk. Stand-ins for the
+# network and the programs; real shasum, cp -c, xattr and bash 3.2.
+if (cd scripts && python3 test_helper_bootstrap.py) >/tmp/verify_helper_bootstrap_test.log 2>&1; then
+  pass "the launchers install the helper programs from inside the app, or download and check them, and create the website builder from the app's starting disk (scripts/test_helper_bootstrap.py)"
+else
+  fail "the launchers install the helper programs from inside the app, or download and check them, and create the website builder from the app's starting disk (scripts/test_helper_bootstrap.py)"
+  cat /tmp/verify_helper_bootstrap_test.log
+fi
+
 if (cd scripts && python3 test_preflight_exclusions.py) >/tmp/verify_preflight_exclusions_test.log 2>&1; then
   pass "build_site.py: preflight excluded_items discovery skipping & index.md notes (scripts/test_preflight_exclusions.py)"
 else
   fail "build_site.py: preflight excluded_items discovery skipping & index.md notes (scripts/test_preflight_exclusions.py)"
   cat /tmp/verify_preflight_exclusions_test.log
+fi
+
+# Issue #128: one coverage map per curriculum folder, and what setup records.
+if (cd scripts && python3 test_coverage_maps.py) >/tmp/verify_coverage_maps_test.log 2>&1; then
+  pass "build_site.py: one curriculum coverage map per curriculum folder, the code rule, and single-map output unchanged (scripts/test_coverage_maps.py)"
+else
+  fail "build_site.py: one curriculum coverage map per curriculum folder, the code rule, and single-map output unchanged (scripts/test_coverage_maps.py)"
+  sed 's/^/     /' /tmp/verify_coverage_maps_test.log | tail -40
+fi
+
+if (cd scripts && python3 test_setup_curriculum_folders.py) >/tmp/verify_setup_curriculum_folders_test.log 2>&1; then
+  pass "setup_course.py: curriculum_folders written for a new course, and a re-run keeps a recorded folder (scripts/test_setup_curriculum_folders.py)"
+else
+  fail "setup_course.py: curriculum_folders written for a new course, and a re-run keeps a recorded folder (scripts/test_setup_curriculum_folders.py)"
+  sed 's/^/     /' /tmp/verify_setup_curriculum_folders_test.log | tail -40
+fi
+
+# Issue #265: the build never changes `hidden`, the sidebar filter keeps the
+# stored names, and an older section's filter is repaired.
+if (cd scripts && python3 test_sidebar_hiding.py) >/tmp/verify_sidebar_hiding_test.log 2>&1; then
+  pass "build_site.py: the build keeps hidden as saved, and the sidebar filter and its repair (scripts/test_sidebar_hiding.py)"
+else
+  fail "build_site.py: the build keeps hidden as saved, and the sidebar filter and its repair (scripts/test_sidebar_hiding.py)"
+  cat /tmp/verify_sidebar_hiding_test.log
+fi
+
+# Issue #265: the build notes when it STARTED, so a Save made during a
+# publish's build makes the next Publish build again.
+if (cd scripts && python3 test_build_started_marker.py) >/tmp/verify_build_started_marker_test.log 2>&1; then
+  pass "build_site.py: the build notes when it started, for the freshness check (scripts/test_build_started_marker.py)"
+else
+  fail "build_site.py: the build notes when it started, for the freshness check (scripts/test_build_started_marker.py)"
+  cat /tmp/verify_build_started_marker_test.log
+fi
+
+# Issue #136: one rule for "this built site is a preview's" — deploy.sh's
+# check and deploy.py's, run against contracts/app-rules.json ->
+# buildFreshness.previewBuild, the cases the apps read too.
+if (cd scripts && python3 test_preview_build_detection.py) >/tmp/verify_preview_build_detection_test.log 2>&1; then
+  pass "deploy.sh and deploy.py call a site a preview's by every page, as the apps do (scripts/test_preview_build_detection.py)"
+else
+  fail "deploy.sh and deploy.py call a site a preview's by every page, as the apps do (scripts/test_preview_build_detection.py)"
+  cat /tmp/verify_preview_build_detection_test.log
 fi
 
 if (cd scripts && python3 test_publishable_site.py) >/tmp/verify_publishable_site_test.log 2>&1; then
@@ -235,6 +505,13 @@ if (cd scripts && python3 test_class_pages.py) >/tmp/verify_class_pages_test.log
 else
   fail "class_pages.py: what a course calls a unit, and what the build counts as a class page (scripts/test_class_pages.py)"
   cat /tmp/verify_class_pages_test.log
+fi
+
+if (cd scripts && python3 test_club_start.py) >/tmp/verify_club_start_test.log 2>&1; then
+  pass "setup_course.py: a club starts with its front page heading and a published first page, and keeps its recorded class folder (scripts/test_club_start.py)"
+else
+  fail "setup_course.py: a club starts with its front page heading and a published first page, and keeps its recorded class folder (scripts/test_club_start.py)"
+  cat /tmp/verify_club_start_test.log
 fi
 
 if (cd scripts && python3 test_page_visibility.py) >/tmp/verify_page_visibility_test.log 2>&1; then
@@ -261,9 +538,9 @@ else
 fi
 
 if (cd scripts && python3 test_stop_quietly.py) >/tmp/verify_stop_quietly_test.log 2>&1; then
-  pass "pressing Stop ends a build quietly, exit 130 and no traceback (scripts/test_stop_quietly.py)"
+  pass "pressing Cancel ends a build or a publish quietly, exit 130 and no traceback (scripts/test_stop_quietly.py)"
 else
-  fail "pressing Stop ends a build quietly, exit 130 and no traceback (scripts/test_stop_quietly.py)"
+  fail "pressing Cancel ends a build or a publish quietly, exit 130 and no traceback (scripts/test_stop_quietly.py)"
   cat /tmp/verify_stop_quietly_test.log
 fi
 
@@ -280,13 +557,20 @@ fi
 # behavioural — a real preview-then-publish cycle would add minutes to every
 # run of this script — but it catches the guard being deleted, which is how it
 # came to be missing in the first place.
+#
+# deploy.sh is asked for its ONE reader of the rule (#291), which
+# scripts/test_preview_build_detection.py then runs against every case in
+# contracts/app-rules.json; deploy.ps1 still carries the bare address until
+# Windows adopts the same rule (GitHub #272).
 _folder_guard_ok=true
-for _launcher in deploy.sh deploy.ps1; do
-  if ! grep -q "ws://localhost:" "$_launcher"; then
-    _folder_guard_ok=false
-    echo "   $_launcher does not check for a preview build before publishing to a folder"
-  fi
-done
+if ! grep -q 'site_carries_preview_client "${PUBLIC_DIR_HOST}"' deploy.sh; then
+  _folder_guard_ok=false
+  echo "   deploy.sh does not check for a preview build before publishing to a folder"
+fi
+if ! grep -q "ws://localhost:" deploy.ps1; then
+  _folder_guard_ok=false
+  echo "   deploy.ps1 does not check for a preview build before publishing to a folder"
+fi
 if [ "$_folder_guard_ok" = true ]; then
   pass "publishing to a folder refuses a preview build (deploy.sh and deploy.ps1)"
 else
@@ -354,6 +638,28 @@ if [ -z "$_dead_heredocs" ]; then
 else
   fail "a launcher feeds a program to docker exec without -i, so it never runs"
   echo "$_dead_heredocs"
+fi
+
+# No temporary-file template may carry anything after its X's. macOS mktemp
+# fills in only TRAILING X's: with a suffix the name is used exactly as
+# written, so the first run succeeds, and the second — or any run after one
+# that was stopped before tidying up, or a second worktree running at the same
+# time — dies with "File exists". verify.sh's prune check had exactly that
+# shape until 2026-09-25 (GitHub #273). The list is every TRACKED shell file,
+# not a hand list, because the next copy will be somewhere nobody thought to
+# look; an empty list fails rather than passing having read nothing.
+_tracked_shell_files="$(git ls-files -- '*.sh' .githooks 2>/dev/null || true)"
+if [ -z "$_tracked_shell_files" ]; then
+  fail "could not list the tracked shell files to check their temporary-file names"
+else
+  _literal_temp_names="$(git ls-files -z -- '*.sh' .githooks \
+    | xargs -0 grep -nE 'mktemp[^|;]*X{3,}[^X"[:space:])]' || true)"
+  if [ -z "$_literal_temp_names" ]; then
+    pass "every temporary-file template ends in its X's (none is used literally)"
+  else
+    fail "a temporary-file template has text after its X's, so its name is fixed"
+    echo "$_literal_temp_names"
+  fi
 fi
 
 # Nothing may have left bytecode behind. PYTHONDONTWRITEBYTECODE above stops
@@ -461,6 +767,55 @@ else
   cat /tmp/verify_class_folder_test.log
 fi
 
+# ---- build_site.py: pages take their class's date, in the teacher's files ----
+# The front page and every page a visible class brings (#275, #276), run
+# against the shared contract in the image for the same reason as above — and
+# every case built TWICE, because a second build that rewrote anything would
+# make every publish build once more (#265).
+echo ""
+echo "🔎 Checking that pages take their class's date, against the shared contract…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/test_dates_follow_the_class.py" /opt/scripts/test_dates_follow_the_class.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_dates_follow_the_class.py >/tmp/verify_dates_follow_the_class_test.log 2>&1; then
+  pass "build_site.py: the front page and linked pages take their class's date, per section (scripts/test_dates_follow_the_class.py)"
+else
+  fail "build_site.py: the front page and linked pages take their class's date, per section (scripts/test_dates_follow_the_class.py)"
+  cat /tmp/verify_dates_follow_the_class_test.log
+fi
+
+# ---- build_site.py: a page whose settings cannot be read is hidden ----
+# GitHub #246. Every case in contracts/shared-rules.json ->
+# unreadablePageSettings through the real process_frontmatter, in the image
+# because it needs python-frontmatter: hidden, named with its line, its body
+# kept, the teacher's file untouched, and an unreadable front page clearing
+# the last site and saying so in its own words.
+echo ""
+echo "🔎 Checking that a page whose settings cannot be read is hidden and named…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/test_unreadable_page_settings.py" /opt/scripts/test_unreadable_page_settings.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_unreadable_page_settings.py >/tmp/verify_unreadable_page_settings_test.log 2>&1; then
+  pass "build_site.py: a page whose settings cannot be read is hidden and named (scripts/test_unreadable_page_settings.py)"
+else
+  fail "build_site.py: a page whose settings cannot be read is hidden and named (scripts/test_unreadable_page_settings.py)"
+  cat /tmp/verify_unreadable_page_settings_test.log
+fi
+
+# ---- build_site.py: links students would find dead (#333) ----
+# Every case in contracts/shared-rules.json -> siteHealth.linksIntoHiddenPages
+# through the build's own reader, in the image because it imports build_site
+# (python-frontmatter): a link on a page students can see into one they
+# cannot, named by its place in the course folder, once, and ONE finding.
+echo ""
+echo "🔎 Checking that links into hidden pages are named…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/test_links_into_hidden_pages.py" /opt/scripts/test_links_into_hidden_pages.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_links_into_hidden_pages.py >/tmp/verify_links_into_hidden_pages_test.log 2>&1; then
+  pass "build_site.py: a link on a page students can see into a hidden page is named (scripts/test_links_into_hidden_pages.py, #333)"
+else
+  fail "build_site.py: a link on a page students can see into a hidden page is named (scripts/test_links_into_hidden_pages.py, #333)"
+  cat /tmp/verify_links_into_hidden_pages_test.log
+fi
+
 # ---- Whether the site shows a page: the contract, run down the REAL chain ----
 # The one check here that is not about a rule being implemented right — it is
 # about the rule being TRUE. Both apps are tested against
@@ -481,6 +836,40 @@ if docker run --rm \
 else
   fail "every pageVisibility reading case agrees with the built site (scripts/check_visibility_against_the_site.py)"
   cat /tmp/verify_visibility_site.log
+fi
+
+# ---- The date and title writers, against what the site reads ----
+# GitHub #199. `contracts/file-formats.json` -> `datesAndTitles.writingCases`
+# says what the built site reads from each page a writer produces; this runs
+# every `after` through the real process_frontmatter so that stays true.
+echo ""
+echo "🔎 Checking the date and title writing cases against what the real build reads…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/check_dates_and_titles_against_the_site.py" /opt/scripts/check_dates_and_titles_against_the_site.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/check_dates_and_titles_against_the_site.py \
+  >/tmp/verify_dates_titles_site.log 2>&1; then
+  pass "every datesAndTitles writing case reads on the site as the contract says (scripts/check_dates_and_titles_against_the_site.py)"
+else
+  fail "every datesAndTitles writing case reads on the site as the contract says (scripts/check_dates_and_titles_against_the_site.py)"
+  cat /tmp/verify_dates_titles_site.log
+fi
+
+# ---- The sidebar's hide rule, against the REAL Quartz file tree ----
+# Issue #265. Every `file-formats.json` -> `sidebarHiding.matchRule` case is
+# run through Quartz 4.5's own FileTrieNode with the filter text the build
+# writes, rebuilt from that text the way the page does in the browser. Needs
+# Node and Quartz's sources, which only the image has — so it is here and
+# not a `test_` file (Windows' Python suite has neither).
+echo ""
+echo "🔎 Checking the sidebar's hide rule against the real Quartz file tree…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/check_sidebar_hiding_against_the_site.py" /opt/scripts/check_sidebar_hiding_against_the_site.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/check_sidebar_hiding_against_the_site.py \
+  >/tmp/verify_sidebar_hiding.log 2>&1; then
+  pass "every sidebarHiding.matchRule case agrees with the real Quartz file tree (scripts/check_sidebar_hiding_against_the_site.py)"
+else
+  fail "every sidebarHiding.matchRule case agrees with the real Quartz file tree (scripts/check_sidebar_hiding_against_the_site.py)"
+  cat /tmp/verify_sidebar_hiding.log
 fi
 
 # ---- build_site.py: custom-domain resolution follows the primary destination ----
@@ -565,7 +954,11 @@ rm -rf "$EXPORT_TMP"
 # throwaway fixtures standing in for each case.
 echo ""
 echo "🔎 Checking that a new build removes superseded builder images…"
-PRUNE_SRC="$(mktemp "${TMPDIR:-/tmp}/verify_prune.XXXXXX.sh")"
+# The X's must END the template: macOS mktemp fills in only trailing X's, and
+# with anything after them the name is used as written — so a second run, or
+# any run after a stopped one, died here on "File exists" (GitHub #273).
+# `source` below needs no extension.
+PRUNE_SRC="$(mktemp "${TMPDIR:-/tmp}/verify_prune.XXXXXX")"
 awk '/^prune_superseded_images\(\) \{/,/^\}/' preview.sh > "$PRUNE_SRC"
 # The three launchers are standalone scripts sharing hand-copied helper blocks,
 # and the cross-check above only proves each NAME is defined — not that the
@@ -715,6 +1108,8 @@ check_baked scripts/site_health.py        /opt/scripts/site_health.py
 # stands for the directory — the Dockerfile copies it wholesale.
 check_baked contracts/class-planning.json /opt/contracts/class-planning.json
 check_baked scripts/page_visibility.py    /opt/scripts/page_visibility.py
+check_baked scripts/markdown_code.py      /opt/scripts/markdown_code.py
+check_baked scripts/how_i_teach.py        /opt/scripts/how_i_teach.py
 check_baked scripts/setup_course.py       /opt/scripts/setup_course.py
 check_baked scripts/build_site.py         /opt/scripts/build_site.py
 check_baked scripts/deploy.py             /opt/scripts/deploy.py
@@ -732,6 +1127,43 @@ check_baked support/favicon/icon.svg      /opt/support/favicon/icon.svg
 check_baked support/favicon/apple-touch-icon.png /opt/support/favicon/apple-touch-icon.png
 check_baked support/favicon/icon.png      /opt/support/favicon/icon.png
 [[ "$BAKED_OK" == "true" ]] && pass "Baked scripts, patches, and support files match the working tree"
+
+# -------------------- 4a. The live-reload client is still the one the rule names --------------------
+# Every check for "this site is a preview's" looks for the client's script tag
+# followed by its first statement (contracts/app-rules.json ->
+# buildFreshness.previewBuild.signature, #291). Those bytes are Quartz's, not
+# ours: if a Quartz raise or a patch changes them, the rule matches NOTHING,
+# every preview reads as a production build, and a preview is published — the
+# one catastrophic direction. So the source that produces them is asked for
+# here, in the image, which takes seconds rather than a serve cycle and fails
+# the day Quartz is raised. verify-deploy.sh checks a real serve-mode page
+# against the rule as well.
+#
+# The client's template is checked for ADJACENCY, not for its words: the
+# inline script's template literal must open with nothing but whitespace
+# before `const socket = new WebSocket(`, read as one record in the C locale
+# as deploy.sh reads a page. Three separate `grep -F`s (the first version)
+# would all still pass if a Quartz raise put a comment or "use strict" first,
+# and the rule would then match nothing (found by review, #291). The other two
+# lines — the address and the tag's type — are words, so a fixed string does.
+echo ""
+echo "🔎 Checking the image's Quartz still writes the live-reload client the preview rule looks for…"
+CLIENT_OK="true"
+check_client_source() {
+  local image_path="$1" expected="$2"
+  if ! docker run --rm "$DEV_TEST_IMAGE" grep -Fq -- "$expected" "$image_path" 2>/dev/null; then
+    CLIENT_OK="false"
+    fail "$image_path no longer holds: $expected — re-measure the preview rule in contracts/app-rules.json (#291)"
+  fi
+}
+QUARTZ_CLIENT_TEMPLATE='script: `[[:space:]]*const socket = new WebSocket('"'"'${wsUrl}'"'"')'
+if ! docker run --rm -e LC_ALL=C "$DEV_TEST_IMAGE" grep -zq -- "$QUARTZ_CLIENT_TEMPLATE" /opt/quartz/quartz/plugins/index.ts 2>/dev/null; then
+  CLIENT_OK="false"
+  fail "/opt/quartz/quartz/plugins/index.ts no longer opens the live-reload script with const socket = new WebSocket(…) — re-measure the preview rule in contracts/app-rules.json (#291)"
+fi
+check_client_source /opt/quartz/quartz/plugins/index.ts 'ws://localhost:${ctx.argv.wsPort}'
+check_client_source /opt/quartz/quartz/util/resources.tsx 'moduleType ?? "application/javascript"'
+[[ "$CLIENT_OK" == "true" ]] && pass "The image's Quartz writes the live-reload client the preview rule looks for (#291)"
 
 # -------------------- 4b. The hide filter must be IN THE IMAGE --------------------
 # The Explorer's filterFn is what makes a teacher's hidden pages hidden, and
@@ -756,19 +1188,81 @@ check_baked support/favicon/icon.png      /opt/support/favicon/icon.png
 echo ""
 echo "🔎 Checking the Explorer's hide filter is baked into the image, and wired to a live omit Set…"
 ANCHOR_OK="true"
-for layout in /opt/quartz/quartz.layout.ts /opt/quartz-site/quartz.layout.ts; do
+for layout in /opt/quartz/quartz.layout.ts; do
   if ! docker run --rm "$DEV_TEST_IMAGE" grep -Pzoq '//[ \t]*CQ4T-OMIT-ANCHOR:[^\n]*\n[ \t]*const[ \t]+omit[ \t]*=[ \t]*new[ \t]+Set' "$layout" 2>/dev/null; then
     fail "The Explorer's hide filter is missing or structurally detached from $layout in the image — hidden pages would be published"
     ANCHOR_OK="false"
   fi
 done
-[[ "$ANCHOR_OK" == "true" ]] && pass "The Explorer's hide filter is baked into the image and wired to a live omit Set (both Quartz copies)"
+[[ "$ANCHOR_OK" == "true" ]] && pass "The Explorer's hide filter is baked into the image and wired to a live omit Set"
+
+# #334: the unused second copy of the scaffold is gone (it was 468 MB of
+# image disk that nothing read), and Quartz is a one-commit clone.
+if docker run --rm "$DEV_TEST_IMAGE" test -e /opt/quartz-site; then
+  fail "The image still carries /opt/quartz-site, which nothing reads (#334)"
+else
+  pass "The image carries one copy of the website builder's scaffold (#334)"
+fi
+QUARTZ_COMMITS="$(docker run --rm "$DEV_TEST_IMAGE" git -C /opt/quartz rev-list --count HEAD 2>/dev/null || echo "?")"
+if [[ "$QUARTZ_COMMITS" == "1" ]]; then
+  pass "Quartz is cloned at depth 1: the tag's one commit (#334)"
+else
+  fail "Quartz carries ${QUARTZ_COMMITS} commits of history; the clone should be depth 1 (#334)"
+fi
 
 # -------------------- 5. Drive the real launcher against the image --------------------
 echo ""
 echo "🧹 Removing existing '$CONTAINER_NAME' container so the launcher recreates it"
 echo "   from ${DEV_TEST_IMAGE}…"
 docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+
+# ---- #209: How I Teach pages, planted for the build below ----
+# Three pages, each carrying its own sentinel phrase so the check after the
+# build can look for the WORDS anywhere in the site (pages, contentIndex.json,
+# the sitemap, the RSS feed) rather than for a file name — the section's page
+# is spelled in capitals, whose web address a case-sensitive name check would
+# miss (#209 plan review, item 9). The course's settings are made to LIST the
+# two reserved pages, the way a course whose page predates the rule does, so
+# the preflight drop runs for real.
+#
+# They are put back by an EXIT trap, not only at the end of 6h: the fixture is
+# the developer's own git-ignored course, and a run stopped between here and
+# the check (^C, HUP, a hard exit) must not leave three pages and an edited
+# configuration for the next run to start from (#209 implementation review,
+# item 4). The build's preflight also rewrites course_config.backup.json, so
+# that is kept and put back too — or removed if there was none.
+HIT_COURSE="courses/EXC2O"
+HIT_CONFIG_BACKUP="$(mktemp -t cq4t-hit-config)"
+HIT_CONFIG_BACKUP_BACKUP="$(mktemp -t cq4t-hit-config-backup)"
+cp "$HIT_COURSE/course_config.json" "$HIT_CONFIG_BACKUP"
+HIT_HAD_CONFIG_BACKUP="no"
+if [[ -f "$HIT_COURSE/course_config.backup.json" ]]; then
+  cp "$HIT_COURSE/course_config.backup.json" "$HIT_CONFIG_BACKUP_BACKUP"
+  HIT_HAD_CONFIG_BACKUP="yes"
+fi
+restore_hit_fixture() {
+  [[ -n "${HIT_CONFIG_BACKUP:-}" && -f "$HIT_CONFIG_BACKUP" ]] || return 0
+  rm -f "$HIT_COURSE/How I Teach.md" "$HIT_COURSE/section1/HOW I TEACH.md" "$HIT_COURSE/How I Teach 1.md"
+  cp "$HIT_CONFIG_BACKUP" "$HIT_COURSE/course_config.json"
+  if [[ "$HIT_HAD_CONFIG_BACKUP" == "yes" ]]; then
+    cp "$HIT_CONFIG_BACKUP_BACKUP" "$HIT_COURSE/course_config.backup.json"
+  else
+    rm -f "$HIT_COURSE/course_config.backup.json"
+  fi
+  rm -f "$HIT_CONFIG_BACKUP" "$HIT_CONFIG_BACKUP_BACKUP"
+}
+trap 'restore_hit_fixture; release_verify_lock' EXIT
+printf 'I teach by plantoir-hit-sentinel-course-7f3a.\n' > "$HIT_COURSE/How I Teach.md"
+printf 'I teach by plantoir-hit-sentinel-section-7f3a.\n' > "$HIT_COURSE/section1/HOW I TEACH.md"
+printf 'A look-alike page: plantoir-hit-sentinel-lookalike-7f3a.\n' > "$HIT_COURSE/How I Teach 1.md"
+python3 - "$HIT_COURSE/course_config.json" <<'PY'
+import json, sys
+path = sys.argv[1]
+config = json.load(open(path, encoding="utf-8"))
+config.setdefault("shared_files", []).append("How I Teach.md")
+config.setdefault("per_section_files", []).append("HOW I TEACH.md")
+json.dump(config, open(path, "w", encoding="utf-8"), indent=2, ensure_ascii=False)
+PY
 
 STAMP_FILE="$(mktemp -t cq4t-stamp)"
 echo ""
@@ -796,7 +1290,7 @@ rm -f "$STAMP_FILE"
 # LINK. Checked here because every other check in this file would pass just as
 # happily with a real folder in the old place — and the whole point of the
 # change is that the bytes are not in the working folder any more.
-EXPECTED_BUILD_ROOT="${HOME%/}/Library/Application Support/Plantoir/builds/$(pwd -P | shasum -a 256 | cut -c1-8)"
+EXPECTED_BUILD_ROOT="${HOME%/}/Library/Application Support/Plantoir/builds/$(/bin/pwd -P | shasum -a 256 | cut -c1-8)"
 LINK_TARGET="$(readlink courses/EXC2O/.merged_output 2>/dev/null || true)"
 if [[ -L "courses/EXC2O/.merged_output" && "$LINK_TARGET" == "$EXPECTED_BUILD_ROOT/EXC2O" ]]; then
   pass "The built site is kept outside the working folder ($LINK_TARGET)"
@@ -842,6 +1336,48 @@ if [[ -f "$SITE_INDEX" ]]; then
   [[ "$ICON_OK" == "true" ]] && pass "Built site carries and links the Plantoir icon (tab, root, Apple touch)"
 fi
 
+# -------------------- 6h. The How I Teach page never reaches the site (#209) ----
+# The pages planted before the build above, looked for by their WORDS across
+# everything the site serves. Two halves that fail independently: the two
+# reserved pages must be nowhere, and the look-alike MUST be there — a site
+# that built nothing would pass the first half alone.
+HIT_OK="true"
+if [[ -d "$SITE_PUBLIC" ]]; then
+  for sentinel in plantoir-hit-sentinel-course-7f3a plantoir-hit-sentinel-section-7f3a; do
+    if grep -rIliq -- "$sentinel" "$SITE_PUBLIC"; then
+      fail "A How I Teach page reached the built site: '$sentinel' is in $(grep -rIli -- "$sentinel" "$SITE_PUBLIC" | head -3 | tr '\n' ' ')"
+      HIT_OK="false"
+    fi
+  done
+  if ! grep -rIliq -- plantoir-hit-sentinel-lookalike-7f3a "$SITE_PUBLIC"; then
+    fail "The look-alike page 'How I Teach 1' is missing from the built site — it is an ordinary page and must be published (without it the check above proves nothing)"
+    HIT_OK="false"
+  fi
+else
+  fail "No built site at $SITE_PUBLIC to check for How I Teach pages"
+  HIT_OK="false"
+fi
+if python3 - "$HIT_COURSE/course_config.json" <<'PY'
+import json, sys
+config = json.load(open(sys.argv[1], encoding="utf-8"))
+listed = [n for n in config.get("shared_files", []) + config.get("per_section_files", [])
+          if n.lower() in ("how i teach.md",)]
+sys.exit(1 if listed else 0)
+PY
+then :; else
+  fail "The course's settings still list a How I Teach page after a build — preflight did not drop it"
+  HIT_OK="false"
+fi
+for planted in "$HIT_COURSE/How I Teach.md" "$HIT_COURSE/section1/HOW I TEACH.md"; do
+  if [[ ! -f "$planted" ]]; then
+    fail "The build removed the teacher's own $planted — only the site's copy may ever be removed"
+    HIT_OK="false"
+  fi
+done
+[[ "$HIT_OK" == "true" ]] && pass "No How I Teach page reaches the built site, the look-alike does, and the teacher's own pages are untouched (#209)"
+restore_hit_fixture
+trap release_verify_lock EXIT
+
 # -------------------- 6c. An existing teacher's container is recreated ------
 # Every container that exists today was made WITHOUT the builds mount, and a
 # mount cannot be added to a container that already exists — so the launcher
@@ -870,6 +1406,72 @@ docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
 if docker run -dit --name "$CONTAINER_NAME" \
      -v "$(pwd)/courses":/teaching/courses \
      "$DEV_TEST_IMAGE" tail -f /dev/null >/dev/null 2>&1; then
+  # ---- First: an OPEN preview is not killed to remake it (GitHub #94) ----
+  # The launcher is about to remake this workspace (no builds mount). Before
+  # #94 it stopped it without looking, ending whatever ran inside. Here a
+  # pretend preview of section 2 runs inside it, and a pretend preview.sh for
+  # section 2 runs on this Mac — the launcher that keeps a preview OPEN; a
+  # preview without one is an orphan and is (correctly) remade over. `exec -a`
+  # renames `sleep` so the process tables read exactly what a real preview
+  # puts there (measured in this image: `docker top` shows
+  # "python3 /opt/scripts/build_site.py … --section=2 --port 8082 300").
+  # The run must refuse after the preview wait, say which preview, and leave
+  # the workspace and the pretend preview exactly as they were.
+  _old_id="$(docker inspect -f '{{.Id}}' "$CONTAINER_NAME" 2>/dev/null)"
+  docker exec -d "$CONTAINER_NAME" bash -c \
+    'exec -a "python3 /opt/scripts/build_site.py --host-os mac --course=EXC2O --section=2 --port 8082" sleep 300' \
+    >/dev/null 2>&1
+  bash -c 'exec -a "/bin/bash ./preview.sh EXC2O 2" sleep 300' &
+  _pretend_launcher=$!
+  sleep 1
+  _refusal_started=$(date +%s)
+  if ./preview.sh EXC2O 1 --image "$DEV_TEST_IMAGE" --build-only >/tmp/verify_in_use.log 2>&1; then
+    fail "a remake went ahead while a preview from the folder was open (#94)"
+  else
+    pass "a remake refuses while a preview from the folder is open (#94)"
+  fi
+  _refusal_took=$(( $(date +%s) - _refusal_started ))
+  _open_line="$(python3 -c 'import json,sys; s=json.load(open("contracts/app-rules.json"))["previewPorts"]["whenTheWorkspaceIsInUse"]["sentences"]["whenAPreviewIsOpen"][0]; print(s.replace("{course}","EXC2O").replace("{section}","2"))')"
+  if grep -Fq -- "$_open_line" /tmp/verify_in_use.log; then
+    pass "and says which preview is open, in the contract's words"
+  else
+    fail "the refusal did not say which preview was open"
+    tail -15 /tmp/verify_in_use.log
+  fi
+  if [[ "$(docker inspect -f '{{.Id}}' "$CONTAINER_NAME" 2>/dev/null)" == "$_old_id" ]] \
+     && docker top "$CONTAINER_NAME" 2>/dev/null | grep -Fq -- "--course=EXC2O --section=2"; then
+    pass "and the workspace, and the preview in it, were left exactly as they were"
+  else
+    fail "the workspace was stopped or remade while a preview was open in it"
+  fi
+  if [[ "$_refusal_took" -ge 20 ]]; then
+    pass "and it gave the preview ${_refusal_took} s to close before refusing"
+  else
+    fail "it refused after ${_refusal_took} s, before the preview wait was up"
+  fi
+  # End both pretend processes, and make sure they HAVE ended: the run below
+  # is the remake this section exists to check, and it would otherwise meet
+  # the same open preview and refuse.
+  kill "$_pretend_launcher" >/dev/null 2>&1 || true
+  wait "$_pretend_launcher" 2>/dev/null || true
+  docker exec "$CONTAINER_NAME" python3 -c '
+import os, signal
+for entry in os.listdir("/proc"):
+    if not entry.isdigit() or entry == str(os.getpid()):
+        continue
+    try:
+        line = open("/proc/%s/cmdline" % entry, "rb").read().replace(b"\x00", b" ").decode("utf-8", "replace")
+    except OSError:
+        continue
+    if "--course=EXC2O --section=2" in line:
+        os.kill(int(entry), signal.SIGKILL)
+' >/dev/null 2>&1 || true
+  sleep 1
+  if docker top "$CONTAINER_NAME" 2>/dev/null | grep -Fq -- "--course=EXC2O --section=2"; then
+    fail "the pretend preview could not be ended, so the remake below is not a fair test"
+  else
+    pass "the pretend preview has ended, so the remake below has nothing in its way"
+  fi
   if ./preview.sh EXC2O 1 --image "$DEV_TEST_IMAGE" --build-only >/tmp/verify_old_container.log 2>&1; then
     pass "a build in a container made before the builds mount existed still works"
   else
@@ -1101,7 +1703,7 @@ cp -R courses/EXC2O "$VERIFY_COLON_DIR/courses/EXC2O"
 # The fixture's .merged_output is a LINK to THIS folder's builds root. Copied
 # as a link, it would aim the colon folder's build at this one's built site.
 rm -rf "$VERIFY_COLON_DIR/courses/EXC2O/.merged_output"
-VERIFY_COLON_ID="$(cd "$VERIFY_COLON_DIR" && pwd -P | shasum -a 256 | cut -c1-8)"
+VERIFY_COLON_ID="$(cd "$VERIFY_COLON_DIR" && /bin/pwd -P | shasum -a 256 | cut -c1-8)"
 VERIFY_COLON_CONTAINER="teaching-quartz-${VERIFY_COLON_ID}"
 VERIFY_COLON_BUILDS="${HOME%/}/Library/Application Support/Plantoir/builds/${VERIFY_COLON_ID}"
 docker rm -f "$VERIFY_COLON_CONTAINER" >/dev/null 2>&1 || true
@@ -1127,6 +1729,35 @@ if [[ "$COLON_MOUNT_SRC" == "$VERIFY_COLON_DIR/courses" ]]; then
   pass "and the workspace was given the colon-named folder itself, byte for byte"
 else
   fail "the workspace was given [${COLON_MOUNT_SRC:-nothing}], not $VERIFY_COLON_DIR/courses"
+fi
+# And PUBLISH it, from inside the colon folder, to a folder whose name has a
+# colon too, given the way a teacher might type it: relative (GitHub issue
+# #227). rsync reads a colon before the first slash as another COMPUTER; the
+# launcher used to say "Published" over an empty folder here. The folder
+# publish needs no container, so this runs before the one above is removed
+# only because that is the tidier order. PUBLISHED_FOLDER= is compared with
+# the working folder as `/bin/pwd -P` spells it, which is how the launcher
+# spells it.
+VERIFY_COLON_PUBLISHED="$(cd "$VERIFY_COLON_DIR" && /bin/pwd -P)/out 26:27/section1"
+if (cd "$VERIFY_COLON_DIR" && ./deploy.sh EXC2O 1 --to-folder "out 26:27" --non-interactive --image "$DEV_TEST_IMAGE") \
+     >/tmp/verify_colon_folder_publish.log 2>&1; then
+  pass "a folder publish from it, to a relative folder with a colon, finished"
+else
+  fail "a folder publish from it, to a relative folder with a colon, did not finish"
+  tail -20 /tmp/verify_colon_folder_publish.log
+fi
+COLON_BUILT_PAGES="$(find "$VERIFY_COLON_BUILDS/EXC2O/section1/public" -name '*.html' 2>/dev/null | wc -l | tr -d ' ')"
+COLON_PUBLISHED_PAGES="$(find "$VERIFY_COLON_DIR/out 26:27/section1" -name '*.html' 2>/dev/null | wc -l | tr -d ' ')"
+if [[ -f "$VERIFY_COLON_DIR/out 26:27/section1/index.html" && "$COLON_PUBLISHED_PAGES" == "$COLON_BUILT_PAGES" ]]; then
+  pass "and every page (${COLON_PUBLISHED_PAGES} of ${COLON_BUILT_PAGES}) is in that folder, inside the working folder"
+else
+  fail "the published folder holds ${COLON_PUBLISHED_PAGES:-0} of ${COLON_BUILT_PAGES:-0} pages"
+fi
+if grep -Fxq "PUBLISHED_FOLDER=${VERIFY_COLON_PUBLISHED}" /tmp/verify_colon_folder_publish.log; then
+  pass "and the launcher named that folder by its full path"
+else
+  fail "the launcher did not name ${VERIFY_COLON_PUBLISHED} as the published folder"
+  grep '^PUBLISHED_FOLDER=' /tmp/verify_colon_folder_publish.log || true
 fi
 docker rm -f "$VERIFY_COLON_CONTAINER" >/dev/null 2>&1 || true
 rm -rf "$VERIFY_COLON_DIR" "$VERIFY_COLON_BUILDS"
@@ -1177,7 +1808,7 @@ printf -- '---\ntitle: Held Back\ndraft: true\n---\n\nNot for students.\n' \
   > "$VERIFY_LOCK_SECTION/Held Back.md"
 printf -- '---\ntitle: Out In The Open\npublish: true\n---\n\nFor students.\n' \
   > "$VERIFY_LOCK_SECTION/Out In The Open.md"
-VERIFY_LOCK_ID="$(cd "$VERIFY_LOCK_DIR" && pwd -P | shasum -a 256 | cut -c1-8)"
+VERIFY_LOCK_ID="$(cd "$VERIFY_LOCK_DIR" && /bin/pwd -P | shasum -a 256 | cut -c1-8)"
 VERIFY_LOCK_CONTAINER="teaching-quartz-${VERIFY_LOCK_ID}"
 VERIFY_LOCK_BUILDS="${HOME%/}/Library/Application Support/Plantoir/builds/${VERIFY_LOCK_ID}"
 docker rm -f "$VERIFY_LOCK_CONTAINER" >/dev/null 2>&1 || true

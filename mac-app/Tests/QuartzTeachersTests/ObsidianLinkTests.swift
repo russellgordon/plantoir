@@ -320,4 +320,22 @@ final class ObsidianLinkTests: XCTestCase {
             CourseRenamer.obsidianQuestion(openVaultCount: 3)
         )
     }
+
+    /// A PAGE is its own target (#329): routed through `obsidianTarget`, which
+    /// is for folders, it would look for `<page>/index.md`, find none, and
+    /// open the vault instead of the How I Teach page.
+    @MainActor
+    func testAPageOpensAsItself() throws {
+        let vault: URL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("vault-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: vault, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: vault) }
+        let page: URL = vault.appendingPathComponent("How I Teach.md")
+        try "---\npublish: false\n---\n".write(to: page, atomically: true, encoding: .utf8)
+
+        let target: URL = FolderActions.pageTarget(page, vaultURL: vault)
+        XCTAssertEqual(target, page)
+        let link: URL = try XCTUnwrap(FolderActions.obsidianURL(forFolder: target))
+        XCTAssertTrue(link.absoluteString.hasSuffix("/How%20I%20Teach.md"), link.absoluteString)
+    }
 }
+

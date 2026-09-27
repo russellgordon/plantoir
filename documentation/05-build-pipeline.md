@@ -8,7 +8,7 @@ site and either serves it (preview mode, the default) or builds it statically
 (`--build-only`, used by deploy).
 
 To achieve maximum performance across all host operating systems (especially
-Windows WSL2 and macOS Colima/Lima mounts), the pipeline uses a **dual-workspace
+macOS Colima/Lima mounts, and historically Windows WSL2), the pipeline uses a **dual-workspace
 architecture**:
 
 ```
@@ -32,6 +32,25 @@ support files ──────┘                        │                  
    differential `rsync -a --delete` (with `shutil.copytree` fallback). Host-side
    components (`BuildFreshness`, `SectionDetailView`, `ScheduledDeploy`, and `deploy.py`)
    read from this path directly on the host filesystem.
+
+   **Beside `public/`, the build notes when it STARTED** (issue #265, fix
+   round): `build_site.py` makes `section<N>/.build-started.pending` before it
+   reads the settings or any page, and renames it to `.build-started` once the
+   site has been copied out — so `.build-started` always describes the site
+   that is there, and a build that fails, is stopped or is a preview leaves it
+   alone. The file's modification time IS the start; nothing reads its
+   contents. It exists because freshness used to be judged against
+   `index.html`'s time, the END of the build, and a Save made while a publish
+   was building is older than that page: the next Publish called the site up
+   to date and sent the same old build. Measured: a file created from inside
+   the Colima container on a bind mount is stamped by the host's clock, the
+   same clock as the teacher's Save. Readers: `BuildFreshness.needsRebuild`
+   and the scheduled publish's shell (both compare with the EARLIER of the two
+   times); Windows' `BuildFreshness` owes the same. The reasoning and what was
+   rejected: [09 → "Two windows, one course"](09-mac-app.md#two-windows-one-course);
+   the rule: `contracts/app-rules.json` → `buildFreshness.buildStartedMarker`.
+
+**One known extra rebuild, written down so it is not re-found.** Preflight rewrites `course_config.json` after the marker whenever it discovers a new item (a folder or file that arrived in Obsidian since the last build), so the config is then newer than the marker and the next Publish rebuilds once for nothing (measured 2026-09-24: `needsRebuild` true after a build that discovered `Extra Notes.md`). It errs toward rebuilding and settles after one build; not worth a special case.
 
    **That path is a link, and the built site is not inside the working
    folder.** Since 2026-09-05 `courses/<CODE>/.merged_output` is a symlink to
@@ -74,14 +93,37 @@ exist, and that the requested section is one of the course's
 
 It scans the course root and section folder for top-level folders/files that
 are *not yet listed* in `course_config.json` and appends them. A newly
-discovered folder is also taken OUT of `hidden` if it is listed there
-and added to `expandable`, so it appears with a chevron like any other. The updated config is written atomically
+discovered folder is also added to `expandable`, so it appears with a chevron like any other. The updated config is written atomically
 with a `course_config.backup.json` safety copy.
+
+**Preflight never changes `hidden`** (issue #265, 2026-09-24). It used to take
+a newly discovered folder OUT of `hidden` and write the list back ("Un-hid newly
+discovered folder"). Measured with the real preflight on five folder shapes — a
+hidden per-section folder moved to the course root, the same name made at both
+levels, a name listed in one scope and made in the other, and a folder ticked
+hidden before it was listed, shared or per-section — every one looped: the build
+un-hid it and erased the tick from the file, the app went on showing the tick,
+the next Save put it back, and the next build took it out again. `hidden` is now
+written by the setup wizard and the apps only; a "new" folder already named in it
+stays hidden, which errs the safe way (hiding from the sidebar never unpublishes
+a page). Nothing depended on the rewrite: the build copies the FILE into the
+output, and adds `Media` and the coverage page to the sidebar's list in memory
+(`names_the_sidebar_hides`) without writing them back. Rejected: limiting the
+un-hide to names the teacher "could not have ticked" — Course Settings offers
+only listed names, so every entry was ticked by somebody or is a legacy entry
+nobody should lose silently. Cases: `contracts/file-formats.json` →
+`sidebarHiding.buildKeepsHidden`, run by `scripts/test_sidebar_hiding.py`.
+
+**The app does not save over what preflight added, either.** Course Settings
+used to write its whole in-memory copy, so a Save from a window that had read the
+file before a build dropped the folders that build had appended (the next build
+rediscovered them). Since #265 a Save writes only the settings that window
+changed — see [09 → "Two windows, one course"](09-mac-app.md#two-windows-one-course).
 
 **The one thing discovery does not do is re-add what the teacher took away.**
 Names the teacher removed in Course Settings are recorded in `excluded_items`
 (keyed `shared` / `per_section`), and preflight skips them: not discovered, not
-un-hidden, not expanded, and — since 2026-08-24 — actively **dropped** from
+not expanded, and — since 2026-08-24 — actively **dropped** from
 `shared_folders`, `shared_files`, `per_section_folders` and `per_section_files`
 if it finds one back in a copy list, with the config written back. So the four
 copy lists are *not* add-only: `excluded_items` is authoritative. The exclusion
@@ -98,6 +140,57 @@ discovery, every new folder would require re-running the setup wizard;
 with it, the folder just shows up on the next preview. Reserved names
 (`Media`, `.obsidian`, `.merged_output`, `node_modules`, `course_config.json`,
 OS junk files) are excluded from discovery.
+
+<a name="how-i-teach"></a>
+
+### The teacher's How I Teach page never reaches a site (#209)
+
+`How I Teach.md` at the top of a course folder is the teacher's own account of
+how the course is taught, read by the outside doors
+([10 → "Telling an outside assistant how the course is taught"](10-local-ai-assistant.md#telling-an-outside-assistant-how-the-course-is-taught-209)).
+Before #209, discovery listed it like any top-level file and the site
+published it — measured on a scratch course, at the course's top level and at
+`section1/`'s, both. `publish: false` cannot be the guarantee (a later
+`publishForSection<N>: true` beats it, and a page typed in Obsidian has no
+flag at all), so the build keeps it off by LOCATION, asking
+`scripts/how_i_teach.py` at four points, all in the ALWAYS section so no
+course needs `--full-rebuild`:
+
+1. **Discovery** — `discover_shared_items` / `discover_section_items` never
+   list it.
+2. **Preflight** — a name ALREADY listed in `shared_files` /
+   `per_section_files` (a course whose page predates the rule) is dropped and
+   the configuration written back, the way an excluded name is; the in-memory
+   config a build is handed without a write (`_dropping_excluded_items`) drops
+   it too.
+3. **The copy lists** are filtered where they are READ, not in each loop, so a
+   copy loop added later inherits the rule.
+4. **A final sweep** (`remove_from_content_root`) deletes any match from the
+   top of the merged `content/` before the health checks and Quartz — the
+   backstop that makes the guarantee a property of the output. Top level only:
+   inside a folder the name is an ordinary page, and the sweep only ever
+   touches the build's own copy, never the teacher's folder.
+
+The name is matched whole, after NFC, with only A–Z folded; at the top of a
+section folder too, because a section's top-level files land in the same place.
+The console says `howITeachPage.keptOffTheWebsiteLine` when a page is found,
+and names a LOOK-ALIKE ("How I Teach 1") that WILL be published
+(`lookAlikeLine`) — that silent publication is the failure the exact name risks.
+When a page the settings had listed is dropped, the build prints
+`PLANTOIR_KEPT_OFF: {json}`, which the app writes on the trail
+(`How I Teach page kept off the website`) — once, at the transition, not on every
+build. Gates: `scripts/test_how_i_teach.py` (Windows runs it too), and
+`verify.sh`'s real build, which plants pages with sentinel phrases and greps the
+whole of `public/` (pages, `contentIndex.json`, sitemap, RSS) — the reserved
+two absent, the look-alike present so the check cannot pass by building nothing.
+
+**One residual, needing no code** (plan review): a site built for PUBLISHING
+before the update, while such a page existed, and not rebuilt since, still holds
+the page, and a publish that uploads that existing build sends it. A new image
+tag does not by itself rebuild a site. It applies only to a teacher whose page
+was already public before the update; the first build after the update removes
+it (`public/` is cleaned and mirrored with `rsync --delete`), and every preview
+build is rebuilt before it is published.
 
 ## Stage 2: Scaffold management
 
@@ -184,9 +277,10 @@ table, and the rule both apps now implement, is
 `verify.sh` run.
 
 Two consequences worth knowing here. Frontmatter the round trip cannot parse —
-tab indentation, an unclosed flow collection — is NOT resolved: the function
-warns and leaves the file exactly as it found it, and Quartz's own parser then
-throws and stops the whole build. And the `pip install` in the Dockerfile pins
+tab indentation, an unclosed quote, `yes:` used as a key — is HIDDEN, in the
+build's copy only, and named (#246, below); until 2026-09-25 the function
+warned and left the copy exactly as it found it, and Quartz then either
+stopped the whole build or published the page. And the `pip install` in the Dockerfile pins
 python-frontmatter and PyYAML deliberately, because the visibility table rests
 on YAML 1.1 and a PyYAML that moved to YAML 1.2 would republish pages teachers
 had hidden with nothing failing anywhere.
@@ -204,6 +298,186 @@ renaming: Quartz's stock `ExplicitPublish` filter would have required
 including all of the curriculum pages. A missing flag should never make work
 vanish, so the patched filter keeps the forgiving default and only the word
 changes.
+
+### A page whose settings cannot be read is hidden (#246)
+
+**The rule.** When `frontmatter.load` raises on a page, `process_frontmatter`
+rewrites the BUILD'S copy to `---\npublish: false\n---` followed by the
+page's own body, byte for byte (split off by python-frontmatter's own
+`YAMLHandler().split`, which does no YAML), records the page, and prints one
+line: `🙈 Hidden from students until its settings can be read: <page> (near
+line N)`. `publish: false` is the one key every section reads as hidden, so
+the page is hidden in every section whatever it said. The teacher's own file
+is never touched — this runs on the copy in `content/`, which is deleted and
+re-copied on every build, so the rule is ALWAYS-section by construction and
+existing course folders pick it up without `--full-rebuild`; and
+`_write_the_date_back` already refuses a source it cannot parse.
+
+Then, once per section build, ONE `pageSettingsUnreadable` site-health finding
+names every such page (at most ten, then "and N more"), each with the line the
+reader stopped near where it can tell. Its words are
+`contracts/shared-rules.json` → `siteHealth.checks[pageSettingsUnreadable]`;
+the cases are `unreadablePageSettings.cases`, run by
+`scripts/test_unreadable_page_settings.py` through the real
+`process_frontmatter`, and by `check_visibility_against_the_site.py` on down
+through Quartz's own reader to the site. It is never offered a repair
+(`siteHealth.repair.neverOffered`): rewriting a teacher's settings means
+guessing what they meant. It reaches the trail through the existing `folder
+problem found` line, which carries the check's NAME and never a page's.
+
+**Why: Russell, 2026-09-21, option B.** "A page that wrongly DISAPPEARS is
+noticed and harmless; one that wrongly APPEARS cannot be undone." A page
+whose settings the build cannot read might be one the teacher meant to keep
+from students, so it is hidden rather than risked. The finding is what makes
+"noticed" true.
+
+**What happened before, measured** (python-frontmatter 1.3.0 / PyYAML 6.0.3 /
+gray-matter with js-yaml `JSON_SCHEMA`, the image's own, 2026-09-25). When
+PyYAML raised, the function printed `⚠️ Could not read frontmatter from <path>:
+<PyYAML's message>` and returned, leaving the copy untouched, so Quartz parsed
+the ORIGINAL block itself. Of the shapes in
+`copyingAPageBetweenCourses.builderAgreement`, **18** raise when the page is
+opened as a file, as the build opens it:
+
+| What Quartz then did | How many | Which |
+|---|---|---|
+| could not read it either, so `process.exit(1)`: **the whole build stopped** with a developer's error | 14 | a list whose indentation decreases, a combining mark after a colon, a vertical tab, `"a"b"`, `,comma`, a column-0 list item, an indented continuation holding a colon, `key:value`, `a: b: c`, an unclosed quote, `-- -`, `%YAML`, an undefined alias, a tab indent |
+| read it, and **published the page** unless it also carried a plain `publish: false` | 4 | a date that cannot be (`2025-09-93`), the 29th of February with a colon in its offset, `yes:` as a key, U+2028 |
+
+The headline is the second row: a page hidden only by `publishForSection1:
+false` — which is what the app writes for a course-level page — carrying
+`yes: value` was PUBLISHED (measured by `check_visibility_against_the_site.py`
+against the old `build_site.py`: "the contract says hidden and the site says
+visible").
+
+**The plan's count and the review's count were both off, and a third number
+is the true one.** The plan said 18 raising / 13 stopping / 5 read; its review
+said 19 / 15 / 4, counting "a LONE carriage return". The lone carriage return
+raises only when the block is handed to python-frontmatter as TEXT
+(`frontmatter.loads`), which is how `builderAgreement` measured it; the build
+calls `frontmatter.load` on the FILE, which opens it with universal newlines,
+so the carriage returns become line ends, the block ends at the first `---`,
+and it is READ. It is in `unreadablePageSettings.cases` as a readable case for
+that reason. Measured in the image, and `builderAgreement`'s own `why` for it
+already says the build uses universal newlines.
+
+**Incidence.** 0 of 14,699 real and shipped pages raise today (the planner's
+walk: 12,490 under `support/`, 1,620 in a real 2026-27 working folder, 589 in
+the 2023-24 iCloud courses), so no existing site changes on the first build
+after the update. 25 real pages open with an EMPTY block (`---` then `---`):
+PyYAML reads that as no keys and the page is shown, and it stays shown — it is
+a case.
+
+**"Near line N", and how it is counted.** The line is counted from the
+character INDEX PyYAML reports (`problem_mark.index`, or a `ReaderError`'s
+`position`) into the text python-frontmatter handed it, which begins with the
+newline that ends the opening fence — so newlines before the index, plus one,
+is the file's line with the opening `---` as line 1. **Not** from
+`problem_mark.line`: PyYAML counts U+2028, U+2029, U+0085 and a lone `\r` as
+line breaks, which an editor does not show, so U+2028 on line 3 reports 5 by
+its own count and 4 by the index. Of the 18 shapes, 15 carry a position: 10
+point AT the wrong line and 5 one or two past it (a key with no space after
+its colon, `-- -`, `%YAML` and U+2028 one past; an unclosed quote two past, at
+the closing fence). A date that cannot be, a key that is a number, date or
+yes/no, and the offset February 29th give none, and the words then name the
+page alone. Hence "near".
+
+**What the console no longer says.** The old line printed PyYAML's message,
+which QUOTES the page's own text (`title: A page: with a colon`) into a
+console that goes into problem reports, and said "frontmatter". The new line
+carries the page's place in the course folder (`section1/index`,
+`Concepts/Arrays`) — the name a teacher finds it by in Obsidian — and nothing
+of the reader's.
+
+**When hiding itself fails.** A copy that cannot be rewritten is REMOVED
+(named just the same); a copy that can be neither rewritten nor removed stops
+the build with a plain two-line refusal, in the manner of the hide-filter
+hardening: a build that cannot promise the page is hidden must not produce a
+site. Both are tested by making the write and the removal refuse rather than
+by file modes, because the image runs as root (which writes through any mode)
+and NTFS ignores a folder's mode — a mode-based test would have run nowhere.
+
+**An unreadable FRONT PAGE** is hidden like any other page, so Quartz emits no
+root `index.html` and there is no website. What that costs is not what any
+other hidden page costs, so it gets its own words throughout:
+
+* its own console line (`🙈 The settings at the top of the front page of … could
+  not be read, near line N, so the website has no front page until they are
+  fixed, and it cannot be published.`) and the finding's `frontPage` sentence
+  added to the detail;
+* a teacher whose site is already live keeps the OLD published site: the
+  refusal comes in the build, before the deploy, so nothing is uploaded and
+  what students see does not change until the front page is fixed;
+* the last built site is CLEARED, exactly as for a missing front page
+  (`_clear_a_site_this_build_cannot_replace` → `_clear_stale_host_site`,
+  whose 🗑️ line says the front page is hidden rather than missing), so a
+  publish cannot send out last week's pages;
+* `section_index_exists` stays TRUE — the page is there, even in the one case
+  where its copy had to be removed to hide it — so `sectionIndexMissing` does
+  not fire and its repair (which would find the page and say "already put
+  right") is not offered;
+* a publish build prints its OWN refusal (`_nothing_to_publish`), never the
+  missing front page's "no front page, so no website was produced … Put the
+  front page back", and the apps turn it into their own card:
+  `contracts/app-rules.json` → `failureExplanations`, the three cases whose
+  output says the front page's settings could not be read (with a line,
+  without, and followed by the deploy's "Built site not found", which must not
+  win). `test_unreadable_page_settings.py` checks each of those outputs
+  against what `_nothing_to_publish` prints, so the app cannot be matching a
+  line nobody prints;
+* the "📆 The front page now carries the date …" line is not said of it: only
+  the hidden copy was dated.
+
+Measured end to end on 2026-09-25 by building a copy of `courses/EXC2O` in the
+image with the new scripts: `Learning Goals` given `publishForSection1: false`
+and `yes: value` built with the page absent from `public/` and one finding;
+then `section1/index.md` given `title: "Section "1"` built with no root
+`index.html`, the previous `public/` removed, the refusal naming line 2, exit
+1, and the teacher's file unchanged but for the edit.
+
+**Rejected, so nobody proposes them again:**
+
+* **Deleting the page from the build instead of hiding it.** A missing page is
+  a different state: an unreadable `index.md` would fire `sectionIndexMissing`,
+  whose repair finds the page and says it was already put right.
+* **A rule in Quartz's publish filter (`patches/publish.ts`).** Quartz cannot
+  read 14 of the 18 shapes at all, so the hide has to happen before Quartz sees
+  the original block.
+* **Stopping the build**, which is what used to happen for most shapes. One
+  typo withheld every other update, including a scheduled publish the teacher
+  was counting on (`siteHealth.scheduledDeployPublishesAnyway`).
+* **One finding per page.** Both apps key a finding on name, course and
+  section (the mac's `SiteHealthFinding.id`, Windows'
+  `SiteHealthFinding.Identity`), so per-page findings would collide in
+  SwiftUI's `ForEach` and in Windows' de-duplication.
+* **A once-only "newly hidden since the update" list.** It needs state
+  carried across builds, and the finding already repeats on every build while
+  the page is broken.
+* **Also hiding a block whose END cannot be found** (an indented closing
+  fence, a block never closed). It cannot be told from a page that begins
+  with a horizontal rule, which is a case here. Where such a block ends was
+  [#188](https://github.com/russellgordon/plantoir/issues/188)'s question, and
+  its answer left the build alone: the apps now agree with python-frontmatter
+  that an indented `---` closes nothing, so the page has no block and is
+  published, as before.
+* **Making the apps' readers call such a page hidden.** They would need a twin
+  of PyYAML in Swift and C#, and #207's certifier is deliberately stricter, so
+  it would flag readable pages. The dangerous disagreement (the app says
+  hidden, the site shows it) is now impossible; the one left (the app says
+  shown, the site hides it) is the mild direction, and the finding announces
+  it.
+* **Printing PyYAML's message**, for the reason above.
+* **Filling the finding's words one placeholder after another.** Since #246 a
+  value can be a page name a teacher typed, and a page called `{pages}` or
+  `{line}` would be expanded by a later replacement. `site_health.filled` does
+  one pass, and `test_site_health.py` proves the difference by swapping the
+  sequential version back in (1 test goes red).
+
+**Consequences for the copy guard.** `CopiedPageText`'s check that the builder
+reads a copy the same way (#207, `copyingAPageBetweenCourses.builderAgreement`)
+still refuses these shapes: a copy that arrives hidden by accident, and is
+named as a problem on every build, is not a clean copy. Whether it can now be
+relaxed is a follow-up and was not done here.
 
 ### Wikilink rewriting
 
@@ -228,17 +502,430 @@ needs the plain `[[Thread 2, Day 8]]` form.
 
 <a name="dates-drive-everything"></a>
 
-### Curriculum date synchronization
+### Dates: which page carries which, and who writes them
 
 Pages listing folder contents in Quartz sort by date, and this toolchain
 [configures dates to mean *created*](06-quartz-customizations.md#c1-applied-on-first-build--full-rebuild)
-(from frontmatter, never from git). Curriculum-expectation pages are written
-once at course setup and never touched again, which would leave them sorted
-to the bottom of list pages forever. The build therefore finds the **newest
-`created` timestamp anywhere in the section's content**, then bumps every
-file inside any folder whose name contains "curriculum" up to that
-timestamp (only if older). Curriculum pages thus float alongside current
-content without the teacher ever editing them.
+(from frontmatter, never from git). Two passes run on EVERY build, in the
+ALWAYS part of `build_section_site`, after the content has been copied and read
+for this section (`process_frontmatter` has already turned `createdSection<N>`
+into `created` in the build's copy):
+
+1. **Pages no class brings** — `_sync_non_class_pages_created`. Sidebar pages,
+   Key Links, Curriculum pages and anything no class page links to, directly or
+   through other pages, take the first class's date (`class-planning.json` → `datingNonClassPages`), in the
+   build's COPY only. (This section used to describe a "bump every curriculum
+   page up to the newest date". Nothing does that any more: measured
+   2026-09-24, `_is_in_curriculum_folder` is defined and called nowhere, and
+   curriculum pages get the first class's date from this pass like every other
+   page nothing links to.)
+2. **The front page and the pages a class links to directly** — `_date_pages_from_their_classes`
+   (GitHub #275, #276, 2026-09-25). This one REWRITES THE TEACHER'S OWN FILES.
+
+A page reached only THROUGH another shared page is in neither population: the
+first pass skips it (a class reaches it) and the second does not date it (no
+class links it directly), so it keeps its own date — and an undated one stays
+undated.
+
+#### The rules (`sectionIndexPointer.dateCases`, `datingPagesAClassBrings.atBuildTime`)
+
+- **The front page** (`section<N>/index.md`) takes the date of the class page
+  its embed names — the first `![[…]]` line naming one of this section's class
+  pages, found exactly as the app's pointer finds it
+  (`sectionIndexPointer.found`) — when that class is VISIBLE and dated. No class
+  embed, or an embed naming a hidden or undated class: the page keeps its own
+  date and is not written. The build never moves the embed; that is the
+  pointer's job.
+- **A page a class links to DIRECTLY** takes the date of the EARLIEST visible,
+  dated class of this section that links to it (ties by title), EVEN OVER A DATE
+  OF ITS OWN — including one the teacher typed on the page. **A date typed on a
+  page that a class links to no longer decides its date: its first class's
+  date wins, on the site and in the file**, on every build; to date such a page
+  by hand, link it from the class whose date it should carry. In the FILE that
+  means: on a shared (course-level) page, a typed `createdSection<N>` is
+  rewritten, and a typed plain `created:` STAYS, byte for byte — the build adds
+  `createdSection<N>` above it, which the site reads in preference, so editing
+  that `created:` later changes nothing; on a section's own page, `created`
+  (or the `createdSection<N>` it already uses) is rewritten. (Nothing in the app says this
+  to a teacher yet: a sentence for them is Russell's wording pass, not this
+  piece's.) "Links to directly" means the wikilinks written on the class page
+  itself, resolved by relative path and by file name (`_pages_a_page_links_to`,
+  shared with the first pass's walk) — never onto another class page, a
+  folder's index, Key Links or any curriculum coverage map (#128). A page two links away is
+  not dated by the class at all.
+
+  **Which shapes are links** (`_extract_wikilink_targets`, the one reader both
+  passes share; contract `shared-rules.json` → `readingALink`, run by
+  `scripts/test_dates_follow_the_class.py`): `[[Page]]`, `[[Page|words]]`,
+  `[[Page#Heading]]`, and the escaped pipe Obsidian writes for an alias inside
+  a table, `[[Page\|words]]` — whose backslash is never part of the name — and,
+  **since [#294](https://github.com/russellgordon/plantoir/issues/294),
+  `[[Page#Heading|words]]` and `[[Page#Heading\|words]]`**, the form
+  Obsidian's own autocomplete writes for a heading link with an alias. Until
+  then the pattern put its alias group BEFORE its heading group, so a heading
+  followed by an alias was not a link to either pass. **After #294 ships, three
+  groups of pages whose only link of that kind is this shape change on the next
+  build, in every existing folder** (measured with the real functions against
+  the old and new pattern):
+
+  - **Linked directly from a visible, dated class** — the second pass now dates
+    it. On the SITE it moves from the first class's date (the first pass's
+    stamp) to its class's; in the TEACHER'S FILE it moves from whatever date
+    the file held — its install-day stamp, or a date the teacher typed — to its
+    class's, as for any page a class links to (the file rules above), and the
+    page is named in the "Gave N of your page(s)…" line and on the trail
+    (`pagesDatedByTheBuild`).
+  - **Linked that way only from a HIDDEN or UNDATED class** — the first pass's
+    walk starts from every class page, so the page is now reached and no longer
+    reset: on the SITE it moves from the first class's date to its own date
+    (for a page copied from a template, the install-day stamp). The file is not
+    touched — the first pass writes the build's copy only.
+  - **Reached only THROUGH such a link** (a hub page carrying `[[P#h|a]]`, and
+    what it leads to) — likewise now reached, so it keeps its own date on the
+    site instead of the first class's; the file is not touched.
+
+  The last two are the rule stated above ("a page reached only THROUGH another
+  shared page … keeps its own date") applying to links it used to miss. It is
+  the right change, and not only because the link is a link: the mac app's
+  re-date already read `[[P#h|a]]` as a link to P (its name stops at `#`), so
+  until #294 the app and the build disagreed about those pages and the build
+  won by overwriting on every build. Measured: 0 such links in `support/`
+  (payloads, skeletons and the example course, code stripped — the old and new
+  readers give identical targets on all 12,490 files), so no shipped page
+  moves; teacher-written ones will. No log line's wording changes and none
+  becomes untrue.
+
+  **A stray `[[` followed by a heading cannot swallow the link after it** (since
+  [#314](https://github.com/russellgordon/plantoir/issues/314)): the heading
+  group stops at `[`, as Quartz's own `wikilinkRegex` does. This reader skips
+  inline code (since #313, below), but a `[[` typed in a sentence, followed later by a `#` and a
+  real `[[Page|words]]`, otherwise read as one link with a garbage name and
+  the real one was lost. Only the heading group stops at `[`; the name still
+  crosses it, so a stray `[[` with no `#` before the next link still swallows
+  it — left as it is, since no shipped page has that shape and widening the
+  name is a change to `readingALink.rule` itself. Measured: 0 change on all
+  12,490 files in `support/`.
+
+  **The other readers of the same shapes, since #314.** The installer's three
+  (`setup_course.py`: `first_use_dates`, `WIKI_LINK_TARGET` for retargeting a
+  template's expectation, `unlink_curriculum_references`) now stop the name
+  before a backslash right in front of `]`, `|` or `#`, as `readingALink.rule`
+  says — all three had read `[[P\|a]]` as a page called `P\`. The coverage
+  map's two (`BLOCK_LINK`, behind "pages the course teaches", and
+  `TRANSCLUSION`, what it counts as covered) already read `\|` but had the old
+  alias-before-heading order, so `[[P#h|a]]` and `![[A1.1#h\|a]]` matched
+  nothing. They were NOT given #294's plain reorder: those two stripped fenced
+  code but not inline code (until #313, below), and on `Tutorials/Scavenger Hunt.md` (the example
+  course and every skeleton family, 90 files) the reordered pattern ran from
+  "type `` `[[` ``" through a `### Custom Display Words` heading and swallowed
+  the real `[[Help Sessions|…]]` after it. With the heading stopping at `[`:
+  0 differences over all 12,490 files, fences-only or inline-stripped. Every
+  `readingALink` case runs through every one of these readers in
+  `scripts/test_install_link_readers.py`, which `verify.sh` lists and Windows'
+  `PythonToolchainTests` discovers. Rejected: one shared `wiki_links.py` for
+  all six readers — each needs different groups, and a new sibling module is a
+  Dockerfile change (`test_baked_modules.py` exists because one was once
+  missed); and stripping inline code in `_pages_the_course_teaches`, which
+  changes what counts as taught by a different rule (#313's question — since
+  answered, below, WITH a shared module: the mask is one rule every reader
+  needs identically, which the six patterns were not).
+
+  **A link written inside code is not a link, for every one of these readers**
+  (since [#313](https://github.com/russellgordon/plantoir/issues/313)). A
+  `[[…]]` whose brackets start inside a fenced block or an inline code span is
+  an example of the syntax, and Quartz draws none. `scripts/markdown_code.py`
+  is the one Python definition of where code is — `readingALink.whatIsCode`,
+  implemented identically by the mac's `MarkdownCode` (measured: the two agree
+  offset for offset on all 12,490 files in `support/`) — and every reader here
+  asks it: `_extract_wikilink_targets` (both date passes), `BLOCK_LINK` behind
+  "pages the course teaches", `TRANSCLUSION` in the coverage count, and the
+  installer's three. It is baked beside `class_pages.py` (a Dockerfile `COPY`,
+  guarded by `test_baked_modules.py` and `verify.sh`'s baked-file check).
+  What changed: the dating walk used to strip ```` ``` ```` fences and one-line
+  spans with two regexes, so a `~~~` fence, a span across two lines of a
+  paragraph, a ```` ``` ```` held inside ```` ```` ```` and an escaped backtick
+  were all read wrongly; the coverage map's two readers stripped fences only;
+  the installer's three stripped nothing. The coverage count now also reads a
+  `%%curriculum-start%%` block only where its markers are OUTSIDE code
+  (`_curriculum_blocks_outside_code`) — a fenced example of a curriculum block
+  on a page that teaches how to write one used to count as coverage — and a
+  marker shown inside a fence neither opens nor closes a block, so a fenced
+  example cannot swallow the real block after it. A match that starts in code
+  is not simply dropped: the search starts again where that code ENDS, or an
+  example `` `[[` `` would swallow the real link after it. Measured over
+  `support/` with Quartz's own parser: 1,896 of 39,570 links sit in code, 0 in
+  indented code (which the rule deliberately does not recognise); the build
+  read 7 of them as links before, all on TEJ2O's "Control Something with
+  Code", whose fence inside a list had fallen out to column 0 — fixed in the
+  same piece, so its coverage is unchanged. `scripts/test_markdown_code.py`
+  runs every case through the dating walk and a rename, and checks the
+  coverage count; `verify.sh` lists it and Windows' `PythonToolchainTests`
+  discovers it. The why, the table built in Quartz, and what was rejected are
+  in [10 → Code is never a link](10-local-ai-assistant.md#code-is-never-a-link-313).
+
+  **A `%%` comment is never a link either** (since
+  [#331](https://github.com/russellgordon/plantoir/issues/331)). Quartz v4.5.0
+  removes every `%%…%%` from the RAW page before it reads anything
+  (`ofm.ts:130`, `:160–163`): lazily, left to right, across lines, whether or
+  not a `%%` sits in code, and a `%%` with no partner is plain text. So
+  `markdown_code.py` does the same, in the same order: `comment_ranges` finds
+  the comments on the page as written, `code_ranges` finds code in the page
+  WITH EVERY COMMENT REMOVED and maps the ranges back to the page's own
+  offsets, and `not_a_link_ranges` is the two merged — the default mask of
+  `matches_outside_code`, so every reader above, the installer's three and the
+  linters mask comments without being told. **The trap this is built around:
+  the curriculum markers `%%curriculum-start%%` and `%%curriculum-end%%` ARE
+  comments** (Quartz pairs lazily, so each marker is a whole comment and the
+  block between them is not). `_coverage_counts` therefore asks two different
+  questions: whether a MARKER is in code (`code_ranges`, which still returns
+  code only) and whether a LINK is a link (`not_a_link_ranges`). Folding the
+  comments into `code_ranges` would skip every block and empty every coverage
+  map while the build stayed green; `readingALink.cases` → "the curriculum
+  markers are comments, and what sits between them is not" and
+  `test_markdown_code.CommentTests.test_code_ranges_hold_code_only` guard it.
+  Measured in Quartz's own order over all of `support/`: 344 of the 39,570
+  matches sit inside a comment, all in skeletons (294 naming What This Site
+  Can Do, 50 Help Sessions); 100 page-to-page edges existed only inside
+  comments, none from a class page, and no class page of 3,944 reaches fewer
+  pages; both targets keep plain links, so the site check gains no orphan; 0
+  of the 344 sit inside a curriculum block. The rule agrees with Quartz on all
+  39,570 and on the 12 new cases; finding code on the page as written (R1)
+  also agrees on the corpus but gets two of the cases wrong. Found on the way
+  and fixed: AVI1O's and TEJ4M's `Tasks/_DUPLICATE ME.md` wrote "%%" in the
+  prose of their note, which closed the comment early and put the rest of the
+  teacher's note on the site of every copy (new courses only); the payload
+  linter now refuses a page with an odd number of `%%`.
+- **A class dated with a plain YAML date** (`created: 2026-09-24`, unquoted —
+  what Obsidian's Date property writes) counts, as midnight in Toronto. Until
+  the fix round `_parse_created_value` read it as no date at all, so such a
+  class dated nothing and a page it linked took a LATER class's date (measured:
+  Day 2's 09-24 instead of Day 1's 09-10). That also widens the first pass and
+  `_find_first_class_created`, which read dates through the same function.
+- **Per section.** The build of section N reads section N's classes and writes
+  section N's keys only: a course-level page gets `createdSection<N>` (never a
+  plain `created:` shared by every section, and never another section's key); a
+  page inside `section<N>/` gets `created`, unless it already uses
+  `createdSection<N>`, which the build reads first. A plain `created:` already on
+  a shared page is left alone — it still dates the sections with no key of their
+  own.
+- **The value is the class's own, copied**, not re-formatted: converting a
+  timestamp to Toronto time can move its calendar day near midnight UTC, and the
+  page must show the day its class shows. It is written plain where that reads
+  back as the same value and double-quoted where it would not (a bare
+  `2026-09-24` string would read back as a DATE, and be rewritten every build).
+
+#### Measured: why nothing dated Russell's pages (2026-09-24, ICS4U section 1)
+
+The front page said `created: 2026-09-08…` (the day the course was made) above
+`![[Thread 1, Day 3]]`, dated 09-24. `Exercises/Using Aggregate Functions`
+carried `createdSection1: 2026-09-08T07:00:00.000+0000` and
+`publishForSection1: true` — install day, very likely inherited from the
+`_DUPLICATE ME` template it was copied from, whose own text promises the dates
+"will be set automatically". Three writers existed and none was on his path:
+
+- the app's pointer (`SectionIndexPointer.repointIndex`) and the assistant's
+  publish-time rule run only when the ASSISTANT publishes — Day 3 was published
+  in Obsidian — and the publish-time rule moves only pages that are still
+  HIDDEN, which this one was not;
+- the installer's `first_use_dates` runs once, at pre-population;
+- the build's first pass explicitly skipped both pages: `index.md` since
+  `61ae2ab5` (2026-08-18, "so the landing page retains its newest published
+  class's date" — preserving a date the mac pointer writes, not deciding that
+  the build must not date it), and every page reachable from a class since
+  `6ddc3fd0` (2026-08-17 — the pass set out to date only pages NO class brings,
+  leaving linked pages to the installer and the assistant). **Neither skip is a
+  decision to leave the page undated; both assumed another writer.** Do not
+  "restore the design" by folding the new pass into the first one: they date
+  different populations with different dates, and are kept as two named passes.
+
+On `origin/dev` before the change, `scripts/test_dates_follow_the_class.py`
+fails 16 cases and errors 9; the ICS4U front page and Using Aggregate Functions
+both stay at `2026-09-08T07:00:00.000+0000`.
+
+#### Why the teacher's files, and not only the site — and what was REJECTED
+
+- **Build-output-only was REJECTED by Russell (2026-09-25 07:40)**, overriding
+  the plan review's recommendation. The review's reasons were real: a write on
+  every preview can meet a page open in Obsidian; a page changed after a build
+  has started makes the app build once more (#265's `.build-started` marker —
+  see "When the stamp is written" below); iCloud churn. Russell wants the files
+  to carry the true dates, so that Obsidian, the app, the assistant and the site
+  agree. What keeps the cost down is idempotence: a page is written ONLY when
+  the date the build would read for this section differs, so after the first
+  build of a course the pass writes nothing, and #265's extra build happens once
+  rather than on every publish. The test builds every case twice and requires
+  the second build to write no file.
+- **(B) "never earlier than the class"** — keep a later date typed by hand — was
+  the other option put to Russell on 2026-09-24; he chose (A), the class's date
+  even over the page's own, because it has no judgement call inside it and a date
+  on a site ordered by date is a statement about the course.
+- **Filling only undated pages** (the first plan) — fixes nothing for Russell's
+  page, which HAS a date; the review measured this on the real file shape.
+- **Hidden classes dating pages** — a class students cannot see has not been
+  taught; a page only a hidden class brings keeps its own date until the class
+  is published.
+- **One `created:` for a shared page** (Russell, 07:45) — the last section
+  built would win for every section.
+- **Following links THROUGH pages** — REJECTED on 2026-09-25, after it had been
+  built that way, by the implementation review's measurement. Courses link hub
+  pages from Day 1 ("How Marks Work", "Learning Goals") that link half the
+  course, so the earliest class claimed nearly everything it could reach. On
+  the EXC2O fixture the first build rewrote 105 pages and **98 of them were
+  given Unit 1, Day 1's 2026-09-08** — `Concepts/Cellular Respiration`, which
+  its October class links directly, among them, by the chain Day 1 → `Setup/How
+  Marks Work` → `Tasks/Lab Reports` → `Investigations/Investigating
+  Photosynthesis` → it. Across the 39 payloads (every class treated as visible)
+  **2,150 of 5,177 reached pages took an EARLIER class than the first one
+  linking them directly** — ICS4U 133 of 136 (59 through `Learning Goals`),
+  SNC1W 107 of 150 (88 through `How Marks Work`), MHF4U 142 of 148. The walk had
+  been harmless while the plan only FILLED missing dates; once choice (A) let it
+  overwrite, it rewrote installer-dated, visible pages and reported success.
+  Russell's words were "the first Unit x, Day y page that LINKED to them", and
+  the installer (`first_use_dates`) already followed direct links only. The
+  contract's hub case (How Marks Work → Lab Reports → Investigating
+  Photosynthesis) pins it: the page in between keeps its own date, and the page
+  a later class links directly takes THAT class's date. Also rejected: walking
+  through pages for UNDATED pages only — it infers a date nobody set from a page
+  in between, which the rule does not ask for.
+
+#### How the write is made — a line splice, never a re-serialisation
+
+`_setting_frontmatter_value` changes one key line and nothing else: the apps'
+own fence rule (three or more dashes; blank lines before the opening fence
+skipped — `PageVisibilityReader.fenceIndices`; since #188 the CLOSING fence must
+start at column 0, as python-frontmatter's does, while the opening one may be
+indented — so a line of indented dashes is part of the value above it and goes
+with it, where it used to end the block early and make a write that read back
+wrong and was dropped; `documentation/08-course-config-reference.md` has the
+measurement); the LAST line naming the key,
+because it is the one YAML keeps; the lines below it that belong to its value go
+with it (`continuationLineIndices`' rule from #176, which #199 applies to the
+apps' own date and title writers — ported to Python here because #199 had not
+landed on `dev` when this was written; if the two ever disagree, the contract's
+`writingCases` are the arbiter); a missing key goes at the top of the block,
+and only into a block with a column-0 level for it — the apps' rule from #186,
+`_place_for_a_new_top_level_key`, so a block whose first line is indented or
+is not a key is refused rather than given a key that adopts that line; a
+page with no frontmatter gets a block. Not touched at all: a block opened and
+never closed (which since #188 includes one whose only closing-looking line is
+INDENTED — the apps' visibility writer prepends a block on that shape instead,
+and 08 says why the two differ), a tab-indented block, a file starting with a
+byte-order mark.
+A `# note` at the end of the key's line stays (a `#` inside quotes, or in the
+middle of a word, is part of the value). Every write is read back the way the
+build reads it before it is saved, and refused unless this section's date is now
+the class's and every other key and the whole body are exactly as they were.
+
+**The write is never made in place.** `_replace_the_page_safely` writes the new
+text to a hidden file beside the page (`.<name>.….plantoir-dating`), flushes it
+to disk, copies the page's permissions onto it, re-reads the page, and renames
+the new file over it in one step ONLY if the page still holds exactly the text
+the date was worked out from. A Stop part-way through leaves the old page or the
+new one, never a truncated one; an Obsidian save that lands after the read is
+kept, and the next build dates it. The cost, accepted: a renamed-in file is a
+new file to the file system, so its creation time is the time of the write,
+and it does not carry the page's extended attributes across — measured by the
+fix-round review on macOS 26 through the container, a `user.` attribute was
+lost 4 times of 4 and a Finder tag 1 time of 3 (it came back in the other two,
+presumably restored by macOS — not something to rely on). Nothing in Plantoir
+or the build reads either (only frontmatter dates count), but Obsidian's file
+list sorted by "created time" will move a rewritten page, and a Finder tag on
+one can go. Writing in place would keep both, and stays REJECTED: a Stop or an
+editor save part-way through leaves a torn page, and a torn page is worse than
+a lost tag. The
+first version truncated and wrote in place with no re-check — a window of a few milliseconds per page, across the
+~100 writes of a course's first build, on the teacher's own file.
+
+**Links are never written through.** A page that is a symbolic link, one inside
+a folder that is (between the page and the course folder — the build's copy
+follows a shared folder that is itself a link), or a file with a second name
+(a hard link) is left alone: measured, the first version rewrote a file OUTSIDE
+the course through a link, and two courses sharing one page would overwrite
+each other's `createdSection1` on alternate builds. Its site copy is still
+dated; the console names it ("Left the date on N page(s) as it was, because
+each one also lives somewhere else…"), and it is not on the trail, because
+nothing was written.
+
+**A read-only page is not written either**, and that IS checked before the
+write, from the page's mode bits (no write bit for owner, group or anyone):
+a rename would replace a file that an ordinary write refuses. It is read from
+the mode bits and not from `os.access` because the build runs as ROOT in the
+container, where `os.access` says yes to every file — the fix-round review
+measured the first version rewriting a 0444 page there, mode kept.
+`test_a_read_only_page_is_named_and_left_alone_even_for_root` makes
+`os.access` answer as it does for root. Its site copy is still dated, and the
+console names it ("Left the date on N page(s) as it was, because each one is
+locked or set so it cannot be changed…"). **Finder's Locked flag (`uchg`) is
+NOT checked before** — Linux cannot see it (no `st_flags`), so the check finds
+nothing in the container. What was measured, as root in the image against a
+`uchg` page under `$HOME`: the HOST refuses the rename, the page is unchanged,
+and `_replace_the_page_safely` removes its hidden file, so none is left
+behind. That page is skipped silently (not named), and the next build tries
+again. Python run on the Mac itself (the tests) does see the flag and names
+the page as it names a read-only one; Windows has no such flag, and its
+read-only attribute shows up in the mode bits, so the native build there
+refuses and names a read-only page.
+
+**A course kept for reference is dated on its site only** — its files are
+never rewritten (`write_back=False` when `reference_course.is_reference` or
+`cannot_tell`). Last year's course is frozen on purpose, often with its files
+locked, and a preview of it is a look rather than an edit. This was the
+implementer's call, not Russell's ruling, and is flagged as such
+(`atBuildTime.aCourseKeptForReference`).
+
+**Where a page came from** is recorded as the build copies it
+(`remember_vault_source`, beside each `shutil.copy2`): the section's
+`index.md`, each shared folder and file (a course page), each per-section folder
+and file (a section page). A page the build made itself has no source and is
+never written back.
+
+#### The trail
+
+When anything was rewritten, the build prints a plain sentence and one
+`PLANTOIR_DATED: {"course", "section", "pages"}` line naming each page by its
+place in the course folder (`shared-rules.json` → `pagesDatedByTheBuild`). The
+mac records it as "pages dated by the build" (`PagesDatedByTheBuild`,
+`ScriptRunner`), shows the teacher only the sentence, and prints nothing when
+nothing changed. A SCHEDULED publish records the same line from its own log:
+`ScheduledDeploy.recordFolderProblems` already reads that run's part of the log
+(from `logSizeBeforeRunning`) for `PLANTOIR_HEALTH:` lines, and now hands it to
+`notePagesDatedByTheBuild` too — and, since #153, to `noteFolderProblems`,
+which leaves that run's `folder problem found` lines (Stage 3.5 → "The
+overnight path's trail line"). The first version left it out, saying the app
+was not reading that console — wrong, since the scheduled run IS Plantoir
+(`--run-scheduled-deploy`) and reads its log in-process; and a scheduled publish
+is often the first build after a class goes visible, so the likeliest to rewrite
+files. The sentence the build prints is "Gave N of your page(s) the date of the
+first class that links to them".
+
+
+**"Get Ready for the Start of the Year" (#96) deliberately does NOT read these
+dates.** Its rule decides which pages go into draft from LINKS — which classes
+link a page directly, by position — because straight after a rollover a page's
+stored date comes from a transitive walk and says the first day about pages
+first used in Unit 3 (measured: 53 SNC1W and 79 ICS3U concepts left published
+by a date-based rule). So a change to how pages are dated here changes nothing
+it hides; the only date it reads is a CLASS page's own, for the "already
+taught" warning. `documentation/10-local-ai-assistant.md` → "Getting a section
+ready for the start of the year".
+
+### Which pages are class pages: the word AND the scheme (#267)
+
+What the build counts as a class page — for the curriculum coverage map's
+"pages the course teaches", and for the first-class date non-class pages
+inherit — is `class_pages.class_page_pattern(word, scheme)`, set once per build
+by `set_unit_word` and `set_class_page_scheme` from `course_config.json`.
+`unit_day` (absent, empty or unknown) is `^<word>\s+(\d+),\s*Day\s+(\d+)$`;
+`numbered` — a club — is `^<word>\s+(\d+)$`, and its first class is
+`<word> 1` (leading zeros allowed). The same rule both apps read through
+`class-planning.json` → `pageNaming`. The build prints which scheme it is using.
+
+**No build patch, so no ALWAYS-section rule applies**: the pattern is read
+fresh on every build, and nothing is written into a course. REJECTED: a
+free-form pattern key (`"{word} {n}"`) — every planner would need a parser for
+a regex a teacher wrote. A course whose pages are "Week N" but whose file names
+no scheme (Russell's `CODING`) is read as `unit_day` and so finds no class
+pages, exactly as before: nothing converts a course by building it.
 
 ## Stage 3.5: Checking the folders this course depends on
 
@@ -261,7 +948,7 @@ findings are recorded when the BUILD happens.
 
 **Every check asks whether the FEATURE produced anything**, never whether a
 folder exists. Recreating an empty `Ontario Curriculum` folder does not restore
-a teacher's expectation pages — `_find_curriculum_folder` wants a page named for
+a teacher's expectation pages — `_find_curriculum_folders` wants a page named for
 an expectation code — so an existence check with a "fix it for me" button would
 have silenced the warning and left the map missing.
 
@@ -281,6 +968,24 @@ tail it reports back, which is a second surface and was leaking until
 question to ask of a new one is not whether it shows the transcript but whether
 it shows a LINE.
 
+**The mac's assistant surface was CHECKED on 2026-09-25 (#153), and narrates
+no line.** The in-app assistant and `Plantoir --mcp-stdio` build their answers
+from `AssistWording` plus `SiteHealthFinding.appending` — each finding's
+sentence and detail, read from the runner's findings, never from its
+transcript — and `AssistMCPServer` sends no progress notifications. Nothing in
+`Models/Assist/` or `Views/Assist/` reads `displayText` or `recentText`.
+`SiteHealthFindingTests.testTheAssistantsAnswerCarriesAGluedFindingAndNoMachinery`
+pins it. The `--mcp-stdio` process also WRITES the trail line: it runs a real
+`ScriptRunner`, and its trail store is the ordinary one. The one hole on this
+surface was the glued marker below, which was missing from the answer because
+it was never read at all.
+
+One check is about a PAGE rather than a folder: `pageSettingsUnreadable`
+names the pages the build hid because it could not read their settings (#246,
+"A page whose settings cannot be read is hidden" above). It is the LAST
+finding a build emits, so the others keep their places — the marker examples
+and #153's console cases are captured in that order.
+
 Two of the checks stay quiet unless the other half of the map exists: a
 brand-new course has an empty curriculum folder and an empty class folder on
 day one, and warning about both would nag every build of a course nobody has
@@ -291,10 +996,10 @@ red.** Until
 [#251](https://github.com/russellgordon/plantoir/issues/251) (2026-09-22) a
 course made from a subject's skeleton had two pages in its Curriculum
 folder — a generic index and a placeholder called `A1.1` — so
-`_find_curriculum_folder` found a folder and `_collect_expectations`
+`_find_curriculum_folders` found a folder and `_collect_expectations`
 returned exactly one specific expectation. Switching the map on there would
 have drawn a single cell for an expectation that does not exist. A teacher
-who declines the ready-made pages for one of the 38 codes that have them
+who declines the ready-made pages for one of the 39 codes that have them
 now gets that code's real expectations installed into the skeleton, so the
 map is built from the same 47-and-12 (ICS4U) the payload course draws.
 
@@ -305,6 +1010,78 @@ is the intended reading rather than a defect to special-case — the page's
 caption already says "red in September, greener as the year goes on" — and
 `site_health` is quiet about it for the same reason the paragraph above
 gives.
+
+### Links into hidden pages (#333)
+
+`linksIntoHiddenPages` is the second check about PAGES rather than folders,
+and the last finding a build emits (after `pageSettingsUnreadable`, so the
+existing examples keep their order). A class published by its own flag — in
+Obsidian, by the assistant, by #96's Get Ready — can link to pages that are
+still hidden, and students who follow such a link find nothing. The director's
+ruling on [#333](https://github.com/russellgordon/plantoir/issues/333): the
+BUILD warns, because it is the one place that sees every publish (a flag
+flipped by hand, scheduled deploys, the MCP server); the app's publish does
+not start taking pages with it.
+
+- **The rule** (`_links_into_hidden_pages` in `build_site.py`; contract
+  `siteHealth.checks` → `linksIntoHiddenPages.rule`, cases
+  `siteHealth.linksIntoHiddenPages.cases`): after the merge and after the How
+  I Teach sweep, every page students can see has its links read — wikilinks
+  and embeds, and Markdown-style links in either shape
+  (`followingLinks.markdownStyleLinks`), all through the code and comment
+  mask. A link is resolved by its PATH first (`[[Concepts/Evidence]]`), then
+  by its name; when a name belongs to several pages it is listed only if
+  EVERY one of them is hidden, because which of two same-named pages Quartz
+  picks is not this check's to guess. Embeds count; pictures and files do
+  not; a link to a page that does not exist does not (check_section does not
+  list one either); and How I Teach, removed rather than hidden, resolves to
+  nothing. Each (from, to) pair once, named by its place in the course folder.
+- **One finding per section build**, naming at most ten pairs and counting the
+  rest, never one per link: both apps key a finding on name, course and
+  section, so per-link findings would collide (#246).
+- **Not repairable.** The two fixes are opposite choices — publish the page
+  the link leads to, or take the link off the page it is on — and only the
+  teacher knows which is meant. Scheduled deploys still publish
+  (`scheduledDeployPublishesAnyway`).
+- **The trail line** is the family's existing "found a problem with this
+  course's folders (linksIntoHiddenPages)". "Folders" is a stretch for links,
+  exactly as it already is for `pageSettingsUnreadable`; rewording the family
+  is its own case and was not done here. It never carries a page name.
+- **Measured (2026-09-26):** 0 links from a visible page into a hidden one
+  across all 39 payloads as installed, so a new course is not nagged. An
+  emulation of #96's rule (not its code) flipping SNC1W's second class
+  visible lists `Unit 1, Day 2 → What Counts as Evidence`, the dead link #333
+  describes. And a real second finding the emulation surfaced: the section
+  front page EMBEDS the newest class (`![[Unit 5, Day 17]]`), which only the
+  assistant's publish and unpublish repoint, so after classes are hidden by
+  hand the front page embeds a hidden class and the check lists it. Correct,
+  and wanted.
+- **Get Ready (#96) is the common way a course arrives in this state, and the
+  warning is TRUE there.** Get Ready keeps Day 1, what Day 1 links to directly
+  and Key Links visible, and hides every page first used by a later class — so
+  the pages it keeps still link to pages it hid (its sheet lists them under
+  "links left pointing at hidden pages"). The front page's embed is NOT the
+  cause: Get Ready repoints it after its stray-key pass. So the first build
+  after Get Ready lists those links, ten named and the rest counted, and the
+  warning clears as the classes they lead to are published. Ruled 2026-09-27
+  on the implementation review (S1): the warning stays and #96 does not change
+  what it keeps — keeping what Day 1 reaches was measured and rejected in #96's
+  own plan (16–25 concepts would stay up). The review's rough emulation put
+  the pairs left at 16–44 per payload course (SNC1W 18, ICS3U 44); an estimate,
+  not #96's code.
+- **The build's reading is the site's.** The assistant's check_section reads
+  the teacher's folder by title and the build reads merged content by stem,
+  so the two may differ on a page whose title is not its file name; the
+  shared cases use title == file name and hold for both
+  (`SiteHealthContractTests.testTheLinksIntoHiddenPagesCasesHoldForTheSectionGraph`).
+  Two pages sharing a name, one hidden, is deliberately not a shared case: the
+  mac's graph holds one page per title.
+
+Rejected: the app's publish taking a class's pages with it (the issue's other
+option — a flag flipped in Obsidian bypasses every app path); one finding per
+link; a repair button; limiting the check to links FROM class pages
+(check_section already lists every visible page's dead links, and two
+definitions of "a dead link" is what #313 ended).
 
 ### Where they run, and where they honestly do not
 
@@ -336,20 +1113,102 @@ unambiguous and carries structure a sentence cannot.
 
 ### Three traps, all met here
 
-- **Do not read the findings from a tail.** Every other structured-line reader in
-  the mac's `ScriptRunner` works from `recentText(maximumCharacters: 8000)`, and
-  the health lines print in the MIDDLE of a build. On any real build they are
+- **Do not read the findings from a tail.** Most other structured-line readers in
+  the mac's `ScriptRunner` work from `recentText(maximumCharacters: 8000)`, and
+  the health lines print in the MIDDLE of a build. (The preview's announced
+  address is the other exception since #235: it is printed even EARLIER, lost
+  the same way, and now read from the same carried-over lines as they arrive —
+  `documentation/09-mac-app.md` → "Where the address comes from".) On any real build they are
   long past that window by the end. Collect them as output arrives. The mac test
   floods 400 lines after the finding to prove the point.
-- **Hide the marker line from the console a teacher reads.** A raw JSON blob is
-  machinery (rule 1). The human sentence is printed separately, so nothing is
-  lost. The mac drops it in `TranscriptBuilder`, and reads findings from the raw
-  text BEFORE handing it there.
+- **Hide the marker line from the console a teacher reads — a line CARRYING
+  it, whole, and while it is still arriving.** A raw JSON blob is machinery
+  (rule 1). The human sentence is printed separately, so nothing is lost. The
+  mac drops it in `TranscriptBuilder`, and reads findings from the raw text
+  BEFORE handing it there. Until #153 (2026-09-25) the mac tested only the
+  START of a line, and two leaks followed, both MEASURED by compiling the real
+  `TranscriptBuilder`, `SiteHealthFinding` and `PagesDatedByTheBuild`
+  standalone: fed `"Building…"`, then the marker and `\r\n`, then `"done"`,
+  the console showed `Building…PLANTOIR_HEALTH: {"name": …}` and
+  `findings(in:)` returned **0** — the finding was DROPPED, so no dialog, no
+  trail line and nothing in the assistant's answer; and fed `"ok\r\n"` then
+  the first 60 characters of a marker, both `displayText` and `recentText`
+  ended in the half payload until its newline arrived. Now `isMarkerLine` is
+  `contains`, the parse reads from the prefix onward (`range(of:)`), and the
+  line under construction is hidden while it carries a marker
+  (`visibleCurrentLine`) — which is Windows' own rule, adopted
+  (`CarriesTheHealthMarker`, `VisibleCurrentLine`, `IndexOf`). The same
+  applies to `PLANTOIR_DATED:`, whose trail read is unaffected because it
+  reads the raw text, never the transcript. The prompt check also refuses a
+  marker line: half a payload cut after `"sentence":` ends in a colon, which
+  it would otherwise have offered as a question — `looksLikeQuestion`
+  answers false for any marker line, pinned by
+  `SiteHealthFindingTests.testHalfAMarkerIsNeverAQuestion`. The cases are
+  `contracts/shared-rules.json` → `siteHealth.marker.consoleCases`.
+
+  How a glue could arise: `site_health.py` prints each line whole, so it takes
+  something ELSE writing half a line into the same terminal first (stderr
+  chatter with no newline). Not observed on a real build; the leak and the
+  drop were measured on the code. Parsing from the prefix also means an escape
+  sequence left in front of a marker no longer hides it, since findings are
+  parsed from the raw line, where #235's per-line colour stripping does not
+  apply.
+
+  **Residuals, named rather than fixed** (all the same on Windows): a chunk
+  ending in the middle of the PREFIX (`…PLANTOIR_HE`) shows that fragment
+  for one refresh — it is not JSON, and a rule hiding every line ending in a
+  prefix of the prefix would hide ordinary text ending in "P"; two markers
+  glued on ONE line parse as neither, because the JSON parse from the first
+  prefix fails — it needs a missing newline between two `print`s, so it is
+  theoretical; and the chatter in front of a glued marker leaves the problem
+  report as well as the console (`writeRecordOfRun` reads `displayText`).
+  **Rejected:** keeping that chatter by cutting the line at the prefix. It
+  would differ from Windows, and half a line is not a sentence anybody needs.
 - **Show it once.** The mac holds findings in view state rather than reading them
   off the runner at render time, so a teacher who dismisses the dialog and
   carries on editing does not meet it again on the next redraw. A healthy course
   must see nothing at all — the failure mode for this whole feature is nagging,
   and a warning dismissed by habit is dismissed when it matters.
+
+### The overnight path's trail line (#153)
+
+A scheduled publish runs with the app closed, so its findings reach a teacher
+through a record the app reads later (`findingsSentinelURL`, consumed by
+`takeFolderProblems`). Until 2026-09-25 that was ALL they did on the mac: no
+`folder problem found` line was written anywhere on that path — not by the
+run, and not when the record was read — so the case the check exists for left
+no trace on the trail.
+
+Now `ScheduledDeploy.recordFolderProblems`, in the `--run-scheduled-deploy`
+process at the end of the run, hands the run's part of the log to
+`noteFolderProblems`, which writes one line per DISTINCT finding in the same
+words the console path writes (`SiteHealthFinding.trailSentence`, one home for
+two writers). `takeFolderProblems` notes nothing, so one run's finding is one
+trail line whether or not anybody opens the section. The line is stamped when
+the run FINISHES rather than when the build printed it — minutes apart, the
+same as the dated-pages line. A log found shorter than its offset (rotated
+mid-run) is read whole, so an older night's findings are noted again; the
+record has always had the same edge.
+
+The sentence's apostrophe changed with it: the mac wrote `course's`, while
+`activityTrail.mustRecord` → "folder problem found" → `carries` and Windows'
+`TrailSentence` both say `course’s`. The mac is the one that moved;
+`testTheTrailSentenceIsTheContractsOwn` reads the example out of `carries`.
+Older trail files keep the straight form, which nothing parses.
+
+**Rejected:** (a) writing the line in `takeFolderProblems`, when the section is
+opened — Windows' shape (`ScheduledHealthFindings.Take`, dated to the record's
+write time). On the mac it would date nothing better and leave NO line for a
+teacher who never opens that section: the argument
+`scheduledPublishStopped.trail` already won. (b) #84's per-run capture of the
+output in place of the byte offset — launchd owns the child's stdout, so a
+capture means either a pipe that must be drained (the thing that wedged the
+Windows assistant's server) or a change to the generated agent, which reaches
+only jobs scheduled after an upgrade; the offset is tested, handles rotation,
+and the dated-pages reader shares its text. The log split is on scalars now
+(`linesOf`) — hardening only, since launchd hands the child a plain file and
+the launchers ask for a terminal only when they have one, so the log has
+`\n` endings today.
 
 ### Offering to put it right
 
@@ -425,6 +1284,170 @@ unanswerable. Both are in `contracts/shared-rules.json` → `activityTrail`, and
 the repair rules themselves are in `siteHealth.repair`.
 
 
+## The curriculum coverage maps: one per curriculum folder (#128)
+
+Until #128 a course had ONE coverage map, built from ONE folder, and its
+expectation pages had to be named like `A1.1`. A course keeping both an
+`Ontario Curriculum` and a `College Board Curriculum` folder (every LCS course
+has both) got a map from Ontario only, while Course Settings and "Folders
+Plantoir uses" named College Board — and College Board's pages, named `1.A`,
+were never expectations to the build at all (#90, measured on this Mac
+2026-09-06). Now every curriculum folder the course DECLARES that holds an
+expectation page has a map of its own.
+
+**Which folders.** `configured_curriculum_folders(config)`: the new list key
+`curriculum_folders`, in the course's own order, then the legacy
+`curriculum_folder` if it is not already there (non-strings, empties,
+path-like names and repeats in any letter case dropped). `_find_curriculum_folders`
+keeps every declared folder that holds at least one expectation page — found
+in any letter case, the ON-DISK spelling kept — in declared order. Only when no
+declared folder holds a page does the old scan run, and it still gives exactly
+ONE folder: the alphabetically first top-level folder whose name mentions
+"curriculum" and holds a LETTER-FIRST page (`A1.1`, the only shape before this
+piece), and only if there is none, the first holding any expectation page.
+That preference is the fix for the implementation review's finding 1,
+measured: with the widened code rule and a plain alphabetical scan, a scratch
+LCS course whose `College Board Curriculum` held `1.A` pages had Ontario's map
+silently replaced by College Board's under the same title, because `College`
+sorts before `Ontario`. A golden (Ontario with pages, College Board with `1.A`
+pages, nothing declared) holds it byte for byte to what ff1213ed built. The scan is a FALLBACK, never additive:
+Russell's ruling on the plan. A course made from scratch declares nothing, so
+the scan is still its real path, and its site is unchanged. The whole rule is
+`contracts/shared-rules.json` → `specialNames.curriculumFoldersResolution`,
+run against the build by `scripts/test_coverage_maps.py` and against the apps
+by their contract suites.
+
+**Titles.** The PRIMARY folder's map — the first declared name, or the one
+folder the scan found — is always `Curriculum Coverage`; every other map is
+`<Folder> Coverage`, and a title that would repeat another gets ` (2)`
+(`curriculumRules.coveragePageTitles`). So a course with one map keeps the page,
+its address and every link to it, byte for byte (the goldens in
+`test_coverage_maps.py` were captured from origin/dev ff1213ed before any edit:
+a `Curriculum/` course and the LCS default, Ontario with pages and College
+Board empty), and a course that declares a second folder later gets a SECOND
+page rather than two renamed ones. Only a non-primary title is written quoted
+in the page's frontmatter, because a folder's name can carry a colon.
+
+**The code rule** (`is_expectation_code`, `fullmatch`) admits three shapes:
+letter, digits, dot, digits (`A1.1`, `b2.3`); digits, dot, ONE letter (`1.A`,
+a College Board skill); and two to four CAPITAL letters, a hyphen, digits, a
+dot, one capital letter (`CRD-1.A`, `AAP-2.B`, a College Board learning
+objective — added for Russell's marketing course). Still refused: `12.3`,
+`B2`, `A1. Heading`, `1.A.1` and `CRD-1.A.1`. Measured before widening: 2,842
+curriculum pages ship under `support/` (39 payloads, 50 skeleton families —
+2,214 codes, 494 overall headings, 89 indexes and a handful of about-pages),
+zero lower-case codes, zero digit-first or hyphenated stems, zero subfolders —
+and none of them changes classification. The build had DISAGREED with the
+contract about `b2.3` (its regex was upper-case only) since the contract was
+written, because nothing ran the contract's cases against the build; the new
+test does.
+
+**Order and columns.** `code_sort_key`: letter-first codes, then skills, then
+learning objectives by prefix, number and letter; `strand_of` gives the column
+— the upper-cased letter (so `b2.3` joins B), the skill number, or the
+learning-objective prefix (`CRD`). Only letter-first strands have overall
+expectations and chips; a map with none leaves out the chip sentence, the
+"Overall expectations with no assessed work" row and the chip part of the
+notes, and an empty chips `div` is never written. The old sort key read
+`int(code.split(".")[0][1:])`, which is `int("")` for `1.A`: widening the rule
+without replacing it would have stopped every such build with a traceback.
+
+**Nested pages and repeats.** Pages are collected RECURSIVELY, shallowest
+first then by path — a plain path sort puts `(old)/A1.1` and `2019 version/A1.1`
+ahead of the top-level `A1.1` (measured), and the map would point at the
+archive. A code met twice in one folder is one cell, the first page kept, with
+one console line naming it (`⚠️  College Board Curriculum has two pages called
+1.A — the map uses Unit 1/1.A`). Recursion changes nothing for shipped content
+(no subfolders) but does change a single-map course whose teacher keeps
+subfolders inside the curriculum folder: their nested pages now count.
+
+**Counting.** A page in ANY mapped folder never counts, and neither does any
+map page: a College Board page that transcludes `![[A1.1]]` is curriculum
+material, not a lesson that addressed Ontario's A1.1. A link finds its
+expectation in any letter case, as Obsidian and Quartz resolve it. The
+"taught" crawl is done once per build for every map.
+
+**Everywhere else a title was a literal.** Key Links gets each map directly
+under the bullet pointing into its folder (the "…curriculum expectations]]"
+wording fallback applies only with one map); the Backlinks panel skips every
+title and every mapped folder, in both spellings; the sidebar hides every
+map's file (and `Curriculum Coverage.md` always); class-page detection and both
+date passes ask `_is_coverage_page_name`, fed by `set_coverage_titles` (the
+`set_unit_word` pattern: one build is one process). `handWrittenCoveragePage`
+names the colliding title through `{page}`.
+
+**The trail.** Every build whose section wants the map prints
+`PLANTOIR_MAPS: {"course", "section", "maps": [{title, folder, expectations}]}`
+— an empty list included, because "my College Board map is missing" is the
+question it answers (`coverageMapsBuilt`). The mac reads it from the console
+(`ScriptRunner`) and from a scheduled publish's log
+(`ScheduledDeploy.recordFolderProblems`) and writes `curriculum maps built`.
+Nothing is printed when the map is switched off for the section. And since
+this piece, the mac keeps EVERY line carrying `PLANTOIR_` + capitals and a
+colon out of the console by one rule (`BuildMarkerLine`,
+`transcriptStripping.machineLines`), so the next marker cannot reach a
+teacher as raw JSON the way `PLANTOIR_DATED:` still does on Windows (#279).
+
+**Setup.** `setup_course.py` writes `curriculum_folders` (the manifest's one
+folder) for a course with nothing recorded, keeps a saved list exactly, and
+writes the list's FIRST (primary) folder in the legacy `curriculum_folder` as
+well — Russell's ruling on the implementation review: an older Plantoir on a
+second Mac reads only that key, and a primary folder renamed to something
+without "curriculum" in it would otherwise leave that Mac publishing no map.
+Both apps and the renamer do the same whenever they write the list. Setup used
+to write `curriculum_folder` from the manifest unconditionally, and because the saved-keys merge only restores keys
+the fresh dict lacks, a re-run put `Curriculum` (or null) back over a name a
+rename had recorded — `test_setup_curriculum_folders.py` is the must-fail.
+Manifests keep their singular key: 89 of 89 declare exactly one folder.
+
+**The apps** protect and name from the same rule, reading the course's
+SHARED folders on disk for expectation pages
+(`CurriculumFolderRule.foldersWithPages`): while the map is on only the LAST
+folder with a map is refused, the others ask first
+(`removeCurriculumFolderWithItsMapConfirmation`), and a folder with no pages is
+an ordinary folder — on the LCS default, Ontario (which holds the map) is the
+one refused, where the by-name rule used to protect the empty College Board.
+While no folder holds a page they fall back to the single by-name folder, so
+an empty new course is protected exactly as before. Both apps OFFER to declare
+a folder whose name mentions "curriculum" under "Curriculum folders"
+(`curriculumFoldersOffer`); the map folders are shown ticked, then every
+declared folder (so a folder ticked before its first page stays ticked), and
+the first tick never drops the map the scan found. A rename of any of them materialises
+`curriculum_folders`, with the new name in the old one's place.
+
+**Rejected, so nobody re-proposes them.**
+- Turning `curriculum_folder` into string-or-list: every reader branches on
+  type forever, and an old reader handed a list builds a path out of it. A new
+  key is ignored cleanly by old readers, and both apps keep unknown keys.
+- An array in manifests: no manifest has two folders.
+- A by-name ADDITIVE scan (the plan's first design): a teacher keeping
+  `Ontario Curriculum (2008)` beside the revised curriculum would get a second,
+  overlapping map — and, before the primary-title ruling, the real map renamed.
+  An overlap rule ("skip a folder whose codes repeat another map's") is not
+  safe either: a split-grade ICS3U/ICS4U course legitimately has `A1.1` in both.
+- `<Folder> Coverage` for every map, and `Curriculum Coverage` for whichever map
+  sorts first: both rename existing pages.
+- A per-map switch: one switch covers every map; a teacher who wants one map
+  fewer unticks the folder.
+- Bulk-migrating existing configs, and dropping the legacy key's READ.
+- A health finding for "a curriculum folder with no pages": every LCS course
+  not teaching AP would be nagged on day one.
+- `1.A.1`/`CRD-1.A.1` (essential knowledge): not measured on a real course.
+
+**Known limits.** A code in two folders counts on both maps (matching is by
+page name). The assistant still recognises curriculum pages by a folder name
+mentioning "curriculum", so a declared `AP CSP` folder's pages have a map but
+are not offered by the assistant (`isCurriculumPage.note`). Russell's own
+College Board layout was not measured (the working folders are his); the two
+read-only commands for him are in the #128 hand-over.
+
+**Adding a second curriculum.** Nothing ships the College Board's pages — the
+framework's text is the teacher's to bring. A teacher makes the folder
+(`College Board Curriculum`), ticks it under Course Settings → "Curriculum
+folders", and asks "Revise with Claude…" to draft one page per code from the
+framework they have; the next build draws its map.
+
+
 ## Stage 4: Configuration patching
 
 The remaining per-section settings from `course_config.json` are applied to
@@ -433,6 +1456,26 @@ page title (emoji + course code or custom label + optional `S<N>` marker),
 locale, per-section colour scheme, and the social-media-preview emitter
 toggle. Each is detailed in
 [customizations §C2](06-quartz-customizations.md#c2-applied-on-every-build).
+
+**Before the omit set is written, the section's copy of the sidebar filter is
+brought up to date** (`ensure_sidebar_hide_rule_current`, issue #265). Each
+section's `quartz.layout.ts` is a copy made once, when the section is first
+built, so a change to the filter (`setup_course.EXPLORER_BLOCK`) reaches only new
+sections unless something repairs the old ones. It runs right after the anchor
+check, in the ALWAYS part of the build, and is idempotent: a file whose every
+`Component.Explorer(` block carries `CQ4T-HIDE-RULE: v2` is left byte for byte;
+otherwise every block is replaced with the current one (the omit set and
+`folderClickBehavior` are rewritten just after, as on every build) and the result
+must carry the marker in every block and a wired anchor — or the build refuses,
+the way the anchor check does, rather than guess at a hand-edited file. **On the
+mac this seldom runs**: a changed toolchain gets a new container, whose
+`/tmp/quartz-builds` is empty, so the section is recopied from the image, which
+already has v2. On Windows the build folder (`%TEMP%\quartz-builds`) persists, and
+this is where the change actually lands. It was proved the Windows way on the
+mac: a v1.3.1 build into a persisted `PLANTOIR_WORK_DIR`, then a rebuild with the
+new scripts and no `--full-rebuild` — the console said "Reusing existing" and
+"Brought the sidebar's hide rule up to date", and the built sidebar hid exactly
+the stored names. What the rule itself is: [06 → B1](06-quartz-customizations.md).
 
 Two more things happen here, fresh on every build:
 
@@ -586,10 +1629,98 @@ reaches `main()`, so no node server is left behind. Pinned by
   other stop (`stopByUser`, which terminates the host shell) and
   `stop_preview.py` (SIGTERM by default) already end Python without a
   traceback, because SIGTERM does not raise `KeyboardInterrupt`.
-- **Not in this change:** `scripts/deploy.py` has no `KeyboardInterrupt`
-  handling either, so Cancel during a publish still prints its traceback —
-  measured by the review with a real `^C` through a pty: 20 lines during the
-  rebuild on this change, 53 before. Filed as #259.
+- **A publish, the same way (GitHub #259, 2026-09-25).** `scripts/deploy.py`
+  had no `KeyboardInterrupt` handling either, so Cancel during a publish still
+  printed its traceback. It now enters through `run_until_stopped()`, which
+  calls `main()` and turns `KeyboardInterrupt` into `sys.exit(130)`, printing
+  nothing. Measured with the real `deploy.py` under `pty.fork()` and a `^C`
+  written to the pty, the build swapped for a long `subprocess.run` (host
+  Python 3.14; the image's 3.11 prints fewer caret lines): during the
+  production rebuild, exit −2 and 26 lines with one traceback before, exit 130
+  and nothing after; at the surname question (`input()`), exit −2 and 10 lines
+  before, exit 130 and nothing after.
+  - **Around `main()`, not inside it.** Wrapping `main()`'s ~290-line body was
+    REJECTED (a re-indent diff over the whole publish path), and so was moving
+    the body into a new function: `test_deploy_netlify_headers.py` reads
+    `inspect.getsource(deploy.main)` to prove the Cloudflare branch returns
+    before the badge writer, so `main`'s body has to stay in `main`. One
+    handler covers every place a publish can be waiting — the rebuild's
+    `subprocess.run`, both questions, an upload, wrangler — and the two
+    guards below cover a child that is seen leaving first.
+  - **The Cancel that arrives through the build first.** The `^C` reaches the
+    rebuild child and `deploy.py` together. Usually `deploy.py` is still in
+    `waitpid` and hears its own interrupt first; if the child's exit is seen
+    first, `subprocess.run` raises `CalledProcessError` with 130 (the build's
+    own quiet exit) or −2 (killed outright), and `rebuild_for_production` used
+    to print "Production rebuild failed" and exit 1. It now exits 130 for
+    those two statuses (`build_was_stopped_by_the_teacher`), and 1 for any
+    other. Not reproduced by hand — the race is narrow — so it is pinned by a
+    test that raises the error directly.
+  - **The Cancel that arrives through wrangler first.** The same race on the
+    Cloudflare leg: `deploy_to_cloudflare` exits 130 when wrangler reports 130,
+    −2 or 0xC000013A (Ctrl-C on Windows) —
+    `STATUSES_OF_A_PROGRAM_STOPPED_BY_A_CANCEL`, which the rebuild's guard
+    reads too — instead of raising "Cloudflare's deploy tool exited with
+    code …" with a traceback. Measured inside the image with a stand-in API
+    that never answers: **wrangler 4.80.0 exits 0 on SIGINT** (its `pages`
+    commands install a handler that calls `process.exit()`), so the guard
+    cannot see that shape — `deploy.py`'s own interrupt is what covers it, and
+    with the whole group signalled, as the app's `^C` does, the real wrangler
+    run exits 130 with nothing on stderr and no wrangler left running. (A
+    harness that starts Python with SIGINT ignored — any `&` job in a
+    non-interactive shell — shows the danger: wrangler leaves with 0 and the
+    leg reads as published. Restore `default_int_handler` in such a harness.)
+  - **A Cancel during the upload stops the upload.** Until the #259 fix round
+    it did not: the uploads ran in a `with ThreadPoolExecutor` block, and
+    leaving that block on the `KeyboardInterrupt` waits for the executor to
+    RUN every upload still queued. Measured with the real `deploy.py` under a
+    pty, `netlify_api` stubbed (40 files, 0.4 s per PUT, 5 workers) and the
+    `^C` about a second in: **25 of 40 uploads started after the Cancel**, and
+    it took 2.3 s to leave. Now `_upload_required_files` drops the queue
+    (`shutdown(wait=False, cancel_futures=True)`) and sets `stop_uploading`,
+    so an upload waiting out a 429 gives up instead of retrying for up to a
+    minute: **0 of 40 after the Cancel**, 0.23 s, three runs of three. The
+    uploads already in flight — at most five — still finish.
+  - **What reaches the site, and what does not.** Neither host publishes a
+    half-finished upload, so a Cancel in the middle leaves the published site
+    exactly as it was:
+    - Netlify's file-digest deploy is created with `draft: false`, and Netlify
+      documents that it goes live when its state reaches `ready` — after every
+      required file has arrived. A deploy whose files never all arrive never
+      becomes the published one. (Netlify does document a cancel call, `POST /deploys/{id}/cancel`, but it is deliberately not used here: a deploy whose files have all arrived goes live regardless, and one still receiving files stays a draft anyway;
+      the unfinished one is simply left waiting, and nothing is sent after the
+      Cancel to tidy it up — a network call during a Cancel was REJECTED, since
+      the app ends the launcher two seconds after its `^C`.)
+    - wrangler uploads every asset first and creates the Pages deployment —
+      the step that changes the site — only after (`pages deploy` in
+      wrangler 4.80.0's `cli.js`: `upload(…)`, then `POST …/deployments`).
+      A Cancel before that step publishes nothing; `subprocess.run` kills
+      wrangler 0.25 s after the interrupt if it has not left on its own.
+
+    **The one window where a Cancel does not stop it:** a Cancel that lands
+    after the last files are already on their way — Netlify's final uploads
+    in flight, or wrangler past its deployment step — or after the upload has
+    finished. The publish then completes and the site changes, while the app
+    reports the task as cancelled (it decides by its own flags, and has no way
+    to know which side of that moment the `^C` landed). The window is the
+    last second or two of the upload; nothing in the app's wording claims the
+    site is unchanged, and whether a sentence should say so is a wording
+    decision left open, not taken here.
+  - Nothing else to tidy on the way out: the token file is removed by
+    `deploy.sh` before Python starts, and the publish registry belongs to the
+    app.
+  - Pinned by the second class in `scripts/test_stop_quietly.py`: the
+    in-process 130, the program's entry going through `run_until_stopped()`
+    (the first case alone would pass with the entry put back to `main()`), the
+    rebuild that left first, and a real SIGINT sent to the whole process group
+    mid-rebuild (POSIX only). On `origin/dev` before the change: 3 failures and
+    1 error, three runs out of three. The fix round added three more: wrangler
+    that left first; 40 stubbed uploads with a real SIGINT to the main thread
+    at the 15th (at most 25 may start in all — the old code started 40); and
+    five uploads turned away with 429 that must give up within 5 s of the
+    Cancel (the old code retried for 61 s; POSIX only, since nothing wakes a
+    main thread whose every upload is waiting without a real signal). On the
+    first round's `deploy.py`: 2 failures and 1 error.
 - **Which button.** Only the progress view's Cancel types a `^C`; the Stop
   Preview and console Stop buttons end the process without one and never
   showed the traceback (measured by the same review).
@@ -644,6 +1775,12 @@ variable. If a scanner or an open handle makes the removal fail, the build says
 so and carries on rather than dying; but the stale-publish risk returns for
 that run. Worth one real test on a machine with OneDrive running, and tell the
 the other side what you find.
+
+**A front page that is THERE but hidden** (#246: its settings could not be
+read) produces no website in exactly the same way, and is cleared the same
+way — but it is not missing, so it says so in its own words and never offers
+to put the page back. See "A page whose settings cannot be read is hidden
+(#246)" above.
 
 The `sectionIndexMissing` health check understated the same thing — "the site
 will open on whatever page happens to come first" is true of a PREVIEW, and for
@@ -797,6 +1934,49 @@ the course folder, minus
 - `.DS_Store` / `Thumbs.db`,
 - `course_config.backup.json` and any `*.tmp`.
 
+**The How I Teach page (#209) is left out — under the fingerprint's RULE 2**
+(since [#330](https://github.com/russellgordon/plantoir/issues/330),
+2026-09-26). It never reaches a site, so editing it must not mark the section
+"— Edited" or make the next Publish rebuild for nothing. But this list is a
+wire format held byte for byte by three implementations that cannot change in
+the same hour, so the change is VERSIONED rather than made
+(`contracts/app-rules.json` → `publishedFreshness.fingerprintRules`):
+
+- **Rule 1** is everything above. **Rule 2** is rule 1 less `How I Teach.md` at
+  a reserved place — the top of the course, or the top of `section<N>/`
+  (`HowITeachPage.isAtAReservedPlace` / `how_i_teach.is_reserved_place`, the
+  same NFC-then-ASCII-only fold as `howITeachPage.matching`). Inside any other
+  folder it is an ordinary page and counts; a look-alike counts.
+  `filesCountedUnderRule2.cases` pins it.
+- **The stamp says which rule it was taken under**: `fingerprintRule`, absent in
+  every stamp written before #330 (and by Windows until it moves), which means
+  1. The reader compares under the stamp's own rule; a rule it does not know
+  counts as EDITED, as an unreadable stamp does. `stampRuleCases.cases` pins it.
+- **Who computes what.** The mac: Swift, in-process, interactive and launchd
+  alike — it never runs `section_fingerprint.py` — and it writes rule 2.
+  Windows interactive: C#. Windows scheduled: `section_fingerprint.py`, run by
+  the wrapper (`TaskScheduling.cs`), whose value the C# app records and later
+  compares. So the coupling that must never break is C# ↔ Python, both on
+  Windows — which is why **`section_fingerprint.py` takes `--rule 2` and KEEPS
+  rule 1 as its default**: a rule-2 value compared by the C# app under rule 1
+  would be a false "Edited" for every scheduled Windows teacher whose course
+  has the page. Windows flips the C#, the wrapper and the stamp together, in
+  one MUST issue. Do not "fix" the default on its own.
+- **The property that keeps it safe:** for a course with no How I Teach page at
+  a reserved place, rules 1 and 2 hash identically. So the upgrade costs
+  nothing there; a course WITH the page shows "— Edited" once, on the first
+  edit of that page after the upgrade (its stamp is still rule 1), and the
+  next publish writes rule 2.
+- **The accepted window.** A course folder shared by a Mac and a PC: the mac
+  reads the PC's stamps correctly as rule 1; the PC reads the mac's rule-2
+  stamps as if rule 1, a false "Edited" only for a course with the page, until
+  the PC publishes. Windows alone is unaffected.
+
+Rejected: changing all three unversioned (whichever lands second gives every
+teacher with the page a false "Edited" until their next publish, and a shared
+folder an argument that never settles); leaving the page out by its content,
+frontmatter say (the fingerprint deliberately reads no page).
+
 `course_config.json` itself COUNTS — fonts, the sidebar and the coverage map
 are inputs to the built site as surely as a page is. `Media/` counts, because
 it is symlinked into the build. `hidden_explorer_components*` counts, because
@@ -843,7 +2023,8 @@ The rule now: resolve links by hand, ONE hop.
 
 Nothing stops a teacher choosing `courses/ICS3U/site` as their "publish to
 a folder on this computer" destination — `deployFolderProblem` checks only
-that the folder exists and is writable. `deploy.py` then writes the entire
+that the path is a full one (#227), that the folder exists and that it is
+writable. `deploy.sh` then writes the entire
 built site there, INSIDE the folder being fingerprinted, so each publish
 would differ from the last and the window would say " — Edited"
 permanently. Exclude the configured local destination, and everything under
@@ -1081,7 +2262,10 @@ So: `courses/<CODE>/.merged_output` is a **symlink** to
 launchers bind-mount that builds folder into the container **at the same
 absolute path**, unconditionally, so the link resolves identically inside and
 out and all six readers keep working untouched. The folder id is the same
-`pwd -P | shasum -a 256 | cut -c1-8` that already names the folder's container,
+`/bin/pwd -P | shasum -a 256 | cut -c1-8` that already names the folder's
+container — the disk's own spelling of the folder, so a folder reached in
+another case or Unicode form is still one folder (#189; [03](03-launcher-scripts.md)
+→ "One folder, one spelling") —
 so a folder's container and its builds folder cannot disagree about which
 folder they belong to. It has to be under `$HOME` because the Colima VM mounts
 only the home folder.

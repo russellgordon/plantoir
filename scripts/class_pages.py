@@ -27,9 +27,26 @@ in use, from the app's Course Settings: the app renames every class page and
 follows the links, then writes the new word here. Nothing in the build changes
 for that — it reads the word from the configuration on every run.
 
-**"Day" is deliberately fixed.** A teacher who says "Thread" almost certainly
-still says "Day 3", and a second configurable word would double the migration
-for something nobody asked for.
+**"Day" is deliberately fixed** in the ordinary scheme. A teacher who says
+"Thread" almost certainly still says "Day 3", and a second configurable word
+would double the migration for something nobody asked for.
+
+## A course whose pages carry ONE number: "Week 3" (#267, 2026-09-24)
+
+A club does not have units and days; it meets, and its pages are "Week 1",
+"Week 2", … "Week 9". `class_page_scheme` in `course_config.json` says which
+shape a course's class pages take:
+
+- `"unit_day"` — "<word> 2, Day 3". **ABSENT means this**, and so does any
+  value this code does not know: a scheme a newer app wrote, opened by an
+  older one, reads as today's shape (it then sees no class pages — the same
+  state as before the scheme existed) and nothing is rewritten.
+- `"numbered"` — "<word> 3". The word is the SAME `unit_word` key ("Week" for
+  a club), deliberately reused rather than joined by a `week_word` key: two
+  word keys would be two things to keep in step, and the key's name now
+  under-describes it, which `contracts/file-formats.json` says out loud.
+
+The scheme is chosen when a course is made and is not switched afterwards.
 
 **This module holds the rule; `build_site.py` holds this build's answer.** The
 split matters: the rule is shared with `setup_course.py`, which uses it to
@@ -40,6 +57,9 @@ build.
 import re
 
 DEFAULT_UNIT_WORD = "Unit"
+
+UNIT_DAY_SCHEME = "unit_day"
+NUMBERED_SCHEME = "numbered"
 
 
 def word_from_config(config: dict) -> str:
@@ -54,19 +74,45 @@ def word_from_config(config: dict) -> str:
     return str(config.get("unit_word") or DEFAULT_UNIT_WORD).strip() or DEFAULT_UNIT_WORD
 
 
-def class_page_pattern(word: str = DEFAULT_UNIT_WORD) -> str:
+def scheme_from_config(config: dict) -> str:
     """
-    The regex a class page's name must match: "<word> 2, Day 3".
+    A course's class-page scheme: "numbered", or "unit_day" for everything else.
+
+    Absent, empty and UNKNOWN all read as "unit_day" — the shape every course
+    made before the key existed has. An unknown value is not an error because
+    the only honest reading of a scheme this code has never heard of is "not
+    one I can count", and treating it as today's shape is exactly that.
+    """
+    value = str(config.get("class_page_scheme") or "").strip().lower()
+    if value == NUMBERED_SCHEME:
+        return NUMBERED_SCHEME
+    return UNIT_DAY_SCHEME
+
+
+def _cleaned_scheme(scheme) -> str:
+    if str(scheme or "").strip().lower() == NUMBERED_SCHEME:
+        return NUMBERED_SCHEME
+    return UNIT_DAY_SCHEME
+
+
+def class_page_pattern(word: str = DEFAULT_UNIT_WORD, scheme: str = UNIT_DAY_SCHEME) -> str:
+    """
+    The regex a class page's name must match: "<word> 2, Day 3" — or, under
+    the numbered scheme, "<word> 3" and nothing after it.
 
     `re.escape` is not decoration — the word comes from a teacher's own
     configuration, and one containing "(" or "+" would otherwise quietly become
     a different pattern, or fail to compile in the middle of a build.
     """
+    if _cleaned_scheme(scheme) == NUMBERED_SCHEME:
+        return r"^" + re.escape(_cleaned(word)) + r"\s+(\d+)$"
     return r"^" + re.escape(_cleaned(word)) + r"\s+(\d+),\s*Day\s+(\d+)$"
 
 
-def first_class_pattern(word: str = DEFAULT_UNIT_WORD) -> str:
-    """The regex the FIRST class of the year matches: "<word> 1, Day 1"."""
+def first_class_pattern(word: str = DEFAULT_UNIT_WORD, scheme: str = UNIT_DAY_SCHEME) -> str:
+    """The regex the FIRST class of the year matches: "<word> 1, Day 1", or "<word> 1"."""
+    if _cleaned_scheme(scheme) == NUMBERED_SCHEME:
+        return r"^" + re.escape(_cleaned(word)) + r"\s+0*1$"
     return r"^" + re.escape(_cleaned(word)) + r"\s+0*1,\s*Day\s+0*1$"
 
 

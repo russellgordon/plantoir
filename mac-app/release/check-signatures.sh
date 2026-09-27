@@ -1,0 +1,151 @@
+#!/usr/bin/env bash
+# Refuse a signed Plantoir.app whose updater was not signed by the app's own team (#204).
+#
+#     release/check-signatures.sh <Plantoir.app>                 # team read from the app
+#     release/check-signatures.sh <Plantoir.app> --expect-team T  # team given
+#     release/check-signatures.sh <Plantoir.app> --ad-hoc-for-tests
+#
+# `codesign --verify --deep --strict` CANNOT see a missing step: an app
+# re-signed with a Developer ID around Sparkle's helpers left ad-hoc still
+# verifies (measured for #204's plan, `C.app`). Notarization would reject it
+# five minutes later — or, if it ever got through another way, Sparkle would
+# skip its atomic swap. This asks the question that matters, of every updater
+# item and the app: the SAME team as the app, the hardened runtime, and — for
+# the helpers — none of the app's entitlements. Prints each fault; exit 1 on any.
+#
+# And, outside the tests, a secure timestamp on every item.
+#
+# Since GitHub #312 the same questions are asked of every program the app
+# carries for the website builder (Contents/Resources/helpers), plus two of
+# their own: limactl MUST carry com.apple.security.virtualization (a hardened
+# limactl without it cannot start a vz virtual machine, and that would be
+# found only at a teacher's first start), and no other helper may carry any
+# entitlement at all. And the helpers' MANIFEST must still describe the signed
+# bytes, or every teacher's Mac would refuse the app's copy and quietly
+# download instead.
+#
+# The team is read from the app's own signature rather than typed in, so it is
+# not a second copy of a value. An app with no team (ad-hoc) is refused: that
+# is exactly what a release must never be. --ad-hoc-for-tests lifts that ONE
+# rule so the other checks can be proven on this Mac without a Developer ID.
+set -uo pipefail
+
+APP="${1:?usage: check-signatures.sh <Plantoir.app> [--expect-team TEAM | --ad-hoc-for-tests]}"
+MODE="${2:-}"
+WANT_TEAM=""
+AD_HOC_ALLOWED=false
+case "${MODE}" in
+  --expect-team) WANT_TEAM="${3:?--expect-team needs a team}" ;;
+  --ad-hoc-for-tests) AD_HOC_ALLOWED=true ;;
+  "") ;;
+  *) echo "Unknown option: ${MODE}"; exit 2 ;;
+esac
+
+team_of() {
+  codesign -dvv "$1" 2>&1 | sed -n 's/^TeamIdentifier=//p'
+}
+
+if [[ -z "${WANT_TEAM}" ]]; then
+  WANT_TEAM="$(team_of "${APP}")"
+fi
+
+faults=0
+if [[ "${WANT_TEAM}" == "not set" || -z "${WANT_TEAM}" ]] && [[ "${AD_HOC_ALLOWED}" != true ]]; then
+  echo "NOT SIGNED BY A TEAM: the app itself (a release must be Developer ID signed)"
+  faults=$((faults + 1))
+fi
+
+FW="${APP}/Contents/Frameworks/Sparkle.framework"
+items=()
+if [[ -d "${FW}" ]]; then
+  while IFS= read -r -d '' helper; do
+    items+=("${helper}")
+  done < <(find "${FW}/Versions/B" -maxdepth 2 \( -name '*.xpc' -o -name '*.app' -o -name 'Autoupdate' \) -print0)
+  items+=("${FW}")
+else
+  echo "NO UPDATER: ${FW} is missing"
+  faults=$((faults + 1))
+fi
+HELPERS="${APP}/Contents/Resources/helpers"
+helper_programs=()
+if [[ -f "${HELPERS}/MANIFEST" ]]; then
+  while IFS= read -r -d '' program; do
+    if file -b "${program}" | grep -q '^Mach-O'; then
+      helper_programs+=("${program}")
+      items+=("${program}")
+    fi
+  done < <(find "${HELPERS}" -type f -print0)
+  if ! (cd "${HELPERS}" && grep '^[0-9a-f]\{64\}  ' MANIFEST | shasum -a 256 -c --status); then
+    echo "MANIFEST DOES NOT MATCH THE SIGNED HELPERS: Contents/Resources/helpers/MANIFEST (run release/sign-helpers.sh, which writes it again)"
+    faults=$((faults + 1))
+  fi
+  # Every program must be THERE and in the MANIFEST: a missing one passes
+  # every check above, and every teacher's Mac would then refuse the app's
+  # copy and quietly download instead (#312 implementation review, L1).
+  for required in bin/colima bin/limactl bin/lima bin/docker cli-plugins/docker-buildx; do
+    if [[ ! -f "${HELPERS}/${required}" ]] || ! grep -q "^[0-9a-f]\{64\}  ${required}$" "${HELPERS}/MANIFEST"; then
+      echo "MISSING FROM THE HELPERS: Contents/Resources/helpers/${required}"
+      faults=$((faults + 1))
+    fi
+  done
+  # And its versions must be the launchers' own, or they refuse the copy.
+  want_pins="$("$(dirname "${BASH_SOURCE[0]}")/../Vendor/fetch-helpers.sh" --pins-line 2>/dev/null)"
+  if [[ -z "${want_pins}" ]] || ! grep -qxF "${want_pins}" "${HELPERS}/MANIFEST"; then
+    echo "THE HELPERS ARE NOT THE VERSIONS setup.sh PINS: Contents/Resources/helpers/MANIFEST (run Vendor/fetch-helpers.sh, xcodegen generate, and build again)"
+    faults=$((faults + 1))
+  fi
+else
+  echo "NO HELPER PROGRAMS: ${HELPERS} is missing (Vendor/fetch-helpers.sh before the build)"
+  faults=$((faults + 1))
+fi
+items+=("${APP}")
+
+for item in "${items[@]}"; do
+  name="${item#"${APP}"/}"
+  [[ "${item}" == "${APP}" ]] && name="Plantoir.app"
+  info="$(codesign -dvv "${item}" 2>&1)"
+  team="$(printf '%s\n' "${info}" | sed -n 's/^TeamIdentifier=//p')"
+  if [[ "${team}" != "${WANT_TEAM}" ]]; then
+    echo "WRONG TEAM (${team:-none}, expected ${WANT_TEAM}): ${name}"
+    faults=$((faults + 1))
+  fi
+  # A secure timestamp on every item (the slice-2 review's L2): an item
+  # signed --timestamp=none, or whose call to Apple's timestamp server failed,
+  # would otherwise pass here and be refused by notarization five minutes later.
+  # Not asked in --ad-hoc-for-tests mode, whose signatures have none by design.
+  if [[ "${AD_HOC_ALLOWED}" != true ]] && ! printf '%s\n' "${info}" | grep -q '^Timestamp='; then
+    echo "NO SECURE TIMESTAMP: ${name}"
+    faults=$((faults + 1))
+  fi
+  if ! printf '%s\n' "${info}" | grep -q 'flags=.*runtime'; then
+    echo "NO HARDENED RUNTIME: ${name}"
+    faults=$((faults + 1))
+  fi
+  if [[ "${item}" == "${HELPERS}/"* ]]; then
+    entitlements="$(codesign -d --entitlements - --xml "${item}" 2>/dev/null)"
+    if printf '%s' "${entitlements}" | grep -q 'disable-library-validation'; then
+      echo "CARRIES THE APP'S ENTITLEMENTS: ${name}"
+      faults=$((faults + 1))
+    elif [[ "$(basename "${item}")" == "limactl" ]]; then
+      if ! printf '%s' "${entitlements}" | grep -q 'com.apple.security.virtualization'; then
+        echo "CANNOT START THE WEBSITE BUILDER (no com.apple.security.virtualization): ${name}"
+        faults=$((faults + 1))
+      fi
+    elif printf '%s' "${entitlements}" | grep -q '<key>'; then
+      echo "CARRIES ENTITLEMENTS IT DOES NOT NEED: ${name}"
+      faults=$((faults + 1))
+    fi
+  elif [[ "${item}" != "${APP}" ]]; then
+    entitlements="$(codesign -d --entitlements - --xml "${item}" 2>/dev/null)"
+    if printf '%s' "${entitlements}" | grep -q 'disable-library-validation\|network.server'; then
+      echo "CARRIES THE APP'S ENTITLEMENTS: ${name}"
+      faults=$((faults + 1))
+    fi
+  fi
+done
+
+if [[ ${faults} -gt 0 ]]; then
+  echo "❌ ${faults} signing fault(s) — not a bundle to notarize."
+  exit 1
+fi
+echo "✅ The updater, the ${#helper_programs[@]} helper programs and the app are signed by team ${WANT_TEAM}, with the hardened runtime; no helper carries the app's entitlements, limactl carries its own, and the helpers' MANIFEST matches."

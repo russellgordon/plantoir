@@ -54,11 +54,11 @@ would disappear with them.)
 Triangulation — the evidence you will not have unless you go and get it.
 
 Fill this in for your own task and leave it here. It never appears on the
-site: everything between the %% markers is stripped before the page is
-built, so it is written for you rather than for students. Keep it to
-plain text — a wikilink in here is invisible to readers but still counts
-towards curriculum coverage and page reachability, which makes the site
-report things nobody can see.
+site: everything between the double-percent markers is stripped before
+the page is built, so it is written for you rather than for students.
+Keep it to plain text — a wikilink in here is invisible on the site and
+is not a link anywhere in Plantoir, so write bare codes and page names
+as words.
 
 Products look after themselves; they arrive and they hold still. These
 are the two kinds of evidence that vanish from a real course unless a

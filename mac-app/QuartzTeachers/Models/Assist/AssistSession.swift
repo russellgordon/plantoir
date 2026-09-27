@@ -42,6 +42,13 @@ final class AssistSession {
     let sectionNumber: Int
     let workingFolder: URL
 
+    /// What the course calls one of its class pages — "meeting" in a club
+    /// (#267) — and how it names them, read once when the window opens.
+    /// Only what the WINDOW says takes these (the shelf, the dates card, the
+    /// answer to declining it); nothing here reaches the model.
+    let classNoun: ClassNoun
+    let classPageNaming: ClassPageNaming
+
     /// What this Mac is allowed to give the assistant.
     let budget: AssistHardwareBudget
 
@@ -180,6 +187,17 @@ final class AssistSession {
         self.courseCode = courseCode
         self.sectionNumber = sectionNumber
         self.workingFolder = workingFolder
+        let configURL: URL = workingFolder
+            .appendingPathComponent("courses")
+            .appendingPathComponent(courseCode)
+            .appendingPathComponent("course_config.json")
+        if let configuration = try? CourseConfiguration(contentsOf: configURL) {
+            self.classNoun = configuration.classNoun
+            self.classPageNaming = configuration.classPageNaming
+        } else {
+            self.classNoun = .class
+            self.classPageNaming = ClassPageNaming.standard
+        }
         let budget: AssistHardwareBudget = AssistHardwareBudget.current()
         self.budget = budget
         let choice: AssistModelChoice = AppSettings.shared.assistantModelChoice
@@ -351,6 +369,17 @@ final class AssistSession {
             workspace: workspace, openMainWindow: openMainWindow
         )
         self.toolRunner = runner
+        // The backups this conversation makes are the ones its Restore button
+        // puts the section back from, so nothing may delete them while this
+        // window is open (#242). Asked of the runner each time rather than
+        // copied, because the first copy is made part way through.
+        AssistActivity.holdBackups(
+            folderPath: workingFolder.path,
+            courseCode: courseCode,
+            sectionNumber: sectionNumber
+        ) { [weak runner] in
+            return runner?.backupsThisConversationMade ?? []
+        }
         let agent: AssistAgent = AssistAgent(
             courseCode: courseCode,
             sectionNumber: sectionNumber,
@@ -588,8 +617,9 @@ final class AssistSession {
     func restoreSection() {
         let saidSoFar: Int = agent?.entries.count ?? 0
         let backupURL: URL? = toolRunner?.conversationBackupURL
+        var settingsNotPutBack: Int = 0
         do {
-            try AssistSectionRestore.restore(
+            settingsNotPutBack = try AssistSectionRestore.restore(
                 backupURL: backupURL,
                 courseCode: courseCode,
                 sectionNumber: sectionNumber,
@@ -612,9 +642,13 @@ final class AssistSession {
         AssistSectionRestore.noteRestored(
             courseCode: courseCode, sectionNumber: sectionNumber, backupURL: backupURL
         )
+        AssistSectionRestore.notePagesNotPutBack(
+            settingsNotPutBack, courseCode: courseCode, sectionNumber: sectionNumber
+        )
         restoreNotes.append(RestoreNote(
             text: AssistSectionRestore.doneMessage(
-                courseCode: courseCode, sectionNumber: sectionNumber
+                courseCode: courseCode, sectionNumber: sectionNumber,
+                settingsNotPutBack: settingsNotPutBack
             ),
             isProblem: false,
             saidSoFar: saidSoFar

@@ -366,6 +366,12 @@ ol.steps li::before {
 
 .version-note { margin-top: 16px; font-size: 15px; color: var(--ink-soft); }
 
+/* "On the Mac. The Windows version gets this in a later release." — printed
+   under a section by {{availability:<key>}} while site.json says the Windows
+   download lacks the feature. Quiet on purpose: it qualifies the section, it
+   is not a warning. */
+p.availability { margin-top: 14px; font-size: 15px; color: var(--ink-soft); font-style: italic; }
+
 /* ---------- Note panel ---------- */
 
 .note {

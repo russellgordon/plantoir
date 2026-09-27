@@ -20,6 +20,9 @@ struct FailureExplainer {
         if let reason = vaultLinkExplanation(in: output) {
             return reason
         }
+        if let reason = folderCopyDidNotFinishExplanation(in: output) {
+            return reason
+        }
         if let reason = rateLimitExplanation(in: output) {
             return reason
         }
@@ -27,6 +30,9 @@ struct FailureExplainer {
             return reason
         }
         if let reason = connectionExplanation(in: output) {
+            return reason
+        }
+        if let reason = unreadableFrontPageExplanation(in: output) {
             return reason
         }
         if let reason = missingFrontPageExplanation(in: output) {
@@ -37,6 +43,37 @@ struct FailureExplainer {
         }
         if let reason = workspaceCouldNotBeMadeExplanation(in: output) {
             return reason
+        }
+        return nil
+    }
+
+    /// What a teacher reads when a publish to a folder could not copy every
+    /// page. Contract data: `app-rules.json` → `failureExplanations`.
+    ///
+    /// It names no single cause on purpose: the same "finished in part" comes
+    /// from a folder that will not take a file AND from a page on this side
+    /// that cannot be read (measured in review: one unreadable page, 312 of
+    /// 313 copied), so blaming the folder would be a confident wrong guess.
+    static let folderCopyDidNotFinish: String =
+        "Plantoir could not copy every page into your publishing folder, so it is not up to date. "
+        + "Try publishing again; if the same thing happens, one of your pages may not open "
+        + "or the folder may not be taking new files."
+
+    /// A publish to a folder stopped part way (GitHub issue #227).
+    ///
+    /// `deploy.sh` now reads the copy's own exit status instead of throwing
+    /// it away, and fails — rather than saying "Published" — when the copy
+    /// did not finish, INCLUDING when it finished in part: a page left behind
+    /// may be one the teacher took down. Its line names the copy's error
+    /// number, which means nothing to a teacher, so the line is matched here
+    /// and replaced with a sentence they can act on.
+    ///
+    /// Asked before the connection check on purpose: the copy's own error
+    /// lines can carry words that check matches, and this output is about a
+    /// folder on this Mac, not the internet.
+    static func folderCopyDidNotFinishExplanation(in output: String) -> String? {
+        if output.contains("could be copied into the publishing folder") {
+            return folderCopyDidNotFinish
         }
         return nil
     }
@@ -269,5 +306,53 @@ struct FailureExplainer {
                  + "Put the front page back, then publish again."
         }
         return nil
+    }
+
+    /// The build produced no website because the front page's SETTINGS could
+    /// not be read, so the build hid it (#246).
+    ///
+    /// Not the missing front page: the page is there, and "Put the front page
+    /// back" would send a teacher to restore a page they can see — with a
+    /// repair that would find it and say it was already put right. Asked
+    /// BEFORE `missingBuildExplanation` for the same reason as the missing
+    /// front page is: a publish's transcript carries the deploy's "Built site
+    /// not found" after it, and the build's reason is the specific one.
+    ///
+    /// The line the build's reader stopped near travels in the output as
+    /// "near line N", and is passed on when it is there — the build can tell
+    /// for most shapes, not all (`documentation/05-build-pipeline.md`).
+    static func unreadableFrontPageExplanation(in output: String) -> String? {
+        let sign: String = "the settings at the top of its front page could not be read"
+        guard let signRange = output.range(of: sign) else {
+            return nil
+        }
+        let headline: String = "The settings at the top of this section's front page could not be read, "
+            + "so there is no website to publish. "
+        if let line = lineNumber(after: "(near line ", in: output[signRange.upperBound...]) {
+            return headline + "Open the front page in Obsidian, fix its settings near line \(line), "
+                + "then publish again."
+        }
+        return headline + "Open the front page in Obsidian, fix its settings, then publish again."
+    }
+
+    /// The whole number written straight after `marker` on the same line of
+    /// `text`, or nil when there is none.
+    private static func lineNumber(after marker: String, in text: Substring) -> Int? {
+        guard let markerRange = text.range(of: marker) else {
+            return nil
+        }
+        let before: Substring = text[..<markerRange.lowerBound]
+        if before.contains("\n") {
+            return nil
+        }
+        var digits: String = ""
+        for character in text[markerRange.upperBound...] {
+            if character.isASCII && character.isNumber {
+                digits.append(character)
+            } else {
+                break
+            }
+        }
+        return Int(digits)
     }
 }

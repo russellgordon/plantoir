@@ -5,8 +5,9 @@ taking example content — the ~1,900 codes that have no payload, and the 38
 that have one the teacher declined — so a mistake here is a mistake in
 about 1,900 courses. The checks
 are deliberately blunt: every link resolves, every page is titled, every
-sentinel is where the installer expects it, and no template token survived
-into the output.
+sentinel is where the installer expects it, no template token — %PERCENT% or
+{brace} — survived into the output, and the subject never lands in front of a
+noun it does not fit ("a this course course", #328).
 
     python3 .claude/skills/example-content/lint_skeletons.py [family ...]
 """
@@ -18,10 +19,123 @@ import unicodedata
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
+
+# Where a page's code is: the toolchain's own definition (#313). A link shown
+# inside code is an example of the syntax, not a link that has to resolve.
+sys.path.insert(0, str(ROOT / "scripts"))
+import markdown_code  # noqa: E402
 SKELETONS = ROOT / "support" / "skeletons"
 
 LINK = re.compile(r"!?\[\[([^\]|#]+?)(?:\\?\|[^\]]*)?(?:#[^\]|]*)?\]\]")
 CLASS_SENTINEL = re.compile(r"created: __CREATED_CLASS_(\d+)__")
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from generate_skeletons import article_for  # noqa: E402 — one rule for "a"/"an", shared with the generator
+
+# A {brace} placeholder is never filled — the generator's tokens are
+# %PERCENT% ones, because the pages carry LaTeX and YAML in earnest — so one
+# that reaches a page ships as written. Every Concepts page said "{subject}"
+# and three Fieldwork pages "{room}" until #328. A brace opened straight after
+# a letter, a backslash, `^`, `_`, `$` or another brace is LaTeX (`\frac{a}{b}`,
+# `x^{2}`, `\begin{aligned}`) and is left alone; so is anything inside `$…$`
+# or `$$…$$` (math_removed), and a brace after a LaTeX command and a space
+# (`\mathrm {kg}`), which is checked on the text before the match.
+BRACE_PLACEHOLDER = re.compile(r"(?<![\\\w}^_$])\{[A-Za-z_][A-Za-z0-9_ ]*\}")
+LATEX_COMMAND_BEFORE = re.compile(r"\\[A-Za-z]+\s*$")
+
+# The subject dropped in front of a noun where it does not fit: "a this
+# course course", "A this course class", "a the language course", "a English
+# course" — all shipped until #328. `%SUBJECT%` belongs after a preposition;
+# in front of a noun the generator has %A_SUBJECT_COURSE% and
+# %A_SUBJECT_CLASS_START%.
+THIS_COURSE_BEFORE_A_NOUN = re.compile(r"\bthis course (course|class)\b", re.IGNORECASE)
+LOWER_ARTICLE_BEFORE_THIS_OR_THE = re.compile(r"\ba (this|the)\b")
+# "a"/"an" is checked against article_for, the generator's own rule. A
+# capital "A" or "An" counts only where it cannot be a letter used as a name
+# — "Plan A or B", "Option A is" — so it is skipped straight after a word.
+ARTICLE_LOWER = re.compile(r"\b(a|an) ([A-Za-z][A-Za-z-]*)")
+ARTICLE_UPPER = re.compile(r"(?<![A-Za-z,] )\b(A|An) ([A-Za-z][A-Za-z-]*)")
+UPPER_START_OF_THIS_OR_THE = re.compile(r"(?<![A-Za-z,] )\bA (this|the)\b")
+
+# Shapes the checks must accept and refuse, run before every lint so a
+# widened rule cannot start biting real prose (or stop catching the #328
+# shapes) unnoticed. A failure here is a broken LINTER, not a broken page.
+MUST_BE_ACCEPTED = [
+    "Plan A or B is fine.",
+    "Option A is the default.",
+    "Start with a one-page summary.",
+    "a European exchange",
+    "a unit test, a university, a useful habit",
+    "an hour, an honest answer",
+    "an English course, an arts class, an economics course",
+    "a language course, a French course, a history course",
+    "The mass is $\\mathrm {kg}$ and $ {n} $ is the count.",
+    "Units: \\mathrm {kg} per \\text {m}.",
+    "$$\\begin{aligned} x &= \\frac{a}{b} \\\\ y^{2} \\end{aligned}$$",
+    "written for this course. This class asks people to try things.",
+]
+MUST_BE_REFUSED = [
+    "When an idea in {subject} needs explaining",
+    "Work done outside the {room}.",
+    "a placeholder written for a this course course.",
+    "A this course class asks people to try things.",
+    "written for a the language course.",
+    "written for a English course.",
+    "An economics class? A economics class asks.",
+    "a urban studies course",
+    "an unit",
+    "an one-page summary",
+]
+
+
+def math_removed(text: str) -> str:
+    """The text with `$$…$$` and `$…$` spans taken out — LaTeX braces live there."""
+    text = re.sub(r"\$\$[\s\S]*?\$\$", "", text)
+    return re.sub(r"\$[^$\n]*\$", "", text)
+
+
+def prose_problems(prose: str) -> list:
+    """What is wrong with this prose (code already removed): unfilled
+    placeholders and a subject or article that does not fit the next word."""
+    problems = []
+    text = math_removed(prose)
+    unfilled = []
+    for match in BRACE_PLACEHOLDER.finditer(text):
+        line_start = text.rfind("\n", 0, match.start()) + 1
+        if LATEX_COMMAND_BEFORE.search(text[line_start:match.start()]):
+            continue
+        unfilled.append(match.group(0))
+    if unfilled:
+        problems.append(f"unfilled placeholder(s) left in the page: {sorted(set(unfilled))}")
+    misfit = THIS_COURSE_BEFORE_A_NOUN.search(text)
+    if misfit:
+        problems.append(f'the subject "this course" in front of a noun: {misfit.group(0)!r}')
+    for pattern in (LOWER_ARTICLE_BEFORE_THIS_OR_THE, UPPER_START_OF_THIS_OR_THE):
+        misfit = pattern.search(text)
+        if misfit:
+            problems.append(f'"a" in front of "this" or "the": {misfit.group(0)!r}')
+    for pattern in (ARTICLE_LOWER, ARTICLE_UPPER):
+        for match in pattern.finditer(text):
+            article, word = match.group(1), match.group(2)
+            if word.lower() in ("this", "the"):
+                continue
+            if article.lower() != article_for(word):
+                problems.append(f'"{article}" in front of {word!r}: {match.group(0)!r}')
+                break
+    return problems
+
+
+def check_the_checks() -> list:
+    """The linter's own rules against the shapes they must accept and refuse."""
+    failures = []
+    for sentence in MUST_BE_ACCEPTED:
+        found = prose_problems(sentence)
+        if found:
+            failures.append(f"refused a sentence it must accept: {sentence!r} -> {found}")
+    for sentence in MUST_BE_REFUSED:
+        if not prose_problems(sentence):
+            failures.append(f"accepted a sentence it must refuse: {sentence!r}")
+    return failures
 
 
 def frontmatter(text: str) -> dict:
@@ -117,9 +231,19 @@ def check(family: str) -> list:
             if leftover:
                 problems.append(f"{relative}: template token(s) left in the page: {sorted(set(leftover))}")
 
-        prose = re.sub(r"```[\s\S]*?```", "", text)
-        prose = re.sub(r"`[^`\n]*`", "", prose)
-        for link in LINK.finditer(prose):
+        # The prose the wording checks read: the page with its code blanked
+        # out by the toolchain's own definition of code (#313), so an example
+        # of syntax is never read as a sentence.
+        prose_characters = list(text)
+        for start, end in markdown_code.code_ranges(text):
+            for position in range(start, end):
+                if prose_characters[position] != "\n":
+                    prose_characters[position] = " "
+        prose = "".join(prose_characters)
+
+        for problem in prose_problems(prose):
+            problems.append(f"{relative}: {problem}")
+        for link in markdown_code.matches_outside_code(LINK, text):
             target = link.group(1).strip().rstrip("\\")
             if "/" in target:
                 # A path link has to resolve as a path: every folder has an
@@ -208,6 +332,12 @@ def check(family: str) -> list:
 
 
 def main():
+    broken = check_the_checks()
+    if broken:
+        print("lint_skeletons.py's own checks are wrong — fix the linter before trusting it:")
+        for line in broken:
+            print(f"   {line}")
+        return 2
     families = sys.argv[1:] or sorted(p.name for p in SKELETONS.iterdir() if p.is_dir())
     total = 0
     for family in families:
