@@ -1,5 +1,5 @@
 {
-  "note": "One entry per screenshot on plantoir.app. `build.py` reads alt and caption to write the <picture> element; `website/shots/capture.py` reads `capture` to know how each is produced. Every shot is taken twice, once with the Mac in light appearance and once in dark, and saved as site/img/<id>-light.png and -dark.png. Paths are lowercase because Quartz serves lowercase URLs and 301s anything else \u2014 a capitalised address would be photographed mid-redirect.",
+  "note": "One entry per screenshot on plantoir.app. `build.py` reads alt and caption to write the <picture> element; `website/shots/capture.py` reads `capture` to know how each is produced. Every shot is taken twice, once with the Mac in light appearance and once in dark, and saved as site/img/<id>-light.png and -dark.png. Paths are lowercase because Quartz serves lowercase URLs and 301s anything else — a capitalised address would be photographed mid-redirect. Since v1.4.0: `capture.scene` names the scene in capture.py that makes the shot (`capture.py --only <scene>`); `capture.workspace` says which working folder it is taken in ('marketing' = ~/Plantoir Marketing, ICS3U; 'demo' = ~/Desktop/Teaching, the three published demo courses); `expectText` lists words the finished picture must show, read back with Vision text recognition, so a picture of the wrong state fails its scene; `awaiting_capture` marks a shot the pages already name whose capture waits for the release it photographs (build.py renders nothing for it meanwhile); `windows: true` marks the ids capture_windows.py also takes.",
   "shots": [
     {
       "id": "hero",
@@ -18,19 +18,46 @@
       "id": "courses",
       "capture": {
         "kind": "app-window",
-        "test": "testCourseList"
+        "test": "testCourseList",
+        "scene": "courses",
+        "workspace": "marketing"
       },
       "alt": "The Plantoir window listing three courses in a sidebar, with one section open beside it.",
-      "caption": "Every course you teach and every class section, in one window."
+      "caption": "Every course you teach and every class section, in one window.",
+      "windows": true,
+      "retake": {
+        "test": "testCourses",
+        "alt": "The Plantoir window: ICS3U and ICS4U in the sidebar, last year's ICS3U filed under Reference Courses, and ICS3U's settings open beside them.",
+        "caption": "Every course you teach, and last year's beside them.",
+        "expectText": [
+          "ICS3U",
+          "ICS4U",
+          "Reference Courses",
+          "2025"
+        ],
+        "why": "The image on the site still shows the v1.1.0 interface; the capture takes the new one and promotes these words in the same change, so the words never describe a picture that is not there yet."
+      }
     },
     {
       "id": "new-course",
       "capture": {
         "kind": "app-window",
-        "test": "testNewCourseWizard"
+        "test": "testNewCourseWizard",
+        "scene": "new-course",
+        "workspace": "marketing"
       },
       "alt": "The new course panel, with a course code entered and a summary of the pages about to be created.",
-      "caption": "Adding a course takes one panel and about a minute."
+      "caption": "Adding a course takes one panel and about a minute.",
+      "windows": true,
+      "retake": {
+        "test": "testNewCourse",
+        "alt": "The New Course panel with TEJ3M entered, offering its ready-made pages, folders and curriculum expectations.",
+        "caption": "A course code is enough to start.",
+        "expectText": [
+          "TEJ3M"
+        ],
+        "why": "As for courses: promoted when the new picture is taken."
+      }
     },
     {
       "id": "progress",
@@ -39,7 +66,8 @@
         "test": "testBuildProgress"
       },
       "alt": "A progress view describing, in plain language, the step the site build has reached.",
-      "caption": "Progress is described in words, not in log output."
+      "caption": "Progress is described in words, not in log output.",
+      "windows": true
     },
     {
       "id": "preview",
@@ -48,7 +76,8 @@
         "test": "testPreviewInWindow"
       },
       "alt": "The Plantoir window with a class website shown inside it, beside the list of courses and sections.",
-      "caption": "The site, in the app, before anyone else has seen it."
+      "caption": "The site, in the app, before anyone else has seen it.",
+      "windows": true
     },
     {
       "id": "assistant",
@@ -57,7 +86,8 @@
         "test": "testAssistant"
       },
       "alt": "The assistant window: a request typed in plain English, and the assistant describing what it is about to change with a button to approve it.",
-      "caption": "It says what it will do, then waits."
+      "caption": "It says what it will do, then waits.",
+      "windows": true
     },
     {
       "id": "site-eng2d",
@@ -77,7 +107,7 @@
         "path": "/concepts/derivative-rules"
       },
       "alt": "A Grade 12 Calculus and Vectors page opening with typeset mathematics: a displayed definition and a table of derivative rules.",
-      "caption": "The preview is the real site \u2014 equations and all."
+      "caption": "The preview is the real site — equations and all."
     },
     {
       "id": "site-sch3u",
@@ -87,7 +117,7 @@
         "path": "/style/what-this-site-can-do#diagrams"
       },
       "alt": "A Grade 11 Chemistry page showing a flowchart beside the few lines of text that produced it.",
-      "caption": "Diagrams are written, not drawn \u2014 and edited in seconds."
+      "caption": "Diagrams are written, not drawn — and edited in seconds."
     },
     {
       "id": "site-phone",
@@ -146,6 +176,170 @@
       "static": true,
       "alt": "The same class website twice, side by side: once in a light colour scheme and once in a dark one.",
       "caption": "And every site does both, whichever a student prefers."
+    },
+    {
+      "id": "schedule",
+      "capture": {
+        "kind": "composite-per-appearance",
+        "workspace": "marketing",
+        "scene": "schedule",
+        "of": [
+          "schedule-sheet",
+          "notification-banner"
+        ],
+        "arrange": "banner-over-window-top-right"
+      },
+      "alt": "The Schedule Deploy sheet for ICS3U Section 1 set for a morning time, with a macOS notification above it saying the section published on its own.",
+      "caption": "Set it on Sunday. Hear how it went on Monday.",
+      "parts": {
+        "schedule-sheet": {
+          "scene": "schedule-sheet",
+          "test": "testScheduleSheet",
+          "expectText": [
+            "ICS3U",
+            "Schedule a deploy"
+          ]
+        },
+        "notification-banner": {
+          "scene": "notification-banner",
+          "expectText": [
+            "ICS3U Section 1",
+            "published on its own"
+          ]
+        }
+      },
+      "awaiting_capture": true
+    },
+    {
+      "id": "reference",
+      "capture": {
+        "kind": "app-window",
+        "workspace": "marketing",
+        "scene": "reference",
+        "test": "testReferenceAndCopyAPage"
+      },
+      "alt": "The Plantoir sidebar with last year's ICS3U under Reference Courses, 2025–26, and a sheet copying one of its pages into ICS4U, with the pages it links to ticked.",
+      "caption": "Last year's course, to read and borrow from — never published.",
+      "expectText": [
+        "Reference Courses",
+        "2025",
+        "The Unplugged Algorithm",
+        "ICS4U"
+      ],
+      "awaiting_capture": true
+    },
+    {
+      "id": "start-of-year",
+      "capture": {
+        "kind": "app-window",
+        "workspace": "marketing",
+        "scene": "start-of-year",
+        "test": "testGetReadyForTheStartOfTheYear"
+      },
+      "alt": "The Get Ready for the Start of the Year sheet for ICS3U Section 2, listing the classes and pages it will put into draft, with a reason beside each.",
+      "caption": "Every class after Day 1 into draft, with the reasons, before you agree.",
+      "expectText": [
+        "ICS3U",
+        "Draft"
+      ],
+      "awaiting_capture": true
+    },
+    {
+      "id": "two-maps",
+      "capture": {
+        "kind": "composite-per-appearance",
+        "workspace": "marketing",
+        "scene": "two-maps",
+        "of": [
+          "map-ontario",
+          "map-college-board"
+        ],
+        "arrange": "side-by-side"
+      },
+      "alt": "Two curriculum coverage maps for the same ICS3U section: the Ontario expectations, and the AP Computer Science Principles learning objectives, each shaded by how many pages reach it.",
+      "caption": "Two curricula, a map for each.",
+      "parts": {
+        "map-ontario": {
+          "scene": "two-maps",
+          "test": "testTwoMapsAndBothCurricula",
+          "expectText": [
+            "Curriculum Coverage"
+          ]
+        },
+        "map-college-board": {
+          "scene": "two-maps",
+          "test": "testTwoMapsAndBothCurricula",
+          "expectText": [
+            "College Board Curriculum Coverage",
+            "CRD-2"
+          ]
+        }
+      },
+      "awaiting_capture": true
+    },
+    {
+      "id": "curriculum-settings",
+      "capture": {
+        "kind": "app-window",
+        "workspace": "marketing",
+        "scene": "curriculum-settings",
+        "test": "testDeclareSecondCurriculum"
+      },
+      "alt": "ICS3U's Course Settings with both the Curriculum folder and the College Board Curriculum folder ticked as curricula.",
+      "caption": "Tick a folder, and it gets a map.",
+      "expectText": [
+        "Curriculum",
+        "College Board Curriculum"
+      ],
+      "awaiting_capture": true
+    },
+    {
+      "id": "both-curricula",
+      "capture": {
+        "kind": "app-window",
+        "workspace": "marketing",
+        "scene": "both-curricula",
+        "test": "testTwoMapsAndBothCurricula"
+      },
+      "alt": "A class activity page whose curriculum connection quotes an Ontario expectation and an AP learning objective, one under the other.",
+      "caption": "One lesson, counted on both maps.",
+      "expectText": [
+        "Curriculum connection",
+        "B3.1",
+        "AAP-2.A"
+      ],
+      "awaiting_capture": true
+    },
+    {
+      "id": "how-i-teach",
+      "capture": {
+        "kind": "obsidian",
+        "workspace": "marketing",
+        "scene": "how-i-teach",
+        "note": "ICS3U/How I Teach.md"
+      },
+      "alt": "Obsidian open on ICS3U's How I Teach page: short notes on units, assessment and classroom routines.",
+      "caption": "Tell Claude or Codex how you teach, once. It is never published.",
+      "expectText": [
+        "How I Teach"
+      ],
+      "awaiting_capture": true
+    },
+    {
+      "id": "club",
+      "capture": {
+        "kind": "app-window",
+        "workspace": "marketing",
+        "scene": "club",
+        "test": "testClubWizard"
+      },
+      "alt": "The New Course panel with \"This is a club\" ticked for CODING: meetings in \"All Meetings\", pages named Week 1, Week 2, and a front page headed \"Most Recent Meeting\".",
+      "caption": "Clubs start the way clubs do.",
+      "expectText": [
+        "CODING",
+        "Most Recent Meeting"
+      ],
+      "awaiting_capture": true
     }
   ]
 }

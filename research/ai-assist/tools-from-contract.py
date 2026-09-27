@@ -26,7 +26,12 @@ descriptions, and they are NOT this server's. Measured 2026-09-08: of the 32
 shared tools, 29 full descriptions differ, and of the thirteen the local model
 is shown, FIVE differ in the text `Briefly()` actually produces. So a Windows
 measurement taken from here scores the mac's surface on Windows hardware and
-reads as evidence about neither. On Windows, dump the live surface instead:
+reads as evidence about neither. On Windows, dump the live surface instead.
+This holds UNTIL #114's Windows half lands (decided 2026-09-26: one
+description per tool, pinned in assist-cases.json -> toolDescriptions and
+served verbatim, with no Briefly()); after it the descriptions agree and only
+the parameter departures differ. The BEFORE arm of that very change is still
+the live surface, dumped as here:
 
     research/ai-assist/dump-tools.ps1 -Exe …\plantoir-mcp.exe -Folder … -Course … -Out tools.json
     python research/ai-assist/narrow-tools.py tools.json narrowed.json <COURSE>

@@ -1411,6 +1411,18 @@ summary is that a teacher who does hit this meets
 followable in precisely this case. Raising the cap to cover the worst
 imaginable call is the state #166 was about.
 
+**Re-measured 2026-09-26 for #197, and "all" turned out to be the input-
+dependent half.** On six example payloads (ICS3U, MCR3U, SBI3U, ENG2D, TEJ3M,
+CHC2D) × two spellings of the code × three dates × three follow-ups — 108
+cells, one greedy trial each, same model and flags — **0 of 108 answered
+`"pages": "all"`**: every one was `publish_pages` with an invented list of
+"Unit 3, Day N" titles cut off at 512, which `answerWasCutOff` already
+refuses. So the two-lap shape fails one of two ways depending on the listing.
+The "all" half was the unhandled one: the app answered it "Nothing needed
+changing." — see "A page list that names no page" under Step 3 below for what
+it does now. Conditions and raw output:
+`research/ai-assist/two-lap-all-results.txt`.
+
 **Rejected: a larger cap, or none on the larger tier.** A cap sized to the
 worst imaginable call is a cap that never fires, which is the state this
 issue was about. The two apps also send the same number deliberately — it is
@@ -1531,7 +1543,9 @@ definition — the schema is only READ, so no description, schema or prompt byte
 moved (hashes unchanged). `undo_last_change`'s schema has NO `required` key,
 which reads as requiring nothing; a Windows port must treat a missing key the
 same way. An unknown tool name is judged tool-blind and still reaches "There
-is no tool by that name."
+is no tool by that name." (A name that EXISTS but was not offered to the model
+in this window never reaches this gate: it is refused above it since #327 —
+see Part 6 → "A tool the model was not offered is refused, not run".)
 
 Re-taken after the change on 2026-09-23 by running the real gate over every
 definition on the surface (the local thirteen; the MCP-only nineteen never pass
@@ -1637,6 +1651,95 @@ not the cap.
 corresponding Swift function. If the name is not in the table, nothing runs.
 This is the security boundary: **the set of things the assistant can do is a
 Swift array**, not something the model can extend by being clever.
+
+#### A page list that names no page (#197)
+
+**The rule: a publish or a hide that names pages and finds none of them does
+nothing and SAYS so; a word meaning "every page" is not a page name, and is
+read as "no page named" so the rest of the call's rules decide.** It lives in
+`AssistToolRunner.pagePlan`, which all four publish/unpublish entry points and
+both clients (the window's model and MCP) pass through. No tool description,
+schema or prompt byte moved: steered with code.
+
+What it replaced was a success report about nothing. Confirmed by a throwaway
+test against `dev` before the fix: `publish_pages {"pages": "all"}` found no
+page called "all", so the plan changed nothing and the teacher read "Nothing
+needed changing."; the dates, if any, were IGNORED because a name had been
+"given"; and in plan mode the twin returned a Go/Cancel card over that empty
+plan. The same was true of ANY list whose every name matched nothing — a
+misspelled title too.
+
+- **The every-page words are a closed list** — `all`, `everything`,
+  `all pages`, `every page`, `all of them`, `all of those`, `*` —
+  `AssistToolRunner.everyPageWords`, held equal to `assist-cases.json` →
+  `pagesNamingNoPage.everyPageWords` by a test. Compared trimmed and
+  case-folded, and **only after the section has been asked**: a section with a
+  page really titled "All" publishes that page.
+- **When the list is nothing but such words** they are dropped, and then:
+  dates given → the date range (so "all" with `onOrAfter`/`before` publishes
+  the classes in range — and "all" with `before` ALONE on a publish publishes
+  every class dated before that day, which the existing no-pages rule already
+  did and which plan mode shows on a card first; no contract case pins that
+  direction); `onOrAfter` alone on a publish → the existing
+  open-ended refusal; nothing else → `AssistWording.everyPageIsNotAPageToPublish`
+  / `…ToHide`, with an example.
+- **When names were given and none was found** → `AssistWording.noPageCalled`
+  (one) or `noPagesCalled` (two or more, joined with "or" by
+  `AssistPublishPlan.listingEither`). The teacher's sentences rather than
+  `AssistToolRefusal.noSuchPage`, which tells the MODEL to use `list_pages`.
+- **A mixed list is unchanged**: "all; Unit 3, Day 1" publishes Day 1. Refusing
+  would throw away a right answer to punish a stray word. (That the summary
+  then says "Published 1 page." without naming what was not found is a
+  pre-existing gap, and a follow-up of its own.)
+- **Writes refuse (`refused`, the turn ends); plan twins answer
+  `couldNotRead`, never a plan.** In the window, a plan twin's non-plan answer
+  is said to the teacher and the turn ends there (`AssistAgent.showPlan`), so
+  the model gets no second lap to run away in — measured as the risk: with the
+  refusal in front of it, the smaller assistant wrote a text list cut off at
+  the cap 3/3. Only an MCP client that keeps going would meet that lap.
+- **The example** is something the teacher can type next, built from the
+  section's own pages by `AssistToolRunner.exampleOfWhichPages`: "Publish" or
+  "Hide" and the LOWEST unit that has class pages, named through
+  `ClassPageNaming` ("Publish Module 2" in a Module course, #268's lesson); in
+  a numbered course its first class page ("Publish Week 1", #267); failing
+  both, the first page. In a Unit course "Publish Unit 3" and "Hide Unit 3" are
+  matched in code, so following the advice never reaches the model; the frames
+  are term-blind, so a Module or numbered course's example is read by the model
+  (the planner accepts "Module 2"; that route is not measured). It names a real unit and is
+  a backed-up, undoable whole-unit publish — but it is not what they asked for,
+  and a teacher may copy it unread. The alternative, no example, is advice
+  nobody can follow.
+- **Trail**: `ActivityTrail.Event.assistantNamedNoPage`, "assistant named no
+  page it could find" — the act, and either the word (from the closed list) or
+  HOW MANY names matched nothing; never the names. Without it the trail showed
+  only "assistant chose a tool: publish_pages (course, section, pages)", and
+  "it said it needed to know which pages" could not be looked into.
+
+**Rejected**, each for a reason worth keeping: expanding "all" into the pages
+the last `list_pages` returned (the listing is truncated at sixty, the
+teacher never saw it, a `matching` filter sweeps in pages they did not
+picture, and the MCP path has no conversation state); reading "all" as the
+whole section (the open-ended-publish refusal exists because "everything from
+this day" is almost never meant, and "everything" is more so); reading "all"
+plus an earlier "Unit 3" as the unit (the runner never sees the teacher's
+sentences); a schema change such as an `allPages` boolean (no booleans on this
+surface, and a routing change to measure on a tier not on this Mac); a
+sentence in `publish_pages`' description (the 110/110 → 90/110 lesson);
+catching "all" in `AssistAgent` beside the cut-off gate (MCP callers would
+still get "Nothing needed changing."); and refusing a mixed list.
+
+**One sentence that never reaches the model since the same piece: "Publish all
+the classes in Unit 2."** It went to `publish_class_on` with TODAY's date 3/3
+on the smaller assistant — on a teaching day that publishes today's class and
+reports success. `AssistCardCommand.wholeUnitToPublish` now reads two more
+openings, "publish all the classes in unit " and "publish everything in unit ",
+by the same strict rule as "publish unit " (a bare number, nothing before or
+after), so the publish direction widens by exactly those sentences
+(`pagesNamingNoPage.everythingInAUnit` lists what is accepted and refused).
+**Not fixed, and recorded:** the same sentence naming its course and section
+still reaches the model and still misroutes 3/3, because the frame refuses any
+extra word on purpose — a matched card binds THIS window's course. Numbers in
+`research/ai-assist/two-lap-all-results.txt`.
 
 ### Step 4 — The app presses its own buttons
 
@@ -2311,12 +2414,18 @@ assistant states what it understood and what it is about to do, and waits for
 Go or Cancel. This is applied by Swift, from whether the tool has a `plan_`
 twin — the model is not asked to decide whether something is risky.
 
-Four writes have no twin and no plan, deliberately: `rebuild_preview` (changes
-no page), `undo_last_change` (is the remedy), `cancel_scheduled_deploy`
-(re-scheduling is the remedy), and `deploy_section` — which instead waits on
-its own separate approval, in the teacher's words and naming the real
-destination, whether or not plan mode is on. Deploying is the one act that
-reaches students, so it never rides on a general setting.
+Four of the window's writes have no twin and no plan, deliberately:
+`rebuild_preview` (changes no page), `undo_last_change` (is the remedy),
+`cancel_scheduled_deploy` (re-scheduling is the remedy), and `deploy_section` —
+which instead waits on its own separate approval, in the teacher's words and
+naming the real destination, whether or not plan mode is on. Deploying is the
+one act that reaches students, so it never rides on a general setting. On the
+full thirty-two-tool surface a fifth has none: `back_up_course`, reached by the
+card "back up this course", writes a zip beside the course, changes no page and
+is its own safety net. `AssistPlanModeTests` pins all five, walking every write
+on the whole surface since #327 (it used to walk the twenty-two in `tools`,
+and the one write whose twin was named wrong — `add_curriculum_mentions` — was
+in the other ten).
 
 On a Mac running the smaller assistant, plan mode cannot be turned off. On a
 16 GB machine running the larger one, the app offers to stop asking after a
@@ -3293,6 +3402,82 @@ so they run anywhere a llama-server does. `routing-suite.py` is marked
 HISTORICAL and hand-writes five tools; do not measure the shipping surface with
 it.
 
+### One description per tool (#114)
+
+**Decided by Russell: one description per tool, the mac's text (2026-09-09),
+pinned in the contract and served verbatim by both servers (2026-09-26).** The
+pin is `assist-cases.json` → `toolDescriptions.descriptions`, every tool the
+mac serves over MCP (32 when decided; 35 since #209's three How I Teach tools,
+which Windows owes under #209 and then serves with this text), and it is **hand-written on purpose**. `toolSchemas` beside it is a
+generated READOUT of the Swift, and a readout cannot fail when the code
+changes: a mac edit to a measured description used to regenerate, go green
+here, and turn red only on Windows weeks later — which is how #114 was found,
+with 28 of the 32 full descriptions differing by 2026-09-26.
+`AssistToolDescriptionContractTests` now holds every description the mac
+serves (`mcpDefinitions`, and the local model's `definitions` through
+`namingTheRealCourse`) equal to the pin byte for byte, so a mac edit fails
+the MAC suite first. The two copies in one file are the
+`credentialPrompts`/`credentialRequests` split `contracts/README.md` already
+endorses; deleting the authored one as a "duplicate" deletes the protection,
+and its `note` says so.
+
+- **The local model is shown the same text** — only the example course is
+  rewritten — **never a shortened copy.** Windows' `Briefly()` trim is what
+  its router reads today; measured on the smaller assistant, trimming the
+  contract text that way ties on the 29-probe suite but loses 40 control
+  trials on teachers-say, so the decision is to stop trimming, not to trim the
+  new text. (`research/ai-assist/description-convergence-results.txt`.)
+- **Changing a description is a routing change: measure before it ships, on
+  both platforms.** A platform that keeps its own text records it in
+  `toolDescriptions.measuredDepartures` with the numbers, the hardware and an
+  issue; a departure without numbers fails the mac suite.
+- **Procedural sentences for an MCP client only** ("Only call this after
+  plan_…", "CALL THIS FIRST…") do not go in a description. If Claude Code needs
+  them, they go in the server's MCP `instructions` field, which the router
+  never reads (`AssistMCPServer.instructions` on the mac).
+- **Each server SERVES the pinned text and its suite checks equality; neither
+  reads the JSON at launch.** Rejected: loading descriptions from the bundled
+  contract at run time. Neither app reads a contract at run time today, and it
+  would add a launch failure mode (a missing file is a server with no
+  descriptions) to buy what the test already gives, while moving the text away
+  from the Swift comments that explain it.
+- **Also rejected:** pinning by hash (unreadable in review, and the text is
+  what people argue about); leaving `toolSchemas` as the only copy; applying
+  `Briefly()` on the mac too (arm C above, and it would move two descriptions
+  the mac's model reads with the larger tier unmeasurable here).
+
+**What the measurement said, on the smaller tier only** (M4 Pro, b10435; the
+larger assistant was not on this Mac): against Windows' current router text
+for the five differing tools, the contract's text scores level on the 29-probe
+suite (160/220 the model sees) but spares a 10/10 cut-off runaway on "Put up
+Unit 3, Day 2 … along with everything it points at", and scores 210/250
+against 180/250 on teachers-say; 0 polarity inversions in any arm. **Count a
+cut-off call as a miss** — the suite scores a truncated `publish_pages` as OK
+by its name, and the app refuses it; that is the trap that would report the
+convergence neutral.
+
+**The veto Windows measures against, per TOOL** (their before/after, both
+suites, pre-registered): (a) any polarity inversion AFTER that BEFORE did not
+have vetoes that tool's new text — zero is a veto, not a tiebreaker; (b)
+summing every probe whose expected tool it is, a net loss of 3 trials or more
+keeps the tool's current text as a `measuredDepartures` entry, with a `mac`
+issue asking whether the mac should move instead; (c) if the model-seen total
+falls by more than 5 percentage points, stop and report before landing
+anything. Per tool rather than per probe because on the mac's run the two
+timetable probes swapped (10→0 and 0→10) and netted to zero. **Behaviour before
+text**: `unpublish_pages`' pinned sentence promises a page another class still
+links to stays put, and the result says which and why — a server that does not
+keep such a page must fix the behaviour first or the sentence lies to the
+router and to Claude Code.
+
+**Hashes.** (After merging #209, `toolSchemas.mcp` is n=35 `777bf545…2fdcc54` — #209's own change, identical on `dev`; `local` is unchanged.) The piece moved no byte the mac's model reads, and says so with the
+form quoted above, before and after regenerating the contracts:
+`toolSchemas.local` n=13 `46b965622213567d49aae523c70f9bcd2c9fd3d1c21279e167d0da2b2cd96cb6`,
+`toolSchemas.mcp` n=32 `9bcc7eb7911d06009a70edef1db5721af4a52072726a31d0798662049cef36f7`
+(`sha256(json.dumps(x, sort_keys=True, ensure_ascii=False))`). The hash that
+will move is Windows' — its narrowed local surface and its MCP descriptions —
+and that is theirs to measure.
+
 ### The two MCP surfaces are not the same product
 
 Written 2026-09-06 after a mac audit asked whether the parity list was
@@ -3729,6 +3914,96 @@ nothing happens until they press Go.
   thing must not then be asked whether they would like it to stop asking.
 - **Deploys always ask, plan mode or not.** A deploy puts work in front of
   students immediately and cannot be taken back by us.
+
+### A plan has to be able to SAY it is a plan (#150)
+
+The mark that puts Go and Cancel under a plan is `AssistToolOutcome.isPlan`,
+and only `AssistToolOutcome.planned` sets it. `AssistAgent.showPlan` treats an
+unmarked outcome as a REFUSAL — it prints the words and offers nothing to
+press — which is right for "no page is called that" and fatal for a real plan.
+Swift's type cannot go wrong the way Windows' did in #70 (a twin returning a
+bare `string`, which cannot carry the mark at all), but the CONSTRUCTOR can:
+`isPlan` defaults to false, so a twin whose happy path is built with `.read`,
+`.wrote` or a bare `AssistToolOutcome(...)` compiles, reads correctly in every
+text assertion, and makes its write unrunnable from the window. Measured on
+`ff1213ed`: all ten `plan_` tools marked their happy path, so this is a pin,
+not a fix. Two tests hold it:
+
+- `AssistPlanModeTests.testEveryPlanToolOnTheSurfaceCanSayItIsAPlan` runs every
+  tool on the MCP surface whose name begins `plan_` on a happy path and
+  requires `isPlan`. It walks what EXISTS rather than deriving twins through
+  `planTwinName`, because that derivation is the map under test and it once
+  missed `plan_curriculum_mentions` entirely; a `plan_` tool with no case in
+  its table fails by name. `plan_scheduled_deploy` is given a moment two days
+  ahead of the real clock, because its "That deploy cannot be scheduled." is
+  ALSO marked a plan (it lists what has to be true of the Mac, which a teacher
+  can act on and retry — left as it is, and harmless in the window, where the
+  approval gate asks first and never runs this twin), so a fixed past date
+  would pass for the wrong reason.
+- `testEveryCardThatReachesAPlannedWriteStopsAtGo` says every card whose tool
+  is a write with a twin, through `AssistAgent.say` with plan mode on, and
+  requires the pending call, no tool result, and `AssistWording.planQuestion`
+  last. `testTheArticleFormOfMakeRoomIsAPlanThatCanBeAccepted` then presses Go
+  on "make room for a class at Unit 3, Day 4" and checks Day 4 moved to Day 5.
+
+That sentence is also why `cardPhrasings.parsed` has ten entries for nine
+families. The matcher always took "a" as a count of one and refused "a
+classes", but the contract only ever DECLARED "two classes", so Windows could
+not know the article form was expected and shipped without it — on the
+sentence #70 and the tool's own `TEACHERS SAY` clause both use as their
+example. A generated contract can only describe what the generating side
+thought to put in it; a form this app accepts and does not declare is
+invisible to the other one. It is a second entry rather than a changed
+example, so the entry Windows already implements stays byte-for-byte.
+
+### A tool the model was not offered is refused, not run (#327)
+
+The window shows the local model thirteen tools; the runner can run all
+thirty-two, because the same runner answers Claude Code over `--mcp-stdio`,
+and `AssistToolRunner.definition(named:)` looks through all of them so the
+approval gate can read `needsApproval` off anything. Until #327 nothing in the
+agent asked whether the model had been OFFERED the tool it named, so a local
+model reaching past its list was obeyed — `re_date_classes` behind its plan
+(the tool kept off the local list precisely because re-dating a section is
+too large a change to reach through a router that is right four times in
+five), and `add_curriculum_mentions` with NO plan at all, because
+`planTwinName` derived `plan_add_curriculum_mentions`, which does not exist,
+and the gate runs a write it finds no twin for. The contract generator had
+the same blind spot in silence: it asks the surface whether a twin exists, so
+it simply left that pair out of `tools.planTwins`.
+
+Three changes, each closing one layer:
+
+- **`AssistToolDefinition.irregularPlanTwins`** lists both irregular pairs
+  (`schedule_deploy` → `plan_scheduled_deploy`, `add_curriculum_mentions` →
+  `plan_curriculum_mentions`) explicitly. `tools.planTwins` gains the second.
+- **`AssistAgent.think()` refuses a tool that exists but is not in
+  `tools.definitions`**, above the readability and course gates, because what
+  the model was not offered is not an answer whatever its arguments say. The
+  turn is wound back exactly as for an echo; the teacher reads
+  `AssistWording.didNotFollowThat` — reused on purpose, since from their side
+  this IS a misroute, the sentence says both true halves (nothing changed; say
+  it another way), and a sentence of its own would have to describe a tool
+  list, which rule 1 forbids — and the trail gets `assistant named a tool it
+  was not offered`, the only line that tells this apart from an echo. Cards
+  never pass through `think()`, so the tools only a card reaches (re-dating,
+  making room, backing up) keep working. A name that exists NOWHERE is left as
+  it was ("There is no tool by that name.", back to the model), because that
+  is documented behaviour the issue did not set out to change.
+- **The plan-mode structure tests walk all thirty-two tools**, and a new one,
+  `testEveryPlanToolIsSomeWritesTwin`, checks the other direction: every
+  `plan_` tool is exactly one write's twin, so a plan the gate can never show
+  is red by name. Pinned by
+  `AssistWindowBindingTests.testAToolTheModelWasNotOfferedIsRefusedAndNothingRuns`
+  (re-dating, the curriculum write and a plan twin named directly, plan mode
+  OFF) and `testANameThatExistsNowhereStillGoesBackToTheModel`.
+
+**Rejected:** refusing unknown names too (it changes behaviour this issue did
+not touch, and the readability section above documents it); a sentence of its
+own for the refusal (above); refusing only `mcpOnlyTools` rather than
+everything off the offered list (the local list also hides
+`remember_timetable`, `re_date_classes` and every `plan_` twin, none of which
+a model should reach either).
 
 ### Undo is not version control, and it should not pretend to be
 
@@ -4371,7 +4646,35 @@ and asserts every key is one the tool declares. It found a live defect on its
 first run — the eight `publish_class_on` phrasings sent `when` and the tool
 took `date`, so "publish tomorrow's class" failed in the app (issue #116, fixed
 2026-09-09; the argument is in "Publish tomorrow's class: where a relative day
-becomes a date" below). The mac has no equivalent check and may want one.
+becomes a date" below).
+
+**The mac's counterpart (#150) proves the same property a different way, and
+the difference is deliberate.** There is no binder on the mac: the runner
+reads keys straight out of `[String: Any]`, and the schema is only what the
+MODEL is shown. Measured while planning #150, **35 card arguments are not
+declared on their tool's schema, on purpose** — `when` on `publish_class_on`,
+`unit`/`days`/`duplicate` on `add_next_class`, `scope`, `revise`, `rollover`,
+`answer` — so a straight port of the declaration check would be red on 35
+correct things, and satisfying it would push code-only arguments onto the
+model's schema, which costs routing accuracy (one sentence on `publish_pages`
+took the promise-card score from 110/110 to 90/110) and still proves nothing
+about ARRIVAL. What can go wrong here is a tool that forgets to READ a key it
+is sent. `AssistCardArgumentsTests.testEveryArgumentACardSendsChangesWhatTheToolDoes`
+runs each card's arguments against the tool they reach first in the window
+(the twin, when the write has one) on two identically built worlds, once
+whole and once with one key taken out, and requires the answers to differ.
+**Per tool and key, not per card** — also measured: `howMany: 1` on "make room
+for a class" equals the tool's own default, and `rollover` beside `website`
+is redundant because `website` alone makes a rollover (`isARollover`), so
+neither can be seen by removal on that card in any world; each is proved by
+the other card that sends it ("two classes", "roll this section over to a new
+year"). No exemption list: a world too thin to show a key is fixed by a richer
+world (`AssistFixture.makeRichSection`, `makeBusyClub`,
+`makeSectionAlreadyReDated` — a rollover's own words change its PLAN only
+when the pages are already on their days), never by a list for a real
+non-arrival to hide in. The walk never runs a twin-less write: it asserts
+every target is read-only, and snapshots the section's pages around every
+call.
 
 **The three traps the mac's own write-up named were all present on Windows
 too**, which means they belong to the design rather than to the Swift: the
@@ -4447,11 +4750,16 @@ non-text guard above, and it was weighed rather than missed:
   says `LEAVE THE KEY OUT otherwise`, naming the consequence. This was first
   written up as "rejected: the sentence is identical on both platforms, so a
   one-sided edit creates a divergence". That is wrong, and a Windows session
-  would have seen it was wrong: description BODIES are deliberately not
-  asserted across the two apps and are expected to differ —
-  `AssistSurfaceContractTests` says so in as many words, pinning the
+  would have seen it was wrong: description BODIES were not asserted across
+  the two apps at the time and were expected to differ —
+  `AssistSurfaceContractTests` said so in as many words, pinning the
   `TEACHERS SAY:` clause and the argument names and types and nothing else,
-  because `NarrowToLocal` rewrites every description through `Briefly()`. The
+  because `NarrowToLocal` rewrites every description through `Briefly()`.
+  **No longer true since 2026-09-26:** #114 decided on one description per
+  tool, pinned in `toolDescriptions` and asserted on the mac, with Windows'
+  half owed (see "One description per tool" above). The `re_date_classes`
+  conclusion below still holds — the tool is hidden from the local model — but
+  a mac edit to its description now has to change the pin too. The
   real limit is smaller and is the honest one: better instruction NARROWS the
   placeholder case and cannot close it, because a model can send whatever it
   likes. **Windows may copy the sentence and owes nothing if it does not.**
@@ -5823,7 +6131,9 @@ rather than by writing the code.
    `TEACHERS SAY:` CLAUSE. Of the 32 shared tools, **29 full descriptions
    differ**, and of the thirteen the local model is shown, **five differ in
    the text `Briefly()` produces**. Re-run the comparison; never quote a
-   count from a write-up.
+   count from a write-up. (Re-run 2026-09-26: 28 of 32, and still the same
+   five. #114 then decided on ONE description per tool — "One description per
+   tool" above — so these counts go to zero when Windows' half lands.)
 
 **Also corrected, because it would have sent the next Windows session
 wrong:** `tools-from-contract.py` and `routing-suite.py` both told a reader
@@ -5855,7 +6165,11 @@ are not. Ten phrasings needed measuring; ten did not.
 **Do not start a Windows measurement from `tools-from-contract.py`.** The
 contract is generated on the mac, so its descriptions are the mac's. Dump the
 live surface with `dump-tools.ps1` and narrow it with `narrow-tools.py`. That
-file and `routing-suite.py` now say so; they used to say the opposite.
+file and `routing-suite.py` now say so; they used to say the opposite. **This
+holds until #114's Windows half lands** (the `windows` issue for #197/#114):
+after it, the descriptions agree by construction and only the parameter
+departures differ — and the BEFORE arm of that very measurement is still the
+live surface, dumped and narrowed as here.
 
 **Two things the mac owes from this, and they are issues rather than lines
 here:** [#113](https://github.com/russellgordon/plantoir/issues/113)
@@ -5864,7 +6178,9 @@ the two MCP surfaces) and
 [#114](https://github.com/russellgordon/plantoir/issues/114) (the two servers'
 tool descriptions differing in the sentence the router reads, and
 `unpublish_pages` describing different behaviour — two descriptions of one
-behaviour, or two behaviours?).
+behaviour, or two behaviours?). #114 was DECIDED on 2026-09-26 — one
+description per tool, the mac's, pinned in the contract; see "One description
+per tool" above for the mac's half and what Windows owes, behaviour first.
 
 ---
 
