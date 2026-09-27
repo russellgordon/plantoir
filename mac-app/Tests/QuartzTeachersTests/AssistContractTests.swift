@@ -115,7 +115,8 @@ final class AssistContractTests: XCTestCase {
         }
     }
 
-    /// And every scenario's `expectReply` names a sentence that exists. The
+    /// And every scenario's `expectReply`, `expectTranscript` and
+    /// `expectTranscriptContains` name sentences that exist. The
     /// two files refer to each other by NAME rather than by quoting, which
     /// only helps if the names are checked.
     func testEveryScenarioReplyNamesARealSentence() throws {
@@ -131,6 +132,12 @@ final class AssistContractTests: XCTestCase {
                 named.append(reply)
             }
             for line in (scenario["expectTranscript"] as? [String]) ?? [] {
+                named.append(line)
+            }
+            // The contains lists too (#147). A misspelled key there used to be
+            // caught only because the scenario runner throws on it — by
+            // accident of how the runner resolves names, not by this check.
+            for line in (scenario["expectTranscriptContains"] as? [String]) ?? [] {
                 named.append(line)
             }
             for reference in named {

@@ -145,6 +145,18 @@ nonisolated enum ActivityTrail {
         /// believed. Not `assistant could not answer` either: that is for an
         /// engine that FAILED, and here the engine answered perfectly badly.
         case assistantRepeatedTheRequestBack = "assistant repeated the request back"
+        /// The model named a tool that exists but was not among those it was
+        /// OFFERED in this window, so the turn was refused and nothing ran
+        /// (#327).
+        ///
+        /// Carries the tool, in words — the one fact about this that is not
+        /// already on the turn's own line, which records what the model
+        /// chose without saying it was never on the menu. Never the sentence
+        /// and never the arguments. Its own event rather than `assistant
+        /// repeated the request back`, whose name would be false here: the
+        /// teacher reads the same sentence for both, and only this line
+        /// tells the router reaching past its list apart from an echo.
+        case assistantNamedAToolItWasNotOffered = "assistant named a tool it was not offered"
         /// The model filled in a COURSE that is not the one the window is
         /// for, so the turn was refused and nothing ran.
         ///
@@ -247,6 +259,15 @@ nonisolated enum ActivityTrail {
         /// asked for in so many words, and "why did this page's date change?"
         /// is asked long after the console that said so has gone.
         case pagesDatedByTheBuild = "pages dated by the build"
+
+        /// The curriculum coverage maps a build wrote (#128): one per
+        /// curriculum folder the course declares, each with its title, the
+        /// folder it came from and how many expectations it shows — or that it
+        /// wrote none. Read from the build's `PLANTOIR_MAPS:` line
+        /// (`CoverageMapsBuilt`), printed on every build whose section wants
+        /// the map, so "my second map is missing" has an answer. Course
+        /// structure only, never anything written on a page.
+        case coverageMapsBuilt = "curriculum maps built"
 
         /// A teacher asked for a class to be duplicated, the room for it was
         /// made, and then no copy appeared.
@@ -411,13 +432,48 @@ nonisolated enum ActivityTrail {
         /// gone and `scheduled deploy turned off` says so beside this line.
         /// Saying "turned off" for the first would be false — the old job
         /// would still fire — which is why they are told apart.
+        ///
+        /// Since GitHub #322 also written when the deploy was REFUSED before
+        /// anything was written — at the schedule sheet's button, or by
+        /// `schedule_deploy` from either assistant — carrying the destination
+        /// it was refused for (by kind: Netlify, Cloudflare Pages or a
+        /// folder) and the refusal's first sentence. #322 took a code read to
+        /// diagnose; with this line the trail would have shown "never deployed
+        /// to Netlify" just under a Save that made the course a folder. Not
+        /// written by the approval card or `plan_scheduled_deploy`, which are
+        /// advisory and repeat.
         case scheduledDeployCouldNotBeSet = "scheduled deploy could not be set"
+        /// A scheduled publish read the course's settings when it fired and
+        /// something differed from what the teacher was told (GitHub #323):
+        /// it went ahead to where the course deploys NOW, somewhere other than
+        /// it was set to go; or it could not deploy the way the course is set
+        /// now and stood down, with the reason. Carries where it was set to
+        /// deploy (when that was recorded), where the course deploys now, and
+        /// the reason for a stand-down — never a credential.
+        ///
+        /// Written only when something differs, never on every run:
+        /// `scheduled publish finished` already names where a run went. What
+        /// it adds is that this was not where the teacher was told — the one
+        /// thing a teacher asking "why did it go THERE?" needs, and the thing
+        /// #323's stale deploys hid. Named "read" rather than "followed"
+        /// because it also carries the runs that stood down (plan review L3).
+        case scheduledPublishReadTheSettings = "scheduled publish read the course's settings"
         /// A folder or file was removed in Course Settings, excluding it
-        /// from previews and deploys.
+        /// from previews and deploys. Written on the CLICK, saved or not —
+        /// Russell's decision of 2026-09-06
+        /// (overnight/issues/09-item-excluded-trail-on-click.md): the attempt
+        /// must leave a trace even if the teacher crashes before saving.
+        /// Carries the scope and whether it was a folder or a file.
         case itemExcluded = "item excluded"
         /// A previously excluded folder or file was added back in Course
-        /// Settings, returning it to previews and deploys.
+        /// Settings, returning it to previews and deploys. Written on the
+        /// click, and only for a name that WAS excluded.
         case itemReincluded = "item re-included"
+        /// A Revert in Course Settings took back unsaved exclusion changes —
+        /// the other half of the decision above, so a removal that never
+        /// reached the file is followed by a line saying it was taken back.
+        /// Carries HOW MANY, never the names (issue #152).
+        case exclusionsReverted = "exclusions reverted"
         /// A teacher tried to remove or untick a folder or file that a
         /// feature depends on, and was shown why it cannot go and which
         /// switch to turn off first. Recorded because "I could not remove
@@ -818,6 +874,19 @@ nonisolated enum ActivityTrail {
         /// in the same breath, and this is the line that is still there next
         /// week, when "why is this page still showing?" arrives.
         case pageSettingsLeftAsTheyWere = "page settings left as they were"
+        /// The assistant asked to publish or hide pages and named none this
+        /// section has (#197): only a word meaning every page ("all"), or
+        /// names that match no page. Nothing was changed and the teacher was
+        /// told so. Carries the course and section, the act, and either the
+        /// word (one of the contract's closed list) or how MANY names matched
+        /// nothing — never the names, which are page titles the model wrote.
+        ///
+        /// Without it the trail shows only "assistant chose a tool:
+        /// publish_pages (course, section, pages)", and a teacher reporting
+        /// "it said it needed to know which pages" cannot be looked into: the
+        /// "all" was measured 3 in 3 on one course and 0 in 108 on six others,
+        /// and only the field can say how often it happens.
+        case assistantNamedNoPage = "assistant named no page it could find"
         /// An outside assistant read a course's How I Teach page through
         /// Plantoir (#209), or found there was none: carries the course, and
         /// the word count and whether it was cut short — never the words.
@@ -994,6 +1063,16 @@ nonisolated enum ActivityTrail {
     static func startOfYearNotDoneLine(source: String, reason: String) -> String {
         return "did not get ready for the start of the year \(startOfYearSource(source)) — nothing was "
              + "changed (\(reason))"
+    }
+
+    /// The words for `assistantNamedNoPage`: what was being done, and which
+    /// of the two shapes — never a page's name.
+    static func namedNoPageLine(act: String, everyPageWord: String?, unknownCount: Int) -> String {
+        if let word = everyPageWord {
+            return "named no page while \(act): a word for every page (“\(word)”), so nothing was changed"
+        }
+        let counted: String = unknownCount == 1 ? "1 name that matches" : "\(unknownCount) names that match"
+        return "named no page while \(act): \(counted) no page, so nothing was changed"
     }
 
     static func formatter(timeZone: TimeZone = TimeZone.current) -> DateFormatter {

@@ -1626,14 +1626,32 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     /// The `.` and `!` a teacher types at the end are still accepted, because
     /// the shared tidier at the top of this file strips them before anything
     /// here runs, and that is shipped behaviour rather than a new tolerance.
+    ///
+    /// **Two more openings since #197, and only these two:** "publish all
+    /// the classes in unit " and "publish everything in unit ", read by the
+    /// SAME rule — a literal opening and a bare number, nothing before and
+    /// nothing after. Measured 2026-09-26 on the smaller assistant (b10435,
+    /// the app's own flags, body and prompt, temperature 0): "Publish all the
+    /// classes in Unit 2." went to `publish_class_on` with TODAY's date 3
+    /// times in 3 — on a teaching day that publishes today's class and
+    /// reports success, about a request for a unit. The sentence is a fixed
+    /// frame around a number, which is what this family is for, so it is
+    /// answered here and the router never sees it. The strictness is kept
+    /// whole: "publish all the classes in unit 2 for ICS3U section 1" still
+    /// goes to the model (another course named must never bind to this
+    /// window), and so do "please …", "…?" and a comma — each a contract row
+    /// in `pagesNamingNoPage.everythingInAUnit.refused`.
     private static func wholeUnitToPublish(_ tidied: String) -> AssistCardCommand? {
-        let opening: String = "publish unit "
-        guard tidied.hasPrefix(opening) else {
-            return nil
+        let openings: [String] = [
+            "publish unit ",
+            "publish all the classes in unit ",
+            "publish everything in unit ",
+        ]
+        var rest: String? = nil
+        for opening in openings where tidied.hasPrefix(opening) {
+            rest = String(tidied.dropFirst(opening.count)).trimmingCharacters(in: .whitespaces)
         }
-        let rest: String = String(tidied.dropFirst(opening.count))
-            .trimmingCharacters(in: .whitespaces)
-        guard !rest.isEmpty, !rest.contains(","), Int(rest) != nil else {
+        guard let rest, !rest.isEmpty, !rest.contains(","), Int(rest) != nil else {
             return nil
         }
         return AssistCardCommand(
@@ -1713,6 +1731,8 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     /// time of day. A contract that carried only the literals would say the
     /// assistant understands eleven sentences when it understands those plus
     /// nine families (#167 made it nine), and Windows would build eleven.
+    /// The nine are declared in ten entries since #150, the make-room family
+    /// twice (its count form and its article form).
     ///
     /// One example and one near-miss is not enough to describe a family whose
     /// variable part is a TIME, because the spellings a teacher uses are the
@@ -1766,6 +1786,29 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
                               + "pages the teacher's links point at. Guessing which half they meant is "
                               + "exactly what a fixed shape exists to avoid."
             ),
+            // The same family as the entry above, declared a second time for
+            // its ARTICLE form (#150). The matcher has always taken "a" as a
+            // count of one; the contract never said so, so Windows could not
+            // know it was expected and shipped without it — on the sentence
+            // #70 and the tool's own TEACHERS SAY clause both use as their
+            // example. A form this app accepts and does not DECLARE is
+            // invisible to the other one. Listed as its own entry rather than
+            // by changing the example above, so the entry Windows already
+            // implements stays byte-for-byte what it was.
+            ParsedShape(
+                shape: "make room for a class at unit <unit>, day <day>",
+                tool: "make_room_for_classes",
+                fills: [
+                    "unit": "<unit>", "atDay": "<day>",
+                    "howMany": "1 — the article is a count of one",
+                ],
+                example: "make room for a class at Unit 3, Day 4",
+                notThis: "make room for a classes at Unit 3, Day 4",
+                becauseNotThis: "The article is singular and the noun is plural, which is the same "
+                              + "disagreement as “two class” — and this tool renames pages the teacher's "
+                              + "links point at, so guessing which half they meant is what a fixed "
+                              + "shape exists to avoid."
+            ),
             ParsedShape(
                 shape: "publish unit <number>",
                 tool: "publish_pages",
@@ -1782,6 +1825,21 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
                               + "unpublishing errs safe, a question mark on a publish request is "
                               + "plausibly a teacher ASKING, and this phrasing is answered correctly "
                               + "by the model anyway, so there is nothing to buy by widening it."
+            ),
+            ParsedShape(
+                shape: "publish all the classes in unit <number> | publish everything in unit <number>",
+                tool: "publish_pages",
+                fills: ["pages": "Unit <number>"],
+                example: "publish all the classes in unit 2",
+                notThis: "publish all the classes in unit 2 for ICS3U section 1",
+                becauseNotThis: "The same frame as 'publish unit <number>', with two more openings "
+                              + "and nothing else widened (#197): measured, 'Publish all the classes "
+                              + "in Unit 2.' went to publish_class_on with TODAY's date 3 times in 3 "
+                              + "on the smaller assistant. A matched card binds this window's course "
+                              + "and section into the call, so a sentence naming a course or section "
+                              + "must fall through to the model, where the guard against another "
+                              + "course runs. Every accepted and refused spelling is in "
+                              + "pagesNamingNoPage.everythingInAUnit."
             ),
             ParsedShape(
                 shape: "[please] hide|unpublish unit <number>[, day <number>] [please]",

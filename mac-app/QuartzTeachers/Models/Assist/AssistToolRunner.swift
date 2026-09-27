@@ -155,6 +155,28 @@ final class AssistToolRunner {
         return readToday()
     }
 
+    /// The courses in the working folder, each with its settings AS SAVED
+    /// NOW — read from disk at the moment it is asked for (GitHub #322).
+    ///
+    /// The ONLY way this file reads the course list, and a source test holds
+    /// it to that. The runner's model is made once, when the assistant's
+    /// window opens or the outside-assistant server starts, and a Save in
+    /// Course Settings never reaches it; reading at the call is what stops a
+    /// destination changed to a folder being refused as "never deployed to
+    /// Netlify", the approval card naming the old destination, and an outside
+    /// assistant's deploy going, silently, to where the course USED to deploy.
+    /// Structural rather than one call at the top of `run`: there are six
+    /// public ways in, and a seventh added later would be a stale reader
+    /// nobody noticed. Each reading costs one directory listing and one small
+    /// JSON file per course (measured in docs 10), at human pace. A runner is
+    /// never built over a window's model — `init` asserts it — because the
+    /// reading leaves a window's copy alone, and such a runner would miss
+    /// every write made outside this process.
+    private var coursesAsSavedNow: [Course] {
+        workspace.readCoursesAsSavedNow()
+        return workspace.courses
+    }
+
     /// The tools, as the LOCAL model sees them.
     ///
     /// Thirteen of the twenty-two that exist. A small local model routes worse
@@ -162,7 +184,10 @@ final class AssistToolRunner {
     /// list: the seven `plan_` twins, which plan mode calls in code, and two
     /// more — `remember_timetable`, whose dates must come from a teacher rather
     /// than from a model, and `re_date_classes`, whose phrasings are matched in
-    /// code. All of them still run when they are called.
+    /// code. All of them still run when they are called by CODE — plan mode,
+    /// a matched phrasing, or Claude Code over MCP. A model in a section
+    /// window that names one of them is refused (#327,
+    /// `AssistAgent.sayTheModelNamedAToolItWasNotOffered`).
     var definitions: [AssistToolDefinition] {
         return AssistToolRunner.localTools
     }
@@ -183,6 +208,13 @@ final class AssistToolRunner {
          launchControl: LaunchControlRunning = LaunchControl(),
          openMainWindow: (@MainActor () -> Void)? = nil,
          surface: Surface = .local) {
+        // Never over a window's model (#322 review, L3): the per-call read
+        // refuses one, to keep its unsaved edits, so a runner built over it
+        // would quietly miss every write made outside this process.
+        assert(
+            !WorkspaceModel.isShownInAWindow(workspace),
+            "AssistToolRunner is built over its own WorkspaceModel, never a window's"
+        )
         self.surface = surface
         self.workspace = workspace
         self.siteWork = siteWork ?? AssistToolchainWork(workspace: workspace)
@@ -231,7 +263,7 @@ final class AssistToolRunner {
     /// working folder can afford.
     func knownCourseCode(matching code: String) -> String? {
         let wanted: String = code.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        for candidate in workspace.courses where candidate.code.lowercased() == wanted {
+        for candidate in coursesAsSavedNow where candidate.code.lowercased() == wanted {
             return candidate.code
         }
         return nil
@@ -248,7 +280,7 @@ final class AssistToolRunner {
         let number: Int = number("section", in: arguments) ?? 0
 
         var destination: String = "the web"
-        for course in workspace.courses where course.code.lowercased() == code.lowercased() {
+        for course in coursesAsSavedNow where course.code.lowercased() == code.lowercased() {
             destination = AssistToolRunner.destination(of: course)
         }
 
@@ -288,7 +320,7 @@ final class AssistToolRunner {
                 return card
             }
             var filedCode: String = code
-            for course in workspace.courses where course.code.lowercased() == code.lowercased() {
+            for course in coursesAsSavedNow where course.code.lowercased() == code.lowercased() {
                 filedCode = course.code
             }
             // This working folder's deploy only (#237): another folder's of
@@ -383,7 +415,7 @@ final class AssistToolRunner {
         if code.isEmpty {
             return nil
         }
-        for candidate in workspace.courses
+        for candidate in coursesAsSavedNow
         where candidate.code.lowercased() == code.lowercased() && candidate.isKeptForReference {
             return candidate
         }
@@ -688,7 +720,7 @@ final class AssistToolRunner {
     /// code, since the matcher cannot see the pages (fix review F2).
     func sectionHasAPage(called title: String, course code: String, section number: Int) -> Bool {
         var course: Course? = nil
-        for candidate in workspace.courses where candidate.code.lowercased() == code.lowercased() {
+        for candidate in coursesAsSavedNow where candidate.code.lowercased() == code.lowercased() {
             course = candidate
         }
         guard let course else {
@@ -1099,9 +1131,10 @@ final class AssistToolRunner {
         }
         if moving.isEmpty {
             let unitWord: String = located.course.configuration.unitWord
-            let already: String = publishing
-                ? "\(unitWord) \(unit) has already been published."
-                : "\(unitWord) \(unit) is already hidden."
+            var already: String = AssistWording.unitAlreadyHidden(unitWord: unitWord, unit: unit)
+            if publishing {
+                already = AssistWording.unitAlreadyPublished(unitWord: unitWord, unit: unit)
+            }
             return AssistToolOutcome.wrote(already, detail: already)
         }
 
@@ -1256,9 +1289,10 @@ final class AssistToolRunner {
                 return AssistToolOutcome.wrote(aboutTheLeftAlone, detail: aboutTheLeftAlone)
             }
             let unitWord: String = located.course.configuration.unitWord
-            let already: String = publishing
-                ? "\(unitWord) \(unit) has already been published."
-                : "\(unitWord) \(unit) is already hidden."
+            var already: String = AssistWording.unitAlreadyHidden(unitWord: unitWord, unit: unit)
+            if publishing {
+                already = AssistWording.unitAlreadyPublished(unitWord: unitWord, unit: unit)
+            }
             return AssistToolOutcome.wrote(already, detail: already)
         }
 
@@ -1333,7 +1367,29 @@ final class AssistToolRunner {
             return .failure(refusal(from: found))
         }
 
-        let titles: [String] = names("pages", in: arguments)
+        // The graph is read FIRST, because whether "all" is a word or a page
+        // is a fact about the section (#197): one that really has a page
+        // called "All" gets that page.
+        let graph: AssistSectionGraph = AssistSectionGraph.read(
+            forSection: located.sectionNumber, in: located.course,
+            workspaceURL: workspace.workspaceURL
+        )
+        let classPages: [ClassPageSummary] = ClassPages.list(
+            forSection: located.sectionNumber, in: located.course
+        )
+
+        let named: [String] = names("pages", in: arguments)
+        let everyPageWord: String? = AssistToolRunner.everyPageWordOnly(in: named, graph: graph)
+        // A list that is NOTHING BUT such words names no page, and the rules
+        // below for "no page named" decide what it means: dates given are the
+        // range, `onOrAfter` alone on a publish is the open-ended refusal, and
+        // nothing at all is `askedForEveryPage`. A word beside a real name is
+        // left as a name that matches nothing, so the page that WAS named
+        // still moves.
+        var titles: [String] = named
+        if everyPageWord != nil {
+            titles = []
+        }
         let onOrAfterText: String = text("onOrAfter", in: arguments)
         let beforeText: String = text("before", in: arguments)
 
@@ -1342,7 +1398,9 @@ final class AssistToolRunner {
 
         // Dates are only evaluated when no specific pages were named. If pages
         // were named, date boundaries are ignored so dateline leakage from the
-        // prompt cannot accidentally sweep other classes.
+        // prompt cannot accidentally sweep other classes. A list that was only
+        // an every-page word counts as none named (#197), so a range given
+        // with "all" is the range.
         if titles.isEmpty {
             if !onOrAfterText.isEmpty {
                 guard let day = CalendarDay(text: onOrAfterText) else {
@@ -1359,6 +1417,17 @@ final class AssistToolRunner {
         }
 
         if titles.isEmpty && onOrAfter == nil && before == nil {
+            if let word = everyPageWord,
+               let example = AssistToolRunner.exampleOfWhichPages(
+                publishing: publishing, graph: graph, classPages: classPages,
+                naming: located.course.configuration.classPageNaming
+               ) {
+                AssistToolRunner.noteNamedNoPage(
+                    publishing: publishing, everyPageWord: word, unknownCount: 0,
+                    course: located.course.code, section: located.sectionNumber
+                )
+                return .failure(.askedForEveryPage(publishing: publishing, example: example))
+            }
             return .failure(.nothingNamed)
         }
 
@@ -1386,11 +1455,6 @@ final class AssistToolRunner {
             return .failure(.openEndedPublish(from))
         }
 
-        let graph: AssistSectionGraph = AssistSectionGraph.read(
-            forSection: located.sectionNumber, in: located.course,
-            workspaceURL: workspace.workspaceURL
-        )
-
         // The How I Teach page is never on the website (#209), so the graph
         // leaves it out — and a request for it by name is answered in plain
         // words rather than with "no page is called that", which would be
@@ -1401,10 +1465,6 @@ final class AssistToolRunner {
                 return .failure(.howITeachIsNeverPublished(located.course.code))
             }
         }
-
-        let classPages: [ClassPageSummary] = ClassPages.list(
-            forSection: located.sectionNumber, in: located.course
-        )
 
         // How far each verb reaches is the planner's rule, not an argument.
         // Publishing takes the pages it links to and stops where a link lands
@@ -1426,7 +1486,130 @@ final class AssistToolRunner {
                 forSection: located.sectionNumber, in: located.course
             )
         }
+
+        // Names were given and NONE of them is a page (#197). This used to be
+        // a plan that changes nothing: "Nothing needed changing." on a write,
+        // and a Go/Cancel card over nothing in plan mode — both reporting
+        // success about a request that found nothing at all. A list where
+        // SOME names were found is left alone: the found pages move.
+        if !titles.isEmpty && plan.namedPages.isEmpty && !plan.unknownNames.isEmpty {
+            AssistToolRunner.noteNamedNoPage(
+                publishing: publishing, everyPageWord: nil, unknownCount: plan.unknownNames.count,
+                course: located.course.code, section: located.sectionNumber
+            )
+            return .failure(.noPageByThatName(
+                names: plan.unknownNames, course: located.course.code, section: located.sectionNumber
+            ))
+        }
         return .success(PlannedPages(located: located, plan: plan))
+    }
+
+    // MARK: - A page list that names no page (#197)
+
+    /// The words that mean "every page" rather than naming one, as the
+    /// contract lists them (`assist-cases.json` → `pagesNamingNoPage` →
+    /// `everyPageWords`, and a test holds the two equal). Compared trimmed
+    /// and case-folded.
+    ///
+    /// A CLOSED list on purpose. Reading "all of those" as the pages the last
+    /// listing returned, or as the whole section, is a guess this app does not
+    /// make on the direction that reaches students; the word is read as "no
+    /// page named" and the ordinary rules decide.
+    static let everyPageWords: Set<String> = [
+        "all", "everything", "all pages", "every page", "all of them", "all of those", "*",
+    ]
+
+    /// The every-page word a page list consists of, or nil when the list
+    /// names anything else — or is empty.
+    ///
+    /// Asked AFTER the graph: an entry that is a page in this section is a
+    /// page, whatever it is called, so a section with a page titled "All"
+    /// publishes that page.
+    static func everyPageWordOnly(in names: [String], graph: AssistSectionGraph) -> String? {
+        if names.isEmpty {
+            return nil
+        }
+        var first: String? = nil
+        for name in names {
+            if graph.page(titled: name) != nil {
+                return nil
+            }
+            let folded: String = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if !AssistToolRunner.everyPageWords.contains(folded) {
+                return nil
+            }
+            if first == nil {
+                first = folded
+            }
+        }
+        return first
+    }
+
+    /// Something a teacher can type next when they have been told which
+    /// pages are needed — "Publish Unit 3", "Hide Week 1" — or nil for a
+    /// section with no pages at all.
+    ///
+    /// The lowest unit that has class pages, because in a Unit course
+    /// "Publish Unit 3" and "Hide Unit 3" are both read in CODE (the
+    /// whole-unit frames), so following the advice never reaches the model.
+    /// The frames are term-blind, so a Module or numbered course's example
+    /// is read by the model instead. A numbered course has no
+    /// units, so its first class page is named instead; a section with no
+    /// class pages names its first page. Built through `ClassPageNaming`,
+    /// never typed as "Unit", so a Module course says "Module 3" (#268).
+    static func exampleOfWhichPages(
+        publishing: Bool,
+        graph: AssistSectionGraph,
+        classPages: [ClassPageSummary],
+        naming: ClassPageNaming
+    ) -> String? {
+        let verb: String = publishing ? "Publish" : "Hide"
+        var lowestUnit: Int? = nil
+        var firstNumbered: (number: Int, title: String)? = nil
+        for summary in classPages {
+            guard let numbers = summary.unitAndDay else {
+                continue
+            }
+            if naming.isNumbered {
+                if firstNumbered == nil || numbers.day < (firstNumbered?.number ?? 0) {
+                    firstNumbered = (number: numbers.day, title: summary.title)
+                }
+                continue
+            }
+            if lowestUnit == nil || numbers.unit < (lowestUnit ?? 0) {
+                lowestUnit = numbers.unit
+            }
+        }
+        if let unit = lowestUnit, let unitName = naming.unitName(unit) {
+            return "\(verb) \(unitName)"
+        }
+        if let numbered = firstNumbered {
+            return "\(verb) \(numbered.title)"
+        }
+        if let firstClass = classPages.first {
+            return "\(verb) \(firstClass.title)"
+        }
+        for page in graph.pages where !page.isFolderIndex {
+            return "\(verb) \(page.displayTitle)"
+        }
+        return nil
+    }
+
+    /// The trail line for a publish or a hide that named no page (#197):
+    /// the act, and either the every-page word (one of the contract's closed
+    /// list, so no teacher content) or HOW MANY names matched nothing —
+    /// never the names, which are page titles the model wrote.
+    static func noteNamedNoPage(publishing: Bool, everyPageWord: String?, unknownCount: Int,
+                                course: String, section: Int) {
+        ActivityTrail.note(
+            .assistantNamedNoPage,
+            ActivityTrail.namedNoPageLine(
+                act: publishing ? "publishing pages" : "hiding pages",
+                everyPageWord: everyPageWord, unknownCount: unknownCount
+            ),
+            course: course,
+            section: section
+        )
     }
 
     // MARK: - Backing up, once per conversation
@@ -2219,7 +2402,7 @@ final class AssistToolRunner {
     /// The course with this code, or nil when the working folder no longer has
     /// one — a course renamed or archived mid-conversation.
     private func course(withCode code: String) -> Course? {
-        for candidate in workspace.courses where candidate.code.lowercased() == code.lowercased() {
+        for candidate in coursesAsSavedNow where candidate.code.lowercased() == code.lowercased() {
             return candidate
         }
         return nil
@@ -2421,6 +2604,12 @@ final class AssistToolRunner {
         // Everything the plan refuses is something that would ASK A QUESTION
         // at the scheduled moment, with nobody there to answer it.
         if let problem = asked.plan.problem {
+            ScheduledDeploy.noteRefusedBeforeAnythingWasWritten(
+                course: asked.located.course,
+                sectionNumber: asked.located.sectionNumber,
+                when: asked.when,
+                refusal: problem
+            )
             return AssistToolOutcome.refused("Nothing was scheduled. \(problem)")
         }
 
@@ -3230,6 +3419,19 @@ final class AssistToolRunner {
                 renaming: request.plan.renames.count,
                 noun: request.located.course.configuration.classNoun
             ))
+            // And that the undo will not help (#185). The plan is where a
+            // teacher can still say no, and a duplicate that moves other
+            // classes IS a make-room, so it says what make-room's plan has
+            // always said — gated on the same `movesAnythingElse` that
+            // withholds the undo in `duplicateClass`, so the card warns
+            // exactly when the undo will be refused. The PLAN form, never
+            // `otherClassesMoved`: nothing has moved yet.
+            lines.append("")
+            lines.append(AssistWording.makingRoomCannotBeUndone())
+            cardLines.append("")
+            cardLines.append(AssistWording.makingRoomCannotBeUndone(
+                noun: request.located.course.configuration.classNoun
+            ))
         }
         return AssistToolOutcome.planned(
             "Worked out what duplicating “\(request.sourceTitle)” would do.",
@@ -3761,7 +3963,7 @@ final class AssistToolRunner {
         // Matched the way every other tool here matches a course code, so a
         // teacher typing "ics3u" reaches the same course either way.
         var found: Course? = nil
-        for candidate in workspace.courses
+        for candidate in coursesAsSavedNow
         where candidate.code.lowercased() == asked.lowercased() && found == nil {
             found = candidate
         }
@@ -3889,9 +4091,8 @@ final class AssistToolRunner {
             // so a teacher's whole year moved and the reply said nothing about
             // undo at all — while "undo that" answered "nothing to undo".
             if asked.plan.movesAnythingElse {
-                detail += "\n\nBecause other classes moved, “Undo that” will not take this back. "
-                        + "The copy made before any of it is in Plantoir's Backups list. Look the "
-                        + "section over in Plantoir before you publish."
+                detail += "\n\n" + AssistWording.otherClassesMoved + " "
+                        + AssistWording.lookTheSectionOverBeforePublishing
             }
             if backedUp {
                 detail += "\n\n" + AssistToolRunner.backedUpNote
@@ -4008,7 +4209,7 @@ final class AssistToolRunner {
         // local assistant is told nothing about a reference course, so this is
         // where that is true rather than nearly true.
         var courses: [Course] = []
-        for course in workspace.courses {
+        for course in coursesAsSavedNow {
             if surface == .local && course.isKeptForReference {
                 continue
             }
@@ -4088,7 +4289,7 @@ final class AssistToolRunner {
     /// then the briefing says nothing about it at all.
     func coursesWithAHowITeachPage() -> [String] {
         var codes: [String] = []
-        for course in workspace.courses where !course.isKeptForReference {
+        for course in coursesAsSavedNow where !course.isKeptForReference {
             if HowITeachPage.existingURL(for: course) != nil {
                 codes.append(course.code)
             }
@@ -4104,7 +4305,7 @@ final class AssistToolRunner {
     /// knows the courses. Empty when there are none, which is most folders.
     func referenceCourseBriefingLines() -> [String] {
         var lines: [String] = []
-        for course in workspace.courses where course.isKeptForReference {
+        for course in coursesAsSavedNow where course.isKeptForReference {
             lines.append(
                 "  \(course.code) — \(course.displayCode), "
                 + AssistToolRunner.schoolYearText(of: course, today: readToday())
@@ -4635,7 +4836,7 @@ final class AssistToolRunner {
 
         let code: String = text("course", in: arguments).trimmingCharacters(in: .whitespaces)
         var course: Course? = nil
-        for candidate in workspace.courses where candidate.code.lowercased() == code.lowercased() {
+        for candidate in coursesAsSavedNow where candidate.code.lowercased() == code.lowercased() {
             course = candidate
         }
         // **A reference course is addressed by its FOLDER NAME and nothing
@@ -4692,7 +4893,7 @@ final class AssistToolRunner {
             return []
         }
         var result: [String] = []
-        for candidate in workspace.courses
+        for candidate in coursesAsSavedNow
         where candidate.isKeptForReference && candidate.displayCode.lowercased() == wanted {
             result.append(candidate.code)
         }

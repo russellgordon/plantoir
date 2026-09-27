@@ -146,7 +146,8 @@ final class AssistScenarioTests: XCTestCase {
         // Windows has run these since the families were first described
         // (`AssistCardCommandTests.cs`) and the mac never did — so a family
         // whose example had stopped matching would have gone red on their
-        // machine, from a file generated on this one. Nine families now; the
+        // machine, from a file generated on this one. Nine families in ten
+        // entries now (#150 declares make-room's article form separately); the
         // deploy-at-a-time one also has a table of its own, in `deployAtATime`
         // and run by `ScheduleDeployCardTests`, because one example cannot
         // describe a grammar of times.

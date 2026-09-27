@@ -223,10 +223,17 @@ enum AssistCurriculumMentions {
         return false
     }
 
-    /// True for a leaf expectation's code: a letter, a strand number, a dot and
-    /// an expectation number, and nothing else.
-    static func isExpectationCode(_ code: String) -> Bool {
-        guard let expression = try? NSRegularExpression(pattern: "^[A-Za-z][0-9]+\\.[0-9]+$") else {
+    /// True for a leaf expectation's code, the WHOLE name: a letter, a strand
+    /// number, a dot and an expectation number (`A1.1`, `b2.3`); the College
+    /// Board's skills, digits, a dot and ONE letter (`1.A`); or its learning
+    /// objectives, two to four capital letters, a hyphen, digits, a dot and
+    /// one capital letter (`CRD-1.A`) — #128.
+    /// `\A`…`\z` rather than `^`…`$`, which also match before a final newline.
+    /// `contracts/shared-rules.json` → `curriculumRules.isExpectationCode`.
+    nonisolated static func isExpectationCode(_ code: String) -> Bool {
+        guard let expression = try? NSRegularExpression(
+            pattern: "\\A(?:[A-Za-z][0-9]+\\.[0-9]+|[0-9]+\\.[A-Za-z]|[A-Z]{2,4}-[0-9]+\\.[A-Z])\\z"
+        ) else {
             return false
         }
         let whole: NSRange = NSRange(code.startIndex..<code.endIndex, in: code)

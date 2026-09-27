@@ -114,6 +114,11 @@ struct ScheduleDeploySheet: View {
         // clock moves while the sheet is open, so a time that was in the
         // future when it opened may not be by the time it is used.
         if let problem = plan.problem {
+            // On the trail since #322: a refusal at the button is a teacher
+            // who tried to schedule and could not.
+            ScheduledDeploy.noteRefusedBeforeAnythingWasWritten(
+                course: course, sectionNumber: sectionNumber, when: when, refusal: problem
+            )
             failure = problem
             return
         }
