@@ -630,12 +630,27 @@ class KeyboardNavigationOff:
     def __enter__(self) -> "KeyboardNavigationOff":
         read = subprocess.run(["defaults", "read", "-g", "AppleKeyboardUIMode"], capture_output=True, text=True)
         self.saved: str | None = read.stdout.strip() if read.returncode == 0 else None
+        # A run ended by SIGTERM or SIGHUP (a closed terminal, a killed
+        # shell) would skip __exit__: Python has no handler for either, so
+        # turn both into SystemExit and the `with` unwinds as for Ctrl-C.
+        import signal
+        self.previous_handlers: dict = {}
+        for number in (signal.SIGTERM, signal.SIGHUP):
+            self.previous_handlers[number] = signal.signal(number, KeyboardNavigationOff.exit_on_signal)
         if self.saved not in (None, "0"):
             subprocess.run(["defaults", "write", "-g", "AppleKeyboardUIMode", "-int", "0"], capture_output=True)
-            print(f"   Keyboard navigation off for the run (was {self.saved}; put back afterwards).")
+            print(f"   Keyboard navigation off for the run (was {self.saved}; put back afterwards — if this run "
+                  f"is killed hard, restore it with: defaults write -g AppleKeyboardUIMode -int {self.saved}).")
         return self
 
+    @staticmethod
+    def exit_on_signal(number, frame) -> None:
+        raise SystemExit(128 + number)
+
     def __exit__(self, exc_type, exc_value, traceback) -> bool:
+        import signal
+        for number, handler in self.previous_handlers.items():
+            signal.signal(number, handler)
         if self.saved is None:
             subprocess.run(["defaults", "delete", "-g", "AppleKeyboardUIMode"], capture_output=True)
         elif self.saved != "0":

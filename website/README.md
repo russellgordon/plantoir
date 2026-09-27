@@ -161,7 +161,12 @@ companions, and rebuilds the site.
 ### What it borrows and puts back
 
 The Mac's appearance, the app's remembered window sizes, the frontmost
-application, and any Safari window it opened. It holds off sleep while it runs
+application, and any Safari window it opened — and, for a `--scenes` run,
+the Mac-wide Keyboard navigation setting (`AppleKeyboardUIMode`), switched
+off so no sheet photographs with a focus ring and put back exactly after,
+including on SIGTERM/SIGHUP. Check it with
+`defaults read -g AppleKeyboardUIMode` after a run that died; the run prints
+the value to restore when it starts. It holds off sleep while it runs
 so a capture started at night survives the displays going dark — but the Mac
 itself has to stay awake and unlocked.
 
@@ -297,7 +302,8 @@ named, when a picture it owes is missing, when the text Vision reads on it
 behind it was wrong (an empty plan, a refused copy, an empty second map). The
 count is the exit code now.
 
-It puts back the Mac's appearance, window sizes, Obsidian's list of vaults and
+It puts back the Mac's appearance, window sizes, Obsidian's list of vaults,
+Keyboard navigation (`defaults read -g AppleKeyboardUIMode` to check) and
 the frontmost app, and cancels any schedule it set that has not run. **It
 leaves** one notification in Notification Center (a script cannot withdraw
 another app's), ordinary lines in the activity trail

@@ -1,5 +1,5 @@
 {
-  "note": "One entry per screenshot on plantoir.app. `build.py` reads alt and caption to write the <picture> element; `website/shots/capture.py` reads `capture` to know how each is produced. Every shot is taken twice, once with the Mac in light appearance and once in dark, and saved as site/img/<id>-light.png and -dark.png. Paths are lowercase because Quartz serves lowercase URLs and 301s anything else — a capitalised address would be photographed mid-redirect. Since v1.4.0: `capture.scene` names the scene in capture.py that makes the shot (`capture.py --only <scene>`); `capture.workspace` says which working folder it is taken in ('marketing' = ~/Plantoir Marketing, ICS3U; 'demo' = ~/Desktop/Teaching, the three published demo courses); `expectText` lists words the finished picture must show, read back with Vision text recognition, so a picture of the wrong state fails its scene; `awaiting_capture` marks a shot the pages already name whose capture waits for the release it photographs (build.py renders nothing for it meanwhile); `waiting_on: \"#<issue>\"` beside it names the GitHub issue a capture waits on for a reason that is not the release — `--deploy` lets such a shot through, and the capture removes both flags; `windows: true` marks the ids capture_windows.py also takes.",
+  "note": "One entry per screenshot on plantoir.app. `build.py` reads alt and caption to write the <picture> element; `website/shots/capture.py` reads `capture` to know how each is produced. Every shot is taken twice, once with the Mac in light appearance and once in dark, and saved as site/img/<id>-light.png and -dark.png. Paths are lowercase because Quartz serves lowercase URLs and 301s anything else — a capitalised address would be photographed mid-redirect. Since v1.4.0: `capture.scene` names the scene in capture.py that makes the shot (`capture.py --only <scene>`); `capture.workspace` says which working folder it is taken in ('marketing' = ~/Plantoir Marketing, ICS3U; 'demo' = ~/Desktop/Teaching, the three published demo courses); `expectText` lists words the finished picture must show, read back with Vision text recognition, so a picture of the wrong state fails its scene; `awaiting_capture` marks a shot the pages already name whose capture waits for the release it photographs (build.py renders nothing for it meanwhile); `waiting_on: \"#<issue>\"` beside it names the GitHub issue a capture waits on for a reason that is not the release — `--deploy` lets such a shot through, and the capture removes both flags; `windows: true` marks the ids capture_windows.py also takes; `windows: false` marks a scene Windows does not have yet, so its visitors are shown the Mac picture and any older `-windows` file is ignored.",
   "shots": [
     {
       "id": "hero",
@@ -24,7 +24,7 @@
       },
       "alt": "The Plantoir window: ICS3U and ICS4U in the sidebar, last year's ICS3U filed under Reference Courses, and ICS3U's settings open beside them.",
       "caption": "Every course you teach, and last year's beside them.",
-      "windows": true,
+      "windows": false,
       "expectText": [
         "ICS3U",
         "ICS4U",
@@ -40,9 +40,9 @@
         "scene": "new-course",
         "workspace": "marketing"
       },
-      "alt": "The New Course panel with TEJ3M entered, offering its ready-made pages, folders and curriculum expectations.",
+      "alt": "The New Course panel with TEJ3M entered and its suggested course names offered beneath.",
       "caption": "A course code is enough to start.",
-      "windows": true,
+      "windows": false,
       "expectText": [
         "TEJ3M"
       ]
@@ -318,11 +318,11 @@
         "scene": "club",
         "test": "testClubWizard"
       },
-      "alt": "The New Course panel for a club, at its first-meeting settings: meeting pages kept in \"All Meetings\", and a front page headed \"Most Recent Meeting\".",
+      "alt": "The New Course or Club panel with CODING entered and \"This is a club\" switched on, explaining that a club's pages are numbered one after another, it has no curriculum, and it starts with a page for its first meeting.",
       "caption": "Clubs start the way clubs do.",
       "expectText": [
-        "All Meetings",
-        "Most Recent Meeting"
+        "CODING",
+        "This is a club"
       ]
     }
   ]

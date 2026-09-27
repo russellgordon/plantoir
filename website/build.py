@@ -233,7 +233,12 @@ def picture_element(shot: dict, problems: list[str], modifier: str, up: str) -> 
     display_width = width // 2
     display_height = height // 2
 
-    has_windows = win_light.exists() and win_dark.exists()
+    # `windows: false` says Windows has no such scene yet, so a Windows
+    # visitor sees the Mac picture — with the alt text and caption that were
+    # written for it. Only the image is swapped on Windows, never the words,
+    # so an older Windows capture left on disk would sit under a caption about
+    # a different picture (website-B review M1: courses and new-course).
+    has_windows = shot.get("windows") is not False and win_light.exists() and win_dark.exists()
     win_prefix = f"{identifier}-windows-" if has_windows else ""
 
     sources: list[str] = []
@@ -297,7 +302,7 @@ def static_element(shot: dict, problems: list[str], modifier: str, up: str) -> s
     identifier = shot["id"]
     source = IMAGE_DIR / f"{identifier}.png"
     win_source = IMAGE_DIR / f"{identifier}-windows.png"
-    has_windows = win_source.exists()
+    has_windows = shot.get("windows") is not False and win_source.exists()
 
     classes = "shot shot-static"
     if modifier:
