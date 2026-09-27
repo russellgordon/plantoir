@@ -46,10 +46,11 @@ A few honesty notes about the reproduction:
   than symbols — conditional probability is printed as
   "P(A given B)", not with a vertical bar — those words are kept.
 
-Each page keeps its code, and every lesson, exploration, task, and
-stage of [[The Culminating Investigation]] links back to the codes it
-addresses. The codes are also tags, so every page tagged `#D3` can be
-gathered in one place.
+Each page keeps its code, and every lesson, exploration, and task in
+this course, and every stage of
+[[E1. Designing and Carrying Out a Culminating Investigation|the culminating investigation]]
+that strand E asks for, links back to the codes it addresses. The codes
+are also tags, so every page tagged `#D3` can be gathered in one place.
 
 ## Why the codes matter more than they look
 

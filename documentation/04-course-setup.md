@@ -192,13 +192,19 @@ caption already says "red in September, greener as the year goes on".
 skeleton-without-expectations keeps its two placeholder pages; a teacher
 who wants the real ones deletes the course and remakes it.
 
-**One thing left undone, deliberately.** Four payloads' `About These …`
-explainer links once to a payload page a skeleton course will not have —
-ICS4U to `[[The Software Project]]`, ICS3U to `[[The Community App]]`,
-CGC1W to `[[The Concepts of Geographic Thinking]]`, MDM4U to `[[The
-Culminating Investigation]]`. It was left alone here rather than rewritten
-at install: it is an example-content fix, its own small piece, and the
-skeletons already ship illustrative unresolved links of their own.
+**The explainers' links, since #253.** Four payloads' `About These …`
+explainer used to link once to a payload page a skeleton course does not
+have — ICS4U to `The Software Project`, ICS3U to `The Community App`,
+CGC1W to `The Concepts of Geographic Thinking`, MDM4U to `The Culminating
+Investigation`. Each sentence now points at an expectation page in the
+same folder (B2, B4, A1.5 and E1) and says only what is true with or
+without the ready-made pages; unlinking alone would have left a sentence
+describing pages the course does not have. `lint_payload.py` refuses a
+curriculum page that links outside its folder, and
+`test_starting_content_prompts.py` checks every payload's curriculum links
+after the real double install. Not retroactive either: a course already
+created keeps the teacher's copy of the page, since those files are theirs
+now.
 
 The old note that the skeleton's `Curriculum/index.md` and its expectation
 pages install "even though the app writes `include_curriculum_pages:
@@ -716,6 +722,30 @@ skill `.claude/skills/example-content/` and checked by its
 `lint_payload.py` — no app code changes on either platform. The same skill
 holds the skeleton generator and `lint_skeletons.py`; the skeletons are
 generated output, so never hand-edit `support/skeletons/`.
+
+**How the installer reads a link** ([#314](https://github.com/russellgordon/plantoir/issues/314),
+[#326](https://github.com/russellgordon/plantoir/issues/326)): the three
+readers — which class's date a ready-made page takes (`first_use_dates`),
+pointing a template's placeholder expectation at the course's own
+(`retargeted_expectation_references`), and unlinking the curriculum pages a
+teacher declined (`unlink_curriculum_references`) — follow `shared-rules.json`
+→ `readingALink`, so the escaped pipe Obsidian writes inside a table,
+`[[K1.15\|test cases]]`, is the same link as `[[K1.15|test cases]]`. Until
+then all three read it as a page called `K1.15\`. Unlinking turns it into its
+words and takes the backslash with it, so the table cell stays one cell; a
+retarget keeps the backslash, because dropping it would split the cell.
+Unlinking compares by the page a link NAMES — its last path component — so
+`[[Curriculum/A1.1|words]]` is unlinked too, and an unaliased one reads as the
+page name, `A1.1`, since the folder is one the course does not have. What a
+teacher could see: MCMPR11's Final Evaluation task has an Assessment Matrix
+table with seven such links to British Columbia standards outside any
+`%%curriculum%%` block, and a teacher who declined the curriculum pages got
+seven links to pages that do not exist — measured over every payload with the
+real functions, 7 left, all in that file; 0 after. The other readers are
+latent on shipped content (no escaped pipe in any `per_section/` page, no
+folder-qualified expectation link in `support/`) and bite teacher-written or
+future payload pages. Pinned by `scripts/test_install_link_readers.py`, the
+MCMPR11 file included.
 
 Two payload conventions have changed since these entries, both handled by
 shared Python: course-level pages now arrive with
@@ -1508,10 +1538,13 @@ each pinned by tests in `Plantoir.Tests/ClassFolderMembershipTests.cs`:
   reaches rather than only the publish one. **Both are closed as of
   2026-09-19**: the mac's date walk goes through `reachFollowingLinks(from:)`
   now and stops where Windows stops, pinned by `class-planning.json` →
-  `datingPagesAClassBrings.reachStopsAtAClassPage`. Unpublish reach is the one
-  half still open —
-  [#201](https://github.com/russellgordon/plantoir/issues/201), v1.3.0 — and
-  neither platform stops there today.
+  `datingPagesAClassBrings.reachStopsAtAClassPage`. Unpublish reach, the one
+  half left open then, closed on the mac on 2026-09-26
+  ([#201](https://github.com/russellgordon/plantoir/issues/201)): an unpublish
+  stops at a class page too (`followingLinks.stopsAtAClassPage.appliesTo`,
+  `followingLinks.unpublishing.cases`). Windows' unpublish sweep did not stop
+  either, and owes the same clause; see
+  [the assistant's page](10-local-ai-assistant.md#unpublishing-stops-there-too-201).
 
 **Rejected: keeping Windows' wider membership.** It is the more generous
 reading — everything the teacher put in a per-section folder is a class — and

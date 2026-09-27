@@ -174,7 +174,7 @@ enum AssistCurriculumMentions {
         workspaceURL: URL?
     ) -> [AssistCurriculumExpectation] {
         var found: [AssistCurriculumExpectation] = []
-        for pageURL in ClassPages.pagesOfSection(sectionNumber, in: course) {
+        for pageURL in ClassPages.pagesTheAssistantLists(forSection: sectionNumber, in: course) {
             if !isCurriculum(pageAt: pageURL, in: course) {
                 continue
             }

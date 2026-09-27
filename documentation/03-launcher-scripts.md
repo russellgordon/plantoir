@@ -32,8 +32,10 @@ copy-pasteable follow-up commands in the right dialect (`./preview.sh …` vs
 
 ## 2. Resolve which image to use
 
-Every launcher derives the image from the folder's build recipe: the tag is
-`teaching-quartz:src-<hash of the recipe>`, built locally when missing.
+Every macOS launcher derives the image from the folder's build recipe: the
+tag is `teaching-quartz:src-<hash of the recipe>`, built locally when missing.
+The Windows launchers resolve no image at all — they run the same scripts on a
+runtime the app carries ([12 → Nothing here runs in a container](12-windows-app.md#nothing-here-runs-in-a-container)).
 
 - `--image REF` — substitute a specific already-built image (this is how
   `verify.sh` drives the launchers against its own `dev-test` build).
@@ -493,12 +495,13 @@ from one of them is exit 127 at runtime on the one path nobody tested.
 
 ## 3. Container runtime bootstrap (no Docker Desktop)
 
-Docker Desktop is deliberately not required. Every launcher carries an
-`ensure_container_runtime` (bash) / `Ensure-ContainerRuntime` (PowerShell)
-step that runs before the first `docker` command and removes what used to be
-a manual step ("open Docker Desktop and wait for the engine to start"):
+Docker Desktop is deliberately not required. The macOS launchers carry an
+`ensure_container_runtime` step that runs before the first `docker` command
+and removes what used to be a manual step ("open Docker Desktop and wait for
+the engine to start"); the Windows launchers have no counterpart, because
+there is nothing on Windows for them to start (below).
 
-**Fast path (both platforms).** If `docker info` already succeeds — any
+**Fast path (macOS).** If `docker info` already succeeds — any
 working engine, including Docker Desktop or Rancher Desktop if a teacher
 happens to have one — the launcher uses it as-is and does nothing else.
 
@@ -605,27 +608,24 @@ PATH there. The whole rule, what it refuses to do and what was rejected is in
 it refuses to free, and why"; the standing prohibition it implements is
 `CLAUDE.md` rule 7.
 
-**Windows: Docker Engine inside WSL2.** Colima does not support Windows, but
-it is not needed there — WSL2 is itself a lightweight, Microsoft-supplied
-Linux VM, i.e. exactly the role Colima plays on macOS. The PowerShell
-launchers:
+**Windows: nothing to bootstrap.** Since 2026-08-19 (`GUI-IMPROVEMENTS.md`
+row 290) the `.ps1` launchers run no container: each has a "Native toolchain
+(no container)" block that points the `PLANTOIR_*` variables at the runtime
+the app ships — Node, Python, Quartz and wrangler, found through
+`$env:PLANTOIR_RUNTIME` or else `%LOCALAPPDATA%\Programs\Plantoir\runtime`,
+and only if it holds a `manifest.json` — and runs `scripts/*.py` with that
+runtime's own `python.exe`. A copy without it prints "This copy of Plantoir is
+missing its website builder. Reinstall Plantoir, then try again." and exits 1.
+`$WORKDIR_ID` survives only to name the build folder
+(`%LOCALAPPDATA%\Plantoir\builds\<id>`).
 
-1. Check for a native working `docker` first (fast path above).
-2. Verify `wsl` exists and a distribution is installed; if not, point the
-   teacher at the one-time `wsl --install` + reboot.
-3. Probe for a running engine inside WSL (as the default user, then as root).
-4. If the engine is absent, offer to install it right there
-   (`apt-get install docker.io` as root inside the distro, then add the
-   default user to the `docker` group); if merely stopped, start it with
-   `service docker start` and poll until it answers.
-5. Once the WSL engine is up, define a PowerShell function named `docker`
-   that forwards every call through `wsl -e docker …`. Because functions
-   take precedence over external commands, the rest of the script (and its
-   dozens of existing `docker` call sites) work unchanged. Bind-mount paths
-   are translated with `wslpath` (`C:\Users\me\courses` →
-   `/mnt/c/Users/me/courses`), since the WSL engine sees Windows drives
-   under `/mnt`. Published ports still appear on `localhost` thanks to
-   WSL2's automatic localhost forwarding, so the preview URL is unchanged.
+This section used to describe a WSL2 bootstrap — a `wsl` probe, `apt-get
+install docker.io` inside the distribution, a PowerShell `docker` function
+forwarding every call through `wsl -e docker`, and `wslpath` translation of
+mount paths. All of it went with the container path; if you meet it in
+`PRESENTATION.md` or an old log row, it is history. How the native runtime is
+built, pinned and shipped:
+[12 → Nothing here runs in a container](12-windows-app.md#nothing-here-runs-in-a-container).
 
 ### Which app macOS asks about when it protects the Desktop
 
@@ -1169,8 +1169,9 @@ never crosses the mount — `pwd -P` inside the container is
 `/teaching/courses/<CODE>` — so nothing in the image can see the folder's name
 at all.
 
-**Nothing to mirror on Windows.** There is no `docker` in `setup.ps1`,
-`preview.ps1` or `deploy.ps1` (measured: zero occurrences in each), a Windows
+**Nothing to mirror on Windows.** There is no `docker` command in `setup.ps1`,
+`preview.ps1` or `deploy.ps1` (measured 2026-09-26: the word appears once in
+each, in the comment saying there is none), a Windows
 path cannot contain a colon, and the native runtime replaced the container
 there in 2026-08. The mount form is mac-only machinery and is deliberately
 prose in `contracts/shared-rules.json` →

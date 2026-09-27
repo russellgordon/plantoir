@@ -474,6 +474,10 @@ comments should too. The rule is about what appears on screen.
 - **`Vendor/llama` is not committed.** A fresh clone must run
   `mac-app/Vendor/fetch-llama.sh` once or the assistant reports its engine is
   missing. The app still builds and runs without it.
+- **`Vendor/Sparkle` is not committed either** (#204), and without it the app
+  does NOT build: `project.yml` embeds the framework, so `xcodegen generate`
+  fails. Run `mac-app/Vendor/fetch-sparkle.sh` once per clone or worktree. A
+  Debug build has no update feed, so it never checks for or installs anything.
 - **The assistant's model is not bundled** — it downloads to Application
   Support on first use. Changing the tier means the old file is still there
   under its own name; see the table above.

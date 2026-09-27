@@ -262,11 +262,32 @@ enum AssistMCPServer {
     /// What a session is told about this working folder before it does
     /// anything — or nil when there is nothing to say.
     ///
-    /// Only reference courses are described. Everything else a session needs
-    /// it can ask for, and a briefing that restates the obvious is one that
-    /// gets skimmed.
+    /// Two things are described, each only when there is something to say:
+    /// reference courses, and which live courses have a How I Teach page
+    /// (#209). Everything else a session needs it can ask for, and a briefing
+    /// that restates the obvious is one that gets skimmed.
     static func instructions(for runner: AssistToolRunner) -> String? {
         let described: [String] = runner.referenceCourseBriefingLines()
+        // Each LIVE course whose How I Teach page exists (#209) — the case
+        // the greeting cannot cover, because the greeting names one course.
+        // Nothing for a course without one, so a folder with neither still
+        // sends nothing at all (`howITeachPage.briefingInInstructions`).
+        let withAPage: [String] = runner.coursesWithAHowITeachPage()
+        var paragraphs: [String] = []
+        if let reference = referenceCourseParagraph(described) {
+            paragraphs.append(reference)
+        }
+        if !withAPage.isEmpty {
+            paragraphs.append(AssistWording.howITeachBriefing(courses: withAPage))
+        }
+        if paragraphs.isEmpty {
+            return nil
+        }
+        return paragraphs.joined(separator: "\n\n")
+    }
+
+    /// The reference courses' part of the briefing, or nil when there are none.
+    private static func referenceCourseParagraph(_ described: [String]) -> String? {
         if described.isEmpty {
             return nil
         }
