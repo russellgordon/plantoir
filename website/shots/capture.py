@@ -338,19 +338,32 @@ def export_attachments(bundle: Path, suffix: str, parts: set[str] | None = None,
 # ---------- Provisioning and publishing ----------
 
 def app_bundle_resources() -> Path:
-    """The Resources folder of the Debug build the UI tests run against."""
-    candidates = sorted(
-        (Path.home() / "Library/Developer/Xcode/DerivedData").glob(
-            "Plantoir-*/Build/Products/Debug/Plantoir.app/Contents/Resources"
-        )
+    """The Resources folder of the Debug build the UI tests run against.
+
+    That is the build of THIS checkout's project, found by the WorkspacePath
+    DerivedData records for it. It used to be whichever Plantoir-* folder
+    sorted last, and on a Mac with several clones that was a two-day-old
+    bundle from another one — launchers and a build recipe the app under
+    test did not carry.
+    """
+    import plistlib
+    project = (MAC_APP / "Plantoir.xcodeproj").resolve()
+    for derived in sorted((Path.home() / "Library/Developer/Xcode/DerivedData").glob("Plantoir-*")):
+        try:
+            with (derived / "info.plist").open("rb") as handle:
+                recorded = plistlib.load(handle).get("WorkspacePath", "")
+        except (OSError, plistlib.InvalidFileException):
+            continue
+        if not recorded or Path(recorded).resolve() != project:
+            continue
+        resources = derived / "Build/Products/Debug/Plantoir.app/Contents/Resources"
+        if resources.is_dir():
+            return resources
+    raise SystemExit(
+        f"No built Plantoir.app found for {project}. Build it first:\n"
+        "  cd mac-app && xcodebuild -project Plantoir.xcodeproj -scheme Plantoir "
+        "-configuration Debug build"
     )
-    if not candidates:
-        raise SystemExit(
-            "No built Plantoir.app found. Build it first:\n"
-            "  cd mac-app && xcodebuild -project Plantoir.xcodeproj -scheme Plantoir "
-            "-configuration Debug build"
-        )
-    return candidates[-1]
 
 
 def _recipe_folders() -> list:
@@ -439,7 +452,12 @@ def workspace_has_course(workspace: Path, code: str) -> bool:
 
 
 def ensure_launchers(workspace: Path) -> None:
-    """A brand-new folder needs the three launchers before anything else."""
+    """A brand-new folder needs the three launchers before anything else —
+    and a `courses/` folder. The app reads a folder with launchers and no
+    `courses/` as a problem ("There are no courses in this folder yet") and
+    keeps the folder picker up, so the new-course button a provisioning test
+    clicks is never shown; that is how the first marketing set-up failed."""
+    (workspace / "courses").mkdir(parents=True, exist_ok=True)
     resources = app_bundle_resources()
     for name in ["setup.sh", "preview.sh", "deploy.sh"]:
         destination = workspace / name
