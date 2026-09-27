@@ -364,12 +364,22 @@ class PublishStopLeavesQuietlyTests(unittest.TestCase):
             (courses / "ICS3U" / "course_config.json").write_text(
                 '{"course_code": "ICS3U"}', encoding="utf-8"
             )
-            # A preview build's live-reload address makes deploy.py rebuild
-            # for production first — the moment a teacher's Cancel lands.
+            # A preview build's live-reload client makes deploy.py rebuild
+            # for production first — the moment a teacher's Cancel lands. The
+            # client as Quartz writes it, read from the contract (#291), so
+            # this stays a preview's page whatever the rule becomes.
+            import contracts
+            import toolchain_paths
+            repository_contracts = SCRIPTS_FOLDER.parent / "contracts"
+            if repository_contracts.is_dir():
+                toolchain_paths.CONTRACTS_DIR = repository_contracts
+            contracts.reset_cache()
+            signature = contracts.section("app-rules", "buildFreshness", "previewBuild", "signature")
             (public / "index.html").write_text(
-                '<script>new WebSocket("ws://localhost:9081")</script>', encoding="utf-8"
+                "<html><body>" + signature["asQuartzWritesIt"] + "</body></html>", encoding="utf-8"
             )
             environment = dict(os.environ)
+            environment["PLANTOIR_CONTRACTS_DIR"] = str(toolchain_paths.CONTRACTS_DIR)
             environment["PYTHONDONTWRITEBYTECODE"] = "1"
             environment["PLANTOIR_SCRIPTS_DIR"] = str(stand_in_scripts)
             environment["PLANTOIR_COURSES_DIR"] = str(courses)

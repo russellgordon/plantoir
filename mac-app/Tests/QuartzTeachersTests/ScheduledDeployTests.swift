@@ -150,7 +150,7 @@ final class ScheduledDeployTests: XCTestCase {
             sectionNumber: 1,
             when: sixThirtyTomorrow(),
             workspaceURL: workspaceURL,
-            deployArguments: []
+            scheduledTo: []
         )
         let environment: [String: String] = try XCTUnwrap(
             plist["EnvironmentVariables"] as? [String: String]
@@ -179,7 +179,7 @@ final class ScheduledDeployTests: XCTestCase {
             sectionNumber: 1,
             when: when,
             workspaceURL: workspaceURL,
-            deployArguments: arguments
+            scheduledTo: ["Netlify"]
         )
 
         // Well-formed means launchd could really read it: round-tripped
@@ -295,7 +295,7 @@ final class ScheduledDeployTests: XCTestCase {
         let lastYear: URL = agentsDirectory.deletingLastPathComponent().appendingPathComponent("last-year")
         let theirs: [String: Any] = ScheduledDeploy.propertyList(
             courseCode: course.code, sectionNumber: 1, when: alreadySet.addingTimeInterval(60 * 60),
-            workspaceURL: lastYear, deployArguments: []
+            workspaceURL: lastYear, scheduledTo: []
         )
         let theirPlist: URL = ScheduledDeploy.plistURL(
             courseCode: course.code, sectionNumber: 1, inWorkingFolder: lastYear
@@ -313,7 +313,7 @@ final class ScheduledDeployTests: XCTestCase {
         let old: [String: Any] = ScheduledDeploy.propertyList(
             courseCode: course.code, sectionNumber: 1, when: alreadySet,
             workspaceURL: workspaceURL,
-            deployArguments: []
+            scheduledTo: []
         )
         try PropertyListSerialization.data(fromPropertyList: old, format: .xml, options: 0)
             .write(to: ScheduledDeploy.plistURL(courseCode: course.code, sectionNumber: 1, inWorkingFolder: workspaceURL))
@@ -384,7 +384,7 @@ final class ScheduledDeployTests: XCTestCase {
         let alreadySet: Date = newMoment.addingTimeInterval(36 * 60 * 60)
         let old: [String: Any] = ScheduledDeploy.propertyList(
             courseCode: course.code, sectionNumber: 1, when: alreadySet,
-            workspaceURL: workspaceURL, deployArguments: []
+            workspaceURL: workspaceURL, scheduledTo: []
         )
         try PropertyListSerialization.data(fromPropertyList: old, format: .xml, options: 0)
             .write(to: ScheduledDeploy.plistURL(courseCode: course.code, sectionNumber: 1, inWorkingFolder: workspaceURL))
@@ -421,7 +421,7 @@ final class ScheduledDeployTests: XCTestCase {
         let moment: Date = sixThirtyTomorrow()
         let old: [String: Any] = ScheduledDeploy.propertyList(
             courseCode: course.code, sectionNumber: 1, when: moment,
-            workspaceURL: workspaceURL, deployArguments: []
+            workspaceURL: workspaceURL, scheduledTo: []
         )
         try PropertyListSerialization.data(fromPropertyList: old, format: .xml, options: 0)
             .write(to: ScheduledDeploy.plistURL(courseCode: course.code, sectionNumber: 1, inWorkingFolder: workspaceURL))
@@ -459,7 +459,7 @@ final class ScheduledDeployTests: XCTestCase {
         let alreadySet: Date = newMoment.addingTimeInterval(36 * 60 * 60)
         let old: [String: Any] = ScheduledDeploy.propertyList(
             courseCode: course.code, sectionNumber: 1, when: alreadySet,
-            workspaceURL: workspaceURL, deployArguments: []
+            workspaceURL: workspaceURL, scheduledTo: []
         )
         let plist: URL = ScheduledDeploy.plistURL(courseCode: course.code, sectionNumber: 1, inWorkingFolder: workspaceURL)
         let oldBytes: Data = try PropertyListSerialization.data(fromPropertyList: old, format: .xml, options: 0)
@@ -917,9 +917,13 @@ final class ScheduledDeployTests: XCTestCase {
         XCTAssertTrue(command.contains("-not -path '*/.*'"),
                       "Hidden entries are skipped, or .merged_output makes the site look stale the instant it is built")
         // A PREVIEW build is never deploy-fresh, however recent it looks:
-        // serve mode bakes a ws://localhost client into every page.
-        XCTAssertTrue(command.contains("ws://localhost:"),
+        // serve mode bakes a ws://localhost client into every page. Found by
+        // its script tag and first statement, each page read as one record
+        // (issue #291), not by the bare address a page's words can carry.
+        XCTAssertTrue(command.contains("LC_ALL=C /usr/bin/grep -rzqs"),
                       "A preview build must force a rebuild rather than being deployed")
+        XCTAssertTrue(command.contains(ScheduledDeploy.shellQuoted(BuildFreshness.liveReloadPattern)),
+                      "The overnight check reads the contract's rule, not the bare address")
 
         // The deploy is gated, so a failed build deploys nothing — the
         // button returns early rather than sending the previous build, and
@@ -1314,7 +1318,7 @@ final class ScheduledDeployTests: XCTestCase {
         let home: URL = URL(fileURLWithPath: "/Users/teacher")
         let plist: [String: Any] = ScheduledDeploy.propertyList(
             courseCode: "ICS3U", sectionNumber: 1, when: sixThirtyTomorrow(),
-            workspaceURL: workspaceURL, deployArguments: []
+            workspaceURL: workspaceURL, scheduledTo: []
         )
         XCTAssertEqual(plist["Label"] as? String, label)
         let arguments: [String] = try XCTUnwrap(plist["ProgramArguments"] as? [String])
@@ -1509,7 +1513,7 @@ final class ScheduledDeployTests: XCTestCase {
         )
         let current: [String: Any] = ScheduledDeploy.propertyList(
             courseCode: "ICS3U", sectionNumber: 1, when: lostMoment,
-            workspaceURL: workspaceURL, deployArguments: []
+            workspaceURL: workspaceURL, scheduledTo: []
         )
         try PropertyListSerialization.data(fromPropertyList: current, format: .xml, options: 0)
             .write(to: newPlist)

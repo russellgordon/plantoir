@@ -1879,6 +1879,45 @@ curriculum folder is what let the retired sentence sit unguarded, and the
 banned-word sweep could not stand in for it — a banned word catches only that
 word.
 
+### Curriculum folders: several maps, protection and the offer (#128)
+
+A course has one coverage map per declared curriculum folder that holds
+expectation pages (the rule and its reasons: `05-build-pipeline.md` → "The
+curriculum coverage maps"). Three places in the app follow it, all through
+`CurriculumFolderRule` in `SpecialNames.swift`, which is the build's rule over
+the course's SHARED folders:
+
+- **Protection** (`CurriculumFolderProtection.decide`, asked by Course Settings
+  and the wizard alike): only the LAST folder with a map is refused while the
+  map is on; the others ask first with
+  `SpecialNames.removeCurriculumFolderWithItsMapMessage`, which deliberately
+  does not promise that another map stays. The folders with a map are read
+  from the disk (`CurriculumFolderRule.foldersWithPages`, recursive, the same
+  code rule as the build); the wizard, with nothing on disk yet, counts the
+  payload's folder when its pages are being installed. Course Settings asks
+  once per row, so the disk answer is kept for two seconds per course — long
+  enough to cover one drawing of the lists, short enough that a page added in
+  Obsidian shows up.
+- **"Folders Plantoir uses"** names every curriculum folder with a map and
+  every map page, `whyForSeveral` when there is more than one.
+- **"Curriculum folders"** — checkboxes under the shared folders, in both
+  Course Settings and the wizard, shown only when there are two or more
+  folders to choose between (`CurriculumFoldersOffer`). Ticked are the
+  folders with a map — even on a course that declared nothing, so the first
+  tick writes them FIRST and never drops the map the build's fallback found —
+  then every declared folder, so a folder ticked before its first page is
+  written stays ticked (the review's finding 2); the last ticked folder cannot
+  be unticked. Whatever writes the list also writes its first folder in the
+  legacy `curriculum_folder`, for an older Plantoir on another Mac. The wizard writes
+  `curriculum_folders` only when the teacher touched the list, so every
+  existing wizard path writes the same file as before
+  (`WizardStructureTests`' golden).
+
+The build's `PLANTOIR_MAPS:` line is read by `CoverageMapsBuilt` (console and
+scheduled log) into `curriculum maps built` on the trail, and since this piece
+`BuildMarkerLine` keeps ANY `PLANTOIR_…:` line out of the console, so a marker
+the app has no reader for yet never reaches a teacher as raw JSON.
+
 ## The wizard's Starting Content section, and what governs what
 
 Five toggles can appear there, and their ORDER is their dependency, read
@@ -2229,6 +2268,18 @@ two lists.
 - *A file watcher per window*: a new moving part, for what reload-after-Save and
   reload-on-open already cover.
 
+**`followWrite` reaches WINDOW models only — the assistant reads at the call
+instead** (#322). The assistant's window and the `--mcp-stdio` server each own
+a `WorkspaceModel` that no window shows, and a Save never reached either: they
+held the settings as they were when they started, until a folder deploy was
+refused as "never deployed" and an outside assistant deployed to a
+destination the course had left. They now rediscover the courses on every
+tool call (`WorkspaceModel.readCoursesAsSavedNow()`), which never touches a
+window's model. Two mechanisms on purpose: an in-process follow cannot reach
+another process, and a per-call read must never replace a window's unsaved
+edits. The whole story is docs 10 → "Settings are read at the call, not when
+the window opened (#322)".
+
 **What a Save tells you** (`SettingsSaveNotice`). A preview and a publish read
 the settings once, when their build begins — measured: 20 s after a Save the
 served sidebar filter was unchanged. So:
@@ -2308,6 +2359,21 @@ unsaved settings` and `preview again after settings saved`.
 `PreviewLeases.active` and `CourseActivity.activePublishes`; no cell of the
 sidebar table asks the course anything while drawn (the #266 rule above).
 
+
+**A Save that affects a scheduled deploy says so** (#323). Since #323 a
+scheduled run reads the course's settings when it fires, so a Save can move or
+break a deploy already set. After a Save, for each section with a deploy set to
+happen on its own in THIS working folder and still to come,
+`SettingsSaveNotice.scheduledDeploysAtSave` decides one sentence:
+`SpecialNames.settingsSaveScheduledDeployCannotGoAheadAsSetNow` when it could
+not go ahead as the course is set now (changed or not), else
+`settingsSaveScheduledDeployGoesWhereTheCourseDeploysNow` when this Save changed
+where the course deploys (the file BEFORE the Save against what it wrote).
+They come before the "saved while publishing" early return, so a Save during a
+publish still says them; nothing is refused or undone. The trail's `settings
+saved` line carries the same facts from `SettingsSaveNotice.scheduledDeploys`.
+Contract: `savingSettings.scheduledDeploys`; the whole story is docs 07, "Where
+it deploys is read when it runs (#323)".
 ## Two programs, one course: the build, preview and publish leases (#156)
 
 Written 2026-09-25 for [issue #156](https://github.com/russellgordon/plantoir/issues/156).
@@ -2626,9 +2692,13 @@ Folder rows in Course Settings carry a pencil. It renames the folder **on
 disk** — in every section that has one — rewrites the qualified links that name
 it, and carries across every `course_config.json` key that mentioned it
 (`shared_folders`/`per_section_folders`, `graded_folders`, `curriculum_folder`,
-`class_folder`, `hidden`, `expandable`, `excluded_items`). Renaming the class
-folder or the curriculum folder also WRITES its key, even on a course that
-never had one — a rename is the one moment Plantoir witnesses the change, and
+`curriculum_folders`, `class_folder`, `hidden`, `expandable`, `excluded_items`).
+Renaming the class folder or ANY curriculum folder also WRITES its key, even on
+a course that never had one — `curriculum_folders`, the declared list (or the
+folders the course resolves to, read from the disk BEFORE the move) with the
+new name in the old one's place, so the primary map keeps its title (#128); the
+legacy `curriculum_folder` is written naming the list's first folder, for an
+older Plantoir that reads only that key — a rename is the one moment Plantoir witnesses the change, and
 without it the guess that finds those folders stops finding them with nobody
 told.
 
@@ -2642,15 +2712,17 @@ Four things about it are deliberate:
 - **It runs off the main actor.** The move is quick; reading every page in the
   course to rewrite links is not, on an iCloud-backed vault where an evicted
   file downloads on read.
-- **The new name is spelled differently in the two kinds of link**, and this
-  is measured rather than chosen. A Markdown destination ends at the first
+- **The new name is spelled differently in the three kinds of link**, and
+  this is measured rather than chosen. A Markdown destination ends at the first
   space, so a name containing one is percent-encoded on the way in
   (`[q](All%20Tasks/Quiz.md)`); a wikilink keeps the plain spelling, because
-  `[[All Tasks/Quiz 1]]` is exactly how Obsidian writes one. Which characters
+  `[[All Tasks/Quiz 1]]` is exactly how Obsidian writes one; and inside angle
+  brackets, `[q](<All Tasks/Quiz 1.md>)`, the name goes in plain too, unless it
+  holds a `<`, a `>` or a line break (#97). Which characters
   are encoded is fixed by what the built site can decode, not by any general
   URL rule — `&` and `,` are left alone on purpose, and a name needing nothing
   is left exactly as the teacher typed it. The rule, the measurements and the
-  twelve cases both apps run are in
+  cases both apps run are in
   [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
   `specialNames.renameFolder.linkRewriting`, and which suite deserialises them
   is recorded in [`contracts/README.md`](../contracts/README.md) rather than
@@ -6184,11 +6256,11 @@ and the deploy button — are the app's, not the tool's: over MCP the client is
 told which tools write (`readOnlyHint`) and does its own asking. The app itself answers the flag —
 `Plantoir.app/Contents/MacOS/Plantoir --mcp-stdio <working-folder>` — rather
 than shipping a second binary, so no packaging step can leave it out. Claude
-Code is offered a LONGER list than the local model — 32 tools against 13, with
+Code is offered a LONGER list than the local model — 35 tools against 13, with
 the local model seeing exactly the thirteen its routing was measured against.
-The ten it does not see are off its list for three different reasons: reading
-the curriculum and pointing a page at the expectations that fit is a judgement
-about meaning; listing the folder's courses and explaining what publishing
+The thirteen it does not see are off its list for three different reasons: reading
+the curriculum and pointing a page at the expectations that fit, and reading or
+drafting the teacher's How I Teach page (#209), are judgements about meaning; listing the folder's courses and explaining what publishing
 means are things a window scoped to one section never has to ask; and filling
 out a unit, making room in one and taking a copy are things it can already
 reach through a fixed phrasing, matched in code, that never consults a model.
