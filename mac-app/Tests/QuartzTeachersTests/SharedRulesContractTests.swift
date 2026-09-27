@@ -1584,7 +1584,7 @@ final class SharedRulesContractTests: XCTestCase {
     /// ARRAYS are walked too. No array under `specialNames` carries a
     /// platform-worded sentence today, but this contract's established shape
     /// puts teacher sentences inside arrays of cases — `renameFolder`
-    /// .`linkRewriting`.`cases` and `curriculumFolderResolution`.`cases` are
+    /// .`linkRewriting`.`cases` and `curriculumFoldersResolution`.`cases` are
     /// both here already — so a fourth sentence added as a case would otherwise
     /// be invisible to a test whose whole purpose is to notice a fourth
     /// sentence.
@@ -2114,16 +2114,23 @@ final class SharedRulesContractTests: XCTestCase {
             )
             let folders: [String] = try XCTUnwrap(testCase["folders"] as? [String])
             let withPages: [String] = try XCTUnwrap(testCase["withPages"] as? [String])
+            let letterFirst: [String]? = testCase["withLetterFirstPages"] as? [String]
             XCTAssertEqual(
-                CurriculumFolderRule.mappedFolders(declared: declared, in: folders, withPages: withPages),
+                CurriculumFolderRule.mappedFolders(
+                    declared: declared, in: folders, withPages: withPages, withLetterFirstPages: letterFirst
+                ),
                 try XCTUnwrap(testCase["mapped"] as? [String]), "mapped: \(name)"
             )
             XCTAssertEqual(
-                CurriculumFolderRule.resolvedFolders(declared: declared, in: folders, withPages: withPages),
+                CurriculumFolderRule.resolvedFolders(
+                    declared: declared, in: folders, withPages: withPages, withLetterFirstPages: letterFirst
+                ),
                 try XCTUnwrap(testCase["resolved"] as? [String]), "resolved: \(name)"
             )
             XCTAssertEqual(
-                CurriculumFolderRule.coveragePageTitles(declared: declared, in: folders, withPages: withPages),
+                CurriculumFolderRule.coveragePageTitles(
+                    declared: declared, in: folders, withPages: withPages, withLetterFirstPages: letterFirst
+                ),
                 try XCTUnwrap(testCase["titles"] as? [String]), "titles: \(name)"
             )
         }

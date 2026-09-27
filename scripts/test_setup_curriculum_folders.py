@@ -4,8 +4,9 @@ What course setup writes about a course's curriculum folders (#128).
 
 `curriculum_folders` (a list) is written for a course that has none recorded,
 from the one folder its payload or skeleton manifest declares; a saved list is
-kept exactly; and a course whose only record is the legacy `curriculum_folder`
-is left alone. That last one is a BUG FIX, not a new rule: setup used to write
+kept exactly; the list's first (primary) folder is written in the legacy
+`curriculum_folder` as well, for an older Plantoir; and a course whose only
+record is the legacy `curriculum_folder` is left alone. That last one is a BUG FIX, not a new rule: setup used to write
 `curriculum_folder` from the manifest unconditionally, and the saved-keys merge
 only restores keys the fresh configuration lacks — so re-running setup on a
 course whose folder a rename had recorded as "Expectations" put the manifest's
@@ -108,7 +109,14 @@ class ARerunKeepsWhatWasRecorded(unittest.TestCase):
     def test_a_saved_list_is_kept_exactly(self):
         written = rerun_setup(self, {"curriculum_folders": ["Ontario Curriculum", "AP CSP"]})
         self.assertEqual(written.get("curriculum_folders"), ["Ontario Curriculum", "AP CSP"])
-        self.assertNotIn("curriculum_folder", written)
+        # The primary folder is also written in the legacy key, for an older
+        # Plantoir on another Mac, which reads only that one.
+        self.assertEqual(written.get("curriculum_folder"), "Ontario Curriculum")
+
+    def test_a_primary_folder_differing_from_the_legacy_name_wins(self):
+        written = rerun_setup(self, {"curriculum_folders": ["Expectations"],
+                                     "curriculum_folder": "Curriculum"})
+        self.assertEqual(written.get("curriculum_folder"), "Expectations")
 
     def test_a_course_from_scratch_records_nothing(self):
         written = rerun_setup(self, {})
@@ -123,6 +131,11 @@ class WhatANewCourseRecords(unittest.TestCase):
         self.assertEqual(setup_course.curriculum_folders_to_record({}, "Curriculum"), ["Curriculum"])
         self.assertEqual(setup_course.curriculum_folders_to_record(
             {"course_code": "ICS3U"}, "Curriculum"), ["Curriculum"])
+
+    def test_the_primary_is_the_first_usable_name(self):
+        self.assertEqual(setup_course.primary_curriculum_folder(["", 3, "Curriculum", "AP"]), "Curriculum")
+        self.assertIsNone(setup_course.primary_curriculum_folder([]))
+        self.assertIsNone(setup_course.primary_curriculum_folder(None))
 
     def test_nothing_when_the_manifest_declares_nothing(self):
         self.assertIsNone(setup_course.curriculum_folders_to_record({}, None))

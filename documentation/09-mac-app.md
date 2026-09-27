@@ -1902,10 +1902,13 @@ the course's SHARED folders:
   every map page, `whyForSeveral` when there is more than one.
 - **"Curriculum folders"** — checkboxes under the shared folders, in both
   Course Settings and the wizard, shown only when there are two or more
-  folders to choose between (`CurriculumFoldersOffer`). The folders with a
-  map are shown ticked even on a course that declared nothing, so the first
-  tick writes them FIRST and never drops the map the build's fallback found;
-  the last ticked folder cannot be unticked. The wizard writes
+  folders to choose between (`CurriculumFoldersOffer`). Ticked are the
+  folders with a map — even on a course that declared nothing, so the first
+  tick writes them FIRST and never drops the map the build's fallback found —
+  then every declared folder, so a folder ticked before its first page is
+  written stays ticked (the review's finding 2); the last ticked folder cannot
+  be unticked. Whatever writes the list also writes its first folder in the
+  legacy `curriculum_folder`, for an older Plantoir on another Mac. The wizard writes
   `curriculum_folders` only when the teacher touched the list, so every
   existing wizard path writes the same file as before
   (`WizardStructureTests`' golden).
@@ -2667,7 +2670,8 @@ Renaming the class folder or ANY curriculum folder also WRITES its key, even on
 a course that never had one — `curriculum_folders`, the declared list (or the
 folders the course resolves to, read from the disk BEFORE the move) with the
 new name in the old one's place, so the primary map keeps its title (#128); the
-legacy `curriculum_folder` is only rewritten, never created — a rename is the one moment Plantoir witnesses the change, and
+legacy `curriculum_folder` is written naming the list's first folder, for an
+older Plantoir that reads only that key — a rename is the one moment Plantoir witnesses the change, and
 without it the guess that finds those folders stops finding them with nobody
 told.
 

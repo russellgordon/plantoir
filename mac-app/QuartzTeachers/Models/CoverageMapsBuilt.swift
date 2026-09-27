@@ -109,8 +109,12 @@ enum BuildMarkerLine {
 
     // MARK: - Functions
 
+    /// Compiled once: every console line passes through here.
+    nonisolated private static let machineLinePattern: NSRegularExpression? =
+        try? NSRegularExpression(pattern: "PLANTOIR_[A-Z_]+:")
+
     nonisolated static func isMachineLine(_ line: String) -> Bool {
-        guard let expression = try? NSRegularExpression(pattern: "PLANTOIR_[A-Z_]+:") else {
+        guard let expression = machineLinePattern else {
             return false
         }
         let whole: NSRange = NSRange(line.startIndex..<line.endIndex, in: line)
