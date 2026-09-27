@@ -184,6 +184,20 @@ struct CourseSettingsView: View {
                             return noticeAfterFolderChange(name, change: change, scope: .shared)
                         }
                     )
+                    // Which of those hold curriculum expectations, each with a
+                    // coverage map of its own (#128) — offered, never decided
+                    // for the teacher, and only when there is a choice.
+                    if !offeredCurriculumFolders.isEmpty {
+                        VStack(alignment: .leading, spacing: 4) {
+                            MembershipToggleListView(
+                                title: CurriculumFoldersOffer.label,
+                                allItems: offeredCurriculumFolders,
+                                members: curriculumFolderTicksBinding,
+                                protection: curriculumFolderTickProtection
+                            )
+                            ExampleCaption(CurriculumFoldersOffer.caption)
+                        }
+                    }
                     StringListEditorView(
                         title: "Shared files (all sections)",
                         hidesMarkdownExtension: true,
@@ -447,6 +461,62 @@ struct CourseSettingsView: View {
     /// Which is why the derived list must be as complete as it can afford to
     /// be: the first tick freezes it, so anything the build counts today and
     /// this list omits loses its marks without a word.
+    /// The "Curriculum folders" checkboxes (#128), shown only when the course
+    /// has two or more folders to choose between.
+    var offeredCurriculumFolders: [String] {
+        return CurriculumFoldersOffer.offered(
+            folders: course.configuration.sharedFolders,
+            declared: course.configuration.curriculumFolders
+        )
+    }
+
+    /// Ticked: the folders the build maps, read from the disk, or — while none
+    /// holds a page — the ones the course declares.
+    var tickedCurriculumFolders: [String] {
+        let declared: [String] = course.configuration.curriculumFolders
+        let mapped: [String] = CurriculumFolderRule.mappedFolders(
+            declared: declared,
+            in: course.configuration.sharedFolders,
+            withPages: CurriculumFolderRule.foldersWithPages(for: course),
+            withLetterFirstPages: CurriculumFolderRule.foldersWithLetterFirstPages(for: course)
+        )
+        return CurriculumFoldersOffer.ticked(
+            folders: course.configuration.sharedFolders, declared: declared, mapped: mapped
+        )
+    }
+
+    /// A tick or an untick, written as `curriculum_folders` — the folders
+    /// already ticked first, so the primary folder stays primary.
+    var curriculumFolderTicksBinding: Binding<[String]> {
+        return Binding(
+            get: {
+                return tickedCurriculumFolders
+            },
+            set: { newValue in
+                let current: [String] = tickedCurriculumFolders
+                for folder in newValue where !current.contains(folder) {
+                    course.configuration.curriculumFolders = CurriculumFoldersOffer.ticking(
+                        folder, ticked: current, folders: course.configuration.sharedFolders
+                    )
+                    return
+                }
+                for folder in current where !newValue.contains(folder) {
+                    if let written = CurriculumFoldersOffer.unticking(folder, ticked: current) {
+                        course.configuration.curriculumFolders = written
+                    }
+                    return
+                }
+            }
+        )
+    }
+
+    func curriculumFolderTickProtection(for folder: String) -> ItemProtection {
+        if CurriculumFoldersOffer.canUntick(folder, ticked: tickedCurriculumFolders) {
+            return .ordinary
+        }
+        return .blocked(reason: CurriculumFoldersOffer.lastStaysTicked)
+    }
+
     var gradedFoldersBinding: Binding<[String]> {
         return Binding(
             get: {
@@ -477,7 +547,8 @@ struct CourseSettingsView: View {
             // the file, not this copy, because the file is what the site was
             // built from.
             var hiddenBefore: [String] = []
-            if let onDisk = try? CourseConfiguration(contentsOf: course.configFileURL) {
+            let onDisk: CourseConfiguration? = try? CourseConfiguration(contentsOf: course.configFileURL)
+            if let onDisk {
                 hiddenBefore = onDisk.hiddenItems
             }
             let result: CourseConfiguration.WriteResult = try course.configuration.write(to: course.configFileURL)
@@ -486,7 +557,15 @@ struct CourseSettingsView: View {
                 courseCode: course.code,
                 previewLeases: PreviewLeases.active,
                 publishes: CourseActivity.activePublishes,
-                replacedChangesFromElsewhere: result.replacedChangesFromElsewhere
+                replacedChangesFromElsewhere: result.replacedChangesFromElsewhere,
+                scheduledDeploys: SettingsSaveNotice.scheduledDeploysAtSave(
+                    before: onDisk,
+                    saved: course,
+                    scheduled: SettingsSaveNotice.scheduledDeploysStillToCome(
+                        courseCode: course.code, workingFolder: URL(fileURLWithPath: workingFolderPath)
+                    ),
+                    cloudflareAccountID: AppSettings.shared.cloudflareAccountID
+                )
             )
             saveNotice = notice
             ActivityTrail.note(.settingsSaved, SettingsSaveNotice.trailLine(
@@ -739,6 +818,11 @@ struct CourseSettingsView: View {
         // on the main actor, because it touches the observable model.
         let courseDirectory: URL = course.directoryURL
         let sectionNumbers: [Int] = course.configuration.sectionNumbers
+        // Read BEFORE the move, while the folder still has its old name: which
+        // curriculum folders hold expectation pages decides whether this one
+        // is a curriculum folder whose name must be written down (#128).
+        let curriculumWithPages: [String] = CurriculumFolderRule.foldersWithPages(for: course)
+        let curriculumWithLetterFirstPages: [String] = CurriculumFolderRule.foldersWithLetterFirstPages(for: course)
         do {
             outcome = try await Task.detached(priority: .userInitiated) {
                 return try SpecialFolderRenamer.rename(
@@ -752,7 +836,10 @@ struct CourseSettingsView: View {
         }
         do {
             try course.configuration.recordOnDisk({ values in
-                return SpecialFolderRenamer.renaming(oldName, to: newName, scope: scope, in: values)
+                return SpecialFolderRenamer.renaming(
+                    oldName, to: newName, scope: scope, in: values, foldersWithPages: curriculumWithPages,
+                    foldersWithLetterFirstPages: curriculumWithLetterFirstPages
+                )
             }, at: course.configFileURL)
         } catch {
             // Recorded BEFORE returning, and that ordering is the point: this
@@ -860,16 +947,19 @@ struct CourseSettingsView: View {
     }
 
     func sharedFolderProtection(for folder: String) -> ItemProtection {
-        let resolvedCurriculum: String? = CurriculumFolderRule.resolvedCurriculumFolder(for: course)
-        if let resolvedCurriculum, folder == resolvedCurriculum {
-            if course.configuration.includesCurriculumCoverage {
-                return .blocked(reason: SpecialNames.curriculumFolderBlockedByCoverageSetting)
-            } else {
-                return .consequential(
-                    title: SpecialNames.removeCurriculumFolderTitle(for: folder),
-                    message: SpecialNames.removeCurriculumFolderMessage
-                )
-            }
+        // Every curriculum folder with a map, read from the disk (#128): only
+        // the LAST one is refused while the map is on. See
+        // `CurriculumFolderProtection`, which the wizard asks too.
+        if let curriculum = CurriculumFolderProtection.decide(
+            folder: folder,
+            resolved: CurriculumFolderRule.resolvedFolders(for: course),
+            coverageOn: course.configuration.includesCurriculumCoverage,
+            pagesOn: false,
+            declaredPayloadFolder: nil,
+            surface: .settings,
+            jurisdiction: ""
+        ) {
+            return curriculum
         }
         let currentGraded: [String] = gradedFoldersBinding.wrappedValue
         if currentGraded.contains(folder) {

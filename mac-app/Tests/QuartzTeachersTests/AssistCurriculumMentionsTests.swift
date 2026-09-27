@@ -53,11 +53,12 @@ final class AssistCurriculumMentionsTests: XCTestCase {
             mcpNames.insert(tool.name)
         }
 
-        // The ten MCP-only tools, and WHY each is off the local list — three
-        // different reasons, which is why this cannot be one sentence.
+        // The thirteen MCP-only tools, and WHY each is off the local list —
+        // three different reasons, which is why this cannot be one sentence.
         //
-        // * The curriculum three ask for a judgement about MEANING, which a
-        //   large model does well and a 4B does not.
+        // * The curriculum three, and the How I Teach three (#209), ask for a
+        //   judgement about MEANING, which a large model does well and a 4B
+        //   does not.
         // * `list_courses` and `explain_publishing` are never NEEDED there: the
         //   window is scoped to one section and `AssistAgent.systemPrompt`
         //   already names the course and explains publishing. A Claude Code
@@ -75,6 +76,7 @@ final class AssistCurriculumMentionsTests: XCTestCase {
             "plan_make_room_for_classes", "make_room_for_classes",
             "explain_publishing", "back_up_course",
             "list_curriculum_expectations", "plan_curriculum_mentions", "add_curriculum_mentions",
+            "read_how_i_teach", "plan_write_how_i_teach", "write_how_i_teach",
         ]
         for name in added {
             XCTAssertFalse(localNames.contains(name), "\(name) must not reach the local model.")

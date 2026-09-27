@@ -18,6 +18,11 @@ import unicodedata
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
+
+# Where a page's code is: the toolchain's own definition (#313). A link shown
+# inside code is an example of the syntax, not a link that has to resolve.
+sys.path.insert(0, str(ROOT / "scripts"))
+import markdown_code  # noqa: E402
 SKELETONS = ROOT / "support" / "skeletons"
 
 LINK = re.compile(r"!?\[\[([^\]|#]+?)(?:\\?\|[^\]]*)?(?:#[^\]|]*)?\]\]")
@@ -117,9 +122,7 @@ def check(family: str) -> list:
             if leftover:
                 problems.append(f"{relative}: template token(s) left in the page: {sorted(set(leftover))}")
 
-        prose = re.sub(r"```[\s\S]*?```", "", text)
-        prose = re.sub(r"`[^`\n]*`", "", prose)
-        for link in LINK.finditer(prose):
+        for link in markdown_code.matches_outside_code(LINK, text):
             target = link.group(1).strip().rstrip("\\")
             if "/" in target:
                 # A path link has to resolve as a path: every folder has an
