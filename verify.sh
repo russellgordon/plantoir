@@ -1169,13 +1169,27 @@ check_client_source /opt/quartz/quartz/util/resources.tsx 'moduleType ?? "applic
 echo ""
 echo "🔎 Checking the Explorer's hide filter is baked into the image, and wired to a live omit Set…"
 ANCHOR_OK="true"
-for layout in /opt/quartz/quartz.layout.ts /opt/quartz-site/quartz.layout.ts; do
+for layout in /opt/quartz/quartz.layout.ts; do
   if ! docker run --rm "$DEV_TEST_IMAGE" grep -Pzoq '//[ \t]*CQ4T-OMIT-ANCHOR:[^\n]*\n[ \t]*const[ \t]+omit[ \t]*=[ \t]*new[ \t]+Set' "$layout" 2>/dev/null; then
     fail "The Explorer's hide filter is missing or structurally detached from $layout in the image — hidden pages would be published"
     ANCHOR_OK="false"
   fi
 done
-[[ "$ANCHOR_OK" == "true" ]] && pass "The Explorer's hide filter is baked into the image and wired to a live omit Set (both Quartz copies)"
+[[ "$ANCHOR_OK" == "true" ]] && pass "The Explorer's hide filter is baked into the image and wired to a live omit Set"
+
+# #334: the unused second copy of the scaffold is gone (it was 468 MB of
+# image disk that nothing read), and Quartz is a one-commit clone.
+if docker run --rm "$DEV_TEST_IMAGE" test -e /opt/quartz-site; then
+  fail "The image still carries /opt/quartz-site, which nothing reads (#334)"
+else
+  pass "The image carries one copy of the website builder's scaffold (#334)"
+fi
+QUARTZ_COMMITS="$(docker run --rm "$DEV_TEST_IMAGE" git -C /opt/quartz rev-list --count HEAD 2>/dev/null || echo "?")"
+if [[ "$QUARTZ_COMMITS" == "1" ]]; then
+  pass "Quartz is cloned at depth 1: the tag's one commit (#334)"
+else
+  fail "Quartz carries ${QUARTZ_COMMITS} commits of history; the clone should be depth 1 (#334)"
+fi
 
 # -------------------- 5. Drive the real launcher against the image --------------------
 echo ""
