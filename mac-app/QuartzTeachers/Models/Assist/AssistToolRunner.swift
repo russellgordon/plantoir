@@ -3897,7 +3897,7 @@ final class AssistToolRunner {
     /// then the briefing says nothing about it at all.
     func coursesWithAHowITeachPage() -> [String] {
         var codes: [String] = []
-        for course in workspace.courses where !course.isKeptForReference {
+        for course in coursesAsSavedNow where !course.isKeptForReference {
             if HowITeachPage.existingURL(for: course) != nil {
                 codes.append(course.code)
             }

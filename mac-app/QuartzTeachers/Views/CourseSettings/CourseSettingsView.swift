@@ -547,7 +547,8 @@ struct CourseSettingsView: View {
             // the file, not this copy, because the file is what the site was
             // built from.
             var hiddenBefore: [String] = []
-            if let onDisk = try? CourseConfiguration(contentsOf: course.configFileURL) {
+            let onDisk: CourseConfiguration? = try? CourseConfiguration(contentsOf: course.configFileURL)
+            if let onDisk {
                 hiddenBefore = onDisk.hiddenItems
             }
             let result: CourseConfiguration.WriteResult = try course.configuration.write(to: course.configFileURL)
@@ -556,7 +557,15 @@ struct CourseSettingsView: View {
                 courseCode: course.code,
                 previewLeases: PreviewLeases.active,
                 publishes: CourseActivity.activePublishes,
-                replacedChangesFromElsewhere: result.replacedChangesFromElsewhere
+                replacedChangesFromElsewhere: result.replacedChangesFromElsewhere,
+                scheduledDeploys: SettingsSaveNotice.scheduledDeploysAtSave(
+                    before: onDisk,
+                    saved: course,
+                    scheduled: SettingsSaveNotice.scheduledDeploysStillToCome(
+                        courseCode: course.code, workingFolder: URL(fileURLWithPath: workingFolderPath)
+                    ),
+                    cloudflareAccountID: AppSettings.shared.cloudflareAccountID
+                )
             )
             saveNotice = notice
             ActivityTrail.note(.settingsSaved, SettingsSaveNotice.trailLine(
