@@ -174,6 +174,13 @@ enum AssistContract {
             "linkedClassesWereLeftAlone": AssistWording.linkedClassesWereLeftAlone(
                 AssistPublishPlan.listing(["Unit 2, Day 4", "Unit 2, Day 5"]), count: 2
             ),
+            // A linked class an unpublish stopped at and left visible (#201),
+            // rendered through the plan's own line so what Windows matches is
+            // the frame, the curly quotes and the page name as well as the
+            // reason — literal names, for the reason given just above.
+            "linkedClassStaysVisible": AssistPublishPlan.stayingVisibleLine(
+                title: "Unit 2, Day 4", reason: .aClassOfItsOwn, noun: .class
+            ),
             "backedUpCourse": AssistWording.backedUpCourse(
                 course: course, to: "{course}_backup_2026-09-08_190000.zip"
             ),
@@ -222,6 +229,15 @@ enum AssistContract {
             "previewDidNotBuild": AssistWording.previewDidNotBuild(course: course, section: section),
             "whereTheOutputIs": AssistWording.whereTheOutputIs,
             "nothingToDo": AssistWording.nothingToDo,
+            // "Already the way you asked" (#174): one key per branch, and the
+            // whole-unit forms with a concrete unit, the way `wouldMakeRoom`
+            // shows a concrete position — neither runner substitutes {unit}.
+            "alreadyPublishedOne": AssistWording.alreadyPublishedOne,
+            "alreadyHiddenOne": AssistWording.alreadyHiddenOne,
+            "alreadyPublishedSeveral": AssistWording.alreadyPublishedSeveral,
+            "alreadyHiddenSeveral": AssistWording.alreadyHiddenSeveral,
+            "unitAlreadyPublished": AssistWording.unitAlreadyPublished(unitWord: "Unit", unit: 4),
+            "unitAlreadyHidden": AssistWording.unitAlreadyHidden(unitWord: "Unit", unit: 4),
             "answerWasCutOff": AssistWording.answerWasCutOff,
             "answerLeftOutWhatItWasFor": AssistWording.answerLeftOutWhatItWasFor,
             "noCourseNamed": AssistWording.noCourseNamed,
@@ -350,6 +366,9 @@ enum AssistContract {
             "linkedClassesWereLeftAloneForAMeeting": AssistWording.linkedClassesWereLeftAlone(
                 AssistPublishPlan.listing(["Week 4", "Week 5"]), count: 2, noun: .meeting
             ),
+            "linkedClassStaysVisibleForAMeeting": AssistPublishPlan.stayingVisibleLine(
+                title: "Week 4", reason: .aClassOfItsOwn, noun: .meeting
+            ),
             "mayIAskForYourDates": AssistWording.mayIAskForYourDates(for: .class),
             "mayIAskForYourDatesForAMeeting": AssistWording.mayIAskForYourDates(for: .meeting),
             "datesNotGivenYet": AssistWording.datesNotGivenYet(for: .class),
@@ -364,6 +383,9 @@ enum AssistContract {
             "movedToLaterDaysForAMeeting": AssistWording.movedToLaterDays(count: 3, noun: .meeting),
             "makingRoomCannotBeUndone": AssistWording.makingRoomCannotBeUndone(),
             "makingRoomCannotBeUndoneForAMeeting": AssistWording.makingRoomCannotBeUndone(noun: .meeting),
+            // Make-room's reply ends with this after `otherClassesMoved`
+            // (#185), so the caveat has no inline copy anywhere.
+            "lookTheSectionOverBeforePublishing": AssistWording.lookTheSectionOverBeforePublishing,
             "madeRoom": AssistWording.madeRoom(count: 1, at: "Unit 3, Day 4"),
             "madeRoomForAMeeting": AssistWording.madeRoom(count: 1, at: "Week 5", noun: .meeting),
             "publishedTheClassOn": AssistWording.publishedTheClassOn("2026-09-14"),

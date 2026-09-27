@@ -2444,7 +2444,7 @@ final class AssistToolRunnerTests: XCTestCase {
         let outcome: AssistToolOutcome = await made.runner.run(call: call(
             "unpublish_pages", arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4"]
         ))
-        XCTAssertEqual(outcome.summary, "Unit 4 is already hidden.")
+        XCTAssertEqual(outcome.summary, AssistWording.unitAlreadyHidden(unitWord: "Unit", unit: 4))
     }
 
     /// A unit nobody has is said plainly.
@@ -2597,8 +2597,8 @@ final class AssistToolRunnerTests: XCTestCase {
             let outcome: AssistToolOutcome = await made.runner.run(call: call(
                 tool, arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4, Day 23"]
             ))
-            XCTAssertEqual(outcome.summary, "It's already been published.", tool)
-            XCTAssertEqual(outcome.detail, "It's already been published.", tool)
+            XCTAssertEqual(outcome.summary, AssistWording.alreadyPublishedOne, tool)
+            XCTAssertEqual(outcome.detail, AssistWording.alreadyPublishedOne, tool)
             XCTAssertFalse(outcome.isPlan, "\(tool) asked to approve a no-op")
             // None of the plan's furniture.
             for furniture in ["would change", "Shall I", "Nothing needed changing",
@@ -2635,7 +2635,7 @@ final class AssistToolRunnerTests: XCTestCase {
             let outcome: AssistToolOutcome = await made.runner.run(call: call(
                 "publish_pages", arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4, Day 23"]
             ))
-            XCTAssertEqual(outcome.summary, "It's already been published.", "publish: \(value)")
+            XCTAssertEqual(outcome.summary, AssistWording.alreadyPublishedOne, "publish: \(value)")
             XCTAssertEqual(
                 try String(contentsOf: url, encoding: .utf8), before,
                 "publish: \(value) — the teacher's own line is left alone"
@@ -2696,7 +2696,7 @@ final class AssistToolRunnerTests: XCTestCase {
     /// Each of these hides the page on the built site, and the reader calls
     /// every one of them `cannot tell` rather than guessing. Reporting treats
     /// that as visible, which is the mild mistake — but a PLAN that believed
-    /// it answered "It's already been published." and wrote nothing, while
+    /// it answered `AssistWording.alreadyPublishedOne` and wrote nothing, while
     /// students could not see the page. That is the failure that reports
     /// success, and it is the one this whole issue exists to remove.
     @MainActor
@@ -2758,7 +2758,8 @@ final class AssistToolRunnerTests: XCTestCase {
             "publish_pages", arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4"]
         ))
         XCTAssertFalse(
-            outcome.detail.contains("already been published"),
+            outcome.detail.contains(AssistWording.alreadyPublishedOne)
+                || outcome.detail.contains(AssistWording.unitAlreadyPublished(unitWord: "Unit", unit: 4)),
             "A page whose flag cannot be read is not one that needs no change: \(outcome.detail)"
         )
         let after: String = try String(
@@ -2782,7 +2783,7 @@ final class AssistToolRunnerTests: XCTestCase {
         let outcome: AssistToolOutcome = await made.runner.run(call: call(
             "unpublish_pages", arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4, Day 23"]
         ))
-        XCTAssertEqual(outcome.summary, "It's already hidden.")
+        XCTAssertEqual(outcome.summary, AssistWording.alreadyHiddenOne)
     }
 
     /// A page whose settings have no place a new line can go is NOT "already
@@ -2880,6 +2881,48 @@ final class AssistToolRunnerTests: XCTestCase {
         XCTAssertEqual(declinedClass, AssistPublishPlan.sayingPagesWithNoRoomForAKey(named: ["Unit 4, Day 1"]))
     }
 
+    /// Every "already the way you asked" reply is the contract's own sentence,
+    /// on the PLAN path as well as the path that writes, for publishing and
+    /// hiding alike (#174). Only the executing hide of a whole unit used to be
+    /// asserted; the plan-path and publish-path copies are the ones that would
+    /// drift without anybody noticing.
+    @MainActor
+    func testEveryAlreadySentenceIsTheContractsWord() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        try write(page: "Unit 4, Day 1", publish: "true", date: "2026-09-08",
+                  body: "One.", in: made.course)
+        try write(page: "Unit 4, Day 2", publish: "true", date: "2026-09-09",
+                  body: "Two.", in: made.course)
+        try write(page: "Unit 5, Day 1", publish: "false", date: "2026-09-10",
+                  body: "Three.", in: made.course)
+        try write(page: "Unit 5, Day 2", publish: "false", date: "2026-09-11",
+                  body: "Four.", in: made.course)
+
+        // (what is asked for, publishing?, the sentence that must come back)
+        let expectations: [(pages: String, publishing: Bool, sentence: String)] = [
+            (pages: "Unit 4, Day 1", publishing: true, sentence: AssistWording.alreadyPublishedOne),
+            (pages: "Unit 5, Day 1", publishing: false, sentence: AssistWording.alreadyHiddenOne),
+            (pages: "Unit 4, Day 1; Unit 4, Day 2", publishing: true, sentence: AssistWording.alreadyPublishedSeveral),
+            (pages: "Unit 5, Day 1; Unit 5, Day 2", publishing: false, sentence: AssistWording.alreadyHiddenSeveral),
+            (pages: "Unit 4", publishing: true, sentence: AssistWording.unitAlreadyPublished(unitWord: "Unit", unit: 4)),
+            (pages: "Unit 5", publishing: false, sentence: AssistWording.unitAlreadyHidden(unitWord: "Unit", unit: 5))
+        ]
+        for expectation in expectations {
+            let tools: [String] = expectation.publishing
+                ? ["plan_publish_pages", "publish_pages"]
+                : ["plan_unpublish_pages", "unpublish_pages"]
+            for tool in tools {
+                let outcome: AssistToolOutcome = await made.runner.run(call: call(
+                    tool, arguments: ["course": "ICS3U", "section": 1, "pages": expectation.pages]
+                ))
+                XCTAssertEqual(outcome.summary, expectation.sentence, "\(tool) \(expectation.pages)")
+                XCTAssertEqual(outcome.detail, expectation.sentence, "\(tool) \(expectation.pages)")
+            }
+        }
+    }
+
     /// Two pages, both already done, get the plural.
     @MainActor
     func testTwoPagesAlreadyPublishedGetThePlural() async throws {
@@ -2895,7 +2938,7 @@ final class AssistToolRunnerTests: XCTestCase {
             "publish_pages",
             arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 1, Day 1; Unit 1, Day 2"]
         ))
-        XCTAssertEqual(outcome.summary, "They have already been published.")
+        XCTAssertEqual(outcome.summary, AssistWording.alreadyPublishedSeveral)
     }
 
     /// A page that does NOT exist still gets the full answer — "already done"
@@ -2912,7 +2955,7 @@ final class AssistToolRunnerTests: XCTestCase {
             "publish_pages",
             arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4, Day 23; Bananas"]
         ))
-        XCTAssertNotEqual(outcome.summary, "It's already been published.")
+        XCTAssertNotEqual(outcome.summary, AssistWording.alreadyPublishedOne)
         XCTAssertTrue(outcome.detail.contains("Bananas"),
                       "The page nobody has was not mentioned: \(outcome.detail)")
     }
@@ -3678,6 +3721,251 @@ final class AssistToolRunnerTests: XCTestCase {
         ))
         XCTAssertTrue(outcome.detail.contains("Unit 2, Day 4"), outcome.detail)
         XCTAssertTrue(outcome.detail.contains("(hidden)"), outcome.detail)
+    }
+
+    // MARK: - An unpublish stops at a class page too
+    //
+    // Issue #201, decided 2026-09-26 to mirror #173: a class comes down when
+    // the teacher names it. The contract's cases run here against a real
+    // course on disk, for the reason the section above gives; the four tests
+    // after the loop pin what the case layout cannot express — a whole unit,
+    // a range of dates, and the ORDER of the reasons inside `reasonToKeep`.
+
+    /// `shared-rules.json` → `followingLinks.unpublishing.cases`, each asked
+    /// for as a plan through `plan_unpublish_pages` and then carried out
+    /// through `unpublish_pages`.
+    @MainActor
+    func testUnpublishingStopsAtALinkedClassAsTheContractSays() async throws {
+        let wording: [String: String] = try AssistToolRunnerTests.contractWording()
+
+        for testCase in try AssistToolRunnerTests.cases(
+            in: "contracts/shared-rules.json", section: "followingLinks", key: "unpublishing"
+        ) {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let pages: [[String: Any]] = try XCTUnwrap(testCase["pages"] as? [[String: Any]])
+
+            let made = try makeRunner()
+            defer { try? FileManager.default.removeItem(at: made.root) }
+
+            var isAClass: [String: Bool] = [:]
+            for page in pages {
+                let title: String = try XCTUnwrap(page["title"] as? String)
+                let classPage: Bool = page["isClassPage"] as? Bool ?? false
+                let visible: Bool = page["visible"] as? Bool ?? false
+                let written: String? = page["body"] as? String
+                if written != nil && page["links"] != nil {
+                    XCTFail("\(name): “\(title)” carries both `links` and `body`")
+                    continue
+                }
+                isAClass[title] = classPage
+                try writeContractPage(
+                    title: title, isClassPage: classPage, visible: visible,
+                    links: page["links"] as? [String] ?? [], body: written, in: made.course
+                )
+            }
+
+            var before: [String: String] = [:]
+            for (title, classPage) in isAClass {
+                before[title] = contractPageText(
+                    title: title, isClassPage: classPage, in: made.course
+                )
+            }
+
+            // Each sentence the case names is looked up in the wording file,
+            // never retyped — and it must name a page this case HAS. A key
+            // whose page is missing would be absent from any plan, so a
+            // renamed case would pass by never matching.
+            var mustSay: [String] = []
+            var mustNotSay: [String] = []
+            for (listKey, isPositive) in [("expectPlanSays", true), ("expectPlanDoesNotSay", false)] {
+                for key in testCase[listKey] as? [String] ?? [] {
+                    guard let sentence = wording[key] else {
+                        XCTFail("\(name): \(listKey) names \"\(key)\", which assist-wording.json does not carry")
+                        continue
+                    }
+                    var namesAPageHere: Bool = false
+                    for title in isAClass.keys where sentence.contains("“\(title)”") {
+                        namesAPageHere = true
+                    }
+                    XCTAssertTrue(
+                        namesAPageHere,
+                        "\(name): \"\(key)\" names no page this case lays out, so it could never be said"
+                    )
+                    if isPositive {
+                        mustSay.append(sentence)
+                    } else {
+                        mustNotSay.append(sentence)
+                    }
+                }
+            }
+
+            let asked: [String] = try XCTUnwrap(testCase["unpublish"] as? [String])
+            let arguments: [String: Any] = [
+                "course": "ICS3U", "section": 1, "pages": asked.joined(separator: "; "),
+            ]
+            let planned: AssistToolOutcome = await made.runner.run(call: call(
+                "plan_unpublish_pages", arguments: arguments
+            ))
+            for sentence in mustSay {
+                XCTAssertTrue(planned.detail.contains(sentence),
+                              "\(name): the plan never said \(sentence)\n\(planned.detail)")
+            }
+            for sentence in mustNotSay {
+                XCTAssertFalse(planned.detail.contains(sentence),
+                               "\(name): the plan said \(sentence)\n\(planned.detail)")
+            }
+
+            _ = await made.runner.run(call: call("unpublish_pages", arguments: arguments))
+
+            for title in testCase["expectHidden"] as? [String] ?? [] {
+                let after: String = contractPageText(
+                    title: title, isClassPage: isAClass[title] ?? false, in: made.course
+                )
+                XCTAssertEqual(
+                    PageVisibilityReader.answer(in: after, forSection: 1), .hidden,
+                    "\(name): “\(title)” should be hidden"
+                )
+            }
+            for title in testCase["expectUntouched"] as? [String] ?? [] {
+                let after: String = contractPageText(
+                    title: title, isClassPage: isAClass[title] ?? false, in: made.course
+                )
+                XCTAssertEqual(
+                    after, before[title],
+                    "\(name): “\(title)” was written to, and this unpublish must stop before it"
+                )
+            }
+        }
+    }
+
+    /// "Unpublish Unit 4" names every class in the unit, and a link from its
+    /// last class to the next unit's first does not take that one down too.
+    @MainActor
+    func testUnpublishingAWholeUnitLeavesTheNextUnitsClassAlone() async throws {
+        let made = try makeRunner()
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+            FakePreview.shared.forget()
+        }
+
+        try write(page: "Unit 4, Day 1", publish: "true", date: "2026-09-08",
+                  body: "Day 1.", in: made.course)
+        try write(page: "Unit 4, Day 2", publish: "true", date: "2026-09-09",
+                  body: "Next: [[Unit 5, Day 1]].", in: made.course)
+        try write(page: "Unit 5, Day 1", publish: "true", date: "2026-09-10",
+                  body: "A new unit.", in: made.course)
+
+        _ = await made.runner.run(call: call(
+            "unpublish_pages", arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4"]
+        ))
+
+        XCTAssertTrue(text(ofPage: "Unit 4, Day 1", in: made.course).contains("publish: false"))
+        XCTAssertTrue(text(ofPage: "Unit 4, Day 2", in: made.course).contains("publish: false"))
+        XCTAssertTrue(text(ofPage: "Unit 5, Day 1", in: made.course).contains("publish: true"),
+                      "A class in the next unit came down because the unit before it linked to it")
+    }
+
+    /// An unpublish by dates names the classes in range, and a class outside
+    /// it that one of them links to stays — and the plan says why.
+    @MainActor
+    func testAnUnpublishByDatesLeavesAClassOutsideThemAlone() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        try write(page: "Unit 1, Day 1", publish: "true", date: "2026-09-08",
+                  body: "Next: [[Unit 1, Day 2]].", in: made.course)
+        try write(page: "Unit 1, Day 2", publish: "true", date: "2026-09-10",
+                  body: "The next class.", in: made.course)
+
+        let arguments: [String: Any] = [
+            "course": "ICS3U", "section": 1, "pages": "", "before": "2026-09-09",
+        ]
+        let planned: AssistToolOutcome = await made.runner.run(call: call(
+            "plan_unpublish_pages", arguments: arguments
+        ))
+        let said: String = AssistPublishPlan.stayingVisibleLine(
+            title: "Unit 1, Day 2", reason: .aClassOfItsOwn, noun: .class
+        )
+        XCTAssertTrue(planned.detail.contains(said), planned.detail)
+
+        _ = await made.runner.run(call: call("unpublish_pages", arguments: arguments))
+        XCTAssertTrue(text(ofPage: "Unit 1, Day 1", in: made.course).contains("publish: false"))
+        XCTAssertTrue(text(ofPage: "Unit 1, Day 2", in: made.course).contains("publish: true"),
+                      "A class after the dates asked for came down by following a link")
+    }
+
+    /// The ORDER inside `reasonToKeep`: a class stays because it is a class,
+    /// not because some other visible page happens to link to it.
+    ///
+    /// "“Unit 1, Day 2” still links to it" would be true, and it would tell
+    /// the teacher that hiding Day 2 as well would take Day 3 with it — which
+    /// it will not. The contract cases cannot see this (they stay green with
+    /// the clause below the referrer test), so it is pinned here.
+    @MainActor
+    func testAClassStaysBecauseItIsAClassEvenWhenAnotherPageStillLinksToIt() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        try write(page: "Unit 1, Day 1", publish: "true", date: "2026-09-08",
+                  body: "Look ahead to [[Unit 1, Day 3]].", in: made.course)
+        try write(page: "Unit 1, Day 2", publish: "true", date: "2026-09-09",
+                  body: "Look ahead to [[Unit 1, Day 3]].", in: made.course)
+        try write(page: "Unit 1, Day 3", publish: "true", date: "2026-09-10",
+                  body: "The third class.", in: made.course)
+
+        let planned: AssistToolOutcome = await made.runner.run(call: call(
+            "plan_unpublish_pages", arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 1, Day 1"]
+        ))
+        let asAClass: String = AssistPublishPlan.stayingVisibleLine(
+            title: "Unit 1, Day 3", reason: .aClassOfItsOwn, noun: .class
+        )
+        let asLinked: String = AssistPublishPlan.stayingVisibleLine(
+            title: "Unit 1, Day 3", reason: .stillLinkedFrom("Unit 1, Day 2"), noun: .class
+        )
+        XCTAssertTrue(planned.detail.contains(asAClass), planned.detail)
+        XCTAssertFalse(planned.detail.contains(asLinked), planned.detail)
+    }
+
+    /// And the other side of the order: a class Key Links points at keeps its
+    /// Key Links reason. The class test sits BELOW the three exclusions, so
+    /// nothing about them changed. The case layout has no Key Links, so this
+    /// cannot be a contract case.
+    @MainActor
+    func testAClassInKeyLinksIsStillReportedAsKeyLinks() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        try write(page: "Unit 2, Day 3", publish: "true", date: "2026-09-08",
+                  body: "Next: [[Unit 2, Day 4]].", in: made.course)
+        try write(page: "Unit 2, Day 4", publish: "true", date: "2026-09-09",
+                  body: "The next class.", in: made.course)
+        try writeKeyLinks(pointingAt: ["Unit 2, Day 4"], in: made.course)
+
+        let planned: AssistToolOutcome = await made.runner.run(call: call(
+            "plan_unpublish_pages", arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 2, Day 3"]
+        ))
+        let asKeyLinks: String = AssistPublishPlan.stayingVisibleLine(
+            title: "Unit 2, Day 4", reason: .keyLinks, noun: .class
+        )
+        let asAClass: String = AssistPublishPlan.stayingVisibleLine(
+            title: "Unit 2, Day 4", reason: .aClassOfItsOwn, noun: .class
+        )
+        XCTAssertTrue(planned.detail.contains(asKeyLinks), planned.detail)
+        XCTAssertFalse(planned.detail.contains(asAClass), planned.detail)
+    }
+
+    /// The `wording` object of `contracts/assist-wording.json`, read from the
+    /// committed file rather than from `AssistWording`, so a case checks the
+    /// sentence the other platform is given.
+    private static func contractWording() throws -> [String: String] {
+        let url: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("contracts/assist-wording.json")
+        let all: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: try Data(contentsOf: url)) as? [String: Any]
+        )
+        return try XCTUnwrap(all["wording"] as? [String: String])
     }
 
     // MARK: - Contract-case fixtures

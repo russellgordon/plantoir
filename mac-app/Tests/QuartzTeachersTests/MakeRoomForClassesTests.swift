@@ -114,8 +114,16 @@ final class MakeRoomForClassesTests: XCTestCase {
             ["course": "ICS3U", "section": 1, "unit": 1, "atDay": 2]
         )
 
-        XCTAssertTrue(said.contains("Undo that"), said)
-        XCTAssertTrue(said.contains("Backups"), "It must say where the way out is: \(said)")
+        // The reply's caveat is the contract's REPLY form followed by the
+        // make-room tail, both by name: no copy of the caveat is typed inline
+        // anywhere any more (#185).
+        XCTAssertTrue(
+            said.contains(
+                "\n\n" + AssistWording.otherClassesMoved + " "
+                + AssistWording.lookTheSectionOverBeforePublishing
+            ),
+            "It must say the undo will not help, and where the way out is: \(said)"
+        )
 
         // Asked through the tool rather than by reading the list, because what
         // matters is what a teacher who says "undo that" actually gets.
@@ -144,7 +152,7 @@ final class MakeRoomForClassesTests: XCTestCase {
         )
         XCTAssertEqual(try pageNames(in: made.course), before, "A plan must write nothing.")
         XCTAssertTrue(
-            said.contains("Undo that"),
+            said.contains(AssistWording.makingRoomCannotBeUndone()),
             "The warning belongs in the PLAN, where a teacher can still say no: \(said)"
         )
     }
@@ -218,7 +226,10 @@ final class MakeRoomForClassesTests: XCTestCase {
         )
 
         XCTAssertTrue(
-            said.contains("Undo that"),
+            said.contains(
+                "\n\n" + AssistWording.otherClassesMoved + " "
+                + AssistWording.lookTheSectionOverBeforePublishing
+            ),
             "Later classes moved, so the teacher must be told the undo will not help: \(said)"
         )
     }
