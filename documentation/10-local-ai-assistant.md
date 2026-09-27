@@ -1939,6 +1939,22 @@ because Day 3 was published in Obsidian, so no pointer ran. See
   teacher-authored content only. It is the decision working rather than a
   regression; it is written here so it is not discovered as one.
 
+**How a re-date's reply counts (#343).** "Re-dated N classes and M pages they
+use" counts what `SectionReDatePlanner.apply` actually WROTE, each from its own
+kind: a move of reason `.aClass` whose date write came back `.written` is a
+class, `.broughtBy` and `.yearRound` are pages they use. It used to say
+`moves.count - classCount` pages — but `classCount` is every numbered class in
+the section while `moves` holds only pages whose date changes, so a section
+with some classes already on their days was told "Re-dated 14 classes and -4
+pages they use", and the class figure counted classes that had not moved. A
+page left on its day is counted nowhere, and so is one #186's writer declined
+(no column-0 room for `created:`), which `sayingPagesWhoseNewDateCouldNotBeSet`
+still names. When no class moved, the reply is
+`AssistWording.reDatedOnlyPagesTheyUse` rather than "Re-dated 0 classes"; the
+undo line names the classes that moved ("re-dated 2 classes and what they
+use", or "re-dated what the classes use"). Windows had the same subtraction in
+two places. Cases: `class-planning.json` → `reDatingASection.reportedCounts`.
+
 **What the teacher is told.** The plan and the reply name the linked classes
 that were left alone (`AssistWording.linkedClassesWereLeftAlone`, said once via
 `AssistPublishPlan.describe()`, which is the text both surfaces use). Windows
@@ -5248,12 +5264,15 @@ additional destination's refusal.
 - **Settings saved between the card and the Approve press**: the act reads
   fresh, so it may differ from what the card said. The `schedule_deploy` result
   names the destination it used, so the teacher sees it.
-- **The local assistant's deploy through an OPEN section window** runs
-  `window.deploy()`, which uses that window's copy of the course — including
-  Course Settings edits not yet saved — while the card, which reads the saved
-  file, may name the saved destination. The schedule sheet has the same shape.
-  Pre-existing (before #322 the card read an even older copy):
-  [issue #335](https://github.com/russellgordon/plantoir/issues/335).
+- **The local assistant's deploy through an OPEN section window** used that
+  window's copy of the course — including Course Settings edits not yet saved —
+  while the card named the saved destination; the schedule sheet had the same
+  shape. Resolved by
+  [issue #335](https://github.com/russellgordon/plantoir/issues/335): the
+  window's deploy and the sheet read the saved file at the act too, refuse when
+  it cannot be read, and the reply carries `specialNames.deployUsesSavedSettings`
+  when a window holds unsaved edits (docs 07, "The window's acts read the saved
+  settings too").
 - **A config mid-write or malformed at the call** drops that course for that
   call ("no such course") — fail-closed, and what `reloadCourses` and Windows
   do too.
