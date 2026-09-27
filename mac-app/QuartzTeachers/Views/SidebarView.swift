@@ -1095,8 +1095,6 @@ struct SidebarView: View {
         .accessibilityIdentifier("copyAPage-\(course.code)")
     }
 
-    /// Why the course is busy — previewing or publishing, in any window
-    /// showing this working folder — or nil when it isn't.
     /// "Get Ready for the Start of the Year…", and its undo while one is
     /// held (#96).
     @ViewBuilder
@@ -1118,7 +1116,7 @@ struct SidebarView: View {
             .accessibilityIdentifier("startOfYearUndo-\(course.code)-section\(sectionNumber)")
         }
         if deploying {
-            Text("Available once deploy completed")
+            Text(CourseActivity.availableOnceDeployCompleted)
         }
     }
 
@@ -1130,6 +1128,8 @@ struct SidebarView: View {
         return CourseActivity.coursePublishIsRunning(folderPath: folder.path, courseCode: course.code)
     }
 
+    /// Why the course is busy — previewing or publishing, in any window
+    /// showing this working folder — or nil when it isn't.
     func busyReason(for course: Course) -> String? {
         guard let workspaceURL = workspace.workspaceURL else {
             return nil

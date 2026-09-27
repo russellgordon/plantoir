@@ -41,8 +41,9 @@ nonisolated enum StartOfYearWording {
         return "Get \(course) Section \(section) Ready for the Start of the Year"
     }
 
-    static func intro(first: String, noun: String, nouns: String) -> String {
-        return "Every \(noun) after “\(first)” goes into draft, with the pages only later \(nouns) use. "
+    static func intro(first: String, noun: String) -> String {
+        return "Every \(noun) after “\(first)” goes into draft, with the pages students won't need until "
+             + "a later \(noun), and the pages nothing students can still see links to. "
              + "Students keep “\(first)”, the pages it links to, your Key Links and the pages they list. "
              + "Nothing changes for students until you deploy."
     }
@@ -51,8 +52,8 @@ nonisolated enum StartOfYearWording {
         return "Going into draft: \(classes)"
     }
 
-    static func pagesHeading(pages: String, nouns: String) -> String {
-        return "Also going into draft: \(pages) only later \(nouns) use"
+    static func pagesHeading(pages: String) -> String {
+        return "Also going into draft: \(pages) students won't need yet"
     }
 
     static func staysHeading(pages: String) -> String {
@@ -154,6 +155,11 @@ nonisolated enum StartOfYearWording {
         "The section changed after this list was made, so nothing was changed. This is the list as "
       + "it stands now."
 
+    static func deployUnderWay(course: String) -> String {
+        return "\(course) is being deployed right now, so nothing was changed. Try again once the "
+             + "deploy has finished."
+    }
+
     static func backupFailed(course: String) -> String {
         return "Plantoir could not save a copy of \(course) first, so nothing was changed."
     }
@@ -197,8 +203,8 @@ nonisolated enum StartOfYearWording {
     static let undoButtonAfterward: String = "Undo…"
 
     static let undoHasEnded: String =
-        "This can no longer be undone here: the section has been deployed, or some of its pages "
-      + "published or put into draft, since."
+        "This can no longer be undone here: the section has been deployed, or its pages have "
+      + "changed, since."
 
     static func backupHoldsIt(backup: String) -> String {
         return "The backup “\(backup)” holds the course as it was before."

@@ -184,6 +184,10 @@ enum CourseActivity {
     /// A short reason the course is busy — naming whichever activity is
     /// in the way — or nil when it isn't. Menu-length on purpose: it
     /// sits under a disabled menu item.
+    /// The menu-length reason while only a deploy is in the way — also said
+    /// under "Get Ready for the Start of the Year…" (#96), so it is written once.
+    static let availableOnceDeployCompleted: String = "Available once deploy completed"
+
     static func busyDescription(folderPath: String, courseCode: String) -> String? {
         var isPreviewing: Bool = false
         for lease in PreviewLeases.active {
@@ -201,7 +205,7 @@ enum CourseActivity {
             return "Available once preview completed"
         }
         if isPublishing {
-            return "Available once deploy completed"
+            return availableOnceDeployCompleted
         }
         return nil
     }
