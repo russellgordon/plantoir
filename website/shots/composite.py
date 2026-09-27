@@ -10,7 +10,8 @@ shadow, where there is one, is made from the capture's own alpha channel, so
 it follows the real curve. (Until 2026-09-27 this file cut Safari's toolbar
 off the class-site captures and painted an 18 px rounded mask over the cut;
 Russell saw the painted corners on the live site, and the code is gone.
-`test_native_corners.py` fails on any picture with a drawn or square corner.)
+`test_native_corners.py` fails on a square corner, or one drawn tighter than
+any real window's.)
 
 - `colour-schemes` fans three course home pages out like a hand of cards, so
   the different colour schemes sit side by side and can be compared.

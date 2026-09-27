@@ -85,9 +85,12 @@ the browser's toolbar, the answer is a window that never had one
 (`website/shots/webwindow.swift`), never a crop. `composite.py` used to cut
 Safari's toolbar off and paint 18 px corners back on for `colour-schemes`
 and `light-and-dark`, and the schedule scene cut the notification banner out
-and drew its corners; both are gone. `website/shots/test_native_corners.py`
-reads every picture the pages show and fails on a square or drawn corner,
-and `capture.py` runs the same check before it calls a picture done. **Open
+and drew its corners; that code is gone (the `schedule` picture it made is
+still owed a retake — `DRAWN_BUT_NOT_DETECTABLE` in the test names it). The
+page's own CSS no longer draws a rounded box-shadow round a shot either. `website/shots/test_native_corners.py`
+reads every picture the pages show and fails on a square corner or one
+drawn tighter than a real window's, and `capture.py` runs the same check. A
+mask drawn at the REAL radius passes it, so the test is a guard, not a proof. **Open
 the corners of every image you are about to commit and look** — a native
 corner fades over many pixels; a drawn one is tight.
 
