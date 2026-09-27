@@ -271,6 +271,11 @@ missing, then, in the folder only — never the shipped payload:
   course, so `netlify` with no site recorded (`.netlify_sites/`, or a
   section's older `.netlify_site.json`) is not a choice and is replaced; any
   other destination, or Netlify once a site is recorded, is left alone;
+- ICS3U section 2 moved to a second semester (its dates shifted by whole
+  weeks so its first class is in the week of 2027-02-01; section 1 keeps the
+  payload's dates), so the start-of-year scene is the week before school
+  rather than a semester already under way with 13 classes "dated before
+  today";
 - a reference copy of ICS3U for 2025–26, through the app.
 
 Every step says "made" or "already there", a second run changes nothing, a file
