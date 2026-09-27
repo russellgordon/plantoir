@@ -145,7 +145,7 @@ final class ExcludedItemsContractTests: XCTestCase {
         viewA.revertToFile()
         var reverted: [[String: AnyHashable]] = []
         for event in ExcludedItemsContractTests.exclusionEventsOnTheTrail() {
-            if event["event"] == "exclusions reverted" {
+            if event["event"] == AnyHashable("exclusions reverted") {
                 reverted.append(event)
             }
         }
@@ -158,7 +158,7 @@ final class ExcludedItemsContractTests: XCTestCase {
         viewA.revertToFile()
         reverted = []
         for event in ExcludedItemsContractTests.exclusionEventsOnTheTrail() {
-            if event["event"] == "exclusions reverted" {
+            if event["event"] == AnyHashable("exclusions reverted") {
                 reverted.append(event)
             }
         }
