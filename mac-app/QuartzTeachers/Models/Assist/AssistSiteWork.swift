@@ -228,12 +228,6 @@ final class AssistToolchainWork: AssistSiteWork {
         let notice: String? = SettingsSaveNotice.whenDeployStarts(
             settingsHaveUnsavedChanges: WorkspaceModel.anyCopyHasUnsavedChanges(configFileURL: course.configFileURL)
         )
-        if notice != nil {
-            SettingsSaveNotice.noteDeployUsedTheSavedSettings(
-                act: "deployed by the assistant with no section window open",
-                saved: course, windowCourse: nil, sectionNumber: sectionNumber
-            )
-        }
         CourseActivity.beginPublish(
             folderPath: workspaceURL.path, courseCode: course.code, sectionNumber: sectionNumber
         )
@@ -254,6 +248,14 @@ final class AssistToolchainWork: AssistSiteWork {
                 sectionNumber: sectionNumber, holding: holding
             )
             return AssistSiteWorkResult.builtElsewhere(course: course)
+        }
+
+        // Noted once nothing can refuse it any more.
+        if notice != nil {
+            SettingsSaveNotice.noteDeployUsedTheSavedSettings(
+                act: "deployed by the assistant with no section window open",
+                saved: course, windowCourse: nil, sectionNumber: sectionNumber
+            )
         }
 
         // The same sequencer the Deploy button uses. Built separately
@@ -282,9 +284,7 @@ final class AssistToolchainWork: AssistSiteWork {
             if let runner = deployRunner.legs.first?.runner {
                 message = SiteHealthFinding.appending(to: message, from: runner)
             }
-            if let notice {
-                message += "\n\n" + notice
-            }
+            message = SettingsSaveNotice.addingTheNotice(notice, to: message)
             return AssistSiteWorkResult(succeeded: false, message: message)
         }
 
@@ -300,9 +300,7 @@ final class AssistToolchainWork: AssistSiteWork {
         if let runner = deployRunner.legs.first?.runner {
             message = SiteHealthFinding.appending(to: message, from: runner)
         }
-        if let notice {
-            message += "\n\n" + notice
-        }
+        message = SettingsSaveNotice.addingTheNotice(notice, to: message)
         return AssistSiteWorkResult(
             succeeded: outcome.succeeded,
             message: message,

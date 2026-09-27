@@ -2374,8 +2374,8 @@ served sidebar filter was unchanged. So:
   settings may be the point). **Since #335 the same holds for a deploy and
   for the schedule sheet**: both read the SAVED file at the act
   (`Course.asSavedNow()`), and say `deployUsesSavedSettings` (in the same
-  banner, identifier `deployUsesSavedSettingsNotice`, set after any running
-  preview is stopped because the stop clears the banner) or
+  banner, identifier `deployUsesSavedSettingsNotice`, owned by the deploy so a
+  preview's end — which clears only a preview's sentence — cannot take it away) or
   `schedulingUsesSavedSettings` (above the sheet's plan); a file that cannot be
   read refuses with `settingsCouldNotBeReadToDeploy` — docs 07, "The window's
   acts read the saved settings too (#335)".
@@ -5508,8 +5508,10 @@ to `AppUpdates.teacherAnsweredReady` first.
   slice-1 review's L4). `SameExecutableProcessesTests` exercises the scan on
   processes it starts itself: a copy of `/bin/bash` named `Plantoir` in a
   temporary folder, **re-signed ad hoc** (`codesign --force --sign -`), held on
-  `read -t 30`, with an assertion after every scan that the child is still
-  alive (#341). Measured on an M4 Pro, macOS 26.6: an unsigned copy of a system
+  `read -t 30` with its standard input a pipe the test keeps open (end-of-file
+  would end `read` at once; with no pipe the child would depend on the test
+  host's own standard input), with an assertion after every scan that the child
+  is still alive (#341). Measured on an M4 Pro, macOS 26.6: an unsigned copy of a system
   binary run from a temporary folder is SIGKILLed within about 1–100 ms (60 of
   60 copies of `/bin/sh`), so the tests used to pass only by scanning before
   the kill, and flaked when they scanned after it. The re-signing is the part

@@ -18,11 +18,18 @@ import XCTest
 /// was seen and stayed alive (must-fail M2 stayed green), so bash — what
 /// `/bin/sh` resolves to anyway — is kept as the one that was measured both
 /// ways. `read` forks nothing, where `sleep` would briefly fork a second
-/// "Plantoir"; its standard input is a pipe of the test's own, held until
-/// `tearDown`, so it never reads the test host's. (Must-fails M3 and M3b —
-/// no pipe, and the pipe's writing end closed at once — both stayed green:
-/// the child is kept alive by `read -t 30` itself, not by the pipe, and it
-/// is `assertStillRunning` that would catch it dying.)
+/// "Plantoir"; it waits on a pipe the test holds until `tearDown`, and
+/// the HELD PIPE is what keeps it waiting: `read` on a standard input at
+/// end-of-file returns at once, whatever `-t` says, and bash exits.
+/// (Measured, with the check waiting 200 ms: closing the pipe's writing end
+/// at once — must-fail M3b — goes red in four tests. Setting no pipe at all
+/// — M3 — stays green, because the child then inherits the test host's own
+/// standard input, which stayed open under `xcodebuild`; the pipe is held so
+/// the child's life depends on the test rather than on how the host was
+/// started. A first run without the wait read both as green, and this
+/// comment briefly drew the wrong conclusion from that.)
+/// `assertStillRunning`, right after a scan, catches a child that is
+/// already dead; it cannot catch one that is about to die.
 @MainActor
 final class SameExecutableProcessesTests: XCTestCase {
 

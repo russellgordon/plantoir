@@ -3536,6 +3536,8 @@ final class AssistToolRunnerTests: XCTestCase {
             let rendered: String
             if sentence == "reDatedOnlyPagesTheyUse" {
                 rendered = AssistWording.reDatedOnlyPagesTheyUse(pagesTheyUse: pages)
+            } else if sentence == "everyPageIsAlreadyOnItsDay" {
+                rendered = AssistWording.everyPageIsAlreadyOnItsDay(course: "ICS3U", section: 1)
             } else {
                 XCTAssertEqual(sentence, "reDated", name)
                 rendered = AssistWording.reDated(count: classes, pagesTheyUse: pages)
@@ -3548,6 +3550,7 @@ final class AssistToolRunnerTests: XCTestCase {
                 outcome.summary.range(of: "-[0-9]", options: .regularExpression),
                 "\(name): a negative count: \(outcome.summary)"
             )
+            XCTAssertFalse(outcome.summary.contains("only the 0 "), "\(name): “only the 0 pages”: \(outcome.summary)")
         }
     }
 
@@ -3573,6 +3576,31 @@ final class AssistToolRunnerTests: XCTestCase {
         let undone: AssistToolOutcome = await made.runner.run(call: call("undo_last_change"))
         XCTAssertTrue(undone.summary.contains("re-dated 2 classes"), undone.summary)
         XCTAssertFalse(undone.summary.contains("3 classes"), undone.summary)
+    }
+
+    /// Every move declined (#186): no date written, and the reply is the
+    /// declined sentence alone — never "only the 0 pages", and never "every
+    /// page is already on its day", which a declined page is not (F4).
+    @MainActor
+    func testAReDateThatWroteNoDateBecauseEveryMoveWasDeclinedSaysOnlyThat() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        try write(page: "Unit 1, Day 1", publish: "true", date: "2025-09-08", body: "One.", in: made.course)
+        _ = await made.runner.run(call: call(
+            "remember_timetable",
+            arguments: ["course": "ICS3U", "section": 1, "dates": "2026-09-08"]
+        ))
+        try "---\n  a: 1\n---\nOne.\n".write(
+            to: AssistFixture.pageURL(of: "Unit 1, Day 1", in: made.course), atomically: true, encoding: .utf8
+        )
+        let outcome: AssistToolOutcome = await made.runner.run(call: call(
+            "re_date_classes", arguments: ["course": "ICS3U", "section": 1]
+        ))
+        let declined: String = AssistPublishPlan.sayingPagesWhoseNewDateCouldNotBeSet(named: ["Unit 1, Day 1"])
+        XCTAssertTrue(outcome.summary.hasPrefix(declined), outcome.summary)
+        XCTAssertFalse(outcome.summary.contains("already on the day"), outcome.summary)
+        XCTAssertFalse(outcome.summary.contains("only the 0 "), outcome.summary)
     }
 
     /// The teacher is TOLD which linked class was left alone — on the plan card

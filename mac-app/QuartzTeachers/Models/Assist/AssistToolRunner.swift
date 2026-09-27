@@ -3304,8 +3304,9 @@ final class AssistToolRunner {
             let websiteAnswer: String = text("website", in: arguments).lowercased()
             let isRollover: Bool = isARollover(arguments)
             if asked.plan.changesNothing {
-                let already: String = "Every page in \(asked.located.course.code) Section "
-                                    + "\(asked.located.sectionNumber) is already on the day it should be."
+                let already: String = AssistWording.everyPageIsAlreadyOnItsDay(
+                    course: asked.located.course.code, section: asked.located.sectionNumber
+                )
                 guard isRollover else {
                     return AssistToolOutcome.wrote(already, detail: already)
                 }
@@ -3366,8 +3367,9 @@ final class AssistToolRunner {
             return AssistToolOutcome.refused(problem.localizedDescription)
         case .success(let asked):
             if asked.plan.changesNothing {
-                let already: String = "Every page in \(asked.located.course.code) Section "
-                                    + "\(asked.located.sectionNumber) is already on the day it should be."
+                let already: String = AssistWording.everyPageIsAlreadyOnItsDay(
+                    course: asked.located.course.code, section: asked.located.sectionNumber
+                )
                 // The website is settled HERE TOO, and this is the SECOND TURN
                 // of the whole conversation. A teacher answers the website
                 // question by saying one of the two sentences, which comes back
@@ -3427,11 +3429,15 @@ final class AssistToolRunner {
             // Both counts are what was WRITTEN, each from its own kind (#343):
             // never one subtracted from the other.
             let summary: String = AssistToolRunner.sayingWhatWasReDated(
-                classes: classesReDated, pagesTheyUse: pagesTheyUseReDated, noun: .class
+                classes: classesReDated, pagesTheyUse: pagesTheyUseReDated, noun: .class,
+                course: asked.located.course.code, section: asked.located.sectionNumber,
+                anyDeclined: !leftAlone.isEmpty
             )
             let teacherSummary: String = AssistToolRunner.sayingWhatWasReDated(
                 classes: classesReDated, pagesTheyUse: pagesTheyUseReDated,
-                noun: asked.located.course.configuration.classNoun
+                noun: asked.located.course.configuration.classNoun,
+                course: asked.located.course.code, section: asked.located.sectionNumber,
+                anyDeclined: !leftAlone.isEmpty
             )
             var detail: String = summary
             if backedUp {
@@ -3453,7 +3459,7 @@ final class AssistToolRunner {
             // above, since the counts are of dates written (#186, #343).
             if !leftAlone.isEmpty {
                 let declined: String = AssistPublishPlan.sayingPagesWhoseNewDateCouldNotBeSet(named: leftAlone)
-                said += " " + declined
+                said += said.isEmpty ? declined : " " + declined
                 detail += "\n\n" + declined
                 AssistToolRunner.notePagesLeftAsTheyWere(
                     leftAlone.count, act: "re-dating classes",
@@ -3471,7 +3477,25 @@ final class AssistToolRunner {
     /// The line a teacher reads after a re-date (#343). When every class was
     /// already on its day and only what they use moved, "Re-dated 0 classes"
     /// would read as nothing happening, so that case has its own sentence.
-    static func sayingWhatWasReDated(classes: Int, pagesTheyUse: Int, noun: ClassNoun) -> String {
+    ///
+    /// **When no date at all was written** — a plan whose only moves hid an
+    /// overflow class already on the last day, or were declined (#186) — the
+    /// reply is the same sentence a plan that changes nothing gets,
+    /// `AssistWording.everyPageIsAlreadyOnItsDay`, never "only the 0 pages"
+    /// (the implementation review's F4). Except when a page was DECLINED: it
+    /// is not on its day, so saying every page is would be the same kind of
+    /// untruth #343 fixes; the reply is then the declined sentence alone
+    /// (empty here, and the caller adds it).
+    static func sayingWhatWasReDated(
+        classes: Int, pagesTheyUse: Int, noun: ClassNoun,
+        course: String, section: Int, anyDeclined: Bool
+    ) -> String {
+        if classes == 0 && pagesTheyUse == 0 {
+            if anyDeclined {
+                return ""
+            }
+            return AssistWording.everyPageIsAlreadyOnItsDay(course: course, section: section)
+        }
         if classes == 0 {
             return AssistWording.reDatedOnlyPagesTheyUse(pagesTheyUse: pagesTheyUse, noun: noun)
         }
