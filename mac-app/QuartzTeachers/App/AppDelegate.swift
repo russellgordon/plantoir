@@ -77,6 +77,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // the suite must never watch the teacher's real Application
             // Support.
             ScheduledPublishWatcher.shared.start()
+            // Get the website builder ready in the background, so the first
+            // preview is fast (bundle B). It decides for itself whether to run
+            // at all — never twice for one version, never offline, never in a
+            // headless run — and never blocks the window.
+            BuilderWarmUp.shared.startIfItShould(arguments: CommandLine.arguments)
         }
     }
 

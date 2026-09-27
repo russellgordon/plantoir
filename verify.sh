@@ -224,6 +224,13 @@ else
   cat /tmp/verify_site_health_test.log
 fi
 
+if (cd scripts && python3 test_getting_ready_turn.py) >/tmp/verify_getting_ready_turn_test.log 2>&1; then
+  pass "Launchers: one at a time gets the website builder ready, and setup.sh --prepare-builder does only that (scripts/test_getting_ready_turn.py, bundle B)"
+else
+  fail "Launchers: one at a time gets the website builder ready, and setup.sh --prepare-builder does only that (scripts/test_getting_ready_turn.py, bundle B)"
+  cat /tmp/verify_getting_ready_turn_test.log
+fi
+
 if (cd scripts && python3 test_section_fingerprint.py) >/tmp/verify_section_fingerprint_test.log 2>&1; then
   pass "section_fingerprint.py: the \"— Edited\" fingerprint's rule 2 leaves How I Teach out, and the default stays rule 1 until Windows moves (scripts/test_section_fingerprint.py, #330)"
 else

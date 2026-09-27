@@ -429,6 +429,14 @@ struct SidebarView: View {
                 }
             }
 
+            // The one line the background warm-up ever shows (bundle B): no
+            // window, no progress bar, nothing to press. It goes when the
+            // builder is ready, or when getting it ready did not work out —
+            // then the first preview does it the old way, saying nothing here.
+            if BuilderWarmUp.shared.isGettingReady {
+                gettingReadyLine
+            }
+
             Divider()
 
             bottomBar
@@ -765,6 +773,23 @@ struct SidebarView: View {
     /// little smaller than the same buttons elsewhere on the system — Xcode's
     /// list footers, for one — so the size is stated rather than inherited.
     static let footerGlyphSize: CGFloat = 15
+
+    /// The background warm-up's status line (`builderWarmUp.wording.statusLine`).
+    var gettingReadyLine: some View {
+        HStack(spacing: 6) {
+            ProgressView()
+                .controlSize(.small)
+            Text(BuilderWarmUp.statusLine)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("builderWarmUpStatusLine")
+    }
 
     /// Add, remove, and filter — the standard macOS list footer.
     var bottomBar: some View {
