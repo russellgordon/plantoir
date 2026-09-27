@@ -25,6 +25,8 @@ final class SharedRulesContractTests: XCTestCase {
     func testScheduledDeploysRefuseWhatTheContractSays() throws {
         let section: [String: Any] = try SharedRulesContractTests.section("scheduledDeployRefusals")
         let now: Date = Date(timeIntervalSince1970: 1_786_000_000)
+        var wording: [String: String] = try XCTUnwrap(section["wording"] as? [String: String])
+        wording["note"] = nil
 
         for testCase in try XCTUnwrap(section["cases"] as? [[String: Any]]) {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
@@ -69,7 +71,238 @@ final class SharedRulesContractTests: XCTestCase {
                 SharedRulesContractTests.name(ofRefusal: said), expected,
                 "\(name): refused, but not for the reason the contract names — it said \"\(said)\""
             )
+            // The two never-deployed refusals are compared WHOLE, rendered
+            // from the contract's template (#322): both contain "has never
+            // been deployed to", so a phrase cannot tell them apart, and the
+            // destination the sentence names is the point of it.
+            if let template = wording[expected] {
+                let destination: String = try XCTUnwrap(
+                    testCase["destinationNamed"] as? String, "\(name): names no destination"
+                )
+                XCTAssertEqual(
+                    said,
+                    SharedRulesContractTests.render(
+                        template, ["course": "ICS3U", "section": "1", "destination": destination]
+                    ),
+                    "\(name): not the contract's sentence"
+                )
+            }
         }
+    }
+
+    /// The Swift renders the contract's two never-deployed templates exactly.
+    func testTheNeverDeployedSentencesAreTheContractsTemplates() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("scheduledDeployRefusals")
+        let wording: [String: String] = try XCTUnwrap(section["wording"] as? [String: String])
+        let values: [String: String] = ["course": "SPH4U", "section": "3", "destination": "Cloudflare Pages"]
+        XCTAssertEqual(
+            ScheduledDeployWording.neverDeployed(course: "SPH4U", section: 3, destination: "Cloudflare Pages"),
+            SharedRulesContractTests.render(try XCTUnwrap(wording["neverDeployed"]), values)
+        )
+        XCTAssertEqual(
+            ScheduledDeployWording.additionalDestinationNeverDeployed(
+                course: "SPH4U", section: 3, destination: "Cloudflare Pages"
+            ),
+            SharedRulesContractTests.render(try XCTUnwrap(wording["additionalDestinationNeverDeployed"]), values)
+        )
+    }
+
+    /// A contract template with each `{name}` filled in.
+    static func render(_ template: String, _ values: [String: String]) -> String {
+        var rendered: String = template
+        for (name, value) in values {
+            rendered = rendered.replacingOccurrences(of: "{\(name)}", with: value)
+        }
+        return rendered
+    }
+
+    // MARK: - The assistant reads a course's settings at the call (#322)
+
+    /// Each case opens the assistant on a folder, THEN changes the files on
+    /// disk as Course Settings in another window (or another program) would,
+    /// then makes one call — and the call must act on the files as they are.
+    func testTheAssistantReadsSettingsAtTheCall() async throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("assistantReadsSettingsAtTheCall")
+        let refusals: [String: Any] = try SharedRulesContractTests.section("scheduledDeployRefusals")
+        let refusalWording: [String: String] = try XCTUnwrap(refusals["wording"] as? [String: String])
+        let cases: [[String: Any]] = try XCTUnwrap(section["cases"] as? [[String: Any]])
+        XCTAssertFalse(cases.isEmpty)
+
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let opened: [String: Any] = testCase["opened"] as? [String: Any] ?? [:]
+            let surface: AssistToolRunner.Surface
+            switch try XCTUnwrap(testCase["surface"] as? String) {
+            case "window":
+                surface = .local
+            case "outsideAssistant":
+                surface = .mcp
+            default:
+                XCTFail("\(name): unknown surface")
+                continue
+            }
+
+            // The folder as it was when the assistant opened.
+            let made: AssistFixture.Made = try AssistFixture.makeRunner(
+                hasDeployedBefore: opened["hasDeployedBefore"] as? Bool ?? false, surface: surface
+            )
+            let root: URL = made.root
+            defer { try? FileManager.default.removeItem(at: root) }
+            let agents: URL = root.appendingPathComponent("LaunchAgents")
+            try FileManager.default.createDirectory(at: agents, withIntermediateDirectories: true)
+            ScheduledDeploy.launchAgentsDirectoryOverride = agents
+            ScheduledDeploy.scheduledScriptsDirectoryOverride = root.appendingPathComponent("scheduled")
+            defer {
+                ScheduledDeploy.launchAgentsDirectoryOverride = nil
+                ScheduledDeploy.scheduledScriptsDirectoryOverride = nil
+            }
+            let savedFolder: URL = root.appendingPathComponent("published-here")
+            try FileManager.default.createDirectory(at: savedFolder, withIntermediateDirectories: true)
+            let configURL: URL = root.appendingPathComponent("courses/ICS3U/course_config.json")
+            if let target = opened["target"] as? String {
+                try SharedRulesContractTests.change(
+                    configURL, ["deploy_target": target, "deploy_folder_path": savedFolder.path]
+                )
+            }
+            let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
+            workspace.chooseWorkspace(at: root)
+            let siteWork: AssistSettingsFreshnessTests.RecordingSiteWork = AssistSettingsFreshnessTests.RecordingSiteWork()
+            let runner: AssistToolRunner = AssistToolRunner(
+                workspace: workspace, siteWork: siteWork,
+                today: { return CalendarDay(year: 2026, month: 9, day: 8)! },
+                launchControl: SilentLaunchControl(), surface: surface
+            )
+            SectionWindowControllers.shared.forgetAll()
+
+            // Then the files change underneath it.
+            if let saved = testCase["thenSaved"] as? [String: Any] {
+                var changes: [String: Any] = [:]
+                if let target = saved["target"] as? String {
+                    changes["deploy_target"] = target
+                    changes["deploy_folder_path"] = target == "local_folder" ? savedFolder.path : ""
+                }
+                if let sections = saved["sections"] as? [Int] {
+                    changes["section_numbers"] = sections
+                    changes["num_sections"] = sections.count
+                    for number in sections {
+                        try FileManager.default.createDirectory(
+                            at: root.appendingPathComponent("courses/ICS3U/section\(number)/All Classes"),
+                            withIntermediateDirectories: true
+                        )
+                    }
+                }
+                try SharedRulesContractTests.change(configURL, changes)
+            }
+            if let created = testCase["thenCreated"] as? [String: Any] {
+                let code: String = try XCTUnwrap(created["code"] as? String)
+                let courseURL: URL = root.appendingPathComponent("courses").appendingPathComponent(code)
+                try FileManager.default.createDirectory(
+                    at: courseURL.appendingPathComponent("section1/All Classes"), withIntermediateDirectories: true
+                )
+                let configuration: [String: Any] = [
+                    "course_code": code, "course_name": "Made after the assistant opened",
+                    "section_numbers": [1], "num_sections": 1,
+                ]
+                try JSONSerialization.data(withJSONObject: configuration)
+                    .write(to: courseURL.appendingPathComponent("course_config.json"))
+            }
+
+            let asked: [String: Any] = try XCTUnwrap(testCase["call"] as? [String: Any])
+            let arguments: [String: Any] = asked["arguments"] as? [String: Any] ?? [:]
+            let encoded: Data = try JSONSerialization.data(withJSONObject: arguments)
+            let toolCall: AssistToolCall = AssistToolCall(
+                id: UUID().uuidString, type: "function",
+                function: AssistToolCall.Function(
+                    name: try XCTUnwrap(asked["tool"] as? String),
+                    arguments: String(decoding: encoded, as: UTF8.self)
+                )
+            )
+            let expect: [String: Any] = try XCTUnwrap(testCase["expect"] as? [String: Any])
+            // Every key is one this runner reads (#322 review, L4): a misspelt
+            // key would otherwise assert nothing and pass. The note defines each.
+            let knownKeys: Set<String> = [
+                "outcome", "destination", "refusal", "destinationNamed", "cardNames", "cardDoesNotName",
+                "schedulable", "deployedTo", "found", "lists",
+            ]
+            for key in expect.keys {
+                XCTAssertTrue(knownKeys.contains(key), "\(name): unknown expect key \"\(key)\"")
+            }
+            var checked: Int = 0
+            func filledIn(_ text: String) -> String {
+                return text.replacingOccurrences(of: "{savedFolder}", with: savedFolder.path)
+            }
+
+            // The card is read without running anything.
+            if let named = expect["cardNames"] as? String {
+                let card: String = runner.explain(call: toolCall)
+                XCTAssertTrue(card.contains(filledIn(named)), "\(name): the card says \"\(card)\"")
+                if let notNamed = expect["cardDoesNotName"] as? String {
+                    XCTAssertFalse(card.contains(notNamed), "\(name): the card says \"\(card)\"")
+                }
+                continue
+            }
+            if let wanted = expect["outcome"] as? String {
+                XCTAssertTrue(wanted == "scheduled" || wanted == "refused", "\(name): unknown outcome \(wanted)")
+            }
+
+            let outcome: AssistToolOutcome = await runner.run(call: toolCall)
+            if let wanted = expect["outcome"] as? String, wanted == "scheduled" {
+                XCTAssertTrue(outcome.summary.hasPrefix("Scheduled:"), "\(name): \(outcome.summary)")
+                checked += 1
+                if let destination = expect["destination"] as? String {
+                    XCTAssertTrue(outcome.summary.contains(filledIn(destination)), "\(name): \(outcome.summary)")
+                }
+            }
+            if let wanted = expect["outcome"] as? String, wanted == "refused" {
+                let key: String = try XCTUnwrap(expect["refusal"] as? String)
+                let destination: String = try XCTUnwrap(expect["destinationNamed"] as? String)
+                let sentence: String = SharedRulesContractTests.render(
+                    try XCTUnwrap(refusalWording[key]),
+                    ["course": "ICS3U", "section": "1", "destination": destination]
+                )
+                XCTAssertEqual(outcome.summary, "Nothing was scheduled. " + sentence, "\(name)")
+                checked += 1
+            }
+            if let schedulable = expect["schedulable"] as? Bool {
+                XCTAssertEqual(
+                    outcome.summary,
+                    schedulable ? "Worked out what scheduling that deploy would mean."
+                                : "That deploy cannot be scheduled.",
+                    "\(name): \(outcome.detail)"
+                )
+                checked += 1
+            }
+            if let deployedTo = expect["deployedTo"] as? [String] {
+                XCTAssertEqual(siteWork.destinationTypesSeen, [deployedTo], "\(name): \(outcome.summary)")
+                checked += 1
+            }
+            if let found = expect["found"] as? Bool, found {
+                let number: Int = arguments["section"] as? Int ?? 1
+                XCTAssertTrue(
+                    outcome.summary.contains("ICS3U Section \(number)"), "\(name): \(outcome.summary)"
+                )
+                checked += 1
+            }
+            if let listed = expect["lists"] as? [String] {
+                for code in listed {
+                    XCTAssertTrue(outcome.detail.contains(code), "\(name): \(code) not in \(outcome.detail)")
+                }
+                checked += 1
+            }
+            XCTAssertGreaterThan(checked, 0, "\(name): no expectation was checked")
+        }
+    }
+
+    /// Another program saves these keys into a settings file.
+    private static func change(_ configURL: URL, _ changes: [String: Any]) throws {
+        var values: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: try Data(contentsOf: configURL)) as? [String: Any]
+        )
+        for (key, value) in changes {
+            values[key] = value
+        }
+        try JSONSerialization.data(withJSONObject: values, options: [.prettyPrinted])
+            .write(to: configURL, options: [.atomic])
     }
 
     // MARK: - What the sidebar's filter shows
@@ -201,15 +434,26 @@ final class SharedRulesContractTests: XCTestCase {
         XCTAssertNotNil(stop["theNamedPagesAreNeverStopped"] as? String)
         XCTAssertNotNil(stop["saidToTheTeacher"] as? String)
 
-        // UNPUBLISHING is deliberately absent. Its reach is the sibling
-        // decision, held as issue #201 — and a contract that claimed it were
-        // already true would be false on BOTH platforms the day it landed, in
-        // the file that exists to stop this rule drifting.
+        // UNPUBLISHING joined on 2026-09-26 (issue #201): an unpublish stops
+        // at a class the way publishing does. It was held out of this list
+        // until the behaviour landed, because a contract claiming it early
+        // would have been false on both platforms. Named HERE, as a stop the
+        // three verbs share, and deliberately NOT as a fourth entry in
+        // `neverTakenDownByFollowingLinks` — see the test after this one.
         let appliesTo: [String] = try XCTUnwrap(stop["appliesTo"] as? [String])
         XCTAssertTrue(appliesTo.contains("publishing"))
         XCTAssertTrue(appliesTo.contains("the dates a class brings"))
-        XCTAssertFalse(appliesTo.contains("unpublishing"),
-                       "Unpublish reach is #201; claiming it here is false on both platforms")
+        XCTAssertTrue(appliesTo.contains("unpublishing"),
+                      "An unpublish stops at a class since #201; the contract has to say so")
+
+        // The unpublishing cases define their own harness, so the other app
+        // can build it without reading this one.
+        let unpublishing: [String: Any] = try XCTUnwrap(section["unpublishing"] as? [String: Any])
+        let note: String = try XCTUnwrap(unpublishing["casesNote"] as? String)
+        XCTAssertTrue(note.contains("`expectPlanSays`"))
+        XCTAssertTrue(note.contains("never both"))
+        let cases: [[String: Any]] = try XCTUnwrap(unpublishing["cases"] as? [[String: Any]])
+        XCTAssertFalse(cases.isEmpty)
     }
 
     /// The kinds the sweep must never reach, each with the reason it is
@@ -234,6 +478,68 @@ final class SharedRulesContractTests: XCTestCase {
         XCTAssertTrue(all.contains("key links"))
         XCTAssertTrue(all.contains("index.md"))
         XCTAssertTrue(all.contains("curriculum"))
+
+        // Three, and a class is not the fourth (#201). The exclusions are
+        // pages reached from somewhere other than a lesson; a class is a STOP
+        // in the walk, named once in `stopsAtAClassPage.appliesTo`. The
+        // Windows suite pins this count too, so a fourth entry would turn it
+        // red on pull for a rule it already has in the right place.
+        XCTAssertEqual(kinds.count, 3)
+    }
+
+    /// `readingALink.cases` (#294): what a wikilink NAMES, including the
+    /// escaped pipe Obsidian writes for an alias inside a table,
+    /// `[[Ohm's Law\|Ohm]]`. Walked through BOTH mac readers — the one the
+    /// links answer uses (names as written) and the one publishing, dating,
+    /// the site check and copying use (lowercased, last path component) —
+    /// because both read `WikiLinkRewriter.pattern`, and the second is the one
+    /// the issue was about. Since #313 the cases also say where CODE is, and
+    /// both readers go through `WikiLinkRewriter.linkMatches`.
+    @MainActor
+    func testEveryLinkShapeReadsAsTheContractSays() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("readingALink")
+        XCTAssertNotNil(section["rule"] as? String)
+        XCTAssertNotNil(section["whenRewritten"] as? String)
+        XCTAssertNotNil(section["why"] as? String)
+        let cases: [[String: Any]] = try XCTUnwrap(section["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 40, "readingALink lost cases")
+        // #313: what code is, written to be implemented from.
+        XCTAssertNotNil(section["codeIsNeverALink"] as? String)
+        XCTAssertNotNil(section["whatIsCode"] as? [String])
+        XCTAssertNotNil(section["whatIsCodeLimits"] as? [String])
+
+        for oneCase in cases {
+            let name: String = try XCTUnwrap(oneCase["name"] as? String)
+            let text: String = try XCTUnwrap(oneCase["text"] as? String, name)
+            let expected: [String] = try XCTUnwrap(oneCase["expect"] as? [String], name)
+
+            XCTAssertEqual(
+                AssistSectionGraph.linksAsWritten(in: text), expected,
+                "\(name): the names as written"
+            )
+
+            var expectedTargets: [String] = []
+            for written in expected {
+                expectedTargets.append(AssistSectionGraph.normalized(written))
+            }
+            XCTAssertEqual(
+                AssistSectionGraph.linkTargets(in: text), expectedTargets,
+                "\(name): the names publishing follows"
+            )
+        }
+    }
+
+    /// `followingLinks.publishing.casesNote` says what a case's `body` means,
+    /// so the other app can build the same harness without reading this one.
+    @MainActor
+    func testThePublishingCasesSayWhatABodyIs() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("followingLinks")
+        let publishing: [String: Any] = try XCTUnwrap(section["publishing"] as? [String: Any])
+        let note: String = try XCTUnwrap(publishing["casesNote"] as? String)
+        XCTAssertTrue(note.contains("`body`"))
+        XCTAssertTrue(note.contains("never both"))
+        let cases: [[String: Any]] = try XCTUnwrap(publishing["cases"] as? [[String: Any]])
+        XCTAssertFalse(cases.isEmpty)
     }
 
     // MARK: - Asking before the assistant changes anything
@@ -764,6 +1070,143 @@ final class SharedRulesContractTests: XCTestCase {
         return store
     }
 
+    // MARK: - Reading the trail back into a report (#301)
+
+    /// One unreadable byte used to empty the whole trail. Every case writes
+    /// the contract's bytes as they are, reads them back the way a report
+    /// does, and compares line by line — so the readable part of a damaged
+    /// line, its neighbours and the notes at the top are all held to it.
+    func testProblemReportTrailCasesReadBackAsTheContractSays() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("problemReportTrail")
+        let cases: [[String: Any]] = try XCTUnwrap(section["cases"] as? [[String: Any]])
+        XCTAssertFalse(cases.isEmpty)
+
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let input: String = try XCTUnwrap(testCase["input"] as? String)
+            let includingPrompts: Bool = try XCTUnwrap(testCase["includingPrompts"] as? Bool)
+            let expectedTokens: [String] = try XCTUnwrap(testCase["expectLines"] as? [String])
+            let expectSomething: Bool = try XCTUnwrap(testCase["expectSomethingToReport"] as? Bool)
+
+            let folderURL: URL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("trail-read-" + UUID().uuidString, isDirectory: true)
+            try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: folderURL) }
+            let bytes: [UInt8] = try SharedRulesContractTests.bytes(fromContractNotation: input)
+            try Data(bytes).write(
+                to: folderURL.appendingPathComponent(ProblemReportStore.activityFileName)
+            )
+            let store: ProblemReportStore = ProblemReportStore(folderURL: folderURL)
+
+            var expectedLines: [String] = []
+            for token in expectedTokens {
+                expectedLines.append(try SharedRulesContractTests.trailLine(forContractToken: token))
+            }
+            let text: String = store.activityText(includingPrompts: includingPrompts)
+            XCTAssertEqual(
+                text.components(separatedBy: "\n"), expectedLines,
+                "\(name): the trail read back differently"
+            )
+            XCTAssertEqual(store.hasAnythingToReport, expectSomething, "\(name)")
+        }
+    }
+
+    /// The two sentences are the app's own, and they come in the order the
+    /// contract fixes.
+    func testProblemReportTrailSentencesAreTheApps() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("problemReportTrail")
+        XCTAssertEqual(section["promptsLeftOutNote"] as? String, ProblemReportStore.promptsLeftOutNote)
+        let template: String = try XCTUnwrap(section["unreadableCharactersNote"] as? String)
+        for count in [1, 2, 17] {
+            XCTAssertEqual(
+                template.replacingOccurrences(of: "{count}", with: String(count)),
+                ProblemReportStore.unreadableCharactersNote(lineCount: count)
+            )
+        }
+
+        let order: [String] = try XCTUnwrap(section["noteOrder"] as? [String])
+        XCTAssertEqual(order, ["promptsLeftOutNote", "unreadableCharactersNote"])
+        let folderURL: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("trail-order-" + UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folderURL) }
+        let bytes: [UInt8] = try SharedRulesContractTests.bytes(
+            fromContractNotation: "chose\n" + AssistTurnRecord.promptMarker + "hi\nbad {C3}\n"
+        )
+        try Data(bytes).write(to: folderURL.appendingPathComponent(ProblemReportStore.activityFileName))
+        let lines: [String] = ProblemReportStore(folderURL: folderURL)
+            .activityText(includingPrompts: false)
+            .components(separatedBy: "\n")
+        var notesInOrder: [String] = []
+        for key in order {
+            if key == "promptsLeftOutNote" {
+                notesInOrder.append(ProblemReportStore.promptsLeftOutNote)
+            } else {
+                notesInOrder.append(ProblemReportStore.unreadableCharactersNote(lineCount: 1))
+            }
+        }
+        XCTAssertEqual(Array(lines.prefix(2)), notesInOrder)
+    }
+
+    /// Guards the parser the cases above lean on: were `{C3}` written as
+    /// four characters, every "damaged" case would be a readable file and
+    /// could only fail on its note.
+    func testTheByteNotationIsReadAsTheContractDefinesIt() throws {
+        XCTAssertEqual(
+            try SharedRulesContractTests.bytes(fromContractNotation: "a{C3}b"),
+            [0x61, 0xC3, 0x62]
+        )
+        XCTAssertEqual(
+            try SharedRulesContractTests.bytes(fromContractNotation: "{80}{80}"),
+            [0x80, 0x80]
+        )
+        XCTAssertEqual(
+            try SharedRulesContractTests.bytes(fromContractNotation: "caf\u{E9} · ok"),
+            Array("caf\u{E9} · ok".utf8)
+        )
+    }
+
+    /// `{XX}` is one raw byte; everything else is the UTF-8 of its text.
+    /// `problemReportTrail.byteNotation`.
+    private static func bytes(fromContractNotation notation: String) throws -> [UInt8] {
+        var result: [UInt8] = []
+        let characters: [Character] = Array(notation)
+        var index: Int = 0
+        while index < characters.count {
+            let character: Character = characters[index]
+            if character == "{" && index + 3 < characters.count && characters[index + 3] == "}" {
+                let hexDigits: String = String(characters[index + 1]) + String(characters[index + 2])
+                let value: UInt8 = try XCTUnwrap(
+                    UInt8(hexDigits, radix: 16), "not a byte in the contract's notation: {\(hexDigits)}"
+                )
+                result.append(value)
+                index += 4
+                continue
+            }
+            for byte in String(character).utf8 {
+                result.append(byte)
+            }
+            index += 1
+        }
+        return result
+    }
+
+    /// Turns an `expectLines` entry into the line the app should write:
+    /// `{promptsLeftOutNote}` and `{unreadableCharactersNote:N}` stand for the
+    /// app's sentences, anything else is the line itself.
+    private static func trailLine(forContractToken token: String) throws -> String {
+        if token == "{promptsLeftOutNote}" {
+            return ProblemReportStore.promptsLeftOutNote
+        }
+        let prefix: String = "{unreadableCharactersNote:"
+        if token.hasPrefix(prefix) && token.hasSuffix("}") {
+            let digits: String = String(token.dropFirst(prefix.count).dropLast())
+            let count: Int = try XCTUnwrap(Int(digits), "not a count: \(token)")
+            return ProblemReportStore.unreadableCharactersNote(lineCount: count)
+        }
+        return token
+    }
+
     // MARK: - The New Course wizard's words
 
     /// The button a teacher presses to make a course says what the contract says.
@@ -825,7 +1268,8 @@ final class SharedRulesContractTests: XCTestCase {
         XCTAssertEqual(
             WizardWording.skeletonToggleLabelTemplate,
             section["skeletonToggleLabel"] as? String,
-            "The skeleton toggle's own label. {subject} is the family's label, lowercased."
+            "The skeleton toggle's own label. {article} and {subject} are filled as "
+            + "wizard.skeletonToggleLabelSubject says (#336)."
         )
         XCTAssertEqual(
             WizardWording.skeletonToggleLabelForAGeneralSkeleton,
@@ -879,6 +1323,69 @@ final class SharedRulesContractTests: XCTestCase {
             "Start from a drama skeleton",
             "Every other family reads its own subject back, lowercased."
         )
+    }
+
+    /// The toggle label for the families it used to get wrong (#336), and
+    /// four it already got right, each resolved through the real catalog.
+    ///
+    /// The lists the rule is built from are pinned too, so a word added on
+    /// one side is a red line on this one rather than a label that differs
+    /// between the two apps for one family nobody tried.
+    func testTheSkeletonToggleLabelReadsEachFamilyAsTheContractSays() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("wizard")
+        let rule: [String: Any] = try XCTUnwrap(section["skeletonToggleLabelSubject"] as? [String: Any])
+        XCTAssertEqual(
+            WizardWording.skeletonToggleProperNouns,
+            rule["properNouns"] as? [String],
+            "The words that keep their capitals."
+        )
+        let article: [String: Any] = try XCTUnwrap(rule["article"] as? [String: Any])
+        XCTAssertEqual(
+            WizardWording.consonantSoundVowelStarts,
+            article["consonantSoundVowelStarts"] as? [String]
+        )
+        XCTAssertEqual(
+            WizardWording.vowelSoundConsonantStarts,
+            article["vowelSoundConsonantStarts"] as? [String]
+        )
+
+        let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 16, "Twelve families #336 fixed, four controls.")
+        for testCase in cases {
+            let familyName: String = try XCTUnwrap(testCase["family"] as? String)
+            let expected: String = try XCTUnwrap(testCase["expect"] as? String)
+            let family: SkeletonCatalog.Family = try XCTUnwrap(
+                SkeletonCatalog.family(named: familyName),
+                "No skeleton family called \(familyName)"
+            )
+            XCTAssertEqual(
+                WizardWording.skeletonToggleLabel(forFamilyNamed: family.name, label: family.label),
+                expected,
+                "The toggle label for \(familyName) (label \"\(family.label)\")."
+            )
+        }
+    }
+
+    /// The article rule on its own, for the words no family starts with
+    /// today — the #328 review's point that a first-letter check says
+    /// "an unit".
+    func testTheArticleFollowsTheSoundNotTheLetter() {
+        let expectations: [(word: String, article: String)] = [
+            (word: "unit", article: "a"),
+            (word: "European", article: "a"),
+            (word: "one-page", article: "a"),
+            (word: "hour", article: "an"),
+            (word: "urban", article: "an"),
+            (word: "English", article: "an"),
+            (word: "history", article: "a"),
+        ]
+        for expectation in expectations {
+            XCTAssertEqual(
+                WizardWording.article(for: expectation.word),
+                expectation.article,
+                "The article in front of \(expectation.word)."
+            )
+        }
     }
 
     // MARK: - The skeleton toggle, in both directions
@@ -1397,7 +1904,7 @@ final class SharedRulesContractTests: XCTestCase {
     /// ARRAYS are walked too. No array under `specialNames` carries a
     /// platform-worded sentence today, but this contract's established shape
     /// puts teacher sentences inside arrays of cases — `renameFolder`
-    /// .`linkRewriting`.`cases` and `curriculumFolderResolution`.`cases` are
+    /// .`linkRewriting`.`cases` and `curriculumFoldersResolution`.`cases` are
     /// both here already — so a fourth sentence added as a case would otherwise
     /// be invisible to a test whose whole purpose is to notice a fourth
     /// sentence.
@@ -1705,6 +2212,14 @@ final class SharedRulesContractTests: XCTestCase {
                 XCTAssertEqual(afterPerSection[key] as? [String], ["Assessments", "Private Notes.md"])
             case "expandable":
                 XCTAssertEqual(afterShared[key] as? [String], ["Assessments", "Concepts"])
+            case "curriculum_folders":
+                // Materialised (#128): the legacy name was the course's one
+                // curriculum folder, so the list is written with the new name.
+                XCTAssertEqual(afterShared[key] as? [String], ["Assessments"])
+                XCTAssertNil(
+                    afterPerSection[key],
+                    "The curriculum folders are SHARED; a per-section rename must not write them"
+                )
             case "curriculum_folder":
                 XCTAssertEqual(afterShared[key] as? String, "Assessments")
                 XCTAssertEqual(
@@ -1752,6 +2267,17 @@ final class SharedRulesContractTests: XCTestCase {
             UnitWordRenameWording.rowCaption(word: "Module"),
             (rename["rowCaption"] as? String)?.replacingOccurrences(of: "{word}", with: "Module")
         )
+        // A numbered course (#267): its own caption, and the sentence beside
+        // its disabled Rename… button.
+        XCTAssertEqual(
+            UnitWordRenameWording.rowCaption(naming: ClassPageNaming(word: "Week", scheme: .numbered)),
+            (rename["rowCaptionNumbered"] as? String)?.replacingOccurrences(of: "{word}", with: "Week")
+        )
+        XCTAssertEqual(
+            UnitWordRenameWording.rowCaption(naming: ClassPageNaming(word: "Module", scheme: .unitDay)),
+            (rename["rowCaption"] as? String)?.replacingOccurrences(of: "{word}", with: "Module")
+        )
+        XCTAssertEqual(UnitWordRenameWording.renameLockedNumbered, rename["renameLockedNumbered"] as? String)
         XCTAssertEqual(UnitWordRenameWording.explanation, rename["explanation"] as? String)
         XCTAssertEqual(UnitWordRenameWording.proseIsLeftAlone, rename["proseIsLeftAlone"] as? String)
 
@@ -1888,19 +2414,184 @@ final class SharedRulesContractTests: XCTestCase {
         )
     }
 
-    func testCurriculumFolderResolutionCases() throws {
+    /// `specialNames.curriculumFoldersResolution` (#128): what the build maps
+    /// and what the apps protect and name, over the declared names and the
+    /// folders holding pages. The Python half runs the same cases against the
+    /// build (`scripts/test_coverage_maps.py`).
+    func testCurriculumFoldersResolutionCases() throws {
         let section: [String: Any] = try SharedRulesContractTests.section("specialNames")
-        let resolutionSection: [String: Any] = try XCTUnwrap(section["curriculumFolderResolution"] as? [String: Any])
-        let cases: [[String: Any]] = try XCTUnwrap(resolutionSection["cases"] as? [[String: Any]])
+        let resolution: [String: Any] = try XCTUnwrap(section["curriculumFoldersResolution"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(resolution["cases"] as? [[String: Any]])
+        // A floor: a loop over a list an edit has emptied passes having read nothing.
+        XCTAssertGreaterThanOrEqual(cases.count, 12)
+        XCTAssertNil(section["curriculumFolderResolution"],
+                     "the singular rule was replaced by curriculumFoldersResolution and must stay gone")
 
         for testCase in cases {
-            let configured: String? = testCase["configured"] as? String
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let declared: [String] = CurriculumFolderRule.declaredFolders(
+                list: testCase["curriculumFolders"], legacy: testCase["curriculumFolder"]
+            )
             let folders: [String] = try XCTUnwrap(testCase["folders"] as? [String])
-            let expected: String? = testCase["resolved"] as? String
-            let why: String = testCase["why"] as? String ?? ""
+            let withPages: [String] = try XCTUnwrap(testCase["withPages"] as? [String])
+            let letterFirst: [String]? = testCase["withLetterFirstPages"] as? [String]
+            XCTAssertEqual(
+                CurriculumFolderRule.mappedFolders(
+                    declared: declared, in: folders, withPages: withPages, withLetterFirstPages: letterFirst
+                ),
+                try XCTUnwrap(testCase["mapped"] as? [String]), "mapped: \(name)"
+            )
+            XCTAssertEqual(
+                CurriculumFolderRule.resolvedFolders(
+                    declared: declared, in: folders, withPages: withPages, withLetterFirstPages: letterFirst
+                ),
+                try XCTUnwrap(testCase["resolved"] as? [String]), "resolved: \(name)"
+            )
+            XCTAssertEqual(
+                CurriculumFolderRule.coveragePageTitles(
+                    declared: declared, in: folders, withPages: withPages, withLetterFirstPages: letterFirst
+                ),
+                try XCTUnwrap(testCase["titles"] as? [String]), "titles: \(name)"
+            )
+        }
+    }
 
-            let actual: String? = CurriculumFolderRule.resolvedCurriculumFolder(configured: configured, in: folders)
-            XCTAssertEqual(actual, expected, "Failed case: \(why)")
+    /// `curriculumRules.coveragePageTitles` (#128).
+    func testCoveragePageTitlesCases() throws {
+        let rules: [String: Any] = try SharedRulesContractTests.section("curriculumRules")
+        let titles: [String: Any] = try XCTUnwrap(rules["coveragePageTitles"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(titles["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 6)
+        for testCase in cases {
+            let folders: [String] = try XCTUnwrap(testCase["folders"] as? [String])
+            XCTAssertEqual(
+                CurriculumFolderRule.coveragePageTitles(for: folders, primary: testCase["primary"] as? String),
+                try XCTUnwrap(testCase["titles"] as? [String]), "\(folders)"
+            )
+        }
+        XCTAssertEqual(CurriculumFolderRule.primaryMapTitle, "Curriculum Coverage")
+    }
+
+    /// `specialNames.curriculumFolderProtection` (#128): only the LAST folder
+    /// with a map is refused while the map is on.
+    func testCurriculumFolderProtectionCases() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("specialNames")
+        let protection: [String: Any] = try XCTUnwrap(section["curriculumFolderProtection"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(protection["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 10)
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let folder: String = try XCTUnwrap(testCase["folder"] as? String)
+            let surface: CurriculumFolderProtection.Surface =
+                (testCase["surface"] as? String) == "wizard" ? .wizard : .settings
+            let decided: ItemProtection? = CurriculumFolderProtection.decide(
+                folder: folder,
+                resolved: try XCTUnwrap(testCase["resolved"] as? [String]),
+                coverageOn: try XCTUnwrap(testCase["coverageOn"] as? Bool),
+                pagesOn: try XCTUnwrap(testCase["pagesOn"] as? Bool),
+                declaredPayloadFolder: testCase["declaredPayloadFolder"] as? String,
+                surface: surface,
+                jurisdiction: "Ontario"
+            )
+            let expected: ItemProtection?
+            let sentenceKey: String = testCase["sentence"] as? String ?? ""
+            switch sentenceKey {
+            case "curriculumFolderBlockedByCoverageSetting":
+                expected = .blocked(reason: SpecialNames.curriculumFolderBlockedByCoverageSetting)
+            case "curriculumFolderBlockedByCoverageMap":
+                expected = .blocked(reason: SpecialNames.curriculumFolderBlockedByCoverageMap)
+            case "curriculumFolderBlockedByCurriculumPages":
+                expected = .blocked(reason: SpecialNames.curriculumFolderBlockedByCurriculumPages(jurisdiction: "Ontario"))
+            case "removeCurriculumFolderWithItsMapConfirmation":
+                expected = .consequential(
+                    title: SpecialNames.removeCurriculumFolderTitle(for: folder),
+                    message: SpecialNames.removeCurriculumFolderWithItsMapMessage
+                )
+            case "removeCurriculumFolderConfirmation":
+                expected = .consequential(
+                    title: SpecialNames.removeCurriculumFolderTitle(for: folder),
+                    message: SpecialNames.removeCurriculumFolderMessage
+                )
+            default:
+                expected = nil
+            }
+            XCTAssertEqual(decided, expected, name)
+            XCTAssertEqual(decided == nil, (testCase["kind"] as? String) == "notACurriculumFolder", name)
+        }
+
+        let sentence: [String: Any] = try XCTUnwrap(section["removeCurriculumFolderWithItsMapConfirmation"] as? [String: Any])
+        XCTAssertEqual(SpecialNames.removeCurriculumFolderWithItsMapMessage, sentence["message"] as? String)
+        XCTAssertEqual(
+            SpecialNames.removeCurriculumFolderTitle(for: "Ontario Curriculum"),
+            (sentence["title"] as? String)?.replacingOccurrences(of: "{name}", with: "Ontario Curriculum")
+        )
+    }
+
+    /// `specialNames.curriculumFoldersOffer` (#128): the checkboxes, what is
+    /// ticked, and what a tick or an untick writes.
+    func testCurriculumFoldersOfferCases() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("specialNames")
+        let offer: [String: Any] = try XCTUnwrap(section["curriculumFoldersOffer"] as? [String: Any])
+        XCTAssertEqual(CurriculumFoldersOffer.label, offer["label"] as? String)
+        XCTAssertEqual(CurriculumFoldersOffer.caption, offer["caption"] as? String)
+        XCTAssertEqual(CurriculumFoldersOffer.lastStaysTicked, offer["lastStaysTicked"] as? String)
+        let cases: [[String: Any]] = try XCTUnwrap(offer["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 8)
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let folders: [String] = try XCTUnwrap(testCase["folders"] as? [String])
+            let declared: [String] = try XCTUnwrap(testCase["declared"] as? [String])
+            let mapped: [String] = try XCTUnwrap(testCase["mapped"] as? [String])
+            let ticked: [String] = CurriculumFoldersOffer.ticked(folders: folders, declared: declared, mapped: mapped)
+            if let offered = testCase["offered"] as? [String] {
+                XCTAssertEqual(CurriculumFoldersOffer.offered(folders: folders, declared: declared), offered, name)
+            }
+            if let expected = testCase["ticked"] as? [String] {
+                XCTAssertEqual(ticked, expected, name)
+            }
+            if let tick = testCase["tick"] as? String {
+                XCTAssertEqual(
+                    CurriculumFoldersOffer.ticking(tick, ticked: ticked, folders: folders),
+                    try XCTUnwrap(testCase["writes"] as? [String]), name
+                )
+            }
+            if let untick = testCase["untick"] as? String {
+                XCTAssertEqual(
+                    CurriculumFoldersOffer.unticking(untick, ticked: ticked),
+                    testCase["writes"] as? [String], name
+                )
+            }
+        }
+    }
+
+    /// `renameFolder.materialisesOnRename.curriculumFoldersCases` (#128).
+    func testARenameMaterialisesTheCurriculumFolders() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("specialNames")
+        let rename: [String: Any] = try XCTUnwrap(section["renameFolder"] as? [String: Any])
+        let materialises: [String: Any] = try XCTUnwrap(rename["materialisesOnRename"] as? [String: Any])
+        XCTAssertEqual(materialises["keys"] as? [String], ["class_folder", "curriculum_folders"])
+        let cases: [[String: Any]] = try XCTUnwrap(materialises["curriculumFoldersCases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 5)
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let before: [String: Any] = try XCTUnwrap(testCase["before"] as? [String: Any])
+            var values: [String: Any] = [:]
+            for (key, value) in before where !(value is NSNull) {
+                values[key] = value
+            }
+            let scope: FolderScope = (testCase["scope"] as? String) == "perSection" ? .perSection : .shared
+            let updated: [String: Any] = SpecialFolderRenamer.renaming(
+                try XCTUnwrap(testCase["old"] as? String),
+                to: try XCTUnwrap(testCase["new"] as? String),
+                scope: scope,
+                in: values,
+                foldersWithPages: try XCTUnwrap(testCase["withPages"] as? [String])
+            )
+            let after: [String: Any] = try XCTUnwrap(testCase["after"] as? [String: Any])
+            XCTAssertEqual(updated["curriculum_folders"] as? [String], after["curriculum_folders"] as? [String],
+                           "curriculum_folders: \(name)")
+            XCTAssertEqual(updated["curriculum_folder"] as? String, after["curriculum_folder"] as? String,
+                           "curriculum_folder: \(name)")
         }
     }
 
@@ -1970,7 +2661,10 @@ final class SharedRulesContractTests: XCTestCase {
         if said.contains("Account ID") {
             return "cloudflareAccountMissing"
         }
-        if said.contains("never been deployed to") {
+        // Since #322 both never-deployed sentences say "never been deployed
+        // to"; only the additional one asks what to call "that site". The
+        // whole sentence is compared in the test itself.
+        if said.contains("asks what to call that site") {
             return "additionalDestinationNeverDeployed"
         }
         if said.contains("never been deployed") {
@@ -2159,14 +2853,24 @@ final class SharedRulesContractTests: XCTestCase {
             )
             let makesTheBuildsFolder: Range<String.Index>? =
                 functionBody.range(of: "\n  ensure_build_root\n")
+            // Since GitHub #280 the container is made by ONE function the
+            // three launchers share (the PREVIEW PORT BLOCK, which
+            // scripts/test_port_blocks.py pins byte-identical and runs), so
+            // the order asked here is "builds folder, then the call to it" —
+            // and the shared function is asked for its refusable form below.
             let makesTheWorkspace: Range<String.Index>? =
-                functionBody.range(of: "\n  if ! docker run -dit")
+                functionBody.range(of: "\n  create_the_workspace_on_free_ports\n")
             XCTAssertNotNil(
                 makesTheBuildsFolder,
                 "\(launcher) never makes the builds folder in run_container_with_mount()"
             )
             XCTAssertNotNil(
                 makesTheWorkspace,
+                "\(launcher) does not create the container through the shared create_the_workspace_on_free_ports"
+            )
+            XCTAssertTrue(
+                text.contains("\ncreate_the_workspace_on_free_ports() {\n")
+                    && text.contains("    if output=\"$(docker run -dit \\\n"),
                 "\(launcher) does not create the container in a form that can refuse"
             )
             if let buildsFolder = makesTheBuildsFolder, let workspace = makesTheWorkspace {
@@ -2211,6 +2915,10 @@ final class SharedRulesContractTests: XCTestCase {
                 .replacingOccurrences(of: "{course}", with: "ICS3U")
                 .replacingOccurrences(of: "{section}", with: "2")
                 .replacingOccurrences(of: "{destination}", with: "Netlify")
+                // The record's second line fills {reason} for
+                // couldNotRunAsSetNow (#323), as it fills {destination} for
+                // the kinds that name one.
+                .replacingOccurrences(of: "{reason}", with: "Netlify")
             let actual: String = ScheduledPublishOutcome.sentence(
                 for: ScheduledPublishOutcome.Stopped(
                     kind: kind, destination: "Netlify", when: Date()
@@ -2450,13 +3158,16 @@ final class SharedRulesContractTests: XCTestCase {
         switch kind {
         case .neededAnAnswer: return "neededAnAnswer"
         case .buildNeededAnAnswer: return "buildNeededAnAnswer"
+        case .buildDidNotFinish: return "buildDidNotFinish"
         case .didNotFinish: return "didNotFinish"
         case .succeeded: return "succeeded"
         case .tooLateToRun: return "tooLateToRun"
+        case .courseWasBusy: return "courseWasBusy"
+        case .couldNotRunAsSetNow: return "couldNotRunAsSetNow"
         }
     }
 
-    private static func section(_ name: String) throws -> [String: Any] {
+    static func section(_ name: String) throws -> [String: Any] {
         let url: URL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
@@ -2478,7 +3189,7 @@ final class SharedRulesContractTests: XCTestCase {
     ) {
         guard let adoptable = SkeletonCatalog.structureToAdopt(
             forCode: code,
-            takingExampleContent: takingExampleContent,
+            takingExampleContent: takingExampleContent, numbered: false,
             currentSharedFolders: lists.sharedFolders
         ) else {
             return

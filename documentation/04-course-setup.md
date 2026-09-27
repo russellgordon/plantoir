@@ -75,7 +75,7 @@ OFFERED is two separate questions:
 **The rule, once, because three surfaces ask it:** a skeleton is OFFERED for
 a code when a family exists for its prefix AND the teacher is not taking the
 example content written for that code. It lives in ONE function —
-`SkeletonCatalog.hasSkeleton(forCode:takingExampleContent:)` on the mac,
+`SkeletonCatalog.hasSkeleton(forCode:takingExampleContent:numbered:)` on the mac (a club, #267, is offered none),
 `SkeletonCatalog.HasSkeleton` on Windows — read by the toggle's visibility,
 by what the structure editor adopts, and by `use_skeleton` in the file.
 Neither app takes a default value for the second argument, so a call site
@@ -134,7 +134,7 @@ PAGE" — against the payload's **61**. Forcing all three curriculum keys
 true changed *nothing*: no code path read the payload once the skeleton was
 the starting point, so `include_curriculum_pages: true` merely switched the
 map on over that one fake cell. Applying `build_site.py`'s own
-`_find_curriculum_folder` and `_collect_expectations` to the tree gave **1
+`_find_curriculum_folder` (now `_find_curriculum_folders`, #128) and `_collect_expectations` to the tree gave **1
 specific expectation and 0 overall**, against the payload's **47 and 12**.
 Enabling coverage without copying the pages is not half a fix; it is a
 worse state than the fault.
@@ -177,7 +177,9 @@ timestamps aside.
 
 **The pages are installed into the SKELETON's `curriculum_folder` name**,
 because that is the name `course_config.json` records for a course with
-`prepopulate_example_content: false`, and the name the build looks in. All
+`prepopulate_example_content: false` (since #128 as `curriculum_folders`, a
+list of that one name — the manifest key itself stays singular), and the name
+the build looks in. All
 38 payloads and all 50 skeleton families call it `Curriculum` today
 (measured 2026-09-21), so the parameter buys nothing this morning; it buys
 a future payload that disagreed landing where the build will look rather
@@ -192,13 +194,19 @@ caption already says "red in September, greener as the year goes on".
 skeleton-without-expectations keeps its two placeholder pages; a teacher
 who wants the real ones deletes the course and remakes it.
 
-**One thing left undone, deliberately.** Four payloads' `About These …`
-explainer links once to a payload page a skeleton course will not have —
-ICS4U to `[[The Software Project]]`, ICS3U to `[[The Community App]]`,
-CGC1W to `[[The Concepts of Geographic Thinking]]`, MDM4U to `[[The
-Culminating Investigation]]`. It was left alone here rather than rewritten
-at install: it is an example-content fix, its own small piece, and the
-skeletons already ship illustrative unresolved links of their own.
+**The explainers' links, since #253.** Four payloads' `About These …`
+explainer used to link once to a payload page a skeleton course does not
+have — ICS4U to `The Software Project`, ICS3U to `The Community App`,
+CGC1W to `The Concepts of Geographic Thinking`, MDM4U to `The Culminating
+Investigation`. Each sentence now points at an expectation page in the
+same folder (B2, B4, A1.5 and E1) and says only what is true with or
+without the ready-made pages; unlinking alone would have left a sentence
+describing pages the course does not have. `lint_payload.py` refuses a
+curriculum page that links outside its folder, and
+`test_starting_content_prompts.py` checks every payload's curriculum links
+after the real double install. Not retroactive either: a course already
+created keeps the teacher's copy of the page, since those files are theirs
+now.
 
 The old note that the skeleton's `Curriculum/index.md` and its expectation
 pages install "even though the app writes `include_curriculum_pages:
@@ -273,11 +281,12 @@ mechanics; the fourth is what to know before reading a green run as coverage:
   checklist with nothing ticked while the wizard writes
   `graded_folders: ["Thinking Tasks"]` against a course with no such folder —
   and the two apps then write DIFFERENT files for the same clicks, which is
-  what the contract exists to stop. (`setup_course.py` reconciles the key
-  again when it reads it, so no teacher ends up with a broken course; that is
-  a second net, not a licence for the wizard to write something untrue. The
-  first version of the mac's restore did exactly that, and the adversarial
-  review of it found it.) The two apps reach the same answer from
+  what the contract exists to stop. (There is no second net behind the
+  wizard: since #192 `setup_course.py` writes a saved pool back exactly as it
+  was — see "A command-line re-run leaves the marks pool alone" below — so a
+  name the wizard writes untruly stays in the file. The first version of the
+  mac's restore did exactly that, and the adversarial review of it found
+  it.) The two apps reach the same answer from
   opposite ends: the mac narrows inside the restore, Windows leaves the pool
   and narrows it on every read (`CurrentGradedFolders`) and again when the
   file is written. The mac narrows ONCE MORE as the file is written, for the
@@ -535,7 +544,11 @@ checkout at `/opt/quartz` (the template that every build copies from):
    `quartz.layout.ts` with a configured call containing a `filterFn` and a
    marked line (`// CQ4T-OMIT-ANCHOR`) declaring `const omit = new Set([...])`.
    At build time, `build_site.py` rewrites this set with the course's hidden
-   items. The anchor comment makes the rewrite target unambiguous.
+   items. The anchor comment makes the rewrite target unambiguous. The filter
+   is version 2 since #265 (top-level items by stored name; the marker
+   `CQ4T-HIDE-RULE: v2`), and a section built before that is brought up to
+   date on its next build — see
+   [06 → B1](06-quartz-customizations.md#b1-explorer-omit-anchor-in-quartzlayoutts).
 2. **OverflowList stable ID** — replaces `const id = randomIdNonSecure()`
    with a constant in `OverflowList.tsx`, so rebuilt pages do not differ
    just because a random DOM id changed (fewer files re-uploaded on deploy).
@@ -572,6 +585,59 @@ first. Both wizards write it at creation, and a rename in Course Settings
 writes it even on a course that never had one. The old guess is kept as the
 fallback, never replaced.
 
+**A re-run keeps the RECORDED `class_folder`** (#267, `class_folder_to_record`).
+It used to rebuild the key from the guess alone, and the dict it wrote into
+wins over the saved configuration — measured: `["Resources", "All Meetings"]`
+guesses `Resources`, so a club the app had set up correctly would have been
+rewritten to look for its meetings in the wrong folder. The recorded name wins
+while it is still in the list; the guess is the fallback only.
+
+## A club: one number, its own words, and what it starts with (#267)
+
+A club — a coding club, a debate team — meets rather than holds classes. The
+New Course wizard's **"This is a club"** choice writes
+`class_page_scheme: "numbered"` with `unit_word: "Week"`,
+`class_folder: "All Meetings"`, `front_page_heading: "Most Recent Meeting"` and
+`class_noun: "meeting"` (all editable in the wizard, none switchable
+afterwards — Russell, 2026-09-24), plus `use_skeleton` and
+`prepopulate_example_content` false and the three curriculum keys false. See
+[the config reference](08-course-config-reference.md) for each key.
+
+What `setup_course.py` does with a numbered course (`ClubStart`):
+
+- **No skeleton and no ready-made pages**, even if the configuration asks —
+  a second net behind the wizard. Both are "Unit 1, Day 1" pages, which a
+  numbered course does not read as class pages: every planner would see
+  nothing and the build would report success.
+- **Each section's NEW front page** gets `# <front_page_heading>`, a blank line
+  and `![[<word> 1]]`. Only a front page the run creates; an existing one is
+  never touched.
+- **`<class_folder>/<word> 1.md`**, PUBLISHED, dated at creation, with no
+  `unit-1` tag. Published because the front page embeds it: a landing page
+  showing a withheld page is exactly what the assistant's repointing exists to
+  prevent, and the repointing moves the embed only when a VISIBLE page is newer,
+  so it would never fix this one. No tag because a club has no units, and the
+  tag would make a Quartz tag page listing every meeting. **Written only for a
+  section being MADE** — one whose `index.md` does not exist yet
+  (`ClubStart.write_first_page`, called before the front page is written). A
+  re-run of setup from the command line on an existing club used to recreate a
+  deleted `Week 1.md` in every section, published and dated NOW, so the front
+  page would follow it as the newest meeting (#267 implementation review; the
+  app never re-runs setup on an existing course, so this was command-line
+  only). A new section added to an existing club still gets its first page.
+  `scripts/test_club_start.py` pins both.
+
+REJECTED: a generated "club" skeleton family (more pages to maintain, for a
+code prefix that means nothing); starting completely empty (then the heading
+has no front page to be written into and the embed never exists — the mac's
+repointing never INSERTS one).
+
+**An existing course can never become a club.** Nothing reads the scheme into
+a course that does not already say it, and Course Settings shows the settings
+locked. Russell's `CODING` fixture — pages already named "Week N" in
+`All Meetings`, no `class_page_scheme` — therefore stays exactly as it is: no
+planner sees its pages as class pages, as before #267.
+
 ## Which of a course's folders the build treats specially
 
 Most of a course folder is the teacher's to arrange however they like. A
@@ -582,12 +648,12 @@ that is not there simply contributes nothing.
 | What | Where the name comes from |
 |---|---|
 | The lessons folder | Every per-section folder the build counts as a class folder — the recorded `class_folder`, plus any whose name mentions classes; failing both, the guess described in [`08`](08-course-config-reference.md). New class pages are written to one; the coverage map counts all of them. |
-| The curriculum folder | `curriculum_folder` if it names a folder the course has, otherwise the alphabetically first shared folder whose name mentions the curriculum. The BUILD asks one thing more than either app can see from configuration: the folder must actually hold a page carrying an expectation code. |
+| The curriculum folders | Every folder the course declares in `curriculum_folders` (then the legacy `curriculum_folder`) that holds a page named by an expectation code — both apps read the disk for that, as the build does (#128); when none does, the one alphabetically first shared folder mentioning the curriculum. Each has a coverage map of its own. Both apps OFFER to declare another folder mentioning the curriculum under "Curriculum folders", and never do it for the teacher. |
 | The folders that count for marks | `graded_folders`, or — for a course never asked — every folder whose name contains "task". An ABSENT key and an EMPTY list are different answers; see [`08-course-config-reference.md`](08-course-config-reference.md). |
 | `Media` | Managed by the build and kept out of the sidebar. |
 | `index.md` | The page a folder opens on, in every section and every folder. |
 | `Key Links.md` | The sidebar's shortcut list. The build adds the curriculum map to it and leaves the teacher's own entries alone. |
-| `Curriculum Coverage` | Written by the build on every run. A teacher's own page of that name would be replaced. |
+| `Curriculum Coverage` (and `<Folder> Coverage` for each further curriculum folder) | Written by the build on every run. A teacher's own page of that name would be replaced. |
 
 **Both apps can show a teacher this list for their own course**, from Course
 Settings → "What else does Plantoir use my folders for?". Two things about
@@ -605,13 +671,14 @@ that sheet are deliberate and easy to undo by accident:
   to create one they already have is the one failure a sheet about folder names
   cannot afford. **Both apps do this** — Windows from the start, the mac from
   2026-09-06, when it stopped reading the key and started asking the same rule
-  that decides which folder is protected from removal. Two things narrow the
-  answer, in both apps equally: the scan looks at the SHARED folders only,
-  where the build walks the merged tree, and neither app can see whether the
-  folder actually holds an expectation page — and when the recorded folder has
-  none, the build does not give up, it falls through to the same scan. So the
-  sheet can name a folder the build passes over in favour of another. Still
-  righter than naming one that is not there.
+  that decides which folder is protected from removal. Since #128 that rule
+  reads the DISK as the build does — which declared folders hold an
+  expectation page — so the sheet names every folder with a map and every map
+  page, and the #90 tie (the sheet naming College Board while the map came
+  from Ontario) is gone. One narrowing is left, in both apps equally: they look
+  at the SHARED folders only, where the build walks the merged tree —
+  unreachable in practice, because every manifest declares the folder as
+  shared.
 
 The rows, the sentences and the cases are
 [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
@@ -632,12 +699,16 @@ Windows needs exactly three UI behaviours:
 - **Detection**: example content exists for a code when the bundled
   `support/example_content/<CODE>/manifest.json` exists; the curriculum
   toggle additionally needs the manifest's `curriculum_folder` to be
-  non-empty (reference logic: `ExampleContentCatalog.swift`).
+  non-empty (the MANIFEST key stays singular after #128; the course records it
+  as the list `curriculum_folders`) (reference logic: `ExampleContentCatalog.swift`).
 - **Starting Content section** in the new-course wizard: "Pre-populate
   course with example content" (default ON) with "Include Ontario
   curriculum pages" beneath it (default ON, disabled when the first is
   off). The SKELETON toggle goes BELOW that block (entry 123) — "Start
-  from a <subject> skeleton" — and since 2026-09-21 it is a sibling of it
+  from {article} <subject> skeleton", the subject lowercased except its
+  proper nouns and the article following its first SOUND ("an English",
+  "a French"; `shared-rules.json` → `wizard.skeletonToggleLabelSubject`,
+  #336) — and since 2026-09-21 it is a sibling of it
   rather than its `else`, so a code with ready-made pages shows it the
   moment those pages are turned down (#248). The quiet "empty folders"
   caption is the last resort, for a code with neither. (Both apps also
@@ -655,6 +726,30 @@ skill `.claude/skills/example-content/` and checked by its
 `lint_payload.py` — no app code changes on either platform. The same skill
 holds the skeleton generator and `lint_skeletons.py`; the skeletons are
 generated output, so never hand-edit `support/skeletons/`.
+
+**How the installer reads a link** ([#314](https://github.com/russellgordon/plantoir/issues/314),
+[#326](https://github.com/russellgordon/plantoir/issues/326)): the three
+readers — which class's date a ready-made page takes (`first_use_dates`),
+pointing a template's placeholder expectation at the course's own
+(`retargeted_expectation_references`), and unlinking the curriculum pages a
+teacher declined (`unlink_curriculum_references`) — follow `shared-rules.json`
+→ `readingALink`, so the escaped pipe Obsidian writes inside a table,
+`[[K1.15\|test cases]]`, is the same link as `[[K1.15|test cases]]`. Until
+then all three read it as a page called `K1.15\`. Unlinking turns it into its
+words and takes the backslash with it, so the table cell stays one cell; a
+retarget keeps the backslash, because dropping it would split the cell.
+Unlinking compares by the page a link NAMES — its last path component — so
+`[[Curriculum/A1.1|words]]` is unlinked too, and an unaliased one reads as the
+page name, `A1.1`, since the folder is one the course does not have. What a
+teacher could see: MCMPR11's Final Evaluation task has an Assessment Matrix
+table with seven such links to British Columbia standards outside any
+`%%curriculum%%` block, and a teacher who declined the curriculum pages got
+seven links to pages that do not exist — measured over every payload with the
+real functions, 7 left, all in that file; 0 after. The other readers are
+latent on shipped content (no escaped pipe in any `per_section/` page, no
+folder-qualified expectation link in `support/`) and bite teacher-written or
+future payload pages. Pinned by `scripts/test_install_link_readers.py`, the
+MCMPR11 file included.
 
 Two payload conventions have changed since these entries, both handled by
 shared Python: course-level pages now arrive with
@@ -738,7 +833,8 @@ was argued the other way first and the contract's `why` carries the full
 argument:
 
 - **It says "tick", never "add" or "remove"** — a correction rather than a
-  preference. The control is a tick list with no Add button, so the mac's
+  preference. The control is a table of checkboxes with no Add button (a tick list until
+  issue #266 made it a table; the rule is unchanged), so the mac's
   previous caption named two actions it does not offer, and "remove what you
   don't" invited the one thing the product refuses outright: unticking the last
   graded folder while the coverage map is on.
@@ -793,7 +889,7 @@ nothing published reports that no folder counts for marks exactly as an empty
 pool would.
 
 **And a consequence of that filter, which is a rule in its own right** —
-`gradedFolders.removingAFolder`, seven cases. Removing a folder takes its name out
+`gradedFolders.removingAFolder`, eight cases. Removing a folder takes its name out
 of the marks pool, with two exceptions, and both exist to stop a removal quietly
 taking marks OFF the map:
 
@@ -813,17 +909,31 @@ taking marks OFF the map:
 Both fall out of one instruction: recompute what the checklist offers AFTER the
 removal is recorded, and drop the name only if it is no longer among them —
 asked the way the BUILD asks it, case ignored — AND the course had already been
-asked.
+asked. On the mac that instruction is one function,
+`MarksPoolRemoval.poolAfterRemoving`, which the marks floor below asks as well,
+so the removal and the floor cannot disagree about what a removal leaves.
 
-Two edges of that, recorded rather than left to be met. The second exception
+**Only the removed NAME is ever dropped — a nested name is not recomputed**
+(case 8, [#152](https://github.com/russellgordon/plantoir/issues/152), from
+#80's first item, settled with Russell away and the recommendation adopted).
+Removing `Portfolios` leaves a pooled `Tasks` that was found only inside it in
+the pool, matching nothing the site publishes. That is the cost the paragraph
+above already records, taken on purpose: putting `Portfolios` back restores the
+marks, where dropping `Tasks` would lose them silently on that same undo. The
+one real harm the kept name could do — holding up the "at least one folder
+counts for marks" floor while nothing counts — is closed by the floor counting
+only names found on disk (the next section). REJECTED: dropping every pooled
+name the removal took off the checklist; a must-fail of exactly that (offered
+before against offered after) turns case 8 red and leaves 1–7 green.
+
+One edge of that, recorded rather than left to be met. The second exception
 says "still OFFERED", not "still counts": the checklist sees four levels and the
 build counts at any depth, so a `Tasks` five levels down is dropped from the
-pool and goes on counting. And the "at least one folder must count for marks"
-floor — the one that refuses to unpick the last pooled folder while the coverage
-map is on — asks whether this is the last NAME in the pool, not whether the pool
-would survive the removal. So it still blocks removing a top-level `Tasks` on a
-course where `Portfolios/Tasks` would have kept the name. Conservative, rare,
-and the same on both platforms; sharpening it would be a shared change.
+pool and goes on counting. (This paragraph also recorded a second edge until
+#152: the floor asked whether a folder was the last NAME in the pool, so it
+refused removing a top-level `Tasks` that `Portfolios/Tasks` would have kept.
+The floor now asks whether the pool would SURVIVE — the next section — and that
+removal is allowed.)
 
 **Order is the whole subject.** Ask before
 the exclusion is written and the removed folder is still on the list, so the
@@ -840,6 +950,48 @@ reordering that causes the bug. Mutation-measured there on 2026-09-18: putting
 the pre-fix body back turns cases 1, 2, 5 and 6 red, the old pool semantics over
 a CORRECT walk turn 5 and 6 red, and reordering the walk before the exclusion —
 or leaving the exclusion out — turns 3 and 4 red.
+
+**On the mac the order has one owner too, and since
+[#183](https://github.com/russellgordon/plantoir/issues/183) (2026-09-26) the
+contract drives it.** Since #266 both folder lists' removal is one method,
+`CourseSettingsView.folderWasRemoved(_:scope:)` — `excluded_items`, then the
+pool, then the trail line (written on the click, saved or not —
+`excludedItems.recordedOnClick`) — called from the list editor's
+`StringListEditorView.removeItem(named:)` after the editor has written the copy
+list. Until #183 the mac's contract runner (and three other tests) REPLAYED
+those steps by hand in the order they were believed to run, so a reorder inside
+`folderWasRemoved` left every case green. Measured before the change: moving the
+pool above the exclusion, or leaving the exclusion out, kept all seven cases and
+every `SpecialFoldersProtectionTests` case green. The only red was the #266 byte
+golden (`ListTableGoldenTests`), by accident, and that is not a pin: its message
+says the tables changed the saved bytes rather than that the order broke, a
+golden is re-captured whenever a legitimate change moves the file (a re-capture
+on a mutated tree takes the regression in silently), and it covers one removal
+in one scope. Now the runner removes through the editor
+(`CourseSettingsGestureScript.editor(for:of:).removeItem(named:)`), and each of
+four mutations — pool above exclusion, exclusion left out, pool left out, or
+`onRemove` called before the editor writes the list — turns cases 3 and 4 red:
+the same pair as on Windows. Cases 1, 2, 5, 6 and 7 (and 8, added by #152) stay green under a reorder,
+correctly: there the name is still offered or the course was never asked, so
+the pool is left alone whatever the order.
+
+**Windows owes nothing for this**: its order was already pinned through
+`FolderRemoval.RemoveFolderFromCourse`, and no case changed. The trap it records
+applies to both sides on any later refactor: a runner that replays the steps
+instead of calling the gesture's owner stays green through exactly the bug the
+rule exists for. REJECTED on the mac: moving the removal into a model function
+to mirror Windows' Core method (`folderWasRemoved` is already the single owner
+and reachable from a test, so it would buy symmetry no test needs), an authored
+`sequence` field in the contract (neither runner could assert it without
+instrumenting internal calls, which tests how the code is built rather than
+what it does, and Windows would owe a runner change for no gain), and relying
+on the #266 golden. **One seam stays unpinned**:
+`CourseSettingsGestureScript.editor(for:of:)` is a hand copy of `body`'s wiring,
+so if `body` ever wired a folder list differently — another method than
+`folderWasRemoved`, the other scope, a binding to another list, or different
+protection or notice closures — these tests would stay green. Closing it means extracting the editors into
+a function both the view and the tests call — a view refactor with its own
+reviews, not part of #183.
 
 **A course damaged by the old behaviour is NOT repaired, decided 2026-09-18.**
 It keeps its frozen pool until the teacher ticks or unticks something, and
@@ -948,7 +1100,9 @@ unasked. A mac reader who tries the stated mutation and sees the suite stay
 green must not conclude the guard is dead.
 
 Nothing new is written to the activity trail for any of this. The removal
-already leaves its own line (`item excluded`), and what changed is only which
+already leaves its own line (`item excluded`, written on the click, saved or
+not, with `exclusions reverted` beside it if a Revert takes it back —
+`excludedItems.recordedOnClick`), and what changed is only which
 folders are OFFERED — which is not something a teacher DOES, and a trail line
 for it would record a redraw.
 
@@ -979,24 +1133,346 @@ Finder order is arguably nicer for a person reading a list. If anyone wants it,
 it is a shared change to the contract and both apps — not something to reach for
 on one side because it looked more natural there.
 
+### The marks floor counts only folders on disk (#152)
+
+While the coverage map is on, Course Settings refuses to remove or untick the
+folder that would leave nothing counting for marks
+(`specialNames.lastGradedFolderBlocked`). Until
+[#152](https://github.com/russellgordon/plantoir/issues/152) (from #80's second
+item) it asked whether the folder was the LAST NAME in the pool, with no look at
+the disk, and that cut both ways: a pooled name whose folder had been deleted in
+Finder REFUSED its own removal on the strength of a folder that was not there,
+and it ALLOWED the last real folder to go while it sat in the pool beside it —
+leaving every expectation reading as never evaluated. The kept nested name
+above is the same phantom, reached by removing its parent.
+
+**The rule** (`contracts/shared-rules.json` → `gradedFolders.floor`, seventeen
+cases, three outcomes): refuse a removal or an untick when, BEFORE it, some
+pooled name names a folder found by the checklist's own walk (case ignored, as
+the build compares), and AFTER it none does. "After" is the removal rule's own
+answer — the walk without everything found under the removed folder, the lists
+without the name, and the pool as `MarksPoolRemoval` leaves it; for an untick,
+the pool without that name. A never-asked course's pool is the historical rule
+over what is offered. If the walk finds no folder at all, every pooled name
+counts as found — the old rule, kept so an unreadable or empty course folder
+cannot switch the floor off (F11; it is also what keeps
+`SpecialFoldersProtectionTests`, whose courses hold only `section1/`, green
+unchanged, and Windows' `ItemProtectionTests`, which build contexts with no
+disk at all — the fallback must not be "simplified" away on either side).
+
+**The confirmation follows the same comparison**, so its sentence stays true.
+A removal is ASKED about when it changes the pool or takes a pooled name from
+found to not found, and not otherwise. So removing `Portfolios` while a pooled
+top-level `Tests` holds the floor up now asks (F9 — it takes
+`Portfolios/Tasks` out of the marks, and "This folder holds work that counts for
+marks" is true of `Portfolios`); and removing a top-level `Tasks` that
+`Portfolios/Tasks` keeps no longer asks (F7, F16), because "Removing it will take
+it out of your course's marks pool" would be untrue of a name that stays. The
+contract pins `refused` with its SENTENCE, so a per-section case cannot pass on
+`lastPerSectionFolderBlocked`; every per-section fixture has two per-section
+folders, none of them the class folder, and no case has a curriculum folder.
+
+**Every occurrence, with where it was found.** `GradedFolderChoices.walkedFolders`
+records each folder the walk finds — every occurrence, not the first — with the
+folder directly inside the course it was found under and the folders on its path
+that sit directly inside a section folder. The walk after a removal is then
+worked out in memory by dropping entries under the removed name, compared
+EXACTLY (`excluded_items` is exact, `excludedItems.matching`): removing a list
+entry `tasks` whose folder on disk is `Tasks` takes nothing off the site, and the
+floor must agree (F17). A walk that kept only first occurrences passes fifteen
+of the cases and fails F16 — `Tasks` is first found inside `Portfolios`, and the
+top-level `Tasks` that survives removing `Portfolios` must still be seen.
+
+**When the walk is taken, measured.** One walk per drawing of the page (per
+BODY evaluation, which includes every keystroke in the course name or the
+footer — the same count as before, since the checklist already walked in the
+body), shared by the checklist and all three lists' protections; again when the
+window becomes key (`controlActiveState`, because `onAppear` does not fire when a
+window merely becomes key again); and AFRESH for the row a teacher acts on
+(`protectionWhenActedOn` on `StringListEditorView` and
+`MembershipToggleListView`). The last is the one that matters: the floor now
+depends on the disk, and a teacher who deletes a folder in Finder with Settings
+open — #80's own scenario — would otherwise be answered from a walk taken before
+the deletion. Asking at the click happens in the list's own handler (the
+editor's `requestRemoval`, the checkbox binding's setter), never while a table
+cell is drawn, so #266's rule that a cell never asks the course a question
+(09 → "A cell never asks the course a question") still holds. Measured on an
+Apple M4 Pro, `swiftc -O`, a synthetic 413-folder, 2,500-page course, best of
+20: the walk before this change 35.6 ms, the new walk with ancestry 32.7 ms —
+the same cost. What changed is how many: a never-asked course used to walk
+once per ROW in every protection (through the inferred pool), and now walks
+once per drawing plus once per click. The planner's 53 ms on a 400-folder,
+3,264-page course was the same walk on another fixture.
+
+**REJECTED**, so they are not proposed again: counting only names found on disk
+but keeping "is this the last pooled name" (F8 still passes and F7 is still
+refused, and liveness needs the same walk anyway); taking names without a folder
+OUT of the pool (a preserved answer, `choices` case 11 and #142's no-repair
+ruling); a new sentence naming the nested folder for F8 (offered to the wording
+pass — the existing instruction, "choose another graded folder under Marks
+first", is already right); a walk per row (above); and deciding a click from the
+walk the list was drawn with (above).
+
+**Recorded, not fixed.** A course folder that is readable but whose every folder
+is hidden, skipped or excluded walks as EMPTY, so the floor falls back to
+counting the declared pool, phantoms included — the old behaviour, not a new
+fault. Between a Finder deletion and the next drawing, a row can LOOK ordinary
+and then refuse when clicked; the refusal explains itself. And a removal of a
+list entry whose case differs from a pooled name (`tasks` against a pooled
+`Tasks`) is asked about when it takes the folder off the site, while the mac's
+DROP compares exactly and keeps `Tasks` in the pool (Windows drops with
+`OrdinalIgnoreCase`) — the drop's own comparison is still unpinned
+(`removingAFolder` case 7's `why`), and a teacher needs a list entry spelled
+differently from its own pooled name to meet it.
+
+### A command-line re-run leaves the marks pool alone (#192)
+
+**A run of `setup_course.py` that finds a saved `graded_folders` writes it back
+as it was** — same names, same spelling, same order, whatever the folder lists
+the run ends with and whatever is on disk. A saved `null` is written as `[]`
+(as it always was), and a course that never had the key still has none. The
+one cleaning left is of entries that cannot name a folder at all — null, a
+blank string, a non-string, an exact repeat — which only a hand edit writes
+and which the old path also removed (`saved_pool_without_malformed_entries`);
+every real name stays, including one with no folder behind it. Only a
+NEW course made on the command line — no saved `course_config.json` at all —
+has its pool worked out from the payload or skeleton and reconciled against
+its folder lists by `graded_folders_for`; a new course made in either app
+arrives with its pool already in the saved file, written by the wizard (see
+the #292 section below for what happened while one path did not). The contract is `contracts/shared-rules.json` →
+`gradedFolders.rerunningSetup`, eleven cases, run by
+`scripts/test_graded_folders_rerun.py`, which drives the real wizard in-process
+(`input` and `getch` replaced, every prompt answered with Return) — on the mac
+host in `verify.sh`'s first step and on Windows through `PythonToolchainTests`.
+Neither app runs it, because neither ever re-runs setup on an existing course.
+
+**Why.** The re-run used to pass a saved pool back through the new-course
+reconciliation, which keeps only names on the TOP-LEVEL copy lists
+(`shared_folders` + `per_section_folders`). That rule was written on
+2026-08-24, two weeks before the Marks checklist began offering folders found
+INSIDE other folders (`gradedFolders.choices`, #79/#112), and nobody changed
+the re-run. Measured on 2026-09-25 by driving the real wizard with every prompt
+accepted and no folder removed:
+
+| saved pool | lists the run ends with | on disk | written back before #192 |
+|---|---|---|---|
+| `["Tasks"]` | Concepts, Portfolios | `Portfolios/Tasks` | `[]` |
+| `["Tasks"]` | Concepts / All Classes | `section1/Tasks` | `[]` |
+| `["Tests"]` | Concepts, Tasks | `Tasks/Tests` | `[]` |
+| `["Tasks"]` | Concepts, tasks | `tasks` | `["tasks"]` (respelt) |
+| `["Tasks"]` | Concepts, Tasks | `Tasks` | `["Tasks"]` |
+
+The first three are exactly what the checklist WRITES when a teacher ticks a
+nested folder, so a teacher who ran `./setup.sh` again to change a colour lost
+every mark in those folders — `[]` is "asked, and nothing counts", and the
+historical rule never applies to the course again. The issue as reported
+(a removal's preserved entry, `removingAFolder`'s fifth case, emptied by the
+next re-run) is one road into the same fault.
+
+The re-run does not ask the marks question and has no way to remove a folder,
+so it does not own the answer. Two more measurements say nothing was lost by
+dropping the reconciliation:
+
+- **It never counted more.** Over the shapes above plus two with a name that
+  names no folder, counting pages with the build's own `_is_graded_path`, the
+  reconciled pool counted the same pages or FEWER in every shape. A respelling
+  counts the same (the build lowercases both sides); the only shapes where the
+  written value changed what counts were the FOUR that lost marks — the first
+  three rows above, and the prompt-drop shape in the next point, which wrote
+  `[]` for a folder the next build published again.
+- **A name taken off a copy list at a prompt is not a removal.** With `Tasks` on
+  disk but off `shared_folders`, one call of
+  `build_site.preflight_update_course_config` puts it straight back
+  (`['Concepts']` → `['Concepts', 'Tasks']`), and the command-line wizard writes
+  no `excluded_items`. Dropping the name from the pool stopped counting a
+  folder that was still published.
+
+**A name that names no folder is kept, and it is not invisible.** It counts no
+page, but the published Curriculum Coverage page names every pooled folder in
+its sentence about what counts (`build_site._graded_folders_in_words`). Course
+Settings' last-folder guard used to count it too, so the last LIVE folder could
+be unticked without the block; since #152 the guard counts only names found on
+disk (`gradedFolders.floor`, "The marks floor counts only folders on disk"
+above), so that half is closed. `site_health` raises `noGradedFolders` only when the
+coverage map is on, curriculum pages are found and nothing in the pool matches a
+published folder — so a dead name beside a live one raises nothing. Both effects
+could already happen through the apps' own exact-match removal
+(`removingAFolder`), and the contract's tenth case pins the name being KEPT so
+that nobody adds a clean-up by existence here that the apps would disagree with.
+
+**This retires the "second net".** This page, three Swift comments and the
+`wizard.skeletonToggle` reasoning used to say `setup_course.py` "reconciles the
+key again when it reads it" behind the apps' own narrowing on a new course.
+Both apps write `course_config.json` BEFORE they drive the setup script, so an
+app-created course always takes the re-run path; there the reconciliation was a
+no-op, since each wizard narrows its pool before writing (mac
+`GradedFolderRule.reconciled`, Windows `CurrentGradedFolders` — both, since
+#152, the command line's own rule: exact first, then respelled with case
+ignored, repeats dropped, `gradedFolders.reconcilingAChosenPool`). What the net
+could still catch was a name that counts nothing. Now each wizard's narrowing
+is the only one.
+
+**REJECTED**, so they are not proposed again:
+
+- *Reconcile against the checklist's own walk* (depth four, the skip list,
+  hidden folders, links and reparse points, `sectionN` scope, `excluded_items`)
+  — a THIRD implementation of the walk, kept in step with two apps, to drop only
+  names that count nothing; with a Windows-only reparse-point caution nobody on
+  the mac can test.
+- *Reconcile against every folder at any depth* — a walk rule of its own, the
+  same payoff.
+- *Keep the respelling, drop only unmatched names* — marks-neutral, and a pool
+  one tool rewrites and the others do not is a file two apps can disagree about.
+- *Tell an app's new-course run from a command-line re-run* (an empty course
+  folder, say) so the old check stayed on the app path — a guess about intent,
+  for a net that caught nothing that counts.
+
+**Not done.** Courses already emptied by a re-run are not repaired: a re-run's
+`[]` is byte-identical to a teacher's deliberate one. And `null` still reads
+differently in the mac app (never asked) and the build (asked and cleared); the
+re-run keeps writing `[]` for it, and the ninth case records that as today's
+behaviour rather than as a decision.
+
 ### Content declares its own pool
 
-All 38 payload manifests and all 50 skeleton families now carry
+All 39 payload manifests and all 50 skeleton families now carry
 `graded_folders`, and both linters refuse a manifest without one or one naming a
-folder the course does not have. `setup_course.py` writes it at creation from
-the manifest — shared Python, so both platforms get that unchanged.
+folder the course does not have. It reaches a NEW course by two routes, and they
+must write the same thing. On the command line `setup_course.py` writes it at
+creation from the manifest (`graded_folders_for`). In either app the WIZARD
+writes it — the payload's pool for a course taking ready-made pages, the
+skeleton's or the teacher's own ticks otherwise — into the `course_config.json`
+it creates before setup runs, because setup reads a saved file as answered and
+never works the pool out over one. That second half was missing for a
+pre-populated course until #292; see the next section.
 
 Declared rather than inferred deliberately: inference is a substring while the
 build matches exactly, and those two agree for 88 of the 89 courses here and
 disagree for the one that would have been broken by it.
 
+### A course made in either app from ready-made pages had no marks pool (#292)
+
+**The mechanism.** Both apps write `courses/<CODE>/course_config.json` FIRST
+and then run setup with no arguments (`NewCourseCreator.swift`;
+`NewCourseDialog` on Windows). `setup_course.py` decides the pool by whether a
+saved configuration EXISTS, not by whether the course is new: over a saved
+file it writes back a saved `graded_folders` (#192) and leaves the key ABSENT
+when the file had none; only with no saved file at all — a command-line run —
+does it call `graded_folders_for` on the manifest. And both wizards
+deliberately left the key out when the structure came from example content,
+believing setup would take the pool from the manifest. Windows' comment above
+`NewCourseDialog.BuildConfiguration` says so ("prefers a pool already present
+in the saved config over the manifest's"). That is half true: a saved pool does
+win, but a saved file WITHOUT one does not fall back to the manifest. So every
+pre-populated course either app made had no `graded_folders`, which reads as
+"never asked".
+
+**How long.** Two commits crossed on 2026-08-24. At 10:39 `11a70b7e` made a
+saved-config run stop deriving the pool (before it, `392bf357` wrote the
+manifest's pool on every run, the app's included). At 11:41 `e9d71d8d` made
+the wizard write the pool on every path EXCEPT a payload, on the old
+assumption. #192 did not touch this path.
+
+**Measured** (2026-09-26, the real `setup_course.setup_course` driven
+in-process): a command-line TAS2O or ADA1O with every prompt accepted is
+written `["Tasks"]`; the same run over the file the mac wizard wrote for ADA1O
+leaves the key absent; that file with `["Tasks"]` added keeps it.
+
+**What a teacher saw.** Not an empty Marks checklist, as the issue first said:
+with the key absent, Course Settings shows the inferred folders ticked. All 39
+payloads declare `["Tasks"]`, the historical rule infers the same from their
+lists, and the only "task" folder in any payload is `shared/Tasks`, so the
+build counted the same pages and no mark was missing. What differed:
+
+- the published Curriculum Coverage page said "any folder with “task” in its
+  name" where a command-line course said "**Tasks**"
+  (`build_site._graded_folders_in_words`);
+- the course stayed never-asked, so a later folder with "task" in its name was
+  counted automatically, renaming `Tasks` to a name without "task" silently
+  stopped counting it (`SpecialFolderRenamer` rewrites only a key that is
+  present), and removing `Tasks` left the key absent rather than writing `[]`;
+- a future payload whose pool is not `["Tasks"]` would have lost marks in the
+  apps while working on the command line.
+
+**What changed.** The app owns the answer, because it is the only party that
+knows the course is new. `ExampleContentCatalog.marksPool(fromManifest:)`
+mirrors `graded_folders_for` exactly as setup calls it for a payload: the
+shared folders without `Media` (and — on the command line only — without the
+curriculum folder when its pages are declined, which no payload's pool names,
+so the apps do not model that step), then the per-section ones; a declared name kept
+when it matches a folder exactly, respelled to the folder's spelling when it
+matches ignoring case, dropped otherwise; blanks, nulls, non-names and repeats
+dropped; a declared null or `[]` gives `[]`; inference only when the key is
+absent. `buildConfigurationDictionary` writes it when
+`takesExampleContent && hasContent` — so never for a club, which takes no
+ready-made pages. An unreadable manifest leaves the key absent, as before.
+`setup_course.py` did not change. Windows has the same gap and owes the same
+change (the `windows` issue for #292).
+
+One behaviour follows that is intended, not a regression: with the key now
+present, `removingAFolder` applies to a new payload course, so removing `Tasks`
+in Course Settings writes `[]` (with the coverage warning) instead of leaving
+the key absent — which is what a command-line course has always done.
+
+**REJECTED**, so they are not proposed again:
+
+- *A Python fix* that treats "the saved file is the only thing in the folder"
+  as a new course and derives the pool. Free for Windows, and that is its only
+  merit: it infers newness from disk state, which is wrong for a teacher who
+  deletes a course's pages and re-runs setup; it carves an exception into
+  `rerunningSetup` the day after it landed; and it makes two writers of one
+  answer, since the apps already write the pool on every other path.
+- *Dropping the wizard's guard and writing its own list.* The structure editors
+  are collapsed for a payload course, so that list is the wizard's default,
+  reconciled against the wizard's default folders rather than the payload's.
+  It happens to give `["Tasks"]` for all 39 today, which is exactly why it
+  would pass every literal test while being wrong — the contract's MCV4U case
+  with a hidden `["Tests"]` exists to catch it.
+- *Reusing `GradedFolderRule.reconciled`* (exact match) on the manifest's
+  pool. That reconciled a teacher's own ticks exactly, while this reproduces
+  what the command line writes, which matches ignoring case and infers when the
+  key is absent; the contract's respelling case was red for it on the mac and
+  green in Python. **Superseded by #152**: `reconciled` now IS the command
+  line's rule (`gradedFolders.reconcilingAChosenPool`), so `marksPool` hands its
+  string entries to it and there is one copy. The manifest reading — the
+  `Media` filter, the absent-key inference, non-strings dropped — stays in
+  `marksPool`.
+- *Reading `SkeletonCatalog.adoptedGradedFolders`* — the wrong source, and it
+  reads a declared `[]` as "infer".
+
+**Not done: existing courses are not repaired.** A migration cannot tell such a
+course from a legacy course that was never asked, or from one where the
+teacher has since added "Performance Tasks", which the historical rule counts
+and a frozen `["Tasks"]` would not — the "Do not seed existing courses"
+argument above, again. Measured, no mark changes for any of them; what they
+keep is the unconfigured Coverage-page sentence and the rename edge, and the
+first tick in Course Settings → Marks makes the pool explicit, as it does for
+every legacy course.
+
+**Why the tests look the way they do.** Every shipped payload and the
+wizard's default say `["Tasks"]`, so any wrong source passes a literal case.
+What discriminates is the MCV4U case with a hidden `["Tests"]` (the wizard's
+own list leaks as `[]`; the mathematics skeleton's pool reads as `["Thinking
+Tasks", "Tasks"]`), the eight made-up `manifestCases`, and a club case whose
+own list is `["Exercises"]`. One mutation is honestly NOT caught on the command
+line: pointing setup at the skeleton instead of the payload stays green there,
+because `graded_folders_for` reconciles any declared pool against the
+PAYLOAD's folders and no payload has "Thinking Tasks". The mac catches it,
+because nothing there reconciles the skeleton's list against the payload's.
+
 ### Where the rules live
 
 `contracts/shared-rules.json` → `gradedFolders` (10 cases for which folders
 COUNT, run by `scripts/test_graded_folders.py` in the image — neither app
-implements that rule, so neither suite runs them) and `gradedFolders.choices`
-(14 cases for what the checklist OFFERS, run by both apps). The key itself is in
-`contracts/file-formats.json`.
+implements that rule, so neither suite runs them), `gradedFolders.choices`
+(14 cases for what the checklist OFFERS, run by both apps) and
+`gradedFolders.rerunningSetup` (11 cases for what a re-run of setup writes back,
+run by `scripts/test_graded_folders_rerun.py`) and `gradedFolders.newCourse`
+(6 cases and 8 `manifestCases` for the pool a NEW course is written, #292 — run
+by the mac's `WizardStructureTests` and `ExampleContentContractTests`, and on
+the command line by `scripts/test_graded_folders_new_course.py`, which Windows'
+`PythonToolchainTests` discovers; Windows owes the app half). The key itself is
+in `contracts/file-formats.json`.
 
 ## “Where do the class pages live?” had four answers
 
@@ -1184,10 +1660,13 @@ each pinned by tests in `Plantoir.Tests/ClassFolderMembershipTests.cs`:
   reaches rather than only the publish one. **Both are closed as of
   2026-09-19**: the mac's date walk goes through `reachFollowingLinks(from:)`
   now and stops where Windows stops, pinned by `class-planning.json` →
-  `datingPagesAClassBrings.reachStopsAtAClassPage`. Unpublish reach is the one
-  half still open —
-  [#201](https://github.com/russellgordon/plantoir/issues/201), v1.3.0 — and
-  neither platform stops there today.
+  `datingPagesAClassBrings.reachStopsAtAClassPage`. Unpublish reach, the one
+  half left open then, closed on the mac on 2026-09-26
+  ([#201](https://github.com/russellgordon/plantoir/issues/201)): an unpublish
+  stops at a class page too (`followingLinks.stopsAtAClassPage.appliesTo`,
+  `followingLinks.unpublishing.cases`). Windows' unpublish sweep did not stop
+  either, and owes the same clause; see
+  [the assistant's page](10-local-ai-assistant.md#unpublishing-stops-there-too-201).
 
 **Rejected: keeping Windows' wider membership.** It is the more generous
 reading — everything the teacher put in a per-section folder is a class — and

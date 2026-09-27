@@ -141,6 +141,35 @@ final class SectionRestoredTrailTests: XCTestCase {
         XCTAssertTrue(trail.contains(AssistSectionRestore.unnamedBackup), "and says so plainly: \(trail)")
     }
 
+    /// Pages whose setting a restore could not put back leave their own line
+    /// — a COUNT with the course and section, never which pages — and none
+    /// at all when there were none (#182; `page settings left as they were`).
+    @MainActor
+    func testPagesNotPutBackAreCountedOnTheTrailAndNeverNamed() throws {
+        let scratchFolderURL: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("restore-trail-\(UUID().uuidString)", isDirectory: true)
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: scratchFolderURL)
+        defer {
+            ActivityTrail.store = previousStore
+            try? FileManager.default.removeItem(at: scratchFolderURL)
+        }
+
+        AssistSectionRestore.notePagesNotPutBack(0, courseCode: "ICS3U", sectionNumber: 1)
+        XCTAssertFalse(
+            ActivityTrail.store.activityText(includingPrompts: true).contains("as they were"),
+            "nothing left undone, no line"
+        )
+
+        AssistSectionRestore.notePagesNotPutBack(2, courseCode: "ICS3U", sectionNumber: 1)
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        let expected: String = "ICS3U/1 · " + ActivityTrail.pageSettingsLeftAsTheyWereLine(
+            act: "putting the section back", pages: 2
+        )
+        XCTAssertTrue(trail.contains(expected), "the course, the section and the count: \(trail)")
+        XCTAssertFalse(trail.contains(".md"), "and never which page: \(trail)")
+    }
+
     // MARK: - The platform filter
 
     /// An entry with no `appliesOn` belongs to both platforms.

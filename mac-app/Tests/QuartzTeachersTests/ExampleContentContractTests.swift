@@ -229,6 +229,28 @@ final class ExampleContentContractTests: XCTestCase {
                        + "toggle the teacher can see.")
     }
 
+    /// `contracts/shared-rules.json` → `gradedFolders.newCourse.manifestCases`,
+    /// against the mirror of `setup_course.graded_folders_for` the wizard
+    /// writes a pre-populated course's pool with (#292). Made-up manifests,
+    /// because every shipped payload declares `["Tasks"]` and so cannot tell
+    /// a faithful mirror from one that hard-codes it.
+    @MainActor
+    func testTheMarksPoolIsReadFromAManifestAsTheCommandLineReadsIt() throws {
+        let rule: [String: Any] = try WorkLeaseLivenessTests.sharedRules(["gradedFolders", "newCourse"])
+        let cases: [[String: Any]] = try XCTUnwrap(rule["manifestCases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 8, "the contract lost manifest cases")
+        for testCase in cases {
+            let caseName: String = testCase["name"] as? String ?? "unnamed"
+            let manifest: [String: Any] = try XCTUnwrap(testCase["manifest"] as? [String: Any], caseName)
+            let expected: [String] = try XCTUnwrap(testCase["expect"] as? [String], caseName)
+            XCTAssertEqual(
+                ExampleContentCatalog.marksPool(fromManifest: manifest), expected,
+                "\(caseName): the app must write what the command line writes for the same payload "
+                + "(contracts/shared-rules.json → gradedFolders.newCourse.manifestCases)."
+            )
+        }
+    }
+
     private static func repositoryRoot() -> URL {
         return URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()

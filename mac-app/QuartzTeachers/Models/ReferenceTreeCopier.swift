@@ -140,6 +140,12 @@ nonisolated enum ReferenceTreeCopier {
         /// teacher would find out next year. The course is refused instead,
         /// naming the folder.
         let unreadableFolders: [String]
+
+        /// Which of the paths asked to be left behind (`leavingBehindPaths`,
+        /// or `leavingBehindIfALink` that turned out to be a link) were
+        /// actually there, in the order the walk met them. The older layouts
+        /// count their add-on entries from this (#255).
+        let pathsLeftBehind: [String]
     }
 
     /// Why a copy stopped.
@@ -176,9 +182,25 @@ nonisolated enum ReferenceTreeCopier {
     /// `.merged_output` is one, pointing out of the working folder
     /// altogether, and following it would copy the built site back into the
     /// course it came from.
-    static func walk(courseAt courseURL: URL, leavingBehind leftBehindNames: Set<String>) -> Survey {
+    ///
+    /// **`leavingBehindPaths` is matched against WHERE a thing is, not what
+    /// it is called** (#255): `.obsidian/plugins` stays behind while a
+    /// teacher's own `Unit 1/plugins` folder of pages comes. Skipped before it
+    /// is so much as `lstat`-ed, like a name, so nothing inside it can refuse
+    /// the course. `leavingBehindIfALink` is skipped only when `lstat` says it
+    /// is a link — a real `.obsidian` comes, a linked one does not. Both
+    /// default to empty, and they are separate from `leftBehindNames` on
+    /// purpose: a caller overriding the names (the sheet does, and tests do)
+    /// cannot drop the add-ons rule by accident. `ObsidianAddOns` says why.
+    static func walk(
+        courseAt courseURL: URL,
+        leavingBehind leftBehindNames: Set<String>,
+        leavingBehindPaths leftBehindPaths: Set<String> = [],
+        leavingBehindIfALink leftBehindLinks: Set<String> = []
+    ) -> Survey {
         var items: [Item] = []
         var unreadable: [String] = []
+        var pathsLeftBehind: [String] = []
         var fileCount: Int = 0
         var byteCount: Int64 = 0
         var pageCount: Int = 0
@@ -187,9 +209,10 @@ nonisolated enum ReferenceTreeCopier {
         ReferenceTreeCopier.walk(
             folderAt: ReferenceTreeCopier.pathBytes(of: courseURL),
             relativePath: [],
-            leftBehindNames: leftBehindNames,
+            rules: WalkRules(names: leftBehindNames, paths: leftBehindPaths, links: leftBehindLinks),
             items: &items,
-            unreadable: &unreadable
+            unreadable: &unreadable,
+            pathsLeftBehind: &pathsLeftBehind
         )
 
         for item in items where !item.isDirectory {
@@ -216,13 +239,24 @@ nonisolated enum ReferenceTreeCopier {
             byteCount: byteCount,
             pageCount: pageCount,
             pageYears: pageYears,
-            unreadableFolders: unreadable
+            unreadableFolders: unreadable,
+            pathsLeftBehind: pathsLeftBehind
         )
     }
 
     /// The same walk, for the callers that want only the numbers.
-    static func survey(courseAt courseURL: URL, leavingBehind leftBehindNames: Set<String>) -> Survey {
-        return ReferenceTreeCopier.walk(courseAt: courseURL, leavingBehind: leftBehindNames)
+    static func survey(
+        courseAt courseURL: URL,
+        leavingBehind leftBehindNames: Set<String>,
+        leavingBehindPaths leftBehindPaths: Set<String> = [],
+        leavingBehindIfALink leftBehindLinks: Set<String> = []
+    ) -> Survey {
+        return ReferenceTreeCopier.walk(
+            courseAt: courseURL,
+            leavingBehind: leftBehindNames,
+            leavingBehindPaths: leftBehindPaths,
+            leavingBehindIfALink: leftBehindLinks
+        )
     }
 
     /// Copies what the walk found into a folder that does not exist yet.
@@ -531,6 +565,17 @@ nonisolated enum ReferenceTreeCopier {
 
     // MARK: - Private helpers
 
+    /// What one walk leaves behind: by name at any depth, by path from the
+    /// top of the walk, and by path only when it is a link.
+    private struct WalkRules {
+
+        // MARK: - Stored properties
+
+        let names: Set<String>
+        let paths: Set<String>
+        let links: Set<String>
+    }
+
     /// One folder, then everything in it. Folders come before their contents
     /// so the copy can make each one before writing into it.
     ///
@@ -539,9 +584,10 @@ nonisolated enum ReferenceTreeCopier {
     private static func walk(
         folderAt folderPath: [UInt8],
         relativePath: [UInt8],
-        leftBehindNames: Set<String>,
+        rules: WalkRules,
         items: inout [Item],
-        unreadable: inout [String]
+        unreadable: inout [String],
+        pathsLeftBehind: inout [String]
     ) {
         guard let directory = opendir(ReferenceTreeCopier.path(folderPath, [])) else {
             var name: String = String(decoding: relativePath, as: UTF8.self)
@@ -576,7 +622,7 @@ nonisolated enum ReferenceTreeCopier {
         for name in children {
             // Every name on the skip list is ASCII, so comparing the text is
             // exact here however the rest of the tree is spelled.
-            if leftBehindNames.contains(String(decoding: name, as: UTF8.self)) {
+            if rules.names.contains(String(decoding: name, as: UTF8.self)) {
                 continue
             }
 
@@ -585,6 +631,14 @@ nonisolated enum ReferenceTreeCopier {
                 childRelative.append(ReferenceTreeCopier.separator)
             }
             childRelative.append(contentsOf: name)
+
+            // Where it is, as text — exact for the ASCII paths the rules
+            // name. Skipped before `lstat`, so nothing inside is looked at.
+            let childText: String = String(decoding: childRelative, as: UTF8.self)
+            if rules.paths.contains(childText) {
+                pathsLeftBehind.append(childText)
+                continue
+            }
 
             var childPath: [UInt8] = folderPath
             childPath.append(ReferenceTreeCopier.separator)
@@ -597,8 +651,13 @@ nonisolated enum ReferenceTreeCopier {
             }
 
             // A symlink is copied AS a link, so nothing is followed and
-            // nothing outside the course is read.
+            // nothing outside the course is read — unless the caller asked for
+            // that link to stay behind altogether.
             if (status.st_mode & S_IFMT) == S_IFLNK {
+                if rules.links.contains(childText) {
+                    pathsLeftBehind.append(childText)
+                    continue
+                }
                 items.append(Item(
                     relativePath: childRelative, isDirectory: false,
                     byteCount: 0, mode: status.st_mode, modified: nil
@@ -614,9 +673,10 @@ nonisolated enum ReferenceTreeCopier {
                 ReferenceTreeCopier.walk(
                     folderAt: childPath,
                     relativePath: childRelative,
-                    leftBehindNames: leftBehindNames,
+                    rules: rules,
                     items: &items,
-                    unreadable: &unreadable
+                    unreadable: &unreadable,
+                    pathsLeftBehind: &pathsLeftBehind
                 )
                 continue
             }

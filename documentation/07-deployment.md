@@ -148,9 +148,10 @@ Deploys always go to **production** (no draft deploys), matching the
 
 A preview build embeds a live-reload WebSocket client (`ws://localhost:<port>`)
 into generated HTML pages. Deploying those directly would cause students'
-browsers to prompt for local network permissions. `deploy.py` detects this
-signature in `public/index.html` (or checks if `baseUrl` in `quartz.config.ts` needs
-updating for the deployed domain) and automatically re-executes a clean static
+browsers to prompt for local network permissions. `deploy.py` detects the
+client — its script TAG followed by its first statement, not the bare address,
+since #291 — in any page under `public/` (every `*.html`, since 2026-09-05 — see
+"One rule, six readers" below) and automatically re-executes a clean static
 build inside the container-internal workspace (`/tmp/quartz-builds/...`),
 mirroring the production assets back to `public/` before uploading.
 
@@ -192,6 +193,231 @@ waited the full timeout, and always refused. It is now `Test-CarriesLiveReload`
 in `deploy.ps1`, which tests for a match object rather than a Boolean. The
 general rule for PowerShell written from the mac: `-Quiet` is not a scalar when
 the input is a pipeline.
+
+#### One rule, six readers (GitHub #136, 2026-09-25)
+
+Whether a built site is a preview's is asked in six places, and until #136
+they did not agree:
+
+| Reader | Where | What it reads | What it looks for (#291) |
+|---|---|---|---|
+| `BuildFreshness.builtForPreview` (mac) | `mac-app/QuartzTeachers/Models/BuildFreshness.swift` | every `*.html` under `public/`, as bytes — the front page ALONE until #136 | `carriesLiveReloadClient`: every occurrence of the client, whitespace stepped back over, then the tag |
+| The scheduled publish's own check (mac) | `ScheduledDeploy.oneShotCommand` | `LC_ALL=C grep -rzqs --include='*.html'` over `public/` — `index.html` alone until #136 | `BuildFreshness.liveReloadPattern`, the contract's `asABasicRegex` |
+| `deploy.sh`, folder leg | one `site_carries_preview_client`, called three times | the whole tree, since 2026-09-05 | `LIVE_RELOAD_CLIENT_PATTERN`, under `LC_ALL=C grep -rzqs` |
+| `deploy.py`, Netlify and Cloudflare | `public_dir.rglob("*.html")` | the whole tree, since 2026-09-05, as bytes | the contract's `scriptTag` and `client`, read from the contract |
+| `deploy.ps1`, folder leg | `Test-CarriesLiveReload` | the whole tree, line by line | still the bare address — **owed on [#272](https://github.com/russellgordon/plantoir/issues/272)** |
+| `BuildFreshness.BuiltForPreview` (Windows) | `Plantoir.Core/Models/BuildFreshness.cs` | the front page alone — owed on #272 | still the bare address — owed on #272 |
+
+(Windows' scheduled task builds unconditionally, so it has no check to get
+wrong.)
+
+**Why the apps being narrower mattered.** The built tree is replaced file by
+file, so a clean front page in front of a preview's pages is a real state. The
+app called it deploy-fresh and skipped its own build; the launcher then saw the
+client and rebuilt under the DESTINATION's leg. On the Deploy button that shows
+the deploy-only milestones while a build is in fact running. On the mac's
+scheduled publish to a folder it was worse: a question the rebuild stopped for
+came back through `deploy.sh`'s exit 3 and was recorded as the folder's
+(`neededAnAnswer`, sending the teacher to Publish) rather than the build's
+(`buildNeededAnAnswer`, sending them to Preview). Now the app and the overnight
+check read the same tree, so whenever `deploy.sh` would rebuild, the build leg
+already has. `deploy.sh`'s own rerun is kept: it is what protects
+`./preview.sh` followed by `./deploy.sh --to-folder` typed at a command line.
+
+**The rule is data**: `contracts/app-rules.json` → `buildFreshness.previewBuild`
+— the `signature`, `where` it is looked for, and fifteen `cases` (nine until
+#291), each a tree of pages. The mac suite runs the app's check (`BuildFreshnessTests`) and the
+overnight shell (`ScheduledPublishOutcomeTests`) against it;
+`scripts/test_preview_build_detection.py` cuts `deploy.sh`'s pattern and
+function out of the launcher and runs them under a UTF-8 locale, and runs the real `deploy.py`, against the same list —
+in `verify.sh` and in Windows' `PythonToolchainTests`. `deploy.ps1` is Windows'
+to run against it. Its `notShared` says what the cases deliberately leave out.
+
+**The details each reader has to get right, and why:**
+
+- **Bytes, not text — and so `LC_ALL=C` in every grep, `deploy.sh`'s
+  included (since #291).** A page that is not valid UTF-8 must not change the
+  answer. Reading as a Swift `String` would make one such page force a rebuild
+  on every publish forever; `deploy.py` reads `read_bytes()`. **Measured**
+  (macOS 26.6, `/usr/bin/grep` 2.6.0-FreeBSD): under a UTF-8 locale `grep`
+  does NOT find the signature on a line that also holds an invalid byte
+  (exit 1); under `LC_ALL=C` it does (exit 0). Until #291 that miss needed the
+  byte on the SAME line, and it erred safe (a Terminal's `deploy.sh` called
+  such a page clean while the app, reading bytes, rebuilt first), so #136 wrote
+  it down rather than touch the launcher. With `-z` (next bullet) a record is
+  the whole FILE: `LC_ALL=en_US.UTF-8 grep -zq` on a real preview page with
+  `\xff\n` prepended exits **1** and `LC_ALL=C` exits **0**; a stray `E9` just
+  before `<body` gives the same 1 and 0. A bad byte AFTER the client does not
+  cause the miss (0 in both locales). Quartz writes the client at the end of
+  `<body>`, so an invalid byte almost anywhere in a preview's page — anywhere
+  before the client — would read it as clean, and a preview's page read as
+  clean is a preview PUBLISHED. So `deploy.sh` now carries `LC_ALL=C`
+  (`site_carries_preview_client`), and the case is pinned (case 15,
+  `invalidUTF8Before`). The Python test and the overnight test both run their
+  shell under `en_US.UTF-8`, so neither passes by borrowing a C locale from
+  launchd or CI.
+- **One record, not lines (#291).** Quartz writes the client's tag at the end
+  of one line and its first statement, after eight spaces, at the start of the
+  next (measured: lines 131 and 132 of a real preview's `index.html`). A
+  line-by-line reader cannot see the pair at all, so every reader reads a page
+  whole: `grep -z` in the shells, bytes in Swift and Python, and — owed on
+  #272 — `Get-Content -Raw` or `ReadAllBytes` in PowerShell, whose
+  `Select-String` is line-based and case-insensitive. The pattern is a BASIC
+  regex: under `-E` BSD grep refuses it (`parentheses not balanced`, exit 2),
+  because the client holds a literal `(`.
+- **Hidden folders included** — `grep -r` and `rglob` both look inside them, so
+  the Swift enumerates without `.skipsHiddenFiles`.
+- **A page that cannot be opened is passed over; a front page that cannot be
+  opened means rebuild.** The launchers skip an unreadable page (`2>/dev/null`,
+  `except OSError`). The overnight line says `! [ -r index.html ] || … grep
+  -rqs …`: measured, BSD grep with `-s` exits 0 on a match elsewhere and 2
+  otherwise, which an `if` reads as "no", so the front page needs its own test.
+- **The front page first.** A real preview's build carries the client in every
+  page, so it answers from one file.
+
+**Cost — measured on an Apple M4 Pro, macOS 26.6**, a standalone copy of the
+Swift scan run 20 times against real sections (read-only): a clean 244-file /
+230-page section 6.5–7.8 ms warm, 54 ms on the first run in a fresh process; an
+864-file / 353-page section about 12 ms warm, 72–82 ms first. A real preview's
+build answers in 0.1 ms. The front-page-only read it replaced took 0.02 ms.
+**Re-measured for #291** (2026-09-26, same machine, `swiftc -O`, 20 runs each,
+old byte search against the new tag-and-client search on the same copy): the
+244-file / 230-page ADA1O section 8.0–9.3 ms median warm for the new rule
+against 9.4–12.7 ms for the old, 10–15 ms first; a 976-file / 920-page tree
+(that section four times over — every file a page, so heavier than the
+353-page section above) 29–36 ms median warm for both, 34–114 ms first. The
+new rule costs nothing measurable: the client is rare, so each page is still
+one `range(of:)` pass. It
+runs once per Publish press, on a path that then builds or uploads for seconds
+to minutes, so it stays synchronous on the main actor.
+
+**Rejected:**
+
+- *Giving `deploy.sh`'s rerun its own exit code*, so the wrapper could tell a
+  build question from a destination's: a launcher contract change Windows
+  shares, for a fault that was the app's check being narrower.
+- *Removing `deploy.sh`'s rerun*: it is the only guard on the command line.
+- ~~*Adding `LC_ALL=C` and `-s` to `deploy.sh`*: correct, but a publishing-path
+  launcher change for a state Quartz cannot produce; written down instead.~~
+  **Reversed by #291**: `-z` made the invalid-byte miss whole-file and in the
+  UNSAFE direction, so `deploy.sh` now carries both (see "Bytes, not text").
+- *Reading pages as `String`*, for the reason above.
+- *Sampling the front page and a few others*: cannot promise the answer, and
+  the whole walk costs about 12 ms.
+- *Moving the scan off the main actor*: unnecessary at these numbers.
+- *A home in `shared-rules.json`*: `buildFreshness` already lives in
+  `app-rules.json`, and one rule gets one home.
+- *A narrower signature*, left for later at #136 — and taken up by
+  [issue #291](https://github.com/russellgordon/plantoir/issues/291); see
+  "What is looked for" below for what was chosen and which narrower strings
+  were measured and rejected.
+
+#### What is looked for: the client's tag and first statement (GitHub #291, 2026-09-26)
+
+**The fault.** Every reader looked for the bare `ws://localhost:`, and any page
+whose note MENTIONS the address carries that. Measured in a production build of
+stock Quartz v4.5.0: one networking lesson carried it **20 times on 7 lines**
+(title, meta tags, breadcrumb, heading, link, prose, code). So a folder publish of that course waited
+30 s for a clean tree it could never get and refused, every time; on Netlify
+and Cloudflare, and in the app and the overnight check, it rebuilt on every
+publish.
+
+**The rule** (`signature` in the contract): the client's script TAG,
+`<script type="application/javascript">`, then any run of `between` bytes
+(space, tab, LF, VT, FF, CR — POSIX `[[:space:]]` in the C locale, not a
+Unicode `\s`), then the client's first statement,
+`const socket = new WebSocket('ws://localhost:`. Source: Quartz v4.5.0
+`quartz/plugins/index.ts:26-38` (an inline `afterDOMReady` script, a template
+literal with a leading newline and eight spaces) rendered by
+`quartz/util/resources.tsx:26` (`type={moduleType ?? "application/javascript"}`,
+no other attribute). Plantoir passes no `--remoteDevHost`, so the `wss://`
+branch is never taken. `asQuartzWritesIt` holds the bytes verbatim, and every
+test fixture that needs a preview's page READS it rather than retyping one — a
+retyped fixture could pass against a wrong constant.
+
+**Why a page's words cannot produce it.** Quartz writes `<` as `&lt;` in text
+AND in attribute values (measured:
+`content="&lt;script type=&quot;application/javascript&quot;> const socket = …"`
+in a meta description), Shiki splits a `js` or `html` fence into spans, and
+smartypants turns `'` into `‘` in prose. A raw `<script` can only come from raw
+HTML the teacher typed — and a page that holds the client verbatim as raw HTML
+really does open a socket to the reader's machine (`notShared` (3)).
+
+**Narrower strings, measured and rejected** (production pages of the same
+build; "match" is a false positive):
+
+| Looked for | The networking lesson | A page with no description |
+|---|---|---|
+| `ws://localhost:` (until #291) | match | match |
+| `new WebSocket('ws://localhost:` | match — the meta description (`'` is not escaped in attributes), inline `<code>`, an un-languaged fence | match |
+| `const socket = new WebSocket('ws://localhost:` | match — inline `<code>`, the un-languaged fence | match |
+| the tag, whitespace, the client, read as one record | no match | no match |
+
+And *"the tag is present and the client is present"* is wrong too: a
+production page already holds `<script type="application/javascript">` once,
+for Quartz's own inline script, so the networking lesson has both (case 10).
+The Swift therefore tries EVERY occurrence of the client, not the first — a
+preview's networking lesson mentions the statement in its words before Quartz
+writes the real client at the end of the body (case 12).
+
+**Also rejected:**
+
+- *The tag alone at the end of a line*, which a line-based grep could keep:
+  Quartz's own inline script has the same tag, and any future inline resource
+  with a leading newline would match. It marks "an inline script", not the
+  client.
+- *A marker we add* (a Quartz patch writing `data-plantoir-preview`, or a file
+  beside `public/`): every preview build already on a teacher's disk predates
+  it, so the old text rule would have to stay as a fallback — the fault again —
+  and a marker file cannot see the file-by-file mixture #136 exists for.
+- *Detecting by `--serve` in a build record*: the same transition hole, and the
+  launchers keep no such record.
+- *A tag that allows other attributes* (`<script[^>]*>`): Quartz v4.5.0 writes
+  exactly one, and a looser tag only widens what raw teacher HTML can match.
+- *Editing `deploy.ps1` from the mac*: its last mac-written port was true for
+  every site of two or more pages ("A third detail", above), and there is no
+  `pwsh` on this Mac, so it would ship unrun PowerShell on the publishing path.
+  Windows owes it on #272 and keeps the old (safe-direction) fault until then.
+- *A new activity-trail event* ("rebuilt because the site was a preview's"):
+  the piece narrows WHEN an existing behaviour fires, and what a teacher sees
+  change — the folder publish succeeds, Publish skips a needless build — is
+  already recorded by the publish and build events. If it is wanted, it is its
+  own issue on both platforms.
+
+**Jobs already scheduled keep the old line.** The overnight check is written
+into each job's script when it is scheduled, so a job set before #291 still
+greps the bare address, line by line, until it is rescheduled. That errs SAFE —
+a page that mentions the address is rebuilt every morning, as it always was —
+so nothing migrates it.
+
+**Raising Quartz means re-measuring the client's bytes.** If they move, the
+rule matches nothing, every preview reads as production, and a preview is
+PUBLISHED. Two canaries fail on that day: `verify.sh` reads the image's
+Quartz template for the client as one record in the C locale and requires the
+inline script to open with nothing but whitespace before `const socket = new
+WebSocket(` — an ADJACENCY check, so a comment or `"use strict"` inserted first
+fails it (mutation-checked); three separate fixed-string greps, its first form,
+would have passed that change (found by review) — plus the address and the
+tag's type as words (seconds, no serve cycle); and `verify-deploy.sh` reads a real serve-mode page against `asABasicRegex`.
+
+**Cancelling a publish ends it quietly (GitHub #259, 2026-09-25).** The
+progress view's Cancel types a `^C` (`ScriptRunner.cancelByUser`), which reaches
+`deploy.py` as `KeyboardInterrupt` wherever it is waiting — most often inside
+this production rebuild. It used to escape and print a Python traceback (26
+lines during the rebuild, 10 at the surname question, measured through a pty);
+`deploy.py` now enters through `run_until_stopped()` and exits 130 with nothing
+printed, and a rebuild or a wrangler run that reports 130 or −2 is read as the
+same Cancel rather than as a failure. The app decides a cancelled leg by its own
+flags, not by that 130; the code is for every other reader (a terminal,
+`deploy.sh`'s `set -e`, `deploy.ps1`). A Cancel during the upload now also drops
+the uploads still queued — before the fix round, 25 of 40 went up after it — and
+since neither Netlify nor Cloudflare publishes a half-finished upload, the site
+stays as it was, except for a Cancel in the last second or two, once the final
+files are already on their way. **Only that Cancel sends a `^C`** — the Stop Preview and console Stop
+buttons end the process without one (SIGTERM raises no `KeyboardInterrupt`), so
+nobody should expect this handler to be what covers them; they never printed the
+traceback. The reasoning, the numbers and what was rejected are in
+[the build pipeline](05-build-pipeline.md#stopping-a-build-exit-130-and-no-traceback).
 
 ### Why determinism matters
 
@@ -450,6 +676,93 @@ panel with a reveal-in-file-manager button instead of a link — plus a note
 that pages opened straight from disk won't look right, since the site expects
 to be served over HTTP.
 
+### A relative folder, and a copy that did not finish
+
+GitHub issue [#227](https://github.com/russellgordon/plantoir/issues/227),
+2026-09-25. Two holes, both of which ended in "Published" over a folder that
+was empty, stale, or somewhere else entirely.
+
+**A relative `--to-folder` was handed to rsync as it was typed, and rsync reads
+a colon before the first `/` as a REMOTE computer.** Measured on macOS 26.6 with
+`/usr/bin/rsync` (openrsync, protocol 29), from a copy of `deploy.sh` in a
+scratch working folder called `Comm Tech 26:27`:
+
+| `--to-folder` | Before: exit, pages that landed, what it said |
+|---|---|
+| `out 26:27` | 0, **0** — "hostname contains invalid characters", then `✅ Published: 0 file(s)` and a RELATIVE `PUBLISHED_FOLDER=` |
+| `a:b` | 0, **0** — rsync ran `ssh a` |
+| `localhost:site` | 0, **0** — rsync **opened an ssh connection to this Mac**, refused only because Remote Login was off |
+| `-x` | 1 — `mkdir -p` read it as an option |
+| `sub/a:b`, `./a:b`, a full path with a colon | 0, all — a colon after the first `/` is local |
+
+**The ssh finding is the reason this is more than a cosmetic bug.** With Remote
+Login on, or with a real computer's name before the colon, the site would have
+been copied to ANOTHER MACHINE using the teacher's own ssh keys, while the
+launcher named a local folder as the place it went. "Publishes somewhere else,
+or nowhere, and says Published" is the shape of it.
+
+**What the launcher does now.** A relative `--to-folder` is taken from the
+working folder — which it always was, implicitly, because `deploy.sh` begins
+`cd "$(dirname "$0")"` — and is made a full path (`$(pwd)/<path>`) before
+anything reads it. A path starting with `/` cannot be read as a host or as an
+option, and `PUBLISHED_FOLDER=` is then a path the app can open (a relative one
+would be opened against the APP's current folder, which is `/`). A working
+folder whose own name has a colon is fine: the result still starts with `/`.
+
+**And it reads rsync's own exit status.** It used to pipe rsync into
+`grep -c … || true`, which threw the status away. Now any non-zero status —
+including **23 and 24, a copy that finished only in part** — exits 1 with a
+cross line and no `PUBLISHED_FOLDER=`, so the app's "copied to its publishing
+folder" panel never appears. A partial copy is a failure on purpose (director's
+ruling): measured with a stale folder `--delete` could not remove, the new pages
+landed, the page the teacher had taken down stayed, and the launcher said
+`Published: 2`. The cross line is matched by the app and replaced with
+`FailureExplainer.folderCopyDidNotFinish` (`app-rules.json` →
+`failureExplanations`), because "copy error 23" means nothing to a teacher.
+
+**Not measured, and worth knowing before a report arrives:** a network share
+(SMB — a school web server's share is a plausible destination) and a folder in
+iCloud Drive. rsync's exit 23 also covers attributes it could not SET, which
+is typical on SMB and possible on iCloud's evicted files; if a teacher reports
+"it always fails to my network drive", that is the first thing to look at. An
+exFAT and an MS-DOS disk image were measured (plan review, 2026-09-25): exit 0
+on a first and a second publish, so a USB stick is not a false failure. (On
+those every file is counted as "updated" on every publish, because the count
+includes permission-only lines — cosmetic, and left alone.)
+
+**The app refuses a partial path outright.** `CourseConfiguration.
+deployFolderProblem` now answers `deployFolderIsNotAFullLocation` for anything
+not starting with `/`, BEFORE it looks for the folder: the app's own current
+folder is `/`, so `Users/Shared` used to pass the check and then be published
+into `<working folder>/Users/Shared`. `Choose…` always yields a full path, so
+only a typed one reaches this. Every caller goes through the one function —
+the settings form and the wizard (Save is blocked), every leg of a
+multi-destination deploy, and a scheduled deploy — so a course that already
+SAVED a partial path is refused at Deploy rather than published somewhere
+else; no migration. `DeployCommand.arguments` also hands the launcher the
+path TRIMMED, the same way the check trims it: the settings form saves what was
+typed, and `" /Users/x/Sites"` was a relative path to the launcher.
+
+**Rejected:**
+
+- **Prefixing `./`.** Fixes rsync's reading, but `PUBLISHED_FOLDER=` stays
+  relative and the app would reveal the wrong folder.
+- **`--` or `--protect-args`.** `--` stops OPTION parsing, not HOST parsing;
+  openrsync's `-s` support was not measured.
+- **Refusing a relative path in the launcher.** Breaks command-line users who
+  rely on the working-folder meaning `deploy.sh` has always had.
+- **Counting copied files instead of reading the status.** Exit 23 still
+  copies files, so the count is non-zero while the stale page stays.
+
+Pinned by `scripts/test_deploy_folder_target.py` (the real launcher, from a
+working folder named with a colon, against `shared-rules.json` →
+`folderPublishTarget`), by verify.sh's colon-folder step, which now also
+publishes to `out 26:27`, and by the `configurationRules.deployFolder`,
+`deployArguments` and `failureExplanations` contract cases. **Windows** has no
+colon hole — robocopy has no remote syntax and NTFS forbids `:` in a name —
+and already fails on robocopy ≥ 8; it does have the relative half, owed in the
+`windows` issue drafted from #227.
+
 ## Publishing while a preview is running — the race, and the harness that found it
 
 Two defects on 2026-09-05, both in the publish path, both invisible to every
@@ -628,7 +941,9 @@ know why"*, and it had no answer.
 
 **How the handover works.** The wrapper writes a small record, and the app reads
 it — the moment it lands if the teacher is looking at that section, and
-otherwise the next time they open it. (Reading it only on opening was all this
+otherwise the next time they open it. Since #212 the run also tells the teacher
+directly, with a macOS notification, so a teacher who has not opened the app at
+all is told too — see "When nobody is looking" below. (Reading it only on opening was all this
 did until 2026-09-19; the sub-section "The notice has to arrive while the
 teacher is looking" below is what changed, and why it needed a change to the
 wrapper as well.) The trail line is a
@@ -639,17 +954,21 @@ does its own post-run work.
 
 - The launchd wrapper captures the BUILD's exit code and then each
   destination's. On a non-zero one it writes `~/Library/Application Support/
-  Plantoir/scheduled/stopped/<CODE>-section<N>.txt` — first line the kind,
+  Plantoir/scheduled/stopped/<CODE>-section<N>.<folder id>.txt` (the folder
+  id since #237 — see "One alarm per working folder") — first line the kind,
   second the destination. It assembles both lines in
-  `…/scheduled/<CODE>-section<N>.txt.partial` and **moves** the finished file
+  `…/scheduled/<CODE>-section<N>.<folder id>.txt.partial` and **moves** the finished file
   into place; the sub-section below is the whole reason, and it is not a
   tidiness preference.
 - **Exit 3 is tested before the general non-zero branch**, because it is also
   non-zero. Three means `NEEDS_AN_ANSWER` and nothing else; anything else is an
   ordinary failure.
-- **Which LEG stopped decides the kind, not just the code.** Exit 3 from the
-  build is `buildNeededAnAnswer`; exit 3 from a destination is
-  `neededAnAnswer`. See the section below.
+- **Which LEG stopped decides the kind, not just the code.** From the BUILD,
+  exit 3 is `buildNeededAnAnswer` and any other non-zero code is
+  `buildDidNotFinish` (#137); from a DESTINATION, exit 3 is `neededAnAnswer`
+  and any other is `didNotFinish`. The table is data —
+  `contracts/shared-rules.json` → `scheduledPublishStopped` → `whichKind` —
+  and the sections below explain both build kinds.
 - The **first** destination that stopped is the one kept. A course can publish
   to several and only one may have gone wrong, so *"it published to the folder
   and not to Netlify"* is the report a teacher makes; overwriting would tell
@@ -769,7 +1088,9 @@ backup included.
 - **A distributed notification from the run.** `runScheduled` *is* Plantoir and
   could post one. It is a second channel that can disagree with the file, and it
   covers only writers that are Plantoir — not a record removed by hand, not a
-  restore, not another window.
+  restore, not another window. (Not to be confused with the macOS
+  notification the run now sends the TEACHER, #212, below: that one drives
+  nothing in the app, and is composed from the record after it is written.)
 - **`NSFilePresenter`/`NSFileCoordinator`.** It observes *coordinated* writes,
   and a `mv` from `/bin/bash` is not one. It would never fire at all.
 - **FSEvents** needs a dispatch queue too, plus a C callback and an `Unmanaged`
@@ -780,9 +1101,11 @@ backup included.
   worth doing and not here: it raises whether an overnight folder problem should
   throw a dialog at a teacher mid-lesson, which is a product decision.
 
-**The one use of Dispatch in this app**, and it is commented as such where it
-lives. `DispatchSource.makeFileSystemObjectSource` is the kernel's own
-file-system event source and takes a queue as a required parameter — the queue
+**A deliberate use of Dispatch**, and it is commented as such where it
+lives. (This said "the one use of Dispatch in this app" until #212; it never
+was — `AssistMCPServer.serve` parks in `dispatchMain()` — and #212's
+`ScheduledDeploy.announceThenLeave` does the same, for the same reason.)
+`DispatchSource.makeFileSystemObjectSource` is the kernel's own file-system event source and takes a queue as a required parameter — the queue
 is a delivery channel, not somewhere work is thrown. Nothing is deferred,
 nothing waits, and the events are consumed with `for await` on the main actor.
 Both watches are armed *before* `start()` returns, which is what lets the tests
@@ -862,6 +1185,335 @@ console branch had always filled, by way of the `Spacer(minLength: 0)` at the
 bottom of `consoleArea`, which is why the notice sat correctly whenever anything
 was running and wrongly when nothing was.
 
+### When nobody is looking: a notification from the run (#212)
+
+Added 2026-09-25 for [issue
+#212](https://github.com/russellgordon/plantoir/issues/212). Everything above
+reaches a teacher who opens the app — and, for a success, opens THAT section.
+Russell's case: a publish set for 6:30, the laptop opened at 7:45, and nothing
+anywhere said whether it had gone out, *"especially when it did not"*. With the
+app closed the band waits unseen; with it open on another section a failure
+raises the sidebar's triangle but a success shows nowhere.
+
+**The change: when the run finishes, whatever happened, it sends ONE macOS
+notification**, which waits in Notification Center until the teacher reads it.
+Its text is the section's own sentence —
+`scheduledPublishStopped.sentences.<kind>`, through
+`ScheduledPublishOutcome.sentence(for:course:section:)`, the words the band
+shows — and nothing else. No title of our own: macOS heads it "Plantoir", and
+every sentence already begins with the course and the section, which is also
+what survives when a long one (`courseWasBusy` runs to ~300 characters) is cut
+short in a banner. No new wording, so nothing for the two apps to keep in step
+beyond what the contract already pins; `buildDidNotFinish` and every kind added
+later are covered automatically, because the notification reads the record
+exactly as the band does. `ScheduledPublishNotice` is the code;
+`ScheduledPublishNoticeTests` plays the contract's cases,
+`scheduledPublishStopped.notification`.
+
+- **A success is announced too, every time** (Russell's ruling, 2026-09-25).
+  `attention` gives a success no sidebar badge — a badge nobody reads by
+  Wednesday — and that is unchanged; the notification is how a success now
+  reaches a teacher who has not opened the section. A teacher who finds it noisy
+  turns Plantoir's notifications off in System Settings, and the band still
+  carries it.
+- **One per section per working folder, replaced by the next run** — the
+  identifier is keyed like the record file (`scheduled-publish.<CODE>.section<N>.<folder id>`
+  since #237, so two working folders holding the same section never replace or
+  withdraw each other's news; `ScheduledPublishNoticeTests.testTwoWorkingFoldersKeepTheirOwnNotification`),
+  so section 1 and section 11 never share one — and **withdrawn when the
+  teacher dismisses the band**, so the two never disagree about whether it is still news. A
+  successful run that clears an older record does not need to withdraw
+  anything: its own notification replaces the old one.
+- **The run never asks for permission.** A question at half six is a question
+  to nobody, in a process about to exit. It is asked the first time a teacher
+  schedules a publish from the scheduling sheet or the app's own assistant —
+  never at launch, since most teachers never schedule anything. A run that may
+  not post writes why on the trail instead (`scheduled publish notification`,
+  in both `ActivityTrail.Event` and `activityTrail.mustRecord`): turned off, not
+  allowed yet, or could not be sent. The question writes a line when it goes up
+  and another with the answer, because the answer may never come.
+- **The post happens BEFORE the job is booted out**, since booting it out ends
+  the process — the same ordering rule as the trail line above.
+  `ScheduledDeploy.announceThenLeave` does it for both the ordinary finish and a
+  stand-down (`tooLateToRun`, `courseWasBusy`). It keeps the process alive with
+  `dispatchMain()`, the deliberate exception `AssistMCPServer.serve` already
+  makes: the function is synchronous, never returns, runs inside `App.init`
+  before any run loop exists, and the notification centre only answers
+  asynchronously.
+- **The wait is bounded at ten seconds, and the bound is REAL.** The first plan
+  raced the post against a sleep in a task group. A task group does not return
+  until every child has finished, and cancelling a child only sets a flag that
+  `UNUserNotificationCenter.add` never looks at — so a notification service that
+  never answered would have held the finished run, and its launchd job, for
+  ever, while a test whose stand-in honoured cancellation passed. It is now an
+  unstructured race that resumes the caller exactly once and leaves the loser
+  behind for `exit` to take. `testAPostThatNeverAnswersIsLeftBehindAtTheCeiling`
+  uses a stand-in that ignores cancellation, and fails (times out) on the
+  task-group shape — proved by putting that shape back.
+- **The suite never reaches the real notification centre.** The test host IS
+  Plantoir.app, the bundle whose permission this reads, so a test that reached
+  it could put the permission question on the screen of the Mac running the
+  suite and make whatever was clicked Plantoir's real setting.
+  `ScheduledPublishNotice.poster` is `QuietNotifications` (does nothing) under
+  the suite, `SystemNotifications` refuses there as well, and
+  `AppDelegate` sets no notification delegate under the suite.
+
+**Measured first, on this Mac** (2026-09-25; Apple silicon, macOS 26; the Debug
+bundle built into a scratch DerivedData, never the Dock's copy), because none of
+the design is worth anything if a launchd-started Plantoir cannot post. A
+throwaway LaunchAgent under its own label ran
+`Plantoir.app/Contents/MacOS/Plantoir --run-scheduled-deploy <a no-op script>`
+through `launchctl bootstrap` and `kickstart`, with a temporary probe (never
+committed) posting from the run's own tail exactly where the announcement now
+sits; the last row is the finished code, run the same way:
+
+| what | result |
+|---|---|
+| permission before anything asked | `notDetermined` |
+| a post while `notDetermined` | `add` succeeded and it was listed as delivered, but **no banner appeared** — which is why "not asked yet" is its own trail line rather than a post |
+| asking FROM the launchd run | the question appeared as a notification ("“Plantoir” Notifications", with Allow / Don't Allow); the answer came back when it was pressed, 22 s later |
+| posting from the launchd run, allowed, 3 trials | a banner headed "Plantoir" each time, **3 of 3**; `add` returned in 3–9 ms; the whole exchange 0.04–0.13 s |
+| replace: three runs posting one section's identifier, each its own process | **one** entry left, carrying the third run's text |
+| withdraw from ANOTHER process — a launchd run, and a copy opened by LaunchServices the way the Dock opens it | removed, **0** left |
+| **the shipped code, end to end**: the real `--run-scheduled-deploy … --scheduled-section` path under a throwaway LaunchAgent, its script writing a `succeeded` record and then a `did not finish` one | the section's sentence as a banner each time, the second replacing the first; each run finished in about a second and exited 0 |
+
+The launchd run is a separate process from any open window and shares only the
+bundle identifier, which is what permission, replacement and withdrawal are all
+keyed by. Three banners appeared while another copy of Plantoir was running (not
+in front), so a running app does not swallow them. **Not measured**: the app IN
+FRONT when the run posts (the `willPresent` delegate in `AppDelegate` answers
+`[.banner, .list]` for that case, as Apple documents it is asked); the screen
+locked, and a Focus on. With the screen locked macOS's default "Show previews:
+When Unlocked" hides the text, so nothing here promises the lock screen — what
+matters is that the notification is waiting in Notification Center. **The
+permission this measurement granted is real**: Plantoir on this Mac is now
+allowed to send notifications (System Settings → Notifications → Plantoir turns
+it off).
+
+**What a teacher who says no, or never answers, gets.** Nothing new: the band
+and the triangle are unchanged, and every run writes "turned off" (or "not
+given permission yet") on the trail. Nothing in the app asks again — macOS would
+not show the question twice — so the fix is System Settings → Notifications →
+Plantoir. A question that is ignored, or arrives under a Focus, sits unanswered
+in Notification Center; permission stays not-yet-asked, the next schedule from
+the app puts the question again (whether macOS shows it a second time while the
+first is unanswered was not measured), and the first trail line says a question
+was put.
+
+**Rejected, and recorded so they are not proposed again:**
+
+- **Asking permission from the run.** A prompt at half six to nobody.
+- **`.provisional` authorisation** (no question; delivered quietly into
+  Notification Center only). It would spare the question and deliver exactly
+  where a teacher does not look before class: no banner at 7:45 is the silence
+  this closes. A teacher who chooses "Deliver Quietly" themselves gets that, and
+  the code reads their provisional answer as allowed.
+- **The app posting on its next activation.** Misses the app-closed case — the
+  case #212 is about — and needs an "announced" marker, which must not live in
+  the record (rewriting it re-dates the notice).
+- **Sound, a Dock badge, `.timeSensitive`.** A chime at half six in a quiet
+  house for news; a badge is the success badge `attention` decided against; and
+  breaking through a Focus for a publish needs an entitlement and is Russell's
+  call, not ours. The question asks for alerts only.
+- **A title of our own.** It would repeat the sentence's course and section.
+- ~~**Click-to-open the section.**~~ Deferred here, and done by #306 — see
+  "Clicking the notification opens the section (#306)" below.
+
+**Known limits, stated rather than coded for:**
+
+- **A teacher who only ever schedules through an outside assistant** (Claude
+  Code, over `--mcp-stdio`) is never asked, so never notified, and every run's
+  line says permission was not given yet. That process has no window, so the
+  question would appear with nothing on screen to say why. It ends the first
+  time they schedule anything from the app itself.
+- **A run whose wrapper could not be started at all** (`runScheduled`'s `catch`)
+  writes no record, so nothing is announced — the silence that existed before,
+  not a new one.
+- **A job scheduled before v1.2.0** names no section, writes no record, and
+  announces nothing. A job scheduled by a build from BEFORE this change is
+  announced like any other: announcing is in the app binary, not in the
+  wrapper, so any record, whoever wrote it, is announced.
+- **The Debug copy and an installed copy share one bundle identifier**, so one
+  permission covers both; a click on a notification with the app quit opens
+  whichever copy Launch Services prefers. Since #306 that matters more: an
+  installed copy from before #306 has no click handling, so the click only
+  brings it forward. The trail's launch line records the bundle path, which
+  says which copy a click started.
+
+**Windows** matches the rule (the contract's `notification` cases), and the
+delivery is theirs: their run is PowerShell under Task Scheduler with no app
+process alive, so a toast must be attributed to Plantoir's own application
+identity, and toasts need no permission question — only the contract's
+`allowed` and `notAllowed` rows apply there. `platformDifferences.owed` carries
+it; GitHub #212 carries the ask.
+
+### Clicking the notification opens the section (#306)
+
+Until #306 a click on the notification from "When nobody is looking" only
+brought Plantoir forward, on whatever it had last shown. A teacher who read
+"ICS3U Section 2 was not published" then had to find the section by hand. Now
+the click shows **that section**. The rule is data, in
+`contracts/shared-rules.json` → `scheduledPublishStopped.notification.onClick`
+(its `rule`, seventeen `cases` and ten `rejected`). What follows is the reasoning
+and the mechanics.
+
+**What the notification carries.** The working folder's path, the course and
+the section, in its `userInfo` (`NotificationClickTarget`, keys `v`,
+`workingFolder`, `course`, `section`; plist strings and an integer only,
+because a value that is not a property-list type makes macOS refuse the whole
+notification). The identifier alone is not enough: its last segment is the
+folder's id since #237, and that id is a hash, so it names no path. The run knows
+the path because its course directory is `<folder>/courses/<CODE>`
+(`ScheduledDeploy.workingFolderURL(forCourseDirectory:)`, the same step
+`folderIDForRun` takes, so the id and the path cannot disagree; a test pins
+it). The path is never shown and never written on the trail. It lives in the
+teacher's own notification database with the notification. A notification
+with no target, or of another `v`, names nothing, and its click only brings
+Plantoir forward.
+
+**Who answers the click.** Only a GUI copy of Plantoir. The run itself is
+Plantoir under `--run-scheduled-deploy`, with no `NSApplication` and no
+notification delegate. `AppDelegate` sets the delegate in
+`applicationWillFinishLaunching`, which is early enough for a click that
+launches the app, and `userNotificationCenter(_:didReceive:)` does one thing:
+it asks `NotificationClickTarget.requested` whether this is a plain click
+(`UNNotificationDefaultActionIdentifier`) on a `scheduled-publish.` identifier,
+and hands the target to `SectionFromNotification.receive`. Both filters live
+in the tested type, not in the delegate.
+
+**The rule, in the order `SectionFromNotification.decide` applies it** (pure,
+and the contract's cases are played against it, then again through the router
+with real folders):
+
+1. The notification names nothing → Plantoir comes forward. One trail line,
+   with no course.
+2. Its working folder is not there any more → Plantoir comes forward. No
+   window is opened and none is pointed anywhere. Nothing is said on screen:
+   the notification already said how the publish went, and a folder gone at
+   launch is #311's sentence.
+3. The app is still opening its first window, or any window is still finding
+   its folder → **wait** (below).
+4. A window is already on that folder → the one nearest the FRONT (not "the
+   key window": when a notification is clicked Plantoir is not the active app,
+   so none of its windows is key; `NSApp.orderedWindows`, then any window not on
+   screen in the order the windows appeared). It is brought forward
+   (deminiaturised if needed) and the section is selected with its course
+   unfolded. A window that is **busy** is skipped: a sheet is attached, a course
+   is being renamed in place, or the app is running a modal dialog attached to no
+   window (`NSApp.modalWindow`: an open panel, the quit question), which makes
+   every window busy. If every window on the folder is busy, the
+   front one is brought forward with its selection left alone. A selection change
+   moves the keyboard, and a rename field commits whatever was typed when it
+   loses focus (#293).
+5. Else a window with **no folder** (the picker, and not busy) takes the folder,
+   through `reopen(_:occasion:)` with the occasion
+   `.scheduledPublishNotification`. That is #311's one route for a window taking
+   a folder it did not choose, so a folder in the Trash or out of the builder's
+   reach is said on the picker the way a remembered one is. Its trail line is
+   `working folder reopened`, whose `carries` names the occasion. When `reopen`
+   refuses it, the click's own line says the folder "could not be opened here"
+   (never "gone": the folder exists, and the reason is on the reopen line).
+6. Else **a new window** opens on the folder, but only when #290's check
+   (`WorkingFolderReach.refusal`) lets a window open there. A new window takes
+   its folder through `adoptRestoredPath`, which does not check. So a folder out
+   of the builder's reach is refused HERE, and the click only brings Plantoir
+   forward with the "could not be opened here" line (a mac-only case). Such a
+   folder is also the likeliest to have a failed run to click on (#221). A window
+   on ANOTHER working folder is never pointed elsewhere.
+7. The section is not in the folder (course renamed, section archived) → the
+   window from 4, 5 or 6 is shown with its selection left as it was. It is not
+   guessed at.
+8. Clicking changes nothing else. The record, the band and the sidebar's
+   triangle stay until Dismiss. macOS removing the clicked notification from
+   Notification Center is macOS's own doing.
+
+**Waiting is an event, never a timer.** A click that launches Plantoir can
+arrive before its first window exists, and a restored window takes its folder a
+moment after it appears. Deciding early would either open a second window
+beside the one launch is about to show, or put the section's folder into a
+window about to be given its remembered one. So the router PARKS the click
+while it has seen no window settle (`hasSeenAWindowSettle`) or while any window
+has `hasSettledItsFolder == false`. The one exception: a launch that a
+notification started (`NSApplication.launchUserNotificationUserInfoKey`) and
+that FINISHED with no window registered. Nothing is about to appear then, so
+`applicationDidFinishLaunching` decides the click at once
+(`SectionFromNotification.launchFinished`), opening the window through the File
+menu's New Window item because no window has installed `openWindow`. Whether a
+notification launch shows SwiftUI's window at all is unmeasured, which is why
+this exists. Otherwise the router decides again inside
+`WindowSettling.windowSettled`, which #311's `WorkspaceModel.settleItsFolder()`
+calls exactly once per window, whichever way the window got its folder. That is
+the invariant any future way of giving a window its folder must keep: end in
+`settleItsFolder()`, or a parked click waits for nothing. A click still parked
+when the app resigns active is dropped (`forgetPendingRequest`), together with
+the folder it set aside for a new window. A newer click replaces an older one
+still waiting.
+
+**The new window never shows the wrong folder first.** Before opening it, the
+router sets `WorkspaceModel.folderForNextNewWindow`, the field #311 added for
+the assistant. `adoptFolderForNewWindow` takes it FIRST, before the launch-time
+claims wait (`WindowStartRule.start` → `.requested`). The window settles on it
+before its first frame, and a settled window never claims a remembered entry
+(#311's one decision per window). So a click's window at launch, with claims
+still open and a remembered window left unclaimed, ends on the section's folder
+and leaves the entry alone (`testTheClicksWindowTakesItsFolderWhileClaimsAreOpen`).
+The field is cleared whenever the click is finished or dropped, so it cannot
+leak into the next ⌘N. The opener is `openWindow(id: "main")`, installed by
+every `WindowRootView` in `onAppear`.
+
+**Per app state:**
+
+| At the click | What happens |
+|---|---|
+| Running, a window on that folder | That window (the front one of several) shows the section. |
+| Running, windows only on other folders | A second window opens on the section's folder; the teacher's window is untouched. |
+| Running, no windows open | A window opens on the folder. |
+| Quit, nothing to reopen (fresh account) | Launch shows one window; it settles on the picker; the click is decided then and the picker takes the folder. |
+| Quit, #311 reopens the SAME folder | The reopened window settles, then shows the section. |
+| Quit, #311 reopens a DIFFERENT folder | That window is left exactly as #311 put it, and a second window opens on the section's folder, in front. Nothing restored is thrown away, and the next launch remembers both. |
+| Folder gone, any state | Only comes forward. With the app quit, launch proceeds as it would from the Dock. |
+
+**The trail.** One line per click on the existing event `scheduled publish
+notification`, with the `COURSE/N · ` prefix whenever the notification named a
+section. The words are the contract's `trailSays`, one per outcome
+(`SectionFromNotification.Outcome`). No new event (rejected: the same
+notification, the same story). **No line at all** after a click means the click
+never reached a copy of Plantoir that handles clicks. The launch line's bundle
+path says which copy was started (see the Debug/installed limit above).
+
+**Measured, and not.** Unit tests play every case through the real settle
+hook, with real working folders on disk, real window models and the real
+`reopen`. One test covers a window path spelled `/var` against the run's
+`/private/var`, compared through `FolderIdentity.isSameFolder`. Another covers
+the content handed to macOS round-tripped through a binary property list. What a
+real click does in each app state was **not** measured here: it needs a real
+notification and a person to click it, and posting one to Russell's account was
+ruled out. These are on Russell's list in the piece's hand-over:
+
+- a click with the app running on the same folder, on another folder, and quit;
+- a click on section 1's notification while section 2's run is still going
+  and the GUI is quit. Launch Services may hand the click to the running run
+  process, which has no delegate and would lose it silently. If it does, the
+  mitigation is a minimal delegate in the run that opens the GUI copy
+  (`NSWorkspace.openApplication`), decided after measuring, not built blind;
+- the #311 restore ordering (a click that launches the app with two windows
+  remembered), and before it the plainer question: with the default "Close
+  windows when quitting", quit, click, and check whether ANY window appears. If
+  none does, the File ▸ New Window fallback above is what should open one;
+- that `openWindow` captured from a window that has since closed still opens
+  one (the "no windows open" row). The fallback, if not, is the App-level
+  `@Environment(\.openWindow)`.
+
+**Windows** owes the same rule (every case but the four `appliesOn: ["mac"]`:
+three waits, which exist because the mac's windows find their folders a moment
+after they appear, while Windows builds its remembered windows synchronously in
+`OnLaunched`, and the reach case, because #290's check is mac-only). The toast itself (#212's Windows half) comes first. The toast's
+launch arguments carry the path, course and section. A cold start routes in
+`OnLaunched` after the remembered windows exist. An unpackaged app's toast
+activation can start a SECOND process, which must hand its arguments to the
+first. Nothing on that side reads `notification` yet, so `onClick` is unrun
+there, not red.
+
 ### A build that stopped for a question is its own outcome
 
 Proposed from Windows as [issue
@@ -899,8 +1551,9 @@ reading it. The line names no destination, and
 **The record's second line is still written and never shown.** Every record has
 one shape — the kind, then a name — because it is a shell script writing two
 `echo` lines at half six, and `stopped(inHomeFolder:course:section:)` refuses a
-record whose second line is empty. A build that failed OUTRIGHT still puts that
-name in the teacher's sentence.
+record whose second line is empty. Since #137 (below) neither build kind shows
+it; until then a build that failed OUTRIGHT still put that name in the
+teacher's sentence.
 
 **A section already scheduled keeps the wrapper it was scheduled with.**
 `oneShotCommand` is called from `scheduleDeploy` and nowhere else, and nothing
@@ -909,6 +1562,97 @@ the launchers. So a teacher with a publish already pending when they update
 reads the old sentence once, for that run. Records already on disk stay
 readable — the old kind is still a kind — which is why the fix could be made
 without a migration.
+
+### …and so is a build that failed outright (#137)
+
+Decided by Russell on 2026-09-23 (GitHub
+[#137](https://github.com/russellgordon/plantoir/issues/137)) and landed on the
+mac 2026-09-25. A scheduled publish whose BUILD exits non-zero with any code
+but 3 — a page Quartz cannot build, a build launcher that could not run — used
+to be recorded as `didNotFinish`, the kind a DESTINATION gets. On the mac the
+record's destination line was `buildDestinationName`, and `didNotFinish`'s
+sentence put that phrase where a destination goes — so the teacher read that
+publishing to something that is not a destination had stopped, and was sent to
+**Publish**. On Windows the wrapper joins every configured destination instead,
+so a teacher read that publishing to Netlify and Cloudflare Pages stopped when
+neither had been contacted — the shape #132 had already recorded as REJECTED.
+
+It is now its own kind, `buildDidNotFinish`, and its sentence is
+`scheduledPublishStopped.sentences.buildDidNotFinish` — Russell's starting
+wording, used verbatim and his to polish. It names **no destination** and sends
+the teacher to **Preview**, because previewing is what rebuilds the pages and
+shows the build's output; its last clause echoes
+`AssistWording.couldNotBuildBeforeDeploying`, the assistant's sentence for the
+same failure. The badge is unchanged (it needs attention, like every failure).
+The trail line files under the existing `scheduled publish did not finish`
+event — the run did not finish, which is what that event is about — and names
+no destination; `activityTrail.mustRecord` → that event's `carries` says so.
+No new event.
+
+**The wrapper's test is "not 3", never "is 1".** `preview.sh` itself exits
+only 0, 1 and 3, but a build that never ran exits with whatever stopped it:
+127 from bash for a launcher that could not be run, 143 or 137 for a signal,
+125 from Docker. Every one of those means no pages were built and nothing was
+contacted, which is the only claim the sentence makes. The contract's
+`whichKind.cases` carries a 127 row precisely so a port that tests `-eq 1`
+fails there.
+
+**Rejected, and recorded so they are not proposed again:**
+
+- **Merging the two build kinds** into one. It loses what `buildNeededAnAnswer`
+  promises — answer the question once and the section publishes on its own
+  after that — which is true of a question and false of a broken page.
+- **Leaving it.** It pointed at the wrong button and named a place nobody
+  contacted.
+- **Rewording `didNotFinish` to cover both.** A sentence that fits "Netlify
+  refused your token" and "your pages would not build" names neither the place
+  nor the fix.
+- **Telling the two apart in the app by the record's destination text**
+  (`destination == buildDestinationName`). That makes a display string carry
+  meaning, and it could then never be reworded.
+- **Renaming `buildDestinationName`** now that nobody sees it (the issue
+  floated "the pages could not be built"). Only a person opening the record in
+  TextEdit would notice, the record format is platform-local, and keeping the
+  value means a record from a wrapper scheduled before #137 and one from after
+  differ only in the kind line.
+- **A read-side shim** mapping an old `(did not finish, buildDestinationName)`
+  record to the new kind. It is the display-string inference above, bought for
+  one run's wording.
+
+**Known limits, stated rather than coded for:**
+
+- **A section already scheduled keeps its old wrapper**, as it did for #132:
+  `oneShotCommand` runs only when a deploy is scheduled, and nothing rewrites a
+  pending one. Its one remaining run records a failed build as `didNotFinish`
+  and the teacher reads the old sentence once. Records already on disk stay
+  readable.
+- **A build that fails INSIDE a destination's own rebuild** reaches the
+  wrapper as that destination's exit 1 and is still `didNotFinish` naming the
+  destination, because the exit code is all the wrapper has. Two such rebuilds
+  exist. `deploy.py` rebuilds for production whenever the built site's
+  `baseUrl` is not the destination's address (`ensure_base_url_and_rebuild`) —
+  on a first publish to an address, or after the address changes — and,
+  **unmeasured but very likely, on EVERY run of a course that publishes to two
+  destinations with different addresses** (Netlify AND Cloudflare Pages, say):
+  the site is built for one address, and the next destination finds the other
+  one baked in and rebuilds for its own. So that one stays reachable whatever
+  happens to #136, and for such a course it is not a first-publish corner. And both `deploy.py` and `deploy.sh` rebuild a site they
+  find carrying the preview's live-reload client — reachable in a scheduled run
+  only while the wrapper's is-the-site-stale check is narrower than the
+  launchers' (the gap described under "How it is tested" below,
+  [#136](https://github.com/russellgordon/plantoir/issues/136)). Whichever of
+  #136 and #137 lands second re-reads this paragraph. Giving a destination's
+  rebuild its own exit code was rejected there as a launcher contract change
+  Windows shares.
+- **A failure that was only passing** — Docker or Colima not answering, the
+  build stopped by a signal — is `buildDidNotFinish` too. The teacher previews,
+  it simply works, and "the reason will be in that section's window" is then not
+  literally true: there is no reason left to see. Accepted: Preview is still the
+  right thing to do, and it is strictly better than a destination nobody
+  contacted.
+- **An older build of the app reading a new record** does not recognise the
+  kind and treats the record as half-written (`record(at:)` returns `nil`).
+  Only reachable by downgrading, and true of every kind added since #132.
 
 ### The two widenings, and what still differs between the platforms
 
@@ -934,6 +1678,13 @@ in issue #132's work, described in full in the section above. That sentence
 used to end "this suite is red on `kinds`/`sentences` until the mac adopts it",
 which was true when it was written on the Windows branch and stopped being true
 the moment these two merged.
+
+**`buildDidNotFinish` is on the mac only, as of 2026-09-25** (#137, above), and
+Windows owes it: their wrapper still records a failed build as `DidNotFinish`
+with every destination joined, and their suite goes red on `kinds` and
+`sentences` until it adopts the kind, which is the request rather than damage.
+So do `tooLateToRun` and `courseWasBusy`, on the conditions the contract gives
+for each; `platformDifferences` is where that is kept current.
 
 **One difference remains, and it is deliberate: who writes the trail line,
 which cannot be the same on both.** Here the
@@ -974,6 +1725,11 @@ has run, and only when every one succeeded.
 it — a stub workspace, the real script through `/bin/bash`, and then a look at
 the file it left. A test that only asserts the generated TEXT proves the string
 is what we meant to write and nothing about what bash does with it.
+`testEveryLegAndExitCodeIsFiledAsTheContractSays` plays every
+`scheduledPublishStopped.whichKind` case that way — which leg stopped, with
+which code — and checks the kind, whether the sentence names the record's
+destination, and whether the run counts as published; Windows runs the same
+cases against its own wrapper.
 
 The limit worth stating: those runs use **stub launchers** that exit with a
 chosen code. That the real `deploy.sh` exits 3 in the states we think it does is
@@ -987,28 +1743,31 @@ proved the same way from the same date, by
 question — including in the flag ORDER the launchd wrapper writes, which is
 the shape a parser bug would hide.
 
-**One narrow path can still produce the sentence #132 removed**, and it is
-filed as [issue #136](https://github.com/russellgordon/plantoir/issues/136)
-rather than fixed. **Publishing to a FOLDER, and only to a folder**, reruns the
-build itself: `deploy.sh` greps the section's whole `public/` tree for
-`ws://localhost:` and, finding it, runs `preview.sh --build-only` and passes its
+**One narrow path could produce the sentence #132 removed**, and it was closed
+by [issue #136](https://github.com/russellgordon/plantoir/issues/136) on
+2026-09-25. **Publishing to a FOLDER, and only to a folder**, reruns the build
+itself: `deploy.sh` greps the section's whole `public/` tree for
+the live-reload client (`site_carries_preview_client`, #291) and, finding it, runs `preview.sh --build-only` and passes its
 exit 3 straight through (`deploy.sh:472` opens the `TO_FOLDER` branch the rerun
-sits in). The wrapper can only see that as the folder's own question, because
+sits in). The wrapper could only see that as the folder's own question, because
 the exit code is the only thing it gets. Netlify and Cloudflare do not reach it
 at all — they go through `deploy.py`, whose `rebuild_for_production` runs
 `build_site.py` directly, asks nothing, and fails with 1, so those land in
 `didNotFinish` naming the destination, which is honest.
 
-Reaching even the folder case needs the wrapper to have skipped its own build,
-and that is possible because the wrapper's staleness check is
-`BuildFreshness.needsRebuild` written out in shell: it looks at `index.html`
-**alone**, while `deploy.sh` greps the tree. A clean front page in front of a
-stale preview page is the gap, and `deploy.sh`'s own comment records that the
-index-only check was found insufficient on 2026-09-05 — the launcher has been
-quietly compensating for the app's narrower one ever since. Closing it means
-changing `BuildFreshness`, which the Deploy button uses too, so it is its own
-piece of work with its own measurement; giving the rebuild its own exit code
-was rejected as a launcher contract change Windows shares.
+Reaching the folder case needed the wrapper to have skipped its own build, and
+that was possible because the wrapper's staleness check — `BuildFreshness.
+needsRebuild` written out in shell — looked at `index.html` **alone**, while
+`deploy.sh` greps the tree: a clean front page in front of a stale preview page
+got through. Both checks now read the whole tree, from
+`contracts/app-rules.json` → `buildFreshness.previewBuild` (see "One rule, six
+readers" above), so whenever `deploy.sh` would rerun the build, the wrapper
+has already built, and a question there is recorded as the build's.
+`ScheduledPublishOutcomeTests.testABuildQuestionBehindACleanFrontPageIsTheBuildsNotTheFolders`
+runs that state through the generated shell with a stand-in `deploy.sh` that
+does what the real one does. The rerun is now reached only from the command
+line. Giving the rebuild its own exit code was rejected as a launcher contract
+change Windows shares.
 
 ## A course kept for reference is never deployed — fifteen doors, one rule
 
@@ -1201,8 +1960,8 @@ format an old version can read.
 Added 2026-09-23, [issue #195](https://github.com/russellgordon/plantoir/issues/195).
 
 **The behaviour is unchanged: scheduling a section again REPLACES the deploy
-already set for it.** A job's label is the course code and section number and
-nothing else, so there is one per section per Mac, and
+already set for it.** There is one job per section per WORKING FOLDER (one per
+section per Mac until [#237](#one-alarm-per-working-folder-237)), and
 `ScheduledDeploy.scheduleDeploy` boots the old one out and overwrites its plist
 before writing the new one. What changed is that the teacher is TOLD, before
 and after:
@@ -1227,14 +1986,17 @@ and after:
   Without it, "it went on Saturday, I set it for Friday" has no answer: the old
   job leaves nothing behind.
 
-**Read Mac-wide, on purpose — unlike every other reader of `nextRun` that has a
-folder in hand.** The job being overwritten may belong to ANOTHER working
-folder holding the same code (last year's), because `plistURL` names one file
-per code and section for the whole Mac. `nextRun(…, inWorkingFolder:)` answers
-nil for that job, so a folder-scoped reading — the natural copy of the cancel
-path — stays silent in exactly the case that matters most. The sentence may
-therefore name a deploy this window's sidebar shows no clock for; that is the
-truth about what is being replaced.
+**Read in THIS working folder since #237 — the reversal of what #195 chose.**
+#195 read it Mac-wide on purpose: the job being overwritten could belong to
+ANOTHER working folder holding the same code (last year's), because the label
+then named one file per code and section for the whole Mac, and a folder-scoped
+reading would have stayed silent in exactly the case that mattered most. #237
+gave each folder its own alarm, so scheduling here no longer touches another
+folder's job — and a Mac-wide reading would now name, on this folder's card, a
+deploy this scheduling leaves standing, which is false. `momentBeingReplaced`
+and `momentAlreadySet` take the working folder (required), and so does
+`ScheduledDeploy.plan`. A job this folder set BEFORE #237, under the old label,
+is found by the folder scan and IS replaced — see the #237 section.
 
 **Said nothing, deliberately:** when the old job is set for the SAME minute
 (scheduling the same moment again replaces nothing a teacher would notice), and
@@ -1276,8 +2038,8 @@ writes the plist (atomically) and only then asks macOS to take it.
   since it exists for a deploy turned off by something other than the teacher
   asking. Recorded for the SAME minute too: the card rightly says nothing when
   the moment is unchanged, but a same-minute deploy lost is still lost, so the
-  record reads `momentAlreadySet` (Mac-wide, same minute included) rather than
-  `momentBeingReplaced`.
+  record reads `momentAlreadySet` (this folder's, same minute included) rather
+  than `momentBeingReplaced`.
 - **The new one's files cannot be WRITTEN** (anything that throws before or
   in the plist write): the old plist is still on disk, only booted out — so it
   is handed back to macOS at once (otherwise it would sit unloaded until the
@@ -1295,13 +2057,12 @@ off" on both shapes and nothing for the same minute. Tests:
 `…testAFailedWriteLeavesTheOldDeployStandingAndSaysSo` (the write is made to
 fail by putting the scripts folder under a file).
 
-**Left for [#237](https://github.com/russellgordon/plantoir/issues/237), and
-known:** a job set from ANOTHER working folder for the SAME minute says
-nothing (the suppression compares moments, not folders), though it deploys
-different content; and a job from another folder is NAMED on this window's card
-while this window's sidebar shows no clock for it and its Cancel refuses it.
-Both are the one-deploy-per-Mac fault #237 owns, not something this sentence
-can mend.
+**Closed by [#237](https://github.com/russellgordon/plantoir/issues/237):**
+the two limits this section used to list — a job set from ANOTHER working
+folder for the SAME minute said nothing, and a job from another folder was
+NAMED on this window's card while its sidebar showed no clock and its Cancel
+refused it — were both the one-alarm-per-Mac fault. Another folder's job is now
+a different alarm, neither named nor replaced.
 
 **The suite never reads the real LaunchAgents through this reading.**
 `momentBeingReplaced` answers nil under the test suite unless
@@ -1420,6 +2181,21 @@ do. The folder-open sweep asks the same question through the same function; two
 answers to "how late is too late for this course" is one more than anybody can
 keep in step.
 
+**The destination is read the same way, since #323.** Until then it was fixed
+when the deploy was scheduled — `scheduleDeploy` wrote each destination's
+`deploy.sh` arguments into the wrapper — so changing where a course deploys
+after scheduling sent the deploy to the OLD place, and it reported success.
+Now the run reads the course's settings when it fires and writes the wrapper
+afresh; see "Where it deploys is read when it runs (#323)" at the end of this
+page. What is read AT SCHEDULING still matters for the refusals the sheet and
+the assistants give then: since #322 either assistant reads the SAVED file
+(docs 10 → "Settings are read at the call, not when the window opened"), and
+since [#335](https://github.com/russellgordon/plantoir/issues/335) the schedule
+SHEET does too — at every redraw and again at the press — and says so when
+Course Settings holds unsaved edits; see "The window's acts read the saved
+settings too (#335)" at the end of this page. The run reads the file again
+when it fires.
+
 **Finding the course folder is not `fileExists` on a built path, and that is
 measured.** A job written before the course code went into the plist carries it
 only in its LABEL, uppercased with every non-alphanumeric turned into a hyphen —
@@ -1460,10 +2236,13 @@ for a fault there was not.
 
 ### Everything is scoped to ONE working folder
 
-An agent's label is the course code and the section number and nothing else, so
-`~/Library/LaunchAgents/<label>.plist` names **one file per code and section for
-the whole Mac**. A teacher holding last year's working folder and this year's,
-both with ICS3U section 1, has one alarm between them.
+Until #237 an agent's label was the course code and the section number and
+nothing else, so `~/Library/LaunchAgents/<label>.plist` named **one file per
+code and section for the whole Mac**, and a teacher holding last year's working
+folder and this year's, both with ICS3U section 1, had one alarm between them.
+#237 gave each folder its own ("One alarm per working folder", below) — and this scoping STAYS, because
+it is how every reader FINDS a folder's jobs, including the ones set before
+#237 under the old label.
 
 So every one of these reads the plist's `WorkingDirectory` and leaves alone
 anything belonging to another folder:
@@ -1475,6 +2254,8 @@ anything belonging to another folder:
 | `ScheduledDeployCleanup.warningForConfirmation` | the extra sentence in the confirmation |
 | `CourseRenamer.sectionsWithAScheduledPublish` | what a rename turns off |
 | `ScheduledDeploy.nextRun(inWorkingFolder:)` | the sidebar's clock, and so the Cancel item beside it |
+| `ScheduledDeploy.momentBeingReplaced` / `momentAlreadySet` | the card's "replaces" sentence and the failed-replacement record (Mac-wide until #237) |
+| `ScheduledDeploy.scheduleDeploy` | which of this folder's jobs a new one retires (#237) |
 | `AssistToolRunner.cancelScheduledDeploy` | the assistant's own cancel, and its tidy-up branch |
 | `AssistToolRunner.turnOffAnyScheduledPublish` | the rollover onto a new website |
 | `ScheduledDeploy.cancelScheduledDeploy` | the backstop under all of them |
@@ -1489,18 +2270,21 @@ of the form "everything does X" needs a case behind it or it is prose that reads
 as a gate.
 
 The backstop is why the list cannot grow a hole again. `cancelScheduledDeploy`
-takes the working folder as a **required parameter** and checks the plist
-against it, so the unscoped form cannot be written by accident — a caller that
+takes the working folder as a **required parameter** and cancels only the jobs
+the folder scan finds for it — each by its OWN label and plist
+(`ScheduledDeploy.cancel(agent:runner:)`), never a rebuilt one — so the
+unscoped form cannot be written by accident — a caller that
 had not thought about which folder it meant no longer compiles. A job belonging
 to another folder is left alone and reported as success, deliberately: there is
 nothing of this folder's to turn off, which is the same answer as "there was
 never one set".
 
-Paths are compared with **POSIX `realpath`, never Foundation's
+Paths are compared in **the disk's own spelling — `FolderIdentity.canonicalPath`
+since #189 (POSIX `realpath` before it), never Foundation's
 `resolvingSymlinksInPath()`** — the same trap the container naming met: the
-latter strips `/private` where the former keeps it, and two spellings of one
-folder comparing as DIFFERENT would scope every job out silently, so nothing
-would be cancelled or shown at all.
+latter strips `/private`, and two spellings of one folder comparing as
+DIFFERENT would scope every job out silently, so nothing would be cancelled or
+shown at all.
 
 **A working folder that has MOVED loses its clock and its Cancel item.**
 `nextRun` answers nil when the plist's stored path no longer resolves to the
@@ -1510,9 +2294,9 @@ becomes invisible and un-cancellable from the app. Bounded rather than fixed:
 the job's own wrapper path moved too, so it cannot deploy anything, and the
 lateness check clears it away the next time it tries to fire.
 
-That two working folders share one alarm at all is a separate fault with its own
-issue. A folder-scoped label would orphan every plist a teacher already holds,
-which is its own migration.
+That two working folders shared one alarm at all was a separate fault, closed
+by #237 without orphaning the plists teachers already hold — see "One alarm
+per working folder (#237)" below.
 
 ### What was rejected
 
@@ -1582,3 +2366,389 @@ what each job proved are in `GUI-IMPROVEMENTS.md`'s row for this change.
 ---
 
 [◀ Previous: Quartz Customizations](06-quartz-customizations.md) · [Back to index](README.md) · [Next: course_config.json Reference ▶](08-course-config-reference.md)
+
+### One alarm per working folder (#237)
+
+Added 2026-09-25, [issue #237](https://github.com/russellgordon/plantoir/issues/237).
+The contract's half is `shared-rules.json → scheduledDeployCancellation →
+oneAlarmPerWorkingFolder`, and five cases in that key's `cases` list.
+
+**What was wrong.** A job's label was `…deploy.<CODE>.section<N>` and every
+per-job file was named after it — the plist, the wrapper, the log, the success
+note, the findings file — and the stopped-run record was `stopped/<course>-
+section<N>.txt`. So a teacher with two working folders holding ICS3U section 1
+(last year's and this year's, or a restored copy) had ONE alarm between them:
+scheduling in B booted out and overwrote A's job, A's sidebar lost its clock
+(#236 had scoped it), and B's card named A's moment as "replaced" (#195 read it
+Mac-wide on purpose, above).
+
+**The label now ends with the folder's id:**
+`ca.russellgordon.Plantoir.deploy.<CODE>.section<N>.<folder id>`
+(`ScheduledDeploy.agentLabel(courseCode:sectionNumber:workingFolder:)`, folder
+REQUIRED). The id is `BuildOutputLocation.folderIdentifier` — the eight hex
+characters the folder's container and builds folder already carry, from
+`FolderIdentity.canonicalPath` (#189). **Not a new id**, because a second
+derivation of "which folder" is the exact failure #189 closed; two spellings of
+one folder give one label. Trailing rather than `deploy.<id>.<CODE>…` so the old
+label stays a readable prefix of the new one, `codeAndSection(fromLabel:)`
+needs one strip, and `launchctl list` still groups a course's jobs.
+`folderID(fromLabel:)` reads the tail — exactly eight lowercase hex characters;
+a legacy label's last component always begins `section`, and codes are
+upper-cased by `sanitizedCode`, so the two spellings cannot be confused. The
+parse table was measured before writing it (a scratch probe compiling the
+proposed code) and is pinned by `ScheduledDeployTests.testLabelsAreReadBothWays`:
+
+| label ends | folder id | code, section |
+|---|---|---|
+| `.ICS3U.section1` (before #237) | none | ICS3U, 1 |
+| `.ICS3U.section1.0a1b2c3d` | `0a1b2c3d` | ICS3U, 1 |
+| `.ICS3U.section12.12345678` (all-digit id) | `12345678` | ICS3U, 12 |
+| `.CODING-CLUB.section2.deadbeef` | `deadbeef` | CODING-CLUB, 2 |
+| `.section1.0A1B2C3D` / 7 chars / non-hex | none, and not ours | — |
+
+`plutil -lint` passes a plist with the new label; it is 56 characters for ICS3U.
+
+**The id keeps two folders' files apart; it is NOT how a job is found** (the
+plan review's M2, accepted). Every reader — the clock, the card, the cancel,
+removal, rename, rollover, the sweep — finds a folder's jobs by the plist's
+`WorkingDirectory` through `ScheduledDeploy.agents(inWorkingFolder:courseCode:
+sectionNumber:)`, which passes over any file whose NAME names another course or
+section before opening it (so the sidebar row reads one or two plists, not
+all). Consequences: a job set before #237 is shown, cancelled and replaced with
+no special branch; a later change to `canonicalPath` cannot hide a job; and if a
+folder somehow holds both an old and a new job for one section (an older copy
+of the app still running), the clock shows the EARLIER and Cancel takes both.
+
+**Every file follows, and the record had to.** The wrapper, log and success
+note are named by the label. The stopped-run record is
+`stopped/<course>-section<N>.<folder id>.txt` (and `.txt.partial` beside the
+folder) and the findings file `<old label>.<folder id>.findings`. The record is
+not optional: once two folders can each hold ICS3U section 1, both wrappers can
+run the same morning, and each begins with `rm -f` of LAST time's record — so a
+record named for the course and section alone lets B's run erase A's failure,
+and whichever finishes last wears the badge in BOTH sidebars
+(`ScheduledPublishOutcomeTests.testTwoFoldersRunsKeepTheirOwnRecord` runs the
+two generated wrappers and fails with the id taken out of `recordURL`). The
+readers — the sidebar badge, the section's notice and its Dismiss, the
+section's findings dialog — compute the id of the folder that is open with the
+same `folderIdentifier`. **#212's notification is keyed the same way**
+(`scheduled-publish.<CODE>.section<N>.<folder id>`), and for the same race: a
+section-only key let one folder's run replace, and its Dismiss withdraw, the
+other folder's news.
+
+**The run takes its name from the script it was started with, never a rebuilt
+one.** After an update every pending job is still under the OLD label, with its
+log and success note baked into its plist and wrapper. `runScheduled` reads
+`label(fromScriptPath:)` once and passes it to `logSize(label:)`,
+`recordScheduledPublish(label:…)`, `recordFolderProblems(label:…)` and
+`bootOutAgent(label:)`; the `(courseCode:sectionNumber:)` boot-out is gone. A
+rebuilt label would read an empty log, miss the success note (the section left
+" — Edited" after a good publish) and boot out a job that does not exist,
+leaving the real one loaded (`testTheRunReadsTheNotesOfTheLabelItWasStartedWith`
+runs both spellings). What the run writes ITSELF is filed under the folder's id
+either way (`folderIDForRun`: the id in the label, or — for an old job — the id
+of the working folder it names): the findings, the stand-down record, and the
+record an old wrapper wrote under the old name, which `ScheduledPublishOutcome.
+fileUnderTheFolder` moves to the folder's name straight after the run.
+
+**What a teacher set before the update does: nothing changes for them.** The
+job is left exactly as it is on disk. It shows its clock in its own folder,
+cancels, is removed with its course, is swept when too late, runs correctly,
+and deletes its own plist when it fires, so the old spelling drains away.
+Scheduling the section again IN ITS FOLDER retires it — `scheduleDeploy` boots
+out every job the scan finds for the section, writes the new one, and deletes
+the old plist and wrapper only once macOS has ACCEPTED the new job (review M1:
+the first plan deleted before the write and promised to re-bootstrap a file it
+had just removed). A refusal hands the old job straight back and the trail says
+it still stands — naming the job that STANDS; in the rare folder holding both
+an old-name and a new-name job (an older copy of the app still running), the
+new-name one was overwritten and gets its own "turned off" line
+(`testARefusalInAFolderHoldingBothNamesSaysWhichStands`, review L3) (`testARefusedRescheduleHandsTheOldNamedDeployBack`, which fails
+with the delete moved before the bootstrap). An old job in ANOTHER folder is
+not in the scan and is left standing — that is the fix.
+
+**Rejected, in order of how tempting:**
+1. *Re-register old jobs under the new name when a folder opens, keeping the
+   moment.* It rewrites a live alarm the teacher set and never touched, through
+   the boot-out-then-write sequence whose failure #195 found loses the job; it
+   needs the course's CURRENT destinations and Cloudflare account to regenerate
+   the wrapper, so it would change what an already-promised deploy does, not
+   only its name (since #323 every run reads the destinations as they are when
+   it fires, so THIS reason no longer applies; the first and third still do);
+   and a pre-v1.2.0 plist carries no `PLANTOIR_SCHEDULED_FOR`,
+   so "the moment kept" would mean inventing a year. All to rename a file that
+   expires by itself.
+2. *Rename in place* (rewrite `Label`, move plist/script/log, edit the
+   wrapper's baked paths). Four files per job must move together under a launchd
+   that has the job loaded by its old label; a half-done rename is a job nobody
+   can find.
+3. *Not recognising old jobs.* An updated teacher's clock vanishes and Cancel
+   stops working for a job that WILL still fire — #236's "invisible and
+   un-cancellable", reintroduced by an update.
+4. *Keep reading an old-style record in every folder* (the plan's first
+   answer). In the mixed case — an old job in A, a new one in B — A's failure
+   shows in B's badge and B's Dismiss deletes it (review L2; the ruling: never).
+   Such a record is read by NO folder; the run of an old job files its own
+   record under its folder instead.
+
+**When the folder cannot be opened** (review M2: "deterministic, and the same at
+scheduling and reading time"): the id is `folderIdentifier` both times — the
+disk's own spelling, falling back to `realpath` and then to the path as written.
+At scheduling the folder always opens (its `deploy.sh` is checked first), and
+jobs are found by working folder rather than by id, so the fallback can reach
+only the record and findings names, the same way both times
+(`testAFolderThatCannotBeOpenedGetsTheSameIdEveryTime`).
+
+**The trail is unchanged, on purpose.** No new event: scheduling in B now leaves
+A's alarm alone, so silence is correct; retiring THIS folder's old job is a
+replacement and writes the existing `scheduled deploy replaced` line (its `why`
+in `mustRecord` and the comment on `ActivityTrail.Event.scheduledDeployReplaced`
+now say "one per section per working folder"). **Known limits:** trail lines
+carry course and section, not the folder, so two folders' ICS3U section 1 lines
+read alike — naming a folder on the trail is a `LogRedactor` question larger
+than this; and a record or findings file written under the old name BEFORE the
+update, never filed by a later run, is shown in no folder (its trail line was
+written when it ran).
+
+**The real launchd accepts the shape — measured once, by hand, not by the
+suite.** On 2026-09-25 (this Mac, macOS 26, Apple silicon) a throwaway agent
+`ca.russellgordon.claude-probe237.ICS3U.section1.0a1b2c3d` — outside our
+`labelPrefix`, so no Plantoir ever reads it — running `/usr/bin/true` on 29
+February: `plutil -lint` OK, `launchctl bootstrap` exit 0, `launchctl print`
+listed it, `bootout` exit 0, plist deleted, `print` afterwards exit 113 (gone).
+No teacher's job was touched. Every test uses `FakeLaunchControl` and throwaway
+agents folders.
+
+### Where it deploys is read when it runs (#323)
+
+**What was wrong, measured.** Found while planning #322. A throwaway test
+scheduled ICS3U section 1 to Netlify through the real `scheduleDeploy`, then
+rewrote `course_config.json` to a folder as Course Settings' Save does, then
+read back what launchd would run. The PLIST never carried the destination (its
+`ProgramArguments` are the app, the run flag, the wrapper path, the section flag,
+the working folder, the code and the section — which corrects the issue); the
+WRAPPER did. After the Save it still read
+`/bin/bash '…/deploy.sh' 'ICS3U' '1' '--non-interactive'`: a publish to the old
+place at half six, reported as `succeeded`.
+
+**Reading the destination is not enough on its own, and this is the trap.** A
+course switched to a Cloudflare Pages destination never deployed to would, if
+the run only re-read the destination, publish successfully to a project named by
+guesswork: `publish_to_cloudflare` (`scripts/deploy.py`) contains no
+`refuse_to_ask`, discovers a missing account from the token, suggests the name
+deterministically and creates the project. So the run re-applies everything the
+schedule sheet refuses except a time already passed — one function,
+`ScheduledDeploy.destinationRefusal`, asked at scheduling (`problem()`), at the
+run and after a Save.
+
+**What the run does now** (`runScheduled`, in this order):
+
+1. The lateness window (unchanged) — a job too late stands down `tooLateToRun`
+   whatever its settings say.
+2. The wait for the course (#156) — so a Save made while it waited counts.
+3. **The settings** (`readAtTheRun`): the course folder is found the way the
+   lateness window finds it, `course_config.json` is read, `destinationRefusal`
+   asked, and the wrapper built from `deployPlan` — the SAME function scheduling
+   uses, so an unchanged course gets a byte-identical wrapper
+   (`testAnUnchangedCourseGetsTheSameWrapperItWasScheduledWith`).
+4. **Does the job still stand?** (`jobStillStands`, the plan review's M1). Its
+   plist must still exist and still carry this run's `PLANTOIR_SCHEDULED_FOR`.
+   Before #323 a cancelled job's deleted wrapper was what stopped a run that
+   outlived its cancellation; a run that writes its wrapper afresh would bring
+   the cancelled deploy back. If the job no longer stands the run releases its
+   leases and leaves — no record, no notification, and no boot-out (a job
+   scheduled again under the same name must not be booted out).
+5. **The write** (`writeTheRunsWrapper`): over the job's OWN wrapper, and only
+   if it is still there (a cancel deletes the wrapper before the plist). The
+   permissions are not a condition — the run starts `/bin/bash <wrapper>`.
+6. **The decision** (`whatTheRunDoes`, pure and tested): the ONLY way to run is
+   a wrapper just written from the settings; a failed write stands down with
+   its own true reason, never "could not read the settings" (review M2).
+7. For a job set before #237, the record under the old folder-less name is
+   removed before the run (`clearTheOldNamedRecord`, review H1): that job's own
+   wrapper used to clear it first, and without it `fileUnderTheFolder` would
+   move LAST week's record over tonight's — a failed run announced as last
+   week's success. Must-fail: `testAnOldJobsRunIsNotReportedAsLastWeeksSuccess`.
+
+**Standing down.** A refusal releases the leases FIRST (`standDown` never
+returns, and until #323 it was only reached holding none), then records the new
+kind `couldNotRunAsSetNow` with the REASON as the record's second line — a
+clause true at the run (`ScheduledDeployRefusal.reasonClause`), which the
+sentence shows as `{reason}`. The sheet's own sentences stay for the sheet: their
+remedies ("then schedule this again", "it would wait") are false at the run and
+at a Save (review M3). Settings that cannot be read stand down too — the
+opposite of the lateness window's default, because a destination has no safe
+default. A course kept for reference is never deployed, so its stand-down has a
+sentence of its own (`sentences.couldNotRunAsSetNowForAReferenceCourse`) with no
+"deploy it yourself" in it (the #323 review's L-a).
+
+**What the job keeps.** The plist is unchanged but for ONE note,
+`PLANTOIR_SCHEDULED_TO`: the destinations' descriptions the teacher was told,
+as a JSON array. It is never read to decide
+(`testWhereItWasScheduledIsNeverUsedToDecide`); it lets the trail say when the
+run went somewhere else. (`propertyList`'s unused `deployArguments:` parameter
+went.) The wrapper is still written complete at scheduling, so the job on disk
+runs on its own under an older copy of the app.
+
+**Jobs already on disk.** Every plist since v1.2.0 runs the app, so they follow
+the rule at their next run. One set before #323 recorded nothing to compare
+with, so no "went somewhere else" line; one set before #237 keeps its old name
+for its plist, log and success note, and files its record under the folder's
+id; a plist from before v1.2.0 names no section and runs its wrapper as
+written — the one stale path left, effectively extinct. A regenerated wrapper
+also carries any fix made to the wrapper since the job was set, which is
+intended.
+
+**The trail.** New event `scheduled publish read the course's settings`
+(mustRecord), written ONLY when something differs from what the teacher was
+told: shape A, "a scheduled publish was set to deploy to Netlify; the course
+deploys to /Users/…/Sites now, so it is deploying there"; shape B, "a scheduled
+publish could not deploy the way the course is set now (…reason…)", plus where
+it was set to go and where the course deploys now when those differ. The
+stand-down's generic `scheduled deploy turned off` line follows it, the
+`courseWasBusy` precedent. Named "read" rather than "followed" because it also
+carries the runs that stood down (review L3). **Known, accepted (review L2):**
+the `scheduled publish waited … then went ahead` line is written when the wait
+ends, before the settings are read, so a run that waited and then stood down
+over its settings shows "went ahead" followed by the stand-down line.
+
+**Said at Save, while somebody is awake** (Chunk B). After a Save in Course
+Settings, for each section with a deploy set to happen on its own in THIS working
+folder and still to come: `specialNames.settingsSaveScheduledDeployCannotGoAheadAsSetNow`
+when it could not go ahead as set now (changed or not), else
+`…GoesWhereTheCourseDeploysNow` when the Save changed where the course deploys
+(the file before the Save against what it wrote — never against
+`PLANTOIR_SCHEDULED_TO`, which would repeat the sentence on every later Save).
+Nothing is refused or undone. Appended before the "saved while publishing" early
+return; the `settings saved` trail line carries the same facts
+(`SettingsSaveNotice.scheduledDeploys`, not parsed back out of the sentences).
+Contract: `savingSettings.scheduledDeploys`.
+
+**The one claim no unit test reaches, measured (review M6).** The run reads the
+Cloudflare Account ID from the app's own settings. That a launchd-started run
+reads the same defaults domain as the app was measured on 2026-09-26, Apple M4
+Pro, macOS 26.6: a scratch build of this branch, signed by the same team
+(`ca.russellgordon.Plantoir`, C7DL9Y9A7R), with a TEMPORARY flag that printed
+presence only — never a value — was run once from Terminal and once as a launchd
+job labelled `ca.russellgordon.probe323.<uuid>` (outside the deploy prefix, so no
+sweep or badge could see it), bootstrapped from a plist in the session's scratch
+folder, then booted out and confirmed gone (`launchctl print` exit 113). Both
+printed `bundle=ca.russellgordon.Plantoir accountIDPresent=true domainKeys=75`.
+The app is not sandboxed, and `--mcp-stdio` already read the same setting when
+launched by another program.
+
+**Known, not covered (review L1).** A changed Cloudflare Account ID is not
+refused at the run: "deployed before" is kept per destination TYPE, not per
+account, so a swap to another valid ID deploys to a new project in the new
+account and reports success. Attended deploys behave the same; before #323 the
+baked ID kept the old account.
+
+**Rejected** (with reasons in `scheduledDeployCancellation.theDestination.rejected`):
+re-registering the job at Save (reaches only the app's Save, puts #195's
+boot-out-then-write behind a settings button); reading the destination without
+the refusals (the Cloudflare fail-open); teaching the launchers to read the
+destination (a launcher-contract change Windows shares, and a second reader of
+the rules); the arguments in the plist (the same staleness elsewhere); parsing
+the old wrapper; falling back to the scheduled wrapper when settings cannot be
+read (the fault itself); a temporary wrapper file (everything finds the job by
+its wrapper's path); warning at Save alone.
+
+**Windows** has the same fault — `TaskScheduling.WriteWrapperScript` bakes the
+destinations and the Account ID into the `.ps1`, and Task Scheduler runs
+PowerShell with no app alive — and owes `theDestination`, the kind, the event and
+the two Save sentences. How is theirs; the mac's shape (the task launches
+`Plantoir.exe --run-scheduled-deploy`) is the likely best.
+
+### The window's acts read the saved settings too (#335)
+
+**What was wrong, read from the code.** Course Settings keeps its edits in the
+course's SHARED in-memory configuration until Save, and a section window's
+`course` is that copy. Three acts read it: the Deploy button, the local
+assistant's `deploy_section` through an open section window (both are
+`SectionDetailView.deployAndWait()`), and the schedule sheet. Everything else
+about a publish came from the FILE — the launcher's `deploy.py` reads the site
+and any site id or name from it, and the build reads every other setting — so
+an unsaved destination edit made a MIXED publish: `--to-folder` from memory,
+the rest from disk. Since #322 the approval card reads the file, so the card
+could name Netlify while the window deployed to an unsaved folder; since #323
+the scheduled run reads the file when it fires, so the sheet could promise a
+folder while the run went to Netlify, or refuse over a destination nobody had
+saved.
+
+**The rule.** Every act that sends a site somewhere or sets a deploy reads the
+settings as SAVED in the file at that moment — `Course.asSavedNow()`, a new
+`Course` read from `course_config.json`, never assigned back into a window's
+model:
+
+- `deployAndWait` reads it after the busy check and uses it for the
+  destinations, the destination refusal (`deployRefusalReason` is now static
+  only, so nothing can reach the window's copy through an instance property),
+  `BuildFreshness` and `MultiDestinationDeployRunner.run`. The decision is the
+  static `SectionDetailView.whatADeployUses(windowCourse:anyCopyUnsaved:cloudflareAccountID:)`,
+  so the suite can drive it without a view.
+- The sheet reads it on every redraw (`ScheduleDeploySheet.whatTheSheetShows`
+  — one ~2 KB file, and nothing cached, because a cache is #322's bug) and
+  AGAIN at the press (`scheduleFromTheSavedSettings`), since a Save can land
+  between drawing and pressing; the refusal note and `scheduleDeploy` both get
+  the copy read at the press.
+- The headless path (`AssistToolchainWork.deploy`, an in-app assistant with no
+  window) already had #322's fresh copy; it now also SAYS it.
+
+**When the file cannot be read** the act is refused with
+`specialNames.settingsCouldNotBeReadToDeploy` and nothing is deployed or set.
+The window's copy is never used in its place: a destination has no safe
+default, which is #323's rule.
+
+**What the teacher is told.** When the act starts while ANY window on the
+folder holds unsaved edits for the course (`WorkspaceModel.anyCopyHasUnsavedChanges`,
+as the preview asks), the window shows `specialNames.deployUsesSavedSettings`
+where the preview's `previewUsesSavedSettings` appears, and the sheet shows
+`schedulingUsesSavedSettings` above its plan. When the assistant pressed the
+button, or deployed with no window, the same deploy sentence is added to what
+it says. For ANY unsaved setting, not only a changed destination — the whole
+site is built from the saved file. **The trap:** a preview ending runs
+`releasePreviewLease()`, which used to clear the banner whatever it said — and
+it is reached not only from the stop `deployAndWait` awaits but from the
+preview's own wait loops, which poll once a second and can wake after the
+deploy has set its sentence. Setting the sentence after the stop only made the
+right order likely (the implementation review's F3). So the banner has an OWNER
+(`unsavedSettingsNoticeOwner`, `.preview` or `.deploy`) and a preview's end
+clears only the preview's own sentence
+(`SectionDetailView.previewEndClearsTheNotice`); the sentence is still set after
+the stop, and both are pinned by tests. The assistant's copy goes through one
+function, `SectionDetailView.whatTheAssistantIsTold` (and, headless,
+`SettingsSaveNotice.addingTheNotice`). The banner stays up after the deploy
+ends and is replaced by the next preview or deploy. The MCP server says nothing: it is another process with no window
+models, so nothing unsaved exists that it could see.
+
+**The trail.** `deploy used the saved settings`, written only when some window
+held unsaved edits at the act: which act, the kinds of destination the saved
+settings sent it to, and whether the unsaved edits named a different KIND —
+Netlify, Cloudflare Pages or a folder, never a path or a site name. The
+`settings saved` line is absent in such a report (nothing was saved) and the
+deploy's own line names where it went, so this is the one line that says the
+screen and the act disagreed.
+
+**Rejected:** saving automatically before the act (it writes a half-typed
+setting — #265's precedent); refusing while anything is unsaved (deploying the
+saved settings may be the point); using the unsaved edits for everything (the
+card, both assistants, `deploy.py` and the scheduled run all read the file, and
+the publish would still be mixed); fixing only the sheet (it leaves the worse
+half); a notice only when the destination differs (the preview's notice fires
+for any unsaved edit, and the trail line records the difference); **a Save
+button in the sheet** (the director's ruling on the plan: a second Save path
+would either duplicate Course Settings' validation, after-Save notice and trail
+line or skip them, the unsaved edits may be in another window, and since #323 a
+Save after scheduling is honoured anyway — the sheet's sentence says so);
+refreshing the window's copy from disk before the act (it throws away the
+teacher's unsaved edits). A `SavedCourse` wrapper type that would make passing
+a window's copy to an act a compile error was considered and left for a fourth
+caller; `scheduleDeploy` and `MultiDestinationDeployRunner.run` carry a comment
+saying what to pass.
+
+Contract: `shared-rules.json` → `actsUseTheSavedSettings` (seven cases), the
+three `specialNames` keys and the trail event. Mac tests:
+`ActsUseTheSavedSettingsTests` and the extended `SettingsSaveNoticeTests`.
+**Windows** looks like the same shape (`SidebarPane.xaml.cs` and
+`SectionDetailView.xaml.cs` read `Configuration.AllDeployDestinations` off the
+shared copy) and owes the check, the cases, the keys and the event.

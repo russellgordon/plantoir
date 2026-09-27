@@ -179,6 +179,40 @@ final class ClassPlanningTests: XCTestCase {
     /// the difference between a course that survives and one that loses a
     /// lesson. Working UP from Day 2 would try to make Day 2 into Day 3 while
     /// a real Day 3 is still called that.
+    /// A page moved to a later day whose settings have no place for a new
+    /// date is NAMED, with a sentence about the DATE — not "stays exactly as
+    /// it is", which is false of a page just renamed and moved — and the
+    /// trail counts it (#186's review, B3).
+    @MainActor
+    func testMakingRoomNamesAPageWhoseNewDateCouldNotBeSet() throws {
+        let (root, _, course) = try makeWorkspace()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: root.appendingPathComponent("trail"))
+        defer { ActivityTrail.store = previousStore }
+
+        try writeClass("Unit 1, Day 1", on: "2026-09-08", body: "day one", in: course)
+        try writeClass("Unit 1, Day 2", on: "2026-09-10", body: "day two", in: course)
+        let plan: ClassInsertionPlan = try ClassInsertionPlanner.plan(
+            unit: 1, atDay: 2, count: 1, forSection: 1, in: course
+        )
+        // Edited in Obsidian after the plan was made: no column-0 line at all.
+        let noRoom: URL = ClassPages.folderURL(forSection: 1, in: course)
+            .appendingPathComponent("Unit 1, Day 2.md")
+        try "---\n  a: 1\n---\nday two\n".write(to: noRoom, atomically: true, encoding: .utf8)
+
+        let outcome: ClassChangeOutcome = try ClassInsertionPlanner.apply(plan, in: course)
+        let said: String = AssistPublishPlan.sayingPagesWhoseNewDateCouldNotBeSet(named: ["Unit 1, Day 3"])
+        XCTAssertTrue(outcome.message.hasSuffix(said), outcome.message)
+        XCTAssertFalse(outcome.message.contains("exactly as"), "The page WAS renamed: \(outcome.message)")
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(
+            trail.contains(ActivityTrail.pageSettingsLeftAsTheyWereLine(act: "making room for a class", pages: 1)),
+            trail
+        )
+        XCTAssertFalse(trail.contains("Day 3"), "never which page: \(trail)")
+    }
+
     @MainActor
     func testRenamesRunHighestDayFirst() throws {
         let (root, _, course) = try makeWorkspace()
@@ -385,6 +419,68 @@ final class ClassPlanningTests: XCTestCase {
         )
     }
 
+    /// #294. Inside a table Obsidian escapes the alias pipe,
+    /// `[[Unit 2, Day 3\|Tuesday]]`, so the cell does not end there. The name
+    /// is what comes before the backslash — and a rename moves ONLY the name:
+    /// the backslash stays where the table needs it. A rewrite that dropped
+    /// it would write `[[Module 2, Day 3|Tuesday]]` and split the cell in two,
+    /// which every "does the link point at Module 2 now?" check would pass.
+    @MainActor
+    func testATableLinkIsRewrittenAndKeepsItsBackslash() {
+        let renamed: [String: String] = ["Unit 2, Day 3": "Module 2, Day 3"]
+        let table: String = "| [[Unit 2, Day 3\\|Tuesday]] | [[Unit 2, Day 3]] | ![[pic.png\\|300]] |"
+        XCTAssertEqual(
+            WikiLinkRewriter.rewriting(table, renamedPages: renamed),
+            "| [[Module 2, Day 3\\|Tuesday]] | [[Module 2, Day 3]] | ![[pic.png\\|300]] |"
+        )
+        XCTAssertEqual(WikiLinkRewriter.countLinks(to: ["Unit 2, Day 3"], in: table), 2)
+
+        // A backslash INSIDE a name is not the escape of a pipe, and stays
+        // part of the name.
+        XCTAssertEqual(
+            WikiLinkRewriter.rewriting("[[a\\b]]", renamedPages: ["a\\b": "c"]),
+            "[[c]]"
+        )
+    }
+
+    /// #294, the consequence worse than the one reported: inserting a class
+    /// renames every later class, and a link to one of them written in a
+    /// table has to move with it. Left on the old number, it would point at
+    /// the class just INSERTED — a different lesson, not a dead link.
+    @MainActor
+    func testInsertingAClassMovesALinkWrittenInATable() throws {
+        let (root, _, course) = try makeWorkspace()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        try writeClass("Unit 1, Day 1", on: "2026-09-08", body: "one", in: course)
+        try writeClass("Unit 1, Day 2", on: "2026-09-10", body: "two", in: course)
+
+        let concept: String = """
+        ---
+        title: Loops
+        ---
+
+        | When | Where |
+        |---|---|
+        | Thursday | [[Unit 1, Day 2\\|Thursday's class]] |
+        """
+        let conceptURL: URL = course.directoryURL.appendingPathComponent("Loops.md")
+        try concept.write(to: conceptURL, atomically: true, encoding: .utf8)
+
+        let plan: ClassInsertionPlan = try ClassInsertionPlanner.plan(
+            unit: 1, atDay: 2, count: 1, forSection: 1, in: course
+        )
+        XCTAssertEqual(plan.linksToRewrite, 1, "The table link points at the page being renamed")
+
+        try ClassInsertionPlanner.apply(plan, in: course)
+
+        let updated: String = try String(contentsOf: conceptURL, encoding: .utf8)
+        XCTAssertTrue(
+            updated.contains("| Thursday | [[Unit 1, Day 3\\|Thursday's class]] |"),
+            "The table link follows its class and keeps its backslash:\n\(updated)"
+        )
+    }
+
     @MainActor
     func testInsertionIsRefusedWhenTheTimetableRunsOut() throws {
         let (root, _, course) = try makeWorkspace(meetingDates: ["2026-09-08", "2026-09-10"])
@@ -472,17 +568,17 @@ final class ClassPlanningTests: XCTestCase {
         ---
         Body.
         """
-        let result: (text: String, changed: Bool) = PageFrontmatter.settingCreated(
+        let result: (text: String, outcome: FrontmatterWriteOutcome) = PageFrontmatter.settingCreated(
             in: page, key: "created", to: CalendarDay(year: 2026, month: 9, day: 22)!
         )
-        XCTAssertTrue(result.changed)
+        XCTAssertEqual(result.outcome, .written)
         XCTAssertTrue(result.text.contains("created: 2026-09-22T09:15:00.000-0500"),
                       "Only the date in front of the time moves")
         XCTAssertTrue(result.text.contains("- unit-1"), "Every other byte is left alone")
 
-        let again: (text: String, changed: Bool) = PageFrontmatter.settingCreated(
+        let again: (text: String, outcome: FrontmatterWriteOutcome) = PageFrontmatter.settingCreated(
             in: result.text, key: "created", to: CalendarDay(year: 2026, month: 9, day: 22)!
         )
-        XCTAssertFalse(again.changed, "Setting the date it already has is not a change")
+        XCTAssertEqual(again.outcome, .alreadyRight, "Setting the date it already has is not a change")
     }
 }

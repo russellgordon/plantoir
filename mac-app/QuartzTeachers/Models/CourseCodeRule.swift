@@ -29,6 +29,23 @@ enum CourseCodeRule {
     /// name and a zip's prefix all at once.
     static let mostCharacters: Int = 12
 
+    /// Codes no course may take, because Plantoir keeps the name for itself.
+    ///
+    /// Only `WORK` today (GitHub issue #101, Russell's decision of
+    /// 2026-09-25). The Windows app builds each preview in a folder called
+    /// `work` beside every course's built website (`<buildRoot>\work`, next
+    /// to `<buildRoot>\<CODE>`), so a course of that code would share its
+    /// folder with the build. A Mac never had that collision, and
+    /// the name is refused here anyway: a code one app accepts and the other
+    /// refuses is a course a teacher can make on one computer and not open on
+    /// the other. Compared after `normalized`, so the case a teacher typed
+    /// makes no difference.
+    ///
+    /// Rejected: refusing it on Windows only (a platform difference to
+    /// remember forever) and renaming Windows' folder instead (the clash
+    /// goes, but the name stays free for the next thing to want it).
+    static let namesKeptForPlantoir: [String] = ["WORK"]
+
     // MARK: - Functions
 
     /// A code as it will be STORED: trimmed of surrounding whitespace and
@@ -52,6 +69,7 @@ enum CourseCodeRule {
         case twoSpacesInARow
         case charactersThatAreNotAllowed
         case tooLong
+        case keptForPlantoir(String)
         case alreadyTaken(String)
 
         // MARK: - Computed properties
@@ -66,6 +84,10 @@ enum CourseCodeRule {
                 return "A course code can only use letters, numbers, spaces and dashes."
             case .tooLong:
                 return "A course code can be at most \(CourseCodeRule.mostCharacters) characters."
+            case .keptForPlantoir(let code):
+                // Plain words (rule 1): says the name is taken by Plantoir
+                // itself, never what Plantoir uses it for.
+                return "\(code) is a name Plantoir keeps for its own use. Choose a different course code."
             case .alreadyTaken(let code):
                 // Points at the path rather than just refusing (Russell's
                 // decision): the commonest reason a teacher meets this in
@@ -98,6 +120,9 @@ enum CourseCodeRule {
                 return "Letters, numbers, dashes"
             case .tooLong:
                 return "\(CourseCodeRule.mostCharacters) characters at most"
+            case .keptForPlantoir:
+                // Twenty-three characters, inside the sidebar's room.
+                return "Kept for Plantoir’s use"
             case .alreadyTaken(let code):
                 return "\(code) already exists"
             }
@@ -143,6 +168,15 @@ enum CourseCodeRule {
         if let currentCode {
             if normalized(currentCode) == code {
                 return nil
+            }
+        }
+        // After the self-check above, so a course that already carries a
+        // kept name (one made on a Mac before the name was kept) can still
+        // have its own code re-typed while renaming — it just cannot be
+        // given one new.
+        for keptName in namesKeptForPlantoir {
+            if keptName == code {
+                return .keptForPlantoir(code)
             }
         }
         for existingCode in existingCodes {

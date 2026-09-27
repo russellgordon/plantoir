@@ -22,7 +22,7 @@ An adversarial architecture review uncovered five potential failure points that 
 5. **Windows ZIP vs. Inno Setup**:
    When teachers download a `.zip`, double-clicking `Plantoir.exe` from inside Windows Explorer's archive view launches the executable from `%TEMP%` without extracting DLLs, causing immediate crashes. A per-user Inno Setup installer (`PrivilegesRequired=lowest`) installs cleanly to `%LOCALAPPDATA%\Programs\Plantoir` with **zero UAC/admin prompts**, adds Start Menu/Desktop shortcuts, and manages clean uninstalls and updates.
 6. **The Netlify / GitHub 404 Race Condition**:
-   Pushing to `main` triggers Netlify to deploy the website in ~20 seconds. If GitHub is still uploading the 80 MB DMG or 60 MB Windows installer, teachers clicking "Download" will get a 404 error. The workflow must upload assets to a **GitHub Draft Release first**, publish the draft, and only *then* update and deploy the website.
+   Pushing to `main` triggers Netlify to deploy the website in ~20 seconds. If GitHub is still uploading the ~410 MB DMG (80 MB before #312 put the website builder's helpers in it) or 60 MB Windows installer, teachers clicking "Download" will get a 404 error. The workflow must upload assets to a **GitHub Draft Release first**, publish the draft, and only *then* update and deploy the website.
 
 ---
 
@@ -49,14 +49,17 @@ An adversarial architecture review uncovered five potential failure points that 
 
 ### Packaging & Signing Chain (`mac-app/publish.sh`)
 The automated script executes the following sequence:
-1. Fetches native `llama.cpp` (`mac-app/Vendor/fetch-llama.sh`).
-2. Generates Xcode project (`xcodegen generate`) and builds Release (`xcodebuild`).
-3. Relocates `.dylib` files into `Contents/Frameworks/` and `llama-server` into `Contents/Helpers/`.
+1. Fetches native `llama.cpp` (`mac-app/Vendor/fetch-llama.sh`), Sparkle, the updater (`mac-app/Vendor/fetch-sparkle.sh`, #204), and the website builder's helper programs and starting disk (`mac-app/Vendor/fetch-helpers.sh`, #312 — ~470 MB, Apple silicon only, versions and checksums read from `setup.sh`).
+2. Generates Xcode project (`xcodegen generate`) and builds Release (`xcodebuild`), then refuses a built bundle whose update feed, public key or ask-first key is wrong (`mac-app/release/check-update-keys.sh`).
+3. Does NOT relocate anything, whatever trap 1 above suggests: `llama-server` and its dylibs are signed where the build puts them, in `Contents/Resources/llama/`, and every release since v1.0.0 has notarized that way. (This step said they were moved to `Contents/Frameworks/` and `Contents/Helpers/`; corrected 2026-09-25 with #204, from `publish.sh` as it stands.)
 4. Bottom-up codesigning:
+   - Signs the updater's own code first, item by item — Autoupdate, Updater.app, the framework last; never `--deep`, never the app's entitlements (`mac-app/release/sign-updater.sh`, #204).
    - Signs all real `.dylib` files (preserving symlinks) with Developer ID + `--timestamp` + `--options runtime`.
-   - Signs `Contents/Helpers/llama-server` with Developer ID + `--timestamp` + `--options runtime`.
+   - Signs `Contents/Resources/llama/llama-server` with Developer ID + `--timestamp` + `--options runtime`.
+   - Signs each helper program in `Contents/Resources/helpers` the same way, limactl with its own entitlements (`release/limactl.entitlements`: virtualization, network client and server), then writes the helpers' `MANIFEST` again from the signed bytes (`mac-app/release/sign-helpers.sh`, #312).
    - Signs `Plantoir.app` with Developer ID + `--timestamp` + `--options runtime` + entitlements.
-5. Creates APFS-formatted `dist/Plantoir-macOS.dmg` with `/Applications` symlink.
+   - Refuses unless every updater item, every helper program and the app are on the app's own team with the hardened runtime, limactl carries the virtualization entitlement and the helpers' `MANIFEST` matches (`mac-app/release/check-signatures.sh`) — `codesign --verify --deep --strict` cannot see a helper left ad-hoc.
+5. Creates APFS-formatted `dist/Plantoir-macOS.dmg` with `/Applications` symlink, then recompresses it with LZMA (`hdiutil convert -format ULMO`, #312: 410 MB at the rehearsal; zlib was ~466 MB on an earlier app) BEFORE signing it, because converting drops a signature.
 6. Signs `dist/Plantoir-macOS.dmg` with Developer ID.
 7. Submits DMG to Apple Notarization (`xcrun notarytool submit ... --wait`).
 8. Staples the notarization ticket (`xcrun stapler staple dist/Plantoir-macOS.dmg`).
@@ -90,34 +93,62 @@ The automated PowerShell script executes:
 
 ## 4. Marketing Website & Evergreen Download URLs
 
-The website (`website/pages/index.html`) references evergreen download URLs:
+The website's download cards are drawn from `website/site.json` →
+`downloads` (since v1.4.0; they used to be typed into
+`website/pages/index.html`). A card with no `pinned` version uses the
+evergreen download URL:
 - **macOS**: `https://github.com/russellgordon/plantoir/releases/latest/download/Plantoir-macOS.dmg`
 - **Windows**: `https://github.com/russellgordon/plantoir/releases/latest/download/PlantoirSetup.exe`
 
-GitHub automatically resolves `releases/latest/download/<filename>` to the newest published release carrying that asset name.
+GitHub resolves `releases/latest/download/<filename>` to that asset on the
+newest published release — and 404s when the newest release does not carry it.
+(This paragraph used to say it found "the newest release carrying that asset
+name"; it does not, which is why a platform that lags a release has its card
+PINNED to `releases/download/v<version>/<filename>` by setting `pinned` in
+`site.json`, and un-pinned when it catches up. Windows is pinned to 1.1.0 as
+of v1.2.0.)
 
 **The names are frozen, and renaming one breaks the site's download button
 silently** — the evergreen URL keeps resolving, to nothing. `Plantoir-macOS.dmg`
 and `PlantoirSetup.exe` are what the cards ask for; `Plantoir-win-x64.zip` is
 also published, as a portable alternative nothing links to by that URL.
 
-### Auto-update, when it arrives, needs both appcasts planned together
+### Updating itself: one feed per platform, on plantoir.app (#204)
 
-Neither app updates itself today. Windows is expected to adopt **WinSparkle**,
-paired with the Inno Setup installer it already ships; the mac would adopt
-**Sparkle**. Decided 2026-08-12, before either was built, because the decision
-is cheap now and expensive later:
+**The mac updates itself from v1.4.0**, with Sparkle 2.9.6 (#204); **Windows
+will adopt NetSparkleUpdater**, not WinSparkle as this section expected
+when it was written on 2026-08-12 — NetSparkle reads the same feed format and
+can run the existing per-user Inno installer silently (the `windows` issue
+drafted from #204, milestone v1.4.0). What was decided before either existed
+still holds, with the names it finally took:
 
-- **Both appcasts live on plantoir.app**, in this repository's `website/`.
-- **Use per-platform file names from the very first one** —
-  `appcast-windows.xml` and `appcast-macos.xml`, never a single `appcast.xml`.
-  One shared feed would have each platform reading the other's releases, and
-  splitting it afterwards means every already-installed copy is pointed at a
-  URL that has stopped describing it.
-- **Add the appcast edit to the checklist in
-  [`RELEASING.md`](../RELEASING.md) when the first one lands.** A release that
-  publishes binaries without updating the feed ships an update nobody is
-  offered.
+- **Both feeds live on plantoir.app**, in this repository's `website/`, one file
+  per platform: `https://plantoir.app/updates/macos.xml` and, later,
+  `updates/windows.xml` (Russell, 2026-09-24). Never a single shared feed —
+  each platform would read the other's releases, and splitting it afterwards
+  points every installed copy at a URL that stopped describing it. Never a
+  GitHub release asset either: `releases/latest/download/<name>` answers 404
+  whenever the newest release lacks that asset, and a platform may lag (above).
+  The names this section used to give, `appcast-macos.xml` and
+  `appcast-windows.xml`, were never published and are not used.
+- **One signing key per platform**, and the feed itself is signed as well as
+  the download. The mac's public key is `SUPublicEDKey` in
+  `mac-app/project.yml`; the private half is the `plantoir-macos` Keychain item.
+  NetSparkle signs with a separate `.signature` file beside the feed rather
+  than inside it, which the site's copy must carry too.
+- **A development build has no feed**, so it never updates (decision 5 on #204).
+- **The feed is built at the cut, from the exact bytes uploaded, and goes live
+  only after the release is published** — a feed deployed before its download
+  exists offers an update that 404s. A release that publishes a DMG without
+  updating the feed ships an update nobody is offered. `website/update_feed.py`
+  builds and signs it at the cut, `website/build.py` copies it byte-for-byte (a
+  re-serialised feed breaks its signature) and checks it before and after a
+  deploy — `RELEASING.md` → "The update feed (macOS)". Teachers on v1.3.1 or
+  earlier — the last release without an updater — have no updater, and install the first release that carries one by hand.
+
+The rules a teacher is promised are `contracts/shared-rules.json` →
+`appUpdates`; the mac's mechanism, what was measured and what was rejected are
+in [`09-mac-app.md`](09-mac-app.md) → "Updating itself".
 
 ---
 

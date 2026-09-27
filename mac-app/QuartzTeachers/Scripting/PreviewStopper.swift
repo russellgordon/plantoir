@@ -45,7 +45,7 @@ enum PreviewStopper {
         sectionNumber: Int,
         workspaceURL: URL,
         inheriting inherited: [String: String] = ProcessInfo.processInfo.environment,
-        inHomeFolder homeFolder: URL = FileManager.default.homeDirectoryForCurrentUser
+        inHomeFolder homeFolder: URL = RealHome.forFiles
     ) -> HelperPrograms.Command {
         let scriptURL: URL = workspaceURL.appendingPathComponent("preview.sh")
         return HelperPrograms.Command(

@@ -421,12 +421,12 @@ final class ReferenceLockTests: XCTestCase {
 
     /// Removal works, and it is the unlock that makes it work: a locked tree
     /// refuses `removeItem` outright.
-    func testRemovingAReferenceCourseUnlocksItFirst() throws {
+    func testRemovingAReferenceCourseUnlocksItFirst() async throws {
         try prepare()
         let course: Course = try makeCourse()
         ReferenceLock.ensureLocked(course)
 
-        let result: ScheduledDeployCleanup.RemovalResult = ScheduledDeployCleanup.removeCourse(
+        let result: ScheduledDeployCleanup.RemovalResult = await ScheduledDeployCleanup.removeCourse(
             course, coursesDirectoryURL: coursesDirectoryURL, runner: launchControl
         )
         XCTAssertNil(result.problem)
@@ -436,12 +436,12 @@ final class ReferenceLockTests: XCTestCase {
 
     /// Removing a SECTION changes the course, so it is refused — in a
     /// sentence, never in the file system's own words.
-    func testRemovingOneSectionOfAReferenceCourseIsRefused() throws {
+    func testRemovingOneSectionOfAReferenceCourseIsRefused() async throws {
         try prepare()
         let course: Course = try makeCourse()
         ReferenceLock.ensureLocked(course)
 
-        let result: ScheduledDeployCleanup.RemovalResult = ScheduledDeployCleanup.removeSection(
+        let result: ScheduledDeployCleanup.RemovalResult = await ScheduledDeployCleanup.removeSection(
             2, from: course, coursesDirectoryURL: coursesDirectoryURL, runner: launchControl
         )
         XCTAssertFalse(result.didRemove)
@@ -455,12 +455,12 @@ final class ReferenceLockTests: XCTestCase {
 
     /// A backup round trip loses the flag, and the marker in the restored
     /// config is what puts it back.
-    func testARestoredReferenceCourseComesBackLocked() throws {
+    func testARestoredReferenceCourseComesBackLocked() async throws {
         try prepare()
         let course: Course = try makeCourse()
         ReferenceLock.ensureLocked(course)
 
-        let backupURL: URL = try CourseArchiver.backUpCourse(
+        let backupURL: URL = try await CourseArchiver.backUpCourse(
             course, coursesDirectoryURL: coursesDirectoryURL
         )
         let item: BackupItem = try XCTUnwrap(
@@ -480,7 +480,7 @@ final class ReferenceLockTests: XCTestCase {
 
     func writeAgent(courseCode: String, sectionNumber: Int) throws {
         let label: String = ScheduledDeploy.agentLabel(
-            courseCode: courseCode, sectionNumber: sectionNumber
+            courseCode: courseCode, sectionNumber: sectionNumber, workingFolder: workingFolderURL
         )
         let plist: [String: Any] = [
             "Label": label,
@@ -503,7 +503,7 @@ final class ReferenceLockTests: XCTestCase {
 
     func agentExists(courseCode: String, sectionNumber: Int) -> Bool {
         let label: String = ScheduledDeploy.agentLabel(
-            courseCode: courseCode, sectionNumber: sectionNumber
+            courseCode: courseCode, sectionNumber: sectionNumber, workingFolder: workingFolderURL
         )
         return FileManager.default.fileExists(
             atPath: agentsDirectory.appendingPathComponent("\(label).plist").path

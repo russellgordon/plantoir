@@ -95,6 +95,23 @@ nonisolated enum ReferenceWording {
              + "then copy again."
     }
 
+    /// Said in the sheet, before the copy is made, when the course being
+    /// copied has Obsidian add-ons (#255). The copy is made without them —
+    /// every route to a reference course leaves them behind — and the course
+    /// being taught keeps them, which is the half a teacher will worry about.
+    static func keepACopyLeavesAddOnsBehind(course: String) -> String {
+        return "The copy is made without \(course)'s Obsidian add-ons and their settings, "
+             + "so nothing in them can publish it. \(course) keeps them."
+    }
+
+    /// Keep a Copy for Reference… refused because a copy of the same name
+    /// is being made right now — in another window, or by another copy of
+    /// Plantoir (#245). Nothing of the other one was touched.
+    static func copyAlreadyBeingMade(folder: String) -> String {
+        return "A copy called \(folder) is already being made in another window, or in another "
+             + "copy of Plantoir."
+    }
+
     // MARK: - The pages being locked
 
     /// The calm note, said when a copy is made and again before the teacher

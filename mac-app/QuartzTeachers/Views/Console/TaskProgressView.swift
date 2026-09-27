@@ -33,6 +33,13 @@ struct TaskProgressView: View {
     let allLegs: [MultiDestinationDeployRunner.Leg]?
     let onCancel: (() -> Void)?
 
+    /// TESTS ONLY: told the height the folder publish's render note was
+    /// actually drawn at, so a test can say whether it kept every line
+    /// (#213). Nothing else can: the accessibility tree does not reach a
+    /// hosted `Text` in process, and `sizeThatFits` answers for the whole
+    /// view, not for one line of it. `nil` everywhere in the app.
+    let reportsRenderNoteHeight: ((CGFloat) -> Void)?
+
     @State var isShowingDetails: Bool = false
     @State var isShowingWhyTakingLong: Bool = false
 
@@ -45,7 +52,8 @@ struct TaskProgressView: View {
         canCancel: Bool = true,
         hidesSiteLink: Bool = false,
         allLegs: [MultiDestinationDeployRunner.Leg]? = nil,
-        onCancel: (() -> Void)? = nil
+        onCancel: (() -> Void)? = nil,
+        reportsRenderNoteHeight: ((CGFloat) -> Void)? = nil
     ) {
         self.runner = runner
         self.title = title
@@ -53,6 +61,7 @@ struct TaskProgressView: View {
         self.hidesSiteLink = hidesSiteLink
         self.allLegs = allLegs
         self.onCancel = onCancel
+        self.reportsRenderNoteHeight = reportsRenderNoteHeight
         _isShowingDetails = State(initialValue: showingDetailsForTesting)
     }
 
@@ -259,6 +268,11 @@ struct TaskProgressView: View {
                                     .font(.callout)
                                     .foregroundStyle(.secondary)
                                     .accessibilityIdentifier("publishedFolderRenderNote")
+                                    .onGeometryChange(for: CGFloat.self) { proxy in
+                                        return proxy.size.height
+                                    } action: { renderedHeight in
+                                        reportsRenderNoteHeight?(renderedHeight)
+                                    }
                                 Button("Show in Finder", systemImage: "finder") {
                                     NSWorkspace.shared.activateFileViewerSelecting([folderURL])
                                 }

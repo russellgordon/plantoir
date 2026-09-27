@@ -32,8 +32,10 @@ copy-pasteable follow-up commands in the right dialect (`./preview.sh …` vs
 
 ## 2. Resolve which image to use
 
-Every launcher derives the image from the folder's build recipe: the tag is
-`teaching-quartz:src-<hash of the recipe>`, built locally when missing.
+Every macOS launcher derives the image from the folder's build recipe: the
+tag is `teaching-quartz:src-<hash of the recipe>`, built locally when missing.
+The Windows launchers resolve no image at all — they run the same scripts on a
+runtime the app carries ([12 → Nothing here runs in a container](12-windows-app.md#nothing-here-runs-in-a-container)).
 
 - `--image REF` — substitute a specific already-built image (this is how
   `verify.sh` drives the launchers against its own `dev-test` build).
@@ -66,14 +68,24 @@ Every launcher derives the image from the folder's build recipe: the tag is
 
 Each working folder gets its own container, named
 `teaching-quartz-<hash>` where the hash is the first eight characters of
-`pwd -P | shasum -a 256` — so two folders (this year's courses and last
+`/bin/pwd -P | shasum -a 256` — the disk's own spelling of the folder; see
+"One folder, one spelling" below — so two folders (this year's courses and last
 year's, say) never repoint each other's mounts, and can preview at the same
-time. At creation the launcher probes for a free block of HOST ports
-(bases 8081, 8091, 8101, 8111, 8121, 8131 — four site ports each, plus a
-matching +1000 websocket block for Quartz's live reload) and maps it to
+time. At creation the launcher walks upward for a free block of HOST ports
+(bases 8081, 8091, 8101 … 8471 — forty blocks of four site ports each, plus a
+matching +1000 websocket block for Quartz's live reload; see "How a folder
+finds its ports, and when it cannot" below) and maps it to
 the container's fixed ports 8081–8084 and 9081–9084; `preview.sh` prints the
 resolved address ("Preview will be available at: …"), which is what the app
-and a terminal teacher should open. The old shared `teaching-quartz`
+and a terminal teacher should open. It asks the container for that mapping
+twice, and if both answers are empty it says it could not find out where the
+preview will be and stops before building (exit 1) — since #235 it never
+announces the container's own port in its place, which is right only for the
+first folder on a Mac. Since #234 it then connects to that address before
+building, and stops in about ten seconds if this Mac cannot reach it (see
+"Before building, preview.sh makes sure this Mac can reach the builder"
+below). `--build-only` asks neither question and is never stopped there,
+so a publish is unaffected. The old shared `teaching-quartz`
 container is retired automatically the first time a per-folder container is
 created. The macOS app stops a folder's container (a fast `docker stop`,
 not a removal) when the last window using that folder closes, and on quit —
@@ -90,9 +102,376 @@ it refuses to free, and why".
   scans the whole argument list, since the flag follows the course and
   section.
 
-The scripts then ensure a container runtime is available (next section)
+The scripts then ensure a container runtime is available (section 3)
 and build the image locally if the recipe's tag is missing — nothing is
 ever pulled from a registry.
+
+### One folder, one spelling (GitHub #189)
+
+The same folder can reach a launcher spelled several ways: through a link, as
+`/tmp` for `/private/tmp`, by the firmlink `/System/Volumes/Data/…`, in the
+wrong case (a Mac's disk ignores case), or with an accented letter in the
+other Unicode form — é stored as one character by Terminal, a zip or a
+Windows PC, and as e + accent by Finder. The disk treats them all as one
+folder. Until #189 the launchers hashed bash's BUILT-IN `pwd -P`, which keeps
+the case and form it was HANDED, while the app hashed `realpath`, which
+returns the disk's. And the app cannot hand a launcher the disk's bytes even
+if it wants to: Foundation passes an accented name to a child process as
+e + accent whatever the disk stores (measured, `Process.arguments`). So a
+working folder with an accented name stored the Terminal way — or reached in
+another case — had two workspaces and two builds folders, one the app's and
+one the launchers', and each side cleared the other's builds as "a link that
+is not mine".
+
+**The fix is one line after each launcher's first `cd`**, identical in all
+three and checked by `scripts/test_folder_spelling.py`:
+
+```bash
+FOLDER_ID_AS_HANDED="$(pwd -P | shasum -a 256 | cut -c1-8)"
+cd "$(/bin/pwd -P)"
+```
+
+`/bin/pwd` asks the disk (`getcwd`), so after it `pwd`, `$(pwd)` and the id
+are the disk's spelling, and the id, the container's name, the builds folder
+and the `courses/` folder the container mounts all come from ONE spelling.
+The id line itself became `/bin/pwd -P | shasum` too, and so did the builds
+folder's `working-folder.txt` and `verify.sh`'s own derivations. The app asks
+the same question with `FolderIdentity.canonicalPath`
+([09](09-mac-app.md) → "One folder, however it is spelled").
+
+What was measured on this Mac (macOS 26.6, APFS, case-insensitive), `/bin/bash`
+3.2, against C `realpath` and `fcntl(F_GETPATH)`:
+
+| Spelling handed in | bash built-in `pwd -P` | `/bin/pwd -P` |
+|---|---|---|
+| the disk's own | same | same |
+| wrong case (`plantoircase`) | keeps the typed case | disk's case |
+| through a link | target | target |
+| `/tmp/…` | `/private/tmp/…` | `/private/tmp/…` |
+| `/System/Volumes/Data/Users/…` | keeps the prefix | `/Users/…` |
+| an NFC-stored name reached as NFD | NFD (typed bytes) | NFC (disk bytes) |
+| an NFD-stored (Finder-made) name typed NFC, upper case | typed | disk's |
+
+`/bin/pwd -P` and `F_GETPATH` agreed byte for byte on all 17 spellings tried
+(the table's, plus iCloud Drive, `~/Library/CloudStorage/Dropbox` and an
+external HFS+ disk, each in the right and the wrong case). `realpath`
+agreed on all but the firmlink, where it keeps `/System/Volumes/Data`.
+
+**Rejected:** `realpath(1)` and `python3 -c os.path.realpath` in the launcher
+(the second measured in the issue not to fold case, and Python is not there
+before setup has run); making the app imitate the built-in instead (the id
+would then depend on how the folder was reached, which is the bug, and the
+app's "typed" bytes are not even its own); `cd -P` (measured: also keeps the
+spelling). A reviewer showed that switching only the id line to `/bin/pwd`
+would have been worse than nothing: `HOST_COURSES="$(pwd)/courses"` would
+still hold the typed spelling, one container would be told two mount sources
+on alternate runs, and it would be stopped and recreated each time — a cold
+workspace (about two minutes) instead of a second one. Hence the `cd`.
+
+**The second copy is cleared away.** `clear_away_this_folders_other_spelling`,
+in the PREVIEW PORT BLOCK and called by each launcher just before it looks at
+its own workspace, handles what an old spelling left behind: if
+`FOLDER_ID_AS_HANDED` differs from the folder's id, a STOPPED
+`teaching-quartz-<that id>` is removed with a plain `docker rm` (never `-f`),
+and `builds/<that id>` is removed when its `working-folder.txt` names THIS
+folder (compared through `/bin/pwd -P`, since an old launcher wrote the typed
+spelling; an EMPTY note names no folder, because `cd ""` stays put and would
+read as this one) and no workspace, running or stopped, still mounts it. A RUNNING
+copy is left alone and named on the console — it may be an older launcher's
+publish in the middle of its work. Nothing is removed when Docker cannot be
+asked, and the teacher's courses are never touched. The console says what was
+cleared — the workspace, the built websites, or both, naming only what went —
+and the trail gets one line (`contracts/shared-rules.json` →
+`buildOutputLocation.aSecondSpellingIsClearedAway`, and
+`activityTrail` → "built site moved out of the working folder" →
+`launcherLineWhenASecondCopyIsClearedAway`). Rejected: doing it in the app at
+launch — a publish launchd started with the OLD `deploy.sh` could be building
+into that folder at that moment; moving the old folder's content to the new
+id — adoption under another name, for a build nothing vouches for (the two
+had been clearing each other), which `aBuildWithNoLinkIsNotAdopted` already
+refuses.
+
+**What a teacher pays, once.** Any launcher edit changes the image tag, which
+recreates every folder's container on its next run — this one included; an
+ordinary folder whose path is already in the disk's spelling keeps its id, its
+builds folder and its built websites. A folder that had the split builds from
+scratch once more (the builds folder the launchers now use is the app's, whose
+link the last launcher run had cleared), and never again. Known limits: a
+second copy that is RUNNING when the launcher looks keeps `docker ps` from
+being empty, so the app's quit leaves the virtual machine running until it
+stops ([09](09-mac-app.md) → "Quitting"); a spelling that is never used again
+leaves its stopped copy behind, holding one of the forty preview blocks, which
+the walk's second pass will take when nothing else is free; and one narrow
+race is open — an OLD launcher (a launchd publish still on the pre-refresh
+`deploy.sh`) that has made its builds folder but not yet started its stopped
+workspace can lose that folder to a new launcher handed the same old spelling
+at the same moment, costing that one publish a build
+(`buildOutputLocation.aSecondSpellingIsClearedAway.knownLimits`).
+
+### How a folder finds its ports, and when it cannot
+
+GitHub #280, 2026-09-25. The rule is data in
+[`contracts/app-rules.json`](../contracts/app-rules.json) → `previewPorts`
+(`hostBlockCount`, `hostBlockProbe`, `hostBlockCases`, `hostBlockClash`,
+`whenNoBlockIsFree`); the code is one marked block, `# >>> PREVIEW PORT BLOCK
+>>>`, byte-identical in `setup.sh`, `preview.sh` and `deploy.sh`, and
+`scripts/test_port_blocks.py` runs it against a pretend Mac (fake `lsof`,
+`netstat` and `docker` on PATH) under `/bin/bash` 3.2 with `set -euo
+pipefail`, plus one check of the real `netstat` half on the Mac it runs on.
+
+**What went wrong.** The launchers tried six blocks (8081 … 8131) and gave up.
+A block is held by a workspace that EXISTS — running `tail -f /dev/null`,
+preview or no preview; its forwarders listen on all eight ports — so six
+working folders' workspaces alive on one Mac left a seventh folder unable to
+preview or publish. On the development Mac six agent worktrees did it, and
+`verify.sh` failed five to seven launcher checks. A teacher gets there by
+using six working folders on one Mac: a workspace exists until something
+removes it, nothing removes another folder's (the app only STOPS them), and
+it survives a restart as a stopped workspace — so the count is folders ever
+used, moved and deleted ones included (the name is a hash of the path, so a
+moved folder's old workspace can never be started again).
+The refusal then said "Stop another preview (or another app using ports
+8081+)", which is false: stopping a preview frees nothing.
+
+**The walk.** Forty blocks, 8081 … 8471 (websockets 9081 … 9474), the first
+whose eight ports are all free. **Forty is a chosen number, not a measured
+one.** The arithmetic bounds it: block 100's first port is 9081, the first
+block's websocket, so anything up to 99 works; forty keeps the walk under
+8888, and the websockets land only on the x1–x4 of each ten, clear of 9090,
+9200 and 9229. A ceiling at all keeps the refusal reachable, so it is tested
+and its sentence stays true.
+
+A block is taken when any of its eight ports is:
+
+- **listening on this Mac, in ANY account** — read from TWO listings, each
+  once: the kernel's own list, `netstat -an -p tcp` (LISTEN rows only; port =
+  what follows the LAST dot: `*.8081`, `127.0.0.1.8443`, `::1.8443`), and
+  this account's `lsof -nP -iTCP -sTCP:LISTEN -Fn` (port = what follows the
+  last colon: `n*:8081`, `n127.0.0.1:8443`, `n[::1]:8443`), joined. Until
+  #310 (2026-09-26) it was `lsof` alone — see "Another account on the same
+  Mac" below for why that was wrong. This check has to stay: a python server
+  on 127.0.0.1:18556 and then `docker run -p 18556:8081` → **exit 0**, both
+  listening. Docker cannot see a host program on a port, so this is the only
+  guard against another app (Supabase holds 8443 on the development Mac, so
+  block 8441 is skipped there);
+- **published by another working folder's workspace, stopped ones
+  included** — one `docker inspect` of every `teaching-quartz-*` workspace's
+  `HostConfig.PortBindings` (0.07 s for nine). A stopped workspace listens on
+  nothing, so without this a new folder takes its block and the stopped one
+  cannot start again; since #220 quitting Plantoir STOPS workspaces, so that
+  is an everyday path, not a corner.
+
+**Two passes** (`previewPorts.hostBlockPasses`). The first counts all of the
+above. Only when it finds nothing does a second walk count what is IN USE —
+listening on this Mac, or published by a RUNNING workspace — and take a block
+a stopped workspace was keeping. Without it (review of the first
+implementation, 2026-09-25, measured: nine workspaces on the development Mac,
+four stopped, for 20 minutes to two weeks, uptime 56 days) a block would be
+kept for as long as its workspace exists — for ever, for a folder that was
+moved or deleted — and neither remedy the refusal names would free anything, since both
+only stop workspaces. The folder whose block was taken pays one slow preview:
+its workspace is remade on free ports by the path below when it next starts.
+
+| Measured on the development Mac, 2026-09-25 | Result |
+|---|---|
+| The old probe: one `lsof -iTCP:<port>` per port, 80 calls for 40 blocks | **9.84 s** — 0.123 s a call |
+| One listing, parsed once | **0.12 s** (0.121–0.153 s over three readings) |
+| `docker run -p P` while a HOST program listens on P (Colima) | exit 0 — Docker cannot see it |
+| Workspace X on P, stopped; Y made on P; `docker start X` | X: exit 1, "Bind for 0.0.0.0:P failed: port is already allocated" |
+| The real walk on this Mac, six workspaces running and three stopped (all nine blocks among 8081 … 8131) | **8141**, in 0.25 s end to end (`lsof` + `docker ps` + `docker inspect`) |
+| `verify.sh` with those workspaces alive, after this change | 148 PASS, "All checks passed" (it had failed 5–7 launcher checks) |
+| A first preview after a workspace is remade (#225, a teacher's Mac) | **109.3 s** cold, against seconds warm |
+| (#310, 2026-09-26) `netstat -an -p tcp` + awk, the whole list | **0.00–0.01 s** (3 runs); 17 listeners against `lsof`'s 13 — root's `kdc` on 88 and screen sharing on 5900 are the difference |
+| (#310) `lsof` listing, for comparison | 0.06–0.07 s |
+
+Each listing that cannot be read (missing or failing) counts as EMPTY on its
+own, so the other one's answer stands: a `netstat` whose columns change in a
+future macOS falls back to exactly the old `lsof` answer, never to "nothing
+listening". Only when both fail does the walk count nothing as listening —
+the old probe's answer too, pinned by a test so nobody changes it quietly; the
+other workspaces are still skipped, and a clash with one is caught below.
+
+**A clash at the moment of making.** The probe and `docker run` are two steps,
+so two launchers starting together can both see a block free. A `docker run`
+refused in any of `port is already allocated` (Colima), `Ports are not
+available` or `address already in use` (Docker Desktop, which the launchers
+use as-is when it is what works) removes the half-made workspace with a
+plain `docker rm` and walks on from the NEXT block, up to the same ceiling.
+Any other refusal prints Docker's words (the app's failure explanations match
+on them) and keeps `say_this_folder_cannot_be_reached`.
+
+**A stopped workspace whose block was taken.** `start_the_existing_workspace`
+replaces the bare `docker start` in all three launchers. Refused for a port —
+only then — it removes the workspace (plain `docker rm`) and makes it again on
+free ports, and says in the console that the next preview will be slower,
+about two minutes: the warm copy of the website builder lives in the
+workspace's own `/tmp/quartz-builds` and goes with it. Any other refusal stops
+the run with Docker's words and a sentence. Before this, `setup.sh` and
+`deploy.sh` ended at the bare `docker start` under `set -e` with Docker's
+words alone, and `preview.sh` (no `set -e`) carried on to fail at `docker
+exec` with nothing a teacher could read. With the stopped-workspace skip in
+the first pass, this path is reached when the SECOND pass has taken a stopped
+workspace's block, or for workspaces made before #280.
+
+**A preview looks before it starts one (#310).** Colima does NOT refuse a
+start onto a port something else holds — `docker start` exits 0 and the
+forward silently fails (measured with root's 5900) — so the refusal above
+never comes. So when `preview.sh` is about to SERVE (`WORKSPACE_WILL_SERVE`,
+which only `preview.sh` sets, and only without `--build-only`) and the engine
+is Colima (`the_engine_forwards_from_this_account`), `start_the_existing_workspace`
+first reads the workspace's own eight host ports from `docker inspect` and
+looks for any of them in the listings. A stopped workspace listens on nothing
+— its own forward is gone 0.011 s after the stop returns and back 0.011 s
+after a start (5 of 5 each way) — so a listener there is somebody else's,
+this account's own programs included. It then asks once more whether the
+workspace is RUNNING (another launcher for the same folder started it a
+moment ago: the listener is its forward, and it is used as it is), and
+otherwise takes the same remake as a refusal: the two ♻️ lines, a plain
+`docker rm`, `run_container_with_mount`, and — only once that has
+succeeded — the marker
+`PLANTOIR_PREVIEW_ADDRESS_HELD: before-start <port> <course>/<section>`,
+which the app writes onto the trail as the `preview address held by another
+account` event. If `docker rm` is refused and the workspace is not running,
+the run stops with `saysWhenAStartIsRefused` — there was no start, so there
+are no engine's words to print. `setup.sh` and `deploy.sh` never look: they
+never serve, so a squatted forward costs them nothing, and a six o'clock
+publish keeps its warm builder rather than pay a two-minute remake with a new
+way to fail. The block stays byte-identical in all three launchers because
+the look is switched on by that variable, not written in one copy only.
+
+**Never `docker rm -f` in either path.** A failed start proves nothing runs in
+that workspace, but two launchers on the same folder (a scheduled publish and
+a Preview) can both find it stopped; the second one's `-f` would kill the
+workspace the first had just remade, mid-publish — the shape GitHub #94 was
+about. Plain `rm` refuses a running workspace, and the start path then uses it
+as it is. Every OTHER remake, since #94, looks at what is running first and
+removes by id: "Before a workspace is remade" below.
+
+**When all forty are taken.** Exit 1, and
+`previewPorts.whenNoBlockIsFree.sentence` word for word. It names the two
+remedies that are true: closing Plantoir's windows for the other folders
+(the app stops a folder's workspace when its last window closes, and at quit),
+and restarting the Mac (workspaces are made with no restart policy, so after a
+restart they come back stopped). Both are true because of the second pass,
+which takes a stopped workspace's block when nothing else is free; what is
+left after both is ports other apps are listening on. A publish that cannot get a
+workspace prints it too, which is why it says "a preview". The trail gets the
+existing `preview did not appear` event's second launcher line,
+`launcherLineWhenEveryAddressIsTaken` in `contracts/shared-rules.json`, with
+the course and section (or the word `setup`). A walk that FOUND a high block
+writes nothing: the announced address already carries the port.
+
+**Another account on the same Mac (#310, 2026-09-26).** Found in the #204
+rehearsal: two macOS accounts signed in, each with Plantoir. `lsof` run as
+the teacher lists only the teacher's own programs, so the second account's
+walk saw 8081 as free while the first account's preview held it. Its
+`docker run -p 8081…` exited 0; under Colima the forward is this account's
+own `ssh`, and XNU refuses a port already bound by another uid, so the forward
+failed with a warning in Lima's `ha.stderr.log` (`failed to set up forwarding
+tcp port …`, ssh exit 255) and nowhere a launcher reads — `docker port` still
+names the port. #234's reach check was then answered by the FIRST account's
+forwarder, and the teacher's Preview opened somebody else's site. Measured
+with root's screen sharing on 5900 standing in for another account (a
+different uid, which is all XNU compares): `docker run -p 5900:8081` → exit
+0, `docker port` → `0.0.0.0:5900`, curl to it reaches screen sharing.
+
+Three layers now, each closing a hole the others cannot:
+
+1. **The walk** reads the kernel's list too (above), so another account's
+   listener, or root's, is stepped past like this account's own.
+2. **Before a preview starts a stopped workspace** it looks at its ports
+   (above). The walk cannot see another account's STOPPED workspace (its VM
+   is not ours to ask), so two accounts can still both hold 8081 on paper;
+   whichever starts second is caught here.
+3. **Before `preview.sh` announces the address** it asks whose it is:
+   "Before building, preview.sh makes sure the address is this account's
+   own", in the `preview.sh` section below.
+
+**Known limits, written down rather than fixed:**
+
+- Another account's STOPPED workspace is invisible by construction, so this
+  account can be handed its block while that account is logged out or its
+  workspace stopped. That account then pays one remake (about two minutes)
+  when it next previews. Documented, not a bug.
+- The look before a start, and the look before the announcement, run under
+  Colima only (`contracts/app-rules.json` → `previewPorts
+  .whenAnotherAccountHasTheAddress.gate`). Docker Desktop refuses a start
+  onto a held port itself ("Ports are not available"), which the refusal path
+  handles; any other engine was never measured and must not pay a remake on
+  a guess. A developer whose shell sets `DOCKER_HOST` to anything outside
+  `~/.colima/` (or `$COLIMA_HOME`, for a Colima kept elsewhere) switches both off — `docker context show` then says `default`
+  whatever the engine — and the preview says so on the trail (the
+  `unchecked` outcome) rather than going quiet. The app never sets it.
+- The look before a start can remake a workspace stopped a moment ago
+  whose own forward has not gone yet: 0.011 s on the development
+  Mac, unmeasured on a teacher's (#225's Mac took 0.10–0.24 s for a listener
+  to APPEAR). The cost is one cold preview, never a wrong site.
+- The likeliest follow-on on a two-account Mac looks like #225, not like
+  this: the other account quits Plantoir while this account's broken
+  workspace is still running, so nothing listens on the address at all and
+  #234 says "restart your Mac". That remedy works (the forward is made again
+  on the next start), but the diagnosis is #225's. Left alone deliberately:
+  #234 rejected restarting the builder from a launcher.
+- A root-owned or other-account server in the range is still found only by
+  the kernel's list; if some future macOS changes `netstat`'s columns, the
+  walk silently falls back to `lsof` alone, which is #310 again.
+  `scripts/test_port_blocks.py` → `TheRealListings` checks the `netstat`
+  half ON ITS OWN on whatever Mac runs the suite (non-empty whenever `lsof`'s
+  list is, and holding every port `lsof` lists), so that fallback shows up
+  as a red test rather than as a teacher's wrong site.
+
+**What was rejected, and why:**
+
+- **A workspace with no ports for a publish** (Russell's comment on #280: "a
+  publish-only folder should not need a port block at all"). Rejected by the
+  director on 2026-09-25, reversibly: the workspace is made once per folder
+  and serves both, so the next Preview in that folder would have to remake it
+  — which, when that was decided, stopped the workspace without asking what
+  ran in it, so a scheduled publish of another section in progress would have
+  been killed. Since #94 a remake waits for the publish instead, so the cost
+  became a routine wait (or a refused preview) rather than a killed publish;
+  and it still throws away the warm website builder (109 s cold). It also
+  only moves the wall: that folder's next preview meets the same ceiling.
+- **A throwaway `docker run --rm` workspace per publish.** A second workspace
+  cannot see the first's processes, so a publish could no longer stop a
+  preview of the same section before building (`shared-rules.json`, the
+  `--stop` cases) — the regression that rule exists for.
+- **A per-run image tag in `verify.sh`** (the issue's first idea). The tag is
+  one of at least six things concurrent runs share (the image, 78 fixed
+  `/tmp/verify_*.log` paths, `$HOME/.plantoir-verify-26:27` and its workspace,
+  `$HOME/.plantoir-verify-locked`, the prune fixtures); a per-run tag fixes
+  one, breaks `--skip-build`, and makes every document naming
+  `quartz-teacher:dev-test` wrong. `verify.sh` takes a LOCK instead
+  (`/tmp/plantoir-verify-<uid>.lock`, section 0.2): a second run names the
+  holder and exits 1 rather than queueing silently; a lock whose holder is gone
+  is taken over; a lock with no holder written yet is held; it is let go on
+  every exit, Ctrl-C and hang-up included, and only by its own run.
+  `scripts/test_verify_lock.py` proves each.
+- **One `lsof` per port** (the old probe) — 9.8 s for forty blocks.
+- **A bind probe** (#310's first suggestion). It does see other accounts, even
+  with `SO_REUSEADDR`, but it needs an interpreter: `/usr/bin/python3` on a
+  Mac without the Command Line Tools is a stub that opens the "install
+  developer tools" dialog, and one process per port cost 2.23 s for forty
+  blocks. It also answers the wrong question both ways: without
+  `SO_REUSEADDR` a port in TIME_WAIT (a preview closed a minute ago) reads as
+  taken; with it, a same-account listener on another address reads as free
+  (127.0.0.1 beside `*:5000`, measured).
+- **A connect probe for the walk** — 0.66 s for 320 ports, sees only what
+  answers on 127.0.0.1, and knocks on other people's servers.
+- **`netstat` alone** — a future column change would fail open to "nothing
+  listening", which is worse than before #310. Keeping `lsof` costs 0.06 s.
+- **Reading Lima's `ha.stderr.log`** for the failed forward — the direct
+  evidence, but an internal log in a Colima-version-specific place and shape,
+  and a Docker Desktop teacher has none.
+- **The look before a start in `setup.sh` and `deploy.sh` too** — neither
+  serves; the look would give a scheduled publish a two-minute remake and a
+  new way to fail for a clash that cannot hurt it.
+- **A launcher line under `workspace was in use`** for the #310 remakes (the
+  plan's first proposal) — that event is written by the app from its own
+  marker and says a remake with nothing running writes nothing; the remakes
+  got their own mac-only event instead.
+- **No ceiling** — the refusal would be unreachable and untestable, and past
+  block 99 the site ports sit on the first block's websockets.
 
 ### Staying up to date
 
@@ -116,12 +495,13 @@ from one of them is exit 127 at runtime on the one path nobody tested.
 
 ## 3. Container runtime bootstrap (no Docker Desktop)
 
-Docker Desktop is deliberately not required. Every launcher carries an
-`ensure_container_runtime` (bash) / `Ensure-ContainerRuntime` (PowerShell)
-step that runs before the first `docker` command and removes what used to be
-a manual step ("open Docker Desktop and wait for the engine to start"):
+Docker Desktop is deliberately not required. The macOS launchers carry an
+`ensure_container_runtime` step that runs before the first `docker` command
+and removes what used to be a manual step ("open Docker Desktop and wait for
+the engine to start"); the Windows launchers have no counterpart, because
+there is nothing on Windows for them to start (below).
 
-**Fast path (both platforms).** If `docker info` already succeeds — any
+**Fast path (macOS).** If `docker info` already succeeds — any
 working engine, including Docker Desktop or Rancher Desktop if a teacher
 happens to have one — the launcher uses it as-is and does nothing else.
 
@@ -129,31 +509,229 @@ happens to have one — the launcher uses it as-is and does nothing else.
 lightweight Linux VM with a Docker engine inside, driven entirely from the
 command line. The bash launchers:
 
-1. Use whatever is already on the machine — Homebrew installs included —
-   found by `command -v`. Nothing is installed over a working tool.
-2. Download whatever is missing as a pinned static binary into
+1. Use whatever is already on the machine OUTSIDE Plantoir's own folder —
+   Homebrew installs included — found by `command -v`. Nothing is installed
+   over such a tool, one program at a time.
+2. Install what is missing — and, since GitHub #312, replace Plantoir's own
+   copies when they are of other versions or damaged — into
    `~/Library/Application Support/Plantoir/tools/bin` (buildx into
    `~/.docker/cli-plugins`): Colima `v0.10.3`, Lima `2.2.0`, Docker CLI
-   `29.7.2`, buildx `v0.36.1`. **No Homebrew and no administrator rights** —
-   a teacher cannot be asked for a password they may not have.
-3. Start Colima (`--vm-type vz` when the VM is first created) — sized from the Mac it is running on rather than pinned.
+   `29.7.2`, buildx `v0.36.1`. **Copied out of the Mac app** when it carries
+   them (Apple silicon), **downloaded** otherwise, and every download is
+   checked against a pinned SHA-256 for its kind of Mac. **No Homebrew and no
+   administrator rights** — a teacher cannot be asked for a password they
+   may not have. How, and why: "Where the helper programs come from" below.
+3. Start Colima (`--vm-type vz` when the VM is first created, from the app's
+   copy of its starting disk when there is one) — sized from the Mac it is running on rather than pinned.
    `_colima_cpus` takes half the cores (floor 2, cap 6) and
    `_colima_memory_gb` a third of the RAM (floor 4 GB, cap 12 GB), so an 8 GB
    laptop gets exactly the old 2 CPU / 4 GB default and a 48 GB desktop gets
    6 CPUs and 12 GB. Deliberately not the whole machine: the teacher is using
    it while a site builds.
    What it prints differs by path: a VM being created for the first time
-   prints "🚀 First start: building the virtual machine…", an existing one
+   prints "🚀 First start: setting up your website builder…" (before GitHub
+   #263, "building the virtual machine…" with its disk image), an existing one
    "▶️  Starting the website builder…" (before 2026-09-23, "Starting Colima…";
-   GitHub #228). The app's `ScriptRunner.friendlyPhase` labels only the SECOND
+   GitHub #228). The downloads in step 2 print "📦 Downloading what your
+   website builder needs (N of 4)…", where N is the TOOL's fixed number —
+   Lima 1, Colima 2, the Docker CLI 3, buildx 4 — not a running count, so a
+   Mac missing only buildx reads "(4 of 4)"; it said "Getting the container
+   runtime…" and the like until #263. The app's `ScriptRunner.friendlyPhase` labels only the SECOND
    "Starting up (first time can take a few minutes)…", so that label shows on
    exactly the start that is not the first. Known and left alone: it is shown
    only when a runner has no milestones, which no launcher run lacks.
-4. Poll `docker info` for up to a minute. If the VM claims to be running but
+4. Poll `docker info` for at least a minute — 30 tries, two seconds apart,
+   each try also waiting for `docker info` itself ("⏳ Waiting for the website
+   builder to be ready…" — `friendlyPhase`'s "Starting up…" marker, which
+   moved with the text in #263). If the VM claims to be running but
    the daemon never answers (a known Colima state after the Mac sleeps or
    shuts down uncleanly, where a plain `colima start` no-ops), force a clean
-   `colima stop --force && colima start` cycle and wait again before giving
-   up with manual-recovery instructions.
+   `colima stop --force && colima start` cycle ("🔁 The website builder isn't
+   answering yet — restarting it…") and wait at least two minutes more (60 tries) before
+   giving up with "❌ The website builder did not start." and "Restart this
+   Mac, then try again." The by-hand recovery a developer would use —
+   `colima stop --force && colima start`, then re-run the launcher — is a
+   COMMENT beside that line since #263, not output: a teacher cannot act on a
+   `colima` command, and a restart is what cleared the wedged builder in
+   GitHub #225.
+
+   Every line this step and steps 2–3 print — the whole block from its
+   `# >>> FIRST-RUN BLOCK >>>` line to the bare `ensure_container_runtime`
+   call, byte-identical in `setup.sh`, `preview.sh` and `deploy.sh` (it began
+   at `_download()` until #312 moved the start up to take in the pinned
+   versions and checksums) — is pinned by
+   `AppRulesContractTests.testTheFirstRunLinesNameNoMachinery`: no Colima,
+   Lima, Docker, buildx, container, image, script or toolchain on a printed
+   line, and the three copies still identical. The one exemption is an `echo`
+   of a `PLANTOIR_` line, which the app reads and keeps out of the console.
+   The rest of each launcher still names the machinery in places; that is its
+   own follow-up issue.
+
+### Where the helper programs come from (GitHub #312)
+
+**What a first run cost before.** Measured 2026-09-26 on an M4 Pro (~320
+Mbit/s): Lima 37.6 MB, Colima 15.7 MB, the Docker CLI 18.9 MB and buildx 62.5
+MB (135 MB), then Colima's Ubuntu disk image, 332 MB, then about 390 MB while
+the website builder's image was built (88 s and 137 s on two cold runs) —
+**about 857 MB**, while the launcher said "About 600 MB is downloaded once".
+Estimated for a school connection: about 7 minutes at 25 Mbit/s, 14 at 10.
+Russell's own fresh-account run took "nearly five minutes" on gigabit.
+
+**What the app carries.** `Plantoir.app/Contents/Resources/helpers`, Apple
+silicon only, put there by `mac-app/Vendor/fetch-helpers.sh`:
+`bin/{colima,limactl,lima,docker}`, `cli-plugins/docker-buildx`,
+`share/lima/{lima-guestagent.Linux-aarch64.gz,templates}`,
+`vm/ubuntu-24.04-minimal-cloudimg-arm64-docker.raw.gz` (the upstream bytes,
+never recompressed) and a `MANIFEST` (`arch`, the pins line, `image`, and a
+SHA-256 for every file but the disk). The app says where through
+`PLANTOIR_BUNDLED_HELPERS`, set by `HelperPrograms.environment` only when the
+folder exists — so every run the app starts carries it, the MCP server's and
+the publishes launchd starts THROUGH Plantoir included. A launcher typed at
+the command line has no such variable and downloads, as before.
+
+**Installed into the tools folder, never run from the app.** Rejected, for
+three reasons: `HelperPrograms`, the quit path (#220), the MCP server and
+every scheduled-publish script already look in `tools/bin`, and the app can be
+moved, translocated or renamed; limactl's host agent runs for the life of the
+virtual machine, and a Sparkle update would swap the app out from under it;
+and anything written inside the app turns every Sparkle delta into a full
+download. Nothing in #312 writes inside the app, and
+`scripts/test_helper_bootstrap.py` checks the app's copy is byte-for-byte
+unchanged after every case. Copies are made with `cp -c` (APFS clones;
+0.04 s here, and a plain copy across volumes), the browser's
+`com.apple.quarantine` mark is removed from the COPIES, the copies are checked
+against the MANIFEST in a staging folder inside the tools folder, and each
+file is then moved into place with one rename, so a program that is running
+keeps the copy it started with. The whole install is about two seconds, most
+of it two SHA-256 passes over 135 MB.
+
+**The install stamp, `tools/.installed`,** records the pins line (the four
+versions and the disk's SHA-512), where EACH program came from (`source
+<program> <bundled|downloaded>`, per program, because one install can replace
+one program and leave the rest as an earlier install set them up), and the
+SHA-256 of each program as installed. It is read as three separate questions, and only
+for Plantoir's own copies:
+
+- **different** — the stamp's pins are not this launcher's. Replaced, from the
+  app or by downloading. Before #312 presence was the only test, so a pin bump
+  never reached a Mac that already had tools; now it does.
+- **damaged** — a program no longer hashes to what was installed. Only that
+  program is replaced. A program of Plantoir's that the stamp has NO line for
+  is unrecorded, below, not damaged: nothing says what it was.
+- **unrecorded** — no stamp at all, which is every Mac set up before #312.
+  Replaced from the app when the app carries a usable copy (so the installed
+  base moves onto the signed copies at its next slow start), and otherwise
+  LEFT EXACTLY AS IT IS — today's rule. Rejected: treating a missing stamp as
+  "different" everywhere, which would re-download 135 MB on every such Mac
+  run from Terminal or on an Intel Mac, and stop one behind a download filter.
+
+**Compared on the pins line, never on the app's hashes.** Every release signs
+the programs again, so their bytes change while their versions do not; a stamp
+compared with the MANIFEST's per-file hashes would reinstall after every
+update and tell the trail the programs were "older" when only their
+signatures had changed (plan review H1).
+
+**The app's copy is used only when** `arch` in its MANIFEST is this Mac's, its
+pins line is the launcher's own — an app built after a pin bump but before a
+re-fetch carries old programs whose MANIFEST agrees with them, and would
+otherwise be installed and stamped as current — and the files asked for still
+hash to it. Otherwise the reason (`none-in-app`, `other-arch`,
+`bundle-check-failed`) goes into the trail line, because a silent fallback to
+a 135 MB download is the failure that reports success.
+
+**Downloads are checked** against eight pinned SHA-256s, one per file per kind
+of Mac (`LIMA_SHA256_ARM64`, `…_X86_64`, and the same for Colima, the Docker
+CLI and buildx). Nothing was checked before #312. A mismatch deletes the file
+and is reported as a failed download. With only the Apple-silicon set pinned,
+every Intel first run would have been refused (plan review H2). A download
+that fails while only REPLACING copies that work is not fatal: "Carrying on
+with what is already on this Mac." — the stamp stays as it was, so the next
+start tries again.
+
+**buildx sits outside the stamp.** It lives in `~/.docker/cli-plugins`, which
+Docker Desktop and Homebrew share: it is installed only when `docker buildx
+version` fails, from the app first, and a link there is never replaced,
+because it is Docker Desktop's.
+
+**The first start.** With the app's disk, `colima start --cpu … --memory …
+--vm-type vz --disk-image <app>/…/vm/<image>`: 22–27 s in four of five fresh
+starts measured, nothing downloaded, nothing written to
+`~/Library/Caches/{colima,lima}` (a path with a space in it measured fine).
+Colima checks the file's SHA-512 against the list compiled into it, so a
+damaged copy is refused in about a second ("hash failure: SHA512 checksum
+mismatch"), leaving `~/.colima/default` behind; ANY failure is then retried
+once with the same size and no disk, which downloads it as before and heals
+the refused case (measured: the persisted `diskImage` goes back to ""). The
+path Colima remembers is never read again — a restart and a resize with the
+file moved away both worked — so the app can move afterwards. Rejected:
+seeding `~/Library/Caches/colima/caches/<sha256 of the URL>` (Colima's private
+layout; `--disk-image` is the documented flag and brings the check with it),
+and copying the disk into Application Support (needed exactly once).
+
+**When both starts fail.** The launcher falls through to its wait and
+restart, as a failed start of an existing builder does. If nothing survived
+the two failures, that restart creates the virtual machine, so it passes
+Plantoir's own size then, never a bare `colima start`, which would create one
+at Colima's default (implementation review L2; a first-start case). An archive
+that unpacks without a file its program needs is refused before anything is
+moved into place ("❌ Could not set up what your website builder needs."), and
+`check-signatures.sh` refuses an app whose helpers lack any of the five
+program files or carry other versions than `setup.sh` pins (L1, L3).
+
+**One start in five took 255 s instead of about 25**, two ssh waits of exactly
+two minutes each, while this was measured. Not reproduced with the same
+binaries; the hardened runtime was tested as a cause and not shown to be one
+(a re-signed limactl and colima with a new identity started in 21 s). It is
+recorded as unexplained. The "website builder created" trail line carries the
+seconds from every teacher's Mac, which is how its frequency in the field
+will be known.
+
+**Two lines for the app.** `PLANTOIR_HELPERS_INSTALLED: <bundled|downloaded>
+<missing|different|damaged|unrecorded> <which> <versions> [<why not the app's
+copy>]` and `PLANTOIR_BUILDER_CREATED: <seeded|downloaded|seed-refused-then-downloaded|seed-failed-then-downloaded> <seconds>`
+become the trail events "helper programs installed" and "website builder
+created" (`contracts/shared-rules.json`; `HelperBootstrapReport`), read by
+`ScriptRunner` and by a scheduled publish's log, and kept out of the console.
+
+**What a teacher reads.** "📦 Getting what your website builder needs ready…"
+when copying; the download lines as before; after the unchanged first-start
+line, "This takes about a minute." or "About 350 MB is downloaded once; this
+can take several minutes." (the Intel disk is 358 MB); and "🧱 Building your
+website builder — the first time downloads about 400 MB and takes a few
+minutes…" only when no website builder has been built on this Mac before — a
+rebuild after an update keeps the older line, because most of those bytes are
+already cached (plan review M6). The words are pinned in
+`contracts/app-rules.json` → `helperBootstrap.printed`.
+
+**Rehearsed, 2026-09-26, on the signed and notarized rehearsal build** (M4
+Pro; the launchers' own code run with `HOME` pointed at a throwaway folder in
+Russell's home, so the tools folder, `~/.colima` and the virtual machine were
+new and his own were never touched; the DMG marked by a browser first):
+
+| Stage | Before #312 (v1.3.1's code, same Mac) | With the app's copy |
+|---|---|---|
+| Helper programs | 4 downloads, ~4 s here | copied, checked, stamped: **2 s** — no quarantine on the copies |
+| Virtual machine created | disk downloaded, ~25 s | from the app's disk: **22 s** (`PLANTOIR_BUILDER_CREATED: seeded 22`) |
+| Website builder's image | — | **63 s**, 440,803,331 bytes into the VM |
+| Colima's and Lima's download caches | filled | never created |
+
+The installed base, rehearsed the same way (R-G): a home set up by v1.3.1's
+own launcher code (tools downloaded, unstamped, the virtual machine made by
+upstream's ad-hoc limactl), then the #312 app's next start: "bundled
+unrecorded colima,limactl,docker" in **1 s**, and the EXISTING virtual machine
+started with the Developer ID, hardened-runtime limactl in 15 s. After an
+update to a second signed build (every program's bytes different, same pins),
+the next start installed nothing and left the stamp untouched.
+
+**What is still downloaded on a first run:** the website builder's image
+build, about 390 MB from Docker Hub, the Debian and nodesource mirrors, npm
+and GitHub (the Quartz clone). It is now the largest stage by far; trimming it
+is its own follow-up.
+
+The rule, its cases and what was rejected are in `contracts/app-rules.json` →
+`helperBootstrap` (21 install cases and 7 first-start cases, mac-only), run
+for real — every case under `set -euo pipefail` and without it — by
+`scripts/test_helper_bootstrap.py`, which skips on anything that is not a Mac.
 
 One consequence worth knowing: Colima's VM mounts the teacher's home
 directory by default, so the working folder containing `courses/` must live
@@ -168,6 +746,17 @@ when needed but never shut it down, and the only disruptive action — the
 force-restart in step 4 — happens exclusively when the Docker daemon is
 already dead, i.e. when no Colima-based tool is functional anyway
 (containers with restart policies come back automatically afterwards).
+Until GitHub #263 the launchers PRINTED that last point — "(Colima is shared
+by any other Colima-based toolchains on this Mac; their containers restart
+automatically afterwards if configured to.)" — beside the restart. It is a
+comment now, and that is a trade-off, not a free improvement: the one reader
+the printed note served was a DEVELOPER at the command line whose other
+Colima containers (a Supabase stack, say) the force-cycle was about to take
+down, and a comment is invisible at run time. It went because the console
+is read by teachers, who have nothing else using Colima and for whom every
+word of it was machinery (`CLAUDE.md` rule 1). Do not restore it as output
+without a way to print it only to a developer.
+
 Whichever toolchain creates the VM first determines its CPU/RAM size, so the
 launchers may find a VM somebody else built. `_colima_growth_flags` handles
 that under two rules: it only ever asks for MORE (a VM another toolchain
@@ -195,27 +784,82 @@ PATH there. The whole rule, what it refuses to do and what was rejected is in
 it refuses to free, and why"; the standing prohibition it implements is
 `CLAUDE.md` rule 7.
 
-**Windows: Docker Engine inside WSL2.** Colima does not support Windows, but
-it is not needed there — WSL2 is itself a lightweight, Microsoft-supplied
-Linux VM, i.e. exactly the role Colima plays on macOS. The PowerShell
-launchers:
+**Windows: nothing to bootstrap.** Since 2026-08-19 (`GUI-IMPROVEMENTS.md`
+row 290) the `.ps1` launchers run no container: each has a "Native toolchain
+(no container)" block that points the `PLANTOIR_*` variables at the runtime
+the app ships — Node, Python, Quartz and wrangler, found through
+`$env:PLANTOIR_RUNTIME` or else `%LOCALAPPDATA%\Programs\Plantoir\runtime`,
+and only if it holds a `manifest.json` — and runs `scripts/*.py` with that
+runtime's own `python.exe`. A copy without it prints "This copy of Plantoir is
+missing its website builder. Reinstall Plantoir, then try again." and exits 1.
+`$WORKDIR_ID` survives only to name the build folder
+(`%LOCALAPPDATA%\Plantoir\builds\<id>`).
 
-1. Check for a native working `docker` first (fast path above).
-2. Verify `wsl` exists and a distribution is installed; if not, point the
-   teacher at the one-time `wsl --install` + reboot.
-3. Probe for a running engine inside WSL (as the default user, then as root).
-4. If the engine is absent, offer to install it right there
-   (`apt-get install docker.io` as root inside the distro, then add the
-   default user to the `docker` group); if merely stopped, start it with
-   `service docker start` and poll until it answers.
-5. Once the WSL engine is up, define a PowerShell function named `docker`
-   that forwards every call through `wsl -e docker …`. Because functions
-   take precedence over external commands, the rest of the script (and its
-   dozens of existing `docker` call sites) work unchanged. Bind-mount paths
-   are translated with `wslpath` (`C:\Users\me\courses` →
-   `/mnt/c/Users/me/courses`), since the WSL engine sees Windows drives
-   under `/mnt`. Published ports still appear on `localhost` thanks to
-   WSL2's automatic localhost forwarding, so the preview URL is unchanged.
+This section used to describe a WSL2 bootstrap — a `wsl` probe, `apt-get
+install docker.io` inside the distribution, a PowerShell `docker` function
+forwarding every call through `wsl -e docker`, and `wslpath` translation of
+mount paths. All of it went with the container path; if you meet it in
+`PRESENTATION.md` or an old log row, it is history. How the native runtime is
+built, pinned and shipped:
+[12 → Nothing here runs in a container](12-windows-app.md#nothing-here-runs-in-a-container).
+
+### One launcher at a time gets the builder ready (bundle B)
+
+Since the Mac app began getting the website builder ready in the BACKGROUND
+at first launch ([09 → Getting the builder ready in the background](09-mac-app.md)),
+a teacher who clicks Create or Preview while that is still going is a
+launcher arriving mid-build — and two launchers starting one virtual machine,
+or building one recipe, at once is never useful: two first starts fight over
+the machine, and two builds download the same ~340 MB twice. So the rule is
+in the launchers, not the app, and a teacher at the command line gets it too.
+
+**The GETTING-READY TURN BLOCK**, identical in `setup.sh`, `preview.sh` and
+`deploy.sh` just before the FIRST-RUN BLOCK, cut out by its markers and run
+for real by `scripts/test_getting_ready_turn.py`:
+
+- **The turn is a folder**, `~/Library/Application Support/Plantoir/getting-ready.turn`,
+  because `mkdir` makes it or fails atomically. Inside it is the holder's
+  process id.
+- **Taken before the builder is started** (`take_the_ready_turn`, the block's
+  last line) and **handed back as soon as the image is ready** —
+  `give_back_the_ready_turn` straight after `build_image_if_missing` in
+  `setup.sh` and `preview.sh`. `deploy.sh` hands it back straight after
+  starting the builder and takes it again only inside `ensure_image_present`,
+  when it must BUILD to make a workspace — asking again once it has the turn,
+  since the holder may have just built that very image. It is never held
+  through a site build or a publish. An EXIT trap hands it back on any exit.
+- **Waiting.** A launcher that finds the turn held waits, and after a couple
+  of seconds says so, once: "⏳ Building your website builder — this Mac is
+  already getting it ready, so this waits for that to finish…"
+  (`builderWarmUp.wording.waitingLine`). It carries the words the app's
+  progress bar matches, so a waiting Create or Preview shows "Building your
+  website builder…". When the turn is handed back, it takes it, finds the
+  image ready ("✅ Website builder is ready."), and builds nothing.
+- **Abandoned turns are taken over**: a holder whose process is not running
+  (killed, or a Mac restarted mid-build); a holder whose id now belongs to a
+  process that STARTED AFTER the turn was taken (`ps -o etime=` against the
+  turn's age — the id was reused by something else, which would otherwise be
+  waited on for as long as it lives, a scheduled publish included; review N1);
+  a turn older than a ceiling (two hours, `READY_TURN_CEILING`); or a turn
+  with no id written after a minute. Before removing one it checks the id is still the one it judged
+  gone, so two launchers taking over at once cannot remove a turn a third has
+  just taken. (A narrower race remains — the cost of losing it is two builds,
+  which is what happened before the turn existed.)
+
+**`setup.sh --builder-tag`** prints `BUILDER_TAG=<name>` — the image name the
+recipe's hash gives — and starts nothing; the app asks it at launch to know
+whether the builder it got ready is still this recipe's.
+
+**`setup.sh --prepare-builder`** is the mode the app runs in the background:
+the tool bootstrap, the builder's start and `build_image_if_missing`, then
+`BUILDER_READY=<image>` and exit 0 — no `courses/` folder (the folders
+section is skipped), no workspace, no builds folder. The app runs it from its
+own folder holding only that launcher and a mirror of the recipe, so the
+image tag — a hash of the recipe — is the one every working folder looks for.
+
+Cases: `contracts/app-rules.json` → `builderWarmUp.turn.cases` (7) and
+`.sequences.cases` (2). Mac only, permanently (`builderWarmUp.appliesOn`):
+Windows carries its runtime and builds natively, with no builder to get ready.
 
 ### Which app macOS asks about when it protects the Desktop
 
@@ -295,10 +939,14 @@ the built bundle — which, because the tracked `QuartzTeachers/Info.plist` is
 the build's input, also catches a `project.yml` edit made without re-running
 `xcodegen generate`. It proves **plist content only**.
 
-**Removable and network volumes were considered and rejected.** Nothing in the
-Swift refuses a working folder outside `$HOME`, so
-`NSRemovableVolumesUsageDescription` and `NSNetworkVolumesUsageDescription` are
-genuinely reachable. They are still wrong: the sentence promises a class
+**Removable and network volumes were considered and rejected.** Since #290 the
+app refuses a working folder outside `$HOME` when it is chosen or reopened,
+before writing a byte into it ([09](09-mac-app.md) → "A working folder the
+website builder cannot reach"), so `NSRemovableVolumesUsageDescription` and
+`NSNetworkVolumesUsageDescription` are reached now only while such a folder is
+being CHECKED — a remembered one being looked at on launch, a chosen one being
+asked its spelling — and whether either look raises the prompt is unmeasured.
+They are still wrong, for two reasons now rather than one: the sentence promises a class
 website, and a folder on an external drive is the one place that cannot produce
 one — the virtual machine is given only the home folder, so the workspace is
 refused outright with the sentence in `contracts/app-rules.json` →
@@ -388,54 +1036,225 @@ own long-lived container (see "One container per working folder" above),
 started as:
 
 ```bash
-if ! docker run -dit --name "teaching-quartz-${WORKDIR_ID}" \
+docker run -dit --name "teaching-quartz-${WORKDIR_ID}" \
     --mount "$(bind_mount_argument "$HOST_COURSES" /teaching/courses)" \
     --mount "$(bind_mount_argument "$BUILD_ROOT" "$BUILD_ROOT")" \
-    -p ${HOST_BASE}-$((HOST_BASE+3)):8081-8084 \
-    -p $((HOST_BASE+1000))-$((HOST_BASE+1003)):9081-9084 \
-    "$IMAGE" tail -f /dev/null; then
-  say_this_folder_cannot_be_reached
-  exit 1
-fi
+    -p "${base}-$((base + 3)):8081-8084" \
+    -p "$((base + 1000))-$((base + 1003)):9081-9084" \
+    "$IMAGE" tail -f /dev/null
 ```
 
-where `WORKDIR_ID` is the folder hash and `HOST_BASE` the probed port
-block. **Why `--mount` and not `-v`** has its own section below; the short
-version is that `-v` cannot name a folder called "Comm Tech 26:27" at all.
+where `WORKDIR_ID` is the folder hash and `base` the walked port block. Since
+#280 this is made in ONE place, `create_the_workspace_on_free_ports` in the
+PREVIEW PORT BLOCK the three launchers share, so the mounts and ports cannot
+drift apart; a refusal naming a taken port walks on to the next block (see
+"How a folder finds its ports, and when it cannot" above), and any other
+prints Docker's words and `say_this_folder_cannot_be_reached`. **Why
+`--mount` and not `-v`** has its own section below; the short version is that
+`-v` cannot name a folder called "Comm Tech 26:27" at all.
 
 **The launcher's refusal is broader than the app's matcher, knowingly.** The
-`if ! docker run` branch above speaks for ANY failure to create the
-workspace, while the app's explanation
+refusal branch speaks for any failure to create the workspace other than a
+taken port (which, since #280, walks on instead), while the app's explanation
 (`contracts/app-rules.json` → `failureExplanations`) matches only
 `bind source path does not exist`. Measured 2026-09-19: an address already
 in use and a name already taken also end in exit 125 with the folder safely
 inside the home folder, and a command-line user then reads advice about the
-home folder that is not their trouble. Accepted for now because both are
+home folder that is not their trouble. (The address-in-use half is no longer
+reached: since #280 it walks on to the next block.) Accepted for now because both are
 transient — the free-address probe sees the virtual machine's forwarder
 0.11 s after `docker run` returns, so the window is about 0.2 s — and "then
 try again" is the right next step for them; narrowing the launcher's
 sentence to the daemon's text is tracked as its own issue.
 
-Every launcher inspects the existing container before using it:
+Each launcher inspects the existing container before using it, and remakes
+it for any of these reasons. **They are not the same in all three**, and this
+section said "every launcher" until #94 counted them (2026-09-25):
 
-1. **No `/teaching/courses` mount at all?** Recreate the container.
-2. **Mounted from a different host folder than the current one?** Recreate
-   it pointing at `$(pwd)/courses` (rare now that names are per-folder,
-   but a moved folder keeps its old name with a stale mount).
-3. **Running a different image than the recipe resolves?** Recreate — a
-   container keeps running the version it was created from, so a changed
-   recipe only takes effect through recreation.
-4. **Missing the 9081–9084 websocket ports?** (An older container
-   published only 8081; published ports cannot be changed after creation.)
-   Recreate.
-5. **Mount correct but not writable?** (Checked by creating and deleting a
-   probe file inside the container.) **`setup.sh` and `deploy.sh` only** —
-   `preview.sh` implements the other four checks but not this one, and no
-   comment in it says why. Recreate. This catches macOS
-   permission/ACL oddities after folder moves or restores.
-6. Otherwise, start the container if stopped, or reuse it as-is.
+| Reason to remake | `setup.sh` | `preview.sh` | `deploy.sh` |
+|---|---|---|---|
+| No `/teaching/courses` mount at all | yes | yes | yes |
+| Mounted from a different host folder (a moved folder keeps its old name with a stale mount) | yes | yes | yes |
+| No builds mount (`buildOutputLocation` — every container made before built sites moved out) | yes | yes | yes |
+| Running a different image than the recipe resolves (a container keeps the version it was made from) | yes | yes | **no** |
+| Missing the 9081–9084 live-reload ports (published ports cannot be added later) | yes | yes | **no** |
+| `courses/` was created by this very run | yes | — | — |
+| Mount correct but not writable (a probe file made and deleted inside; macOS permission/ACL oddities after a move or restore) — while running, and again after starting | yes | **no** | yes |
+| The connection has gone stale (`getent hosts` of the destination fails; not for a folder publish) — while running, and again after starting | — | — | yes |
 
-Recreating the container is cheap because all state lives in the bind mount.
+That is **twenty places** (8 + 5 + 7), plus the three that retired the old
+shared `teaching-quartz` workspace. `deploy.sh` never checks the image or
+the live-reload ports: a publish runs in whatever workspace the last preview
+or build left, and the next preview remakes it. That is an inconsistency, not
+a decision — written down here rather than fixed by #94, which is about what
+a remake may END, not about when one is due. `preview.sh` has no writability
+check and no comment in it says why.
+
+Otherwise the container is started if stopped (`start_the_existing_workspace`
+— which, only when the start is refused because its ports were taken,
+recreates it on free ones; see "How a folder finds its ports" above), or
+reused as it is.
+
+Recreating the container loses nothing of the teacher's, because their
+content lives in the bind mounts — but it is not free: the warm Quartz
+scaffold and `node_modules` live in the container's own `/tmp/quartz-builds`,
+so the next preview is a first preview again (109.3 s measured on a teacher's
+Mac for #225). And removing it ENDS everything running inside it, which is
+the next section.
+
+### Before a workspace is remade: what is running in it (GitHub #94)
+
+Until 2026-09-25 each of those twenty places ran `docker stop` and `docker
+rm` (or `docker rm -f`) on the folder's workspace without looking. A preview
+open in one window died when another launcher in the same folder remade the
+workspace — after an update changed the recipe, once per folder for the
+builds mount, on a publish whose connection had gone stale — and a build or a
+publish half-way through its upload was killed. Now every one of them says
+WHY in its own line and then calls one function, `remake_the_workspace`, in
+the PREVIEW PORT BLOCK the three launchers share (byte-identical, checked by
+`scripts/test_port_blocks.py`). The rule is data:
+`contracts/app-rules.json` → `previewPorts.whenTheWorkspaceIsInUse`.
+
+**What it looks at.** Measured on the development Mac, 2026-09-25:
+
+| What | Result |
+|---|---|
+| An idle workspace, `docker top` | exactly one process, `tail -f /dev/null` — 6 of 6 running workspaces |
+| A preview, from outside | `python3 … build_site.py --course=C --section=N … --port P` (no `--build-only`) and its `node … --serve` child and that one's `esbuild`, whole command lines in `CMD`, with PID and PPID |
+| Cost of one look | 23 ms (10 looks, 0.233 s) |
+| A STOPPED workspace | `docker top` exits 1 — so "stopped" is asked first, with `.State.Running` |
+| `.State.Pid` | the same number `docker top` shows for the first process, so "its own first process" is found by pid, not by position |
+
+One look answers one of three: **nothing** (stopped, gone, or only its first
+process), **other work** (anything else — a build for publishing, a publish,
+a course being set up, another launcher's probe — and a running workspace
+`docker top` did not answer), or **a preview**. The app's quit path uses the
+same count to decide whether a workspace is busy (documentation/09-mac-app.md),
+so the two agree on what "running" means.
+
+**A preview counts as open only while its launcher is running on this Mac.**
+Measured by the plan review: killing the host side of `docker exec` leaves
+the process running inside the workspace, parented to the engine's shim. So
+a preview is left behind whenever the app is force-quit, a Terminal window is
+closed or an assistant's client exits. Counted as open, it would refuse every
+remake of that folder for ever with nothing a teacher could close. So each
+`build_site.py` preview in the workspace is matched against the Mac's own
+process table (`ps -Ao pid=,ppid=,args=`, read once) for a `preview.sh`
+whose next two words are that course (either case — the launcher upper-cases
+it) and that section; a `--stop` or `--build-only` run does not count, and
+this run's own ancestors and descendants are left out, because a login shell
+wrapping it carries the same words. A preview with no launcher is an orphan
+and counts as nothing, with everything it started; so does a website builder
+serving with no `build_site.py` above it (its parent waits on it for as long
+as a preview is open, so its absence means the preview side is gone). A
+process table that cannot be read counts the launcher as running — a refused
+remake can be retried, a killed preview is what #94 was.
+
+**What it does.** Nothing running: remade at once, as before. Otherwise one
+line (`sentences.whileWaiting`), then a look every 2 s:
+
+- **a build or a publish** is waited for up to **600 s**, then refused
+  (`sentences.whenWorkDidNotFinish`, exit 1). Ten minutes is the wait a
+  publish set for later already gives a busy course (#156), so a scheduled
+  publish and the launcher it runs give up on the same horizon.
+- **an open preview** is refused after **20 s**, naming it
+  (`sentences.whenAPreviewIsOpen`, exit 1). Twenty seconds is the app's quit
+  path's wait, for the same race: a preview closed a moment ago may still be
+  ending (the Stop button does not wait for the stop). An open preview does
+  not end on its own, so waiting longer only delays the same answer. An open
+  preview wins over other work.
+
+The time is counted in looks rather than read from a clock, as the app's quit
+script counts its own — which is also what lets the test replace `sleep` and
+run a ten-minute wait in a moment. A publish set for later meets the rule
+like any other run: it WAITS for a build or a publish, and STANDS DOWN on an
+open preview; it never ends one, consistent with #156.
+
+**Then it stops and removes the workspace BY ID, never by name, never with
+`-f`.** Two launchers started together after an update can both find the old
+workspace idle; by name, the slower one's stop landed on the NEW workspace the
+faster one had just made — #94's shape one step down. By id it lands on the
+old one. A remove that fails because that id is already gone is no failure; one
+that fails with it still there is tried once more two seconds later, then the
+run stops with `hostBlockClash.saysWhenAStartIsRefused`. At the making, a
+refusal because the NAME is taken (`is already in use by container`) waits two
+seconds and uses that workspace if it is running, else tries once more — a
+second such refusal stops with the same sentence. Until this, a name conflict
+fell through to the mount refusal's advice to keep the folder inside the home
+folder, which was never its trouble (plan review, F4).
+
+**The old shared workspace** (`teaching-quartz`, from before each folder had
+its own) is retired from the same block, only when nothing is running in it,
+by id; otherwise it is left, silently — it holds nothing of the teacher's and
+the port walk already steps round its addresses.
+
+**On the trail.** When it waited or refused, the launcher prints one
+`PLANTOIR_WORKSPACE_IN_USE:` line, which the console a teacher reads leaves
+out, and the APP writes the `workspace was in use` event from it —
+`ScriptRunner` from a run it started, `ScheduledDeploy` from the log of a
+publish launchd ran, exactly as the build's `PLANTOIR_DATED` line reaches the
+trail. The app writes it rather than the launcher so the event has one writer
+for its words and a real call site (`ActivityTrailWiringTests`); the cost is
+that a run typed at the command line leaves its console sentence and no trail
+line. A remake with nothing running writes nothing.
+
+**Tested** by `scripts/test_port_blocks.py` — every `whatCountsAsRunning` case
+and every `sequences` case through the REAL block under `/bin/bash` 3.2, with
+a pretend engine, `ps` and `sleep`, plus the id race, the retire, and a check
+that no launcher stops or removes a workspace outside the block — and by
+`verify.sh` §6c, which puts a pretend preview (`exec -a` renames `sleep`, and
+`docker top` shows it exactly as a real one) inside a real workspace with a
+pretend `preview.sh` on the Mac, and requires the remake to refuse after at
+least 20 s, name the preview, and leave the workspace's id and the preview
+untouched; then ends both and lets the section's own remake go ahead.
+
+**Known limits, written down:**
+
+- Between the last look and the stop — tens of milliseconds — another
+  launcher can start something in the workspace, and it is ended. Narrowed,
+  not closed. Closing it needs a lock every launcher and the app honour.
+- The host launcher is matched on its words, not its folder: another working
+  folder's `preview.sh` for the SAME course and section makes an orphan here
+  count as open (a refusal, never a kill).
+- A preview started through the assistant over MCP may meet its client's own
+  tool timeout during a ten-minute wait for a build.
+- Work that hangs inside the workspace costs a ten-minute wait and a refusal,
+  every time, until this Mac is restarted. Quitting Plantoir does NOT clear
+  it: the quit path stops a workspace only when it is idle, and one with hung
+  work in it counts as busy and is left running (documentation/09-mac-app.md).
+
+**What was rejected, and why:**
+
+- **The #156 work leases as the signal.** A launcher's own caller already
+  holds one — a publish takes its build and publish leases before its
+  launchers run — so a remake would see its own run as busy, and telling the
+  caller's lease from another's needs a pid the pty in between hides. A
+  command-line run writes none. And a lease says "may be about to"; a remake
+  ends only what EXISTS, which `docker top` sees directly in 23 ms. Leases
+  stay the app's tool for "do not start a build"; this is "do not end a
+  running one".
+- **Refuse at once, no wait.** A publish and a build end by themselves;
+  refusing a scheduled publish because another section's build had forty
+  seconds left is a failure made out of nothing.
+- **Wait for ever.** A serving preview never ends; a wedged daemon never
+  answers.
+- **Keep using the old workspace and remake later.** Fine for a missing
+  live-reload port on a publish; wrong for the rest — a wrong mount or a
+  missing builds mount builds into the wrong place, and an old image runs the
+  OLD recipe while looking healthy.
+- **Count every `build_site.py` preview as open** (the plan as first
+  written). Orphans are real and common enough to have their own trail event
+  (`section processes reclaimed`); counting them would refuse for ever.
+- **Exempt this section's own preview** (the run would end it anyway). The app
+  already waits for its own stop before starting a preview, so only a second
+  command-line run of the same section meets it; one rule is easier to trust
+  than two.
+- **`docker rm -f` anywhere, and stop or remove by name** — the id race above.
+- **A test-only knob for the waits** in a teacher's launcher — a pretend
+  `sleep` does it without one.
+- **The launcher writing the trail line itself**, as #280's and #189's lines
+  do. It would cover command-line runs, but the event would have no app call
+  site and two writers for one sentence.
 
 ### How a folder is NAMED to the container, and why it is not `-v`
 
@@ -530,7 +1349,11 @@ that said so have been corrected.
 
 So this is not a regression to be apologised for. A teacher in that state was
 already building nothing; they now find out, in one sentence, on the first
-run. It is also why the refusal branch says something DIFFERENT from the
+run. **Since #290 this refusal is the BACKSTOP, not the first
+word**: the app refuses such a folder when it is chosen or reopened
+([09](09-mac-app.md) → "A working folder the website builder cannot reach"),
+so the launcher's sentence is what a command-line user meets, and what a folder
+moved onto a drive while it was open would meet. It is also why the refusal branch says something DIFFERENT from the
 missing-folder branch — see below.
 
 **Two situations, two sentences.** The launchers hold both, side by side in
@@ -580,8 +1403,9 @@ never crosses the mount — `pwd -P` inside the container is
 `/teaching/courses/<CODE>` — so nothing in the image can see the folder's name
 at all.
 
-**Nothing to mirror on Windows.** There is no `docker` in `setup.ps1`,
-`preview.ps1` or `deploy.ps1` (measured: zero occurrences in each), a Windows
+**Nothing to mirror on Windows.** There is no `docker` command in `setup.ps1`,
+`preview.ps1` or `deploy.ps1` (measured 2026-09-26: the word appears once in
+each, in the comment saying there is none), a Windows
 path cannot contain a colon, and the native runtime replaced the container
 there in 2026-08. The mount form is mac-only machinery and is deliberately
 prose in `contracts/shared-rules.json` →
@@ -594,6 +1418,9 @@ nobody can ever close. The one thing that side does owe is the new
 
 ### `setup.sh`
 
+- With `--prepare-builder` (bundle B), gets the website builder ready and
+  stops before anything below — see "One launcher at a time gets the builder
+  ready" above.
 - Creates `courses/` and `courses/_backups/` on the host if missing, and
   relaxes permissions (`chmod -R u+rwX,go+rwX`) so the container user can
   write regardless of UID mismatches.
@@ -655,6 +1482,188 @@ nobody can ever close. The one thing that side does owe is the new
   websocket on port + 1000 (`--wsPort`) — the reason the container
   publishes both ranges. The reachable HOST address is the folder's
   probed block; `preview.sh` prints it.
+
+#### Before building, preview.sh makes sure this Mac can reach the builder (#234)
+
+Between finding the address and announcing it, `preview.sh`
+(`announce_the_preview_address` → `this_mac_can_reach_the_builder`) opens a
+connection to `127.0.0.1:<the announced HOST port>` —
+`curl -q -s -o /dev/null --noproxy '*' --max-time 1`. Nothing is served inside
+the builder yet, so a healthy Mac answers with an empty reply (curl exit 52)
+and the preview goes on exactly as before. **Only a refused connection (exit
+7) on every try stops it**: 20 tries 0.5 s apart, about ten seconds, or 60
+tries (about thirty) when THIS run started the builder's virtual machine. It
+then prints `previewPorts.whenThisMacCannotReachTheBuilder.sentence`, writes
+`launcherLineWhenThisMacCannotReachTheBuilder` on the trail under the existing
+"preview did not appear" event, and exits 1 before building. The numbers and
+ten cases are in `contracts/app-rules.json` →
+`previewPorts.whenThisMacCannotReachTheBuilder`; `scripts/test_preview_reach.py`
+runs every case against the launcher's own functions, with docker, curl and
+sleep stubbed.
+
+**Why.** The fault is #225's (see `09-mac-app.md` → "A preview that never
+appears"): a Mac whose builder has stopped handing NEW addresses through
+(`ssh … -O forward` exit 255, fixed only by a restart) built a preview for
+about two minutes (109 s on the Mac that met it) and the app then waited 45 s
+more before its alert. Asked before the build, the same fault is found in
+about ten seconds with nothing built. The app needed no change: an exit 1 with
+no address announced is #235's shape, so the run ends with the launcher's
+sentence in the window and `PreviewReachability` never starts a wait.
+
+**It fails OPEN, deliberately.** Every answer but 7 goes ahead — a page (0), an
+empty reply (52), a timeout (28), no curl at all (127), anything —
+because none of them proves the forward is missing, and #225's check after the
+build is still there behind it. A listener that is NOT the forwarder (another
+program took the port after the workspace was made) answers too, so this
+check cannot see it; since #310 the look below asks whose the listener is.
+**Do not tighten this to require a real page**: nothing is served before the
+build, so that would refuse every healthy Mac.
+
+**Why a connection and not `lsof`.** Measured on the development Mac
+(Apple silicon, Colima vz aarch64, 2026-09-25): curl to a forwarded port with
+nothing inside answers 52 in 0.01–0.03 s; to a port nothing listens on, 7 in
+0.01 s; `lsof -iTCP:<port> -sTCP:LISTEN` takes 0.228 s. Worse, `lsof` run as
+the teacher sees only the teacher's own programs: a root-owned listener (:88,
+`kdc`) is invisible to it and answers curl. A forwarder owned by anybody else
+would read as missing and refuse a healthy Mac. All 48 host ports published by
+six running workspaces had a listener. (Since #310 `lsof` is asked below, but
+only for which listeners are THIS account's own, under an engine whose
+forwarder always is.) `-q` comes first so the teacher's
+`~/.curlrc` is never read, and `--noproxy '*'` so a proxy setting cannot
+answer for this Mac.
+
+**The retry is a bounded re-asking of the real question, not a settle-delay.**
+A healthy Mac answers on the first try; #225 measured the listener appearing
+0.10–0.24 s after the builder is created or started (0.15 s under load). The
+bound is for the one case **nobody has measured: the first address after the
+builder's virtual machine starts cold.** That is not rare — since #220,
+quitting Plantoir stops the VM when nothing else uses it, so it is the first
+preview of most days — which is why a run that started the VM
+(`ensure_container_runtime` sets `THIS_RUN_STARTED_THE_BUILDER` on every
+path past its "already running" return) allows 60 tries. The assignment, and
+the `""` before the call, are in all THREE launchers' copies, although only
+`preview.sh` reads the flag: the first-run code from `_download()` to the
+`ensure_container_runtime` call is one text in all three, and #263's test
+holds it identical — a line in one copy only would turn that red. Measuring it would have meant a throwaway second Colima
+profile on Russell's Mac; the director ruled that out, so the number stays
+unmeasured. Instead, **a run that needed more than one try says so in the
+console** (`reachedAfterRetrying`, "…took N tries"), so the next transcript a
+teacher sends carries the figure the bound rests on.
+
+**No gate exercises the probe against a real forward.** Every `preview.sh`
+that `verify.sh` runs is `--build-only` (or `--stop`), and `--build-only`
+returns before the question is asked; `scripts/test_preview_reach.py` stubs
+curl. A serving preview was checked by hand in the implementation review
+(2026-09-25): `./preview.sh EXC2O 1 --image quartz-teacher:dev-test
+--non-interactive` against a real Colima forward announced
+`http://localhost:8241/` on the first try, with no "took N tries" line. Five
+real Colima forwards with nothing inside answered curl 52 in 0.031–0.035 s;
+a listener that accepts and closes answers 56, one that never answers 28 —
+both go ahead.
+
+**Rejected:**
+- *`lsof` as the probe* — above: slower, and blind to listeners the teacher
+  does not own.
+- *A check in `setup.sh`, at the builder's creation* (the issue title's literal
+  reading) — it would not have fired on the night: all three previews met a
+  builder that was already running, and `run_container_with_mount()` is reached
+  only on create or recreate. Setup is also exactly the unmeasured cold start.
+- *One probe* — the cold start is unmeasured, so one refusal is not proof.
+- *Skipping the check when this run started the VM* (the fault is an OLD VM
+  refusing NEW forwards) — a VM broken from birth would then build for minutes
+  first; the longer bound covers both.
+- *Asking inside the builder first* — before the build nothing is served
+  there, so it proves nothing; that stays #225's question, after the build.
+- *Checking the live-reload port (+1000) too* — a Mac that refuses new forwards
+  refuses both, and stopping a preview over live-reload alone is a heavier
+  answer than the fault.
+- *A `failureExplanations` case or an app alert* — as for #280's
+  `whenNoBlockIsFree`, the launcher's own sentence is what a teacher reads, and
+  a case would turn Windows' suite red for a failure its app cannot produce.
+- *Putting it in the shared PREVIEW PORT BLOCK* — only `preview.sh` announces
+  an address; the block is left byte-identical across the three launchers.
+
+**Windows** has nothing to mirror: `preview.ps1` serves on the PC itself, so
+there is no forward to lose. If a preview there ever sits behind a forward
+(WSL2's relay has the same failure class), probe with a CONNECTION, not a
+listener list.
+
+#### Before building, preview.sh makes sure the address is this account's own (#310)
+
+Right after the reach check passes, and before anything is announced or
+built, `announce_the_preview_address` asks `held_by_someone_else <host port>`
+— under Colima only (`the_engine_forwards_from_this_account`, the same gate
+the look before a start uses). It reads ONE kernel list (`netstat -an -p
+tcp`) and ONE list of this account's listeners (`lsof`), and the address is
+somebody else's when **the kernel has more listening sockets on that port
+than this account owns**, and this account's list is not empty. On a healthy
+Colima Mac the counts are equal: the forward is this account's own `ssh`
+(measured). The cases, with harness-readable fields, are
+`contracts/app-rules.json` → `previewPorts.whenAnotherAccountHasTheAddress.cases`;
+`scripts/test_preview_reach.py` → `WhoseAddressItIs` runs every one with
+`netstat`, `lsof`, `docker` and the remake stubbed as shell functions (the
+harness's PATH is the real one, so a program stub would let the real
+`netstat` in), and `scripts/test_port_blocks.py` →
+`TheLookBeforeTheAnnouncement` runs the real remake behind it.
+
+When it is somebody else's: the ♻️ lines, `remake_the_workspace`, and only
+after it RETURNS the marker
+`PLANTOIR_PREVIEW_ADDRESS_HELD: remade <port> <course>/<section>` (a remake
+#94 refuses exits inside it, so the trail gets #94's line and never a claim
+of a rebuild that did not happen) — so #94's look applies, and an open preview of
+another section from this folder refuses with #94's own sentence rather than
+being ended. The remade workspace's walk reads the kernel's list, so its new
+block is free when it is picked; the address is asked for, reached and
+looked at AGAIN. Still somebody else's: `whenAnotherAccountHasTheAddress
+.sentence`, the `refused` marker, exit 1 with nothing announced — #235's
+shape, so the app needs no change. **Never a second remake**: rebuilding in a
+loop against a listener that follows costs two minutes a turn and fixes
+nothing. The remade workspace skips the earlier "Preflight: checking Quartz
+sidebar anchor" look; it only warns, and the new workspace is made from the
+image that was just looked at.
+
+**Why counts, not "is one of them ours".** Colima's forward is IPv4 only
+(`[::1]` refused, measured). A listener on `::1` alone in another account
+sits BESIDE it — different family, no collision — and `localhost`, which the
+app opens, tries `::1` first. Measured with a same-account stand-in on
+18282: `curl http://localhost:18282/` reached the OTHER server, `curl
+http://127.0.0.1:18282/` ours, and `lsof` listed our forward on the port.
+Presence would have announced that address; counts catch it (two kernel
+rows, one of ours). Only the SITE port is looked at: a shadowed live-reload
+port costs only refresh, and #234 declined the same widening.
+
+**It fails OPEN, like the reach check.** Not Colima, no kernel row on the
+port, an unreadable kernel list, a missing `lsof`, or an EMPTY `lsof` list
+(this account always owns `limactl`'s listeners under Colima, so empty means
+`lsof` did not work) — each goes ahead as before #310. `DOCKER_HOST` naming
+anything outside `~/.colima/` or `$COLIMA_HOME` switches the look off (a `tcp://` address at the Colima VM itself is still Colima, and is read as not — a developer-only corner) and prints the
+`unchecked` marker once, so a developer's trail says the look was not made.
+
+**Where "which account" is not said.** The sentence names both things the
+check proves it could be — another account, or macOS itself — because the
+kernel shows a listener and this account owns none. Telling them apart would
+mean `netstat -v`'s `process:pid` column (it has moved between macOS
+releases) and then `ps -o user=`, which puts another person's username a step
+from this teacher's trail. Rejected.
+
+**The trail.** All four outcomes (`before-start`, `remade`, `refused`,
+`unchecked`) are one mac-only event, `preview address held by another
+account`, written by the APP from the marker (`PreviewAddressHeldReport`,
+read by `ScriptRunner` and hidden from the console by `TranscriptBuilder`), the
+same arrangement as `workspace was in use` and for the same reason: one
+writer for its words. A preview typed at the command line leaves the console
+sentence and no trail line. A scheduled publish never prints the marker.
+
+**No gate exercises this against a real second account** — nothing here can
+sign in as one. `verify.sh` runs only `--build-only` previews, which ask
+nothing. The acceptance is Russell's, in the rehearsal account: account 1
+previews and holds 8081; account 2 sets up and previews and must announce
+8091 and show ITS site. Then, for the look before a start: with account 2's
+workspace stopped (quit Plantoir there), account 1 opens a second folder so
+it listens on 8091, and account 2 previews again — expect the two ♻️ lines
+and a site on a new address, not account 1's. Until that is done, the
+other-account half rests on root as the stand-in (a different uid, which is
+all XNU compares).
 
 ### `deploy.sh`
 
@@ -910,6 +1919,31 @@ the shared Python and watching that case — and only that case — fail. The sa
 was done for the descendant walk. A green suite proves nothing about a case
 that cannot fail.
 
+
+**Leases and this stop (#156).** Since 2026-09-25 the mac reads and writes the
+work leases under `courses/.internal/activity/`. Because this stop ends BUILDS
+as well as servers, by working directory, the order around it matters:
+
+- **Deploy** takes its claim — its own `build` and `publish` leases, then a look
+  at everyone else's — BEFORE it runs this stop. A refusal therefore stops
+  nothing, and while the stop runs the window's `build` lease is up, so no other
+  program (an outside assistant, another copy of Plantoir, a publish set for
+  later) can be told the course is free and start a build that the stop then
+  kills.
+- **The in-app assistant** looks before it stops a window's preview, and
+  declines without stopping anything when another program is in the way.
+- **What is NOT covered:** the plain Stop button, the preview's and the
+  deploy's Cancel buttons, a window closing, and the assistant's
+  stop-then-start release the window's lease (its preview lease, or for a cancelled deploy its
+  build lease) the moment the stop begins, while the stop itself runs on (waited up to 20 s). An outside
+  build started in those seconds can be ended by it. Nobody builds twice — the
+  outside program is told its build failed, and a retry works — and it is a
+  known limit in `09-mac-app.md` rather than a guarantee.
+
+The rule and its cases are `contracts/shared-rules.json` →
+`workLeases.declining`; `09-mac-app.md` → "Two programs, one course" is the
+manual.
+
 ## A course kept for reference is refused in the launcher, early
 
 `deploy.sh` and `deploy.ps1` both read `courses/<CODE>/course_config.json`
@@ -920,8 +1954,11 @@ deployed"; three things belong here, beside the launchers themselves:
 
 - **It is in the launcher because the FOLDER destination never reaches the
   container.** That branch copies with `rsync` on the host and exits 0 before
-  `deploy.py` is entered, so a refusal written only in the shared Python would
-  not run on it. Measured with the guard removed: the launcher published the
+  `deploy.py` is entered — or, since #227, exits 1 when the copy did not
+  finish, and makes a relative `--to-folder` a full path from the working
+  folder first (see [`07-deployment.md`](07-deployment.md) → "A relative
+  folder, and a copy that did not finish") — so a refusal written only in the
+  shared Python would not run on it. Measured with the guard removed: the launcher published the
   frozen course and reported `✅ Published: 1 file(s) updated.`
 - **Plain shell, not `python3`.** Nothing on that path needs a host
   interpreter today, and the launchers' whole first-run promise is that a

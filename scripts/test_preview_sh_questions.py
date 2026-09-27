@@ -106,9 +106,10 @@ class TheQuestionRefusesUnderTheFlag(unittest.TestCase):
 
     Exit 3 is the load-bearing part. The mac's scheduled wrapper reads the
     build leg's exit code and writes `buildNeededAnAnswer` for 3 and
-    `didNotFinish` for anything else (`ScheduledDeploy.oneShotCommand`), so a
-    refusal that exited 1 would tell the teacher their overnight publish had
-    failed rather than that it had asked them something.
+    `buildDidNotFinish` for anything else (`ScheduledDeploy.oneShotCommand`;
+    `didNotFinish` until #137), so a refusal that exited 1 would tell the
+    teacher the pages could not be built rather than that building them had
+    asked them something.
     """
 
     def assert_refused(self, result: subprocess.CompletedProcess, question: str):

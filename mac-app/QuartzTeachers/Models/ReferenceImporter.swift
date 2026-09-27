@@ -140,6 +140,7 @@ enum ReferenceImporter {
             if let trouble = ReferenceCourseRule.trouble(
                 placing: displayCode, inYear: request.schoolYear, among: shelved
             ) {
+                ReferenceImporter.noteNotImported(displayCode, from: sourceFolderURL, because: trouble.sentence)
                 outcomes.append(.notImported(course: displayCode, reason: trouble.sentence))
                 continue
             }
@@ -152,9 +153,9 @@ enum ReferenceImporter {
             let destinationURL: URL = coursesDirectoryURL.appendingPathComponent(folderName)
             if fileManager.fileExists(atPath: destinationURL.path) {
                 let problem: ReferenceCopier.Problem = .folderAlreadyExists(folderName)
-                outcomes.append(.notImported(
-                    course: displayCode, reason: problem.errorDescription ?? folderName
-                ))
+                let reason: String = problem.errorDescription ?? folderName
+                ReferenceImporter.noteNotImported(displayCode, from: sourceFolderURL, because: reason)
+                outcomes.append(.notImported(course: displayCode, reason: reason))
                 continue
             }
 
@@ -164,22 +165,39 @@ enum ReferenceImporter {
             let stagingURL: URL = coursesDirectoryURL.appendingPathComponent(
                 ReferenceStaging.stagingName(for: folderName)
             )
-            // Any leftover of that name is one nobody is working on: a live
-            // owner would have made the folder name unavailable earlier, and
-            // a stale one is exactly what the sweep takes.
-            if !ReferenceStaging.someoneIsWorkingOn(
-                stagingURL.lastPathComponent, inCoursesDirectory: coursesDirectoryURL
-            ) {
-                ReferenceStaging.remove(at: stagingURL)
-            }
-            // Said before the first byte, so a Reload Courses, a second
-            // window or an `--mcp-stdio` session started mid-copy leaves this
-            // folder alone instead of sweeping it out from under us.
-            ReferenceStaging.takeLease(for: folderName, inCoursesDirectory: coursesDirectoryURL)
-            defer {
-                ReferenceStaging.releaseLease(
-                    for: folderName, inCoursesDirectory: coursesDirectoryURL
+            // CLAIMED as one act: the folder is made, empty, before the first
+            // `await`, and only a claimer ever removes a staging folder. Two
+            // windows are one process with one process id, and until #245 the
+            // second of them read the first one's lease as a live owner, went
+            // on, failed to make the folder that was already there — and its
+            // own tidy-up removed the FIRST window's half-made copy.
+            // `ReferenceStaging.claim` says the order and why.
+            let claim: ReferenceStaging.Claim = ReferenceStaging.claim(
+                folderName, inCoursesDirectory: coursesDirectoryURL
+            )
+            switch claim {
+            case .claimed:
+                break
+            case .someoneElseIsMakingIt:
+                ReferenceImporter.noteNotImported(
+                    displayCode,
+                    from: sourceFolderURL,
+                    because: ReferenceImportWording.alreadyBeingImported
                 )
+                outcomes.append(.notImported(
+                    course: displayCode, reason: ReferenceImportWording.alreadyBeingImported
+                ))
+                continue
+            case .couldNotStart(let reason):
+                ReferenceImporter.noteNotImported(displayCode, from: sourceFolderURL, because: reason)
+                outcomes.append(.notImported(course: displayCode, reason: reason))
+                continue
+            }
+            // Given back however this course ends — imported, failed or
+            // stopped — and only AFTER the catch blocks below have tidied
+            // away what was ours, so a sweep can never land in between.
+            defer {
+                ReferenceStaging.giveBack(folderName, inCoursesDirectory: coursesDirectoryURL)
             }
 
             do {
@@ -251,7 +269,8 @@ enum ReferenceImporter {
                         ))
                     }
                 } else {
-                    made = try await ReferenceImporter.importOneCourse(
+                    let result: (made: ReferenceCopier.Made, addOnsLeftBehind: ObsidianAddOns.Found) =
+                        try await ReferenceImporter.importOneCourse(
                         request,
                         named: folderName,
                         stagedAt: stagingURL,
@@ -261,9 +280,16 @@ enum ReferenceImporter {
                         courseCount: requests.count,
                         progress: progress
                     )
+                    made = result.made
+                    // The one route whose line names the add-ons left behind:
+                    // the two older layouts count theirs on their own second
+                    // line, and saying it twice would be two answers (#255).
                     ActivityTrail.note(
                         .courseImportedForReference,
-                        ReferenceImporter.trailLine(for: made, broughtInFrom: sourceFolderURL)
+                        ReferenceImporter.trailLine(
+                            for: made, broughtInFrom: sourceFolderURL,
+                            addOnsLeftBehind: result.addOnsLeftBehind
+                        )
                     )
                     outcomes.append(.imported(made))
                 }
@@ -293,16 +319,29 @@ enum ReferenceImporter {
                     stagingURL, course: displayCode, broughtInFrom: sourceFolderURL
                 )
                 let reason: String = error.localizedDescription
-                ActivityTrail.note(
-                    .courseCouldNotBeImportedForReference,
-                    "could not import \(displayCode) for reference "
-                    + "from \(sourceFolderURL.lastPathComponent) — \(reason)"
-                )
+                ReferenceImporter.noteNotImported(displayCode, from: sourceFolderURL, because: reason)
                 outcomes.append(.notImported(course: displayCode, reason: reason))
             }
         }
 
         return outcomes
+    }
+
+    /// The trail line for a course that did not come across, and why —
+    /// written for EVERY course the summary lists as not imported (#287):
+    /// refused by the shelf rule, a folder of that name already there, being
+    /// imported somewhere else right now, a leftover that could not be
+    /// cleared, or a copy that failed part way. The reason is the sentence
+    /// the teacher read in the summary. Every early `continue` in
+    /// `importCourses` that appends `.notImported` must call this first; a
+    /// course the teacher STOPPED writes `courseImportForReferenceStopped`
+    /// instead.
+    private static func noteNotImported(_ course: String, from sourceFolderURL: URL, because reason: String) {
+        ActivityTrail.note(
+            .courseCouldNotBeImportedForReference,
+            "could not import \(course) for reference "
+            + "from \(sourceFolderURL.lastPathComponent) — \(reason)"
+        )
     }
 
     /// The trail line for a course that came across — what a teacher would
@@ -311,7 +350,16 @@ enum ReferenceImporter {
     /// Names the folder it was read FROM, which is the one thing an import
     /// records that a copy does not: the answer to "where did this ICS4U come
     /// from" is a folder somewhere else on this Mac.
-    static func trailLine(for made: ReferenceCopier.Made, broughtInFrom sourceFolderURL: URL) -> String {
+    ///
+    /// Shared by all three import routes. `addOnsLeftBehind` is passed by the
+    /// MODERN route only (#255) — read by `ObsidianAddOns.found` from the
+    /// course being imported, folder names only — and adds nothing when
+    /// there were none, so every other line is exactly what it was.
+    static func trailLine(
+        for made: ReferenceCopier.Made,
+        broughtInFrom sourceFolderURL: URL,
+        addOnsLeftBehind: ObsidianAddOns.Found = ObsidianAddOns.Found()
+    ) -> String {
         var year: String = ReferenceImportWording.noSchoolYear
         if let startingYear = made.schoolYear {
             year = SchoolYear.label(forStartingYear: startingYear)
@@ -319,6 +367,7 @@ enum ReferenceImporter {
         let sections: String = made.sectionCount == 1 ? "1 section" : "\(made.sectionCount) sections"
         return "imported \(made.displayCode) for reference from \(sourceFolderURL.lastPathComponent) "
              + "as \(made.folderName) — \(year), \(sections)"
+             + ObsidianAddOns.trailClause(for: addOnsLeftBehind)
     }
 
     /// The second trail line for an older-layout class: where its shared
@@ -465,10 +514,14 @@ enum ReferenceImporter {
         courseNumber: Int,
         courseCount: Int,
         progress: @escaping @Sendable @MainActor (Progress) -> Void
-    ) async throws -> ReferenceCopier.Made {
+    ) async throws -> (made: ReferenceCopier.Made, addOnsLeftBehind: ObsidianAddOns.Found) {
         let fileManager: FileManager = FileManager.default
         let sourceURL: URL = request.course.directoryURL
         let displayCode: String = request.course.courseCode
+
+        // What of `.obsidian` stays behind, for the trail line (#255): read
+        // again rather than trusted from the sheet, like the walk below.
+        let addOnsLeftBehind: ObsidianAddOns.Found = ObsidianAddOns.found(inCourseAt: sourceURL)
 
         // Walked again rather than trusted from the sheet: the sheet's
         // numbers were read when it opened, and the copy has to be of what is
@@ -492,7 +545,8 @@ enum ReferenceImporter {
             totalBytes: survey.byteCount
         ))
 
-        try fileManager.createDirectory(at: stagingURL, withIntermediateDirectories: false)
+        // The staging folder is already there, empty: making it was part of
+        // the claim (`ReferenceStaging.claim`), so it is ours to fill.
 
         let totalBytes: Int64 = survey.byteCount
         try await ReferenceTreeCopier.copy(
@@ -535,12 +589,13 @@ enum ReferenceImporter {
         // `staged` was made under the hidden name, so the folder it reports
         // is that one; everything else in it — the code a teacher reads, the
         // year, the section count — was read from the settings and is right.
-        return ReferenceCopier.Made(
+        let made: ReferenceCopier.Made = ReferenceCopier.Made(
             folderName: folderName,
             displayCode: staged.displayCode,
             schoolYear: staged.schoolYear,
             sectionCount: staged.sectionCount
         )
+        return (made: made, addOnsLeftBehind: addOnsLeftBehind)
     }
 
     /// One OLDER-layout class: planned again (the sheet's numbers were read
@@ -558,7 +613,6 @@ enum ReferenceImporter {
         courseCount: Int,
         progress: @escaping @Sendable @MainActor (Progress) -> Void
     ) async throws -> (made: ReferenceCopier.Made, plan: OlderCourseLayout.Plan) {
-        let fileManager: FileManager = FileManager.default
         let displayCode: String = request.course.courseCode
         let shared: OlderCourseLayout.SharedContent? = request.course.olderLayout?.shared
 
@@ -580,7 +634,8 @@ enum ReferenceImporter {
             totalBytes: plan.byteCount
         ))
 
-        try fileManager.createDirectory(at: stagingURL, withIntermediateDirectories: false)
+        // The staging folder is already there, empty: making it was part of
+        // the claim (`ReferenceStaging.claim`), so it is ours to fill.
 
         let totalBytes: Int64 = plan.byteCount
         try await ReferenceTreeCopier.copy(
@@ -670,7 +725,6 @@ enum ReferenceImporter {
         courseCount: Int,
         progress: @escaping @Sendable @MainActor (Progress) -> Void
     ) async throws -> (made: ReferenceCopier.Made, plan: QuartzCheckoutLayout.Plan) {
-        let fileManager: FileManager = FileManager.default
         let displayCode: String = request.course.courseCode
 
         let plan: QuartzCheckoutLayout.Plan = await ReferenceImporter.planWebsiteOffTheMainActor(
@@ -688,7 +742,8 @@ enum ReferenceImporter {
             totalBytes: plan.byteCount
         ))
 
-        try fileManager.createDirectory(at: stagingURL, withIntermediateDirectories: false)
+        // The staging folder is already there, empty: making it was part of
+        // the claim (`ReferenceStaging.claim`), so it is ours to fill.
 
         let totalBytes: Int64 = plan.byteCount
         try await ReferenceTreeCopier.copy(
@@ -753,7 +808,16 @@ enum ReferenceImporter {
         courseAt courseURL: URL,
         leavingBehind leftBehindNames: Set<String>
     ) async -> ReferenceTreeCopier.Survey {
-        return ReferenceTreeCopier.survey(courseAt: courseURL, leavingBehind: leftBehindNames)
+        // Without the Obsidian add-ons, and without `.obsidian` at all when
+        // it is a link (#255) — the rule every route keeps. Passed here
+        // rather than folded into `leftBehindNames`, which a caller may
+        // override and which matches at every depth.
+        return ReferenceTreeCopier.survey(
+            courseAt: courseURL,
+            leavingBehind: leftBehindNames,
+            leavingBehindPaths: ObsidianAddOns.leftBehindFromTheCourse,
+            leavingBehindIfALink: ObsidianAddOns.leftBehindWhenALinkFromTheCourse
+        )
     }
 
     /// Takes away the hidden folder this run made and did not finish.

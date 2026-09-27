@@ -1,0 +1,369 @@
+### date-appended=True date-prepended=False real-course=True
+### prompt=shipped temperature=0.0 app-body=True trials=10 course=VVH2O
+### max_tokens=512 (read from mac-app/QuartzTeachers/Models/Assist/AssistModelClient.swift)
+### em-dashes in the shipped literal, folded for the hyphen form: 6
+### deploy-at-a-time guard agrees with 144 contract rows
+### hide-is-unpublish guard agrees with 33 contract rows
+### intercepted in code before the model (6 of 29 probes): card: publish tomorrow -> publish_class_on, card: unpublish by name -> unpublish_pages, card: check the section -> check_section, card: rebuild preview -> rebuild_preview, card: undo -> undo_last_change, card: deploy now -> deploy_section
+probe                          chose                    ok    ms     arguments
+----------------------------------------------------------------------------------------------------------------------
+card: publish by name          publish_pages            OK    2311   {"course": "VVH2O", "section": 1, "pages": "Unit 2
+card: publish by name          publish_pages            OK    477    {"course": "VVH2O", "section": 1, "pages": "Unit 2
+card: publish by name          publish_pages            OK    527    {"course": "VVH2O", "section": 1, "pages": "Unit 2
+card: publish by name          publish_pages            OK    572    {"course": "VVH2O", "section": 1, "pages": "Unit 2
+card: publish by name          publish_pages            OK    610    {"course": "VVH2O", "section": 1, "pages": "Unit 2
+card: publish by name          publish_pages            OK    743    {"course": "VVH2O", "section": 1, "pages": "Unit 2
+card: publish by name          publish_pages            OK    634    {"course": "VVH2O", "section": 1, "pages": "Unit 2
+card: publish by name          publish_pages            OK    715    {"course": "VVH2O", "section": 1, "pages": "Unit 2
+card: publish by name          publish_pages            OK    773    {"course": "VVH2O", "section": 1, "pages": "Unit 2
+card: publish by name          publish_pages            OK    655    {"course": "VVH2O", "section": 1, "pages": "Unit 2
+card: publish tomorrow         publish_class_on         OK    558    {"course": "VVH2O", "date": "2026-09-26", "section
+card: publish tomorrow         publish_class_on         OK    627    {"course": "VVH2O", "date": "2026-09-26", "section
+card: publish tomorrow         publish_class_on         OK    558    {"course": "VVH2O", "date": "2026-09-26", "section
+card: publish tomorrow         publish_class_on         OK    601    {"course": "VVH2O", "date": "2026-09-26", "section
+card: publish tomorrow         publish_class_on         OK    615    {"course": "VVH2O", "date": "2026-09-26", "section
+card: publish tomorrow         publish_class_on         OK    521    {"course": "VVH2O", "date": "2026-09-26", "section
+card: publish tomorrow         publish_class_on         OK    564    {"course": "VVH2O", "date": "2026-09-26", "section
+card: publish tomorrow         publish_class_on         OK    559    {"course": "VVH2O", "date": "2026-09-26", "section
+card: publish tomorrow         publish_class_on         OK    575    {"course": "VVH2O", "date": "2026-09-26", "section
+card: publish tomorrow         publish_class_on         OK    645    {"course": "VVH2O", "date": "2026-09-26", "section
+card: unpublish by name        unpublish_pages          OK    599    {"course": "VVH2O", "section": 1, "pages": "Unit 2
+card: unpublish by name        unpublish_pages          OK    594    {"course": "VVH2O", "section": 1, "pages": "Unit 2
+card: unpublish by name        unpublish_pages          OK    611    {"course": "VVH2O", "section": 1, "pages": "Unit 2
+card: unpublish by name        unpublish_pages          OK    778    {"course": "VVH2O", "section": 1, "pages": "Unit 2
+card: unpublish by name        unpublish_pages          OK    788    {"course": "VVH2O", "section": 1, "pages": "Unit 2
+card: unpublish by name        unpublish_pages          OK    955    {"course": "VVH2O", "section": 1, "pages": "Unit 2
+card: unpublish by name        unpublish_pages          OK    650    {"course": "VVH2O", "section": 1, "pages": "Unit 2
+card: unpublish by name        unpublish_pages          OK    608    {"course": "VVH2O", "section": 1, "pages": "Unit 2
+card: unpublish by name        unpublish_pages          OK    547    {"course": "VVH2O", "section": 1, "pages": "Unit 2
+card: unpublish by name        unpublish_pages          OK    537    {"course": "VVH2O", "section": 1, "pages": "Unit 2
+card: unpublish, mistake       unpublish_pages          OK    742    {"course": "VVH2O", "section": 1, "pages": "Unit 4
+card: unpublish, mistake       unpublish_pages          OK    571    {"course": "VVH2O", "section": 1, "pages": "Unit 4
+card: unpublish, mistake       unpublish_pages          OK    536    {"course": "VVH2O", "section": 1, "pages": "Unit 4
+card: unpublish, mistake       unpublish_pages          OK    585    {"course": "VVH2O", "section": 1, "pages": "Unit 4
+card: unpublish, mistake       unpublish_pages          OK    576    {"course": "VVH2O", "section": 1, "pages": "Unit 4
+card: unpublish, mistake       unpublish_pages          OK    599    {"course": "VVH2O", "section": 1, "pages": "Unit 4
+card: unpublish, mistake       unpublish_pages          OK    774    {"course": "VVH2O", "section": 1, "pages": "Unit 4
+card: unpublish, mistake       unpublish_pages          OK    692    {"course": "VVH2O", "section": 1, "pages": "Unit 4
+card: unpublish, mistake       unpublish_pages          OK    832    {"course": "VVH2O", "section": 1, "pages": "Unit 4
+card: unpublish, mistake       unpublish_pages          OK    924    {"course": "VVH2O", "section": 1, "pages": "Unit 4
+card: plan a publish           publish_pages            OK    677    {"course": "VVH2O", "section": 1, "pages": "Unit 3
+card: plan a publish           publish_pages            OK    703    {"course": "VVH2O", "section": 1, "pages": "Unit 3
+card: plan a publish           publish_pages            OK    1027   {"course": "VVH2O", "section": 1, "pages": "Unit 3
+card: plan a publish           publish_pages            OK    1172   {"course": "VVH2O", "section": 1, "pages": "Unit 3
+card: plan a publish           publish_pages            OK    1055   {"course": "VVH2O", "section": 1, "pages": "Unit 3
+card: plan a publish           publish_pages            OK    1087   {"course": "VVH2O", "section": 1, "pages": "Unit 3
+card: plan a publish           publish_pages            OK    1042   {"course": "VVH2O", "section": 1, "pages": "Unit 3
+card: plan a publish           publish_pages            OK    1044   {"course": "VVH2O", "section": 1, "pages": "Unit 3
+card: plan a publish           publish_pages            OK    772    {"course": "VVH2O", "section": 1, "pages": "Unit 3
+card: plan a publish           publish_pages            OK    912    {"course": "VVH2O", "section": 1, "pages": "Unit 3
+card: check the section        check_section            OK    502    {"course": "VVH2O", "section": 1}
+card: check the section        check_section            OK    689    {"course": "VVH2O", "section": 1}
+card: check the section        check_section            OK    559    {"course": "VVH2O", "section": 1}
+card: check the section        check_section            OK    490    {"course": "VVH2O", "section": 1}
+card: check the section        check_section            OK    543    {"course": "VVH2O", "section": 1}
+card: check the section        check_section            OK    377    {"course": "VVH2O", "section": 1}
+card: check the section        check_section            OK    609    {"course": "VVH2O", "section": 1}
+card: check the section        check_section            OK    446    {"course": "VVH2O", "section": 1}
+card: check the section        check_section            OK    671    {"course": "VVH2O", "section": 1}
+card: check the section        check_section            OK    480    {"course": "VVH2O", "section": 1}
+card: rebuild preview          rebuild_preview          OK    613    {"course": "VVH2O", "section": 1}
+card: rebuild preview          rebuild_preview          OK    399    {"course": "VVH2O", "section": 1}
+card: rebuild preview          rebuild_preview          OK    500    {"course": "VVH2O", "section": 1}
+card: rebuild preview          rebuild_preview          OK    427    {"course": "VVH2O", "section": 1}
+card: rebuild preview          rebuild_preview          OK    446    {"course": "VVH2O", "section": 1}
+card: rebuild preview          rebuild_preview          OK    622    {"course": "VVH2O", "section": 1}
+card: rebuild preview          rebuild_preview          OK    637    {"course": "VVH2O", "section": 1}
+card: rebuild preview          rebuild_preview          OK    616    {"course": "VVH2O", "section": 1}
+card: rebuild preview          rebuild_preview          OK    517    {"course": "VVH2O", "section": 1}
+card: rebuild preview          rebuild_preview          OK    764    {"course": "VVH2O", "section": 1}
+card: undo                     undo_last_change         OK    235    {}
+card: undo                     undo_last_change         OK    342    {}
+card: undo                     undo_last_change         OK    219    {}
+card: undo                     undo_last_change         OK    248    {}
+card: undo                     undo_last_change         OK    180    {}
+card: undo                     undo_last_change         OK    243    {}
+card: undo                     undo_last_change         OK    254    {}
+card: undo                     undo_last_change         OK    257    {}
+card: undo                     undo_last_change         OK    201    {}
+card: undo                     undo_last_change         OK    192    {}
+card: deploy now               (declined)               MISS  399    {}
+card: deploy now               (declined)               MISS  271    {}
+card: deploy now               (declined)               MISS  211    {}
+card: deploy now               (declined)               MISS  212    {}
+card: deploy now               (declined)               MISS  217    {}
+card: deploy now               (declined)               MISS  238    {}
+card: deploy now               (declined)               MISS  236    {}
+card: deploy now               (declined)               MISS  268    {}
+card: deploy now               (declined)               MISS  312    {}
+card: deploy now               (declined)               MISS  290    {}
+card: schedule a deploy        deploy_section           MISS  525    {"course": "VVH2O", "section": 1}
+card: schedule a deploy        deploy_section           MISS  592    {"course": "VVH2O", "section": 1}
+card: schedule a deploy        deploy_section           MISS  658    {"course": "VVH2O", "section": 1}
+card: schedule a deploy        deploy_section           MISS  904    {"course": "VVH2O", "section": 1}
+card: schedule a deploy        deploy_section           MISS  692    {"course": "VVH2O", "section": 1}
+card: schedule a deploy        deploy_section           MISS  616    {"course": "VVH2O", "section": 1}
+card: schedule a deploy        deploy_section           MISS  493    {"course": "VVH2O", "section": 1}
+card: schedule a deploy        deploy_section           MISS  558    {"course": "VVH2O", "section": 1}
+card: schedule a deploy        deploy_section           MISS  663    {"course": "VVH2O", "section": 1}
+card: schedule a deploy        deploy_section           MISS  754    {"course": "VVH2O", "section": 1}
+card: cancel the deploy        cancel_scheduled_deploy  OK    372    {"course": "VVH2O", "section": 1}
+card: cancel the deploy        cancel_scheduled_deploy  OK    486    {"course": "VVH2O", "section": 1}
+card: cancel the deploy        cancel_scheduled_deploy  OK    383    {"course": "VVH2O", "section": 1}
+card: cancel the deploy        cancel_scheduled_deploy  OK    323    {"course": "VVH2O", "section": 1}
+card: cancel the deploy        cancel_scheduled_deploy  OK    308    {"course": "VVH2O", "section": 1}
+card: cancel the deploy        cancel_scheduled_deploy  OK    318    {"course": "VVH2O", "section": 1}
+card: cancel the deploy        cancel_scheduled_deploy  OK    388    {"course": "VVH2O", "section": 1}
+card: cancel the deploy        cancel_scheduled_deploy  OK    310    {"course": "VVH2O", "section": 1}
+card: cancel the deploy        cancel_scheduled_deploy  OK    305    {"course": "VVH2O", "section": 1}
+card: cancel the deploy        cancel_scheduled_deploy  OK    360    {"course": "VVH2O", "section": 1}
+publish tomorrow, with links   publish_pages            MISS  5377   {"__unparsed__": "{\"course\": \"VVH2O\", \"sectio
+publish tomorrow, with links   publish_pages            MISS  4974   {"__unparsed__": "{\"course\": \"VVH2O\", \"sectio
+publish tomorrow, with links   publish_pages            MISS  4534   {"__unparsed__": "{\"course\": \"VVH2O\", \"sectio
+publish tomorrow, with links   publish_pages            MISS  4576   {"__unparsed__": "{\"course\": \"VVH2O\", \"sectio
+publish tomorrow, with links   publish_pages            MISS  4573   {"__unparsed__": "{\"course\": \"VVH2O\", \"sectio
+publish tomorrow, with links   publish_pages            MISS  4246   {"__unparsed__": "{\"course\": \"VVH2O\", \"sectio
+publish tomorrow, with links   publish_pages            MISS  3980   {"__unparsed__": "{\"course\": \"VVH2O\", \"sectio
+publish tomorrow, with links   publish_pages            MISS  3934   {"__unparsed__": "{\"course\": \"VVH2O\", \"sectio
+publish tomorrow, with links   publish_pages            MISS  3926   {"__unparsed__": "{\"course\": \"VVH2O\", \"sectio
+publish tomorrow, with links   publish_pages            MISS  3932   {"__unparsed__": "{\"course\": \"VVH2O\", \"sectio
+publish by name, informal      publish_pages            OK    563    {"course": "VVH2O", "section": 1, "pages": "Unit 3
+publish by name, informal      publish_pages            OK    417    {"course": "VVH2O", "section": 1, "pages": "Unit 3
+publish by name, informal      publish_pages            OK    416    {"course": "VVH2O", "section": 1, "pages": "Unit 3
+publish by name, informal      publish_pages            OK    454    {"course": "VVH2O", "section": 1, "pages": "Unit 3
+publish by name, informal      publish_pages            OK    574    {"course": "VVH2O", "section": 1, "pages": "Unit 3
+publish by name, informal      publish_pages            OK    665    {"course": "VVH2O", "section": 1, "pages": "Unit 3
+publish by name, informal      publish_pages            OK    689    {"course": "VVH2O", "section": 1, "pages": "Unit 3
+publish by name, informal      publish_pages            OK    578    {"course": "VVH2O", "section": 1, "pages": "Unit 3
+publish by name, informal      publish_pages            OK    604    {"course": "VVH2O", "section": 1, "pages": "Unit 3
+publish by name, informal      publish_pages            OK    698    {"course": "VVH2O", "section": 1, "pages": "Unit 3
+HIDE - the inversion case      unpublish_pages          OK    591    {"course": "VVH2O", "section": 1, "pages": "Ohm's 
+HIDE - the inversion case      unpublish_pages          OK    627    {"course": "VVH2O", "section": 1, "pages": "Ohm's 
+HIDE - the inversion case      unpublish_pages          OK    826    {"course": "VVH2O", "section": 1, "pages": "Ohm's 
+HIDE - the inversion case      unpublish_pages          OK    656    {"course": "VVH2O", "section": 1, "pages": "Ohm's 
+HIDE - the inversion case      unpublish_pages          OK    504    {"course": "VVH2O", "section": 1, "pages": "Ohm's 
+HIDE - the inversion case      unpublish_pages          OK    523    {"course": "VVH2O", "section": 1, "pages": "Ohm's 
+HIDE - the inversion case      unpublish_pages          OK    584    {"course": "VVH2O", "section": 1, "pages": "Ohm's 
+HIDE - the inversion case      unpublish_pages          OK    594    {"course": "VVH2O", "section": 1, "pages": "Ohm's 
+HIDE - the inversion case      unpublish_pages          OK    580    {"course": "VVH2O", "section": 1, "pages": "Ohm's 
+HIDE - the inversion case      unpublish_pages          OK    672    {"course": "VVH2O", "section": 1, "pages": "Ohm's 
+hide, informal (verbatim cue)  unpublish_pages          OK    550    {"course": "VVH2O", "section": 1, "pages": "Unit 4
+hide, informal (verbatim cue)  unpublish_pages          OK    471    {"course": "VVH2O", "section": 1, "pages": "Unit 4
+hide, informal (verbatim cue)  unpublish_pages          OK    495    {"course": "VVH2O", "section": 1, "pages": "Unit 4
+hide, informal (verbatim cue)  unpublish_pages          OK    707    {"course": "VVH2O", "section": 1, "pages": "Unit 4
+hide, informal (verbatim cue)  unpublish_pages          OK    514    {"course": "VVH2O", "section": 1, "pages": "Unit 4
+hide, informal (verbatim cue)  unpublish_pages          OK    652    {"course": "VVH2O", "section": 1, "pages": "Unit 4
+hide, informal (verbatim cue)  unpublish_pages          OK    706    {"course": "VVH2O", "section": 1, "pages": "Unit 4
+hide, informal (verbatim cue)  unpublish_pages          OK    470    {"course": "VVH2O", "section": 1, "pages": "Unit 4
+hide, informal (verbatim cue)  unpublish_pages          OK    948    {"course": "VVH2O", "section": 1, "pages": "Unit 4
+hide, informal (verbatim cue)  unpublish_pages          OK    690    {"course": "VVH2O", "section": 1, "pages": "Unit 4
+hide, phrased as a mistake     unpublish_pages          OK    866    {"course": "VVH2O", "section": 1, "pages": "Unit 2
+hide, phrased as a mistake     unpublish_pages          OK    649    {"course": "VVH2O", "section": 1, "pages": "Unit 2
+hide, phrased as a mistake     unpublish_pages          OK    680    {"course": "VVH2O", "section": 1, "pages": "Unit 2
+hide, phrased as a mistake     unpublish_pages          OK    790    {"course": "VVH2O", "section": 1, "pages": "Unit 2
+hide, phrased as a mistake     unpublish_pages          OK    854    {"course": "VVH2O", "section": 1, "pages": "Unit 2
+hide, phrased as a mistake     unpublish_pages          OK    550    {"course": "VVH2O", "section": 1, "pages": "Unit 2
+hide, phrased as a mistake     unpublish_pages          OK    608    {"course": "VVH2O", "section": 1, "pages": "Unit 2
+hide, phrased as a mistake     unpublish_pages          OK    753    {"course": "VVH2O", "section": 1, "pages": "Unit 2
+hide, phrased as a mistake     unpublish_pages          OK    570    {"course": "VVH2O", "section": 1, "pages": "Unit 2
+hide, phrased as a mistake     unpublish_pages          OK    590    {"course": "VVH2O", "section": 1, "pages": "Unit 2
+list pages                     list_pages               OK    556    {"course": "VVH2O", "section": 1, "matching": ""}
+list pages                     list_pages               OK    500    {"course": "VVH2O", "section": 1, "matching": ""}
+list pages                     list_pages               OK    438    {"course": "VVH2O", "section": 1, "matching": ""}
+list pages                     list_pages               OK    403    {"course": "VVH2O", "section": 1, "matching": ""}
+list pages                     list_pages               OK    376    {"course": "VVH2O", "section": 1, "matching": ""}
+list pages                     list_pages               OK    363    {"course": "VVH2O", "section": 1, "matching": ""}
+list pages                     list_pages               OK    364    {"course": "VVH2O", "section": 1, "matching": ""}
+list pages                     list_pages               OK    358    {"course": "VVH2O", "section": 1, "matching": ""}
+list pages                     list_pages               OK    376    {"course": "VVH2O", "section": 1, "matching": ""}
+list pages                     list_pages               OK    476    {"course": "VVH2O", "section": 1, "matching": ""}
+read                           check_section            MISS  528    {"course": "VVH2O", "section": 1}
+read                           check_section            MISS  405    {"course": "VVH2O", "section": 1}
+read                           check_section            MISS  447    {"course": "VVH2O", "section": 1}
+read                           check_section            MISS  351    {"course": "VVH2O", "section": 1}
+read                           check_section            MISS  401    {"course": "VVH2O", "section": 1}
+read                           check_section            MISS  490    {"course": "VVH2O", "section": 1}
+read                           check_section            MISS  362    {"course": "VVH2O", "section": 1}
+read                           check_section            MISS  340    {"course": "VVH2O", "section": 1}
+read                           check_section            MISS  334    {"course": "VVH2O", "section": 1}
+read                           check_section            MISS  314    {"course": "VVH2O", "section": 1}
+check section                  check_section            OK    341    {"course": "VVH2O", "section": 1}
+check section                  check_section            OK    320    {"course": "VVH2O", "section": 1}
+check section                  check_section            OK    327    {"course": "VVH2O", "section": 1}
+check section                  check_section            OK    512    {"course": "VVH2O", "section": 1}
+check section                  check_section            OK    391    {"course": "VVH2O", "section": 1}
+check section                  check_section            OK    386    {"course": "VVH2O", "section": 1}
+check section                  check_section            OK    364    {"course": "VVH2O", "section": 1}
+check section                  check_section            OK    355    {"course": "VVH2O", "section": 1}
+check section                  check_section            OK    303    {"course": "VVH2O", "section": 1}
+check section                  check_section            OK    306    {"course": "VVH2O", "section": 1}
+rebuild preview                rebuild_preview          OK    364    {"course": "VVH2O", "section": 1}
+rebuild preview                rebuild_preview          OK    302    {"course": "VVH2O", "section": 1}
+rebuild preview                rebuild_preview          OK    279    {"course": "VVH2O", "section": 1}
+rebuild preview                rebuild_preview          OK    272    {"course": "VVH2O", "section": 1}
+rebuild preview                rebuild_preview          OK    283    {"course": "VVH2O", "section": 1}
+rebuild preview                rebuild_preview          OK    346    {"course": "VVH2O", "section": 1}
+rebuild preview                rebuild_preview          OK    285    {"course": "VVH2O", "section": 1}
+rebuild preview                rebuild_preview          OK    328    {"course": "VVH2O", "section": 1}
+rebuild preview                rebuild_preview          OK    295    {"course": "VVH2O", "section": 1}
+rebuild preview                rebuild_preview          OK    336    {"course": "VVH2O", "section": 1}
+undo                           undo_last_change         OK    226    {}
+undo                           undo_last_change         OK    186    {}
+undo                           undo_last_change         OK    231    {}
+undo                           undo_last_change         OK    193    {}
+undo                           undo_last_change         OK    199    {}
+undo                           undo_last_change         OK    213    {}
+undo                           undo_last_change         OK    188    {}
+undo                           undo_last_change         OK    183    {}
+undo                           undo_last_change         OK    178    {}
+undo                           undo_last_change         OK    190    {}
+schedule a deploy              deploy_section           MISS  326    {"course": "VVH2O", "section": 1}
+schedule a deploy              deploy_section           MISS  285    {"course": "VVH2O", "section": 1}
+schedule a deploy              deploy_section           MISS  282    {"course": "VVH2O", "section": 1}
+schedule a deploy              deploy_section           MISS  300    {"course": "VVH2O", "section": 1}
+schedule a deploy              deploy_section           MISS  299    {"course": "VVH2O", "section": 1}
+schedule a deploy              deploy_section           MISS  321    {"course": "VVH2O", "section": 1}
+schedule a deploy              deploy_section           MISS  292    {"course": "VVH2O", "section": 1}
+schedule a deploy              deploy_section           MISS  291    {"course": "VVH2O", "section": 1}
+schedule a deploy              deploy_section           MISS  321    {"course": "VVH2O", "section": 1}
+schedule a deploy              deploy_section           MISS  290    {"course": "VVH2O", "section": 1}
+deploy now                     publish_class_on         MISS  434    {"course": "VVH2O", "date": "2026-09-25", "section
+deploy now                     publish_class_on         MISS  407    {"course": "VVH2O", "date": "2026-09-25", "section
+deploy now                     publish_class_on         MISS  393    {"course": "VVH2O", "date": "2026-09-25", "section
+deploy now                     publish_class_on         MISS  402    {"course": "VVH2O", "date": "2026-09-25", "section
+deploy now                     publish_class_on         MISS  440    {"course": "VVH2O", "date": "2026-09-25", "section
+deploy now                     publish_class_on         MISS  409    {"course": "VVH2O", "date": "2026-09-25", "section
+deploy now                     publish_class_on         MISS  431    {"course": "VVH2O", "date": "2026-09-25", "section
+deploy now                     publish_class_on         MISS  424    {"course": "VVH2O", "date": "2026-09-25", "section
+deploy now                     publish_class_on         MISS  407    {"course": "VVH2O", "date": "2026-09-25", "section
+deploy now                     publish_class_on         MISS  373    {"course": "VVH2O", "date": "2026-09-25", "section
+cancel scheduled deploy        cancel_scheduled_deploy  OK    329    {"course": "VVH2O", "section": 1}
+cancel scheduled deploy        cancel_scheduled_deploy  OK    300    {"course": "VVH2O", "section": 1}
+cancel scheduled deploy        cancel_scheduled_deploy  OK    283    {"course": "VVH2O", "section": 1}
+cancel scheduled deploy        cancel_scheduled_deploy  OK    276    {"course": "VVH2O", "section": 1}
+cancel scheduled deploy        cancel_scheduled_deploy  OK    280    {"course": "VVH2O", "section": 1}
+cancel scheduled deploy        cancel_scheduled_deploy  OK    294    {"course": "VVH2O", "section": 1}
+cancel scheduled deploy        cancel_scheduled_deploy  OK    284    {"course": "VVH2O", "section": 1}
+cancel scheduled deploy        cancel_scheduled_deploy  OK    283    {"course": "VVH2O", "section": 1}
+cancel scheduled deploy        cancel_scheduled_deploy  OK    297    {"course": "VVH2O", "section": 1}
+cancel scheduled deploy        cancel_scheduled_deploy  OK    306    {"course": "VVH2O", "section": 1}
+no course named: publish       publish_pages            MISS  637    {"course": "VVH2O", "section": 1, "onOrAfter": "20
+no course named: publish       publish_pages            MISS  592    {"course": "VVH2O", "section": 1, "onOrAfter": "20
+no course named: publish       publish_pages            MISS  594    {"course": "VVH2O", "section": 1, "onOrAfter": "20
+no course named: publish       publish_pages            MISS  607    {"course": "VVH2O", "section": 1, "onOrAfter": "20
+no course named: publish       publish_pages            MISS  719    {"course": "VVH2O", "section": 1, "onOrAfter": "20
+no course named: publish       publish_pages            MISS  662    {"course": "VVH2O", "section": 1, "onOrAfter": "20
+no course named: publish       publish_pages            MISS  665    {"course": "VVH2O", "section": 1, "onOrAfter": "20
+no course named: publish       publish_pages            MISS  615    {"course": "VVH2O", "section": 1, "onOrAfter": "20
+no course named: publish       publish_pages            MISS  612    {"course": "VVH2O", "section": 1, "onOrAfter": "20
+no course named: publish       publish_pages            MISS  667    {"course": "VVH2O", "section": 1, "onOrAfter": "20
+no course named: hide          unpublish_pages          OK    507    {"course": "VVH2O", "section": 1, "pages": "Unit 1
+no course named: hide          unpublish_pages          OK    461    {"course": "VVH2O", "section": 1, "pages": "Unit 1
+no course named: hide          unpublish_pages          OK    451    {"course": "VVH2O", "section": 1, "pages": "Unit 1
+no course named: hide          unpublish_pages          OK    463    {"course": "VVH2O", "section": 1, "pages": "Unit 1
+no course named: hide          unpublish_pages          OK    487    {"course": "VVH2O", "section": 1, "pages": "Unit 1
+no course named: hide          unpublish_pages          OK    404    {"course": "VVH2O", "section": 1, "pages": "Unit 1
+no course named: hide          unpublish_pages          OK    395    {"course": "VVH2O", "section": 1, "pages": "Unit 1
+no course named: hide          unpublish_pages          OK    438    {"course": "VVH2O", "section": 1, "pages": "Unit 1
+no course named: hide          unpublish_pages          OK    390    {"course": "VVH2O", "section": 1, "pages": "Unit 1
+no course named: hide          unpublish_pages          OK    406    {"course": "VVH2O", "section": 1, "pages": "Unit 1
+deletion - no such tool        rebuild_preview          MISS  376    {"course": "VVH2O", "section": 1}
+deletion - no such tool        rebuild_preview          MISS  366    {"course": "VVH2O", "section": 1}
+deletion - no such tool        rebuild_preview          MISS  358    {"course": "VVH2O", "section": 1}
+deletion - no such tool        rebuild_preview          MISS  532    {"course": "VVH2O", "section": 1}
+deletion - no such tool        rebuild_preview          MISS  346    {"course": "VVH2O", "section": 1}
+deletion - no such tool        rebuild_preview          MISS  356    {"course": "VVH2O", "section": 1}
+deletion - no such tool        rebuild_preview          MISS  325    {"course": "VVH2O", "section": 1}
+deletion - no such tool        rebuild_preview          MISS  363    {"course": "VVH2O", "section": 1}
+deletion - no such tool        rebuild_preview          MISS  339    {"course": "VVH2O", "section": 1}
+deletion - no such tool        rebuild_preview          MISS  339    {"course": "VVH2O", "section": 1}
+out of scope                   (declined)               OK    431    {}
+out of scope                   (declined)               OK    396    {}
+out of scope                   (declined)               OK    397    {}
+out of scope                   (declined)               OK    401    {}
+out of scope                   (declined)               OK    455    {}
+out of scope                   (declined)               OK    425    {}
+out of scope                   (declined)               OK    405    {}
+out of scope                   (declined)               OK    439    {}
+out of scope                   (declined)               OK    410    {}
+out of scope                   (declined)               OK    425    {}
+typos                          publish_class_on         OK    504    {"course": "VVH2O", "date": "2026-09-26", "section
+typos                          publish_class_on         OK    475    {"course": "VVH2O", "date": "2026-09-26", "section
+typos                          publish_class_on         OK    435    {"course": "VVH2O", "date": "2026-09-26", "section
+typos                          publish_class_on         OK    509    {"course": "VVH2O", "date": "2026-09-26", "section
+typos                          publish_class_on         OK    450    {"course": "VVH2O", "date": "2026-09-26", "section
+typos                          publish_class_on         OK    736    {"course": "VVH2O", "date": "2026-09-26", "section
+typos                          publish_class_on         OK    528    {"course": "VVH2O", "date": "2026-09-26", "section
+typos                          publish_class_on         OK    631    {"course": "VVH2O", "date": "2026-09-26", "section
+typos                          publish_class_on         OK    459    {"course": "VVH2O", "date": "2026-09-26", "section
+typos                          publish_class_on         OK    430    {"course": "VVH2O", "date": "2026-09-26", "section
+----------------------------------------------------------------------------------------------------------------------
+all probes:            210/290 (72%)
+the 23 the model SEES:  160/230 (70%)   — the rest are answered in code
+Windows-comparable 18: 120/180
+promise-card 11 (WINDOWS' ExampleRequests): 90/110
+promise-card, the 5 the model sees: 40/50
+polarity inversions (all polarity probes, incl. plan_*): 0
+   ...of which the OLD label-matching counter would have seen: 0
+misses that were a WRITE (the dangerous kind): 50
+responses needing type coercion: 0
+malformed tool calls: 10   (HTTP errors, plus arguments that did not parse)
+tool calls whose arguments were TRUNCATED mid-JSON: 10
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3926 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3932 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3934 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3980 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 4246 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 4534 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 4573 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 4576 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 4974 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 5377 ms
+turns the server ended on 'length' rather than on the model finishing: 10
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3926 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3932 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3934 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3980 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 4246 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 4534 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 4573 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 4576 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 4974 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 5377 ms
+'tomorrow' dates not equal to 2026-09-26: 0
+course arguments not equal to VVH2O: 0
+argument faults the APP would have corrected before running: 0
+completion tokens: median 39, max 512   (thinking off is tens, not hundreds)
+turn latency: median 476 ms, max 5377 ms
+
+probe                          score  tools chosen over 10 trials
+--------------------------------------------------------------------------------------------------------------
+card: publish by name          10/10  10x publish_pages
+card: publish tomorrow         10/10  10x publish_class_on  (answered in code, not routed)
+card: unpublish by name        10/10  10x unpublish_pages  (answered in code, not routed)
+card: unpublish, mistake       10/10  10x unpublish_pages
+card: plan a publish           10/10  10x publish_pages
+card: check the section        10/10  10x check_section  (answered in code, not routed)
+card: rebuild preview          10/10  10x rebuild_preview  (answered in code, not routed)
+card: undo                     10/10  10x undo_last_change  (answered in code, not routed)
+card: deploy now               0/10   10x (declined)  [MISS]  (answered in code, not routed)
+card: schedule a deploy        0/10   10x deploy_section  [MISS]
+card: cancel the deploy        10/10  10x cancel_scheduled_deploy
+publish tomorrow, with links   0/10   10x publish_pages  [MISS]
+publish by name, informal      10/10  10x publish_pages
+HIDE - the inversion case      10/10  10x unpublish_pages
+hide, informal (verbatim cue)  10/10  10x unpublish_pages
+hide, phrased as a mistake     10/10  10x unpublish_pages
+list pages                     10/10  10x list_pages
+read                           0/10   10x check_section  [MISS]
+check section                  10/10  10x check_section
+rebuild preview                10/10  10x rebuild_preview
+undo                           10/10  10x undo_last_change
+schedule a deploy              0/10   10x deploy_section  [MISS]
+deploy now                     0/10   10x publish_class_on  [MISS]
+cancel scheduled deploy        10/10  10x cancel_scheduled_deploy
+no course named: publish       0/10   10x publish_pages  [MISS]
+no course named: hide          10/10  10x unpublish_pages
+deletion - no such tool        0/10   10x rebuild_preview  [MISS]
+out of scope                   10/10  10x (declined)
+typos                          10/10  10x publish_class_on

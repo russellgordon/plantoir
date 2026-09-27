@@ -14,7 +14,7 @@ the left mirrors them exactly.
 - **Concepts** — One page per idea, written once and linked from
   everywhere it comes up.
 - **Investigations** — Hands-on work, one page per investigation.
-- **Fieldwork** — Work done outside the {room}.
+- **Fieldwork** — Work done outside the lab.
 - **Discussions** — Questions the class talks through, one page each.
 - **Portfolios** — The record each student builds over the course.
 - **Tasks** — Assessed work, one page per task.

@@ -71,9 +71,12 @@ nonisolated enum BuildOutputLocation {
     /// fixture paths into the teacher's real Application Support, where the
     /// sweep will never find them again: their working folders were under
     /// `/private/var`, and only folders under HOME are ever swept.
-    static let isRunningTests: Bool =
-        NSClassFromString("XCTestCase") != nil
-        || ProcessInfo.processInfo.environment["UITEST_WORKSPACE"] != nil
+    ///
+    /// Still true under a UI test's state folder (#154): what it guards
+    /// besides where builds go — `launchctl`, most of all — stays refused
+    /// there. Where builds go under a state folder is `buildsRoot`'s own
+    /// question, asked of `RealHome.keepsTestStateInThrowawayFolders`.
+    static let isRunningTests: Bool = RealHome.isInsideTestBundle || RealHome.isUnderUITest
 
     /// One temporary builds root for the whole test run, so a test that goes
     /// through `CourseArchiver` or `CourseRenamer` without setting an override
@@ -95,17 +98,43 @@ nonisolated enum BuildOutputLocation {
     /// without this, running the suite would scatter folders through the
     /// teacher's real Application Support and delete things out of it. The
     /// real answer stays testable as `buildsRoot(inHomeFolder:)`.
+    ///
+    /// **Under a UI test's state folder (#154) it is the real rule inside
+    /// that folder**, so the one root a test inspects holds the builds too.
     static var buildsRoot: URL {
         if let buildsRootOverride {
             return buildsRootOverride
         }
-        if isRunningTests {
-            return buildsRootWhileTesting
-        }
-        return buildsRoot(inHomeFolder: FileManager.default.homeDirectoryForCurrentUser)
+        return buildsRoot(
+            isInsideTestBundle: RealHome.isInsideTestBundle,
+            isUnderUITest: RealHome.isUnderUITest,
+            stateDirectory: RealHome.stateDirectory,
+            homeForFiles: RealHome.forFiles
+        )
     }
 
     // MARK: - Functions
+
+    /// Which builds root a process uses, as a pure function: the throwaway
+    /// one while `RealHome` says test state belongs in one, otherwise the
+    /// real rule in the home `RealHome` resolves (the state folder, when
+    /// there is one). `homeForFiles` is only consulted without a state
+    /// folder, so a test can pass anything there.
+    static func buildsRoot(
+        isInsideTestBundle: Bool,
+        isUnderUITest: Bool,
+        stateDirectory: URL?,
+        homeForFiles: URL
+    ) -> URL {
+        if RealHome.keepsTestStateInThrowawayFolders(
+            isInsideTestBundle: isInsideTestBundle,
+            isUnderUITest: isUnderUITest,
+            stateDirectory: stateDirectory
+        ) {
+            return buildsRootWhileTesting
+        }
+        return buildsRoot(inHomeFolder: stateDirectory ?? homeForFiles)
+    }
 
     /// Where builds live for a given home folder — the real rule, as a pure
     /// function so it can be checked without writing anything anywhere.
@@ -119,18 +148,15 @@ nonisolated enum BuildOutputLocation {
 
     /// The eight hex characters that stand for one working folder.
     ///
-    /// The launchers derive the same value with `pwd -P | shasum -a 256`, so
-    /// the trailing newline is part of the hashed input here too, and the path
-    /// is resolved with POSIX `realpath` rather than Foundation's
-    /// `resolvingSymlinksInPath()` — the latter strips the `/private` prefix
-    /// from `/var` and `/tmp` paths where `pwd -P` keeps it, and the two sides
-    /// would hash different strings.
+    /// The launchers derive the same value with `/bin/pwd -P | shasum -a 256`
+    /// after moving into `$(/bin/pwd -P)`, so the trailing newline is part of
+    /// the hashed input here too, and the path is the disk's own spelling of
+    /// the folder from `FolderIdentity.canonicalPath` — the same function
+    /// every comparison of two folder paths uses (#189), so the folder a
+    /// workspace is named after and the folder a window is "in" can never be
+    /// two different answers. Change one and you change the other.
     static func folderIdentifier(forWorkingFolder path: String) -> String {
-        var physical: String = path
-        if let resolved = realpath(path, nil) {
-            physical = String(cString: resolved)
-            free(resolved)
-        }
+        let physical: String = FolderIdentity.canonicalPath(path)
         let hashed: SHA256.Digest = SHA256.hash(data: Data((physical + "\n").utf8))
         var hex: String = ""
         for byte in hashed {
@@ -357,7 +383,7 @@ nonisolated enum BuildOutputLocation {
     /// be back tomorrow. Builds for those simply accumulate, which is the
     /// cheaper mistake.
     static func discardBuildsForMissingWorkingFolders(
-        homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
+        homeDirectory: URL = RealHome.forFiles
     ) {
         let fileManager: FileManager = FileManager.default
         guard let entries = try? fileManager.contentsOfDirectory(
@@ -420,11 +446,7 @@ nonisolated enum BuildOutputLocation {
         let builds: URL = buildsFolder(forWorkingFolder: workingFolderURL)
         try FileManager.default.createDirectory(at: builds, withIntermediateDirectories: true)
         let marker: URL = builds.appendingPathComponent(workingFolderMarkerName)
-        var physical: String = workingFolderURL.path
-        if let resolved = realpath(workingFolderURL.path, nil) {
-            physical = String(cString: resolved)
-            free(resolved)
-        }
+        let physical: String = FolderIdentity.canonicalPath(workingFolderURL.path)
         try (physical + "\n").write(to: marker, atomically: true, encoding: .utf8)
     }
 

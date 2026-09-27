@@ -8,7 +8,8 @@ final class FolderContainerTests: XCTestCase {
 
     /// The app and the launchers must derive the SAME name, or the app
     /// would stop a container that does not exist while the real one runs
-    /// on. The launchers use `pwd -P | shasum -a 256 | cut -c1-8`.
+    /// on. The launchers use `/bin/pwd -P | shasum -a 256 | cut -c1-8`; every
+    /// spelling of a folder is checked in `FolderIdentityTests`.
     @MainActor
     func testTheNameMatchesWhatTheLaunchersDerive() throws {
         let folder: String = NSTemporaryDirectory() + "fc-\(UUID().uuidString)"
@@ -17,7 +18,7 @@ final class FolderContainerTests: XCTestCase {
 
         let shell: Process = Process()
         shell.executableURL = URL(fileURLWithPath: "/bin/bash")
-        shell.arguments = ["-c", "cd '\(folder)' && pwd -P | shasum -a 256 | cut -c1-8"]
+        shell.arguments = ["-c", "cd '\(folder)' && /bin/pwd -P | shasum -a 256 | cut -c1-8"]
         let output: Pipe = Pipe()
         shell.standardOutput = output
         try shell.run()
@@ -181,9 +182,10 @@ final class QuitScriptTests: XCTestCase {
     func testWorkRunningOnTheHostIsLeftAlone() {
         let script: String = FolderContainers.quitScript(
             folderPaths: [QuitScriptTests.pretendFolder],
-            inHomeFolder: QuitScriptTests.pretendHome
+            inHomeFolder: QuitScriptTests.pretendHome,
+            processListing: .thisMac
         )
-        XCTAssertTrue(script.contains("ps -Ao args="))
+        XCTAssertTrue(script.contains("ps -Ao args="), "What the APP writes: the real list of what is running")
         XCTAssertTrue(
             script.contains("grep -F \"$1/$launcher\""),
             "A fixed-string match, because pgrep -f takes a REGULAR EXPRESSION and a folder called C++ 26(27) would fail OPEN"
@@ -194,6 +196,34 @@ final class QuitScriptTests: XCTestCase {
             "The app's own preview stops run a launcher too; counting them would make every quit-with-a-preview free nothing"
         )
         XCTAssertTrue(script.contains("docker top"), "A build inside the container is work too")
+    }
+
+    /// Under the suite, a quit script reads a file in the throwaway home
+    /// unless a test asks for this Mac's real list (issue #243) — so a test
+    /// that runs one cannot be turned red, or skipped, by a launcher some
+    /// other worktree, `verify.sh` or real preview has running.
+    ///
+    /// And the app's half, which nothing inside the suite can otherwise
+    /// observe: outside the suite the answer is the real list.
+    @MainActor
+    func testTheSuiteNeverListsThisMacsProcessesByDefault() {
+        let script: String = FolderContainers.quitScript(
+            folderPaths: [QuitScriptTests.pretendFolder],
+            inHomeFolder: QuitScriptTests.pretendHome
+        )
+        XCTAssertFalse(script.contains("ps -A"), "The suite read this Mac's real process list by default")
+        let listFile: String = RealHome.homeWhileTesting
+            .appendingPathComponent("processes-running-on-this-mac.txt")
+            .path
+        XCTAssertTrue(
+            script.contains("cat " + HelperPrograms.shellQuoted(listFile)),
+            "The suite's default list is not the file in the throwaway home"
+        )
+        XCTAssertEqual(
+            FolderContainers.ProcessListing.forProcess(insideTestBundle: false),
+            .thisMac,
+            "The app must read the real list"
+        )
     }
 
     /// A stop that was asked for and REFUSED must not be written down as a

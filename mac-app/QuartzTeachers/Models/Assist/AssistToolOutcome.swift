@@ -105,12 +105,17 @@ struct AssistToolOutcome: Sendable, Equatable {
     /// The plan itself is written for the teacher, because the teacher is who
     /// decides. Only the instruction to ask is added for the model, and only
     /// on its way out — see `forTheCard`.
-    static func planned(_ summary: String, plan: String) -> AssistToolOutcome {
+    ///
+    /// `card` is the same plan in the course's own noun (#267) — "meeting"
+    /// where a club says it — and goes ONLY on the card. The model reads
+    /// `plan`, rendered with "class" whatever the course says, so a club
+    /// changes nothing the model is given; nil means the two are the same.
+    static func planned(_ summary: String, plan: String, card: String? = nil) -> AssistToolOutcome {
         return AssistToolOutcome(
             summary: summary,
             detail: plan + "\n\n" + AssistToolOutcome.askBeforeGoingAhead,
             shouldContinue: true,
-            forTheCard: plan,
+            forTheCard: card ?? plan,
             isPlan: true
         )
     }
@@ -120,6 +125,18 @@ struct AssistToolOutcome: Sendable, Equatable {
     /// teacher.
     static let askBeforeGoingAhead: String =
         "Nothing has been changed. Show this to the teacher and ask before going ahead."
+
+    /// A read answered IN FULL, in code: the teacher has the answer, and the
+    /// turn is over (#167).
+    ///
+    /// Only for a read the model was never asked for. A code-matched turn never
+    /// puts the teacher's sentence into the model's conversation, so handing
+    /// back would give the model a tool result with no question in front of it
+    /// — and on the smaller assistant, the lap that followed is where a
+    /// read-only question turned into a publish plan.
+    static func answered(_ summary: String, detail: String) -> AssistToolOutcome {
+        return AssistToolOutcome(summary: summary, detail: detail, shouldContinue: false)
+    }
 
     /// A write: it happened, and the turn is over.
     static func wrote(_ summary: String, detail: String) -> AssistToolOutcome {

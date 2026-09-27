@@ -157,6 +157,10 @@ final class SpecialFolderRenamerTests: XCTestCase {
                 "curriculum_folder": NSNull(),
             ]
         )
+        // Since #128 the name is written down as the LIST `curriculum_folders`,
+        // and the primary folder in the legacy key as well, so an older
+        // Plantoir on another Mac, which reads only that key, keeps its map.
+        XCTAssertEqual(updated["curriculum_folders"] as? [String], ["Expectations"])
         XCTAssertEqual(updated["curriculum_folder"] as? String, "Expectations")
     }
 

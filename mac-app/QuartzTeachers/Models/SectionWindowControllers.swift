@@ -46,11 +46,14 @@ final class SectionWindowControllers {
         // MARK: - Initializer
 
         init(folderPath: String, courseCode: String, sectionNumber: Int) {
-            // Standardised and case-folded on the way IN, so a caller cannot
-            // fail to match by spelling the same folder a different way. The
-            // previous mechanism compared raw strings, and a mismatch there
-            // would have been invisible.
-            self.folderPath = URL(fileURLWithPath: folderPath).standardizedFileURL.path
+            // Put in one spelling on the way IN, so a caller cannot fail to
+            // match by spelling the same folder a different way: the folder
+            // in the disk's own spelling (links, `/private`, case and Unicode
+            // form — `FolderIdentity`, #189) and the course code in lower
+            // case. The previous mechanism compared raw strings, and a
+            // mismatch there would have been invisible. (Until #189 this said
+            // "case-folded" of both, and only the code was.)
+            self.folderPath = FolderIdentity.canonicalPath(URL(fileURLWithPath: folderPath).standardizedFileURL.path)
             self.courseCode = courseCode.lowercased()
             self.sectionNumber = sectionNumber
         }

@@ -19,13 +19,39 @@ What a build still fetches from the network, the first time: the
 Quartz v4.5.0 clone from GitHub, and npm dependencies. After that the build
 is cached and everything runs offline.
 
+**Measured on a first run (GitHub #312, 2026-09-26, M4 Pro, ~320 Mbit/s):**
+about **390 MB** received (the virtual machine's own network counter,
+389,826,558 bytes), and **88 s and 137 s** on two cold builds in a fresh
+3-CPU / 4 GB virtual machine; **63 s and 440,803,331 bytes** at the #312
+rehearsal in a fresh 6-CPU / 12 GB one. Since #312 the Mac app carries the helper
+programs and the virtual machine's starting disk, so this build is the only
+large download left on a first run, and the largest stage by far; the
+launchers say "about 400 MB" only when no website builder has been built on
+the Mac before (`documentation/03-launcher-scripts.md` → "Where the helper
+programs come from"). Trimming it — the base image, `apt`'s Node.js and fonts,
+wrangler, Quartz's `npm install` — is a follow-up of its own.
+
 ## Anatomy of the Dockerfile
 
 The image is layered as follows (in order):
 
-1. **Base: `python:3.11-slim`** — Debian slim with Python 3.11. Python is
-   needed for the four orchestration scripts; 3.11 also provides `zoneinfo`
-   for timezone-correct timestamps.
+1. **Base: `python:3.11-slim`, pinned by digest** — Debian slim with Python
+   3.11. Python is needed for the four orchestration scripts; 3.11 also
+   provides `zoneinfo` for timezone-correct timestamps.
+
+   **Pinned by its multi-architecture index digest since bundle B
+   (2026-09-26, #334's follow-on).** The tag alone moves: teachers who built
+   at different times held different Debian and Python patch releases, and a
+   build could change under a teacher with no change to the recipe. The
+   digest is `sha256:90744cff…` — the one every build on this Mac had resolved
+   since 2026-08-05 (Python 3.11.15, Debian 13 "trixie") — so a Mac that
+   already has it downloads nothing new, and BuildKit keys the base layer on
+   the resolved digest, not on the line's text. The tag had moved on by the
+   day it was pinned (`sha256:e41613…`). **The cost:** security fixes to the
+   base arrive only when somebody bumps the line on purpose —
+   `docker buildx imagetools inspect python:3.11-slim` names the current
+   index digest; bump it, run `verify.sh`, and expect every teacher to pay
+   one full rebuild (a new base invalidates every layer above it).
 2. **`pip install python-frontmatter==1.3.0 PyYAML==6.0.3 Pillow==12.3.0`** —
    the Python dependencies, all three PINNED since 2026-09-18 (issue #140) at
    the versions the image already carried, so the pin changed nothing about
@@ -68,11 +94,19 @@ The image is layered as follows (in order):
    an upstream CLI change from breaking a teacher's publishing mid-term.
    Note this adds an npm-registry dependency to the image build, alongside
    the Debian and GitHub sources.
-5. **Clone Quartz v4.5.0 & pre-bake dependencies → `/opt/quartz`** — a pinned checkout:
+5. **Clone Quartz v4.5.0, at depth 1, & pre-bake dependencies → `/opt/quartz`** — a pinned checkout:
    ```dockerfile
-   RUN git clone --branch v4.5.0 https://github.com/jackyzha0/quartz.git quartz \
-       && cd quartz && npm install --no-audit && npm cache clean --force
+   RUN git clone --depth 1 --branch v4.5.0 https://github.com/jackyzha0/quartz.git quartz
+   RUN cd /opt/quartz && npm install --no-audit && npm cache clean --force
    ```
+   **Depth 1 since #334 (2026-09-26):** the tag's one commit rather than
+   Quartz's whole history — 2.3 MB received against 42.0 MB, measured per
+   container on an M4 Pro. Nothing reads the history: `build_site.py` already
+   takes `"git"` out of `CreatedModifiedDate`'s priority, and a one-commit
+   clone is still a repository. It also matters on the way OUT: the
+   scaffold, `.git` included, is copied into every section's output folder at
+   its first build and at `--full-rebuild`, so every section now stages
+   38 MB less. `verify.sh` checks `git rev-list --count HEAD` is 1.
    Pinning matters because most customizations are regex patches that target
    the exact source text of this version
    (see [Quartz Customizations](06-quartz-customizations.md)). Pre-installing
@@ -95,10 +129,7 @@ The image is layered as follows (in order):
    logic — and would be fragile to express as regex edits. They implement the
    *expandable vs. plain-link folder* behaviour in the sidebar; the details
    are in [customizations §A](06-quartz-customizations.md#a-components-replaced-at-image-build-time).
-7. **`cp -r /opt/quartz /opt/quartz-site`** — a spare copy of the scaffold
-   (not used by the current build path, which copies from `/opt/quartz`
-   directly).
-8. **Copy the Python scripts** into `/opt/scripts/` — eleven of them as of
+7. **Copy the Python scripts** into `/opt/scripts/` — eleven of them as of
    2026-09-18: `toolchain_paths.py`, `contracts.py`, `site_health.py`,
    `class_pages.py`, `page_visibility.py`, `stop_preview.py`,
    `setup_course.py`, `build_site.py`, `deploy.py`, `social_card.py` and
@@ -120,7 +151,7 @@ The image is layered as follows (in order):
    with `ast` and fails if one is missing. `verify.sh` runs it BEFORE the image
    build, because it answers in a tenth of a second what the build answers in
    three minutes.
-9. **Copy `support/` → `/opt/support/`** — data files consumed by the
+8. **Copy `support/` → `/opt/support/`** — data files consumed by the
    scripts:
    - `ontario_secondary_courses.json` — 1,930 Ontario course codes mapped to
      formal and short names, so the wizard can auto-fill "ICS3U →
@@ -148,7 +179,7 @@ The image is layered as follows (in order):
    - `example_course/EXC2O/` — the complete example course installable from
      the setup wizard (it, too, receives the `.obsidian` defaults on
      install).
-   - `example_content/<CODE>/` — ready-made course content for 38 course
+   - `example_content/<CODE>/` — ready-made course content for 39 course
      codes (count the folders rather than trusting the number), poured into
      a new course of that code
      ([course setup §0b](04-course-setup.md#0b-starting-content-for-the-course-code)).
@@ -161,7 +192,7 @@ The image is layered as follows (in order):
    Together these are most of the recipe's file count (11,378 files as of
    August 2026), which is why the launchers' image-tag hash has to batch
    its work — see [launcher scripts](03-launcher-scripts.md).
-10. **Bake the launcher scripts into `/opt/export/`** and register an
+9. **Bake the launcher scripts into `/opt/export/`** and register an
    `export-scripts` command:
    ```bash
    docker run --rm -v "$PWD:/out" teaching-quartz:src-<hash8> export-scripts
@@ -173,7 +204,61 @@ The image is layered as follows (in order):
    converts the `.bat` and `.ps1` files to CRLF line endings — `cmd.exe` can
    misparse LF-only batch files, and the repo itself stores everything with
    LF.
-11. **Default state**: working directory `/teaching`, command `/bin/bash`.
+10. **Default state**: working directory `/teaching`, command `/bin/bash`.
+
+**Gone since #334: `cp -r /opt/quartz /opt/quartz-site`**, which used to be
+step 7 — a spare copy of the scaffold that nothing read (the build copies
+from `/opt/quartz`), kept in step by a `cp` on the end of the line that bakes
+the Explorer's hide filter. It was 468 MB of image disk per image version,
+and during an update two versions sit side by side for a day. `verify.sh`
+now checks it is absent.
+
+### What the first build downloads (measured for #334)
+
+Per container (`/sys/class/net/eth0/statistics/rx_bytes` inside each
+`docker run`, because another build shared the VM during part of the
+measurement), on an M4 Pro with Colima at 6 CPUs / 12 GiB, 2026-09-26:
+
+| Stage, in Dockerfile order | Received | Notes |
+|---|---|---|
+| base `python:3.11-slim` | ~46 MB | a fresh VM only |
+| `pip install` (three pins) | 7.7 MB | |
+| `apt-get` (curl, git, lsof, dos2unix, emoji font, rsync, nodesource, nodejs) | 92.8 MB | `--no-install-recommends` would save 4.3 MB — rejected, below |
+| `npm install -g wrangler@4.80.0` | 65.1 MB | |
+| `git clone` of Quartz | 42.0 MB → **2.3 MB** at depth 1 | |
+| Quartz's `npm install` | 128.0 MB | the largest |
+| **Total** | **≈382 MB → ≈342 MB** | #312's VM counter read 389.8 MB in a fresh VM |
+
+Time here: 49–52 s cold with the base cached; an incremental rebuild after a
+script edit is 5 s, every heavy layer `CACHED`. A teacher's fresh 3-CPU / 4 GB
+VM is slower (#312 measured 88–137 s). On the VM's disk the image went from
+2.44 GB to 1.67 GB with the trims built together.
+
+**What an existing teacher pays once.** The pip, apt and wrangler lines were
+left byte-identical, because layer caching is by instruction: the first
+build after the update re-runs the clone, Quartz's `npm install` and
+everything after them — about 130 MB — and nothing above.
+
+**Measured and rejected** (so they are not proposed again):
+`--no-install-recommends` on both apt lines (−4.3 MB, but it changes the apt
+line's text, so every existing teacher would re-download apt, wrangler, the
+clone and npm — about 330 MB — once, to save a new teacher 1%; it also drops
+recommends nobody has audited: git's `less`, `openssh-client`, `patch`);
+`npm install --libc=glibc` (0 bytes: npm 10.8.2 ignores it for sass and
+sharp); `npm install --omit=dev` (Quartz's CLI needs `esbuild`, `tsx` and
+`typescript`, which are dev dependencies); skipping wrangler until a first
+Cloudflare publish (−65 MB, but it moves a download onto the publishing path
+at the moment a teacher publishes — a publishing change, not a trim); a
+smaller base such as `node:20-bookworm-slim` with Debian's Python (it changes
+the Python a teacher's settings are read with — the PyYAML pin exists because
+visibility depends on it); BuildKit cache mounts (a first build gains
+nothing, and later rebuilds already hit the layer cache); and a pre-built
+layer tarball in the DMG (Russell's #312 decision: build on the Mac).
+
+Since bundle B the app does this download in the BACKGROUND at first launch
+(`setup.sh --prepare-builder`, [03](03-launcher-scripts.md) and
+[09](09-mac-app.md)), so the teacher is usually in the wizard while it
+happens rather than watching "Building your website builder…".
     The launchers start the container with `tail -f /dev/null` so it idles
     indefinitely, and every operation is a `docker exec` into it.
 
@@ -213,9 +298,10 @@ it does not. On the mac, the builder image is tagged
 a new tag and orphans the previous one. Nothing in the repository had ever
 removed one: 139 images and 50 GB on this dev machine, ~115 of them
 `teaching-quartz` tags. Containers were never the problem — each launcher
-already removes its own container by name before recreating it, and the name
-is a hash of the working folder, so it is one container per folder replaced in
-place.
+already removes its own container before recreating it (since #94 by its id,
+and only once nothing is running in it — 03 → "Before a workspace is
+remade"), and the name is a hash of the working folder, so it is one container
+per folder replaced in place.
 
 The mac fix is `prune_superseded_images()` in `setup.sh`, `preview.sh` and
 `deploy.sh`: after a build SUCCEEDS, remove every `teaching-quartz:src-*` tag

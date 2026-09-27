@@ -41,6 +41,7 @@ enum ReferenceCopier {
     /// Why a copy could not be made.
     enum Problem: LocalizedError, Equatable {
         case folderAlreadyExists(String)
+        case alreadyBeingMade(String)
         case couldNotCopy(String)
 
         // MARK: - Computed properties
@@ -49,6 +50,8 @@ enum ReferenceCopier {
             switch self {
             case .folderAlreadyExists(let folderName):
                 return "There is already a course folder called \(folderName). Choose a different name."
+            case .alreadyBeingMade(let folderName):
+                return ReferenceWording.copyAlreadyBeingMade(folder: folderName)
             case .couldNotCopy(let reason):
                 return "The copy could not be made: \(reason)"
             }
@@ -83,12 +86,62 @@ enum ReferenceCopier {
     /// part-way through a locked copy would leave a folder the teacher cannot
     /// delete. Everything that can fail happens while the folder is still
     /// ordinary.
+    ///
+    /// Every way this can fail leaves ONE line on the trail —
+    /// `courseCouldNotBeKeptForReference`, carrying the sentence the sheet
+    /// shows (#287). It is written HERE, around the whole act, rather than at
+    /// each `throw`, so a new way to fail added later is on the trail without
+    /// anyone having to remember. A copy that was made writes
+    /// `courseKeptForReference` instead, never both.
+    ///
+    /// *Rejected: borrowing the import's "could not be imported for
+    /// reference".* Nothing was imported, and that line names a source folder
+    /// this act does not have — a failure line carrying the other act's name
+    /// misleads whoever reads it back. *Rejected: writing it in the sheet's
+    /// catch* — the success line lives here, and a view is not where a test
+    /// can reach it.
     static func keepACopy(
         of course: Course,
         named folderName: String,
         schoolYear: Int?,
         coursesDirectoryURL: URL,
         at moment: Date = Date()
+    ) throws -> Made {
+        do {
+            return try ReferenceCopier.makeTheCopy(
+                of: course,
+                named: folderName,
+                schoolYear: schoolYear,
+                coursesDirectoryURL: coursesDirectoryURL,
+                at: moment
+            )
+        } catch {
+            ActivityTrail.note(
+                .courseCouldNotBeKeptForReference,
+                ReferenceCopier.failureTrailLine(
+                    copiedFrom: course.displayCode,
+                    folderName: folderName,
+                    reason: error.localizedDescription
+                )
+            )
+            throw error
+        }
+    }
+
+    /// The trail line for a copy that was not made, and why — the reason is
+    /// the sentence the sheet showed the teacher.
+    static func failureTrailLine(copiedFrom source: String, folderName: String, reason: String) -> String {
+        return "could not keep a copy of \(source) for reference as \(folderName) — \(reason)"
+    }
+
+    /// The whole act, for `keepACopy` to wrap. Throws a `Problem` for every
+    /// way it can fail.
+    private static func makeTheCopy(
+        of course: Course,
+        named folderName: String,
+        schoolYear: Int?,
+        coursesDirectoryURL: URL,
+        at moment: Date
     ) throws -> Made {
         let fileManager: FileManager = FileManager.default
         let destinationURL: URL = coursesDirectoryURL.appendingPathComponent(folderName)
@@ -107,21 +160,29 @@ enum ReferenceCopier {
         let stagingURL: URL = coursesDirectoryURL.appendingPathComponent(
             ReferenceStaging.stagingName(for: folderName)
         )
-        if !ReferenceStaging.someoneIsWorkingOn(
-            stagingURL.lastPathComponent, inCoursesDirectory: coursesDirectoryURL
-        ) {
-            ReferenceStaging.remove(at: stagingURL)
+        // CLAIMED as one act, and only a claimer removes a staging folder:
+        // an import of the same folder name, or this copy in another window,
+        // is refused here rather than having its half-made work cleared away
+        // by this one's tidy-up below (#245). `ReferenceStaging.claim` says
+        // the order and why.
+        switch ReferenceStaging.claim(folderName, inCoursesDirectory: coursesDirectoryURL) {
+        case .claimed:
+            break
+        case .someoneElseIsMakingIt:
+            throw Problem.alreadyBeingMade(folderName)
+        case .couldNotStart(let reason):
+            throw Problem.couldNotCopy(reason)
         }
-        // A second window reading this working folder sweeps leftover staging
-        // folders; this says the folder is in use so that the sweep leaves it
-        // alone. Quick here — a local clone — but "quick" is not a guarantee.
-        ReferenceStaging.takeLease(for: folderName, inCoursesDirectory: coursesDirectoryURL)
         defer {
-            ReferenceStaging.releaseLease(for: folderName, inCoursesDirectory: coursesDirectoryURL)
+            ReferenceStaging.giveBack(folderName, inCoursesDirectory: coursesDirectoryURL)
         }
 
+        // What of `.obsidian` stays behind, read before the copy so the trail
+        // can name it (#255). A LIVE course keeps its add-ons; only the copy
+        // is made without them.
+        let addOnsLeftBehind: ObsidianAddOns.Found = ObsidianAddOns.found(inCourseAt: course.directoryURL)
+
         do {
-            try fileManager.createDirectory(at: stagingURL, withIntermediateDirectories: false)
             try ReferenceCopier.copyContents(of: course.directoryURL, into: stagingURL)
             // The lock TRAVELS through `FileManager.copyItem`, so a copy taken
             // from a course that is already frozen arrives frozen — and then
@@ -140,7 +201,8 @@ enum ReferenceCopier {
             ReferenceLock.clearLock(at: stagingURL)
         } catch {
             // Nothing is locked yet, so the half-written folder is an
-            // ordinary one and goes away cleanly.
+            // ordinary one and goes away cleanly — and it is OURS: the claim
+            // above made it, so this can never remove somebody else's.
             ReferenceStaging.remove(at: stagingURL)
             if let problem = error as? Problem {
                 throw problem
@@ -176,7 +238,9 @@ enum ReferenceCopier {
         )
         ActivityTrail.note(
             .courseKeptForReference,
-            ReferenceCopier.trailLine(for: made, copiedFrom: course.displayCode)
+            ReferenceCopier.trailLine(
+                for: made, copiedFrom: course.displayCode, addOnsLeftBehind: addOnsLeftBehind
+            )
         )
         return made
     }
@@ -283,8 +347,14 @@ enum ReferenceCopier {
     }
 
     /// The trail line — what a teacher would recognise, and enough to explain
-    /// a report months later.
-    static func trailLine(for made: Made, copiedFrom source: String) -> String {
+    /// a report months later. It names the Obsidian add-ons the copy was made
+    /// without, by folder name, only when there were any (#255): the line for
+    /// a course without them is exactly what it was before.
+    static func trailLine(
+        for made: Made,
+        copiedFrom source: String,
+        addOnsLeftBehind: ObsidianAddOns.Found = ObsidianAddOns.Found()
+    ) -> String {
         var year: String = "no school year"
         if let startingYear = made.schoolYear {
             year = SchoolYear.label(forStartingYear: startingYear)
@@ -292,13 +362,20 @@ enum ReferenceCopier {
         let sections: String = made.sectionCount == 1 ? "1 section" : "\(made.sectionCount) sections"
         return "kept a copy of \(source) for reference as \(made.folderName) — "
              + "shown as \(made.displayCode), \(year), \(sections)"
+             + ObsidianAddOns.trailClause(for: addOnsLeftBehind)
     }
 
     // MARK: - Private helpers
 
-    /// Copies everything the teacher wrote, and nothing that is rebuilt.
     /// Copies everything the teacher wrote, and nothing that is rebuilt —
     /// through the SAME copier the import uses.
+    ///
+    /// **Without the course's Obsidian add-ons** (#255), the same three
+    /// entries every route leaves behind, and without `.obsidian` at all when
+    /// it is a link. A copy of a LIVE course follows the same rule as an
+    /// import: the copy is never published, so an add-on in it is only ever a
+    /// way to publish it outside Plantoir's refusals — and the course being
+    /// taught keeps its add-ons untouched. `ObsidianAddOns` says why.
     ///
     /// It used to have a loop of its own: `contentsOfDirectory`, then
     /// `copyItem` to `destination.appendingPathComponent(child.lastPathComponent)`.
@@ -318,7 +395,10 @@ enum ReferenceCopier {
             leftBehind.insert(name)
         }
         let survey: ReferenceTreeCopier.Survey = ReferenceTreeCopier.survey(
-            courseAt: sourceURL, leavingBehind: leftBehind
+            courseAt: sourceURL,
+            leavingBehind: leftBehind,
+            leavingBehindPaths: ObsidianAddOns.leftBehindFromTheCourse,
+            leavingBehindIfALink: ObsidianAddOns.leftBehindWhenALinkFromTheCourse
         )
         if let unreadable = survey.unreadableFolders.first {
             throw ReferenceTreeCopier.Trouble.couldNotRead(name: unreadable)

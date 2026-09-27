@@ -21,6 +21,15 @@ import Foundation
 /// The date moves with it because the landing page's date IS the class's date
 /// to a reader: a section whose front page says August while its newest lesson
 /// is in January reads as abandoned.
+///
+/// **The heading above the embed is never read and never written.** A course
+/// writes "# Most Recent Class", a club "# Most Recent Meeting"
+/// (`front_page_heading`, #267), and a course made by hand says whatever its
+/// teacher typed — CODING's is an h2. The embed is found by the page it names,
+/// so all of them repoint the same way, and an existing course keeps its
+/// heading. Nor does this ever INSERT an embed into a page that has none;
+/// Windows does, under the course's own heading, and
+/// `contracts/class-planning.json` → `sectionIndexPointer` pins both.
 enum SectionIndexPointer {
 
     // MARK: - Types
@@ -52,7 +61,7 @@ enum SectionIndexPointer {
     /// When two visible classes sit on the same date (e.g. overflow lessons or
     /// multi-class days), the higher Unit x, Day y count wins.
     static func mostRecentVisibleClass(
-        in graph: AssistSectionGraph, term: String = ClassPageTerm.standard
+        in graph: AssistSectionGraph, naming: ClassPageNaming
     ) -> AssistSectionPage? {
         var newest: AssistSectionPage?
         var newestDay: CalendarDay?
@@ -64,7 +73,7 @@ enum SectionIndexPointer {
             guard let day = page.date else {
                 continue
             }
-            let unitDay: UnitDay? = UnitDay(pageTitle: page.title, term: term)
+            let unitDay: UnitDay? = UnitDay(pageTitle: page.title, naming: naming)
             if let soFarDay = newestDay {
                 if day.text < soFarDay.text {
                     continue
@@ -93,6 +102,9 @@ enum SectionIndexPointer {
     /// repointing one of those at a lesson would be a far worse bug than the
     /// one being fixed — so the replacement is made by matching against the
     /// section's actual class titles rather than by position.
+    ///
+    /// A page with no class transclusion at all is left exactly as it is —
+    /// its date included (#275).
     static func repointing(
         _ text: String,
         at page: AssistSectionPage,
@@ -101,6 +113,7 @@ enum SectionIndexPointer {
     ) -> Result? {
         var updated: String = text
         var replaced: String?
+        var foundTheClassEmbed: Bool = false
 
         for line in text.components(separatedBy: "\n") {
             let trimmed: String = line.trimmingCharacters(in: .whitespaces)
@@ -120,6 +133,7 @@ enum SectionIndexPointer {
             if !classTitles.contains(bare.lowercased()) {
                 continue
             }
+            foundTheClassEmbed = true
             if bare == page.title {
                 replaced = nil
             } else {
@@ -127,6 +141,15 @@ enum SectionIndexPointer {
                 replaced = bare
             }
             break
+        }
+
+        // A front page with no class embed is one the teacher made without
+        // one, or emptied on purpose: it keeps its own date, because there is
+        // no class on it for the date to follow (#275,
+        // `contracts/class-planning.json` → `sectionIndexPointer.dateCases`).
+        // This used to date it to the newest class anyway.
+        if !foundTheClassEmbed {
+            return nil
         }
 
         // The date follows the class it points at.
@@ -161,7 +184,7 @@ enum SectionIndexPointer {
             forSection: sectionNumber, in: course, workspaceURL: nil
         )
         guard let newest = SectionIndexPointer.mostRecentVisibleClass(
-            in: graph, term: course.configuration.unitWord
+            in: graph, naming: course.configuration.classPageNaming
         ) else {
             return nil
         }

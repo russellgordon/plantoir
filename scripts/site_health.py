@@ -17,7 +17,7 @@ Scheduler with the app CLOSED and is the case that matters most.
 
 **Every check asks whether the FEATURE produced anything**, never whether a
 folder exists. Recreating an empty `Ontario Curriculum` folder does not restore
-a teacher's expectation pages — `_find_curriculum_folder` wants a page named
+a teacher's expectation pages — `_find_curriculum_folders` wants a page named
 for an expectation code — so an existence check with a Fix button would have
 silenced the warning AND left the map missing. A check that can be satisfied
 without fixing the problem is worse than no check at all.
@@ -29,6 +29,7 @@ reads has one home like every other sentence in this product.
 """
 
 import json
+import re
 
 import contracts
 
@@ -69,32 +70,125 @@ def marker_prefix() -> str:
     return contracts.section(CONTRACT_FILE, "siteHealth", "marker", "prefix")
 
 
-def finding(name: str, course: str, section, checks: dict = None) -> Finding:
+_PLACEHOLDER = re.compile(r"\{([A-Za-z]+)\}")
+
+
+def filled(text: str, fill: dict) -> str:
+    """
+    `text` with each `{name}` in `fill` replaced, in ONE pass.
+
+    Not `str.format`, so a sentence containing ordinary braces cannot become a
+    format string by accident. And not one `replace` after another, because
+    since #246 a value can be a PAGE NAME a teacher typed: a page called
+    "{course} notes" must be named as it is, not expanded into the course
+    code. A single pass never re-reads what it has just put in. A placeholder
+    `fill` does not name is left exactly as written.
+    """
+    def one(match: re.Match) -> str:
+        key = match.group(1)
+        if key in fill:
+            return str(fill[key])
+        return match.group(0)
+
+    return _PLACEHOLDER.sub(one, text)
+
+
+def finding(name: str, course: str, section, checks: dict = None,
+            extra_fill: dict = None, sentence_key: str = "sentence",
+            detail_suffix: str = "") -> Finding:
     """
     One finding, worded from the contract.
 
-    `{course}` and `{section}` are filled in by plain replacement rather than
-    `str.format`, so a sentence containing ordinary braces cannot become a
-    format string by accident. The replacements are applied in a fixed order
-    and are not re-scanned, so a value that itself contained a placeholder
-    would not be expanded twice.
+    `{course}` and `{section}` always; `extra_fill` for the placeholders one
+    check has of its own (`pageSettingsUnreadable`'s page, count and list).
+    `sentence_key` picks which of the entry's sentences heads the finding, and
+    `detail_suffix` is appended to the detail after it is filled, so nothing in
+    it is expanded.
     """
     table = checks if checks is not None else _checks_by_name()
     entry = table[name]
     fill = {"course": str(course), "section": str(section)}
-
-    def worded(text: str) -> str:
-        for key, value in fill.items():
-            text = text.replace("{" + key + "}", value)
-        return text
+    if extra_fill:
+        for key, value in extra_fill.items():
+            fill[key] = str(value)
 
     return Finding(
         name=name,
-        sentence=worded(entry["sentence"]),
-        detail=worded(entry["detail"]),
+        sentence=filled(entry[sentence_key], fill),
+        detail=filled(entry["detail"], fill) + detail_suffix,
         fixable=bool(entry["fixable"]),
         course=course,
         section=section,
+    )
+
+
+# How many pages a `pageSettingsUnreadable` finding names before it says "and
+# N more": the detail is ONE line of the console and of the dialog.
+MOST_PAGES_NAMED = 10
+
+
+def unreadable_settings_finding(facts: dict, course: str, section, table: dict) -> Finding:
+    """
+    ONE finding for every page of this build whose settings could not be read
+    (#246), never one per page. Both apps key a finding's identity on its name,
+    course and section (the mac's `SiteHealthFinding.id`, Windows'
+    `SiteHealthFinding.Identity`), so two per-page findings would collide.
+
+    Each page's name is filled into `pageWithLine` or `pageWithoutLine` on its
+    own, and the list is then put into `{pages}` in a single pass, so a page
+    named with braces is named as it is.
+    """
+    entry = table["pageSettingsUnreadable"]
+    pages = facts.get("unreadable_pages") or []
+    named = []
+    for page in pages[:MOST_PAGES_NAMED]:
+        line = page.get("line")
+        if line is None:
+            named.append(filled(entry["pageWithoutLine"], {"page": page.get("page", "")}))
+        else:
+            named.append(filled(entry["pageWithLine"], {"page": page.get("page", ""), "line": line}))
+    if len(pages) > MOST_PAGES_NAMED:
+        named.append(filled(entry["andMore"], {"count": len(pages) - MOST_PAGES_NAMED}))
+    extra = {
+        "page": pages[0].get("page", "") if pages else "",
+        "count": len(pages),
+        "pages": ", ".join(named),
+    }
+    suffix = ""
+    if facts.get("front_page_unreadable"):
+        suffix = " " + filled(entry["frontPage"], {"course": str(course), "section": str(section)})
+    return finding(
+        "pageSettingsUnreadable", course, section, table,
+        extra_fill=extra,
+        sentence_key="sentence" if len(pages) == 1 else "sentenceForSeveral",
+        detail_suffix=suffix,
+    )
+
+
+def links_into_hidden_pages_finding(facts: dict, course: str, section, table: dict) -> Finding:
+    """
+    ONE finding for every link on a page students can see that leads to a
+    page they cannot (#333), never one per link - both apps key a finding on
+    name, course and section (#246's lesson). At most ten pairs are named,
+    each through `linkLine`, then `andMore`; every value is filled in one pass,
+    so a page named "{course} notes" is named as it is.
+    """
+    entry = table["linksIntoHiddenPages"]
+    pairs = facts.get("links_into_hidden_pages") or []
+    named = []
+    for pair in pairs[:MOST_PAGES_NAMED]:
+        named.append(filled(entry["linkLine"], {"from": pair.get("from", ""), "to": pair.get("to", "")}))
+    if len(pairs) > MOST_PAGES_NAMED:
+        named.append(filled(entry["andMore"], {"count": len(pairs) - MOST_PAGES_NAMED}))
+    extra = {
+        "page": pairs[0].get("to", "") if pairs else "",
+        "count": len(pairs),
+        "links": ", ".join(named),
+    }
+    return finding(
+        "linksIntoHiddenPages", course, section, table,
+        extra_fill=extra,
+        sentence_key="sentence" if len(pairs) == 1 else "sentenceForSeveral",
     )
 
 
@@ -107,14 +201,23 @@ def findings(facts: dict, course: str, section) -> list:
     which is what lets it be tested without building a site. The keys:
 
     * `coverage_wanted`      — is the map switched on for this section?
-    * `curriculum_found`     — did `_find_curriculum_folder` return a folder
-                               that actually holds expectation pages?
+    * `curriculum_found`     — did `_find_curriculum_folders` find at least
+                               one folder that actually holds expectation
+                               pages?
     * `class_pages_found`    — did the section have any class pages at all?
     * `graded_folders_found` — does any folder on disk count for marks?
     * `media_target_exists`  — does the COURSE-level `Media` folder exist? Not
                                `content/Media`, which every build recreates.
     * `section_index_exists`
-    * `hand_written_coverage_page`
+    * `hand_written_coverage_page` — the title of the first map whose page
+                               already exists in the teacher's notes, or None
+    * `unreadable_pages`     — [{"page": name in the course folder, "line":
+                               n or None}], the pages hidden because their
+                               settings could not be read (#246)
+    * `front_page_unreadable` — is the section's front page one of them?
+    * `links_into_hidden_pages` — [{"from": page, "to": page}], each a link on
+                               a page students can see to one they cannot,
+                               by place in the course folder (#333)
     """
     table = _checks_by_name()
     found = []
@@ -151,8 +254,24 @@ def findings(facts: dict, course: str, section) -> list:
     if not facts.get("section_index_exists"):
         found.append(finding("sectionIndexMissing", course, section, table))
 
-    if facts.get("hand_written_coverage_page"):
-        found.append(finding("handWrittenCoveragePage", course, section, table))
+    # The title of the map the teacher's own page is about to be overwritten
+    # by (#128: a course can have several maps, each with its own title). An
+    # older caller's True still means the one title there used to be.
+    hand_written = facts.get("hand_written_coverage_page")
+    if hand_written:
+        page = hand_written if isinstance(hand_written, str) else "Curriculum Coverage"
+        found.append(finding("handWrittenCoveragePage", course, section, table,
+                             extra_fill={"page": page}))
+
+    # LAST, so the findings above keep their places — the contract's marker
+    # examples and #153's console cases are captured in this order.
+    if facts.get("unreadable_pages"):
+        found.append(unreadable_settings_finding(facts, course, section, table))
+
+    # After everything above, for the same reason: the existing examples keep
+    # their order (#333).
+    if facts.get("links_into_hidden_pages"):
+        found.append(links_into_hidden_pages_finding(facts, course, section, table))
 
     return found
 

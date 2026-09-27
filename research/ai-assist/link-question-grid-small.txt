@@ -1,0 +1,604 @@
+### date-appended=False date-prepended=False real-course=False
+### prompt=shipped temperature=0.0 app-body=True trials=1 course=EXC2O
+### max_tokens=512 (read from mac-app/QuartzTeachers/Models/Assist/AssistModelClient.swift)
+### em-dashes in the shipped literal, folded for the hyphen form: 6
+### deploy-at-a-time guard agrees with 144 contract rows
+### hide-is-unpublish guard agrees with 33 contract rows
+### intercepted in code before the model (6 of 29 probes): card: publish tomorrow -> publish_class_on, card: unpublish by name -> unpublish_pages, card: check the section -> check_section, card: rebuild preview -> rebuild_preview, card: undo -> undo_last_change, card: deploy now -> deploy_section
+small	VVH2O	2026-09-21	verbatim #167	check_section
+small	VVH2O	2026-09-21	quoted, bare	check_section
+small	VVH2O	2026-09-21	unquoted, bare	check_section
+small	VVH2O	2026-09-21	which pages	check_section
+small	VVH2O	2026-09-21	what links are on	check_section
+small	VVH2O	2026-09-21	links from	check_section
+small	VVH2O	2026-09-21	where does it point	check_section
+small	VVH2O	2026-09-22	verbatim #167	check_section
+small	VVH2O	2026-09-22	quoted, bare	read_page
+small	VVH2O	2026-09-22	unquoted, bare	check_section
+small	VVH2O	2026-09-22	which pages	check_section
+small	VVH2O	2026-09-22	what links are on	check_section
+small	VVH2O	2026-09-22	links from	check_section
+small	VVH2O	2026-09-22	where does it point	check_section
+small	VVH2O	2026-09-23	verbatim #167	check_section
+small	VVH2O	2026-09-23	quoted, bare	read_page
+small	VVH2O	2026-09-23	unquoted, bare	check_section
+small	VVH2O	2026-09-23	which pages	check_section
+small	VVH2O	2026-09-23	what links are on	check_section
+small	VVH2O	2026-09-23	links from	check_section
+small	VVH2O	2026-09-23	where does it point	check_section
+small	VVH2O	2026-09-24	verbatim #167	check_section
+small	VVH2O	2026-09-24	quoted, bare	read_page
+small	VVH2O	2026-09-24	unquoted, bare	check_section
+small	VVH2O	2026-09-24	which pages	check_section
+small	VVH2O	2026-09-24	what links are on	check_section
+small	VVH2O	2026-09-24	links from	check_section
+small	VVH2O	2026-09-24	where does it point	check_section
+small	VVH2O	2026-09-25	verbatim #167	check_section
+small	VVH2O	2026-09-25	quoted, bare	check_section
+small	VVH2O	2026-09-25	unquoted, bare	check_section
+small	VVH2O	2026-09-25	which pages	check_section
+small	VVH2O	2026-09-25	what links are on	check_section
+small	VVH2O	2026-09-25	links from	check_section
+small	VVH2O	2026-09-25	where does it point	check_section
+small	VVH2O	2026-09-26	verbatim #167	check_section
+small	VVH2O	2026-09-26	quoted, bare	read_page
+small	VVH2O	2026-09-26	unquoted, bare	check_section
+small	VVH2O	2026-09-26	which pages	check_section
+small	VVH2O	2026-09-26	what links are on	check_section
+small	VVH2O	2026-09-26	links from	check_section
+small	VVH2O	2026-09-26	where does it point	check_section
+small	VVH2O	2026-09-27	verbatim #167	check_section
+small	VVH2O	2026-09-27	quoted, bare	check_section
+small	VVH2O	2026-09-27	unquoted, bare	check_section
+small	VVH2O	2026-09-27	which pages	check_section
+small	VVH2O	2026-09-27	what links are on	check_section
+small	VVH2O	2026-09-27	links from	check_section
+small	VVH2O	2026-09-27	where does it point	check_section
+small	VVH2O	2026-09-28	verbatim #167	check_section
+small	VVH2O	2026-09-28	quoted, bare	check_section
+small	VVH2O	2026-09-28	unquoted, bare	check_section
+small	VVH2O	2026-09-28	which pages	check_section
+small	VVH2O	2026-09-28	what links are on	check_section
+small	VVH2O	2026-09-28	links from	check_section
+small	VVH2O	2026-09-28	where does it point	check_section
+small	VVH2O	2026-09-29	verbatim #167	check_section
+small	VVH2O	2026-09-29	quoted, bare	read_page
+small	VVH2O	2026-09-29	unquoted, bare	check_section
+small	VVH2O	2026-09-29	which pages	check_section
+small	VVH2O	2026-09-29	what links are on	check_section
+small	VVH2O	2026-09-29	links from	check_section
+small	VVH2O	2026-09-29	where does it point	check_section
+small	VVH2O	2026-09-30	verbatim #167	check_section
+small	VVH2O	2026-09-30	quoted, bare	read_page
+small	VVH2O	2026-09-30	unquoted, bare	check_section
+small	VVH2O	2026-09-30	which pages	check_section
+small	VVH2O	2026-09-30	what links are on	check_section
+small	VVH2O	2026-09-30	links from	check_section
+small	VVH2O	2026-09-30	where does it point	check_section
+small	VVH2O	2026-10-01	verbatim #167	check_section
+small	VVH2O	2026-10-01	quoted, bare	read_page
+small	VVH2O	2026-10-01	unquoted, bare	check_section
+small	VVH2O	2026-10-01	which pages	check_section
+small	VVH2O	2026-10-01	what links are on	check_section
+small	VVH2O	2026-10-01	links from	check_section
+small	VVH2O	2026-10-01	where does it point	check_section
+small	VVH2O	2026-10-02	verbatim #167	check_section
+small	VVH2O	2026-10-02	quoted, bare	check_section
+small	VVH2O	2026-10-02	unquoted, bare	check_section
+small	VVH2O	2026-10-02	which pages	check_section
+small	VVH2O	2026-10-02	what links are on	check_section
+small	VVH2O	2026-10-02	links from	check_section
+small	VVH2O	2026-10-02	where does it point	check_section
+small	VVH2O	2026-10-03	verbatim #167	check_section
+small	VVH2O	2026-10-03	quoted, bare	read_page
+small	VVH2O	2026-10-03	unquoted, bare	check_section
+small	VVH2O	2026-10-03	which pages	check_section
+small	VVH2O	2026-10-03	what links are on	check_section
+small	VVH2O	2026-10-03	links from	check_section
+small	VVH2O	2026-10-03	where does it point	check_section
+small	VVH2O	2026-10-04	verbatim #167	check_section
+small	VVH2O	2026-10-04	quoted, bare	check_section
+small	VVH2O	2026-10-04	unquoted, bare	check_section
+small	VVH2O	2026-10-04	which pages	check_section
+small	VVH2O	2026-10-04	what links are on	check_section
+small	VVH2O	2026-10-04	links from	check_section
+small	VVH2O	2026-10-04	where does it point	check_section
+small	EXC2O	2026-09-21	verbatim #167	check_section
+small	EXC2O	2026-09-21	quoted, bare	check_section
+small	EXC2O	2026-09-21	unquoted, bare	check_section
+small	EXC2O	2026-09-21	which pages	check_section
+small	EXC2O	2026-09-21	what links are on	check_section
+small	EXC2O	2026-09-21	links from	check_section
+small	EXC2O	2026-09-21	where does it point	check_section
+small	EXC2O	2026-09-22	verbatim #167	read_page
+small	EXC2O	2026-09-22	quoted, bare	read_page
+small	EXC2O	2026-09-22	unquoted, bare	check_section
+small	EXC2O	2026-09-22	which pages	check_section
+small	EXC2O	2026-09-22	what links are on	check_section
+small	EXC2O	2026-09-22	links from	check_section
+small	EXC2O	2026-09-22	where does it point	check_section
+small	EXC2O	2026-09-23	verbatim #167	read_page
+small	EXC2O	2026-09-23	quoted, bare	read_page
+small	EXC2O	2026-09-23	unquoted, bare	check_section
+small	EXC2O	2026-09-23	which pages	check_section
+small	EXC2O	2026-09-23	what links are on	check_section
+small	EXC2O	2026-09-23	links from	check_section
+small	EXC2O	2026-09-23	where does it point	check_section
+small	EXC2O	2026-09-24	verbatim #167	read_page
+small	EXC2O	2026-09-24	quoted, bare	read_page
+small	EXC2O	2026-09-24	unquoted, bare	check_section
+small	EXC2O	2026-09-24	which pages	check_section
+small	EXC2O	2026-09-24	what links are on	check_section
+small	EXC2O	2026-09-24	links from	check_section
+small	EXC2O	2026-09-24	where does it point	check_section
+small	EXC2O	2026-09-25	verbatim #167	check_section
+small	EXC2O	2026-09-25	quoted, bare	check_section
+small	EXC2O	2026-09-25	unquoted, bare	check_section
+small	EXC2O	2026-09-25	which pages	check_section
+small	EXC2O	2026-09-25	what links are on	check_section
+small	EXC2O	2026-09-25	links from	check_section
+small	EXC2O	2026-09-25	where does it point	check_section
+small	EXC2O	2026-09-26	verbatim #167	read_page
+small	EXC2O	2026-09-26	quoted, bare	read_page
+small	EXC2O	2026-09-26	unquoted, bare	check_section
+small	EXC2O	2026-09-26	which pages	check_section
+small	EXC2O	2026-09-26	what links are on	check_section
+small	EXC2O	2026-09-26	links from	check_section
+small	EXC2O	2026-09-26	where does it point	check_section
+small	EXC2O	2026-09-27	verbatim #167	read_page
+small	EXC2O	2026-09-27	quoted, bare	read_page
+small	EXC2O	2026-09-27	unquoted, bare	check_section
+small	EXC2O	2026-09-27	which pages	check_section
+small	EXC2O	2026-09-27	what links are on	check_section
+small	EXC2O	2026-09-27	links from	check_section
+small	EXC2O	2026-09-27	where does it point	check_section
+small	EXC2O	2026-09-28	verbatim #167	check_section
+small	EXC2O	2026-09-28	quoted, bare	check_section
+small	EXC2O	2026-09-28	unquoted, bare	check_section
+small	EXC2O	2026-09-28	which pages	check_section
+small	EXC2O	2026-09-28	what links are on	check_section
+small	EXC2O	2026-09-28	links from	check_section
+small	EXC2O	2026-09-28	where does it point	check_section
+small	EXC2O	2026-09-29	verbatim #167	read_page
+small	EXC2O	2026-09-29	quoted, bare	read_page
+small	EXC2O	2026-09-29	unquoted, bare	check_section
+small	EXC2O	2026-09-29	which pages	check_section
+small	EXC2O	2026-09-29	what links are on	check_section
+small	EXC2O	2026-09-29	links from	check_section
+small	EXC2O	2026-09-29	where does it point	check_section
+small	EXC2O	2026-09-30	verbatim #167	read_page
+small	EXC2O	2026-09-30	quoted, bare	read_page
+small	EXC2O	2026-09-30	unquoted, bare	check_section
+small	EXC2O	2026-09-30	which pages	check_section
+small	EXC2O	2026-09-30	what links are on	check_section
+small	EXC2O	2026-09-30	links from	check_section
+small	EXC2O	2026-09-30	where does it point	check_section
+small	EXC2O	2026-10-01	verbatim #167	read_page
+small	EXC2O	2026-10-01	quoted, bare	read_page
+small	EXC2O	2026-10-01	unquoted, bare	check_section
+small	EXC2O	2026-10-01	which pages	check_section
+small	EXC2O	2026-10-01	what links are on	check_section
+small	EXC2O	2026-10-01	links from	check_section
+small	EXC2O	2026-10-01	where does it point	check_section
+small	EXC2O	2026-10-02	verbatim #167	check_section
+small	EXC2O	2026-10-02	quoted, bare	check_section
+small	EXC2O	2026-10-02	unquoted, bare	check_section
+small	EXC2O	2026-10-02	which pages	check_section
+small	EXC2O	2026-10-02	what links are on	check_section
+small	EXC2O	2026-10-02	links from	check_section
+small	EXC2O	2026-10-02	where does it point	check_section
+small	EXC2O	2026-10-03	verbatim #167	read_page
+small	EXC2O	2026-10-03	quoted, bare	read_page
+small	EXC2O	2026-10-03	unquoted, bare	check_section
+small	EXC2O	2026-10-03	which pages	check_section
+small	EXC2O	2026-10-03	what links are on	check_section
+small	EXC2O	2026-10-03	links from	check_section
+small	EXC2O	2026-10-03	where does it point	check_section
+small	EXC2O	2026-10-04	verbatim #167	read_page
+small	EXC2O	2026-10-04	quoted, bare	read_page
+small	EXC2O	2026-10-04	unquoted, bare	check_section
+small	EXC2O	2026-10-04	which pages	check_section
+small	EXC2O	2026-10-04	what links are on	check_section
+small	EXC2O	2026-10-04	links from	check_section
+small	EXC2O	2026-10-04	where does it point	check_section
+small	ICS3U	2026-09-21	verbatim #167	check_section
+small	ICS3U	2026-09-21	quoted, bare	check_section
+small	ICS3U	2026-09-21	unquoted, bare	check_section
+small	ICS3U	2026-09-21	which pages	publish_pages
+small	ICS3U	2026-09-21	what links are on	check_section
+small	ICS3U	2026-09-21	links from	check_section
+small	ICS3U	2026-09-21	where does it point	check_section
+small	ICS3U	2026-09-22	verbatim #167	read_page
+small	ICS3U	2026-09-22	quoted, bare	read_page
+small	ICS3U	2026-09-22	unquoted, bare	check_section
+small	ICS3U	2026-09-22	which pages	publish_pages
+small	ICS3U	2026-09-22	what links are on	check_section
+small	ICS3U	2026-09-22	links from	check_section
+small	ICS3U	2026-09-22	where does it point	check_section
+small	ICS3U	2026-09-23	verbatim #167	read_page
+small	ICS3U	2026-09-23	quoted, bare	read_page
+small	ICS3U	2026-09-23	unquoted, bare	check_section
+small	ICS3U	2026-09-23	which pages	publish_pages
+small	ICS3U	2026-09-23	what links are on	check_section
+small	ICS3U	2026-09-23	links from	check_section
+small	ICS3U	2026-09-23	where does it point	check_section
+small	ICS3U	2026-09-24	verbatim #167	read_page
+small	ICS3U	2026-09-24	quoted, bare	read_page
+small	ICS3U	2026-09-24	unquoted, bare	check_section
+small	ICS3U	2026-09-24	which pages	publish_pages
+small	ICS3U	2026-09-24	what links are on	check_section
+small	ICS3U	2026-09-24	links from	check_section
+small	ICS3U	2026-09-24	where does it point	check_section
+small	ICS3U	2026-09-25	verbatim #167	check_section
+small	ICS3U	2026-09-25	quoted, bare	check_section
+small	ICS3U	2026-09-25	unquoted, bare	check_section
+small	ICS3U	2026-09-25	which pages	publish_pages
+small	ICS3U	2026-09-25	what links are on	check_section
+small	ICS3U	2026-09-25	links from	check_section
+small	ICS3U	2026-09-25	where does it point	check_section
+small	ICS3U	2026-09-26	verbatim #167	read_page
+small	ICS3U	2026-09-26	quoted, bare	read_page
+small	ICS3U	2026-09-26	unquoted, bare	check_section
+small	ICS3U	2026-09-26	which pages	publish_pages
+small	ICS3U	2026-09-26	what links are on	check_section
+small	ICS3U	2026-09-26	links from	check_section
+small	ICS3U	2026-09-26	where does it point	check_section
+small	ICS3U	2026-09-27	verbatim #167	read_page
+small	ICS3U	2026-09-27	quoted, bare	read_page
+small	ICS3U	2026-09-27	unquoted, bare	check_section
+small	ICS3U	2026-09-27	which pages	publish_pages
+small	ICS3U	2026-09-27	what links are on	check_section
+small	ICS3U	2026-09-27	links from	check_section
+small	ICS3U	2026-09-27	where does it point	check_section
+small	ICS3U	2026-09-28	verbatim #167	check_section
+small	ICS3U	2026-09-28	quoted, bare	check_section
+small	ICS3U	2026-09-28	unquoted, bare	check_section
+small	ICS3U	2026-09-28	which pages	publish_pages
+small	ICS3U	2026-09-28	what links are on	check_section
+small	ICS3U	2026-09-28	links from	check_section
+small	ICS3U	2026-09-28	where does it point	check_section
+small	ICS3U	2026-09-29	verbatim #167	read_page
+small	ICS3U	2026-09-29	quoted, bare	read_page
+small	ICS3U	2026-09-29	unquoted, bare	check_section
+small	ICS3U	2026-09-29	which pages	publish_pages
+small	ICS3U	2026-09-29	what links are on	check_section
+small	ICS3U	2026-09-29	links from	check_section
+small	ICS3U	2026-09-29	where does it point	check_section
+small	ICS3U	2026-09-30	verbatim #167	read_page
+small	ICS3U	2026-09-30	quoted, bare	read_page
+small	ICS3U	2026-09-30	unquoted, bare	check_section
+small	ICS3U	2026-09-30	which pages	publish_pages
+small	ICS3U	2026-09-30	what links are on	check_section
+small	ICS3U	2026-09-30	links from	check_section
+small	ICS3U	2026-09-30	where does it point	check_section
+small	ICS3U	2026-10-01	verbatim #167	read_page
+small	ICS3U	2026-10-01	quoted, bare	read_page
+small	ICS3U	2026-10-01	unquoted, bare	check_section
+small	ICS3U	2026-10-01	which pages	publish_pages
+small	ICS3U	2026-10-01	what links are on	check_section
+small	ICS3U	2026-10-01	links from	check_section
+small	ICS3U	2026-10-01	where does it point	check_section
+small	ICS3U	2026-10-02	verbatim #167	check_section
+small	ICS3U	2026-10-02	quoted, bare	check_section
+small	ICS3U	2026-10-02	unquoted, bare	check_section
+small	ICS3U	2026-10-02	which pages	publish_pages
+small	ICS3U	2026-10-02	what links are on	check_section
+small	ICS3U	2026-10-02	links from	check_section
+small	ICS3U	2026-10-02	where does it point	check_section
+small	ICS3U	2026-10-03	verbatim #167	read_page
+small	ICS3U	2026-10-03	quoted, bare	read_page
+small	ICS3U	2026-10-03	unquoted, bare	check_section
+small	ICS3U	2026-10-03	which pages	publish_pages
+small	ICS3U	2026-10-03	what links are on	check_section
+small	ICS3U	2026-10-03	links from	check_section
+small	ICS3U	2026-10-03	where does it point	check_section
+small	ICS3U	2026-10-04	verbatim #167	check_section
+small	ICS3U	2026-10-04	quoted, bare	check_section
+small	ICS3U	2026-10-04	unquoted, bare	check_section
+small	ICS3U	2026-10-04	which pages	publish_pages
+small	ICS3U	2026-10-04	what links are on	check_section
+small	ICS3U	2026-10-04	links from	check_section
+small	ICS3U	2026-10-04	where does it point	check_section
+small	SPH3U	2026-09-21	verbatim #167	read_page
+small	SPH3U	2026-09-21	quoted, bare	read_page
+small	SPH3U	2026-09-21	unquoted, bare	check_section
+small	SPH3U	2026-09-21	which pages	publish_pages
+small	SPH3U	2026-09-21	what links are on	check_section
+small	SPH3U	2026-09-21	links from	check_section
+small	SPH3U	2026-09-21	where does it point	check_section
+small	SPH3U	2026-09-22	verbatim #167	read_page
+small	SPH3U	2026-09-22	quoted, bare	read_page
+small	SPH3U	2026-09-22	unquoted, bare	check_section
+small	SPH3U	2026-09-22	which pages	publish_pages
+small	SPH3U	2026-09-22	what links are on	check_section
+small	SPH3U	2026-09-22	links from	check_section
+small	SPH3U	2026-09-22	where does it point	check_section
+small	SPH3U	2026-09-23	verbatim #167	read_page
+small	SPH3U	2026-09-23	quoted, bare	read_page
+small	SPH3U	2026-09-23	unquoted, bare	check_section
+small	SPH3U	2026-09-23	which pages	publish_pages
+small	SPH3U	2026-09-23	what links are on	check_section
+small	SPH3U	2026-09-23	links from	check_section
+small	SPH3U	2026-09-23	where does it point	check_section
+small	SPH3U	2026-09-24	verbatim #167	read_page
+small	SPH3U	2026-09-24	quoted, bare	read_page
+small	SPH3U	2026-09-24	unquoted, bare	check_section
+small	SPH3U	2026-09-24	which pages	publish_pages
+small	SPH3U	2026-09-24	what links are on	check_section
+small	SPH3U	2026-09-24	links from	check_section
+small	SPH3U	2026-09-24	where does it point	check_section
+small	SPH3U	2026-09-25	verbatim #167	read_page
+small	SPH3U	2026-09-25	quoted, bare	read_page
+small	SPH3U	2026-09-25	unquoted, bare	check_section
+small	SPH3U	2026-09-25	which pages	publish_pages
+small	SPH3U	2026-09-25	what links are on	check_section
+small	SPH3U	2026-09-25	links from	check_section
+small	SPH3U	2026-09-25	where does it point	check_section
+small	SPH3U	2026-09-26	verbatim #167	read_page
+small	SPH3U	2026-09-26	quoted, bare	read_page
+small	SPH3U	2026-09-26	unquoted, bare	check_section
+small	SPH3U	2026-09-26	which pages	publish_pages
+small	SPH3U	2026-09-26	what links are on	check_section
+small	SPH3U	2026-09-26	links from	check_section
+small	SPH3U	2026-09-26	where does it point	check_section
+small	SPH3U	2026-09-27	verbatim #167	read_page
+small	SPH3U	2026-09-27	quoted, bare	read_page
+small	SPH3U	2026-09-27	unquoted, bare	check_section
+small	SPH3U	2026-09-27	which pages	publish_pages
+small	SPH3U	2026-09-27	what links are on	check_section
+small	SPH3U	2026-09-27	links from	check_section
+small	SPH3U	2026-09-27	where does it point	check_section
+small	SPH3U	2026-09-28	verbatim #167	read_page
+small	SPH3U	2026-09-28	quoted, bare	read_page
+small	SPH3U	2026-09-28	unquoted, bare	check_section
+small	SPH3U	2026-09-28	which pages	publish_pages
+small	SPH3U	2026-09-28	what links are on	check_section
+small	SPH3U	2026-09-28	links from	check_section
+small	SPH3U	2026-09-28	where does it point	check_section
+small	SPH3U	2026-09-29	verbatim #167	read_page
+small	SPH3U	2026-09-29	quoted, bare	read_page
+small	SPH3U	2026-09-29	unquoted, bare	check_section
+small	SPH3U	2026-09-29	which pages	publish_pages
+small	SPH3U	2026-09-29	what links are on	check_section
+small	SPH3U	2026-09-29	links from	check_section
+small	SPH3U	2026-09-29	where does it point	check_section
+small	SPH3U	2026-09-30	verbatim #167	read_page
+small	SPH3U	2026-09-30	quoted, bare	read_page
+small	SPH3U	2026-09-30	unquoted, bare	check_section
+small	SPH3U	2026-09-30	which pages	publish_pages
+small	SPH3U	2026-09-30	what links are on	check_section
+small	SPH3U	2026-09-30	links from	check_section
+small	SPH3U	2026-09-30	where does it point	check_section
+small	SPH3U	2026-10-01	verbatim #167	read_page
+small	SPH3U	2026-10-01	quoted, bare	read_page
+small	SPH3U	2026-10-01	unquoted, bare	check_section
+small	SPH3U	2026-10-01	which pages	publish_pages
+small	SPH3U	2026-10-01	what links are on	check_section
+small	SPH3U	2026-10-01	links from	check_section
+small	SPH3U	2026-10-01	where does it point	check_section
+small	SPH3U	2026-10-02	verbatim #167	check_section
+small	SPH3U	2026-10-02	quoted, bare	check_section
+small	SPH3U	2026-10-02	unquoted, bare	check_section
+small	SPH3U	2026-10-02	which pages	publish_pages
+small	SPH3U	2026-10-02	what links are on	check_section
+small	SPH3U	2026-10-02	links from	check_section
+small	SPH3U	2026-10-02	where does it point	check_section
+small	SPH3U	2026-10-03	verbatim #167	read_page
+small	SPH3U	2026-10-03	quoted, bare	read_page
+small	SPH3U	2026-10-03	unquoted, bare	check_section
+small	SPH3U	2026-10-03	which pages	publish_pages
+small	SPH3U	2026-10-03	what links are on	check_section
+small	SPH3U	2026-10-03	links from	check_section
+small	SPH3U	2026-10-03	where does it point	check_section
+small	SPH3U	2026-10-04	verbatim #167	read_page
+small	SPH3U	2026-10-04	quoted, bare	read_page
+small	SPH3U	2026-10-04	unquoted, bare	check_section
+small	SPH3U	2026-10-04	which pages	publish_pages
+small	SPH3U	2026-10-04	what links are on	check_section
+small	SPH3U	2026-10-04	links from	check_section
+small	SPH3U	2026-10-04	where does it point	check_section
+small	MPM2D	2026-09-21	verbatim #167	read_page
+small	MPM2D	2026-09-21	quoted, bare	check_section
+small	MPM2D	2026-09-21	unquoted, bare	check_section
+small	MPM2D	2026-09-21	which pages	check_section
+small	MPM2D	2026-09-21	what links are on	check_section
+small	MPM2D	2026-09-21	links from	check_section
+small	MPM2D	2026-09-21	where does it point	check_section
+small	MPM2D	2026-09-22	verbatim #167	read_page
+small	MPM2D	2026-09-22	quoted, bare	read_page
+small	MPM2D	2026-09-22	unquoted, bare	check_section
+small	MPM2D	2026-09-22	which pages	check_section
+small	MPM2D	2026-09-22	what links are on	check_section
+small	MPM2D	2026-09-22	links from	check_section
+small	MPM2D	2026-09-22	where does it point	check_section
+small	MPM2D	2026-09-23	verbatim #167	read_page
+small	MPM2D	2026-09-23	quoted, bare	read_page
+small	MPM2D	2026-09-23	unquoted, bare	check_section
+small	MPM2D	2026-09-23	which pages	publish_pages
+small	MPM2D	2026-09-23	what links are on	check_section
+small	MPM2D	2026-09-23	links from	check_section
+small	MPM2D	2026-09-23	where does it point	check_section
+small	MPM2D	2026-09-24	verbatim #167	read_page
+small	MPM2D	2026-09-24	quoted, bare	read_page
+small	MPM2D	2026-09-24	unquoted, bare	check_section
+small	MPM2D	2026-09-24	which pages	check_section
+small	MPM2D	2026-09-24	what links are on	check_section
+small	MPM2D	2026-09-24	links from	check_section
+small	MPM2D	2026-09-24	where does it point	check_section
+small	MPM2D	2026-09-25	verbatim #167	check_section
+small	MPM2D	2026-09-25	quoted, bare	check_section
+small	MPM2D	2026-09-25	unquoted, bare	check_section
+small	MPM2D	2026-09-25	which pages	publish_pages
+small	MPM2D	2026-09-25	what links are on	check_section
+small	MPM2D	2026-09-25	links from	check_section
+small	MPM2D	2026-09-25	where does it point	check_section
+small	MPM2D	2026-09-26	verbatim #167	read_page
+small	MPM2D	2026-09-26	quoted, bare	read_page
+small	MPM2D	2026-09-26	unquoted, bare	check_section
+small	MPM2D	2026-09-26	which pages	check_section
+small	MPM2D	2026-09-26	what links are on	check_section
+small	MPM2D	2026-09-26	links from	check_section
+small	MPM2D	2026-09-26	where does it point	check_section
+small	MPM2D	2026-09-27	verbatim #167	read_page
+small	MPM2D	2026-09-27	quoted, bare	read_page
+small	MPM2D	2026-09-27	unquoted, bare	check_section
+small	MPM2D	2026-09-27	which pages	check_section
+small	MPM2D	2026-09-27	what links are on	check_section
+small	MPM2D	2026-09-27	links from	check_section
+small	MPM2D	2026-09-27	where does it point	check_section
+small	MPM2D	2026-09-28	verbatim #167	read_page
+small	MPM2D	2026-09-28	quoted, bare	check_section
+small	MPM2D	2026-09-28	unquoted, bare	check_section
+small	MPM2D	2026-09-28	which pages	check_section
+small	MPM2D	2026-09-28	what links are on	check_section
+small	MPM2D	2026-09-28	links from	check_section
+small	MPM2D	2026-09-28	where does it point	check_section
+small	MPM2D	2026-09-29	verbatim #167	read_page
+small	MPM2D	2026-09-29	quoted, bare	read_page
+small	MPM2D	2026-09-29	unquoted, bare	check_section
+small	MPM2D	2026-09-29	which pages	check_section
+small	MPM2D	2026-09-29	what links are on	check_section
+small	MPM2D	2026-09-29	links from	check_section
+small	MPM2D	2026-09-29	where does it point	check_section
+small	MPM2D	2026-09-30	verbatim #167	read_page
+small	MPM2D	2026-09-30	quoted, bare	read_page
+small	MPM2D	2026-09-30	unquoted, bare	check_section
+small	MPM2D	2026-09-30	which pages	check_section
+small	MPM2D	2026-09-30	what links are on	check_section
+small	MPM2D	2026-09-30	links from	check_section
+small	MPM2D	2026-09-30	where does it point	check_section
+small	MPM2D	2026-10-01	verbatim #167	read_page
+small	MPM2D	2026-10-01	quoted, bare	read_page
+small	MPM2D	2026-10-01	unquoted, bare	check_section
+small	MPM2D	2026-10-01	which pages	check_section
+small	MPM2D	2026-10-01	what links are on	check_section
+small	MPM2D	2026-10-01	links from	check_section
+small	MPM2D	2026-10-01	where does it point	check_section
+small	MPM2D	2026-10-02	verbatim #167	check_section
+small	MPM2D	2026-10-02	quoted, bare	check_section
+small	MPM2D	2026-10-02	unquoted, bare	check_section
+small	MPM2D	2026-10-02	which pages	publish_pages
+small	MPM2D	2026-10-02	what links are on	check_section
+small	MPM2D	2026-10-02	links from	check_section
+small	MPM2D	2026-10-02	where does it point	check_section
+small	MPM2D	2026-10-03	verbatim #167	read_page
+small	MPM2D	2026-10-03	quoted, bare	read_page
+small	MPM2D	2026-10-03	unquoted, bare	check_section
+small	MPM2D	2026-10-03	which pages	check_section
+small	MPM2D	2026-10-03	what links are on	check_section
+small	MPM2D	2026-10-03	links from	check_section
+small	MPM2D	2026-10-03	where does it point	check_section
+small	MPM2D	2026-10-04	verbatim #167	read_page
+small	MPM2D	2026-10-04	quoted, bare	read_page
+small	MPM2D	2026-10-04	unquoted, bare	check_section
+small	MPM2D	2026-10-04	which pages	check_section
+small	MPM2D	2026-10-04	what links are on	check_section
+small	MPM2D	2026-10-04	links from	check_section
+small	MPM2D	2026-10-04	where does it point	check_section
+small	ENG4U	2026-09-21	verbatim #167	check_section
+small	ENG4U	2026-09-21	quoted, bare	check_section
+small	ENG4U	2026-09-21	unquoted, bare	check_section
+small	ENG4U	2026-09-21	which pages	check_section
+small	ENG4U	2026-09-21	what links are on	check_section
+small	ENG4U	2026-09-21	links from	check_section
+small	ENG4U	2026-09-21	where does it point	check_section
+small	ENG4U	2026-09-22	verbatim #167	read_page
+small	ENG4U	2026-09-22	quoted, bare	read_page
+small	ENG4U	2026-09-22	unquoted, bare	check_section
+small	ENG4U	2026-09-22	which pages	check_section
+small	ENG4U	2026-09-22	what links are on	check_section
+small	ENG4U	2026-09-22	links from	check_section
+small	ENG4U	2026-09-22	where does it point	check_section
+small	ENG4U	2026-09-23	verbatim #167	read_page
+small	ENG4U	2026-09-23	quoted, bare	read_page
+small	ENG4U	2026-09-23	unquoted, bare	check_section
+small	ENG4U	2026-09-23	which pages	check_section
+small	ENG4U	2026-09-23	what links are on	check_section
+small	ENG4U	2026-09-23	links from	check_section
+small	ENG4U	2026-09-23	where does it point	check_section
+small	ENG4U	2026-09-24	verbatim #167	read_page
+small	ENG4U	2026-09-24	quoted, bare	read_page
+small	ENG4U	2026-09-24	unquoted, bare	check_section
+small	ENG4U	2026-09-24	which pages	check_section
+small	ENG4U	2026-09-24	what links are on	check_section
+small	ENG4U	2026-09-24	links from	check_section
+small	ENG4U	2026-09-24	where does it point	check_section
+small	ENG4U	2026-09-25	verbatim #167	check_section
+small	ENG4U	2026-09-25	quoted, bare	check_section
+small	ENG4U	2026-09-25	unquoted, bare	check_section
+small	ENG4U	2026-09-25	which pages	check_section
+small	ENG4U	2026-09-25	what links are on	check_section
+small	ENG4U	2026-09-25	links from	check_section
+small	ENG4U	2026-09-25	where does it point	check_section
+small	ENG4U	2026-09-26	verbatim #167	read_page
+small	ENG4U	2026-09-26	quoted, bare	read_page
+small	ENG4U	2026-09-26	unquoted, bare	check_section
+small	ENG4U	2026-09-26	which pages	check_section
+small	ENG4U	2026-09-26	what links are on	check_section
+small	ENG4U	2026-09-26	links from	check_section
+small	ENG4U	2026-09-26	where does it point	check_section
+small	ENG4U	2026-09-27	verbatim #167	read_page
+small	ENG4U	2026-09-27	quoted, bare	read_page
+small	ENG4U	2026-09-27	unquoted, bare	check_section
+small	ENG4U	2026-09-27	which pages	check_section
+small	ENG4U	2026-09-27	what links are on	check_section
+small	ENG4U	2026-09-27	links from	check_section
+small	ENG4U	2026-09-27	where does it point	check_section
+small	ENG4U	2026-09-28	verbatim #167	check_section
+small	ENG4U	2026-09-28	quoted, bare	read_page
+small	ENG4U	2026-09-28	unquoted, bare	check_section
+small	ENG4U	2026-09-28	which pages	check_section
+small	ENG4U	2026-09-28	what links are on	check_section
+small	ENG4U	2026-09-28	links from	check_section
+small	ENG4U	2026-09-28	where does it point	check_section
+small	ENG4U	2026-09-29	verbatim #167	read_page
+small	ENG4U	2026-09-29	quoted, bare	read_page
+small	ENG4U	2026-09-29	unquoted, bare	check_section
+small	ENG4U	2026-09-29	which pages	check_section
+small	ENG4U	2026-09-29	what links are on	check_section
+small	ENG4U	2026-09-29	links from	check_section
+small	ENG4U	2026-09-29	where does it point	check_section
+small	ENG4U	2026-09-30	verbatim #167	read_page
+small	ENG4U	2026-09-30	quoted, bare	read_page
+small	ENG4U	2026-09-30	unquoted, bare	check_section
+small	ENG4U	2026-09-30	which pages	check_section
+small	ENG4U	2026-09-30	what links are on	check_section
+small	ENG4U	2026-09-30	links from	check_section
+small	ENG4U	2026-09-30	where does it point	check_section
+small	ENG4U	2026-10-01	verbatim #167	read_page
+small	ENG4U	2026-10-01	quoted, bare	read_page
+small	ENG4U	2026-10-01	unquoted, bare	check_section
+small	ENG4U	2026-10-01	which pages	check_section
+small	ENG4U	2026-10-01	what links are on	check_section
+small	ENG4U	2026-10-01	links from	check_section
+small	ENG4U	2026-10-01	where does it point	check_section
+small	ENG4U	2026-10-02	verbatim #167	check_section
+small	ENG4U	2026-10-02	quoted, bare	check_section
+small	ENG4U	2026-10-02	unquoted, bare	check_section
+small	ENG4U	2026-10-02	which pages	check_section
+small	ENG4U	2026-10-02	what links are on	check_section
+small	ENG4U	2026-10-02	links from	check_section
+small	ENG4U	2026-10-02	where does it point	check_section
+small	ENG4U	2026-10-03	verbatim #167	read_page
+small	ENG4U	2026-10-03	quoted, bare	read_page
+small	ENG4U	2026-10-03	unquoted, bare	check_section
+small	ENG4U	2026-10-03	which pages	check_section
+small	ENG4U	2026-10-03	what links are on	check_section
+small	ENG4U	2026-10-03	links from	check_section
+small	ENG4U	2026-10-03	where does it point	check_section
+small	ENG4U	2026-10-04	verbatim #167	read_page
+small	ENG4U	2026-10-04	quoted, bare	read_page
+small	ENG4U	2026-10-04	unquoted, bare	check_section
+small	ENG4U	2026-10-04	which pages	check_section
+small	ENG4U	2026-10-04	what links are on	check_section
+small	ENG4U	2026-10-04	links from	check_section
+small	ENG4U	2026-10-04	where does it point	check_section
+
+## small: 6 courses x 14 dates (2026-09-21..2026-10-04), one greedy trial per cell
+verbatim #167         54/84  54x read_page, 30x check_section
+quoted, bare          61/84  61x read_page, 23x check_section
+unquoted, bare         0/84  84x check_section
+which pages            0/84  53x check_section, 31x publish_pages
+what links are on      0/84  84x check_section
+links from             0/84  84x check_section
+where does it point    0/84  84x check_section

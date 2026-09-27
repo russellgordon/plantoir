@@ -19,12 +19,40 @@ struct AssistSiteWorkResult {
     /// says through its console, which is already on screen.
     let isAboutTheDestination: Bool
 
+    /// Whether what stopped it was ANOTHER program building or previewing the
+    /// same course (#156). The message is then
+    /// `AssistWording.courseIsBeingBuiltElsewhere`; `AssistToolRunner` swaps
+    /// it for `courseIsBusy` when the one asking is an assistant working from
+    /// another app, since the program that is busy is the one it talks to.
+    let wasBuiltElsewhere: Bool
+
     // MARK: - Initializer
 
-    init(succeeded: Bool, message: String, isAboutTheDestination: Bool = false) {
+    init(
+        succeeded: Bool,
+        message: String,
+        isAboutTheDestination: Bool = false,
+        wasBuiltElsewhere: Bool = false
+    ) {
         self.succeeded = succeeded
         self.message = message
         self.isAboutTheDestination = isAboutTheDestination
+        self.wasBuiltElsewhere = wasBuiltElsewhere
+    }
+
+    // MARK: - Functions
+
+    /// The refusal for a build another program is in the way of — raised as
+    /// the window's alert (`isAboutTheDestination`, the flag the window reads
+    /// for "say this in an alert", as the reference-course refusal uses it:
+    /// the console has nothing to show, because nothing ran).
+    static func builtElsewhere(course: Course) -> AssistSiteWorkResult {
+        return AssistSiteWorkResult(
+            succeeded: false,
+            message: AssistWording.courseIsBeingBuiltElsewhere(course: course.displayCode),
+            isAboutTheDestination: true,
+            wasBuiltElsewhere: true
+        )
     }
 }
 
@@ -91,6 +119,13 @@ final class AssistToolchainWork: AssistSiteWork {
                 succeeded: false, message: AssistToolRefusal.noWorkingFolder.message
             )
         }
+        // Not while a copy of the course is being zipped (#351): a removal
+        // waiting on that zip deletes the folder this would build from.
+        if CourseActivity.courseIsBeingCopied(folderPath: workspaceURL.path, courseCode: course.code) {
+            return AssistSiteWorkResult(
+                succeeded: false, message: AssistWording.courseIsBeingCopied(course: course.code)
+            )
+        }
 
         // Recorded for ⌘Q (issue #232): the delegate cannot see this runner,
         // and a quit in the middle of it is a quit through a preview build.
@@ -104,6 +139,20 @@ final class AssistToolchainWork: AssistSiteWork {
             CourseActivity.endPreviewBuild(
                 folderPath: workspaceURL.path, courseCode: course.code, sectionNumber: sectionNumber
             )
+        }
+
+        // Taken, THEN checked (#156): the `build` lease is on disk from the
+        // line above, and only a lease another program took before it counts,
+        // so two that ask at once cannot both go ahead or both back off. The
+        // backstop on this path, whatever the caller checked first.
+        if let holding = WorkLeaseRegistry.whatBlocksABuild(
+            folderPath: workspaceURL.path, courseCode: course.code, afterTaking: true
+        ) {
+            WorkLeaseRegistry.noteDeclined(
+                act: WorkLeaseRegistry.assistantsAct("rebuild"), courseCode: course.code,
+                sectionNumber: sectionNumber, holding: holding
+            )
+            return AssistSiteWorkResult.builtElsewhere(course: course)
         }
 
         runner = ScriptRunner()
@@ -162,6 +211,12 @@ final class AssistToolchainWork: AssistSiteWork {
                 succeeded: false, message: AssistToolRefusal.noWorkingFolder.message
             )
         }
+        if CourseActivity.courseIsBeingCopied(folderPath: workspaceURL.path, courseCode: course.code) {
+            return AssistSiteWorkResult(
+                succeeded: false,
+                message: AssistWording.courseIsBeingCopied(course: course.code)
+            )
+        }
         if CourseActivity.busyDescription(folderPath: workspaceURL.path, courseCode: course.code) != nil {
             // A whole sentence, not the menu fragment `busyDescription`
             // returns. That string is written to sit under a greyed-out menu
@@ -176,12 +231,43 @@ final class AssistToolchainWork: AssistSiteWork {
 
         let destinations: [CourseConfiguration.DeployDestination] = course.configuration.allDeployDestinations
         let needsBuild: Bool = BuildFreshness.needsRebuild(course: course, sectionNumber: sectionNumber)
+        // `course` here is already the saved copy — #322's reading at the
+        // call — so the deploy follows the file. What an in-app assistant
+        // adds is the SAYING (#335): when a window holds unsaved Course
+        // Settings edits, the conversation is told the deploy used the saved
+        // ones, as the window would be. In-process only: the MCP server is
+        // another process with no window models, so nothing unsaved exists
+        // that it could see, and it says nothing.
+        let notice: String? = SettingsSaveNotice.whenDeployStarts(
+            settingsHaveUnsavedChanges: WorkspaceModel.anyCopyHasUnsavedChanges(configFileURL: course.configFileURL)
+        )
         CourseActivity.beginPublish(
             folderPath: workspaceURL.path, courseCode: course.code, sectionNumber: sectionNumber
         )
         defer {
             CourseActivity.endPublish(
                 folderPath: workspaceURL.path, courseCode: course.code, sectionNumber: sectionNumber
+            )
+        }
+
+        // The same take-then-check as the rebuild above (#156). Synchronous
+        // from the busy check to here, so nothing of this process's own can
+        // have started in between.
+        if let holding = WorkLeaseRegistry.whatBlocksABuild(
+            folderPath: workspaceURL.path, courseCode: course.code, afterTaking: true
+        ) {
+            WorkLeaseRegistry.noteDeclined(
+                act: WorkLeaseRegistry.assistantsAct("deploy"), courseCode: course.code,
+                sectionNumber: sectionNumber, holding: holding
+            )
+            return AssistSiteWorkResult.builtElsewhere(course: course)
+        }
+
+        // Noted once nothing can refuse it any more.
+        if notice != nil {
+            SettingsSaveNotice.noteDeployUsedTheSavedSettings(
+                act: "deployed by the assistant with no section window open",
+                saved: course, windowCourse: nil, sectionNumber: sectionNumber
             )
         }
 
@@ -211,6 +297,7 @@ final class AssistToolchainWork: AssistSiteWork {
             if let runner = deployRunner.legs.first?.runner {
                 message = SiteHealthFinding.appending(to: message, from: runner)
             }
+            message = SettingsSaveNotice.addingTheNotice(notice, to: message)
             return AssistSiteWorkResult(succeeded: false, message: message)
         }
 
@@ -220,14 +307,16 @@ final class AssistToolchainWork: AssistSiteWork {
             destinationCount: destinations.count,
             outcome: deployRunner.outcome
         )
-        guard let runner = deployRunner.legs.first?.runner else {
-            return outcome
-        }
+        var message: String = outcome.message
         // Taken from the FIRST leg: every destination publishes the same built
         // site, so a second leg only repeats the same findings.
+        if let runner = deployRunner.legs.first?.runner {
+            message = SiteHealthFinding.appending(to: message, from: runner)
+        }
+        message = SettingsSaveNotice.addingTheNotice(notice, to: message)
         return AssistSiteWorkResult(
             succeeded: outcome.succeeded,
-            message: SiteHealthFinding.appending(to: outcome.message, from: runner),
+            message: message,
             isAboutTheDestination: outcome.isAboutTheDestination
         )
     }

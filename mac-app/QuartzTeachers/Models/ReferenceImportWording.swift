@@ -144,6 +144,26 @@ nonisolated enum ReferenceImportWording {
         return "\(course) was not imported. \(reason)"
     }
 
+    /// The `{reason}` in `couldNotImport` when the same course is being
+    /// imported somewhere else right now (#245) — in another window on this
+    /// working folder, or by another copy of Plantoir, another account's
+    /// included.
+    ///
+    /// Says only what is true now. It does not promise the course will
+    /// appear, because the other import may yet fail or be stopped; and it
+    /// does not reuse `folderAlreadyExists` ("There is already a course
+    /// folder called…"), which is false while nothing is visible and gives
+    /// advice this sheet cannot act on.
+    static let alreadyBeingImported: String =
+        "It is already being imported in another window, or in another copy of Plantoir."
+
+    /// The `{reason}` in `couldNotImport` when what an earlier, unfinished
+    /// attempt at the same course left behind could not be cleared away, so
+    /// this one was not started (#245). Worded for either way a reference
+    /// course is made, because Keep a Copy for Reference… says it too.
+    static let leftoverInTheWay: String =
+        "Something left behind by an earlier attempt that did not finish could not be cleared away."
+
     /// What "no year" is called in a summary line.
     static let noSchoolYear: String = "no school year"
 
@@ -254,6 +274,15 @@ nonisolated enum ReferenceImportWording {
     /// settings hold a live credential; none of it comes across.
     static let olderLayoutAddOnsAreLeftBehind: String =
         "Obsidian add-ons and their settings are not brought across from older class folders, "
+        + "so nothing in them can publish these pages."
+
+    /// Said under the list and in the summary when a course in the modern
+    /// layout has Obsidian add-ons (#255). True of EVERY route, so when this
+    /// is said the older-layout sentence is not: beside a modern course with
+    /// an add-on, "…from older class folders…" would read as if that one's
+    /// add-ons DID come. `ImportCoursesForReferenceSheet.addOnsNote` chooses.
+    static let addOnsAreLeftBehind: String =
+        "Obsidian add-ons and their settings are not brought across, "
         + "so nothing in them can publish these pages."
 
     // MARK: - The 2024–25 layout (a website folder per class, #256)

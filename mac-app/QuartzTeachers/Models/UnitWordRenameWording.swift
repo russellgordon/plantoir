@@ -74,6 +74,22 @@ nonisolated enum UnitWordRenameWording {
         return "Class pages are named “\(word) 1, Day 1”."
     }
 
+    /// The caption in the course's own SHAPE: a numbered course (#267) has
+    /// no page called “Week 1, Day 1”, so it hears its own.
+    static func rowCaption(naming: ClassPageNaming) -> String {
+        if naming.isNumbered {
+            return "Class pages are named “\(naming.word) 1”, “\(naming.word) 2” and so on."
+        }
+        return rowCaption(word: naming.word)
+    }
+
+    /// Under a numbered course's word, beside a disabled Rename… button:
+    /// a club's words are chosen in the wizard and are not switchable
+    /// afterwards (Russell, 2026-09-24). See `renameLockedNumberedWhy` in
+    /// `contracts/shared-rules.json`.
+    static let renameLockedNumbered: String =
+        "This course numbers its pages one after another, so its word was chosen when the course was made and cannot be renamed here."
+
     /// A rename that stopped part way must be finished with the SAME word.
     /// Any other word would plan from the old word alone, leave the pages
     /// already moved matching neither, and end with three words in one course.

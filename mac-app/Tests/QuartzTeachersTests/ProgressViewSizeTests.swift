@@ -559,6 +559,109 @@ final class ProgressViewSizeTests: XCTestCase {
         XCTAssertEqual(afterDismissing, 720)
         XCTAssertLessThan(withNotice, afterDismissing)
     }
+    // MARK: - The folder note under a notice, with details open
+
+    /// The window's content at a given size, built the way `MainWindowView`
+    /// builds its detail column — the section's column (a scheduled publish's
+    /// notice, then `consoleArea` as `SectionDetailView` builds it: a finished
+    /// folder publish with "Show details" open, over a `Spacer(minLength: 0)`),
+    /// then the synced-folder notice when one is showing, then the path bar —
+    /// and reports the height the folder publish's render note was actually
+    /// DRAWN at (#213).
+    @MainActor
+    func renderNoteHeight(
+        width: CGFloat,
+        height: CGFloat,
+        syncedFolderNotice: Bool,
+        syncedFolderDetails: Bool
+    ) -> CGFloat {
+        let drawn: OfferedHeight = OfferedHeight()
+        let outcome: ScheduledPublishOutcome.Stopped = ScheduledPublishOutcome.Stopped(
+            kind: .neededAnAnswer,
+            destination: "Netlify",
+            when: Date(timeIntervalSince1970: 1_758_297_000)
+        )
+        let runner: ScriptRunner = makeFinishedFolderDeployRunner()
+        let syncedFolder: CloudSyncedFolder = CloudSyncedFolder(
+            serviceName: "iCloud Drive",
+            folderPath: "/Users/teacher/Library/Mobile Documents/com~apple~CloudDocs/Course Notes"
+        )
+        let window = VStack(spacing: 0) {
+            VStack(spacing: 0) {
+                ScheduledPublishNoticeView(outcome: outcome, course: "ICS4U", sectionNumber: 1, dismiss: {})
+                ZStack {
+                    VStack(spacing: 0) {
+                        TaskProgressView(
+                            runner: runner,
+                            title: "Deploying ADA1O-S1",
+                            showingDetailsForTesting: true,
+                            reportsRenderNoteHeight: { renderedHeight in
+                                drawn.height = renderedHeight
+                            }
+                        )
+                        Spacer(minLength: 0)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if syncedFolderNotice {
+                CloudSyncNoticeContentView(
+                    syncedFolder: syncedFolder,
+                    isShowingDetails: .constant(syncedFolderDetails),
+                    dismiss: {}
+                )
+            }
+            Divider()
+            Color.clear
+                .frame(height: WindowChrome.pathBarHeight)
+        }
+        let hostingView: NSHostingView = NSHostingView(rootView: AnyView(window))
+        hostingView.frame = NSRect(x: 0, y: 0, width: width, height: height)
+        hostingView.layoutSubtreeIfNeeded()
+        // `onGeometryChange` reports after the layout pass, on the next turn.
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.05))
+        hostingView.layoutSubtreeIfNeeded()
+        return drawn.height
+    }
+
+    /// The folder publish's note keeps every line at the narrowest section
+    /// column the window allows (#213) — a scheduled publish's notice
+    /// showing, "Show details" open, with the synced-folder notice absent,
+    /// showing, and showing its details.
+    ///
+    /// The width is `WindowChrome.narrowestDetailColumn`: the window's
+    /// minimum less the sidebar's MAXIMUM, which is what makes a narrower
+    /// column unreachable (`SidebarWidthTests` proves the maximum holds).
+    /// Measured before the cap, 2026-09-26: red at 200 wide — reachable then
+    /// by dragging the sidebar to 700 — with the synced-folder notice
+    /// showing. The console is deliberately unchanged; see
+    /// `WindowChrome.sidebarMaximumWidth` for the console fix that was
+    /// measured worse.
+    @MainActor
+    func testTheFolderNoteKeepsEveryLineAtEveryColumnTheWindowAllows() {
+        let width: CGFloat = WindowChrome.narrowestDetailColumn
+        let withRoomToSpare: CGFloat = renderNoteHeight(
+            width: width, height: 1400, syncedFolderNotice: false, syncedFolderDetails: false
+        )
+        XCTAssertGreaterThan(withRoomToSpare, 0, "the note was never drawn — the test is measuring nothing")
+        var problems: [String] = []
+        for (notice, details) in [(false, false), (true, false), (true, true)] {
+            let atTheSmallestWindow: CGFloat = renderNoteHeight(
+                width: width, height: WindowChrome.minimumWindowHeight,
+                syncedFolderNotice: notice, syncedFolderDetails: details
+            )
+            if atTheSmallestWindow < withRoomToSpare {
+                problems.append(
+                    "\(Int(width)) wide, synced-folder notice \(notice ? (details ? "with details" : "showing") : "absent"): "
+                        + "\(atTheSmallestWindow) points of \(withRoomToSpare)"
+                )
+            }
+        }
+        XCTAssertTrue(
+            problems.isEmpty,
+            "The folder note lost a line at the smallest window: " + problems.joined(separator: "; ")
+        )
+    }
 }
 
 /// Somewhere to put the height the stand-in was offered.

@@ -18,7 +18,24 @@ the mac calls this file — its launchd agent launches the app binary itself,
 so it fingerprints in Swift, in-process, and never needed a Python copy.
 
 Usage:
-    python.exe section_fingerprint.py <course_directory> <section_number> [exclude ...]
+    python.exe section_fingerprint.py [--rule 2] <course_directory> <section_number> [exclude ...]
+
+`--rule` names the fingerprint rule (#330; `contracts/app-rules.json` ->
+`publishedFreshness.fingerprintRules`). Rule 1 is every counted file; rule 2
+is rule 1 less the teacher's How I Teach page at a reserved place (the top of
+the course, or the top of `section<N>/`), which never reaches the site, so
+editing it must not mark a section "— Edited". The stamp records the rule its
+fingerprint was taken under, and a stamp without one means rule 1.
+
+**The default stays rule 1, on purpose.** This file's ONLY caller is Windows'
+scheduled wrapper, whose value the C# app records and later compares under
+ITS rule — rule 1 until the Windows half of #330 lands. A rule-2 value
+compared under rule 1 is a false "— Edited" for every scheduled teacher whose
+course has the page, which is exactly what #330 exists to remove. Windows
+flips the C#, the wrapper (`--rule 2`) and the stamp's `fingerprintRule` in
+one change. `--rule` is read only BEFORE the positional arguments, so an
+exclude path is never mistaken for a flag. For a course with no How I Teach
+page at a reserved place the two rules hash identically.
 
 Excludes are course-relative, forward-slash paths (self-publishing
 destinations that land inside the course's own folder) — see
@@ -32,6 +49,12 @@ import hashlib
 import os
 import re
 import sys
+
+import how_i_teach
+
+# The rules this file can compute, and the one it computes when not told.
+KNOWN_RULES = (1, 2)
+DEFAULT_RULE = 1
 
 IGNORED_FILE_NAMES = {".DS_Store", "Thumbs.db", "course_config.backup.json"}
 IGNORED_FOLDER_NAMES = {"merged_output", "node_modules"}
@@ -55,7 +78,9 @@ def is_excluded(relative_path, excluded):
     return False
 
 
-def counts_toward_fingerprint(relative_path, section_number):
+def counts_toward_fingerprint(relative_path, section_number, rule=DEFAULT_RULE):
+    if rule >= 2 and how_i_teach.is_reserved_place(relative_path):
+        return False
     parts = relative_path.split("/")
     if any(part.startswith(".") for part in parts):
         return False
@@ -100,7 +125,7 @@ def append_file_line(lines, relative_path, physical_path):
     lines.append(f"{relative_path}|{size}|{microseconds}")
 
 
-def walk(course_directory, directory, section_number, excluded, lines, hops_remaining):
+def walk(course_directory, directory, section_number, excluded, lines, hops_remaining, rule=DEFAULT_RULE):
     try:
         entries = list(os.scandir(directory))
     except OSError:
@@ -123,20 +148,21 @@ def walk(course_directory, directory, section_number, excluded, lines, hops_rema
         if is_symlink:
             if hops_remaining <= 0:
                 continue  # one hop only
-            append_symlink(course_directory, entry.path, relative, section_number, excluded, lines)
+            append_symlink(course_directory, entry.path, relative, section_number, excluded, lines, rule)
             continue
 
         if entry.is_dir(follow_symlinks=False):
             if not folder_counts_toward_fingerprint(relative, section_number):
                 continue
-            walk(course_directory, entry.path, section_number, excluded, lines, hops_remaining)
+            walk(course_directory, entry.path, section_number, excluded, lines, hops_remaining, rule)
         elif entry.is_file(follow_symlinks=False):
-            if not counts_toward_fingerprint(relative, section_number):
+            if not counts_toward_fingerprint(relative, section_number, rule):
                 continue
             append_file_line(lines, relative, entry.path)
 
 
-def append_symlink(course_directory, link_path, link_relative, section_number, excluded, lines):
+def append_symlink(course_directory, link_path, link_relative, section_number, excluded, lines,
+                   rule=DEFAULT_RULE):
     """
     Resolves a symlink by hand, ONE hop: a link to a file contributes its
     target's size/date under the LINK's own path; a link to a folder is
@@ -160,17 +186,18 @@ def append_symlink(course_directory, link_path, link_relative, section_number, e
         return
 
     if os.path.isfile(target):
-        if not counts_toward_fingerprint(link_relative, section_number):
+        if not counts_toward_fingerprint(link_relative, section_number, rule):
             return
         append_file_line(lines, link_relative, target)
         return
 
     # A link to a folder: walk it under the LINK's own path prefix, not
     # following any further symlink inside it.
-    walk_under_prefix(target, target, link_relative, section_number, excluded, lines)
+    walk_under_prefix(target, target, link_relative, section_number, excluded, lines, rule)
 
 
-def walk_under_prefix(physical_root, directory, relative_prefix, section_number, excluded, lines):
+def walk_under_prefix(physical_root, directory, relative_prefix, section_number, excluded, lines,
+                      rule=DEFAULT_RULE):
     try:
         entries = list(os.scandir(directory))
     except OSError:
@@ -195,34 +222,50 @@ def walk_under_prefix(physical_root, directory, relative_prefix, section_number,
         if entry.is_dir(follow_symlinks=False):
             if not folder_counts_toward_fingerprint(relative, section_number):
                 continue
-            walk_under_prefix(physical_root, entry.path, relative_prefix, section_number, excluded, lines)
+            walk_under_prefix(physical_root, entry.path, relative_prefix, section_number, excluded, lines, rule)
         elif entry.is_file(follow_symlinks=False):
-            if not counts_toward_fingerprint(relative, section_number):
+            if not counts_toward_fingerprint(relative, section_number, rule):
                 continue
             append_file_line(lines, relative, entry.path)
 
 
-def fingerprint(course_directory, section_number, excluded):
+def fingerprint(course_directory, section_number, excluded, rule=DEFAULT_RULE):
     lines = []
-    walk(course_directory, course_directory, section_number, excluded, lines, hops_remaining=1)
+    walk(course_directory, course_directory, section_number, excluded, lines, hops_remaining=1, rule=rule)
     lines.sort()  # ordinal — Python's default string sort is by code point, matching StringComparer.Ordinal
     joined = "\n".join(lines)
     return hashlib.sha256(joined.encode("utf-8")).hexdigest()
 
 
 def main(argv):
-    if len(argv) < 3:
-        sys.stderr.write("usage: section_fingerprint.py <course_directory> <section_number> [exclude ...]\n")
+    arguments = list(argv[1:])
+    rule = DEFAULT_RULE
+    # Only BEFORE the positional arguments: an exclude path is never a flag.
+    if arguments and arguments[0] == "--rule":
+        if len(arguments) < 2:
+            sys.stderr.write("--rule needs a number\n")
+            return 2
+        try:
+            rule = int(arguments[1])
+        except ValueError:
+            sys.stderr.write(f"not a rule: {arguments[1]}\n")
+            return 2
+        if rule not in KNOWN_RULES:
+            sys.stderr.write(f"not a rule this knows: {rule}\n")
+            return 2
+        arguments = arguments[2:]
+    if len(arguments) < 2:
+        sys.stderr.write("usage: section_fingerprint.py [--rule 2] <course_directory> <section_number> [exclude ...]\n")
         return 2
-    course_directory = argv[1]
+    course_directory = arguments[0]
     try:
-        section_number = int(argv[2])
+        section_number = int(arguments[1])
     except ValueError:
-        sys.stderr.write(f"not a section number: {argv[2]}\n")
+        sys.stderr.write(f"not a section number: {arguments[1]}\n")
         return 2
-    excluded = argv[3:]
+    excluded = arguments[2:]
 
-    print(fingerprint(course_directory, section_number, excluded))
+    print(fingerprint(course_directory, section_number, excluded, rule))
     return 0
 
 

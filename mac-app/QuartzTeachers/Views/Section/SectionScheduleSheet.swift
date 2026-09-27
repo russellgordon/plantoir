@@ -644,7 +644,7 @@ struct SectionSchedulePromptModifier: ViewModifier {
         if request.courseCode != courseCode || request.sectionNumber != sectionNumber {
             return nil
         }
-        if request.workingFolder.path != workingFolder.path {
+        if !FolderIdentity.isSameFolder(request.workingFolder.path, workingFolder.path) {
             return nil
         }
         return request

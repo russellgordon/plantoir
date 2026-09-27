@@ -425,6 +425,34 @@ class TheTwoInstallsTogetherTests(unittest.TestCase):
                                  f"{code}: pages point at expectation pages that are not "
                                  "in the course")
 
+    def test_every_payloads_curriculum_links_resolve_in_a_skeleton_course(self):
+        # Issue #253. Since #251 a teacher who declines the ready-made pages
+        # still gets the payload's Curriculum folder, beside the skeleton's
+        # pages, so a curriculum page that links to a lesson, a task or a
+        # project page of the payload links to nothing in that course. Every
+        # link and embed, in every payload, after the real double install;
+        # code spans and fenced blocks are examples, not links.
+        codes = every_payload_code()
+        self.assertGreaterEqual(len(codes), 38)
+        for code in codes:
+            with self.subTest(code=code):
+                course_path = self.install(code)
+                present = {"index"}
+                for page in course_path.rglob("*.md"):
+                    present.add(page.stem)
+                unresolved = []
+                for page in sorted((course_path / "Curriculum").rglob("*.md")):
+                    text = page.read_text(encoding="utf-8")
+                    without_fences = re.sub(r"(`{3,})[\s\S]*?\1", "", text)
+                    without_code = re.sub(r"`[^`\n]*`", "", without_fences)
+                    for match in LINK_TARGET.finditer(without_code):
+                        target = match.group(1).strip().rstrip("\\").split("/")[-1]
+                        if target not in present:
+                            unresolved.append(f"{page.name}: [[{target}]]")
+                self.assertEqual(unresolved, [],
+                                 f"{code}: a curriculum page links to a page a skeleton "
+                                 "course does not have")
+
     def test_the_two_codes_with_no_A1_1_are_really_the_two(self):
         # The rename rule does nothing for the other 36, and a test that
         # could not tell the difference would pass even if it did nothing
@@ -469,11 +497,17 @@ class ExampleContentIsUnchangedTests(unittest.TestCase):
     same install against that script: 295 files, identical name list,
     identical bytes. Deterministic because the install is given a fixed
     timestamp and no class-date reference.
+
+    Moved ON PURPOSE once since: #331 (2026-09-26) corrected three
+    sentences of the template note in ADA1O's `Tasks/_DUPLICATE ME.md`,
+    which said a link inside a %% comment "still counts as a link". Checked
+    by installing against origin/dev 8c5ff37c and diffing: that one file,
+    those lines, nothing else.
     """
 
     PAYLOAD_FILE_COUNT = 295
     PAYLOAD_NAMES_HASH = "6de9b151539aeb40eae91152641a3c2870d36b9618af02a49aff30e7b516e612"
-    PAYLOAD_CONTENT_HASH = "6a2276dbbedc27c504667ffcbecb7b8f4371f31a23bbc78e50ac553011b277c9"
+    PAYLOAD_CONTENT_HASH = "8800813083c03bc1f24a2ac58a923e58dd596c9e6fda31d73a5ee5253148cf0a"
 
     def test_a_payload_course_is_installed_byte_for_byte_as_it_always_was(self):
         payload = find_example_content_dir("ADA1O")

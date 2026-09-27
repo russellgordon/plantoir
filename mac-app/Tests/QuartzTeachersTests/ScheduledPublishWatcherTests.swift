@@ -88,6 +88,11 @@ final class ScheduledPublishWatcherTests: XCTestCase {
         try super.tearDownWithError()
     }
 
+    /// The working folder the fixture section's records belong to (#237).
+    /// Any fixed id does: the watcher watches the record FOLDER and reads
+    /// nothing from a name.
+    private let folderID: String = "0a1b2c3d"
+
     /// The folder this test's watcher watches.
     private var recordFolder: URL {
         return ScheduledPublishOutcome.directory(inHomeFolder: home)
@@ -101,7 +106,7 @@ final class ScheduledPublishWatcherTests: XCTestCase {
 
     /// What this section's record says, if it can be read at all.
     private func recordForTheFixtureSection() -> ScheduledPublishOutcome.Stopped? {
-        return ScheduledPublishOutcome.stopped(inHomeFolder: home, course: "ZZW1O", section: 1)
+        return ScheduledPublishOutcome.stopped(inHomeFolder: home, course: "ZZW1O", section: 1, folderID: folderID)
     }
 
     /// An expectation that is fulfilled as soon as `condition` holds, re-checked
@@ -148,10 +153,10 @@ final class ScheduledPublishWatcherTests: XCTestCase {
         destination: String
     ) throws {
         let record: URL = ScheduledPublishOutcome.recordURL(
-            inHomeFolder: home, course: "ZZW1O", section: 1
+            inHomeFolder: home, course: "ZZW1O", section: 1, folderID: folderID
         )
         let partial: URL = ScheduledPublishOutcome.partialRecordURL(
-            inHomeFolder: home, course: "ZZW1O", section: 1
+            inHomeFolder: home, course: "ZZW1O", section: 1, folderID: folderID
         )
         try runShell(
             "/bin/mkdir -p '\(recordFolder.path)'; "
@@ -191,7 +196,7 @@ final class ScheduledPublishWatcherTests: XCTestCase {
     func testARecordWrittenInTwoStepsIsNoticedWhenTheSecondLineLands() async throws {
         startWatching()
         let record: URL = ScheduledPublishOutcome.recordURL(
-            inHomeFolder: home, course: "ZZW1O", section: 1
+            inHomeFolder: home, course: "ZZW1O", section: 1, folderID: folderID
         )
 
         let halfArrives: XCTestExpectation = expectation("the half-written record is seen") {
@@ -228,7 +233,7 @@ final class ScheduledPublishWatcherTests: XCTestCase {
         let goesAway: XCTestExpectation = expectation("the cleared record reaches the app") {
             return self.recordForTheFixtureSection() == nil
         }
-        ScheduledPublishOutcome.clear(inHomeFolder: home, course: "ZZW1O", section: 1)
+        ScheduledPublishOutcome.clear(inHomeFolder: home, course: "ZZW1O", section: 1, folderID: folderID)
         await fulfillment(of: [goesAway], timeout: 5)
     }
 

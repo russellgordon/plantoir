@@ -72,7 +72,8 @@ class NewCourseCreator {
                 takesExampleContent: configuration["prepopulate_example_content"] as? Bool ?? false,
                 usesSkeleton: configuration["use_skeleton"] as? Bool ?? false,
                 skeletonSubject: NewCourseCreator.skeletonSubject(forCode: courseCode),
-                withCurriculumPages: configuration["include_curriculum_pages"] as? Bool ?? false
+                withCurriculumPages: configuration["include_curriculum_pages"] as? Bool ?? false,
+                asAClub: NewCourseCreator.clubWords(in: configuration)
             )
         )
 
@@ -120,7 +121,8 @@ class NewCourseCreator {
                         courseCode: installedCode,
                         takesExampleContent: true,
                         usesSkeleton: false,
-                        skeletonSubject: nil
+                        skeletonSubject: nil,
+                        asAClub: nil
                     )
                 )
             }
@@ -149,7 +151,17 @@ class NewCourseCreator {
                                     takesExampleContent: Bool,
                                     usesSkeleton: Bool,
                                     skeletonSubject: String?,
-                                    withCurriculumPages: Bool = false) -> String {
+                                    withCurriculumPages: Bool = false,
+                                    asAClub club: (pageWord: String, classFolder: String)? = nil) -> String {
+        // A club (#267) starts with empty folders and one page, and the
+        // line says so in the club's own words — so "my club's pages are
+        // not being seen" can be answered from the trail: which word, which
+        // folder. Checked FIRST, because a club takes neither the ready-made
+        // pages nor a skeleton whatever the other keys say.
+        if let club {
+            return "created \(courseCode) as a club, with pages named “\(club.pageWord) 1” "
+                 + "in “\(club.classFolder)”"
+        }
         if takesExampleContent {
             return "created \(courseCode) from the ready-made pages written for it"
         }
@@ -166,6 +178,19 @@ class NewCourseCreator {
             return line
         }
         return "created \(courseCode) with empty folders"
+    }
+
+    /// A club's page word and class folder, read from the configuration the
+    /// wizard has just written — nil for any course whose pages are not
+    /// numbered, so every other line is byte-identical to before #267.
+    static func clubWords(in configuration: [String: Any]) -> (pageWord: String, classFolder: String)? {
+        let scheme: ClassPageScheme = ClassPageScheme.reading(configuration["class_page_scheme"] as? String)
+        guard scheme == .numbered else {
+            return nil
+        }
+        let word: String = ClassPageTerm.cleaned(configuration["unit_word"] as? String)
+        let folder: String = (configuration["class_folder"] as? String) ?? ClubVocabulary.club.classFolder
+        return (word, folder)
     }
 
     /// The subject a code's skeleton is shaped for, or nil for the general

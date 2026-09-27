@@ -31,6 +31,7 @@ final class HitAreaTests: XCTestCase {
         try await Task.sleep(for: .milliseconds(500))
 
         for identifier in ["addCourseButton", "removeSelectedButton"] {
+            try AccessibilityInspector.skipUnlessTheWindowCanBeRead(workspace.window)
             guard let rectangle = AccessibilityInspector.frame(forIdentifier: identifier) else {
                 XCTFail("\(identifier) is not in the accessibility tree")
                 continue

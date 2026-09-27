@@ -444,6 +444,25 @@ final class QuartzCheckoutImportTests: XCTestCase {
         }
     }
 
+    /// #255: the add-ons are SKIPPED by the walk, not walked and filtered
+    /// after it, so a folder inside one that nobody can read does not refuse
+    /// the class. The same test runs on every route.
+    func testAnUnreadableFolderInsideAnAddOnDoesNotRefuseTheClass() async throws {
+        try prepare()
+        let websiteURL: URL = try makeWebsite(at: rootURL.appendingPathComponent("Documents/2024-25/ICS3U/S1"))
+        let shut: URL = websiteURL.appendingPathComponent("quartz/content/.obsidian/plugins/publisher/cache")
+        try FileManager.default.createDirectory(at: shut, withIntermediateDirectories: true)
+        try Data("cached".utf8).write(to: shut.appendingPathComponent("blob"))
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: shut.path)
+        addTeardownBlock {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: shut.path)
+        }
+        let imported: (outcome: ReferenceImporter.Outcome, courseURL: URL) = try await importTheTicked(websiteURL)
+        guard case .imported = imported.outcome else {
+            return XCTFail("A folder inside an add-on was reported: \(imported.outcome)")
+        }
+    }
+
     /// The program's files, the editing folder, section 2's pages, the
     /// add-ons and the replaced links are ALL absent from the course, and the
     /// import is still complete: machinery is not a loss.

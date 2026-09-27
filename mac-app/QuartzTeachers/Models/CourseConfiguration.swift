@@ -15,8 +15,9 @@ class CourseConfiguration {
     /// The decoded contents of `course_config.json`.
     var values: [String: Any]
 
-    /// The bytes most recently read from or written to disk, used by
-    /// `discardChanges()` to implement the Cancel button.
+    /// The bytes most recently read from or written to disk: what a Save
+    /// merges against, and what `revertToFile(at:)` falls back to when the
+    /// file cannot be read.
     private var lastSavedData: Data
 
     // MARK: - Computed properties
@@ -289,6 +290,13 @@ class CourseConfiguration {
         return nil
     }
 
+    /// What a teacher is told when the publishing folder they typed is not a
+    /// full location — a name on its own, or a path that does not start at
+    /// the top of the disk. Contract data: `app-rules.json` →
+    /// `configurationRules.deployFolder`.
+    static let deployFolderIsNotAFullLocation: String =
+        "That isn’t a full folder location — use Choose… to pick the folder."
+
     /// What is wrong with a folder chosen for local-folder publishing, or
     /// nil when the folder is usable. Both the settings form and the
     /// wizard check this live — and block saving — so a deploy never
@@ -297,6 +305,18 @@ class CourseConfiguration {
         let path: String = rawPath.trimmingCharacters(in: .whitespaces)
         if path.isEmpty {
             return "Choose the folder this course deploys into."
+        }
+        // Asked BEFORE the folder is looked for, because a partial path is
+        // looked for in the wrong place: the app's own current folder is
+        // "/", so "Users/Shared" exists here, while `deploy.sh` would publish
+        // into "<working folder>/Users/Shared". A path that is validated in
+        // one folder and published into another is the hole GitHub issue
+        // #227 is about; the other half of it — a colon read as a remote
+        // host — is closed in the launcher, and is documented in
+        // documentation/07-deployment.md. `Choose…` always hands back a full
+        // path, so only a typed one can reach this.
+        if !path.hasPrefix("/") {
+            return deployFolderIsNotAFullLocation
         }
         let fileManager: FileManager = FileManager.default
         var isDirectory: ObjCBool = false
@@ -470,6 +490,42 @@ class CourseConfiguration {
         set { values["unit_word"] = ClassPageTerm.cleaned(newValue) }
     }
 
+    /// The shape of this course's class-page names (#267). Absent and unknown
+    /// read as "Unit 2, Day 3"; see `ClassPageScheme`.
+    var classPageScheme: ClassPageScheme {
+        get { return ClassPageScheme.reading(stringValue(forKey: "class_page_scheme")) }
+        set { values["class_page_scheme"] = newValue.rawValue }
+    }
+
+    /// The heading this course's front pages were created with, as
+    /// `front_page_heading` records it — nil when the course has none, which
+    /// is every course made before #267 (CODING included).
+    ///
+    /// **No default is filled in, on purpose.** The first version answered
+    /// "Most Recent Class" for a course without the key, and Course Settings'
+    /// locked row then showed that for CODING, whose front page reads "Most
+    /// Recent Meeting" — a locked row stating something the page does not
+    /// say. Nothing rewrites a heading after creation, so the only honest
+    /// answer for a course without the key is that none was recorded.
+    var recordedFrontPageHeading: String? {
+        let stored: String = stringValue(forKey: "front_page_heading").trimmingCharacters(in: .whitespaces)
+        if stored.isEmpty {
+            return nil
+        }
+        return stored
+    }
+
+    /// What the assistant calls one class page to the teacher (#267).
+    var classNoun: ClassNoun {
+        get { return ClassNoun.reading(stringValue(forKey: "class_noun")) }
+        set { values["class_noun"] = newValue.rawValue }
+    }
+
+    /// The word and the scheme together — what every planner names pages by.
+    var classPageNaming: ClassPageNaming {
+        return ClassPageNaming(word: unitWord, scheme: classPageScheme)
+    }
+
     var sharedFolders: [String] {
         get { return stringListValue(forKey: "shared_folders") }
         set { values["shared_folders"] = newValue }
@@ -513,6 +569,40 @@ class CourseConfiguration {
         }
     }
 
+    /// The curriculum folders this course DECLARES, in its own order (#128):
+    /// `curriculum_folders`, then the legacy `curriculum_folder` when it is not
+    /// already there — read and unioned forever, so a folder written down by an
+    /// older Plantoir still counts. The first is the primary folder, whose map
+    /// keeps the title "Curriculum Coverage".
+    ///
+    /// Setting it writes `curriculum_folders` (an empty list removes the key)
+    /// AND the legacy `curriculum_folder`, naming the list's first (primary)
+    /// folder — so an older Plantoir on another Mac, which reads only that key,
+    /// keeps its map (Russell's ruling on the #128 review). With an empty list
+    /// the legacy key is removed too, or the union would keep a folder the
+    /// teacher has just unticked. `contracts/file-formats.json` → `courseConfigKeys`.
+    var curriculumFolders: [String] {
+        get {
+            return CurriculumFolderRule.declaredFolders(
+                list: values["curriculum_folders"], legacy: values["curriculum_folder"]
+            )
+        }
+        set {
+            if newValue.isEmpty {
+                values.removeValue(forKey: "curriculum_folders")
+            } else {
+                values["curriculum_folders"] = newValue
+            }
+            if let primary = newValue.first {
+                values["curriculum_folder"] = primary
+            } else {
+                values.removeValue(forKey: "curriculum_folder")
+            }
+        }
+    }
+
+    /// The legacy one-folder key, as written. Kept for the renamer, which
+    /// rewrites it when it names the renamed folder; nothing new writes it.
     var curriculumFolder: String? {
         get { return values["curriculum_folder"] as? String }
         set {
@@ -944,7 +1034,7 @@ class CourseConfiguration {
     ///
     /// ONE rule, read by the three toggles, the config keys and the
     /// coverage rule below, so that the surfaces cannot drift apart — the
-    /// same reason `SkeletonCatalog.hasSkeleton(forCode:takingExampleContent:)`
+    /// same reason `SkeletonCatalog.hasSkeleton(forCode:takingExampleContent:numbered:)`
     /// exists, and `skeletonIsOffered` is that function's own answer rather
     /// than a second copy of its rule.
     static func curriculumPagesOffered(
@@ -1095,12 +1185,165 @@ class CourseConfiguration {
 
     /// Writes the configuration to disk in the same shape the setup wizard
     /// uses: pretty-printed JSON with a trailing newline.
-    func write(to url: URL) throws {
+    ///
+    /// **Only the settings THIS copy changed are written over the file**
+    /// (issue #265). Two windows on one working folder each hold their own
+    /// copy of a course's settings, and this used to be a blind whole-file
+    /// write — so a Save in the window that had not seen the other's Save put
+    /// back every setting as that window last read it. Measured with this
+    /// file compiled standalone and a copy of a real course: window A saved
+    /// three sidebar hides, window B then saved an unrelated setting, and the
+    /// file went back to B's ten hides while both windows said "nothing
+    /// unsaved". Every Save — Course Settings, Add Section, archive, restore,
+    /// rename, school year — comes through here, so all six are covered.
+    ///
+    /// The rule, per top-level key, with `lastSavedData` as what this copy
+    /// last read or wrote:
+    /// - the file has not changed since then → write this copy, as before;
+    /// - otherwise, a key this copy did NOT change keeps the file's value
+    ///   (somebody else's Save, or a build adding a folder it discovered);
+    /// - a key this copy DID change is written, and when the file had also
+    ///   changed it, that is reported so the trail can say so.
+    ///
+    /// Per KEY rather than per list element, deliberately: merging inside a
+    /// list would need rules for order and for an item removed on one side and
+    /// added on the other, and nothing a teacher reported needs them. The same
+    /// read-then-check-then-write loop as `recordOnDisk` guards against a
+    /// build writing between the read and the write.
+    ///
+    /// Afterwards the in-memory copy IS the file, so a form that is open
+    /// shows what was really saved, and every other window's copy of this
+    /// course is brought up to date (`WorkspaceModel.followWrite`).
+    @discardableResult
+    func write(to url: URL) throws -> WriteResult {
         let options: JSONSerialization.WritingOptions = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-        var data: Data = try JSONSerialization.data(withJSONObject: values, options: options)
-        data.append(contentsOf: [0x0A])
-        try data.write(to: url, options: [.atomic])
+        var attempts: Int = 0
+        while true {
+            let before: Data? = try? Data(contentsOf: url)
+            var result: WriteResult = WriteResult()
+            var toWrite: [String: Any] = values
+            if let before, before != lastSavedData {
+                let base: [String: Any]? = CourseConfiguration.decodedDictionary(lastSavedData)
+                let onDisk: [String: Any]? = CourseConfiguration.decodedDictionary(before)
+                if let base, let onDisk {
+                    toWrite = CourseConfiguration.merged(mine: values, base: base, onDisk: onDisk, result: &result)
+                }
+            }
+            var data: Data = try JSONSerialization.data(withJSONObject: toWrite, options: options)
+            data.append(contentsOf: [0x0A])
+
+            // Something wrote the file between the read and here (a build's
+            // preflight, most likely): read it again and redo the merge. After
+            // three tries this Save goes ahead with the last merge, which is
+            // still right for every key except one written in that instant.
+            let nowOnDisk: Data? = try? Data(contentsOf: url)
+            if nowOnDisk != before && attempts < 3 {
+                attempts += 1
+                continue
+            }
+            try data.write(to: url, options: [.atomic])
+            lastSavedData = data
+            values = toWrite
+            WorkspaceModel.followWrite(of: self, at: url)
+            return result
+        }
+    }
+
+    /// What a write found in the file that this copy had not read.
+    struct WriteResult {
+
+        // MARK: - Stored properties
+
+        /// Settings changed in the file since this copy read it, which this
+        /// copy had not touched — kept as the file had them.
+        var keptFromElsewhere: [String] = []
+
+        /// Settings changed BOTH in the file and in this copy. This copy's
+        /// value was written, because it is the Save the teacher just made.
+        var replacedChangesFromElsewhere: [String] = []
+
+        // MARK: - Computed properties
+
+        /// True when the file had been changed by something else since this
+        /// copy read it.
+        var fileHadChangedElsewhere: Bool {
+            return !keptFromElsewhere.isEmpty || !replacedChangesFromElsewhere.isEmpty
+        }
+    }
+
+    /// The per-key merge `write(to:)` describes. `base` is what this copy last
+    /// read or wrote, `mine` is this copy now, `onDisk` is the file now.
+    static func merged(
+        mine: [String: Any],
+        base: [String: Any],
+        onDisk: [String: Any],
+        result: inout WriteResult
+    ) -> [String: Any] {
+        var allKeys: Set<String> = []
+        for key in mine.keys {
+            allKeys.insert(key)
+        }
+        for key in base.keys {
+            allKeys.insert(key)
+        }
+        for key in onDisk.keys {
+            allKeys.insert(key)
+        }
+
+        var output: [String: Any] = [:]
+        for key in allKeys.sorted() {
+            let changedHere: Bool = !sameValue(mine[key], base[key])
+            let changedThere: Bool = !sameValue(onDisk[key], base[key])
+            if changedHere {
+                if let value = mine[key] {
+                    output[key] = value
+                }
+                if changedThere && !sameValue(mine[key], onDisk[key]) {
+                    result.replacedChangesFromElsewhere.append(key)
+                }
+            } else {
+                if let value = onDisk[key] {
+                    output[key] = value
+                }
+                if changedThere {
+                    result.keptFromElsewhere.append(key)
+                }
+            }
+        }
+        return output
+    }
+
+    /// Reads the file again when this copy has nothing unsaved — what Course
+    /// Settings does each time it is opened (issue #265), so a folder the
+    /// build discovered, or a Save made in another window, is on screen
+    /// without relaunching. Unsaved edits are never replaced. Returns whether
+    /// the file was read.
+    @discardableResult
+    func reloadIfNothingUnsaved(url: URL) -> Bool {
+        if hasUnsavedChanges {
+            return false
+        }
+        do {
+            try reloadFromDisk(url: url)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// Replaces this copy with what is in the file now — for a copy with
+    /// nothing unsaved, after something else wrote the file. Callers check
+    /// `hasUnsavedChanges` first: this discards unsaved edits.
+    func reloadFromDisk(url: URL) throws {
+        let data: Data = try Data(contentsOf: url)
+        if data == lastSavedData {
+            return
+        }
+        guard let dictionary = CourseConfiguration.decodedDictionary(data) else {
+            throw CourseConfigurationError.notADictionary
+        }
         lastSavedData = data
+        values = dictionary
     }
 
     /// Records a change that has ALREADY happened on disk — a folder rename —
@@ -1162,12 +1405,56 @@ class CourseConfiguration {
             try written.write(to: url, options: [.atomic])
             lastSavedData = written
             values = change(values)
+            WorkspaceModel.followWrite(of: self, at: url)
             return
         }
     }
 
+    /// What Course Settings' Revert button does: the settings as the FILE
+    /// has them now, not as this copy last read them (issue #265).
+    ///
+    /// A copy with unsaved edits is deliberately left alone when another
+    /// window saves (`WorkspaceModel.followWrite`), so the bytes it last read
+    /// can be older than the file. Reverting to those put the other window's
+    /// Save back on screen as "nothing unsaved" — measured by the review: B
+    /// with an unsaved edit, A saves three hides, B reverts and shows the old
+    /// ten — and B's next Save wrote the old list back over A's, because it
+    /// now looked like a change B had made. Reading the file is what "put it
+    /// back the way it was saved" means when somebody else saved last.
+    ///
+    /// When the file cannot be read, falls back to the bytes this copy last
+    /// read, which is what Revert did before.
+    func revertToFile(at url: URL) throws {
+        if let data = try? Data(contentsOf: url),
+           let dictionary = CourseConfiguration.decodedDictionary(data) {
+            lastSavedData = data
+            values = dictionary
+            return
+        }
+        try discardChanges()
+    }
+
+    /// `excluded_items.<scope>` as this copy last read or wrote it — the
+    /// baseline its UNSAVED exclusion changes are measured against. Not the
+    /// file: another window may have saved an exclusion since, and a Revert
+    /// here does not take that back (issue #152's review, M1).
+    func savedExcludedItems(forScope scope: String) -> [String] {
+        guard let saved = CourseConfiguration.decodedDictionary(lastSavedData),
+              let excluded = saved["excluded_items"] as? [String: Any],
+              let entries = excluded[scope] as? [Any] else {
+            return []
+        }
+        var names: [String] = []
+        for entry in entries {
+            if let name = entry as? String {
+                names.append(name)
+            }
+        }
+        return names
+    }
+
     /// Reverts all in-memory edits back to the last data read from or
-    /// written to disk (the Cancel button).
+    /// written to disk. Course Settings' Revert uses `revertToFile(at:)`.
     func discardChanges() throws {
         let decoded: Any = try JSONSerialization.jsonObject(with: lastSavedData)
         guard let dictionary = decoded as? [String: Any] else {
@@ -1190,6 +1477,27 @@ class CourseConfiguration {
     }
 
     // MARK: - Private helpers
+
+    /// The JSON object in `data`, when it is a dictionary.
+    private static func decodedDictionary(_ data: Data) -> [String: Any]? {
+        guard let decoded = try? JSONSerialization.jsonObject(with: data) else {
+            return nil
+        }
+        return decoded as? [String: Any]
+    }
+
+    /// Whether two values from a decoded (or edited) configuration are the
+    /// same JSON value — a missing key is only the same as a missing key.
+    private static func sameValue(_ first: Any?, _ second: Any?) -> Bool {
+        guard let first else {
+            return second == nil
+        }
+        guard let second else {
+            return false
+        }
+        let firstWrapped: NSArray = [first]
+        return firstWrapped.isEqual(to: [second])
+    }
 
     private func stringValue(forKey key: String) -> String {
         if let stored = values[key] as? String {
