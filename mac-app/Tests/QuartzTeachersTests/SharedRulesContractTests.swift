@@ -2851,6 +2851,10 @@ final class SharedRulesContractTests: XCTestCase {
                 .replacingOccurrences(of: "{course}", with: "ICS3U")
                 .replacingOccurrences(of: "{section}", with: "2")
                 .replacingOccurrences(of: "{destination}", with: "Netlify")
+                // The record's second line fills {reason} for
+                // couldNotRunAsSetNow (#323), as it fills {destination} for
+                // the kinds that name one.
+                .replacingOccurrences(of: "{reason}", with: "Netlify")
             let actual: String = ScheduledPublishOutcome.sentence(
                 for: ScheduledPublishOutcome.Stopped(
                     kind: kind, destination: "Netlify", when: Date()
@@ -3095,6 +3099,7 @@ final class SharedRulesContractTests: XCTestCase {
         case .succeeded: return "succeeded"
         case .tooLateToRun: return "tooLateToRun"
         case .courseWasBusy: return "courseWasBusy"
+        case .couldNotRunAsSetNow: return "couldNotRunAsSetNow"
         }
     }
 
