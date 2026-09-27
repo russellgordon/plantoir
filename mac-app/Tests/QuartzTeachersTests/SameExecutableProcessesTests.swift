@@ -12,11 +12,17 @@ import XCTest
 /// folder is SIGKILLed by the system within about 1–100 ms (60 of 60 copies
 /// of `/bin/sh`, 10 of 10 of `/bin/bash`), so these tests used to pass only
 /// by scanning before the kill. Re-signed ad hoc, a copy of bash stays alive
-/// (20 of 20 seen at 500 ms); a re-signed copy of `/bin/sh` stays alive but is
-/// never seen (0 of 10), because `/bin/sh` is a trampoline that execs bash and
-/// stops being "Plantoir". `read` forks nothing, where `sleep` would briefly
-/// fork a second "Plantoir"; it waits on a pipe the test holds until
-/// `tearDown`, since a released pipe is end-of-file and bash exits.
+/// (20 of 20 seen at 500 ms). The RE-SIGNING is the part that matters: the
+/// plan measured a re-signed `/bin/sh` (a trampoline to bash) as never seen
+/// (0 of 10, from a shell), but under this test host a re-signed `/bin/sh`
+/// was seen and stayed alive (must-fail M2 stayed green), so bash — what
+/// `/bin/sh` resolves to anyway — is kept as the one that was measured both
+/// ways. `read` forks nothing, where `sleep` would briefly fork a second
+/// "Plantoir"; its standard input is a pipe of the test's own, held until
+/// `tearDown`, so it never reads the test host's. (Must-fails M3 and M3b —
+/// no pipe, and the pipe's writing end closed at once — both stayed green:
+/// the child is kept alive by `read -t 30` itself, not by the pipe, and it
+/// is `assertStillRunning` that would catch it dying.)
 @MainActor
 final class SameExecutableProcessesTests: XCTestCase {
 
@@ -24,7 +30,7 @@ final class SameExecutableProcessesTests: XCTestCase {
 
     private var folder: URL?
     private var children: [Process] = []
-    /// Each child's standard input. Held so `read` keeps waiting (#341).
+    /// Each child's standard input, held until `tearDown` (#341).
     private var inputs: [Pipe] = []
 
     // MARK: - Set up
