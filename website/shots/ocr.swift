@@ -1,6 +1,13 @@
 // Prints every line of text Vision recognises in an image, one per line.
 //
 // Usage: swift ocr.swift <image.png>
+//        swift ocr.swift --boxes <image.png>
+//
+// `--boxes` prints each line as "x y width height<TAB>text", in the image's
+// own pixels with the origin at the TOP left. It exists for the notification
+// banner: on macOS 26 a banner is drawn inside Notification Center's one
+// full-screen window rather than in a window of its own, so it is found by
+// where its words are, and cut out from there (scenes.py, banner_in_window).
 //
 // The capture's read-back check: every scene lists, in shots.json
 // `expectText`, words its finished picture must show, and capture.py fails
@@ -13,10 +20,17 @@ import AppKit
 import Foundation
 import Vision
 
-guard CommandLine.arguments.count == 2,
-      let image: NSImage = NSImage(contentsOfFile: CommandLine.arguments[1]),
+var arguments: [String] = CommandLine.arguments
+var printsBoxes: Bool = false
+if arguments.count == 3 && arguments[1] == "--boxes" {
+    printsBoxes = true
+    arguments.remove(at: 1)
+}
+
+guard arguments.count == 2,
+      let image: NSImage = NSImage(contentsOfFile: arguments[1]),
       let cgImage: CGImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-    FileHandle.standardError.write("usage: swift ocr.swift <image.png>\n".data(using: .utf8)!)
+    FileHandle.standardError.write("usage: swift ocr.swift [--boxes] <image.png>\n".data(using: .utf8)!)
     exit(2)
 }
 
@@ -35,6 +49,18 @@ do {
 }
 for observation in request.results ?? [] {
     if let candidate: VNRecognizedText = observation.topCandidates(1).first {
-        print(candidate.string)
+        if printsBoxes {
+            // Vision's box is a fraction of the image, origin bottom left.
+            let box: CGRect = observation.boundingBox
+            let imageWidth: Double = Double(cgImage.width)
+            let imageHeight: Double = Double(cgImage.height)
+            let left: Int = Int(box.minX * imageWidth)
+            let top: Int = Int((1.0 - box.maxY) * imageHeight)
+            let width: Int = Int(box.width * imageWidth)
+            let height: Int = Int(box.height * imageHeight)
+            print("\(left) \(top) \(width) \(height)\t\(candidate.string)")
+        } else {
+            print(candidate.string)
+        }
     }
 }

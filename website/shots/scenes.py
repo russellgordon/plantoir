@@ -419,6 +419,95 @@ def banner_windows() -> dict[int, tuple[int, int, int, int]]:
     return found
 
 
+def banner_in_window(number: int, needle: str, destination: Path) -> bool:
+    """Cut a banner out of Notification Center's full-screen window.
+
+    On macOS 26 (measured 2026-09-27) a banner is not a window of its own:
+    Notification Center keeps ONE on-screen window the size of the display
+    (layer 21) and draws every banner inside it, so polling for a NEW window
+    never sees one. That is why two real scheduled publishes at 08:06 and
+    08:13 on 2026-09-27, with Focus off and the notification delivered, were
+    reported as "no banner appeared".
+
+    So the window is photographed as it stands, Vision finds the line that
+    names the course, and the banner is the opaque card around that line:
+    the window's background is transparent, and cards are separated by
+    transparent gaps, so the run of solid pixels through the line's middle,
+    across and down, is exactly the card. Another app's banner stacked above
+    it is left out. True when a card was found and saved.
+    """
+    from PIL import Image, ImageChops, ImageDraw
+
+    with tempfile.TemporaryDirectory() as scratch:
+        whole = Path(scratch) / "notification-center.png"
+        taken = subprocess.run(["screencapture", "-x", "-o", "-l", str(number), str(whole)],
+                               capture_output=True)
+        if taken.returncode != 0 or not whole.exists():
+            return False
+        result = subprocess.run(["swift", str(OCR_HELPER), "--boxes", str(whole)],
+                                capture_output=True, text=True)
+        wanted = re.sub(r"\s+", "", needle).lower()
+        line_box: tuple[int, int, int, int] | None = None
+        for line in result.stdout.splitlines():
+            if "\t" not in line:
+                continue
+            numbers, text = line.split("\t", 1)
+            if wanted in re.sub(r"\s+", "", text).lower():
+                left, top, width, height = (int(value) for value in numbers.split())
+                line_box = (left, top, width, height)
+                break
+        if line_box is None:
+            return False
+
+        picture = Image.open(whole).convert("RGBA")
+        alpha = picture.getchannel("A")
+        solid = 200
+        middle_x = line_box[0] + line_box[2] // 2
+        middle_y = line_box[1] + line_box[3] // 2
+
+        card_left = middle_x
+        while card_left > 0 and alpha.getpixel((card_left - 1, middle_y)) >= solid:
+            card_left -= 1
+        card_right = middle_x
+        while card_right < picture.width - 1 and alpha.getpixel((card_right + 1, middle_y)) >= solid:
+            card_right += 1
+        card_top = middle_y
+        while card_top > 0 and alpha.getpixel((middle_x, card_top - 1)) >= solid:
+            card_top -= 1
+        card_bottom = middle_y
+        while card_bottom < picture.height - 1 and alpha.getpixel((middle_x, card_bottom + 1)) >= solid:
+            card_bottom += 1
+
+        # A card is wider than the words on it and not the whole screen; a
+        # run that reaches an edge means the background was not transparent.
+        if card_right - card_left < line_box[2] or card_left == 0 or card_right >= picture.width - 1:
+            return False
+        if card_bottom - card_top < line_box[3] * 2:
+            return False
+        # The card's corner radius, measured: walking in from its top-left
+        # corner along the diagonal, the first solid pixel is r(1 - 1/√2) in.
+        step = 0
+        while step < 200 and alpha.getpixel((card_left + step, card_top + step)) < solid:
+            step += 1
+        radius = round(step / (1 - 0.7071)) if step else 0
+
+        # Cut to the card's own rounded shape. The rectangle round it also
+        # holds the card's SHADOW, which is invisible on a dark desktop and
+        # a grey box round the banner on a light one (seen in the first light
+        # composite, 2026-09-27). Drawn four times larger and shrunk, so the
+        # corners stay smooth.
+        box = (card_left, card_top, card_right + 1, card_bottom + 1)
+        card = picture.crop(box)
+        scale = 4
+        mask = Image.new("L", (card.width * scale, card.height * scale), 0)
+        ImageDraw.Draw(mask).rounded_rectangle(
+            (0, 0, card.width * scale - 1, card.height * scale - 1), radius=radius * scale, fill=255)
+        mask = mask.resize(card.size, Image.LANCZOS)
+        card.putalpha(ImageChops.multiply(card.getchannel("A"), mask))
+        card.save(destination)
+        return True
+
+
 def ask_over_mcp(app_binary: Path, working_folder: Path, tool: str, arguments: dict) -> dict:
     """One tool call through the app's own MCP server, the way an outside
     assistant makes it. Newline-delimited JSON-RPC over stdio."""
@@ -498,6 +587,13 @@ def capture_notification(app_binary: Path, working_folder: Path, destination: Pa
                 problems.append(f"the scheduled run did not succeed: its record says {first_line!r}")
                 break
         for number, bounds in banner_windows().items():
+            if record_seen_at is not None and number in before and bounds[2] >= 800 and bounds[3] >= 600:
+                # Notification Center's own full-screen window: macOS 26
+                # draws banners inside it (banner_in_window says why).
+                if banner_in_window(number, course, destination):
+                    captured = True
+                    break
+                continue
             if number in before or bounds[2] < 200 or bounds[3] < 40:
                 continue
             if record_seen_at is None:

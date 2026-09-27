@@ -168,14 +168,6 @@ def open_profile_window(profile: str) -> bool:
     return True
 
 
-# Where to click to take focus out of the address field — a fraction of the
-# window, so it follows a resize. 0.80 across is the empty margin to the right
-# of a class site's text column, and 0.55 down is below the header and above
-# the footer: background on every page this harness photographs.
-MARGIN_ACROSS = 0.80
-MARGIN_DOWN = 0.55
-
-
 class WrongAppearance(SystemExit):
     """A capture came out light in a dark pass, or the other way round."""
 
@@ -260,7 +252,7 @@ def verify_address_bar(path: Path, what: str) -> None:
         f"{what} was photographed with its address bar selected "
         f"({fraction:.1%} of the toolbar is selection blue, in {path.name}).\n"
         f"Focus did not leave the address field — see "
-        f"SafariWindow.unfocus_address_bar, which clicks the page's right margin."
+        f"SafariWindow.unfocus_address_bar, which hands focus to the page with the find bar."
     )
 
 
@@ -414,19 +406,23 @@ class SafariWindow:
         believed, which made it a race rather than a bug: some shots came out
         clean and some did not.
 
-        So focus is moved somewhere it can be SEEN to be: a click in the
-        page's own right-hand margin. `MARGIN_ACROSS` is 0.80 of the way
-        across the window, which on a class site at these dimensions is empty
-        background beside the text column — no link to follow, no word to
-        select. The click lands in the page, which is where focus belongs
-        while a page is being photographed.
+        So focus is handed to the page with the find bar: Command-F, then
+        Escape to close it (below).
+
+        **And no Escape BEFORE that**, which this method used to send. From
+        the second page onwards focus is already in the page, left there by
+        the last call, so that Escape reached the web content — and the site
+        then drew its Search box with a focus ring. Every browser shot but
+        the first carried it (coverage, SCH3U, MCV4U, the colour-scheme
+        pair). Measured 2026-09-27 on ENG2D: three loads in one window, ring
+        on loads 2 and 3 with the Escape, on none without it; the address
+        field unselected either way (#367).
         """
         osascript(
             f'tell application "Safari"\n'
             f'  set index of window id {self.window_id} to 1\n'
             f'  activate\n'
-            f'end tell\n'
-            'tell application "System Events" to key code 53'
+            f'end tell'
         )
         time.sleep(0.3)
         # Command-F then Escape: the find bar takes focus out of the address
