@@ -1265,6 +1265,10 @@ enum AssistToolRefusal: LocalizedError, Equatable {
     /// A course was named by its CODE alone, no live course has that code,
     /// and one or more courses kept for reference show it.
     case askedForACourseByItsCodeAlone(String, [String])
+    /// A teacher or a model asked to publish or hide the course's How I Teach
+    /// page by name (#209). Its own case so a test can pin it by name: it is
+    /// never on the website, and "no page is called that" would be untrue.
+    case howITeachIsNeverPublished(String)
 
     var errorDescription: String? {
         switch self {
@@ -1319,6 +1323,8 @@ enum AssistToolRefusal: LocalizedError, Equatable {
             return "No course you are teaching is called \(code). "
                  + "These are kept for reference and show that code: \(listed). "
                  + "Name the one you mean."
+        case .howITeachIsNeverPublished(let code):
+            return AssistWording.howITeachIsNeverPublished(course: code)
         case .keptForReference(let code):
             // The FROZEN sentence, not the deploy one: this refusal covers
             // every write, and "it is never deployed" answers a question

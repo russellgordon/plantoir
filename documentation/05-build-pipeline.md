@@ -141,6 +141,57 @@ with it, the folder just shows up on the next preview. Reserved names
 (`Media`, `.obsidian`, `.merged_output`, `node_modules`, `course_config.json`,
 OS junk files) are excluded from discovery.
 
+<a name="how-i-teach"></a>
+
+### The teacher's How I Teach page never reaches a site (#209)
+
+`How I Teach.md` at the top of a course folder is the teacher's own account of
+how the course is taught, read by the outside doors
+([10 → "Telling an outside assistant how the course is taught"](10-local-ai-assistant.md#telling-an-outside-assistant-how-the-course-is-taught-209)).
+Before #209, discovery listed it like any top-level file and the site
+published it — measured on a scratch course, at the course's top level and at
+`section1/`'s, both. `publish: false` cannot be the guarantee (a later
+`publishForSection<N>: true` beats it, and a page typed in Obsidian has no
+flag at all), so the build keeps it off by LOCATION, asking
+`scripts/how_i_teach.py` at four points, all in the ALWAYS section so no
+course needs `--full-rebuild`:
+
+1. **Discovery** — `discover_shared_items` / `discover_section_items` never
+   list it.
+2. **Preflight** — a name ALREADY listed in `shared_files` /
+   `per_section_files` (a course whose page predates the rule) is dropped and
+   the configuration written back, the way an excluded name is; the in-memory
+   config a build is handed without a write (`_dropping_excluded_items`) drops
+   it too.
+3. **The copy lists** are filtered where they are READ, not in each loop, so a
+   copy loop added later inherits the rule.
+4. **A final sweep** (`remove_from_content_root`) deletes any match from the
+   top of the merged `content/` before the health checks and Quartz — the
+   backstop that makes the guarantee a property of the output. Top level only:
+   inside a folder the name is an ordinary page, and the sweep only ever
+   touches the build's own copy, never the teacher's folder.
+
+The name is matched whole, after NFC, with only A–Z folded; at the top of a
+section folder too, because a section's top-level files land in the same place.
+The console says `howITeachPage.keptOffTheWebsiteLine` when a page is found,
+and names a LOOK-ALIKE ("How I Teach 1") that WILL be published
+(`lookAlikeLine`) — that silent publication is the failure the exact name risks.
+When a page the settings had listed is dropped, the build prints
+`PLANTOIR_KEPT_OFF: {json}`, which the app writes on the trail
+(`How I Teach page kept off the website`) — once, at the transition, not on every
+build. Gates: `scripts/test_how_i_teach.py` (Windows runs it too), and
+`verify.sh`'s real build, which plants pages with sentinel phrases and greps the
+whole of `public/` (pages, `contentIndex.json`, sitemap, RSS) — the reserved
+two absent, the look-alike present so the check cannot pass by building nothing.
+
+**One residual, needing no code** (plan review): a site built for PUBLISHING
+before the update, while such a page existed, and not rebuilt since, still holds
+the page, and a publish that uploads that existing build sends it. A new image
+tag does not by itself rebuild a site. It applies only to a teacher whose page
+was already public before the update; the first build after the update removes
+it (`public/` is cleaned and mirrored with `rsync --delete`), and every preview
+build is rebuilt before it is published.
+
 ## Stage 2: Scaffold management
 
 The container build workspace `/tmp/quartz-builds/<CODE>/section<N>/` is
@@ -546,8 +597,8 @@ undated.
 
   **A stray `[[` followed by a heading cannot swallow the link after it** (since
   [#314](https://github.com/russellgordon/plantoir/issues/314)): the heading
-  group stops at `[`, as Quartz's own `wikilinkRegex` does. This reader strips
-  inline code, but a `[[` typed in a sentence, followed later by a `#` and a
+  group stops at `[`, as Quartz's own `wikilinkRegex` does. This reader skips
+  inline code (since #313, below), but a `[[` typed in a sentence, followed later by a `#` and a
   real `[[Page|words]]`, otherwise read as one link with a garbage name and
   the real one was lost. Only the heading group stops at `[`; the name still
   crosses it, so a stray `[[` with no `#` before the next link still swallows
@@ -563,8 +614,8 @@ undated.
   map's two (`BLOCK_LINK`, behind "pages the course teaches", and
   `TRANSCLUSION`, what it counts as covered) already read `\|` but had the old
   alias-before-heading order, so `[[P#h|a]]` and `![[A1.1#h\|a]]` matched
-  nothing. They were NOT given #294's plain reorder: those two strip fenced
-  code but not inline code, and on `Tutorials/Scavenger Hunt.md` (the example
+  nothing. They were NOT given #294's plain reorder: those two stripped fenced
+  code but not inline code (until #313, below), and on `Tutorials/Scavenger Hunt.md` (the example
   course and every skeleton family, 90 files) the reordered pattern ran from
   "type `` `[[` ``" through a `### Custom Display Words` heading and swallowed
   the real `[[Help Sessions|…]]` after it. With the heading stopping at `[`:
@@ -575,7 +626,42 @@ undated.
   all six readers — each needs different groups, and a new sibling module is a
   Dockerfile change (`test_baked_modules.py` exists because one was once
   missed); and stripping inline code in `_pages_the_course_teaches`, which
-  changes what counts as taught by a different rule (#313's question).
+  changes what counts as taught by a different rule (#313's question — since
+  answered, below, WITH a shared module: the mask is one rule every reader
+  needs identically, which the six patterns were not).
+
+  **A link written inside code is not a link, for every one of these readers**
+  (since [#313](https://github.com/russellgordon/plantoir/issues/313)). A
+  `[[…]]` whose brackets start inside a fenced block or an inline code span is
+  an example of the syntax, and Quartz draws none. `scripts/markdown_code.py`
+  is the one Python definition of where code is — `readingALink.whatIsCode`,
+  implemented identically by the mac's `MarkdownCode` (measured: the two agree
+  offset for offset on all 12,490 files in `support/`) — and every reader here
+  asks it: `_extract_wikilink_targets` (both date passes), `BLOCK_LINK` behind
+  "pages the course teaches", `TRANSCLUSION` in the coverage count, and the
+  installer's three. It is baked beside `class_pages.py` (a Dockerfile `COPY`,
+  guarded by `test_baked_modules.py` and `verify.sh`'s baked-file check).
+  What changed: the dating walk used to strip ```` ``` ```` fences and one-line
+  spans with two regexes, so a `~~~` fence, a span across two lines of a
+  paragraph, a ```` ``` ```` held inside ```` ```` ```` and an escaped backtick
+  were all read wrongly; the coverage map's two readers stripped fences only;
+  the installer's three stripped nothing. The coverage count now also reads a
+  `%%curriculum-start%%` block only where its markers are OUTSIDE code
+  (`_curriculum_blocks_outside_code`) — a fenced example of a curriculum block
+  on a page that teaches how to write one used to count as coverage — and a
+  marker shown inside a fence neither opens nor closes a block, so a fenced
+  example cannot swallow the real block after it. A match that starts in code
+  is not simply dropped: the search starts again where that code ENDS, or an
+  example `` `[[` `` would swallow the real link after it. Measured over
+  `support/` with Quartz's own parser: 1,896 of 39,570 links sit in code, 0 in
+  indented code (which the rule deliberately does not recognise); the build
+  read 7 of them as links before, all on TEJ2O's "Control Something with
+  Code", whose fence inside a list had fallen out to column 0 — fixed in the
+  same piece, so its coverage is unchanged. `scripts/test_markdown_code.py`
+  runs every case through the dating walk and a rename, and checks the
+  coverage count; `verify.sh` lists it and Windows' `PythonToolchainTests`
+  discovers it. The why, the table built in Quartz, and what was rejected are
+  in [10 → Code is never a link](10-local-ai-assistant.md#code-is-never-a-link-313).
 - **A class dated with a plain YAML date** (`created: 2026-09-24`, unquoted —
   what Obsidian's Date property writes) counts, as midnight in Toronto. Until
   the fix round `_parse_created_value` read it as no date at all, so such a
@@ -1731,6 +1817,12 @@ the course folder, minus
 - `node_modules` and the legacy non-hidden `merged_output`,
 - `.DS_Store` / `Thumbs.db`,
 - `course_config.backup.json` and any `*.tmp`.
+
+The How I Teach page (#209) COUNTS, although it never reaches a site: editing it
+marks the section "— Edited" and makes the next Publish rebuild for nothing.
+Deliberately not excluded yet — this list is a wire format held byte for byte in
+three implementations, and changing one first would give the others a permanent
+false "Edited"; follow-up [#330](https://github.com/russellgordon/plantoir/issues/330).
 
 `course_config.json` itself COUNTS — fonts, the sidebar and the coverage map
 are inputs to the built site as surely as a page is. `Media/` counts, because

@@ -244,11 +244,56 @@ final class FolderPathRewriterTests: XCTestCase {
         )
     }
 
+    /// Inside angle brackets a space is fine, so a name is never escaped for
+    /// one — nor for any character the Markdown rule would escape. Every
+    /// character the contract leaves alone, plus a space and an accented
+    /// letter, must come out plain (#97).
+    func testAnAngleBracketedNameIsNeverEscapedForASpace() throws {
+        let rules: [String: Any] = try FolderPathRewriterTests.linkRewritingRules()
+        let set: [String: Any] = try XCTUnwrap(rules["escapingSet"] as? [String: Any])
+        let untouched: String = try XCTUnwrap(set["leaveUnescaped"] as? String)
+
+        var namesToTry: [String] = ["All Tasks", "Café", "Café Notes", "Work (new)"]
+        for character in untouched {
+            namesToTry.append("New " + String(character))
+        }
+        for newName in namesToTry {
+            XCTAssertEqual(
+                FolderPathRewriter.rewriting("[q](<Tasks/Quiz 1.md>)", folderNamed: "Tasks", to: newName),
+                "[q](<" + newName + "/Quiz 1.md>)",
+                "Inside angle brackets “\(newName)” goes in exactly as it is written"
+            )
+        }
+    }
+
+    /// The same idempotence check as above, for the angle-bracketed form: an
+    /// interrupted rename re-runs the relinking pass over pages it may have
+    /// already changed, and the new name has a space the plain reader must
+    /// not mistake for the end of a link.
+    func testRelinkingAnAngleBracketedLinkTwiceChangesNothing() {
+        let once: String = FolderPathRewriter.rewriting(
+            "[q](<Tasks/Quiz 1.md>) and [r](Tasks/Quiz%202.md)", folderNamed: "Tasks", to: "All Tasks"
+        )
+        XCTAssertEqual(once, "[q](<All Tasks/Quiz 1.md>) and [r](All%20Tasks/Quiz%202.md)")
+        XCTAssertEqual(
+            FolderPathRewriter.rewriting(once, folderNamed: "Tasks", to: "All Tasks"), once
+        )
+    }
+
     // MARK: - Counting
 
     func testCountingFindsOnlyQualifiedLinks() {
         let text: String = "[[Tasks/Quiz 1]] [[Quiz 2]] [the third](Tasks/Quiz 3.md) [[Handbook/Tasks]]"
         XCTAssertEqual(FolderPathRewriter.countReferences(to: "Tasks", in: text), 2)
+    }
+
+    /// One link, one reader: the plain Markdown pattern must not ALSO read an
+    /// angle-bracketed destination, or a rename reports two links where the
+    /// page holds one (#97).
+    func testAnAngleBracketedLinkIsCountedOnce() {
+        XCTAssertEqual(
+            FolderPathRewriter.countReferences(to: "Tasks", in: "[q](<Units/Tasks/Quiz1.md>)"), 1
+        )
     }
 
     func testCountingIsZeroWhenNothingPointsIn() {
