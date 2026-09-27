@@ -1769,7 +1769,12 @@ def _extract_wikilink_targets(text: str) -> set[str]:
     # The lazy target plus '\\?\|' keeps the '\|' backslash off the name,
     # and the rstrip below stays as a second guard. Shared contract:
     # contracts/shared-rules.json -> readingALink.
-    link_pattern = re.compile(r"!?\[\[([^\]|#]+?)(?:#[^\]|]*)?(?:\\?\|[^\]]*)?\]\]")
+    # The heading stops at '[' (#314), as Quartz's own wikilinkRegex does: a
+    # stray "[[" followed by a heading would otherwise run on through the
+    # next real link's name and swallow it. (The name still crosses '[', so
+    # a stray "[[" with no '#' before the next link still can; not widened.)
+    # Measured 0 change over all of support/.
+    link_pattern = re.compile(r"!?\[\[([^\]|#]+?)(?:#[^\[\]|]*)?(?:\\?\|[^\]]*)?\]\]")
     targets = set()
     for match in link_pattern.finditer(outside_fences):
         target = match.group(1).strip().rstrip("\\")
@@ -5162,8 +5167,18 @@ carry assessed work."""
 EXPECTATION_CODE = re.compile(r"[A-Za-z]\d+\.\d+|\d+\.[A-Za-z]|[A-Z]{2,4}-\d+\.[A-Z]")
 OVERALL_FILE = re.compile(r"^([A-Za-z]\d+)\.\s")
 CURRICULUM_BLOCK = re.compile(r"%%curriculum-start%%(.*?)%%curriculum-end%%", re.S)
-BLOCK_LINK = re.compile(r"!?\[\[([^\]|#]+?)(?:\\?\|[^\]]*)?(?:#[^\]|]*)?\]\]")
-TRANSCLUSION = re.compile(r"!\[\[([^\]|#]+?)(?:\\?\|[^\]]*)?(?:#[^\]|]*)?\]\]")
+# What a link names, for "pages the course teaches" and the coverage count.
+# Heading BEFORE alias, the order Quartz and Obsidian write them in, so
+# [[Page#Heading|words]] and ![[A1.1#Examples\|see]] are links to Page and
+# A1.1 (until #314 the alias came first and neither matched at all). The
+# heading stops at '[', as Quartz's own wikilinkRegex does: the reorder
+# alone let `type [[` in inline code on Tutorials/Scavenger Hunt.md (the
+# example course and every skeleton family, 90 files) run on through a
+# "### Heading" and swallow the real [[Help Sessions|...]] after it. With
+# '[' excluded, 0 differences over all 12,490 pages in support/. Shared
+# contract: contracts/shared-rules.json -> readingALink.
+BLOCK_LINK = re.compile(r"!?\[\[([^\]|#]+?)(?:#[^\[\]|]*)?(?:\\?\|[^\]]*)?\]\]")
+TRANSCLUSION = re.compile(r"!\[\[([^\]|#]+?)(?:#[^\[\]|]*)?(?:\\?\|[^\]]*)?\]\]")
 
 
 def is_expectation_code(stem: str) -> bool:

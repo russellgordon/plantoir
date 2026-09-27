@@ -238,6 +238,13 @@ else
   cat /tmp/verify_starting_content_test.log
 fi
 
+if (cd scripts && python3 test_install_link_readers.py) >/tmp/verify_install_link_readers_test.log 2>&1; then
+  pass "setup_course.py and the coverage map: every link shape the contract names is read by the installer's and the map's link readers (scripts/test_install_link_readers.py)"
+else
+  fail "setup_course.py and the coverage map: every link shape the contract names is read by the installer's and the map's link readers (scripts/test_install_link_readers.py)"
+  cat /tmp/verify_install_link_readers_test.log
+fi
+
 if (cd scripts && python3 test_graded_folders_rerun.py) >/tmp/verify_graded_rerun_test.log 2>&1; then
   pass "setup_course.py: a re-run writes a saved marks pool back as it was (scripts/test_graded_folders_rerun.py)"
 else
