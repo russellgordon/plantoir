@@ -279,6 +279,11 @@ enum AssistContract {
             "couldNotUndo": AssistWording.couldNotUndo(changePlaceholder, leftAlone: 2),
             "undoIsStillAvailable": AssistWording.undoIsStillAvailable,
             "nothingToUndo": AssistWording.nothingToUndo,
+            "startOfYearNeedsItsPlan": AssistWording.startOfYearNeedsItsPlan(course: course, section: section),
+            "startOfYearPlanHasChanged": AssistWording.startOfYearPlanHasChanged(
+                course: course, section: section
+            ),
+            "startOfYearNeedsABackup": AssistWording.startOfYearNeedsABackup(course: course),
             "undoDoesNotReachTheLiveSite": AssistWording.undoDoesNotReachTheLiveSite,
             "aCreatedPageCanBeTakenBack": AssistWording.aCreatedPageCanBeTakenBack,
             // Duplicating a class. The date is a LITERAL rather than a
@@ -781,10 +786,12 @@ enum AssistContract {
             "note": "Three lists, deliberately. `all` is what the runner can execute; `local` is what the "
                   + "small model is SHOWN (the plan twins and remember_timetable are taken off, because "
                   + "the model never has to name a plan and dates it supplies are dates it may have "
-                  + "invented); `mcpOnly` is the thirteen offered to Claude Code on top of everything — six "
+                  + "invented); `mcpOnly` is the fifteen offered to Claude Code on top of everything — six "
                   + "asking for judgement about meaning (the three curriculum tools and the three "
-                  + "for the How I Teach page), the rest either never needed by a model scoped to "
-                  + "one section or already reachable by it through a fixed phrasing.",
+                  + "for the How I Teach page), two that get a whole section ready for the start of "
+                  + "the year (a change a person should read in full, with a button of its own in the "
+                  + "app), the rest either never needed by a model scoped to one section or already "
+                  + "reachable by it through a fixed phrasing.",
             "all": all,
             "local": local,
             "mcpOnly": mcpOnly,

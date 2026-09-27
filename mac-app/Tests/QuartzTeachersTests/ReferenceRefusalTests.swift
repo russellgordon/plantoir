@@ -345,6 +345,25 @@ final class ReferenceRefusalTests: XCTestCase {
         XCTAssertFalse(outcome.detail.contains("kept for reference"), outcome.detail)
     }
 
+    /// Getting a reference course ready for the start of the year is a write,
+    /// and is refused before anything is read or written (#96) — the write
+    /// gate reads `readOnly`, so the MCP-only tool needed no code of its own,
+    /// and this is the explicit case the plan asked for.
+    func testGettingAReferenceCourseReadyIsRefused() async throws {
+        try prepare()
+        let classes: URL = reference.sectionDirectoryURL(forSection: 1).appendingPathComponent("All Classes")
+        try "---\npublish: true\n---\nOne.".write(
+            to: classes.appendingPathComponent("Unit 1, Day 1.md"), atomically: true, encoding: .utf8
+        )
+        let second: URL = classes.appendingPathComponent("Unit 1, Day 2.md")
+        try "---\npublish: true\n---\nTwo.".write(to: second, atomically: true, encoding: .utf8)
+        let outcome: AssistToolOutcome = await runner.run(
+            call: call("prepare_for_start_of_year", ["course": "ICS3U-2025", "section": 1, "planCode": "x"])
+        )
+        XCTAssertEqual(outcome.detail, ReferenceWording.staysAsItIs(course: "ICS3U"))
+        XCTAssertEqual(try String(contentsOf: second, encoding: .utf8), "---\npublish: true\n---\nTwo.")
+    }
+
     /// Reads work, which is the point of keeping the course at all.
     func testReadingAReferenceCourseWorks() async throws {
         try prepare()

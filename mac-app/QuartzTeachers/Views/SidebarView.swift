@@ -60,6 +60,10 @@ struct SidebarView: View {
     /// The section "Schedule Deploy…" was chosen on, while its sheet is up.
     @State var scheduleRequest: ScheduledDeployRequest?
 
+    /// The section "Get Ready for the Start of the Year…" (or its undo) was
+    /// chosen on, while its sheet is up (#96).
+    @State var startOfYearRequest: StartOfYearRequest?
+
     /// The scheduled deploy the teacher is being asked about cancelling.
     @State var cancelScheduleRequest: ScheduledDeployRequest?
 
@@ -178,6 +182,17 @@ struct SidebarView: View {
                                                 )
                                             }
                                             .accessibilityIdentifier("scheduleDeploy-\(course.code)-section\(sectionNumber)")
+                                        }
+                                        // Getting ready for the start of the
+                                        // year only HIDES pages, and nothing
+                                        // reaches students until a deploy
+                                        // (#96). Never on a reference course;
+                                        // not while this course is being
+                                        // deployed. Its undo sits BESIDE it,
+                                        // never in its place, while one is
+                                        // held for this section.
+                                        if !course.isKeptForReference {
+                                            startOfYearItems(course: course, sectionNumber: sectionNumber)
                                         }
                                         Divider()
                                         folderMenuItems(for: course.sectionDirectoryURL(forSection: sectionNumber))
@@ -567,6 +582,16 @@ struct SidebarView: View {
             AddSectionSheet(course: course) { sectionNumber in
                 workspace.reloadCourses()
                 workspace.selection = SidebarSelection.section(course.code, sectionNumber)
+            }
+        }
+        .sheet(item: $startOfYearRequest) { request in
+            if let workspaceURL = workspace.workspaceURL {
+                StartOfYearSheet(model: StartOfYearSheetModel(
+                    course: request.course,
+                    sectionNumber: request.sectionNumber,
+                    workspaceURL: workspaceURL,
+                    mode: request.mode
+                ))
             }
         }
         .sheet(item: $scheduleRequest) { request in
@@ -1068,6 +1093,39 @@ struct SidebarView: View {
             copyPageCourse = course
         }
         .accessibilityIdentifier("copyAPage-\(course.code)")
+    }
+
+    /// "Get Ready for the Start of the Year…", and its undo while one is
+    /// held (#96).
+    @ViewBuilder
+    func startOfYearItems(course: Course, sectionNumber: Int) -> some View {
+        let deploying: Bool = isBeingDeployed(course)
+        Button(StartOfYearWording.menuItem, systemImage: "moon.zzz") {
+            startOfYearRequest = StartOfYearRequest(course: course, sectionNumber: sectionNumber, mode: .getReady)
+        }
+        .disabled(deploying)
+        .accessibilityIdentifier("startOfYear-\(course.code)-section\(sectionNumber)")
+        if let folder = workspace.workspaceURL,
+           StartOfYearUndoRegistry.shared.entry(
+               folderPath: folder.path, courseCode: course.code, sectionNumber: sectionNumber
+           ) != nil {
+            Button(StartOfYearWording.undoMenuItem, systemImage: "arrow.uturn.backward") {
+                startOfYearRequest = StartOfYearRequest(course: course, sectionNumber: sectionNumber, mode: .undo)
+            }
+            .disabled(deploying)
+            .accessibilityIdentifier("startOfYearUndo-\(course.code)-section\(sectionNumber)")
+        }
+        if deploying {
+            Text(CourseActivity.availableOnceDeployCompleted)
+        }
+    }
+
+    /// Whether a deploy of this course is running from this app.
+    func isBeingDeployed(_ course: Course) -> Bool {
+        guard let folder = workspace.workspaceURL else {
+            return false
+        }
+        return CourseActivity.coursePublishIsRunning(folderPath: folder.path, courseCode: course.code)
     }
 
     /// Why the course is busy — previewing or publishing, in any window
