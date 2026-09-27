@@ -322,5 +322,36 @@ final class AssistBackupOffTheMainActorTests: XCTestCase {
         XCTAssertEqual(backupLines(in: trail()).count, linesBefore + 1, trail())
         XCTAssertEqual(CourseArchiver.lastZipRanOnTheMainThread, false)
     }
+
+    /// A start of the year whose re-plan FAILS after the copy refuses, like
+    /// every other write (#351's second review, SF2): here every class page
+    /// is deleted while the copy is saved, so there is no first class.
+    func testAStartOfTheYearRefusesWhenItsPlanFailsAfterTheCopy() async throws {
+        let made: AssistFixture.Made = try makeRunner()
+        try AssistFixture.write(page: "Unit 1, Day 3", publish: "true", body: "Three.", in: made.course)
+        _ = await AssistFixture.run("publish_pages", with: ["pages": "Unit 1, Day 1, Unit 1, Day 2"], on: made.runner)
+        let planned: AssistToolOutcome = await AssistFixture.run("plan_prepare_for_start_of_year", with: [:], on: made.runner)
+        let code: String = try XCTUnwrap(StartOfYearPlanner.planCode(in: planned.detail), planned.detail)
+        holdEveryCopy(on: made.runner)
+
+        let runner: AssistToolRunner = made.runner
+        let preparing: Task<AssistToolOutcome, Never> = Task { @MainActor in
+            return await AssistFixture.run("prepare_for_start_of_year", with: ["planCode": code], on: runner)
+        }
+        await waitUntil("the copy to start") { return !heldCopies.isEmpty }
+        for title in ["Unit 1, Day 1", "Unit 1, Day 2", "Unit 1, Day 3"] {
+            try FileManager.default.removeItem(at: AssistFixture.pageURL(of: title, in: made.course))
+        }
+        releaseHeldCopies()
+        let outcome: AssistToolOutcome = await preparing.value
+
+        XCTAssertFalse(outcome.summary.isEmpty)
+        XCTAssertTrue(trail().contains("nothing was changed (noFirstClass)"), trail())
+        var classPages: [String] = []
+        for url in ClassPages.list(forSection: 1, in: made.course) {
+            classPages.append(url.title)
+        }
+        XCTAssertEqual(classPages, [], "the stale plan was carried out: \(classPages)")
+    }
 }
 

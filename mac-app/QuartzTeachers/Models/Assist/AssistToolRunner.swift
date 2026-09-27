@@ -2128,6 +2128,13 @@ final class AssistToolRunner {
     private func bringThePreviewUpToDate(
         for course: Course, sectionNumber: Int
     ) async -> String {
+        // Before anything is stopped (#351's second review, SF1): while a copy
+        // of the course is being zipped the window's own Preview refuses, so
+        // stopping a running preview first would end it and start nothing.
+        if let folder = workspace.workspaceURL,
+           CourseActivity.courseIsBeingCopied(folderPath: folder.path, courseCode: course.code) {
+            return AssistWording.courseIsBeingCopied(course: course.code)
+        }
         // FIRST, before a window is opened or a preview stopped (#156): a
         // build another program is running, or a preview it is showing, is
         // not this conversation's to end.
@@ -2425,7 +2432,19 @@ final class AssistToolRunner {
         // The copy can take a minute, and the teacher can edit in Obsidian
         // meanwhile: held again to the plan the call was given (the rule in
         // documentation/10 → "The gap between a plan and its write").
-        if case .success(let afterTheBackup) = startOfYearPlan(arguments),
+        // A re-plan that FAILS refuses too (#351's second review, SF2): a
+        // first class renamed or deleted during the copy is noFirstClass,
+        // and the plan from before the copy must not be carried out.
+        let replanned: Result<(located: Located, plan: StartOfYearPlan), StartOfYearRefusal> = startOfYearPlan(arguments)
+        if case .failure(let problem) = replanned {
+            ActivityTrail.note(
+                .startOfTheYearNotDone,
+                ActivityTrail.startOfYearNotDoneLine(source: source, reason: problem.reason),
+                course: course.code, section: sectionNumber
+            )
+            return AssistToolOutcome.refused(problem.message)
+        }
+        if case .success(let afterTheBackup) = replanned,
            afterTheBackup.plan.fingerprint != plan.fingerprint {
             ActivityTrail.note(
                 .startOfTheYearNotDone,

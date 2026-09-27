@@ -127,4 +127,86 @@ final class WhileACopyIsSavedTests: XCTestCase {
         }
         XCTAssertEqual(archivesWhenUnlocking, 1, "the course was unlocked before its archive existed")
     }
+
+    // MARK: - Every busy reader sees the copy (the second review, SF1)
+
+    func testACopyMakesTheCourseBusyForEveryReader() throws {
+        let (root, _, _) = try makeWorkspace()
+        XCTAssertFalse(CourseActivity.courseIsBusy(folderPath: root.path, courseCode: "ICS3U"))
+        CourseActivity.beginCopy(folderPath: root.path, courseCode: "ICS3U")
+        XCTAssertTrue(CourseActivity.courseIsBusy(folderPath: root.path, courseCode: "ICS3U"))
+        XCTAssertEqual(
+            CourseActivity.busyDescription(folderPath: root.path, courseCode: "ICS3U"),
+            CourseActivity.availableOnceTheCopyIsSaved
+        )
+        CourseActivity.endCopy(folderPath: root.path, courseCode: "ICS3U")
+        XCTAssertFalse(CourseActivity.courseIsBusy(folderPath: root.path, courseCode: "ICS3U"))
+    }
+
+    /// The assistant's preview refuses BEFORE stopping anything: the window's
+    /// own Preview refuses during a copy, so a stop first would end a running
+    /// preview and start nothing.
+    func testTheAssistantsPreviewRefusesWhileACopyIsSaved() async throws {
+        let made: AssistFixture.Made = try AssistFixture.makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+        CourseActivity.beginCopy(folderPath: made.root.path, courseCode: "ICS3U")
+        let outcome: AssistToolOutcome = await AssistFixture.run("rebuild_preview", with: [:], on: made.runner)
+        XCTAssertTrue(outcome.detail.contains(AssistWording.courseIsBeingCopied(course: "ICS3U")), outcome.detail)
+        XCTAssertEqual(made.siteWork.previewRebuilds, 0, "a build was started during the copy")
+    }
+
+    /// With no window, the site work itself refuses — the build and the
+    /// publish both.
+    func testTheSiteWorkRefusesToBuildOrPublishWhileACopyIsSaved() async throws {
+        let (root, workspace, course) = try makeWorkspace()
+        CourseActivity.beginCopy(folderPath: root.path, courseCode: "ICS3U")
+        let work: AssistToolchainWork = AssistToolchainWork(workspace: workspace)
+        let rebuilt: AssistSiteWorkResult = await work.rebuildPreview(course: course, sectionNumber: 1)
+        XCTAssertFalse(rebuilt.succeeded)
+        XCTAssertEqual(rebuilt.message, AssistWording.courseIsBeingCopied(course: "ICS3U"))
+        let published: AssistSiteWorkResult = await work.deploy(course: course, sectionNumber: 1)
+        XCTAssertFalse(published.succeeded)
+        XCTAssertEqual(published.message, AssistWording.courseIsBeingCopied(course: "ICS3U"))
+        XCTAssertTrue(CourseActivity.activePreviewBuilds.isEmpty)
+    }
+
+    func testARemovalRefusesWhileTheCourseIsBusy() async throws {
+        let (root, _, course) = try makeWorkspace()
+        CourseActivity.beginPublish(folderPath: root.path, courseCode: "ICS3U", sectionNumber: 1)
+        let result: ScheduledDeployCleanup.RemovalResult = await ScheduledDeployCleanup.removeCourse(
+            course, coursesDirectoryURL: root.appendingPathComponent("courses"), runner: SilentLaunchControl()
+        )
+        XCTAssertFalse(result.didRemove)
+        XCTAssertEqual(result.problem, ScheduledDeployCleanup.removalWaitsWhileBusy(course: "ICS3U"))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: course.directoryURL.path))
+        // Refused BEFORE anything: no archive made, nothing turned off.
+        XCTAssertEqual(WorkspaceModel.findBackupItems(in: root.appendingPathComponent("courses")).count, 0)
+        let archives: [String] = (try? FileManager.default.contentsOfDirectory(
+            atPath: root.appendingPathComponent("courses/_backups/ICS3U").path
+        )) ?? []
+        XCTAssertEqual(archives, [], "the refused removal zipped the course first")
+    }
+
+    /// A publish that begins during the removal's zip: the archive is made,
+    /// the course is NOT deleted.
+    func testARemovalDeletesNothingWhenTheCourseBecameBusyDuringItsZip() async throws {
+        let (root, workspace, course) = try makeWorkspace()
+        let removing: Task<ScheduledDeployCleanup.RemovalResult, Never> = Task { @MainActor in
+            return await ScheduledDeployCleanup.removeCourse(
+                course, coursesDirectoryURL: root.appendingPathComponent("courses"), runner: SilentLaunchControl()
+            )
+        }
+        await waitForTheCopyToStart(in: workspace)
+        CourseActivity.beginPublish(folderPath: root.path, courseCode: "ICS3U", sectionNumber: 1)
+        let result: ScheduledDeployCleanup.RemovalResult = await removing.value
+        XCTAssertFalse(result.didRemove)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: course.directoryURL.path),
+                      "the course was deleted under a publish that began during the zip")
+    }
+
+    func testTheQuitQuestionNamesTheCourseAsATeacherReadsIt() {
+        CourseActivity.beginCopy(folderPath: "/pretend", courseCode: "ICS4U-2025", displayCode: "ICS4U")
+        XCTAssertEqual(QuitConfirmation.workUnderWay(), "saving a copy of ICS4U")
+    }
 }
+

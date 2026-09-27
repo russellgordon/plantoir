@@ -285,6 +285,13 @@ enum ScheduledDeployCleanup {
         runner: LaunchControlRunning = LaunchControl()
     ) async -> RemovalResult {
         let workingFolderURL: URL = coursesDirectoryURL.deletingLastPathComponent()
+        // Before anything is turned off or zipped (#351's second review).
+        if isBusy(course, workingFolderURL: workingFolderURL) {
+            return RemovalResult(
+                stoppedSections: [], didRemove: false,
+                problem: removalWaitsWhileBusy(course: course.displayCode)
+            )
+        }
         let agents: [ScheduledDeploy.Agent] = agentsOwnedBy(
             courseCode: course.code,
             sectionNumber: nil,
@@ -313,6 +320,11 @@ enum ScheduledDeployCleanup {
             try await CourseArchiver.archiveAndRemoveCourse(
                 course, coursesDirectoryURL: coursesDirectoryURL
             ) {
+                // Asked again after the zip: the archive is made, the delete
+                // is not (#351's second review).
+                if isBusy(course, workingFolderURL: workingFolderURL) {
+                    throw BecameBusy(sentence: removalWaitsWhileBusy(course: course.displayCode))
+                }
                 if course.isKeptForReference {
                     ReferenceLock.unlock(courseDirectory: course.directoryURL)
                 }
@@ -355,6 +367,12 @@ enum ScheduledDeployCleanup {
             )
         }
         let workingFolderURL: URL = coursesDirectoryURL.deletingLastPathComponent()
+        if isBusy(course, workingFolderURL: workingFolderURL) {
+            return RemovalResult(
+                stoppedSections: [], didRemove: false,
+                problem: removalWaitsWhileBusy(course: course.displayCode)
+            )
+        }
         let agents: [ScheduledDeploy.Agent] = agentsOwnedBy(
             courseCode: course.code,
             sectionNumber: sectionNumber,
@@ -371,7 +389,11 @@ enum ScheduledDeployCleanup {
         do {
             try await CourseArchiver.archiveAndRemoveSection(
                 sectionNumber, from: course, coursesDirectoryURL: coursesDirectoryURL
-            )
+            ) {
+                if isBusy(course, workingFolderURL: workingFolderURL) {
+                    throw BecameBusy(sentence: removalWaitsWhileBusy(course: course.displayCode))
+                }
+            }
         } catch {
             return RemovalResult(
                 stoppedSections: outcome.stopped,
@@ -436,6 +458,36 @@ enum ScheduledDeployCleanup {
     ///
     /// When nothing was scheduled there is nothing extra to say and the
     /// teacher gets the plain reason, exactly as they did before this existed.
+    /// Said when the course is previewing, publishing or being copied (#351's
+    /// second review, SF1). Before, the frozen window made a removal during a
+    /// preview's start or a publish unreachable for the length of the
+    /// archive; now the zip is off the main actor, and a removal that
+    /// deleted a folder a build or publish is reading would break both.
+    static func removalWaitsWhileBusy(course: String) -> String {
+        return "\(course) is previewing, deploying or being copied right now. Let that finish, then remove it."
+    }
+
+    /// Thrown from the step between the archive and the delete when the
+    /// course became busy during the zip: nothing is deleted.
+    struct BecameBusy: LocalizedError {
+
+        // MARK: - Stored properties
+
+        let sentence: String
+
+        // MARK: - Computed properties
+
+        var errorDescription: String? {
+            return sentence
+        }
+    }
+
+    /// Whether the course is busy in this process, by the one reading every
+    /// busy check makes (`CourseActivity.courseIsBusy`).
+    private static func isBusy(_ course: Course, workingFolderURL: URL) -> Bool {
+        return CourseActivity.courseIsBusy(folderPath: workingFolderURL.path, courseCode: course.code)
+    }
+
     private static func removalProblemSentence(
         courseCode: String, stopped: [Int], reason: String
     ) -> String {

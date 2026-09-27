@@ -7566,20 +7566,36 @@ freeze. Moving them is its own piece if one is ever measured slow.
 **While a copy is being zipped, nothing changes the course under it** (the
 review round's S1). Before #351 the frozen window made every one of these
 impossible; now `CourseActivity` records a copy for the length of its zip
-(`beginCopy`/`endCopy`, in `CourseArchiver`'s main-actor entry points, so every
-caller is covered) and: Back Up Now, Restore and Remove for that course are
-greyed and refuse if reached another way; its preview cannot be started; its
-sidebar row shows a small spinner; and ⌘Q asks first ("saving a copy of
-ICS3U" — `shared-rules.json` → `quittingWhileWorkIsUnderWay`, the
+(`beginCopy`/`endCopy`, in `CourseArchiver`'s main-actor entry points —
+`backUpCourse`, `archiveCourse` and the section archive, which every caller but
+Copy a Page goes through; see below) and **the course counts as BUSY for every
+reader**: `CourseActivity.busyDescription` names it first ("Available once the
+copy is saved"), so everything that already waited for a preview or publish
+waits for the copy too — the assistant's rebuild and deploy, with or without a
+window (they say `AssistWording.courseIsBeingCopied`, not `courseIsBusy`, whose
+"a preview or a deploy is running" would be untrue), the unit-word rename, a
+course rename, Add Section. The assistant's rebuild asks BEFORE stopping a
+running preview, since the window's own Preview refuses during a copy and a
+stop first would end the preview and start nothing (the second review, SF1).
+On top of that: Back Up Now, Restore, Remove, Preview and Deploy for that
+course are greyed and refuse if reached another way; its sidebar row shows a
+small spinner; and ⌘Q asks first ("saving a copy of ICS4U", the name a teacher
+reads — `shared-rules.json` → `quittingWhileWorkIsUnderWay`, the
 `copiesBeingSaved` case). `WorkspaceModel.restoreBackup` asks `courseIsBusy`
-AGAIN after its zip, since a preview or publish could have started during it.
+AGAIN after its zip, and a REMOVAL — which never checked at all — now refuses
+while the course is busy (`removalWaitsWhileBusy`) and asks again after its
+zip, deleting nothing if a publish or preview began meanwhile; the archive
+stays.
 A reference course being removed is unlocked after its archive and just before
 the delete (`archiveAndRemoveCourse(beforeRemoving:)`): unlocked before, a
 folder read during the zip locked it again and the delete failed after the
 archive was made. `WhileACopyIsSavedTests` pins all four, interleaving
 deterministically (the work cannot resume on the main actor until the test
-suspends). Copy a Page's own backup does not record one: its sheet is modal
-and already says what it is doing.
+suspends). **Copy a Page's own backup does not record one** — it calls
+`CourseArchiver.backingUp` directly, off the main actor from the copier — so
+during it ⌘Q does not ask and an assistant window could act on the course. Its
+sheet is modal over the MAIN window and says what it is doing; accepted in the
+second review (N2) rather than threading a copy record through the copier.
 `ClassInsertionPlanner.apply` and `PlaceholderClassPlanner.apply` lost a
 `backingUpInto:` parameter that no caller passed — the assistant, their only
 caller, saves its own copy first — rather than going async for a zip that

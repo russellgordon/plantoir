@@ -236,6 +236,14 @@ nonisolated enum AssistWording {
              + "Wait for that to finish, then ask again."
     }
 
+    /// Said when a copy of the course is being saved in Plantoir (#351) — a
+    /// backup, or the archive before a restore or a removal — and the
+    /// assistant was asked to preview or deploy it. Not `courseIsBusy`, whose
+    /// "a preview or a deploy is running" would be untrue.
+    static func courseIsBeingCopied(course: String) -> String {
+        return "A copy of \(course) is being saved in Plantoir. Wait for that to finish, then ask again."
+    }
+
     /// Said when ANOTHER program on this computer is previewing, building or
     /// publishing the course — an assistant working from another app, another
     /// copy of Plantoir, or a deploy set for later (#156) — to a teacher who

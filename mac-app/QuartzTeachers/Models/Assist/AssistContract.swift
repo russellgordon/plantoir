@@ -230,6 +230,7 @@ enum AssistContract {
             "deployDidNotFinish": AssistWording.deployDidNotFinish(course: course, section: section),
             "sectionIsBusy": AssistWording.sectionIsBusy(course: course, section: section),
             "courseIsBusy": AssistWording.courseIsBusy(course: course),
+            "courseIsBeingCopied": AssistWording.courseIsBeingCopied(course: course),
             "courseIsBeingBuiltElsewhere": AssistWording.courseIsBeingBuiltElsewhere(course: course),
             "previewIsRebuilding": AssistWording.previewIsRebuilding(course: course, section: section),
             "builtWithNoWindowOpen": AssistWording.builtWithNoWindowOpen(course: course, section: section),

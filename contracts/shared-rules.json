@@ -8047,7 +8047,7 @@
     ]
   },
   "quittingWhileWorkIsUnderWay": {
-    "rule": "Quitting asks the teacher to confirm when THIS app is in the middle of publishing or of building a preview, and never asks when the Mac itself is logging out, restarting or shutting down.",
+    "rule": "Quitting asks the teacher to confirm when THIS app is in the middle of publishing, of building a preview, or (since #351) of saving a copy of a course, and never asks when the Mac itself is logging out, restarting or shutting down.",
     "why": "Quitting used to be free, because it could not reach anything: the path that stops a working folder's website builder looked for programs it had never told itself where to find, so on an ordinary teacher's Mac it did nothing at all and there was nothing to interrupt (issue #220, 2026-09-19). Making it work means a quit can now genuinely land on work in flight, and the one case where that hurts is the one the teacher cannot see happening.",
     "whatCountsAsUnderWay": "A publish this app started - in any of its windows, or by its own assistant. Counted from the app's own record of active publishes, which lasts exactly as long as the publish does. And, since issue #232 (2026-09-23), a preview being BUILT - from the moment it is asked for until its page first answers, or the run ends - whether a section window started it or the app's own assistant rebuilt it with no window open. Counted from a second record of the same kind, of preview builds. A publish's own build is NOT counted as a preview build: it is part of the publish, which is already counted. When both are under way the question names the publish, whose loss reaches the class website. And, since #351 (2026-09-27), a copy of a course being ZIPPED - a backup, or the archive made before a restore or a removal - counted from a third record of the same kind, while the zip runs; named after a publish or a preview build when more than one is under way.",
     "whatDoesNotCount": "A preview that is merely OPEN. A preview is known by the port it holds, and that is held for as long as the preview is OPEN - it cannot tell a section still building from one that finished twenty minutes ago and is being read. Asking on every open preview would mean asking almost every quit, which teaches a teacher to dismiss the question unread, and the question exists for work that can still be lost. Previews are not abandoned either: quitting stops this app's own previews deliberately, the way the Stop button does, before anything else is asked to rest. The record of a preview BUILD is a different fact from the port, and it is the one that counts: it ends when the page first answers, so a preview being read is never asked about. It is NOT the preview's address either - the launcher prints the address before it starts building, so the address is known for almost the whole build.",
@@ -14784,6 +14784,7 @@
       "caption": "Your notes on how this course is taught, for you and any assistant you use. It is never on the website.",
       "couldNotCreate": "The How I Teach page could not be made: {reason}",
       "createdBytes": "---\npublish: false\n---\n",
+      "history": "Deferred by #209 (a GUI surface on both platforms, left out of that piece); shipped in #329 as this row, 2026-09-26.",
       "why": "Russell on #329, 2026-09-26: the row opens the page, or creates it and opens it. #209 left the page to be written in Obsidian or drafted by an outside assistant, and a teacher had no way to find or start it from Plantoir. Empty, never a starter text: #209 rejected a template because an assistant reads the page as the teacher's own approach (see `rejected`), so the page is made with its settings and nothing else - and emptyPageIsNotWritten is what stops that empty page being described as written.",
       "cases": [
         {
@@ -14892,7 +14893,6 @@
       "The local assistant reading or drafting it - a routing and prompt change owing re-measurement, and the wrong job for a small model.",
       "A starter page from the wizard or setup_course.py, or payloads shipping one - a template is text an agent would read as the teacher's own approach, and it would put words in the teacher's mouth.",
       "Leaving the page out of the section's '- Edited' fingerprint UNVERSIONED - a wire format held byte for byte in three implementations. Done versioned by #330: app-rules.json -> publishedFreshness.fingerprintRules.",
-      "A button to open or create the page - shipped in #329 as settingsButton.",
       "read_page redirecting to read_how_i_teach - read_page answers as it does for any page not in the section, and the tool's own description is what an agent finds.",
       "A starter text in a page Course Settings makes (#329) - the template #209 rejected, by another door.",
       "Creating the page with obsidian://new (#329) - Obsidian writes the file without publish: false, and nothing would record that the app made it.",

@@ -5807,10 +5807,16 @@ that is no longer the one it planned for. So every write that saves a copy
 first works its plan out AGAIN after the copy and refuses, with
 `changedWhileSavingACopy`, when it no longer matches — remember_timetable,
 duplicating a class, make_room_for_classes, add_next_class / add_classes and
-add_curriculum_mentions compare the plan's own description (and, for a
-duplicate, the source page's words and the new page's name);
+add_curriculum_mentions compare the plan's DISPLAYED summary (and, for a
+duplicate, the source page's words and the new page's name) — a summary that
+is lossy by design: a make-room plan names its first ten renames and moves and
+counts the rest, and a timetable names its count and its first and last dates,
+so a change past what the summary shows is not caught here; the apply's own
+guards (a rename onto a name in use is skipped, an existing page is never
+written over) are what stand behind it (accepted in the second review, N1);
 prepare_for_start_of_year compares its fingerprint and answers
-`startOfYearPlanHasChanged`; write_how_i_teach compares the page's mark and
+`startOfYearPlanHasChanged`, and refuses too when its plan cannot be made at
+all any more (a first class renamed or deleted meanwhile); write_how_i_teach compares the page's mark and
 answers `howITeachChangedSincePlanned`. A course removed meanwhile no longer
 locates, so a write never makes its folder again. The writes that reach the
 copy through publish_pages, unpublish_pages, publish_class_on and
@@ -5850,7 +5856,11 @@ bundle C). REJECTED: leaving an empty page counted as written.
   [#329](https://github.com/russellgordon/plantoir/issues/329) as Course
   Settings' How I Teach row (above, and documentation/09). The page it makes
   is left out of the "— Edited" fingerprint by #330's rule 2 like any How I
-  Teach page, written or not, so starting one never marks a section edited.
+  Teach page, written or not, so starting one never marks a section edited
+  once the section's stamp is rule 2. A section last published before #330
+  (its stamp still rule 1, which counts every file) IS marked "— Edited" once
+  by the first Create and Open, as #330's own `why` says of any first edit —
+  and on Windows, until it implements rule 2, every time.
 - No starter page from the wizard, `setup_course.py` or a payload: a template is
   text an agent would read as the teacher's approach.
 - The local assistant neither reads nor drafts it.

@@ -408,7 +408,9 @@ struct SectionDetailView: View {
                 // was clickable again the instant that phase started — a
                 // second click there raced its own stop-preview-then-deploy
                 // sequence against the first's.
-                .disabled(deployRunner.isRunning || isPreparingDeploy)
+                // Nor while a copy of the course is being zipped (#351): a
+                // removal waiting on that zip deletes what this would publish.
+                .disabled(deployRunner.isRunning || isPreparingDeploy || workspace.isBeingCopied(course.code))
                 .help("Deploy this section's website")
                 .accessibilityIdentifier("deployButton")
                 }
@@ -1461,6 +1463,12 @@ struct SectionDetailView: View {
                 message: AssistWording.sectionIsBusy(
                     course: course.code, section: String(sectionNumber)
                 )
+            )
+        }
+        // Every way in, the assistant's included (#351's second review, SF1).
+        if CourseActivity.courseIsBeingCopied(folderPath: workspaceURL.path, courseCode: course.code) {
+            return AssistSiteWorkResult(
+                succeeded: false, message: AssistWording.courseIsBeingCopied(course: course.code)
             )
         }
 
