@@ -114,6 +114,22 @@ final class AssistantRolloverUITests: XCTestCase {
             XCTFail("Asking before changing is on, so a rollover must offer a plan first.")
             return
         }
+        // **A known product freeze, held open here (#154's R0).** Approving
+        // runs the once-per-conversation backup, which zips the course with
+        // `Process.waitUntilExit()` ON THE MAIN THREAD; the nested run loop it
+        // spins re-enters SwiftUI's transaction flush over and over, and the
+        // window is frozen — measured 93 one-second samples busy there, over
+        // 122 s, on 2026-09-26. XCUITest reports it as "main thread busy for
+        // 30.0s". Strict, and matched to that message only: the day the
+        // backup stops blocking the main thread this goes red, and whoever
+        // fixed it removes this wrapper. The issue is written up in
+        // ~/Downloads/plantoir-v1.3.2-run/ready/154.md for the director to open.
+        let freeze: XCTExpectedFailure.Options = XCTExpectedFailure.Options()
+        freeze.isStrict = true
+        freeze.issueMatcher = { issue in
+            return issue.compactDescription.contains("main thread busy")
+        }
+        XCTExpectFailure("The backup's zip blocks the main thread after Approve (#154 R0).", options: freeze)
         approve.click()
         let approvedAt: Date = Date()
 

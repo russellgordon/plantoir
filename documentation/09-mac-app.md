@@ -6447,7 +6447,7 @@ in `IsolatedLaunch.swift` and `MarketingScreenshotTests.swift`.
 | …anywhere else? | **Only under `/private/tmp`.** A probe with the same name under `/private/tmp` wrote the file at the path; under `$TMPDIR` (`/var/folders/…`) or under the home folder — where a UI runner's temp folder is, inside its container — it silently wrote `~/Library/Preferences/<last component>.plist` instead, the REAL preferences folder. (The litter from that probe was deleted.) So a state folder's preferences live in `/private/tmp`, named by a hash of the state folder's path, and the state folder carries a note saying where (`PlantoirDefaults.honouredParent`, `locationNoteName`). The unit test asserts the file appears where the note says and that the standard store never sees the write. |
 | Does a path suite see the argument domain? | Yes: `-assistantAsksBeforeChanging YES` reads, and is not written into the file. |
 | And the global domain? | Yes: `AppleLocale`, `NSQuitAlwaysKeepsWindows`, `AppleInterfaceStyle`. Reading creates no file. |
-| Can the sandboxed UI runner read the real Logs and Preferences? | Its entitlements carry `temporary-exception.files.absolute-path.read-only` for `/`, plus `(allow signal)`. `StateDirectoryUITests` FAILS rather than skips on any read that is refused, so this is re-measured on every run. RESULT_OF_THE_RUN |
+| Can the sandboxed UI runner read the real Logs and Preferences? | Its entitlements carry `temporary-exception.files.absolute-path.read-only` for `/`, plus `(allow signal)`. `StateDirectoryUITests` FAILS rather than skips on any read that is refused, so this is re-measured on every run. Measured green on 2026-09-26: every read of the real trail, `runs/`, `scheduled/`, `assist/`, `builds/`, `LaunchAgents` and the real preferences file succeeded. |
 
 ### The redirect, proved through the window: `StateDirectoryUITests`
 
@@ -6470,7 +6470,9 @@ UI test can still move where the teacher's main window next opens. The allowed
 prefixes are `StateDirectoryUITests.realPreferenceKeysAppKitOwns`; any other
 real key that changes is red. `-ApplePersistenceIgnoreState YES` (passed by
 `IsolatedLaunch`) keeps the app from restoring the teacher's windows.
-KEY_DIFF_OF_THE_RUN
+The real domain's key NAMES were read around each UI run on 2026-09-26 (75
+before and after, none added or removed); values of AppKit's keys may still
+change, which is why they are allowed by prefix rather than listed.
 
 ### The assistant's weights under a state folder
 
@@ -6482,7 +6484,42 @@ weights and a download would land in the real folder. It passes the real
 through the argument domain; if that read fails it passes nothing and says the
 automatic tier was used.
 
-ROLLOVER_R0
+**Weights through a link needed one product change.** `AssistModelStore.isReady`
+measured the file with `attributesOfItem`, which reports a symbolic link's OWN
+size (135 bytes), so a linked model read as a truncated download and the
+assistant never became ready. It now resolves the link first (and so does
+`bytesOnDisk`); `AssistModelStoreLinkTests` pins it with a sparse file of the
+exact size.
+
+### #88's "main thread busy ~30 s": a product freeze, not the fixture
+
+Measured 2026-09-26 by sampling the app under test once a second through the
+rollover. The stall is NOT the fixture's missing container (the preview is a
+stub here, and slowing the stub by 30 s changed nothing): Approve runs
+`AssistToolRunner.backUpOnceForThisConversation`, which calls
+`CourseArchiver.archive`, which runs `/usr/bin/zip` and then
+`Process.waitUntilExit()` ON THE MAIN THREAD. The nested run loop that call
+spins re-enters SwiftUI's transaction flush (726 of 732 main-thread samples in
+`NSHostingView.beginTransaction` → lazy-stack placement) — 93 busy one-second
+samples over 122 s, and XCUITest fails with "main thread busy for 30.0s". A
+teacher approving a rollover or re-dating meets the same beachball. It is its
+own issue (written up for the director with the stack), not fixed here; the
+opt-in rollover test holds it open with a strict `XCTExpectFailure` matched to
+that message, so it turns red the day the backup stops blocking.
+
+### Two things the new-site test found about the real window
+
+- **`CredentialRequestSheet`'s `.accessibilityIdentifier("credentialSheet")`
+  is stamped on every element inside it**, so `credentialField` and
+  `credentialSendButton` never reach the accessibility tree (read off the real
+  tree). The test finds the sheet as `application.sheets` and its one text
+  field; the dead identifiers are left as they are, since nothing else reads
+  them.
+- **XCUITest leaves the previous test's app running**, so the redirect test's
+  "no other Plantoir" check would skip on its own neighbour: it ends the copy
+  `IsolatedLaunch` launched last, and only that one, and counts only this
+  ACCOUNT's copies (a fast-user-switched account's Plantoir is not a reason to
+  skip).
 
 ### Rejected
 
