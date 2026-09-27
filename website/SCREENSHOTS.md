@@ -96,10 +96,10 @@ at the end of a run, exiting 1 and naming what not to commit. It failed on
 the committed `colour-schemes` and `light-and-dark` before they were
 retaken, and passes after. **It is a guard, not a proof:** a mask drawn at a
 window's REAL radius reads like the real curve, which is why the code that
-drew them is gone rather than merely checked. The one such picture still on
-the site is `schedule` (its banner was masked at the measured radius on
-2026-09-27); the test lists it in `DRAWN_BUT_NOT_DETECTABLE` and reports a
-skip until it is retaken.
+drew them is gone rather than merely checked. `schedule` was the one such picture
+(its banner masked at the measured radius in 2e11471d); it was retaken the
+same day from a native capture of Notification Center's window, and
+`DRAWN_BUT_NOT_DETECTABLE` in the test is empty and must stay so.
 
 **Windows owes the same rule.** `capture_windows.py` builds
 `light-and-dark-windows` and `colour-schemes-windows` with `composite.py`,

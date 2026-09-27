@@ -58,28 +58,18 @@ class CommittedPictures(unittest.TestCase):
                             f"{name} passes now — take it off NAMED_GAPS ({owner})")
 
 
-# Pictures known to carry a drawn corner that this reader CANNOT see, so the
-# gate above passes them. Each is owed a retake; the list is here so that the
-# pass above is not read as "clean".
-#
-# `schedule`: its banner was cut out of Notification Center's window and a
-# rounded mask drawn over it at the banner's MEASURED radius (2e11471d). The
-# ratio test cannot tell a mask drawn at the real radius from the real curve,
-# and the banner sits inside the same shape as the window below it. The
-# retake with the new crop (scenes.banner_in_window) was paused on
-# 2026-09-27 when Russell was at the Mac.
-DRAWN_BUT_NOT_DETECTABLE: dict[str, str] = {
-    "schedule-light.png": "retake owed: capture.py --only notification-banner, then compose",
-    "schedule-dark.png": "retake owed: capture.py --only notification-banner, then compose",
-}
+# A mask drawn at a window's REAL radius cannot be told from the real curve
+# by pixels. Any picture known to carry one goes here, with what it is owed,
+# and the test below reports it rather than letting the pass read as "clean".
+# Empty since 2026-09-27, when `schedule` was retaken from a native capture
+# of Notification Center's window.
+DRAWN_BUT_NOT_DETECTABLE: dict[str, str] = {}
 
 
 class PicturesStillOwed(unittest.TestCase):
 
     def test_no_picture_is_known_to_carry_a_drawn_corner(self):
-        if DRAWN_BUT_NOT_DETECTABLE:
-            owed = "; ".join(f"{name}: {why}" for name, why in DRAWN_BUT_NOT_DETECTABLE.items())
-            self.skipTest(f"known drawn corners the reader cannot see — {owed}")
+        self.assertEqual(DRAWN_BUT_NOT_DETECTABLE, {})
 
 
 class TheCheckItself(unittest.TestCase):
