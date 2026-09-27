@@ -145,6 +145,18 @@ nonisolated enum ActivityTrail {
         /// believed. Not `assistant could not answer` either: that is for an
         /// engine that FAILED, and here the engine answered perfectly badly.
         case assistantRepeatedTheRequestBack = "assistant repeated the request back"
+        /// The model named a tool that exists but was not among those it was
+        /// OFFERED in this window, so the turn was refused and nothing ran
+        /// (#327).
+        ///
+        /// Carries the tool, in words — the one fact about this that is not
+        /// already on the turn's own line, which records what the model
+        /// chose without saying it was never on the menu. Never the sentence
+        /// and never the arguments. Its own event rather than `assistant
+        /// repeated the request back`, whose name would be false here: the
+        /// teacher reads the same sentence for both, and only this line
+        /// tells the router reaching past its list apart from an echo.
+        case assistantNamedAToolItWasNotOffered = "assistant named a tool it was not offered"
         /// The model filled in a COURSE that is not the one the window is
         /// for, so the turn was refused and nothing ran.
         ///

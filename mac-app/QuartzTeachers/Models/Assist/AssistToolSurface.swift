@@ -92,9 +92,11 @@ extension AssistToolRunner {
 
     /// The tools the LOCAL model is actually shown.
     ///
-    /// Everything above still RUNS; this is only what the model is asked to
-    /// choose between, and every schema in the list costs it context and
-    /// accuracy. Nine are left out — the seven `plan_` twins, plus the two
+    /// Everything above still RUNS when code asks for it — plan mode, a
+    /// matched phrasing, an MCP client; this is only what the model is asked
+    /// to choose between, and every schema in the list costs it context and
+    /// accuracy. A local model that names something NOT on this list is
+    /// refused rather than obeyed (#327). Nine are left out — the seven `plan_` twins, plus the two
     /// named in `hiddenFromTheLocalModel` below — and none of them loses a
     /// teacher anything:
     ///
