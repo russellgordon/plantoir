@@ -76,6 +76,23 @@ class Course: Identifiable {
 
     // MARK: - Functions
 
+    /// This course as its settings file says it is RIGHT NOW (#335) — a new
+    /// `Course` with the same code and folder, read from `course_config.json`.
+    ///
+    /// **For acts, not for display.** Deploying, and setting a deploy, read
+    /// the saved file, because the launcher, the build, the approval card and
+    /// a scheduled run all do: a window's copy may hold Course Settings edits
+    /// nobody has saved, and an act that followed those would publish half
+    /// from memory and half from disk. Never assign the result back into a
+    /// window's model — that copy holds the teacher's unsaved edits and must
+    /// keep them. The same idea as #322's `readCoursesAsSavedNow`, for one
+    /// course. Throws when the file cannot be read: there is no safe default
+    /// for where a site goes, so the caller refuses rather than guessing.
+    func asSavedNow() throws -> Course {
+        let saved: CourseConfiguration = try CourseConfiguration(contentsOf: configFileURL)
+        return Course(code: code, directoryURL: directoryURL, configuration: saved)
+    }
+
     /// The folder holding one section's content, e.g.
     /// `<workspace>/courses/ICS3U/section3`.
     func sectionDirectoryURL(forSection sectionNumber: Int) -> URL {

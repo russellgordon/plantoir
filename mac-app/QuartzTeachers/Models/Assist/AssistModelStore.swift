@@ -80,7 +80,12 @@ final class AssistModelStore {
         guard FileManager.default.fileExists(atPath: path) else {
             return false
         }
-        let attributes: [FileAttributeKey: Any]? = try? FileManager.default.attributesOfItem(atPath: path)
+        // Through a symbolic link to the file it names (#154): a UI test links
+        // the real weights into its state folder one file at a time, and
+        // `attributesOfItem` reports the LINK's own few bytes, which read as a
+        // truncated download.
+        let resolved: String = URL(fileURLWithPath: path).resolvingSymlinksInPath().path
+        let attributes: [FileAttributeKey: Any]? = try? FileManager.default.attributesOfItem(atPath: resolved)
         let size: Int64 = (attributes?[.size] as? NSNumber)?.int64Value ?? 0
         return size == tier.downloadBytes
     }
@@ -175,7 +180,7 @@ final class AssistModelStore {
     /// size it was going to be.
     static func bytesOnDisk(for tier: AssistModelTier) -> Int64? {
         let url: URL = AssistModelStore.directoryURL.appendingPathComponent(tier.fileName)
-        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path) else {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.resolvingSymlinksInPath().path) else {
             return nil
         }
         return (attributes[.size] as? NSNumber)?.int64Value

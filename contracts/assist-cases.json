@@ -3573,7 +3573,7 @@
       "unpublish_pages" : "plan_unpublish_pages",
       "write_how_i_teach" : "plan_write_how_i_teach"
     },
-    "planTwinsNote" : "A write with a twin is shown as a plan first. Four writes have none, deliberately: rebuild_preview changes no page, undo_last_change IS the remedy, deploy_section waits on its own button whatever plan mode says, and a cancelled scheduled deploy is remedied by scheduling it again."
+    "planTwinsNote" : "A write with a twin is shown as a plan first. Five writes have none, deliberately: rebuild_preview changes no page, undo_last_change IS the remedy, deploy_section waits on its own button whatever plan mode says, a cancelled scheduled deploy is remedied by scheduling it again, and back_up_course writes a copy outside the course and changes no page."
   },
   "toolSchemas" : {
     "departures" : {

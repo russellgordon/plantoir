@@ -505,6 +505,11 @@ enum AssistContract {
             ),
             "reDated": AssistWording.reDated(count: 12, pagesTheyUse: 5),
             "reDatedForAMeeting": AssistWording.reDated(count: 12, pagesTheyUse: 5, noun: .meeting),
+            "reDatedOnlyPagesTheyUse": AssistWording.reDatedOnlyPagesTheyUse(pagesTheyUse: 3),
+            "everyPageIsAlreadyOnItsDay": AssistWording.everyPageIsAlreadyOnItsDay(course: "ICS3U", section: 1),
+            "reDatedOnlyPagesTheyUseForAMeeting": AssistWording.reDatedOnlyPagesTheyUse(
+                pagesTheyUse: 3, noun: .meeting
+            ),
         ]
         return [
             "note": "Generated from mac-app AssistWording by `Plantoir --write-contracts`. "
@@ -797,10 +802,11 @@ enum AssistContract {
             "mcpOnly": mcpOnly,
             "needsApproval": needsApproval.sorted(),
             "planTwins": twins,
-            "planTwinsNote": "A write with a twin is shown as a plan first. Four writes have none, "
+            "planTwinsNote": "A write with a twin is shown as a plan first. Five writes have none, "
                            + "deliberately: rebuild_preview changes no page, undo_last_change IS the "
-                           + "remedy, deploy_section waits on its own button whatever plan mode says, and "
-                           + "a cancelled scheduled deploy is remedied by scheduling it again.",
+                           + "remedy, deploy_section waits on its own button whatever plan mode says, "
+                           + "a cancelled scheduled deploy is remedied by scheduling it again, and "
+                           + "back_up_course writes a copy outside the course and changes no page.",
         ]
     }
 

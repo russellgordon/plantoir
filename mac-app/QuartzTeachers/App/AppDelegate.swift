@@ -11,8 +11,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     ///
     /// Behind the test guard: the test host IS Plantoir.app, and the suite
     /// must not touch the real notification centre at all (#212).
+    ///
+    /// Nor under a state folder (#154): nothing is posted there to be clicked
+    /// (`ScheduledPublishNotice.defaultPoster`).
     func applicationWillFinishLaunching(_ notification: Notification) {
-        if !WorkspaceModel.isRunningTests {
+        if !RealHome.isRedirected {
             UNUserNotificationCenter.current().delegate = self
         }
     }
@@ -42,6 +45,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 infoDictionary: Bundle.main.infoDictionary ?? [:],
                 arguments: CommandLine.arguments,
                 isRunningTests: WorkspaceModel.isRunningTests,
+                stateDirectory: RealHome.stateDirectory,
                 headlessFlags: AppUpdates.headlessFlags
             ) {
                 AppUpdates.shared.start()

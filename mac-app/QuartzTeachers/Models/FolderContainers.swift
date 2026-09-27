@@ -338,9 +338,32 @@ enum FolderContainers {
         )
     }
 
+    /// Whether this process may run the quit script at all — the guard both
+    /// callers below share, as a pure function.
+    nonisolated static func mayFreeContainersAtQuit(isInsideTestBundle: Bool, isUnderUITest: Bool, isRedirected: Bool) -> Bool {
+        if isInsideTestBundle {
+            return false
+        }
+        if isUnderUITest {
+            return false
+        }
+        if isRedirected {
+            return false
+        }
+        return true
+    }
+
     /// Runs the quit script detached, so quitting does not wait on it.
+    ///
+    /// Never from a test, hosted or UI-driven, or a redirected run (#154):
+    /// the script can stop the SHARED virtual machine (CLAUDE.md rule 7), and
+    /// a UI test quitting its app must never be what stops it.
     static func releaseEverythingAtQuit(folderPaths: [String]) {
-        if WorkspaceModel.isRunningTests {
+        if !mayFreeContainersAtQuit(
+            isInsideTestBundle: RealHome.isInsideTestBundle,
+            isUnderUITest: RealHome.isUnderUITest,
+            isRedirected: RealHome.isRedirected
+        ) {
             return
         }
         var uniquePaths: [String] = []
@@ -359,7 +382,11 @@ enum FolderContainers {
     /// shared virtual machine is NOT touched here — one window closing says
     /// nothing about the rest of the Mac.
     static func stopContainer(forFolder path: String) {
-        if WorkspaceModel.isRunningTests {
+        if !mayFreeContainersAtQuit(
+            isInsideTestBundle: RealHome.isInsideTestBundle,
+            isUnderUITest: RealHome.isUnderUITest,
+            isRedirected: RealHome.isRedirected
+        ) {
             return
         }
         run(quitCommand(

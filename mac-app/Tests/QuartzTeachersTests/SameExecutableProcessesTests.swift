@@ -2,10 +2,34 @@ import XCTest
 @testable import QuartzTeachers
 
 /// The scan the install gate falls back on (#204), against real processes:
-/// a copy of `/bin/sh` renamed `Plantoir` in a scratch folder, started the
+/// a copy of `/bin/bash` renamed `Plantoir` in a scratch folder, started the
 /// way launchd starts a scheduled publish and the way an assistant working
 /// from another app starts the server. Every child is ended by its own
 /// process id in `tearDown`.
+///
+/// Why bash, re-signed, waiting on `read` (#341, measured on an M4 Pro,
+/// macOS 26.6): an unsigned copy of a system binary run from a temporary
+/// folder is SIGKILLed by the system within about 1–100 ms (60 of 60 copies
+/// of `/bin/sh`, 10 of 10 of `/bin/bash`), so these tests used to pass only
+/// by scanning before the kill. Re-signed ad hoc, a copy of bash stays alive
+/// (20 of 20 seen at 500 ms). The RE-SIGNING is the part that matters: the
+/// plan measured a re-signed `/bin/sh` (a trampoline to bash) as never seen
+/// (0 of 10, from a shell), but under this test host a re-signed `/bin/sh`
+/// was seen and stayed alive (must-fail M2 stayed green), so bash — what
+/// `/bin/sh` resolves to anyway — is kept as the one that was measured both
+/// ways. `read` forks nothing, where `sleep` would briefly fork a second
+/// "Plantoir"; it waits on a pipe the test holds until `tearDown`, and
+/// the HELD PIPE is what keeps it waiting: `read` on a standard input at
+/// end-of-file returns at once, whatever `-t` says, and bash exits.
+/// (Measured, with the check waiting 200 ms: closing the pipe's writing end
+/// at once — must-fail M3b — goes red in four tests. Setting no pipe at all
+/// — M3 — stays green, because the child then inherits the test host's own
+/// standard input, which stayed open under `xcodebuild`; the pipe is held so
+/// the child's life depends on the test rather than on how the host was
+/// started. A first run without the wait read both as green, and this
+/// comment briefly drew the wrong conclusion from that.)
+/// `assertStillRunning`, right after a scan, catches a child that is
+/// already dead; it cannot catch one that is about to die.
 @MainActor
 final class SameExecutableProcessesTests: XCTestCase {
 
@@ -13,6 +37,8 @@ final class SameExecutableProcessesTests: XCTestCase {
 
     private var folder: URL?
     private var children: [Process] = []
+    /// Each child's standard input, held until `tearDown` (#341).
+    private var inputs: [Pipe] = []
 
     // MARK: - Set up
 
@@ -24,6 +50,7 @@ final class SameExecutableProcessesTests: XCTestCase {
             }
         }
         children = []
+        inputs = []
         if let folder {
             try? FileManager.default.removeItem(at: folder)
         }
@@ -34,10 +61,10 @@ final class SameExecutableProcessesTests: XCTestCase {
     func testFindsAndClassifiesOtherCopiesOfTheSameExecutable() throws {
         let executable: URL = try makeFakePlantoir()
         let scheduled: Process = try start(executable, [
-            "-c", "sleep 30; :", ScheduledDeploy.runFlag, "/w/.scheduled/deploy.sh",
+            "-c", "read -t 30 _", ScheduledDeploy.runFlag, "/w/.scheduled/deploy.sh",
             ScheduledDeploy.sectionFlag, "/w", "EXC2O", "1"
         ])
-        let server: Process = try start(executable, ["-c", "sleep 30; :", AssistMCPServer.flag, "/f"])
+        let server: Process = try start(executable, ["-c", "read -t 30 _", AssistMCPServer.flag, "/f"])
 
         let sightings: [SameExecutableProcesses.Sighting] = SameExecutableProcesses.sightings(
             ofExecutableAt: executable.path
@@ -47,6 +74,8 @@ final class SameExecutableProcessesTests: XCTestCase {
             byPID[sighting.pid] = UpdateGate.classify(pid: sighting.pid, arguments: sighting.arguments)
         }
         XCTAssertEqual(sightings.count, 2)
+        assertStillRunning(scheduled)
+        assertStillRunning(server)
 
         let asScheduled: UpdateGate.OtherCopy = try XCTUnwrap(byPID[scheduled.processIdentifier])
         XCTAssertEqual(asScheduled.kind, .scheduledPublish)
@@ -63,7 +92,7 @@ final class SameExecutableProcessesTests: XCTestCase {
     /// `/var/folders` is `/private/var/folders` to the kernel.
     func testOneExecutableIsNeverTwoSpellings() throws {
         let executable: URL = try makeFakePlantoir()
-        let child: Process = try start(executable, ["-c", "sleep 30; :"])
+        let child: Process = try start(executable, ["-c", "read -t 30 _"])
         let resolved: String = SameExecutableProcesses.resolved(executable.path)
         for spelling in [executable.path, resolved] {
             var pids: [Int32] = []
@@ -72,15 +101,17 @@ final class SameExecutableProcessesTests: XCTestCase {
             }
             XCTAssertEqual(pids, [child.processIdentifier], spelling)
         }
+        assertStillRunning(child)
     }
 
     /// A different copy of Plantoir is never this one: installing this copy
     /// does not touch it.
     func testADifferentExecutableIsNotSeen() throws {
         let executable: URL = try makeFakePlantoir()
-        _ = try start(executable, ["-c", "sleep 30; :", ScheduledDeploy.runFlag, "s"])
+        let child: Process = try start(executable, ["-c", "read -t 30 _", ScheduledDeploy.runFlag, "s"])
         let elsewhere: URL = try makeFakePlantoir(named: "Elsewhere")
         XCTAssertEqual(SameExecutableProcesses.sightings(ofExecutableAt: elsewhere.path), [])
+        assertStillRunning(child)
     }
 
     func testThisProcessIsNeverReported() throws {
@@ -105,8 +136,9 @@ final class SameExecutableProcessesTests: XCTestCase {
 
     func testAnEndingIsHeard() async throws {
         let executable: URL = try makeFakePlantoir()
-        let child: Process = try start(executable, ["-c", "sleep 30; :"])
+        let child: Process = try start(executable, ["-c", "read -t 30 _"])
         let ends: AsyncStream<Void> = ProcessEnding.ends(of: child.processIdentifier)
+        assertStillRunning(child)
         kill(child.processIdentifier, SIGTERM)
         var heard: Bool = false
         for await _ in ends {
@@ -117,7 +149,7 @@ final class SameExecutableProcessesTests: XCTestCase {
 
     func testAProcessAlreadyGoneIsHeardAtOnce() async throws {
         let executable: URL = try makeFakePlantoir()
-        let child: Process = try start(executable, ["-c", ":"])
+        let child: Process = try start(executable, ["-c", ":"], waitUntilSeen: false)
         child.waitUntilExit()
         var heard: Bool = false
         for await _ in ProcessEnding.ends(of: child.processIdentifier) {
@@ -141,19 +173,72 @@ final class SameExecutableProcessesTests: XCTestCase {
         try FileManager.default.createDirectory(at: place, withIntermediateDirectories: true)
         let executable: URL = place.appendingPathComponent("Plantoir")
         if !FileManager.default.fileExists(atPath: executable.path) {
-            try FileManager.default.copyItem(at: URL(fileURLWithPath: "/bin/sh"), to: executable)
+            try FileManager.default.copyItem(at: URL(fileURLWithPath: "/bin/bash"), to: executable)
+            try signAdHoc(executable)
         }
         return executable
     }
 
-    private func start(_ executable: URL, _ arguments: [String]) throws -> Process {
+    /// Without a fresh signature the copy is killed within milliseconds (#341).
+    private func signAdHoc(_ executable: URL) throws {
+        let codesign: Process = Process()
+        codesign.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
+        codesign.arguments = ["--force", "--sign", "-", executable.path]
+        codesign.standardOutput = FileHandle.nullDevice
+        codesign.standardError = FileHandle.nullDevice
+        try codesign.run()
+        codesign.waitUntilExit()
+        if codesign.terminationStatus != 0 {
+            throw NSError(
+                domain: "SameExecutableProcessesTests", code: Int(codesign.terminationStatus),
+                userInfo: [NSLocalizedDescriptionKey: "codesign could not re-sign the copy at \(executable.path)"]
+            )
+        }
+    }
+
+    /// Starts a child and, unless it is meant to end at once, waits until the
+    /// scan sees it: every 10 ms, for at most 2 s. This waits for the very
+    /// condition the test then asserts, not for anything to settle.
+    private func start(
+        _ executable: URL, _ arguments: [String], waitUntilSeen: Bool = true
+    ) throws -> Process {
         let process: Process = Process()
+        let input: Pipe = Pipe()
         process.executableURL = executable
         process.arguments = arguments
+        process.standardInput = input
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
         try process.run()
         children.append(process)
+        inputs.append(input)
+        if waitUntilSeen {
+            let deadline: Date = Date().addingTimeInterval(2)
+            var seen: Bool = false
+            while !seen && Date() < deadline {
+                for sighting in SameExecutableProcesses.sightings(ofExecutableAt: executable.path) {
+                    if sighting.pid == process.processIdentifier {
+                        seen = true
+                    }
+                }
+                if !seen {
+                    usleep(10_000)
+                }
+            }
+            if !seen {
+                XCTFail("the scan never saw the child \(process.processIdentifier) within 2 s")
+            }
+        }
         return process
+    }
+
+    /// Every scan that relies on a live child checks it is still alive, so a
+    /// test can never pass by finding nothing because the child died (#341).
+    private func assertStillRunning(_ child: Process, file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertTrue(
+            child.isRunning,
+            "the child \(child.processIdentifier) is no longer running, so the scan proved nothing",
+            file: file, line: line
+        )
     }
 }
