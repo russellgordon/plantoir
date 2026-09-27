@@ -254,11 +254,16 @@ fix by hand anything a crashed run left behind:
 
 ```bash
 osascript -e 'tell application "System Events" to tell appearance preferences to get dark mode'
+defaults read -g AppleKeyboardUIMode
 xcrun simctl list devices | grep Booted
 ```
 
 - **Appearance** must be what it was. A half-finished run can leave the Mac
   in the wrong colour scheme.
+- **Keyboard navigation** (`AppleKeyboardUIMode`) must read what it did
+  before. A `--scenes` run switches it off Mac-wide, so no sheet photographs
+  with a focus ring, and prints the value to put back; it restores it on a
+  normal end, an error, Ctrl-C, SIGTERM and SIGHUP, but not on SIGKILL.
 - **Any simulator YOU booted** gets shut down. One that was already running
   is not yours — leave it.
 - **Window sizes.** The app's remembered frames are saved and put back around

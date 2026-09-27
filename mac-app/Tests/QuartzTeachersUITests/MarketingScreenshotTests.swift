@@ -884,11 +884,13 @@ final class MarketingScenes: MarketingScreenshotCase {
             clubToggle.click()
         }
         XCTAssertEqual(clubToggle.value as? Int, 1, "The club toggle should be ticked before the picture")
-        // The club's own fields sit lower in the panel. A form XCUITest cannot
-        // scroll is photographed only when the field is on screen; anything
-        // else would be a picture of the top of the panel filed as a club.
-        XCTAssertTrue(scrollSettings(in: application, to: "clubFrontPageHeadingField"),
-                      "The club's front-page heading should be on screen")
+        // Framed at the top of the panel: CODING and the ticked switch, with
+        // the switch's own explanation under it, are what say "club". The
+        // meeting fields sit a screen further down and cannot share the
+        // frame; a picture of them alone read as the ordinary course panel
+        // (website-B review M3), since that part still says Units and Create
+        // Course (#368).
+        XCTAssertTrue(clubToggle.isHittable, "The club switch should be on screen")
         settle(1.5)
         save(window, as: "club")
         application.buttons["wizardCloseButton"].click()

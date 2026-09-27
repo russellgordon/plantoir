@@ -139,7 +139,7 @@ SCENES: list[Scene] = [
         name="club", produces=["club"], kind="ui-test", test="testClubWizard",
         identifiers=["addCourseButton", "wizardCourseCodeField", "clubToggle", "clubFrontPageHeadingField",
                      "wizardCloseButton"],
-        what_it_sets_up="The New Course panel for CODING with \"This is a club\" ticked; cancelled.",
+        what_it_sets_up="The New Course panel for CODING with \"This is a club\" ticked, framed at the top of the panel; cancelled.",
     ),
 ]
 
@@ -576,19 +576,24 @@ class ObsidianRegistryKept:
         OBSIDIAN_REGISTRY.write_text(json.dumps(registry), encoding="utf-8")
         return True
 
+    @staticmethod
+    def quit_obsidian() -> None:
+        """Quit Obsidian and WAIT for it to be gone: it writes its list of
+        vaults back as it quits, so anything put back before then is lost."""
+        subprocess.run(["osascript", "-e", 'quit app "Obsidian"'], capture_output=True)
+        for _ in range(40):
+            if subprocess.run(["pgrep", "-x", "Obsidian"], capture_output=True).returncode != 0:
+                break
+            time.sleep(0.25)
+
     def __exit__(self, exc_type, exc_value, traceback) -> bool:
         if self.saved is None:
             if not self.was_running and OBSIDIAN_REGISTRY.exists():
-                subprocess.run(["osascript", "-e", 'quit app "Obsidian"'], capture_output=True)
-                time.sleep(2)
+                ObsidianRegistryKept.quit_obsidian()
                 OBSIDIAN_REGISTRY.unlink()
             return False
         if not self.was_running:
-            subprocess.run(["osascript", "-e", 'quit app "Obsidian"'], capture_output=True)
-            for _ in range(40):
-                if subprocess.run(["pgrep", "-x", "Obsidian"], capture_output=True).returncode != 0:
-                    break
-                time.sleep(0.25)
+            ObsidianRegistryKept.quit_obsidian()
             OBSIDIAN_REGISTRY.write_bytes(self.saved)
         if OBSIDIAN_REGISTRY.read_bytes() != self.saved:
             print("   ✗ Obsidian's list of vaults is not as it was (Obsidian was already open, so it was "
