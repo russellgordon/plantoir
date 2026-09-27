@@ -266,26 +266,26 @@ enum ClassInsertionPlanner {
     /// overwrites a lesson or — with the guard below — silently skips, leaving
     /// two pages claiming to be Day 3. Working down from the top means every
     /// destination has already been vacated.
+    ///
+    /// **Makes no backup of its own** (#351): the parameter that could ask
+    /// for one was passed by no caller, and it zipped on the main actor.
+    /// The assistant — the only caller that changes a course this way —
+    /// saves its copy first, once per conversation, off the main actor.
     @discardableResult
     static func apply(
         _ plan: ClassInsertionPlan,
-        in course: Course,
-        backingUpInto coursesDirectoryURL: URL? = nil
+        in course: Course
     ) throws -> ClassChangeOutcome {
         if plan.courseCode != course.code {
             throw Problem.wrongCourse(plan.courseCode, course.code)
         }
         if plan.changesNothing {
-            return ClassChangeOutcome(message: "Nothing needed moving.", backupURL: nil)
+            return ClassChangeOutcome(message: "Nothing needed moving.")
         }
         if plan.added.isEmpty {
             throw Problem.wouldNotFit(plan.problems.joined(separator: " "))
         }
 
-        var backupURL: URL? = nil
-        if let coursesDirectoryURL {
-            backupURL = try CourseArchiver.backUpCourse(course, coursesDirectoryURL: coursesDirectoryURL)
-        }
 
         let fileManager: FileManager = FileManager.default
         let folderURL: URL = ClassPages.folderURL(forSection: plan.sectionNumber, in: course)
@@ -404,7 +404,7 @@ enum ClassInsertionPlanner {
         if !notDated.isEmpty {
             message += " " + AssistPublishPlan.sayingPagesWhoseNewDateCouldNotBeSet(named: notDated)
         }
-        return ClassChangeOutcome(message: message, backupURL: backupURL, created: created)
+        return ClassChangeOutcome(message: message, created: created)
     }
 
     /// Making room in a numbered course (#267) — a club's "Week 1", "Week 2".

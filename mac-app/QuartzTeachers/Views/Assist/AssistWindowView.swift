@@ -320,6 +320,22 @@ struct AssistWindowView: View {
                     if session.agent?.isBusy == true, session.agent?.pendingApproval == nil {
                         AssistTypingIndicator()
                     }
+                    // What the wait is, when it is a copy of the course being
+                    // saved before a change (#351): the one wait long enough
+                    // to read as a hang — a course full of pictures takes a
+                    // minute — so it is named rather than left to the dots.
+                    if let backingUp = session.agent?.courseBeingBackedUp {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text(AssistWording.backingUpFirst(course: backingUp))
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("assistBackingUpLine")
+                    }
                     if let approval = session.agent?.pendingApproval,
                        let agent = session.agent {
                         AssistApprovalView(isDeploy: agent.pendingIsDeploy) {

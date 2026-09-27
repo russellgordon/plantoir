@@ -359,7 +359,7 @@ final class BuildOutputLocationTests: XCTestCase {
     /// Driven through `CourseRestorer` rather than the primitive, because the
     /// primitive was already right and the wiring was what was missing.
     @MainActor
-    func testRestoringASectionThrowsAwayItsBuiltSite() throws {
+    func testRestoringASectionThrowsAwayItsBuiltSite() async throws {
         let courseURL: URL = try makeCourse("ICS3U")
         let sectionURL: URL = courseURL.appendingPathComponent("section1")
         try FileManager.default.createDirectory(at: sectionURL, withIntermediateDirectories: true)
@@ -382,7 +382,7 @@ final class BuildOutputLocationTests: XCTestCase {
             configuration: CourseConfiguration(values: values, lastSavedData: configurationData)
         )
         let coursesURL: URL = workingFolder.appendingPathComponent("courses")
-        let backupURL: URL = try CourseArchiver.backUpCourse(course, coursesDirectoryURL: coursesURL)
+        let backupURL: URL = try await CourseArchiver.backUpCourse(course, coursesDirectoryURL: coursesURL)
         let backup: BackupItem = try XCTUnwrap(BackupItem.from(fileURL: backupURL, courseCode: "ICS3U"))
 
         try CourseRestorer.restoreSection(1, from: backup, coursesDirectoryURL: coursesURL)

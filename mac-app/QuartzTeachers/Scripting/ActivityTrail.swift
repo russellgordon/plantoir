@@ -902,6 +902,14 @@ nonisolated enum ActivityTrail {
         /// LISTED for the website (#209) — one earlier builds published.
         /// Read from the build's `PLANTOIR_KEPT_OFF:` line.
         case howITeachPageKeptOff = "How I Teach page kept off the website"
+        /// The assistant saved a copy of a course (#351) — its first write in
+        /// a conversation, or the `back_up_course` tool: the course, the
+        /// section the copy is named for, the backup's FILE NAME, its size
+        /// and how long it took; or that it could not, and why. Answers "the
+        /// window hung after I approved" and "where did this zip come from".
+        /// The once-per-conversation reuse writes nothing: one line per real
+        /// zip.
+        case assistantBackedUpACourse = "assistant backed up a course"
         /// Plantoir found a new version of itself (#204) — once per version
         /// per launch, and "found" rather than "offered", because the updater
         /// may hold its window back until the app is next in front. Carries
@@ -984,6 +992,22 @@ nonisolated enum ActivityTrail {
     static func pageSettingsLeftAsTheyWereLine(act: String, pages: Int) -> String {
         let counted: String = pages == 1 ? "1 page" : "\(pages) pages"
         return "left the settings of \(counted) as they were while \(act): no room at the top for a new setting"
+    }
+
+    /// The words for `assistantBackedUpACourse`: the copy's file name — a
+    /// course code, a moment and who made it, never anything written on a
+    /// page — its size in megabytes and the seconds it took, one decimal
+    /// each, so a reader can tell 0.4 s from two minutes without a threshold
+    /// anybody had to guess.
+    static func assistantBackedUpLine(fileName: String, bytes: Int64, seconds: Double) -> String {
+        let megabytes: String = String(format: "%.1f", Double(bytes) / 1_000_000)
+        let took: String = String(format: "%.1f", seconds)
+        return "assistant backed up the course as \(fileName) (\(megabytes) MB, \(took) s)"
+    }
+
+    /// The words for an assistant backup that could not be made.
+    static func assistantCouldNotBackUpLine(reason: String) -> String {
+        return "assistant could not back up the course: \(reason)"
     }
 
     /// The words for `assistantNamedNoPage`: what was being done, and which

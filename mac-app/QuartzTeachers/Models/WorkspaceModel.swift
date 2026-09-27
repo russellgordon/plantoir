@@ -1745,12 +1745,15 @@ class WorkspaceModel {
 
     /// Saves a copy of a whole course, then reloads so the Backups group
     /// shows it — opened, so the new row is visible feedback.
-    func backUp(_ course: Course) {
+    ///
+    /// Async since #351: the zip runs off the main actor, so the window keeps
+    /// drawing while a course full of pictures is copied.
+    func backUp(_ course: Course) async {
         guard let coursesDirectoryURL else {
             return
         }
         do {
-            try CourseArchiver.backUpCourse(course, coursesDirectoryURL: coursesDirectoryURL)
+            try await CourseArchiver.backUpCourse(course, coursesDirectoryURL: coursesDirectoryURL)
         } catch {
             backupProblem = error.localizedDescription
             return
@@ -1982,7 +1985,10 @@ class WorkspaceModel {
     /// Puts a backed-up course back in place of the current one. The
     /// current version is ARCHIVED first — even a restore has an undo —
     /// and the backup itself stays until the teacher deletes it.
-    func restoreBackup(_ item: BackupItem) {
+    ///
+    /// Async since #351: that archive is a zip, and it runs off the main
+    /// actor.
+    func restoreBackup(_ item: BackupItem) async {
         guard let coursesDirectoryURL else {
             return
         }
@@ -1999,7 +2005,7 @@ class WorkspaceModel {
             // showing stale files until the vault is reopened.
             for course in courses {
                 if course.code == item.courseCode {
-                    try CourseArchiver.archiveCourse(course, coursesDirectoryURL: coursesDirectoryURL)
+                    try await CourseArchiver.archiveCourse(course, coursesDirectoryURL: coursesDirectoryURL)
                 }
             }
             try CourseRestorer.restoreBackup(item, coursesDirectoryURL: coursesDirectoryURL)

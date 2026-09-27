@@ -301,11 +301,11 @@ final class BackupTests: XCTestCase {
     }
 
     @MainActor
-    func testBackingUpCopiesTheCourseAndLeavesItInPlace() throws {
+    func testBackingUpCopiesTheCourseAndLeavesItInPlace() async throws {
         let fixture: BackupFixture = try BackupFixture()
         defer { fixture.tearDown() }
 
-        let backupURL: URL = try CourseArchiver.backUpCourse(
+        let backupURL: URL = try await CourseArchiver.backUpCourse(
             fixture.course, coursesDirectoryURL: fixture.coursesDirectoryURL
         )
 
@@ -334,12 +334,12 @@ final class BackupTests: XCTestCase {
     }
 
     @MainActor
-    func testRestoringABackupBringsTheOldContentBackAndKeepsTheZip() throws {
+    func testRestoringABackupBringsTheOldContentBackAndKeepsTheZip() async throws {
         let fixture: BackupFixture = try BackupFixture()
         defer { fixture.tearDown() }
         let fileManager: FileManager = FileManager.default
 
-        _ = try CourseArchiver.backUpCourse(
+        _ = try await CourseArchiver.backUpCourse(
             fixture.course, coursesDirectoryURL: fixture.coursesDirectoryURL
         )
 
@@ -350,7 +350,7 @@ final class BackupTests: XCTestCase {
 
         // The app archives the current version (without removing it),
         // then restores the backup in place.
-        try CourseArchiver.archiveCourse(
+        try await CourseArchiver.archiveCourse(
             fixture.course, coursesDirectoryURL: fixture.coursesDirectoryURL
         )
         let items: [BackupItem] = WorkspaceModel.findBackupItems(in: fixture.coursesDirectoryURL)
@@ -370,7 +370,7 @@ final class BackupTests: XCTestCase {
     }
 
     @MainActor
-    func testRestoringKeepsTheCourseFolderItselfInPlace() throws {
+    func testRestoringKeepsTheCourseFolderItselfInPlace() async throws {
         // The course folder is Obsidian's vault, and Obsidian's file
         // watcher is anchored to the folder's identity: replace the
         // folder and Obsidian shows stale files until the vault is
@@ -379,7 +379,7 @@ final class BackupTests: XCTestCase {
         defer { fixture.tearDown() }
         let fileManager: FileManager = FileManager.default
 
-        _ = try CourseArchiver.backUpCourse(
+        _ = try await CourseArchiver.backUpCourse(
             fixture.course, coursesDirectoryURL: fixture.coursesDirectoryURL
         )
         let identityBefore: Any? =
@@ -398,11 +398,11 @@ final class BackupTests: XCTestCase {
     }
 
     @MainActor
-    func testRestoringIntoAMissingCourseRecreatesIt() throws {
+    func testRestoringIntoAMissingCourseRecreatesIt() async throws {
         let fixture: BackupFixture = try BackupFixture()
         defer { fixture.tearDown() }
 
-        _ = try CourseArchiver.backUpCourse(
+        _ = try await CourseArchiver.backUpCourse(
             fixture.course, coursesDirectoryURL: fixture.coursesDirectoryURL
         )
         try FileManager.default.removeItem(at: fixture.courseURL)

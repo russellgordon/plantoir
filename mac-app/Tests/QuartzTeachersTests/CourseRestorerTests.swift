@@ -31,11 +31,11 @@ final class CourseRestorerTests: XCTestCase {
     }
 
     @MainActor
-    func testASectionComesBackAndIsListedAgain() throws {
+    func testASectionComesBackAndIsListedAgain() async throws {
         let (coursesURL, course) = try makeWorkspace()
         defer { try? FileManager.default.removeItem(at: coursesURL.deletingLastPathComponent()) }
 
-        let archiveURL: URL = try CourseArchiver.archiveAndRemoveSection(1, from: course, coursesDirectoryURL: coursesURL)
+        let archiveURL: URL = try await CourseArchiver.archiveAndRemoveSection(1, from: course, coursesDirectoryURL: coursesURL)
         XCTAssertFalse(FileManager.default.fileExists(atPath: course.sectionDirectoryURL(forSection: 1).path))
         XCTAssertEqual(course.sectionNumbers, [2], "Archiving takes the section out of the settings")
 
@@ -50,11 +50,11 @@ final class CourseRestorerTests: XCTestCase {
     }
 
     @MainActor
-    func testAWholeCourseComesBack() throws {
+    func testAWholeCourseComesBack() async throws {
         let (coursesURL, course) = try makeWorkspace()
         defer { try? FileManager.default.removeItem(at: coursesURL.deletingLastPathComponent()) }
 
-        let archiveURL: URL = try CourseArchiver.archiveAndRemoveCourse(course, coursesDirectoryURL: coursesURL)
+        let archiveURL: URL = try await CourseArchiver.archiveAndRemoveCourse(course, coursesDirectoryURL: coursesURL)
         XCTAssertFalse(FileManager.default.fileExists(atPath: course.directoryURL.path))
 
         let item = try XCTUnwrap(ArchivedItem.from(fileURL: archiveURL, courseCode: "IZN2O"))
@@ -65,11 +65,11 @@ final class CourseRestorerTests: XCTestCase {
     }
 
     @MainActor
-    func testASectionWillNotRestoreWithoutItsCourse() throws {
+    func testASectionWillNotRestoreWithoutItsCourse() async throws {
         let (coursesURL, course) = try makeWorkspace()
         defer { try? FileManager.default.removeItem(at: coursesURL.deletingLastPathComponent()) }
 
-        let archiveURL: URL = try CourseArchiver.archiveAndRemoveSection(1, from: course, coursesDirectoryURL: coursesURL)
+        let archiveURL: URL = try await CourseArchiver.archiveAndRemoveSection(1, from: course, coursesDirectoryURL: coursesURL)
         let item = try XCTUnwrap(ArchivedItem.from(fileURL: archiveURL, courseCode: "IZN2O"))
 
         XCTAssertThrowsError(try CourseRestorer.restore(item, coursesDirectoryURL: coursesURL, courses: [])) { error in
@@ -80,11 +80,11 @@ final class CourseRestorerTests: XCTestCase {
     }
 
     @MainActor
-    func testNothingIsWrittenOverAnExistingSection() throws {
+    func testNothingIsWrittenOverAnExistingSection() async throws {
         let (coursesURL, course) = try makeWorkspace()
         defer { try? FileManager.default.removeItem(at: coursesURL.deletingLastPathComponent()) }
 
-        let archiveURL: URL = try CourseArchiver.archiveAndRemoveSection(1, from: course, coursesDirectoryURL: coursesURL)
+        let archiveURL: URL = try await CourseArchiver.archiveAndRemoveSection(1, from: course, coursesDirectoryURL: coursesURL)
         // The teacher makes a new section 1 before restoring the old one.
         try FileManager.default.createDirectory(at: course.sectionDirectoryURL(forSection: 1), withIntermediateDirectories: true)
         try "# new work".write(to: course.sectionDirectoryURL(forSection: 1).appendingPathComponent("index.md"), atomically: true, encoding: .utf8)
@@ -97,11 +97,11 @@ final class CourseRestorerTests: XCTestCase {
     }
 
     @MainActor
-    func testACourseWillNotRestoreOverOneThatIsBack() throws {
+    func testACourseWillNotRestoreOverOneThatIsBack() async throws {
         let (coursesURL, course) = try makeWorkspace()
         defer { try? FileManager.default.removeItem(at: coursesURL.deletingLastPathComponent()) }
 
-        let archiveURL: URL = try CourseArchiver.archiveAndRemoveCourse(course, coursesDirectoryURL: coursesURL)
+        let archiveURL: URL = try await CourseArchiver.archiveAndRemoveCourse(course, coursesDirectoryURL: coursesURL)
         try FileManager.default.createDirectory(at: course.directoryURL, withIntermediateDirectories: true)
 
         let item = try XCTUnwrap(ArchivedItem.from(fileURL: archiveURL, courseCode: "IZN2O"))
@@ -256,7 +256,7 @@ final class ArchiveExclusionTests: XCTestCase {
     }
 
     @MainActor
-    func testBuiltOutputIsLeftOutOfAnArchive() throws {
+    func testBuiltOutputIsLeftOutOfAnArchive() async throws {
         let root: URL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("exclude-\(UUID().uuidString)")
         let coursesURL: URL = root.appendingPathComponent("courses")
         let courseURL: URL = coursesURL.appendingPathComponent("IZN2O")
@@ -277,7 +277,7 @@ final class ArchiveExclusionTests: XCTestCase {
 
         let loaded: CourseConfiguration = try CourseConfiguration(contentsOf: courseURL.appendingPathComponent("course_config.json"))
         let course: Course = Course(code: "IZN2O", directoryURL: courseURL, configuration: loaded)
-        let archiveURL: URL = try CourseArchiver.archiveAndRemoveCourse(course, coursesDirectoryURL: coursesURL)
+        let archiveURL: URL = try await CourseArchiver.archiveAndRemoveCourse(course, coursesDirectoryURL: coursesURL)
 
         let listing: String = try entries(in: archiveURL)
         XCTAssertTrue(listing.contains("section1/index.md"), "The teacher's own work must be archived")

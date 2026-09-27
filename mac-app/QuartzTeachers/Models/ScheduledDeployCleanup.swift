@@ -283,7 +283,7 @@ enum ScheduledDeployCleanup {
         _ course: Course,
         coursesDirectoryURL: URL,
         runner: LaunchControlRunning = LaunchControl()
-    ) -> RemovalResult {
+    ) async -> RemovalResult {
         let workingFolderURL: URL = coursesDirectoryURL.deletingLastPathComponent()
         let agents: [ScheduledDeploy.Agent] = agentsOwnedBy(
             courseCode: course.code,
@@ -311,7 +311,7 @@ enum ScheduledDeployCleanup {
             ReferenceLock.unlock(courseDirectory: course.directoryURL)
         }
         do {
-            try CourseArchiver.archiveAndRemoveCourse(
+            try await CourseArchiver.archiveAndRemoveCourse(
                 course, coursesDirectoryURL: coursesDirectoryURL
             )
         } catch {
@@ -334,7 +334,7 @@ enum ScheduledDeployCleanup {
         from course: Course,
         coursesDirectoryURL: URL,
         runner: LaunchControlRunning = LaunchControl()
-    ) -> RemovalResult {
+    ) async -> RemovalResult {
         // A reference course is frozen, and removing a section CHANGES it —
         // so this is refused rather than unlocked. The sidebar does not offer
         // the item at all, which is where a teacher meets this; the refusal
@@ -366,7 +366,7 @@ enum ScheduledDeployCleanup {
             )
         }
         do {
-            try CourseArchiver.archiveAndRemoveSection(
+            try await CourseArchiver.archiveAndRemoveSection(
                 sectionNumber, from: course, coursesDirectoryURL: coursesDirectoryURL
             )
         } catch {

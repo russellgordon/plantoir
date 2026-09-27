@@ -135,9 +135,6 @@ struct ClassChangeOutcome {
     /// What happened, in words meant to be read back to the teacher.
     let message: String
 
-    /// The backup written before anything was touched, when one was asked for.
-    let backupURL: URL?
-
     /// The pages this actually created, so a caller can offer to take them
     /// away again. Empty when nothing was written — including the case where
     /// every page asked for had appeared while the teacher was deciding.
@@ -145,9 +142,8 @@ struct ClassChangeOutcome {
 
     // MARK: - Initializer
 
-    init(message: String, backupURL: URL?, created: [URL] = []) {
+    init(message: String, created: [URL] = []) {
         self.message = message
-        self.backupURL = backupURL
         self.created = created
     }
 }

@@ -31,17 +31,23 @@ enum CourseArchiver {
     /// folder settles at `mostBackupsKept` instead of growing forever — with
     /// one exception, added with the calendar fix: a backup whose stamp
     /// cannot be true is neither counted nor deleted. See `pruneBackups`.
+    ///
+    /// **Async, and the zip runs off the main actor** (#351): every zip in
+    /// the app goes through `zipping`, which is `@concurrent`. The course's
+    /// folder and code are read HERE, on the caller's actor, and only those
+    /// cross; pruning comes back to this actor afterwards, because it is a
+    /// directory listing and a few deletes, measured in milliseconds.
     @discardableResult
     static func backUpCourse(
         _ course: Course,
         coursesDirectoryURL: URL,
         madeBy maker: BackupMaker = .teacher
-    ) throws -> URL {
-        let backupURL: URL = try archive(
-            folderURL: course.directoryURL,
-            named: timestampedName(prefix: "\(course.code)_backup", suffix: maker.nameSuffix),
-            forCourseCode: course.code,
-            coursesDirectoryURL: coursesDirectoryURL
+    ) async throws -> URL {
+        let backupURL: URL = try await backingUp(
+            courseDirectoryPath: course.directoryURL.path,
+            code: course.code,
+            coursesDirectoryPath: coursesDirectoryURL.path,
+            nameSuffix: maker.nameSuffix
         )
         pruneBackups(forCourseCode: course.code, coursesDirectoryURL: coursesDirectoryURL)
         return backupURL
@@ -131,20 +137,20 @@ enum CourseArchiver {
     /// Obsidian's file watcher (anchored to the folder) keeps up.
     /// Returns the archive that was written.
     @discardableResult
-    static func archiveCourse(_ course: Course, coursesDirectoryURL: URL) throws -> URL {
-        return try archive(
-            folderURL: course.directoryURL,
-            named: timestampedName(prefix: course.code),
-            forCourseCode: course.code,
-            coursesDirectoryURL: coursesDirectoryURL
+    static func archiveCourse(_ course: Course, coursesDirectoryURL: URL) async throws -> URL {
+        return try await zipping(
+            folderPath: course.directoryURL.path,
+            archiveName: timestampedName(prefix: course.code),
+            courseCode: course.code,
+            coursesDirectoryPath: coursesDirectoryURL.path
         )
     }
 
     /// Archives and removes an entire course folder.
     /// Returns the archive that was written.
     @discardableResult
-    static func archiveAndRemoveCourse(_ course: Course, coursesDirectoryURL: URL) throws -> URL {
-        let archiveURL: URL = try archiveCourse(course, coursesDirectoryURL: coursesDirectoryURL)
+    static func archiveAndRemoveCourse(_ course: Course, coursesDirectoryURL: URL) async throws -> URL {
+        let archiveURL: URL = try await archiveCourse(course, coursesDirectoryURL: coursesDirectoryURL)
         try FileManager.default.removeItem(at: course.directoryURL)
         // The built website lives OUTSIDE the working folder now, so removing
         // the course folder no longer removes it — see `BuildOutputLocation`.
@@ -166,13 +172,13 @@ enum CourseArchiver {
         _ sectionNumber: Int,
         from course: Course,
         coursesDirectoryURL: URL
-    ) throws -> URL {
+    ) async throws -> URL {
         let sectionURL: URL = course.sectionDirectoryURL(forSection: sectionNumber)
-        let archiveURL: URL = try archive(
-            folderURL: sectionURL,
-            named: timestampedName(prefix: "\(course.code)-section\(sectionNumber)"),
-            forCourseCode: course.code,
-            coursesDirectoryURL: coursesDirectoryURL
+        let archiveURL: URL = try await zipping(
+            folderPath: sectionURL.path,
+            archiveName: timestampedName(prefix: "\(course.code)-section\(sectionNumber)"),
+            courseCode: course.code,
+            coursesDirectoryPath: coursesDirectoryURL.path
         )
         if FileManager.default.fileExists(atPath: sectionURL.path) {
             try FileManager.default.removeItem(at: sectionURL)
@@ -220,40 +226,80 @@ enum CourseArchiver {
     ]
 
     /// The same backup as `backUpCourse`, for a caller that has a FOLDER
-    /// rather than a loaded course — and that is not on the main actor.
+    /// rather than a loaded course — without the pruning, which a caller that
+    /// wants it does back on its own actor.
     ///
-    /// **Split out because a real backup takes real time.** Measured on
-    /// Russell's ICS4U with this very command: **9.7 s and 467 MB**, because
-    /// `Media` is not in `excludedFromArchives` and 487 MB of pictures are
-    /// zipped every time. "Copy a Page from This Course…" takes one of these
-    /// before it writes anything, and on the main actor that is ten seconds
-    /// of a window that cannot draw. `Course` is `@Observable` and not
-    /// `Sendable`, so the folder and the code are what cross rather than the
-    /// course itself.
+    /// **A real backup takes real time.** Measured on Russell's ICS4U with
+    /// this very command: **9.7 s and 467 MB**, because `Media` is not in
+    /// `excludedFromArchives` and 487 MB of pictures are zipped every time.
+    /// `Course` is `@Observable` and not `Sendable`, so the folder and the
+    /// code are what cross rather than the course itself.
     ///
-    /// `madeBy: .teacher` always, and deliberately: the teacher asked for
-    /// this. Only `.assistant` backups are pruned, so nothing here is ever
-    /// deleted on their behalf — see `pruneBackups`.
-    nonisolated static func backUpCourseOffTheMainActor(
-        courseDirectoryURL: URL,
+    /// `nameSuffix` is `BackupMaker.nameSuffix`, read by the caller: empty
+    /// for a teacher's backup, which is never pruned — see `pruneBackups`.
+    @concurrent
+    static func backingUp(
+        courseDirectoryPath: String,
         code: String,
-        coursesDirectoryURL: URL
-    ) throws -> URL {
+        coursesDirectoryPath: String,
+        nameSuffix: String = ""
+    ) async throws -> URL {
+        return try await zipping(
+            folderPath: courseDirectoryPath,
+            archiveName: timestampedName(prefix: "\(code)_backup", suffix: nameSuffix),
+            courseCode: code,
+            coursesDirectoryPath: coursesDirectoryPath
+        )
+    }
+
+    /// Whether the most recent zip ran on the main thread. Written by
+    /// `archive` — the one function that runs `/usr/bin/zip`, so no path to
+    /// a zip goes unobserved — and READ by tests only (#351), the same seam
+    /// `CoursePageCopier.lastPassRanOnTheMainThread` is: `@concurrent` is an
+    /// annotation an edit can lose without anything failing to compile.
+    /// Nothing in the product reads it.
+    nonisolated(unsafe) static var lastZipRanOnTheMainThread: Bool?
+
+    /// **The one door every zip goes through, and it is off the main actor**
+    /// (#351).
+    ///
+    /// `@concurrent`, and the attribute is load-bearing: this target builds
+    /// with `SWIFT_APPROACHABLE_CONCURRENCY`, under which a plain
+    /// `nonisolated async` function runs on its CALLER's actor. Until #351
+    /// every zip ran on the main thread, and `Process.waitUntilExit` spins a
+    /// nested run loop there that re-enters SwiftUI's transaction flush:
+    /// approving an assistant change held the window for up to two minutes
+    /// (#154's samples: 726 of 732 main-thread samples in
+    /// `NSHostingView.beginTransaction`, 93 busy seconds in 122) — on a
+    /// fixture course a few kilobytes big, so it was the re-entered run
+    /// loop, not the size of the zip. Paths and names cross, never a
+    /// `Course`.
+    @concurrent
+    private static func zipping(
+        folderPath: String,
+        archiveName: String,
+        courseCode: String,
+        coursesDirectoryPath: String
+    ) async throws -> URL {
         return try archive(
-            folderURL: courseDirectoryURL,
-            named: timestampedName(prefix: "\(code)_backup"),
-            forCourseCode: code,
-            coursesDirectoryURL: coursesDirectoryURL
+            folderURL: URL(fileURLWithPath: folderPath),
+            named: archiveName,
+            forCourseCode: courseCode,
+            coursesDirectoryURL: URL(fileURLWithPath: coursesDirectoryPath)
         )
     }
 
     /// Zips a folder into `courses/_backups/<CODE>/<name>.zip`.
+    ///
+    /// Synchronous and private: the only caller is `zipping`, which is what
+    /// keeps it off the main actor.
     nonisolated private static func archive(
         folderURL: URL,
         named archiveName: String,
         forCourseCode courseCode: String,
         coursesDirectoryURL: URL
     ) throws -> URL {
+        CourseArchiver.lastZipRanOnTheMainThread = Thread.isMainThread
         let backupsURL: URL = coursesDirectoryURL
             .appendingPathComponent("_backups")
             .appendingPathComponent(courseCode)

@@ -120,6 +120,33 @@ final class AssistToolRunner {
     /// the conversation changes something.
     private(set) var conversationBackupURL: URL?
 
+    /// The course whose copy is being saved RIGHT NOW, for the line the
+    /// window shows under its three dots (#351) — nil the rest of the time,
+    /// including after a copy that failed.
+    ///
+    /// A course full of pictures takes real time to zip (9.7 s for Russell's
+    /// ICS4U), and a wait with nothing on screen but dots reads as a hang.
+    private(set) var courseBeingBackedUp: String?
+
+    /// The copy under way for each course, so that a second write arriving
+    /// while the first is still zipping waits for THAT copy rather than
+    /// making another (#351).
+    ///
+    /// New with #351: while the zip held the main thread, nothing else could
+    /// run until it finished. Off the main actor, an outside assistant's
+    /// second call can arrive at the await — and without this, one
+    /// conversation would make two near-identical zips of the same course.
+    /// A copy that FAILED is never remembered: the next write tries again.
+    @ObservationIgnored private var backupsInFlight: [String: Task<URL?, Never>] = [:]
+
+    /// How a course is copied. `CourseArchiver.backUpCourse` in the app; a
+    /// test replaces it with one it can hold part-way, to see what the
+    /// window is shown while a copy is being saved.
+    @ObservationIgnored var backUpACourse: @MainActor (Course, URL, BackupMaker) async throws -> URL = {
+        course, coursesDirectoryURL, maker in
+        return try await CourseArchiver.backUpCourse(course, coursesDirectoryURL: coursesDirectoryURL, madeBy: maker)
+    }
+
     // MARK: - Computed properties
 
     /// Whether this conversation has saved a copy to go back to yet.
@@ -481,7 +508,7 @@ final class AssistToolRunner {
         case "plan_remember_timetable":
             return planRememberTimetable(arguments)
         case "remember_timetable":
-            return rememberTimetable(arguments)
+            return await rememberTimetable(arguments)
         case "plan_add_next_class":
             return planAddNextClass(arguments)
         case "plan_re_date_classes":
@@ -489,19 +516,19 @@ final class AssistToolRunner {
         case "re_date_classes":
             return await reDateClasses(arguments)
         case "add_next_class":
-            return addNextClass(arguments)
+            return await addNextClass(arguments)
         case "explain_publishing":
             return explainPublishing(arguments)
         case "back_up_course":
-            return backUpCourse(arguments)
+            return await backUpCourse(arguments)
         case "plan_make_room_for_classes":
             return planMakeRoomForClasses(arguments)
         case "make_room_for_classes":
-            return makeRoomForClasses(arguments)
+            return await makeRoomForClasses(arguments)
         case "plan_add_classes":
             return planAddNextClass(addClassesArguments(from: arguments))
         case "add_classes":
-            return addNextClass(addClassesArguments(from: arguments))
+            return await addNextClass(addClassesArguments(from: arguments))
         case "list_courses":
             return listCourses()
         case "list_curriculum_expectations":
@@ -509,13 +536,13 @@ final class AssistToolRunner {
         case "plan_curriculum_mentions":
             return planCurriculumMentions(arguments)
         case "add_curriculum_mentions":
-            return addCurriculumMentions(arguments)
+            return await addCurriculumMentions(arguments)
         case "read_how_i_teach":
             return readHowITeach(arguments)
         case "plan_write_how_i_teach":
             return planWriteHowITeach(arguments)
         case "write_how_i_teach":
-            return writeHowITeach(arguments)
+            return await writeHowITeach(arguments)
         default:
             return AssistToolOutcome.couldNotRead(
                 "There is no tool called “\(call.function.name)”."
@@ -1186,7 +1213,7 @@ final class AssistToolRunner {
             pages.reverse()
         }
 
-        let backedUp: Bool = backUpOnceForThisConversation(
+        let backedUp: Bool = await backUpOnceForThisConversation(
             located.course, forSection: located.sectionNumber
         )
         _ = await stopThePreviewBeforeWriting(
@@ -1585,26 +1612,99 @@ final class AssistToolRunner {
     /// the same conversation reuses it rather than saving a near-identical one.
     /// The copy is named for the assistant and the section it was made for, so
     /// a teacher reading the Backups list knows what it was for.
+    ///
+    /// **Async, and the zip is off the main actor** (#351): it used to hold
+    /// the window for up to two minutes after the teacher approved a change.
+    /// A second call for the same course while the first copy is still being
+    /// saved waits for that copy (`backupsInFlight`); a copy that failed is
+    /// not remembered, so the write says nothing about a backup and the next
+    /// one tries again.
     private func backUpOnceForThisConversation(
         _ course: Course,
         forSection sectionNumber: Int
-    ) -> Bool {
-        if conversationBackups[course.code] != nil {
+    ) async -> Bool {
+        let code: String = course.code
+        if conversationBackups[code] != nil {
             return true
+        }
+        if let underWay = backupsInFlight[code] {
+            let sharedURL: URL? = await underWay.value
+            return sharedURL != nil
         }
         guard let coursesDirectoryURL = workspace.coursesDirectoryURL else {
             return false
         }
-        guard let backupURL = try? CourseArchiver.backUpCourse(
-            course,
-            coursesDirectoryURL: coursesDirectoryURL,
-            madeBy: .assistant(sectionNumber: sectionNumber)
-        ) else {
+        let saving: Task<URL?, Never> = Task { @MainActor in
+            return try? await self.savingACopy(
+                of: course, forSection: sectionNumber, coursesDirectoryURL: coursesDirectoryURL
+            )
+        }
+        backupsInFlight[code] = saving
+        let savedURL: URL? = await saving.value
+        backupsInFlight[code] = nil
+        guard let backupURL = savedURL else {
             return false
         }
-        conversationBackups[course.code] = backupURL
+        conversationBackups[code] = backupURL
         conversationBackupURL = backupURL
         return true
+    }
+
+    /// Saves one copy of a course for the assistant, with the window's line
+    /// showing while it runs and one line on the trail when it is done.
+    ///
+    /// The ONE place an assistant backup is made — the once-per-conversation
+    /// copy and the `back_up_course` tool both come here — so the progress
+    /// line and the trail line cannot differ between them. `defer` clears the
+    /// line on every way out, a failure included: a line left saying "saving
+    /// a copy" after the copy failed would be a claim that is false.
+    private func savingACopy(
+        of course: Course,
+        forSection sectionNumber: Int,
+        coursesDirectoryURL: URL
+    ) async throws -> URL {
+        let code: String = course.code
+        courseBeingBackedUp = code
+        defer {
+            if courseBeingBackedUp == code {
+                courseBeingBackedUp = nil
+            }
+        }
+        let started: Date = Date()
+        do {
+            let backupURL: URL = try await backUpACourse(
+                course, coursesDirectoryURL, .assistant(sectionNumber: sectionNumber)
+            )
+            let bytes: Int64 = AssistToolRunner.sizeOnDisk(of: backupURL)
+            ActivityTrail.note(
+                .assistantBackedUpACourse,
+                ActivityTrail.assistantBackedUpLine(
+                    fileName: backupURL.lastPathComponent,
+                    bytes: bytes,
+                    seconds: Date().timeIntervalSince(started)
+                ),
+                course: code,
+                section: sectionNumber
+            )
+            return backupURL
+        } catch {
+            ActivityTrail.note(
+                .assistantBackedUpACourse,
+                ActivityTrail.assistantCouldNotBackUpLine(reason: error.localizedDescription),
+                course: code,
+                section: sectionNumber
+            )
+            throw error
+        }
+    }
+
+    /// A file's size in bytes, or 0 when it cannot be read.
+    private static func sizeOnDisk(of fileURL: URL) -> Int64 {
+        let attributes: [FileAttributeKey: Any]? = try? FileManager.default.attributesOfItem(atPath: fileURL.path)
+        if let size = attributes?[.size] as? NSNumber {
+            return size.int64Value
+        }
+        return 0
     }
 
     /// What the teacher is told about that copy. The same sentence whether the
@@ -1656,7 +1756,7 @@ final class AssistToolRunner {
         // Before anything is touched — but only the first time in a
         // conversation. The undo history covers the rest of it; the backup
         // outlives the conversation.
-        let backedUp: Bool = backUpOnceForThisConversation(course, forSection: sectionNumber)
+        let backedUp: Bool = await backUpOnceForThisConversation(course, forSection: sectionNumber)
 
         // Stop → write → start, and the stop is HERE rather than beside the
         // start for a reason. A preview left serving while the pages beneath
@@ -2717,7 +2817,7 @@ final class AssistToolRunner {
         }
     }
 
-    private func rememberTimetable(_ arguments: [String: Any]) -> AssistToolOutcome {
+    private func rememberTimetable(_ arguments: [String: Any]) async -> AssistToolOutcome {
         switch timetablePlan(arguments) {
         case .failure(let problem):
             return AssistToolOutcome.refused(problem.localizedDescription)
@@ -2733,7 +2833,7 @@ final class AssistToolRunner {
             // Replacing a year's dates is worth having a way back from, and
             // the copy is made once per conversation however many writes
             // follow it.
-            let backedUp: Bool = backUpOnceForThisConversation(
+            let backedUp: Bool = await backUpOnceForThisConversation(
                 asked.located.course, forSection: asked.located.sectionNumber
             )
             do {
@@ -2911,7 +3011,7 @@ final class AssistToolRunner {
     /// duplicating a published lesson is a draft of next week's, and putting
     /// it in front of students the moment it is made is the one thing it must
     /// not do.
-    private func duplicateClassRequested(_ arguments: [String: Any]) -> AssistToolOutcome? {
+    private func duplicateClassRequested(_ arguments: [String: Any]) async -> AssistToolOutcome? {
         guard let asked = duplicateAsked(arguments) else {
             return nil
         }
@@ -2922,7 +3022,7 @@ final class AssistToolRunner {
             return nil
         }
 
-        let backedUp: Bool = backUpOnceForThisConversation(
+        let backedUp: Bool = await backUpOnceForThisConversation(
             request.located.course, forSection: request.located.sectionNumber
         )
 
@@ -3394,7 +3494,7 @@ final class AssistToolRunner {
                 return AssistToolOutcome.wrote(said, detail: said)
             }
 
-            let backedUp: Bool = backUpOnceForThisConversation(
+            let backedUp: Bool = await backUpOnceForThisConversation(
                 asked.located.course, forSection: asked.located.sectionNumber
             )
             _ = await stopThePreviewBeforeWriting(
@@ -3718,7 +3818,7 @@ final class AssistToolRunner {
     }
 
     /// A full copy of one course.
-    private func backUpCourse(_ arguments: [String: Any]) -> AssistToolOutcome {
+    private func backUpCourse(_ arguments: [String: Any]) async -> AssistToolOutcome {
         let asked: String = text("course", in: arguments)
         // Matched the way every other tool here matches a course code, so a
         // teacher typing "ics3u" reaches the same course either way.
@@ -3747,9 +3847,11 @@ final class AssistToolRunner {
         // precisely to stop that.
         let section: Int = number("section", in: arguments) ?? 1
         do {
-            let backupURL: URL = try CourseArchiver.backUpCourse(
-                course, coursesDirectoryURL: coursesDirectoryURL,
-                madeBy: .assistant(sectionNumber: section)
+            // Every call a NEW copy, which is what this tool is for — so no
+            // sharing with a copy under way, unlike the once-per-conversation
+            // one. The same line in the window, and the same trail line.
+            let backupURL: URL = try await savingACopy(
+                of: course, forSection: section, coursesDirectoryURL: coursesDirectoryURL
             )
             let said: String = AssistWording.backedUpCourse(
                 course: course.code, to: backupURL.lastPathComponent
@@ -3808,7 +3910,7 @@ final class AssistToolRunner {
     /// is the way out. That is the same rule the duplicate path already lives
     /// by, said out loud here because this tool moves more pages than anything
     /// else on the surface.
-    private func makeRoomForClasses(_ arguments: [String: Any]) -> AssistToolOutcome {
+    private func makeRoomForClasses(_ arguments: [String: Any]) async -> AssistToolOutcome {
         switch roomPlan(arguments) {
         case .couldNot(let message):
             return AssistToolOutcome.couldNotRead(message)
@@ -3829,7 +3931,7 @@ final class AssistToolRunner {
                 )
             }
 
-            let backedUp: Bool = backUpOnceForThisConversation(
+            let backedUp: Bool = await backUpOnceForThisConversation(
                 asked.located.course, forSection: asked.located.sectionNumber
             )
             let outcome: ClassChangeOutcome
@@ -4115,8 +4217,8 @@ final class AssistToolRunner {
         )
     }
 
-    private func addNextClass(_ arguments: [String: Any]) -> AssistToolOutcome {
-        if let duplicated = duplicateClassRequested(arguments) {
+    private func addNextClass(_ arguments: [String: Any]) async -> AssistToolOutcome {
+        if let duplicated = await duplicateClassRequested(arguments) {
             return duplicated
         }
         switch nextClassPlan(arguments) {
@@ -4133,7 +4235,7 @@ final class AssistToolRunner {
                 )
             }
 
-            let backedUp: Bool = backUpOnceForThisConversation(
+            let backedUp: Bool = await backUpOnceForThisConversation(
                 asked.located.course, forSection: asked.located.sectionNumber
             )
 
@@ -4298,7 +4400,7 @@ final class AssistToolRunner {
         }
     }
 
-    private func addCurriculumMentions(_ arguments: [String: Any]) -> AssistToolOutcome {
+    private func addCurriculumMentions(_ arguments: [String: Any]) async -> AssistToolOutcome {
         switch mentionsPlan(arguments) {
         case .failure(let refusal):
             return AssistToolOutcome.refused(refusal.message)
@@ -4314,7 +4416,7 @@ final class AssistToolRunner {
             // Before anything is touched — but only the first time in a
             // conversation. The undo history covers the rest of it; the
             // backup outlives the conversation.
-            let backedUp: Bool = backUpOnceForThisConversation(
+            let backedUp: Bool = await backUpOnceForThisConversation(
                 asked.located.course, forSection: asked.located.sectionNumber
             )
 
@@ -4503,7 +4605,7 @@ final class AssistToolRunner {
     /// does); keeps a replaced page's settings block byte for byte; and
     /// records ONE undo entry that never touches a preview, because the page
     /// is never on the site.
-    private func writeHowITeach(_ arguments: [String: Any]) -> AssistToolOutcome {
+    private func writeHowITeach(_ arguments: [String: Any]) async -> AssistToolOutcome {
         let planned: PlannedHowITeach
         switch howITeachPlan(arguments) {
         case .failure(let refusal):
@@ -4531,7 +4633,7 @@ final class AssistToolRunner {
         var sections: [Int] = planned.course.sectionNumbers
         sections.sort()
         let standInSection: Int = sections.first ?? 1
-        let backedUp: Bool = backUpOnceForThisConversation(planned.course, forSection: standInSection)
+        let backedUp: Bool = await backUpOnceForThisConversation(planned.course, forSection: standInSection)
 
         do {
             try newText.write(to: pageURL, atomically: true, encoding: .utf8)

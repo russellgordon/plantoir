@@ -938,6 +938,16 @@ nonisolated enum AssistWording {
     // MARK: - Backing a course up
 
     /// Where the copy went.
+    /// Shown under the three dots while the assistant saves a copy of a
+    /// course before changing it (#351) — the wait a teacher approving a
+    /// change used to see as a frozen window. It names the course and says
+    /// why the wait is worth it; the time is said as "a minute" because a
+    /// course full of pictures really does take that long.
+    static func backingUpFirst(course: String) -> String {
+        return "Saving a copy of \(course) first, so this can be undone — a course with lots of "
+             + "pictures can take a minute."
+    }
+
     static func backedUpCourse(course: String, to name: String) -> String {
         return "Backed up \(course) to \(name). It is in Plantoir's Backups list, and restoring "
              + "from it puts the whole course back as it is right now."
