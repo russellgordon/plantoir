@@ -195,9 +195,7 @@
             "published on its own"
           ]
         }
-      },
-      "awaiting_capture": true,
-      "waiting_on": "#367"
+      }
     },
     {
       "id": "reference",
@@ -306,9 +304,7 @@
       "caption": "Tell Claude or Codex how you teach, once. It is never published.",
       "expectText": [
         "How I Teach"
-      ],
-      "awaiting_capture": true,
-      "waiting_on": "#367"
+      ]
     },
     {
       "id": "club",
