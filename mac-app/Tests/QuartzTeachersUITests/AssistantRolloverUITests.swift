@@ -347,6 +347,18 @@ final class AssistantRolloverUITests: XCTestCase {
         application.activate()
         let window: XCUIElement = application.windows["assistant-AppWindow-1"]
         XCTAssertTrue(window.waitForExistence(timeout: 30), "The assistant window is not open.")
+        // The main window put out of the way when it covers the assistant.
+        // Its size comes from AppKit's own frame autosave in the REAL
+        // preferences (a residual #154 documents), and at 1512 × 948 it
+        // covered the assistant's centre on 2026-09-27: XCUITest then ran its
+        // interruption monitors over the main window's texts and raised
+        // "Can't do regex matching on object 1" — twice, and again after
+        // raising the assistant from the Window menu. Minimised, it covers
+        // nothing and the section's work in it carries on.
+        let mainWindow: XCUIElement = application.windows["main-AppWindow-1"]
+        if !window.isHittable && mainWindow.exists {
+            mainWindow.buttons[XCUIIdentifierMinimizeWindow].click()
+        }
         window.click()
 
         let field: XCUIElement = application.textFields["assistInputField"]
