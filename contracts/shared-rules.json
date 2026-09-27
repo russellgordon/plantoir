@@ -1087,6 +1087,88 @@
             "Answer Key"
           ],
           "why": "Quartz removes every %% comment before it reads a link (readingALink.commentIsNeverALink, #331), so the answer key in the teacher's private note is never drawn as a link: publishing it would put in front of students the one page the note was reminding the teacher NOT to post yet. Worksheet proves the class still publishes what it really links to."
+        },
+        {
+          "name": "a Markdown-style link to a page is followed, in either spelling",
+          "pages": [
+            {
+              "title": "Unit 2, Day 3",
+              "isClassPage": true,
+              "visible": false,
+              "body": "Read [the notes](Notes.md), then [the worksheet](<Unit 2/Worksheet 2.md>) and [part A of the quiz](Quiz%201.md#part-a).\n\nMore at [the course site](https://example.com/Answer%20Key.md).\n"
+            },
+            {
+              "title": "Notes",
+              "isClassPage": false,
+              "visible": false,
+              "links": []
+            },
+            {
+              "title": "Worksheet 2",
+              "isClassPage": false,
+              "visible": false,
+              "links": []
+            },
+            {
+              "title": "Quiz 1",
+              "isClassPage": false,
+              "visible": false,
+              "links": []
+            },
+            {
+              "title": "Answer Key",
+              "isClassPage": false,
+              "visible": false,
+              "links": []
+            }
+          ],
+          "publish": [
+            "Unit 2, Day 3"
+          ],
+          "expectVisible": [
+            "Unit 2, Day 3",
+            "Notes",
+            "Worksheet 2",
+            "Quiz 1"
+          ],
+          "expectUntouched": [
+            "Answer Key"
+          ],
+          "why": "Folded into #325 by the director's ruling (2026-09-26): publishing used to follow wikilinks only, so a class written by a teacher who has Obsidian's 'Use [[Wikilinks]]' turned off published without a single page it uses. A Markdown destination names a page by its last component, the way a wikilink does, in the plain shape (percent-encoded, any #heading taken off) and the angle-bracket shape (#97). A destination with a scheme is somewhere else entirely, so the Answer Key named inside a web address stays hidden."
+        },
+        {
+          "name": "a Markdown-style link in code or in a comment is not followed",
+          "pages": [
+            {
+              "title": "Unit 2, Day 3",
+              "isClassPage": true,
+              "visible": false,
+              "body": "Write a link like `[key](Answer%20Key.md)`.\n\n%% post [key](<Answer Key.md>) after the quiz %%\n\nToday: [the worksheet](Worksheet.md).\n"
+            },
+            {
+              "title": "Answer Key",
+              "isClassPage": false,
+              "visible": false,
+              "links": []
+            },
+            {
+              "title": "Worksheet",
+              "isClassPage": false,
+              "visible": false,
+              "links": []
+            }
+          ],
+          "publish": [
+            "Unit 2, Day 3"
+          ],
+          "expectVisible": [
+            "Unit 2, Day 3",
+            "Worksheet"
+          ],
+          "expectUntouched": [
+            "Answer Key"
+          ],
+          "why": "Both Markdown shapes go through the one mask every link reader uses (readingALink.codeIsNeverALink, #313, and commentIsNeverALink, #331): an example in code and a note in a comment are not links in any style."
         }
       ]
     },
@@ -1148,6 +1230,42 @@
           "expectUntouched": ["Unit 2, Day 4", "Worksheet"],
           "expectPlanDoesNotSay": ["linkedClassStaysVisible"],
           "why": "Worksheet is Day 4's material, and whether students see it is Day 4's business: taking it down because the class in front of it was hidden is the old behaviour through a hidden door. And a hidden class is not 'staying visible', so the plan does not say it is."
+        },
+        {
+          "name": "a page a Markdown-style link still leads to stays published",
+          "pages": [
+            {
+              "title": "Unit 2, Day 3",
+              "isClassPage": true,
+              "visible": true,
+              "links": [
+                "Worksheet"
+              ]
+            },
+            {
+              "title": "Study Guide",
+              "isClassPage": false,
+              "visible": true,
+              "body": "Practise with [the worksheet](Worksheet.md).\n"
+            },
+            {
+              "title": "Worksheet",
+              "isClassPage": false,
+              "visible": true,
+              "links": []
+            }
+          ],
+          "unpublish": [
+            "Unit 2, Day 3"
+          ],
+          "expectHidden": [
+            "Unit 2, Day 3"
+          ],
+          "expectUntouched": [
+            "Study Guide",
+            "Worksheet"
+          ],
+          "why": "The referrer test reads the same links publishing follows (folded into #325, 2026-09-26): Study Guide, which students can see, still leads to Worksheet with a Markdown-style link, so taking Worksheet down with the class would leave a dead link on a visible page."
         }
       ]
     },
@@ -1207,6 +1325,11 @@
         "why": "build_site.py's own rule, so a course whose folder is called 'Ontario Curriculum' is covered exactly as a plain one is. In a real course this is every expectation page, the folder's own index, and the page explaining them."
       }
     ],
+    "markdownStyleLinks": {
+      "rule": "Publishing, unpublishing's referrer test, the site check's links into hidden pages and the answer to what a page links to read a Markdown-style link to a page as well as a wikilink: [text](Notes.md), [text](Unit%202/Quiz%201.md#part-a) and [text](<Unit 2/Worksheet 2.md>). Each shape is read by ONE pattern (specialNames.renameFolder.linkRewriting's two: the plain one refuses a destination opening with <, the angle-bracket one takes it). The destination is cut at the first # or ?, percent-decoded (the raw text when it does not decode), and resolved like a wikilink by its last component, .md dropped. A destination with a scheme (https:, mailto:, data:), one starting //, or one that is only a #heading names no page. Both shapes go through the same mask as wikilinks: code (readingALink.whatIsCode) and %% comments (whatIsAComment).",
+      "notYet": "A page RENAME does not rewrite a Markdown-style link to the renamed page (a folder rename does, #97). Measured at one local Markdown link in all of support/, so it is recorded rather than built.",
+      "why": "Folded into #325 by the director's ruling, 2026-09-26. Before, no walk read a Markdown-style link in any spelling, so a teacher with Obsidian's 'Use [[Wikilinks]]' turned off published classes without a page they use, and hid pages still linked from visible ones. Measured in support/: 0 angle-bracket destinations and 1 local Markdown link (ENL1W's Indigenous Storywork, itself dead on the site because it resolved relative to Concepts/; now a wikilink)."
+    },
     "theOrderIsLoadBearing": {
       "value": true,
       "why": "The exclusions are checked BEFORE the referrer test, so narrowing what counts as a referrer cannot reach them. Narrowing a sweep rule makes every exclusion above it matter more than it did the day before, which is why the exclusions are the thing to re-test after any change to what gets swept."
@@ -13090,6 +13213,109 @@
         "expect": {
           "pages": [
             "Concepts/Teaching.md"
+          ],
+          "mediaCreated": [],
+          "mediaReused": [],
+          "mediaRenamed": {},
+          "skipped": [],
+          "linksLeadingNowhere": []
+        }
+      },
+      {
+        "name": "a picture named in an angle-bracketed destination is carried, and renamed when the name is taken",
+        "why": "#325: #97's third link style, ![](<one pic.png>), which a teacher can type to avoid %20. Before, the copy read the destination as <one, which names nothing, and silently left the picture behind. The rewritten page keeps the brackets and writes the new name PLAIN inside them (specialNames.renameFolder.linkRewriting.insideAngleBrackets); the text is pinned by the mac's PageReferencesTests, because this case's expect does not carry page text.",
+        "source": {
+          "folder": "ICS4U-2025",
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [
+            {
+              "path": "Concepts/Recursion.md",
+              "text": "![](<one pic.png>)\n"
+            }
+          ],
+          "media": [
+            {
+              "name": "one pic.png",
+              "bytes": "aaa"
+            }
+          ]
+        },
+        "destination": {
+          "folder": "ICS4U",
+          "sections": [
+            1
+          ],
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [],
+          "media": [
+            {
+              "name": "one pic.png",
+              "bytes": "zzzz"
+            }
+          ]
+        },
+        "copy": {
+          "page": "Concepts/Recursion.md",
+          "intoFolder": "Concepts"
+        },
+        "expect": {
+          "pages": [
+            "Concepts/Recursion.md"
+          ],
+          "mediaCreated": [
+            "one pic (from ICS4U-2025).png"
+          ],
+          "mediaReused": [],
+          "mediaRenamed": {
+            "one pic.png": "one pic (from ICS4U-2025).png"
+          },
+          "skipped": [],
+          "linksLeadingNowhere": []
+        }
+      },
+      {
+        "name": "a picture named in an angle-bracketed destination inside inline code is left alone",
+        "why": "The angle-bracket shape goes through the same mask as the other shapes (readingALink.codeIsNeverALink, #313): an example of the syntax is not a use of the picture.",
+        "source": {
+          "folder": "ICS4U-2025",
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [
+            {
+              "path": "Concepts/Recursion.md",
+              "text": "Show one with `![](<one pic.png>)`.\n"
+            }
+          ],
+          "media": [
+            {
+              "name": "one pic.png",
+              "bytes": "aaa"
+            }
+          ]
+        },
+        "destination": {
+          "folder": "ICS4U",
+          "sections": [
+            1
+          ],
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [],
+          "media": []
+        },
+        "copy": {
+          "page": "Concepts/Recursion.md",
+          "intoFolder": "Concepts"
+        },
+        "expect": {
+          "pages": [
+            "Concepts/Recursion.md"
           ],
           "mediaCreated": [],
           "mediaReused": [],

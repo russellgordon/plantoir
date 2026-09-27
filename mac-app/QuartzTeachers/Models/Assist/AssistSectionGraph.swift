@@ -479,14 +479,15 @@ nonisolated struct AssistSectionGraph {
     /// reader and rewriter uses. Until #313 this read every match, code and
     /// all: 1,896 across `support/`, each one a page a publish could take
     /// along that nothing on the site leads to.
+    ///
+    /// A Markdown-style link to a page, `[text](Worksheet.md)` or
+    /// `[text](<Unit 1/Worksheet.md>)`, is read too, through the same mask
+    /// (see `everyLinkAsWritten`).
     static func linkTargets(in text: String) -> [String] {
         var targets: [String] = []
         var seen: Set<String> = []
-        for match in WikiLinkRewriter.linkMatches(in: text) {
-            guard let targetRange = Range(match.range(at: 2), in: text) else {
-                continue
-            }
-            let target: String = normalized(String(text[targetRange]))
+        for written in AssistSectionGraph.everyLinkAsWritten(in: text) {
+            let target: String = normalized(written)
             if target.isEmpty || seen.contains(target) {
                 continue
             }
@@ -532,11 +533,8 @@ nonisolated struct AssistSectionGraph {
     static func linksAsWritten(in text: String) -> [String] {
         var written: [String] = []
         var seen: Set<String> = []
-        for match in WikiLinkRewriter.linkMatches(in: text) {
-            guard let targetRange = Range(match.range(at: 2), in: text) else {
-                continue
-            }
-            var target: String = String(text[targetRange]).trimmingCharacters(in: .whitespaces)
+        for asWritten in AssistSectionGraph.everyLinkAsWritten(in: text) {
+            var target: String = asWritten.trimmingCharacters(in: .whitespaces)
             if target.lowercased().hasSuffix(".md") {
                 target = String(target.dropLast(3))
             }
@@ -548,6 +546,89 @@ nonisolated struct AssistSectionGraph {
             written.append(target)
         }
         return written
+    }
+
+    /// Every link on a page, in the order it appears: each wikilink's name
+    /// as written, and each Markdown-style link's destination — in either
+    /// shape, `](Unit%201/Worksheet.md)` or `](<Unit 1/Worksheet.md>)` —
+    /// decoded, with any `#heading` or `?query` taken off. Both go through
+    /// the one mask (`MarkdownCode.notALinkRanges`), so a link in code or in
+    /// a `%%` comment is not read in either style.
+    ///
+    /// **Why Markdown-style links are read at all** (folded into #325 by the
+    /// director's ruling, 2026-09-26): before, publishing never followed one,
+    /// so a class that linked its worksheet as `[worksheet](Worksheet.md)`
+    /// published without it, and hiding the worksheet never noticed the class
+    /// still led there. Obsidian writes wikilinks unless its "Use
+    /// [[Wikilinks]]" setting is off, so this is rare — measured at ONE local
+    /// Markdown link in all of `support/`, ENL1W's, which was itself dead and
+    /// is now a wikilink — but a teacher who turned the setting off writes
+    /// nothing else. The destination is resolved the way a wikilink is, by
+    /// its last component; a destination with a scheme (`https:`, `mailto:`),
+    /// or one that is only a `#heading`, names no page.
+    ///
+    /// Each shape is read by ONE pattern, `FolderPathRewriter`'s own
+    /// (`markdownLinkPattern` refuses a `<`, `angleBracketedLinkPattern`
+    /// takes it), so a destination is never read twice.
+    static func everyLinkAsWritten(in text: String) -> [String] {
+        var located: [(location: Int, name: String)] = []
+        for match in WikiLinkRewriter.linkMatches(in: text) {
+            guard let targetRange = Range(match.range(at: 2), in: text) else {
+                continue
+            }
+            located.append((location: match.range.location, name: String(text[targetRange])))
+        }
+        let mask: [NSRange] = MarkdownCode.notALinkRanges(in: text)
+        for expression in [AssistSectionGraph.markdownLinkExpression, AssistSectionGraph.angleBracketedLinkExpression] {
+            guard let expression else {
+                continue
+            }
+            for match in MarkdownCode.matches(of: expression, in: text, outside: mask) {
+                guard let targetRange = Range(match.range(at: 2), in: text),
+                      let name = AssistSectionGraph.pageNamedByDestination(String(text[targetRange])) else {
+                    continue
+                }
+                located.append((location: match.range.location, name: name))
+            }
+        }
+        located.sort { first, second in
+            return first.location < second.location
+        }
+        var names: [String] = []
+        for entry in located {
+            names.append(entry.name)
+        }
+        return names
+    }
+
+    nonisolated private static let markdownLinkExpression: NSRegularExpression? =
+        try? NSRegularExpression(pattern: FolderPathRewriter.markdownLinkPattern)
+
+    nonisolated private static let angleBracketedLinkExpression: NSRegularExpression? =
+        try? NSRegularExpression(pattern: FolderPathRewriter.angleBracketedLinkPattern)
+
+    /// What a Markdown destination names as a page, as written but decoded,
+    /// or nil when it names nothing in the course.
+    private static func pageNamedByDestination(_ destination: String) -> String? {
+        var text: String = destination.trimmingCharacters(in: .whitespaces)
+        if text.isEmpty || text.hasPrefix("#") || text.hasPrefix("//") {
+            return nil
+        }
+        if let scheme = text.range(of: #"^[A-Za-z][A-Za-z0-9+.\-]*:"#, options: .regularExpression),
+           !scheme.isEmpty {
+            return nil
+        }
+        for separator in ["#", "?"] {
+            if let cut = text.firstIndex(of: Character(separator)) {
+                text = String(text[..<cut])
+            }
+        }
+        text = text.removingPercentEncoding ?? text
+        let tidied: String = text.trimmingCharacters(in: .whitespaces)
+        if tidied.isEmpty {
+            return nil
+        }
+        return tidied
     }
 
     /// A link target or a teacher's page name reduced to the form the index

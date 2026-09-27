@@ -16,6 +16,13 @@ import Foundation
 /// | `[[x.pdf]]` links at a FILE | 250, of which 235 PDFs | a link, not an embed — and the biggest single thing a scan of embeds alone would drop |
 /// | `<img src="/Media/x.png">` | 5 | three of them on pages inside shared folders; one is a live 1.1 MB picture |
 /// | `[text](x.png)` | 526, every one `https://` | nothing local to carry today, scanned anyway because the cost is nothing |
+/// | `[text](<x y.png>)` | 0 in `support/` | #97's third link style (#325): a teacher can type it, and before #325 the plain pattern read `<x` and named nothing, so the copy silently left the picture behind |
+///
+/// Each Markdown shape is read by exactly ONE pattern, and both are
+/// REFERENCES to `FolderPathRewriter`'s constants rather than copies:
+/// `markdownLinkPattern`, whose `(?!<)` leaves a `<…>` destination alone, and
+/// `angleBracketedLinkPattern`, whose closing `>` is a lookahead so the
+/// rewrite never eats it.
 ///
 /// **Code and `%%` comments are left alone** — a fenced block of either
 /// character, a fence inside a callout, an inline span, and (#331) anything
@@ -24,7 +31,7 @@ import Foundation
 /// an example a teacher wrote. Where code is comes from `MarkdownCode`, the
 /// one definition every link reader and rewriter on the mac shares (#313,
 /// `readingALink.whatIsCode`, and `whatIsAComment` since #331): a match of
-/// any of the three shapes that STARTS in code or a comment is skipped. Until
+/// any of the four shapes that STARTS in code or a comment is skipped. Until
 /// #313 this walker tracked ``` and ~~~ fences itself and not inline spans,
 /// and saw no fence inside a `>` callout.
 ///
@@ -44,6 +51,11 @@ nonisolated enum PageReferences {
             case wikilink
             /// An HTML attribute or a Markdown link — percent-encoded.
             case encoded
+            /// A Markdown destination in angle brackets, `](<one pic.png>)`
+            /// (#325). Read like `.encoded` — the site's Markdown reader
+            /// resolves `<a%20b.png>` and `<a b.png>` to the same address
+            /// (#97's measurement) — but written back PLAIN, #97's rule.
+            case angleBracketed
         }
 
         // MARK: - Stored properties
@@ -154,6 +166,12 @@ nonisolated enum PageReferences {
                 withAllowedCharacters: CharacterSet.urlPathAllowed
             ) ?? newName.text
             return prefix + encoded
+        case .angleBracketed:
+            var oldSegment: String = reference.target
+            if let lastSlash = reference.target.lastIndex(of: "/") {
+                oldSegment = String(reference.target[reference.target.index(after: lastSlash)...])
+            }
+            return prefix + FolderPathRewriter.spelledInsideAngleBrackets(newName.text, likeThe: oldSegment)
         }
     }
 
@@ -207,9 +225,15 @@ nonisolated enum PageReferences {
     )
 
     /// A Markdown link's destination: `](…)`, up to a space or the closing
-    /// bracket, so a link carrying a title is still read.
+    /// bracket, so a link carrying a title is still read — and never one that
+    /// opens with `<`, which is the next shape's (group 2).
     private static let markdownExpression: NSRegularExpression? =
-        try? NSRegularExpression(pattern: #"\]\(([^)\s]+)"#)
+        try? NSRegularExpression(pattern: FolderPathRewriter.markdownLinkPattern)
+
+    /// A Markdown destination in angle brackets, `](<…>)`, which may hold
+    /// spaces (group 2; the `>` is a lookahead).
+    private static let angleBracketedExpression: NSRegularExpression? =
+        try? NSRegularExpression(pattern: FolderPathRewriter.angleBracketedLinkPattern)
 
     private static func matches(in line: String, code: [NSRange], lineOffset: Int) -> [Match] {
         var found: [Match] = []
@@ -222,8 +246,12 @@ nonisolated enum PageReferences {
             kind: .encoded, code: code, lineOffset: lineOffset, into: &found
         )
         PageReferences.collect(
-            PageReferences.markdownExpression, in: line, groups: [1],
+            PageReferences.markdownExpression, in: line, groups: [2],
             kind: .encoded, code: code, lineOffset: lineOffset, into: &found
+        )
+        PageReferences.collect(
+            PageReferences.angleBracketedExpression, in: line, groups: [2],
+            kind: .angleBracketed, code: code, lineOffset: lineOffset, into: &found
         )
         found.sort { first, second in
             return first.range.lowerBound < second.range.lowerBound
@@ -283,7 +311,7 @@ nonisolated enum PageReferences {
         if let lastSlash = text.lastIndex(of: "/") {
             text = String(text[text.index(after: lastSlash)...])
         }
-        if kind == .encoded {
+        if kind == .encoded || kind == .angleBracketed {
             for separator in ["?", "#"] {
                 if let cut = text.firstIndex(of: Character(separator)) {
                     text = String(text[..<cut])

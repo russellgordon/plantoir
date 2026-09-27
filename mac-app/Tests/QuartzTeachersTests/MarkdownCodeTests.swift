@@ -157,6 +157,37 @@ final class MarkdownCodeTests: XCTestCase {
         XCTAssertEqual(names, ["b.png"])
     }
 
+    // MARK: - Markdown-style page links (folded into #325)
+
+    /// The walks read a Markdown-style link to a page in either spelling,
+    /// decoded and with the heading taken off, in page order among the
+    /// wikilinks — and a web address or a bare heading is no page.
+    func testMarkdownStyleLinksAreReadInPageOrder() {
+        let text: String = "[[First]] then [n](Unit%202/Notes.md#top), [w](<Unit 2/Worksheet 2.md>), "
+            + "[web](https://example.com/Key.md), [here](#heading) and [[Last]]."
+        XCTAssertEqual(
+            AssistSectionGraph.linksAsWritten(in: text),
+            ["First", "Unit 2/Notes", "Unit 2/Worksheet 2", "Last"]
+        )
+        XCTAssertEqual(
+            AssistSectionGraph.linkTargets(in: text),
+            ["first", "notes", "worksheet 2", "last"]
+        )
+    }
+
+    /// Each Markdown shape is read by ONE pattern, so a link is never read
+    /// twice, and an unterminated `](<…` is not a link.
+    func testAMarkdownLinkIsReadOnceAndAnUnterminatedOneNotAtAll() {
+        XCTAssertEqual(AssistSectionGraph.linkTargets(in: "[w](<Worksheet.md>)"), ["worksheet"])
+        XCTAssertEqual(AssistSectionGraph.linkTargets(in: "[w](<Worksheet.md"), [])
+    }
+
+    /// Code and comments mask Markdown-style links as they mask wikilinks.
+    func testMarkdownStyleLinksInCodeOrACommentAreNotRead() {
+        let text: String = "`[k](Key.md)` %% [k](<Key.md>) %% [w](Worksheet.md)"
+        XCTAssertEqual(AssistSectionGraph.linkTargets(in: text), ["worksheet"])
+    }
+
     /// A page embedded only as an example is not brought along by a copy.
     func testAnEmbedShownInsideCodeBringsNothing() {
         let text: String = "Embed one with `![[Note]]`.\n\n```\n![[Other]]\n```\n![[Third]]\n"
