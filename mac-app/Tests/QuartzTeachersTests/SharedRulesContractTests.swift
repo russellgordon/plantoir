@@ -201,15 +201,26 @@ final class SharedRulesContractTests: XCTestCase {
         XCTAssertNotNil(stop["theNamedPagesAreNeverStopped"] as? String)
         XCTAssertNotNil(stop["saidToTheTeacher"] as? String)
 
-        // UNPUBLISHING is deliberately absent. Its reach is the sibling
-        // decision, held as issue #201 — and a contract that claimed it were
-        // already true would be false on BOTH platforms the day it landed, in
-        // the file that exists to stop this rule drifting.
+        // UNPUBLISHING joined on 2026-09-26 (issue #201): an unpublish stops
+        // at a class the way publishing does. It was held out of this list
+        // until the behaviour landed, because a contract claiming it early
+        // would have been false on both platforms. Named HERE, as a stop the
+        // three verbs share, and deliberately NOT as a fourth entry in
+        // `neverTakenDownByFollowingLinks` — see the test after this one.
         let appliesTo: [String] = try XCTUnwrap(stop["appliesTo"] as? [String])
         XCTAssertTrue(appliesTo.contains("publishing"))
         XCTAssertTrue(appliesTo.contains("the dates a class brings"))
-        XCTAssertFalse(appliesTo.contains("unpublishing"),
-                       "Unpublish reach is #201; claiming it here is false on both platforms")
+        XCTAssertTrue(appliesTo.contains("unpublishing"),
+                      "An unpublish stops at a class since #201; the contract has to say so")
+
+        // The unpublishing cases define their own harness, so the other app
+        // can build it without reading this one.
+        let unpublishing: [String: Any] = try XCTUnwrap(section["unpublishing"] as? [String: Any])
+        let note: String = try XCTUnwrap(unpublishing["casesNote"] as? String)
+        XCTAssertTrue(note.contains("`expectPlanSays`"))
+        XCTAssertTrue(note.contains("never both"))
+        let cases: [[String: Any]] = try XCTUnwrap(unpublishing["cases"] as? [[String: Any]])
+        XCTAssertFalse(cases.isEmpty)
     }
 
     /// The kinds the sweep must never reach, each with the reason it is
@@ -234,6 +245,13 @@ final class SharedRulesContractTests: XCTestCase {
         XCTAssertTrue(all.contains("key links"))
         XCTAssertTrue(all.contains("index.md"))
         XCTAssertTrue(all.contains("curriculum"))
+
+        // Three, and a class is not the fourth (#201). The exclusions are
+        // pages reached from somewhere other than a lesson; a class is a STOP
+        // in the walk, named once in `stopsAtAClassPage.appliesTo`. The
+        // Windows suite pins this count too, so a fourth entry would turn it
+        // red on pull for a rule it already has in the right place.
+        XCTAssertEqual(kinds.count, 3)
     }
 
     /// `readingALink.cases` (#294): what a wikilink NAMES, including the
