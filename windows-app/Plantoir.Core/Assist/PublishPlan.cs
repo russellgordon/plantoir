@@ -267,7 +267,7 @@ public sealed record IndexChange(
         ? $"{RelativePath} has no “{SectionIndex.Heading}” heading, so its front page can’t be updated. " +
           "Nothing else is affected."
         : WillChange
-            ? $"The section's front page would show “{ToClass}” ({ToDate:yyyy-MM-dd}) as the most recent class" +
+            ? $"The section's front page would show “{ToClass}” ({DateText.Iso(ToDate)}) as the most recent class" +
               (FromClass is null ? "." : $", instead of “{FromClass}”.")
             : $"The section's front page already shows “{ToClass}”.";
 }
@@ -320,7 +320,7 @@ public sealed record PlannedPage(
 
     private static bool? Invert(bool? value) => value is null ? null : !value;
 
-    private string When => Date is { } date ? $"{date:yyyy-MM-dd}, " : "";
+    private string When => Date is { } date ? $"{DateText.Iso(date)}, " : "";
 
     private static string Show(bool? value) =>
         value is null ? "not set" : value.Value ? "true" : "false";

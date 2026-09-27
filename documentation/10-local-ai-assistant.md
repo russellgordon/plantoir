@@ -5160,7 +5160,12 @@ remembered class dates in the machine's calendar and `TimetableMemory.Read`
 parses them back with `InvariantCulture`, so on a Thai-locale machine every
 date a teacher remembered lands 543 years in the future and nothing reports a
 fault. That sweep is its own piece of work, with its own review: [issue
-#144](https://github.com/russellgordon/plantoir/issues/144). **`CalendarDay`
+#144](https://github.com/russellgordon/plantoir/issues/144) — **landed
+2026-09-27**: one helper, `DateText`, every product site through it, and a
+source-scan test that fails on the next bare `yyyy`; the reasoning, the two
+things the fix itself would have broken, and the five sites left to #159's
+branch are in [`12-windows-app.md`](12-windows-app.md) → "Dates are written
+in the Gregorian calendar, by one helper (#144)". **`CalendarDay`
 is immune by construction** — `.text` is `String(format: "%04d-%02d-%02d", …)`,
 three integers and no calendar — **but the mac was not, and this line used to
 say it was.** Two `DateFormatter`s in mac product code set a `dateFormat` and

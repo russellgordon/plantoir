@@ -33,7 +33,7 @@ public partial class App : Application
         {
             string dir = Plantoir.Core.Models.AppDataRoot.Current;
             Directory.CreateDirectory(dir);
-            File.AppendAllText(Path.Combine(dir, "startup.log"), $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {message}\n");
+            File.AppendAllText(Path.Combine(dir, "startup.log"), $"[{Plantoir.Core.Models.DateText.Invariant(DateTime.Now, "yyyy-MM-dd HH:mm:ss.fff")}] {message}\n");
         }
         catch { }
     }

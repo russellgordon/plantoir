@@ -478,7 +478,7 @@ public sealed class AssistWorkspace
             throw new AssistRefusal("No page was named, and no dates were given to choose classes by.");
         if (onOrAfter is { } from && before is { } until && until <= from)
             throw new AssistRefusal(
-                $"No class can be on or after {from:yyyy-MM-dd} and also before {until:yyyy-MM-dd}.");
+                $"No class can be on or after {DateText.Iso(from)} and also before {DateText.Iso(until)}.");
 
         bool isDraft = draft;
         bool isPublish = !draft;
@@ -1156,7 +1156,7 @@ public sealed class AssistWorkspace
         if (matches.Count == 1) return matches[0];
         if (matches.Count > 1)
             throw new AssistRefusal(
-                $"{course.Code} Section {sectionNumber} has {matches.Count} classes on {date:yyyy-MM-dd} — " +
+                $"{course.Code} Section {sectionNumber} has {matches.Count} classes on {DateText.Iso(date)} — " +
                 Humanize(matches.Select(m => "“" + Path.GetFileNameWithoutExtension(m) + "”")) +
                 ". Say which one you mean.");
 
@@ -1165,9 +1165,9 @@ public sealed class AssistWorkspace
             .Where(d => d is not null).Select(d => d!.Value).OrderBy(d => d).ToList();
         string nearby = dated.Count == 0
             ? "None of its classes have dates."
-            : $"Its classes run {dated[0]:yyyy-MM-dd} to {dated[^1]:yyyy-MM-dd}.";
+            : $"Its classes run {DateText.Iso(dated[0])} to {DateText.Iso(dated[^1])}.";
         throw new AssistRefusal(
-            $"{course.Code} Section {sectionNumber} has no class on {date:yyyy-MM-dd}. {nearby}");
+            $"{course.Code} Section {sectionNumber} has no class on {DateText.Iso(date)}. {nearby}");
     }
 
     /// <summary>
@@ -2016,7 +2016,7 @@ public sealed class AssistWorkspace
     {
         var kept = new List<string>();
         var stillPinned = new List<string>();
-        string stamp = DateTime.Now.ToString("yyyy-MM-dd_HHmmss");
+        string stamp = DateText.Invariant(DateTime.Now, "yyyy-MM-dd_HHmmss");
 
         // ONE undo entry for the whole release, not one per destination. A
         // rollover is a single act to the teacher, and a partial undo would
@@ -2725,7 +2725,7 @@ public sealed class AssistWorkspace
         if (runway.Count < needed)
         {
             int short_ = needed - runway.Count;
-            problems.Add($"This needs {needed} class days from {firstFree:yyyy-MM-dd} onwards and the " +
+            problems.Add($"This needs {needed} class days from {DateText.Iso(firstFree)} onwards and the " +
                          $"timetable only has {runway.Count}. Add {short_} more class " +
                          $"date{(short_ == 1 ? "" : "s")} and ask again.");
             return new InsertPlan
@@ -3297,7 +3297,7 @@ public sealed class AssistWorkspace
         return new AssistResult(true,
             $"Created {plan.Classes.Count} class page{(plan.Classes.Count == 1 ? "" : "s")} in Unit " +
             $"{plan.Unit} of {course.Code} Section {section}, dated " +
-            $"{plan.Classes[0].Date:yyyy-MM-dd} to {plan.Classes[^1].Date:yyyy-MM-dd}. " +
+            $"{DateText.Iso(plan.Classes[0].Date)} to {DateText.Iso(plan.Classes[^1].Date)}. " +
             "They are unpublished, so nothing changed in the site — write them, then publish when ready.",
             backup);
     }
@@ -3385,7 +3385,7 @@ public sealed class AssistWorkspace
             ---
             title: {created.Title}
             publish: false
-            created: {created.Date:yyyy-MM-dd}{tail}
+            created: {DateText.Iso(created.Date)}{tail}
             transcludeTitleSize: h2
             enableToc: false
             excludeBacklinks: true

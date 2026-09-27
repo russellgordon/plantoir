@@ -672,7 +672,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             // The teacher asked for a page. Its name and its date are the
             // whole answer; how it was worked out is the model's half.
             var made = plan.Classes[0];
-            return Answering($"Added {made.Title}, dated {made.Date:yyyy-MM-dd}.",
+            return Answering($"Added {made.Title}, dated {DateText.Iso(made.Date)}.",
                              result.Message + "\n\n" + AssistWording.ACreatedPageCanBeTakenBack);
         });
 
@@ -696,7 +696,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             foreach (string piece in dates.Split([',', ';', ' ', '\t', '\n', '\r'],
                                                  StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             {
-                if (DateOnly.TryParse(piece, out var date)) parsed.Add(date);
+                if (DateText.TryReadDay(piece, out var date)) parsed.Add(date);
                 else unreadable.Add(piece);
             }
 
@@ -709,7 +709,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
 
             parsed.Sort();
             return Proposing($"Would record {parsed.Count} class dates for {found.Code} Section {number}, " +
-                             $"{parsed[0]:yyyy-MM-dd} to {parsed[^1]:yyyy-MM-dd}, from {source}.");
+                             $"{DateText.Iso(parsed[0])} to {DateText.Iso(parsed[^1])}, from {source}.");
         });
 
     [McpServerTool(Name = "read_remembered_timetable", Title = "What dates this section meets",
@@ -744,7 +744,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             {
                 var all = new StringBuilder($"Every date on file for {where}:");
                 foreach (var date in remembered.Dates)
-                    all.Append($"\n• {date:dddd}, {date:yyyy-MM-dd}");
+                    all.Append($"\n• {date:dddd}, {DateText.Iso(date)}");
                 return Answering($"All {remembered.Dates.Count} dates for {where}.", all.ToString());
             }
 
@@ -758,7 +758,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                 existingClasses.Add((title, dt));
                 if (dt is { } d)
                 {
-                    classByDate[d.ToString("yyyy-MM-dd")] = title;
+                    classByDate[DateText.Iso(d)] = title;
                 }
             }
 
@@ -775,7 +775,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                     upcomingDates.Add(remembered.Dates[i]);
                 }
                 string countStr = upcomingDates.Count == 1 ? "first class is" : $"first {upcomingDates.Count} classes are";
-                lines.Add($"The semester begins on {firstDate:dddd}, {firstDate:yyyy-MM-dd}. The {countStr}:");
+                lines.Add($"The semester begins on {firstDate:dddd}, {DateText.Iso(firstDate)}. The {countStr}:");
             }
             else
             {
@@ -788,7 +788,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                 }
                 if (upcomingDates.Count == 0)
                 {
-                    lines.Add($"All {remembered.Dates.Count} scheduled classes for {where} have concluded (last class was on {lastDate:dddd}, {lastDate:yyyy-MM-dd}).");
+                    lines.Add($"All {remembered.Dates.Count} scheduled classes for {where} have concluded (last class was on {lastDate:dddd}, {DateText.Iso(lastDate)}).");
                 }
                 else
                 {
@@ -800,7 +800,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             for (int i = 0; i < upcomingDates.Count; i++)
             {
                 var date = upcomingDates[i];
-                string dateStr = date.ToString("yyyy-MM-dd");
+                string dateStr = DateText.Iso(date);
                 string classTitle;
                 if (classByDate.TryGetValue(dateStr, out var t))
                 {
@@ -826,7 +826,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                         classTitle = "(page not yet created)";
                     }
                 }
-                lines.Add($"• {date:dddd}, {date:yyyy-MM-dd} — {classTitle}");
+                lines.Add($"• {date:dddd}, {DateText.Iso(date)} — {classTitle}");
             }
 
             lines.Add("");
@@ -839,13 +839,13 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             else if (existingClasses.Count < remembered.Dates.Count)
             {
                 var next = remembered.Dates[existingClasses.Count];
-                lines.Add($"The next class would fall on {next:yyyy-MM-dd} ({next:dddd}).");
+                lines.Add($"The next class would fall on {DateText.Iso(next)} ({next:dddd}).");
             }
 
             string origin = $"Where they came from: {remembered.Source}.";
             if (remembered.Recorded is { } when)
             {
-                origin += $" Recorded {when:yyyy-MM-dd}.";
+                origin += $" Recorded {DateText.Iso(when)}.";
             }
             lines.Add("");
             lines.Add(origin);
@@ -885,7 +885,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             foreach (string piece in dates.Split([',', ';', ' ', '\t', '\n', '\r'],
                                                  StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             {
-                if (DateOnly.TryParse(piece, out var date)) parsed.Add(date);
+                if (DateText.TryReadDay(piece, out var date)) parsed.Add(date);
                 else unreadable.Add(piece);
             }
 
@@ -906,7 +906,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
 
             var stored = TimetableMemory.Read(workspace.FolderPath, found.Code, number)!;
             return $"Recorded {stored.Dates.Count} class dates for {found.Code} Section {number}, " +
-                   $"{stored.Dates[0]:yyyy-MM-dd} to {stored.Dates[^1]:yyyy-MM-dd}. " +
+                   $"{DateText.Iso(stored.Dates[0])} to {DateText.Iso(stored.Dates[^1])}. " +
                    "I won't need to ask for this again.";
         });
 
@@ -930,17 +930,17 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             var parsed = await Load(timetable, block, startYear, cancellation, firstDay);
             var text = new StringBuilder();
             text.AppendLine($"Block {parsed.Block}: {parsed.Meetings.Count} class meetings, " +
-                            $"{parsed.Meetings[0].Date:yyyy-MM-dd} to {parsed.Meetings[^1].Date:yyyy-MM-dd}.");
+                            $"{DateText.Iso(parsed.Meetings[0].Date)} to {DateText.Iso(parsed.Meetings[^1].Date)}.");
             text.AppendLine();
             foreach (var meeting in parsed.Meetings)
-                text.AppendLine($"  {meeting.Number,3}  {meeting.Date:yyyy-MM-dd}  {meeting.Date:ddd}");
+                text.AppendLine($"  {meeting.Number,3}  {DateText.Iso(meeting.Date)}  {meeting.Date:ddd}");
 
             if (parsed.NonTeachingDays.Count > 0)
             {
                 text.AppendLine();
                 text.AppendLine("Not teaching days — no unit content belongs on these:");
                 foreach (var day in parsed.NonTeachingDays)
-                    text.AppendLine($"       {day.Date:yyyy-MM-dd}  {day.Label}");
+                    text.AppendLine($"       {DateText.Iso(day.Date)}  {day.Label}");
             }
             return text.ToString().TrimEnd();
         }

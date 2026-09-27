@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using Plantoir.Core.Models;
 
 namespace Plantoir.Core.Scripting;
 
@@ -280,7 +281,7 @@ public static class ActivityTrail
     {
         DateTime when = moment ?? DateTime.Now;
         string safeWhat = LogRedactor.Redacting(what);
-        string entry = $"{when:yyyy-MM-dd HH:mm:ss} · {safeWhat}";
+        string entry = $"{DateText.Stamp(when)} · {safeWhat}";
         Append(entry);
     }
 
@@ -288,7 +289,7 @@ public static class ActivityTrail
     {
         DateTime when = moment ?? DateTime.Now;
         string safeWhat = LogRedactor.Redacting(what);
-        string entry = $"{when:yyyy-MM-dd HH:mm:ss} · {course}/{section} · {safeWhat}";
+        string entry = $"{DateText.Stamp(when)} · {course}/{section} · {safeWhat}";
         Append(entry);
     }
 
@@ -296,7 +297,7 @@ public static class ActivityTrail
     {
         DateTime when = moment ?? DateTime.Now;
         string safePrompt = LogRedactor.Redacting(prompt.Trim());
-        string entry = $"{when:yyyy-MM-dd HH:mm:ss} · {course}/{section} · asked a question\n{PromptPrefix}{safePrompt}";
+        string entry = $"{DateText.Stamp(when)} · {course}/{section} · asked a question\n{PromptPrefix}{safePrompt}";
         Append(entry);
     }
 

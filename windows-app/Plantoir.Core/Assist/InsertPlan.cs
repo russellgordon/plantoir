@@ -1,3 +1,5 @@
+using Plantoir.Core.Models;
+
 namespace Plantoir.Core.Assist;
 
 /// <summary>
@@ -54,7 +56,7 @@ public sealed class InsertPlan
 
         lines.Add($"New, and unpublished until you write {(Added.Count == 1 ? "it" : "them")}:");
         foreach (var added in Added)
-            lines.Add($"  {added.Title}  ({added.Date:yyyy-MM-dd} {added.Date.DayOfWeek})");
+            lines.Add($"  {added.Title}  ({DateText.Iso(added.Date)} {added.Date.DayOfWeek})");
 
         if (Renames.Count > 0)
         {
@@ -80,8 +82,8 @@ public sealed class InsertPlan
             lines.Add($"Moved to later class days — {Moves.Count}:");
             foreach (var move in Moves.Take(MostShown))
             {
-                string fromText = move.From.HasValue ? move.From.Value.ToString("yyyy-MM-dd") : "no date";
-                lines.Add($"  {move.Title}  {fromText} → {move.To:yyyy-MM-dd}");
+                string fromText = move.From.HasValue ? DateText.Iso(move.From.Value) : "no date";
+                lines.Add($"  {move.Title}  {fromText} → {DateText.Iso(move.To)}");
             }
             if (Moves.Count > MostShown)
                 lines.Add($"  …and {Moves.Count - MostShown} more.");
