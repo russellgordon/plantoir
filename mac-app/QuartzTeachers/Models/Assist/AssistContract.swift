@@ -189,6 +189,8 @@ enum AssistContract {
             "linkedClassStaysVisible": AssistPublishPlan.stayingVisibleLine(
                 title: "Unit 2, Day 4", reason: .aClassOfItsOwn, noun: .class
             ),
+            "backingUpFirst": AssistWording.backingUpFirst(course: course),
+            "changedWhileSavingACopy": AssistWording.changedWhileSavingACopy(course: course, section: section),
             "backedUpCourse": AssistWording.backedUpCourse(
                 course: course, to: "{course}_backup_2026-09-08_190000.zip"
             ),
@@ -228,6 +230,7 @@ enum AssistContract {
             "deployDidNotFinish": AssistWording.deployDidNotFinish(course: course, section: section),
             "sectionIsBusy": AssistWording.sectionIsBusy(course: course, section: section),
             "courseIsBusy": AssistWording.courseIsBusy(course: course),
+            "courseIsBeingCopied": AssistWording.courseIsBeingCopied(course: course),
             "courseIsBeingBuiltElsewhere": AssistWording.courseIsBeingBuiltElsewhere(course: course),
             "previewIsRebuilding": AssistWording.previewIsRebuilding(course: course, section: section),
             "builtWithNoWindowOpen": AssistWording.builtWithNoWindowOpen(course: course, section: section),
@@ -295,6 +298,7 @@ enum AssistContract {
             // The How I Teach page (#209): shared-rules.json -> howITeachPage.
             "howITeachRead": AssistWording.howITeachRead(course: course, text: "{text}"),
             "howITeachMissing": AssistWording.howITeachMissing(course: course),
+            "howITeachEmpty": AssistWording.howITeachEmpty(course: course),
             "howITeachDraftingBrief": AssistWording.howITeachDraftingBrief,
             "howITeachCutShort": AssistWording.howITeachCutShort(course: course, path: "{path}"),
             "howITeachPlanCreates": AssistWording.howITeachPlanCreates(course: course, path: "{path}"),

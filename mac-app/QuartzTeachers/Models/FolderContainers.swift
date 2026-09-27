@@ -515,6 +515,14 @@ enum FolderContainers {
         lines.append("  done")
         lines.append("  return 1")
         lines.append("}")
+        // The background warm-up (bundle B) is a launcher too, and holds the
+        // shared machine like one — but it is neither a publish nor a
+        // preview, so the trail names it for what it is.
+        lines.append("warmUpRunning() {")
+        lines.append("  seen=$(processesOnThisMac)")
+        lines.append("  printf '%s\\n' \"$seen\" | grep -F '/getting-ready/setup.sh "
+            + BuilderWarmUp.launcherFlag + "' >/dev/null 2>&1")
+        lines.append("}")
         lines.append("anyLauncherRunning() {")
         lines.append("  seen=$(processesOnThisMac)")
         lines.append("  printf '%s\\n' \"$seen\" | grep -E '/(preview|deploy|setup)\\.sh( |$)'"
@@ -604,6 +612,12 @@ enum FolderContainers {
             // builder deliberately left alone mid-publish and by one that
             // refused to stop, and only the first of those is working.
             reasonSomethingElseIsUsingIt: "this folder’s own website builder is still running"
+        ))
+        lines.append("    elif warmUpRunning; then")
+        lines.append("      " + noteCall(
+            .leftTheSharedSetupRunning,
+            occasion: occasion,
+            reasonSomethingElseIsUsingIt: "this Mac is still being got ready to build websites, in the background"
         ))
         lines.append("    elif anyLauncherRunning; then")
         lines.append("      " + noteCall(

@@ -223,7 +223,7 @@ final class ScheduledDeployCleanupTests: XCTestCase {
     /// An unknown `act` FAILS rather than being skipped: a case added to the
     /// contract — from either platform — has to be implemented here or said to
     /// be unrunnable, never quietly walked past.
-    func testEveryCancellationCaseInTheContractHolds() throws {
+    func testEveryCancellationCaseInTheContractHolds() async throws {
         let rule: [String: Any] = try Self.section("scheduledDeployCancellation")
         let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
         XCTAssertGreaterThanOrEqual(cases.count, 15, "The case list has lost cases.")
@@ -242,19 +242,19 @@ final class ScheduledDeployCleanupTests: XCTestCase {
                 continue
             }
             XCTAssertEqual(provedBy, "run", "Unknown provedBy for: \(act)")
-            try run(cancellationCase: act, expecting: cancels)
+            try await run(cancellationCase: act, expecting: cancels)
         }
     }
 
     /// One `provedBy: "run"` case.
-    private func run(cancellationCase act: String, expecting cancels: String) throws {
+    private func run(cancellationCase act: String, expecting cancels: String) async throws {
         try prepare()
         switch act {
         case "remove one section of a course that has more than one":
             let course: Course = try makeCourse()
             try writeAgent(sectionNumber: 1)
             try writeAgent(sectionNumber: 2)
-            let result = ScheduledDeployCleanup.removeSection(
+            let result = await ScheduledDeployCleanup.removeSection(
                 2, from: course, coursesDirectoryURL: coursesDirectoryURL, runner: launchControl
             )
             XCTAssertTrue(result.didRemove, act)
@@ -287,7 +287,7 @@ final class ScheduledDeployCleanupTests: XCTestCase {
             let course: Course = try makeCourse()
             try writeAgent(sectionNumber: 1)
             try writeAgent(sectionNumber: 2)
-            let result = ScheduledDeployCleanup.removeCourse(
+            let result = await ScheduledDeployCleanup.removeCourse(
                 course, coursesDirectoryURL: coursesDirectoryURL, runner: launchControl
             )
             XCTAssertTrue(result.didRemove, act)
@@ -302,7 +302,7 @@ final class ScheduledDeployCleanupTests: XCTestCase {
             // course-shaped `RemovalRequest` for.
             let course: Course = try makeCourse(sections: [1])
             try writeAgent(sectionNumber: 1)
-            let result = ScheduledDeployCleanup.removeCourse(
+            let result = await ScheduledDeployCleanup.removeCourse(
                 course, coursesDirectoryURL: coursesDirectoryURL, runner: launchControl
             )
             XCTAssertTrue(result.didRemove, act)
@@ -324,7 +324,7 @@ final class ScheduledDeployCleanupTests: XCTestCase {
             )
             let course: Course = try makeCourse(sections: [1])
             try writeAgent(sectionNumber: 1, workingFolder: otherFolder, labelled: .beforeFolderScoping)
-            let result = ScheduledDeployCleanup.removeCourse(
+            let result = await ScheduledDeployCleanup.removeCourse(
                 course, coursesDirectoryURL: coursesDirectoryURL, runner: launchControl
             )
             XCTAssertTrue(result.didRemove, act)
@@ -443,7 +443,7 @@ final class ScheduledDeployCleanupTests: XCTestCase {
             let otherFolder: URL = try makeOtherWorkingFolder()
             try writeAgent(sectionNumber: 1)
             try writeAgent(sectionNumber: 1, workingFolder: otherFolder)
-            let result = ScheduledDeployCleanup.removeCourse(
+            let result = await ScheduledDeployCleanup.removeCourse(
                 course, coursesDirectoryURL: coursesDirectoryURL, runner: launchControl
             )
             XCTAssertTrue(result.didRemove, act)
@@ -456,7 +456,7 @@ final class ScheduledDeployCleanupTests: XCTestCase {
             let course: Course = try makeCourse(sections: [1, 2])
             try writeAgent(sectionNumber: 1, labelled: .beforeFolderScoping)
             try writeAgent(sectionNumber: 2)
-            let result = ScheduledDeployCleanup.removeCourse(
+            let result = await ScheduledDeployCleanup.removeCourse(
                 course, coursesDirectoryURL: coursesDirectoryURL, runner: launchControl
             )
             XCTAssertTrue(result.didRemove, act)
@@ -778,7 +778,7 @@ final class ScheduledDeployCleanupTests: XCTestCase {
     /// course that is gone with a live alarm still addressed to it is the
     /// fault this piece exists to close, so the removal must not proceed past
     /// a cancel it could not make.
-    func testAFailedCancelStopsTheRemovalAndIsReported() throws {
+    func testAFailedCancelStopsTheRemovalAndIsReported() async throws {
         try prepare()
         let course: Course = try makeCourse()
         try writeAgent(sectionNumber: 1)
@@ -787,7 +787,7 @@ final class ScheduledDeployCleanupTests: XCTestCase {
             [.posixPermissions: 0o500], ofItemAtPath: agentsDirectory.path
         )
 
-        let result = ScheduledDeployCleanup.removeCourse(
+        let result = await ScheduledDeployCleanup.removeCourse(
             course, coursesDirectoryURL: coursesDirectoryURL, runner: launchControl
         )
 
@@ -807,7 +807,7 @@ final class ScheduledDeployCleanupTests: XCTestCase {
     }
 
     /// A removal that fails AFTER the cancel worked says the deploy stays off.
-    func testARemovalThatFailsAfterTheCancelSaysTheDeployStaysOff() throws {
+    func testARemovalThatFailsAfterTheCancelSaysTheDeployStaysOff() async throws {
         try prepare()
         let course: Course = try makeCourse()
         try writeAgent(sectionNumber: 1)
@@ -816,7 +816,7 @@ final class ScheduledDeployCleanupTests: XCTestCase {
             to: coursesDirectoryURL.appendingPathComponent("_backups")
         )
 
-        let result = ScheduledDeployCleanup.removeCourse(
+        let result = await ScheduledDeployCleanup.removeCourse(
             course, coursesDirectoryURL: coursesDirectoryURL, runner: launchControl
         )
 
@@ -832,13 +832,13 @@ final class ScheduledDeployCleanupTests: XCTestCase {
 
     /// A removal that fails with nothing scheduled says only what went wrong,
     /// exactly as it did before any of this existed.
-    func testARemovalThatFailsWithNothingScheduledSaysOnlyTheReason() throws {
+    func testARemovalThatFailsWithNothingScheduledSaysOnlyTheReason() async throws {
         try prepare()
         let course: Course = try makeCourse()
         try Data("not a folder".utf8).write(
             to: coursesDirectoryURL.appendingPathComponent("_backups")
         )
-        let result = ScheduledDeployCleanup.removeCourse(
+        let result = await ScheduledDeployCleanup.removeCourse(
             course, coursesDirectoryURL: coursesDirectoryURL, runner: launchControl
         )
         XCTAssertFalse(result.didRemove)
@@ -850,13 +850,13 @@ final class ScheduledDeployCleanupTests: XCTestCase {
 
     /// One line per section turned off, carrying the course, the section and
     /// the reason.
-    func testTheTrailCarriesOneLinePerSectionWithItsReason() throws {
+    func testTheTrailCarriesOneLinePerSectionWithItsReason() async throws {
         try prepare()
         let course: Course = try makeCourse()
         try writeAgent(sectionNumber: 1)
         try writeAgent(sectionNumber: 2)
 
-        _ = ScheduledDeployCleanup.removeCourse(
+        _ = await ScheduledDeployCleanup.removeCourse(
             course, coursesDirectoryURL: coursesDirectoryURL, runner: launchControl
         )
 
@@ -878,11 +878,11 @@ final class ScheduledDeployCleanupTests: XCTestCase {
     }
 
     /// Removing a SECTION says so, rather than saying the course went.
-    func testTheTrailSaysWhichKindOfRemovalItWas() throws {
+    func testTheTrailSaysWhichKindOfRemovalItWas() async throws {
         try prepare()
         let course: Course = try makeCourse()
         try writeAgent(sectionNumber: 2)
-        _ = ScheduledDeployCleanup.removeSection(
+        _ = await ScheduledDeployCleanup.removeSection(
             2, from: course, coursesDirectoryURL: coursesDirectoryURL, runner: launchControl
         )
         XCTAssertTrue(trailText().contains(

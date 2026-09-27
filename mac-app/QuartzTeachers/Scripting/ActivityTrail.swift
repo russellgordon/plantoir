@@ -638,6 +638,24 @@ nonisolated enum ActivityTrail {
         /// deliberate choice was made, and a choice nobody was able to make is
         /// a different fact.
         case websiteBuilderCouldNotBeStopped = "website builder could not be stopped"
+        /// The website builder began being got ready in the background, at a
+        /// first launch or the first launch of a new version (bundle B,
+        /// `BuilderWarmUp`). Carries the version. With the three below, it is
+        /// what answers "why was my first preview slow?" — or why it was not.
+        case builderWarmUpStarted = "builder got ready in the background: started"
+        /// The background run finished and the builder is ready. Carries how
+        /// many seconds it took, the number the feature exists to hide.
+        case builderWarmUpFinished = "builder got ready in the background: finished"
+        /// The background run ended without the builder being ready — a
+        /// failed download, a builder that would not start. Carries how it
+        /// ended and after how long. Nothing is said to the teacher: the
+        /// first preview gets it ready the old way.
+        case builderWarmUpDidNotFinish = "builder got ready in the background: did not finish"
+        /// The background run was not started because the Mac was offline or
+        /// in Low Data Mode. Carries which. The other reasons not to start
+        /// (already ready, a headless run, the test suite) leave no line,
+        /// because they are true on nearly every launch.
+        case builderWarmUpSkipped = "builder got ready in the background: skipped"
         /// ⌘Q landed while this app was publishing or building a preview
         /// (the latter since issue #232), the teacher was asked whether to
         /// quit anyway, and this is what they chose.
@@ -933,6 +951,20 @@ nonisolated enum ActivityTrail {
         /// LISTED for the website (#209) — one earlier builds published.
         /// Read from the build's `PLANTOIR_KEPT_OFF:` line.
         case howITeachPageKeptOff = "How I Teach page kept off the website"
+        /// Course Settings made an EMPTY How I Teach page (#329) — or could
+        /// not, and why: carries the course. A page the teacher did not
+        /// write appears in the course folder, and the assistant then calls
+        /// it "not written yet"; this is the only record the button made it.
+        /// Opening a page that is there writes nothing.
+        case howITeachPageStarted = "How I Teach page started"
+        /// The assistant saved a copy of a course (#351) — its first write in
+        /// a conversation, or the `back_up_course` tool: the course, the
+        /// section the copy is named for, the backup's FILE NAME, its size
+        /// and how long it took; or that it could not, and why. Answers "the
+        /// window hung after I approved" and "where did this zip come from".
+        /// The once-per-conversation reuse writes nothing: one line per real
+        /// zip.
+        case assistantBackedUpACourse = "assistant backed up a course"
         /// A section was got ready for the start of the year (#96): every
         /// class after the first, and the pages only later classes use, put
         /// into draft in one act. Carries the course and section, where it
@@ -1043,6 +1075,22 @@ nonisolated enum ActivityTrail {
     static func pageSettingsLeftAsTheyWereLine(act: String, pages: Int) -> String {
         let counted: String = pages == 1 ? "1 page" : "\(pages) pages"
         return "left the settings of \(counted) as they were while \(act): no room at the top for a new setting"
+    }
+
+    /// The words for `assistantBackedUpACourse`: the copy's file name — a
+    /// course code, a moment and who made it, never anything written on a
+    /// page — its size in megabytes and the seconds it took, one decimal
+    /// each, so a reader can tell 0.4 s from two minutes without a threshold
+    /// anybody had to guess.
+    static func assistantBackedUpLine(fileName: String, bytes: Int64, seconds: Double) -> String {
+        let megabytes: String = String(format: "%.1f", Double(bytes) / 1_000_000)
+        let took: String = String(format: "%.1f", seconds)
+        return "assistant backed up the course as \(fileName) (\(megabytes) MB, \(took) s)"
+    }
+
+    /// The words for an assistant backup that could not be made.
+    static func assistantCouldNotBackUpLine(reason: String) -> String {
+        return "assistant could not back up the course: \(reason)"
     }
 
     /// Where a start-of-the-year act was asked from, in the trail's words.

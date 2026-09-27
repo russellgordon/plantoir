@@ -2248,8 +2248,8 @@ paragraph on its own), a table row or a rule line such as frontmatter's
 `---` — and a run of N
 backticks closes on the next run of EXACTLY N; a run never closed is plain
 text; outside a span a backslash escapes. Nothing else is code: not indented
-code, not HTML `<code>`, not math, not `%%` comments (a separate question,
-[#331](https://github.com/russellgordon/plantoir/issues/331)). A link is in
+code, not HTML `<code>`, not math, and not `%%` comments — those are masked
+separately, FIRST, and code is found in what is left (#331, below). A link is in
 code when its `[[`, or the `!` of `![[`, starts inside a code range. **And a
 match that starts in code is not merely dropped: the search starts again where
 that code ENDS.** The link pattern crosses a `[`, so in "Type `` `[[` `` to
@@ -2370,8 +2370,8 @@ rewritten become more correct, not untrue.
   tracking rejected above, to "correctly" hide seven links on a page whose
   author plainly meant them.
 - **Stripping `%%` comments in the same change** — not this question and not
-  measured for its effect on publishing:
-  [#331](https://github.com/russellgordon/plantoir/issues/331).
+  measured for its effect on publishing then; done since, measured, as
+  [#331](https://github.com/russellgordon/plantoir/issues/331) (below).
 
 **Not covered, on purpose — readers of one fixed shape, not of links in
 general, named so nobody has to find them again** (from the implementation
@@ -2386,6 +2386,95 @@ counts as "already there" and the real mention is not added; and
 the BUILT copy only, so an example in code is displayed shortened and the
 teacher's file is untouched. Each would take the mask in a line; none has
 shipped content that reaches it.
+
+#### A comment is never a link (#331)
+
+**The rule** (`shared-rules.json` → `readingALink.whatIsAComment` and
+`commentIsNeverALink`). Quartz v4.5.0 removes every `%%…%%` from the RAW page
+before it reads anything (`ofm.ts:130`, in `textTransform` at `:160–163`), so
+nothing written inside a comment is ever drawn — link, embed or example. Every
+reader and rewriter now does the same, in the same order:
+
+1. **Comments first**, over the page as written: a `%%` opens a comment that
+   closes at the NEXT `%%`, across lines, whether or not either sits in code;
+   a last `%%` with no partner is text. (So `%%` inside inline code still
+   opens a comment, as it does in Quartz.)
+2. **Then code** — the #313 rule, unchanged — found in the page WITH EVERY
+   COMMENT REMOVED, and mapped back to the page's own offsets: a range
+   `[s, e)` of the stripped text becomes `[origin[s], origin[e-1]+1)`. The
+   stripped text never leaves the function, so no rewriter can write it back.
+3. **A link is not a link** when its `[[` (or the `!` of `![[`) starts inside a
+   comment or inside code, and the search resumes where that range ends.
+
+On the mac: `MarkdownCode.commentRanges(in:)`, `ranges(in:)` (code only,
+found after comments are removed, in UTF-16 throughout — `%` is ASCII) and
+`notALinkRanges(in:)`, the merge, which `WikiLinkRewriter.linkMatches`,
+`FolderPathRewriter` and `PageReferences` use — so publishing, dating, the
+site check, the links answer, copying, renames and insertion all agree. The
+build's twin is `markdown_code.py` (`comment_ranges`, `code_ranges`,
+`not_a_link_ranges`, and `matches_outside_code`'s default mask).
+
+**The trap, and the reason `ranges(in:)` still returns code only.** The
+curriculum markers `%%curriculum-start%%` / `%%curriculum-end%%` ARE
+comments — Quartz pairs lazily, so each marker is a whole comment and the
+block between them is NOT inside one. A reader that asks "is this MARKER in
+code?" must not see them masked, or every block is skipped and the coverage
+map goes empty while the build succeeds. So the two questions stay separate,
+and `readingALink.cases` → "the curriculum markers are comments, and what
+sits between them is not" pins it.
+
+**Measured** in Quartz's own order (comment removal, then remark-parse 11 +
+gfm 4) over all of `support/`: of 39,570 matches, 37,337 are plain links,
+1,139 in inline code, 750 in fenced code and **344 inside a comment** — all
+in skeletons, naming What This Site Can Do (294) or Help Sessions (50), and
+every reader before #331 followed them. 100 page-to-page edges existed only
+inside comments, none from a class page: no class page of 3,258 in the
+payloads, 600 in the skeletons and 86 in the example course reaches fewer
+pages, and both targets keep plain links, so check_section gains no orphan.
+The rule agrees with Quartz on all 39,570 and on all 21 matches in the 12 new
+cases, and changes none of the 40 existing ones.
+
+**Cases:** `readingALink.cases` 40 → 52; one each in
+`followingLinks.publishing` (an answer key named in a teacher's note is not
+published), `renamingTheUnitWord.linkCases`, `specialNames.renameFolder.linkRewriting`
+(Windows goes red on it until it masks comments) and
+`copyingAPageBetweenCourses`.
+
+**Rejected:**
+- **Finding code on the page as written (R1)** and masking comments too. It is
+  simpler and agrees with Quartz over the whole corpus, but gets two of the
+  twelve cases wrong: a fence opened inside a comment is read as a real fence
+  and swallows the link after it, and a backtick inside a comment pairs with
+  one after it and hides a real link. The cases decide, not the corpus.
+- **Rewriters that keep updating links inside comments**, so a private note
+  stays accurate: two definitions of a link again, and a rename plan counting
+  links publishing does not follow. Obsidian is believed not to index links
+  inside `%%` either — NOT measured.
+- **Treating a curriculum block as one comment**: Quartz pairs lazily, and the
+  block's contents are on the site and are links.
+
+**Found on the way:** AVI1O's and TEJ4M's `Tasks/_DUPLICATE ME.md` wrote
+"%%" in the prose of their teacher note, which closed the comment early and
+put the rest of the note on the site of every copy a teacher published (new
+courses only; the lint now refuses an odd `%%` count); and three template
+notes told teachers a link in a comment "still counts as a link everywhere
+else" — false since #331, and corrected.
+
+#### Markdown-style links to pages (folded into #325)
+
+Until bundle B the walks — publishing, the unpublish referrer test, the links
+question, check_section — read wikilinks only. `AssistSectionGraph.everyLinkAsWritten`
+now also reads `[text](Notes.md)`, `[text](Unit%202/Quiz%201.md#part-a)` and
+`[text](<Unit 2/Worksheet 2.md>)`, each shape by ONE of `FolderPathRewriter`'s
+two patterns, through the same code and comment mask, in page order among the
+wikilinks. A destination is cut at `#` or `?`, percent-decoded, and resolved
+by its last component like a wikilink; one with a scheme (`https:`,
+`mailto:`), one starting `//`, or a bare `#heading` names no page. Rule and
+cases: `shared-rules.json` → `followingLinks.markdownStyleLinks`, +2
+publishing cases, +1 unpublishing case; the build's link check reads the same
+(`_links_as_written_in_order`). Measured at one local Markdown link in
+`support/` (ENL1W's, itself dead, now a wikilink). **Not done:** a page rename
+does not rewrite a Markdown-style link.
 
 ### No booleans, and separate verbs
 
@@ -4453,6 +4542,21 @@ Two details that make the backups usable rather than merely present:
   the assistant's five, because the two are counted separately.
 - And prune ONLY backups at that: archives and the wizard's own zips live in
   the same folder and their parsers deliberately reject each other's forms.
+- **The zip runs off the main actor, and the window says what the wait is**
+  (#351, 2026-09-26). It used to run on the main thread and hold the window
+  for up to two minutes after the teacher approved a change. Now a line under
+  the three dots names the course being copied (`AssistWording.backingUpFirst`),
+  and a second write arriving while the first copy is still being zipped —
+  which an outside assistant can now do, because the main thread is free —
+  waits for THAT copy rather than making another. A copy that failed is not
+  remembered: the next write tries again, and no write says "backed up" about
+  it. Each real zip leaves one trail line, "assistant backed up a course",
+  with its file name, size and seconds; a reused copy leaves none. **What
+  froze the window after Approve was not the zip, though**: it was the
+  conversation's LAZY stack, placing itself in a loop that never ended and
+  kept the main thread for good; the conversation is a plain stack now.
+  How, measured, and what was rejected: [09-mac-app.md](09-mac-app.md) →
+  "Every zip is off the main actor (#351)".
 
 ### Restore is section-scoped, though the zip holds the course
 
@@ -5584,7 +5688,8 @@ answer states the exact name and place for an agent to relay.
    first" while acting on the greeting at once.
 2. **`read_how_i_teach`**, what the greeting sentence resolves to.
 3. **MCP `initialize.instructions`** (mac only; Windows' server sends none):
-   one paragraph naming each LIVE course whose page exists — the case the
+   one paragraph naming each LIVE course whose page has been WRITTEN — an
+   empty one is left out (`howITeachPage.emptyPageIsNotWritten`) — the case the
    greeting cannot cover, since it names one course. A folder with no page and
    no reference course still sends nothing at all. Third, not first: whether
    clients read `instructions` has never been measured.
@@ -5679,8 +5784,10 @@ pins it.
 
 ### The trail
 
-Three events (`activityTrail.mustRecord`): `How I Teach page read` (course,
-word count, cut short or not — never the words), `How I Teach page written`
+Four events (`activityTrail.mustRecord`): `How I Teach page read` (course,
+word count, cut short or not — never the words — or, since #329, that the page
+was found EMPTY), `How I Teach page started` (Course Settings made an empty
+page, #329 — or could not), `How I Teach page written`
 (created or replaced, word counts, the backup's name — "did I write this, or
 did an assistant?"), and `How I Teach page kept off the website`, read from
 the build's `PLANTOIR_KEPT_OFF:` line — printed ONLY when a page the course's
@@ -5689,14 +5796,71 @@ settings had LISTED is dropped, so the one transition a teacher will ask about
 page was never on the site leaves no line on every build. Read by the app from
 a run's console and from a scheduled publish's log, as `PLANTOIR_DATED:` is.
 
+### The gap between a plan and its write (#351)
+
+Every assistant write saves a copy of the course first (once per conversation,
+or its own copy for the start of the year), and since #351 that copy is zipped
+off the main actor: it can take a minute, and while it does the teacher can
+edit a page in Obsidian and an outside assistant's second call can run. A write
+that carried out the plan it made BEFORE the copy would then act on a course
+that is no longer the one it planned for. So every write that saves a copy
+first works its plan out AGAIN after the copy and refuses, with
+`changedWhileSavingACopy`, when it no longer matches — remember_timetable,
+duplicating a class, make_room_for_classes, add_next_class / add_classes and
+add_curriculum_mentions compare the plan's DISPLAYED summary (and, for a
+duplicate, the source page's words and the new page's name) — a summary that
+is lossy by design: a make-room plan names its first ten renames and moves and
+counts the rest, and a timetable names its count and its first and last dates,
+so a change past what the summary shows is not caught here; the apply's own
+guards (a rename onto a name in use is skipped, an existing page is never
+written over) are what stand behind it (accepted in the second review, N1);
+prepare_for_start_of_year compares its fingerprint and answers
+`startOfYearPlanHasChanged`, and refuses too when its plan cannot be made at
+all any more (a first class renamed or deleted meanwhile); write_how_i_teach compares the page's mark and
+answers `howITeachChangedSincePlanned`. A course removed meanwhile no longer
+locates, so a write never makes its folder again. The writes that reach the
+copy through publish_pages, unpublish_pages, publish_class_on and
+re_date_classes re-read every page at the write already, and decline a page
+edited since (#186). REJECTED: making the copy BEFORE planning — it would save
+one for every refusal too; and a lock on the course for the length of the
+copy, which would refuse a teacher's own edit in Obsidian rather than notice it.
+
+### An empty page is not written (#329)
+
+Course Settings' "Create and Open" makes a page with its settings and nothing
+else. Before #329 that page would have been read to an assistant as the
+teacher's account, listed as "How I Teach page: yes", named in the session
+briefing, and a first draft refused with `howITeachAlreadyWritten` — "a
+teacher's own page is never replaced" — about a page with nothing in it. So
+ONE predicate, `HowITeachPage.hasWords` (the body after the settings block,
+without a byte-order mark and whitespace, is not empty), decides it
+everywhere: `read_how_i_teach` answers `howITeachEmpty` and the drafting brief
+(trail: "found an empty How I Teach page"); `list_courses` says "not written
+yet"; the briefing leaves the course out; `plan_write_how_i_teach` plans it as
+new, at the page's own path; `write_how_i_teach` saves into it with no mark,
+keeping its settings block byte for byte (a whitespace-only page with no
+settings is written as a new page). Decided against the bytes read at the
+write, and — since the backup before it now runs off the main actor (#351) —
+re-checked after the backup, so a page the teacher typed into meanwhile is
+refused. A page whose bytes cannot be read as text is never taken to be empty.
+Contract: `howITeachPage.emptyPageIsNotWritten` (Russell accepted, Q1 of
+bundle C). REJECTED: leaving an empty page counted as written.
+
 ### What is deliberately not in this piece
 
-- The section's "— Edited" fingerprint still counts the page, so editing it
-  makes the next Publish rebuild although the site would not change — a wire
-  format held byte for byte in three implementations; follow-up
-  [#330](https://github.com/russellgordon/plantoir/issues/330).
-- A button to open or create the page — a GUI surface on both platforms;
-  follow-up [#329](https://github.com/russellgordon/plantoir/issues/329).
+- ~~The section's "— Edited" fingerprint still counts the page~~ — done,
+  versioned, by [#330](https://github.com/russellgordon/plantoir/issues/330):
+  the stamp records `fingerprintRule`, and rule 2 leaves the page out
+  ([05 → The — Edited marker](05-build-pipeline.md)).
+- A button to open or create the page — shipped in
+  [#329](https://github.com/russellgordon/plantoir/issues/329) as Course
+  Settings' How I Teach row (above, and documentation/09). The page it makes
+  is left out of the "— Edited" fingerprint by #330's rule 2 like any How I
+  Teach page, written or not, so starting one never marks a section edited
+  once the section's stamp is rule 2. A section last published before #330
+  (its stamp still rule 1, which counts every file) IS marked "— Edited" once
+  by the first Create and Open, as #330's own `why` says of any first edit —
+  and on Windows, until it implements rule 2, every time.
 - No starter page from the wizard, `setup_course.py` or a payload: a template is
   text an agent would read as the teacher's approach.
 - The local assistant neither reads nor drafts it.
@@ -6146,8 +6310,19 @@ Only the assistant's publish is transitive. A teacher who publishes Day 2 by
 changing its page in Obsidian after this ran gets Day 2 live with links to the
 concepts that went into draft — before, those concepts were visible, so the one
 flag was enough. The plan and the sheet say so (`publishingFromNowOn`), and
-[issue #333](https://github.com/russellgordon/plantoir/issues/333) is the fix
-(a build warning, or the app's publish following the assistant's rule).
+[issue #333](https://github.com/russellgordon/plantoir/issues/333) is the fix,
+and since bundle B it is the BUILD WARNING: the next build names every link on
+a page students can see that leads to a page they cannot (`linksIntoHiddenPages`,
+[05 → Links into hidden pages](05-build-pipeline.md)); the app's publish does
+not take pages along. **So the first build after Get Ready lists links, and
+they are true:** the pages Get Ready keeps (Day 1, what it links to, Key Links)
+still link to pages first used by later classes, which it hid — exactly the
+links its own sheet lists under "links left pointing at hidden pages". The
+front page's embed is not among them; Get Ready repoints it. The warning
+clears as those classes are published. Ruled 2026-09-27 (implementation
+review S1): the warning stays, and Get Ready keeps what it keeps. The sheet
+and the build now say the same thing in two places; making the sheet say the
+next build will list them is a wording-pass question, not done here.
 
 ### check_section's third group, "linked but missed"
 

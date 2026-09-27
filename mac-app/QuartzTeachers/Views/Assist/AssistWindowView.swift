@@ -298,7 +298,19 @@ struct AssistWindowView: View {
     private var conversation: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 12) {
+                // A plain VStack, NOT lazy (#351). The lazy stack went into a
+                // placement loop after Approve that never ended: one-second
+                // samples showed the main thread 98% inside SwiftUI placing it
+                // (`LazySubviewPlacements`, the `ForEach` over the transcript),
+                // nothing else on the main actor ran — the copy the approved
+                // change waited for was made in two seconds and its result never
+                // read — and XCUITest reported "main thread busy for 30.0s".
+                // Measured on the rollover UI test, 2026-09-26: lazy, 0 runs in
+                // 6 passed with the animated scroll and 2 in 7 without it; plain,
+                // 8 in 8, the question 1.05–1.07 s after Approve. A conversation
+                // is dozens of lines, not thousands, so laziness bought nothing.
+                // `AssistConversationStackTests` holds this file to it.
+                VStack(alignment: .leading, spacing: 12) {
                     ForEach(Array(transcriptLines.enumerated()), id: \.element.id) { position, line in
                         switch line {
                         case .said(let entry):
@@ -319,6 +331,22 @@ struct AssistWindowView: View {
                     // the two the assistant is busy with.
                     if session.agent?.isBusy == true, session.agent?.pendingApproval == nil {
                         AssistTypingIndicator()
+                    }
+                    // What the wait is, when it is a copy of the course being
+                    // saved before a change (#351): the one wait long enough
+                    // to read as a hang — a course full of pictures takes a
+                    // minute — so it is named rather than left to the dots.
+                    if let backingUp = session.agent?.courseBeingBackedUp {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text(AssistWording.backingUpFirst(course: backingUp))
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("assistBackingUpLine")
                     }
                     if let approval = session.agent?.pendingApproval,
                        let agent = session.agent {

@@ -1743,14 +1743,34 @@ class WorkspaceModel {
         return nil
     }
 
+    /// Whether a copy of this course is being zipped right now (#351) — a
+    /// backup, or the archive before a restore or a removal. While it is,
+    /// Back Up Now, Restore and Remove for the course are greyed and refuse,
+    /// and its preview cannot be started.
+    func isBeingCopied(_ courseCode: String) -> Bool {
+        guard let workspacePath = workspaceURL?.path else {
+            return false
+        }
+        return CourseActivity.courseIsBeingCopied(folderPath: workspacePath, courseCode: courseCode)
+    }
+
     /// Saves a copy of a whole course, then reloads so the Backups group
     /// shows it — opened, so the new row is visible feedback.
-    func backUp(_ course: Course) {
+    ///
+    /// Async since #351: the zip runs off the main actor, so the window keeps
+    /// drawing while a course full of pictures is copied.
+    func backUp(_ course: Course) async {
         guard let coursesDirectoryURL else {
             return
         }
+        // One at a time: a second press while the first copy is zipping would
+        // make a second full copy (#351). The menu item is greyed then too;
+        // this is what catches every other way in.
+        if isBeingCopied(course.code) {
+            return
+        }
         do {
-            try CourseArchiver.backUpCourse(course, coursesDirectoryURL: coursesDirectoryURL)
+            try await CourseArchiver.backUpCourse(course, coursesDirectoryURL: coursesDirectoryURL)
         } catch {
             backupProblem = error.localizedDescription
             return
@@ -1982,8 +2002,14 @@ class WorkspaceModel {
     /// Puts a backed-up course back in place of the current one. The
     /// current version is ARCHIVED first — even a restore has an undo —
     /// and the backup itself stays until the teacher deletes it.
-    func restoreBackup(_ item: BackupItem) {
+    ///
+    /// Async since #351: that archive is a zip, and it runs off the main
+    /// actor.
+    func restoreBackup(_ item: BackupItem) async {
         guard let coursesDirectoryURL else {
+            return
+        }
+        if isBeingCopied(item.courseCode) {
             return
         }
         if let workspacePath = workspaceURL?.path {
@@ -1999,8 +2025,19 @@ class WorkspaceModel {
             // showing stale files until the vault is reopened.
             for course in courses {
                 if course.code == item.courseCode {
-                    try CourseArchiver.archiveCourse(course, coursesDirectoryURL: coursesDirectoryURL)
+                    try await CourseArchiver.archiveCourse(course, coursesDirectoryURL: coursesDirectoryURL)
                 }
+            }
+            // Asked AGAIN after the zip (#351). It runs off the main actor
+            // and can take a minute, and a preview or publish started during
+            // it would have the course replaced under it — the case the check
+            // above exists to refuse. The archive stays: it is a copy of the
+            // course as it is, and harmless.
+            if let workspacePath = workspaceURL?.path,
+               CourseActivity.courseIsBusy(folderPath: workspacePath, courseCode: item.courseCode) {
+                backupProblem = "\(item.courseCode) is previewing or deploying right now. Stop that first, then restore."
+                reloadCourses()
+                return
             }
             try CourseRestorer.restoreBackup(item, coursesDirectoryURL: coursesDirectoryURL)
             // The built site goes with the pages it was built from, for the

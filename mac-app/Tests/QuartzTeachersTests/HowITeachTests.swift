@@ -563,4 +563,177 @@ final class HowITeachTests: XCTestCase {
             + "had listed for it: section2/How I Teach"
         ), trail())
     }
+
+    // MARK: - Course Settings' row (#329)
+
+    private func lines(in text: String, containing words: String) -> Int {
+        var count: Int = 0
+        for line in text.components(separatedBy: "\n") where line.contains(words) {
+            count += 1
+        }
+        return count
+    }
+
+    private func howITeachFiles() throws -> [String] {
+        var names: [String] = []
+        for name in try FileManager.default.contentsOfDirectory(atPath: live.directoryURL.path)
+        where name.lowercased().hasPrefix("how i teach") {
+            names.append(name)
+        }
+        names.sort()
+        return names
+    }
+
+    func testTheRowsWordsAreTheContracts() throws {
+        let button: [String: Any] = try XCTUnwrap(try HowITeachTests.contractRule()["settingsButton"] as? [String: Any])
+        XCTAssertEqual(button["rowLabel"] as? String, HowITeachButtonWording.rowLabel)
+        XCTAssertEqual(button["openButton"] as? String, HowITeachButtonWording.openButton)
+        XCTAssertEqual(button["createButton"] as? String, HowITeachButtonWording.createButton)
+        XCTAssertEqual(button["caption"] as? String, HowITeachButtonWording.caption)
+        XCTAssertEqual(button["couldNotCreate"] as? String, HowITeachButtonWording.couldNotCreate(reason: "{reason}"))
+        XCTAssertEqual(button["createdBytes"] as? String, HowITeachPage.newPageSettings)
+    }
+
+    /// Every case in `howITeachPage.settingsButton.cases`, read from the
+    /// contract and never retyped.
+    func testEverySettingsButtonCaseInTheContractHolds() throws {
+        let button: [String: Any] = try XCTUnwrap(try HowITeachTests.contractRule()["settingsButton"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(button["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 6)
+        let createdBytes: Data = Data(try XCTUnwrap(button["createdBytes"] as? String).utf8)
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            try prepare()
+            var existingURL: URL? = nil
+            var existingBytes: Data? = nil
+            if let existing = testCase["existing"] as? [String: Any] {
+                let url: URL = live.directoryURL.appendingPathComponent(try XCTUnwrap(existing["file"] as? String))
+                let bytes: Data = Data(try XCTUnwrap(existing["text"] as? String).utf8)
+                try bytes.write(to: url)
+                // An hour ago, so an unwanted rewrite would show as a new date.
+                try FileManager.default.setAttributes(
+                    [.modificationDate: Date(timeIntervalSinceNow: -3600)], ofItemAtPath: url.path
+                )
+                existingURL = url
+                existingBytes = bytes
+            }
+            let unwritable: Bool = (testCase["unwritable"] as? Bool) ?? false
+            if unwritable {
+                try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: live.directoryURL.path)
+            }
+            defer {
+                if unwritable {
+                    try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: live.directoryURL.path)
+                }
+            }
+            let filesBefore: [String] = try howITeachFiles()
+            let dateBefore: Date? = existingURL.flatMap { url in
+                return (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
+            }
+
+            // The button's words, decided the way the row decides them.
+            let expectedButton: String = try XCTUnwrap(button[try XCTUnwrap(testCase["button"] as? String)] as? String)
+            let shown: String = HowITeachPage.existingURL(for: live) != nil
+                ? HowITeachButtonWording.openButton : HowITeachButtonWording.createButton
+            XCTAssertEqual(shown, expectedButton, name)
+
+            switch try XCTUnwrap(testCase["expect"] as? String) {
+            case "created":
+                let page: (url: URL, created: Bool) = try HowITeachPage.startOrFind(for: live)
+                XCTAssertTrue(page.created, name)
+                XCTAssertEqual(page.url.lastPathComponent, HowITeachPage.fileName, name)
+                XCTAssertEqual(bytes(page.url), createdBytes, "\(name): exactly its settings, and nothing else")
+                if let existingURL {
+                    XCTAssertEqual(bytes(existingURL), existingBytes, "\(name): the look-alike was touched")
+                }
+                XCTAssertEqual(lines(in: trail(), containing: "started an empty How I Teach page from Course Settings"),
+                               1, "\(name): \(trail())")
+            case "opened":
+                let page: (url: URL, created: Bool) = try HowITeachPage.startOrFind(for: live)
+                let theirURL: URL = try XCTUnwrap(existingURL)
+                XCTAssertFalse(page.created, name)
+                XCTAssertEqual(page.url.lastPathComponent, theirURL.lastPathComponent, name)
+                XCTAssertEqual(bytes(theirURL), existingBytes, "\(name): the page was rewritten")
+                let dateAfter: Date? = (try? FileManager.default.attributesOfItem(atPath: theirURL.path))?[.modificationDate] as? Date
+                XCTAssertEqual(dateAfter, dateBefore, "\(name): the page was touched")
+                XCTAssertEqual(try howITeachFiles(), filesBefore, "\(name): a second page was made")
+                XCTAssertFalse(trail().contains("How I Teach page"), "\(name): opening wrote a line: \(trail())")
+            case "couldNotCreate":
+                XCTAssertThrowsError(try HowITeachPage.startOrFind(for: live), name)
+                XCTAssertEqual(try howITeachFiles(), filesBefore, name)
+                XCTAssertEqual(lines(in: trail(), containing: "could not start the How I Teach page from Course Settings: "),
+                               1, "\(name): \(trail())")
+            default:
+                XCTFail("Unknown expectation in \(name)")
+            }
+        }
+    }
+
+    /// A page that appears between the look and the write is the teacher's,
+    /// and it is what is opened — never written over.
+    func testAPageThatAppearsInTheMeantimeIsNeverWrittenOver() throws {
+        try prepare()
+        let theirs: Data = Data("Written in Obsidian a moment ago.\n".utf8)
+        let page: (url: URL, created: Bool) = try HowITeachPage.startOrFind(for: live) {
+            try? theirs.write(to: self.pageURL)
+        }
+        XCTAssertFalse(page.created)
+        XCTAssertEqual(bytes(pageURL), theirs)
+        XCTAssertFalse(trail().contains("started an empty How I Teach page"), trail())
+    }
+
+    // MARK: - An empty page is not written (#329)
+
+    /// Every case in `howITeachPage.emptyPageIsNotWritten.cases`, through the
+    /// real runner: the read, the listing, the briefing, the plan and the
+    /// write, each deciding by the same predicate.
+    func testEveryEmptyPageCaseInTheContractHolds() async throws {
+        let rule: [String: Any] = try XCTUnwrap(try HowITeachTests.contractRule()["emptyPageIsNotWritten"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
+        let newWords: String = try XCTUnwrap(rule["writeText"] as? String)
+        XCTAssertGreaterThanOrEqual(cases.count, 5)
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let pageText: String = try XCTUnwrap(testCase["text"] as? String)
+            let written: Bool = try XCTUnwrap(testCase["written"] as? Bool)
+            try prepare(surface: .mcp)
+            let original: Data = Data(pageText.utf8)
+            try original.write(to: pageURL)
+
+            XCTAssertEqual(HowITeachPage.hasWords(pageText), written, name)
+
+            let read: AssistToolOutcome = await run("read_how_i_teach", ["course": "ICS4U"])
+            if written {
+                XCTAssertTrue(read.summary.hasPrefix(AssistWording.howITeachRead(course: "ICS4U", text: "")), "\(name): \(read.summary)")
+            } else {
+                XCTAssertEqual(read.summary,
+                               AssistWording.howITeachEmpty(course: "ICS4U") + "\n\n" + AssistWording.howITeachDraftingBrief,
+                               name)
+                XCTAssertTrue(trail().contains("ICS4U · an outside assistant found an empty How I Teach page"), "\(name): \(trail())")
+            }
+
+            let listed: AssistToolOutcome = await run("list_courses", [:])
+            XCTAssertTrue(listed.detail.contains(written ? AssistWording.howITeachListedAsWritten
+                                                         : AssistWording.howITeachListedAsNotWritten),
+                          "\(name): \(listed.detail)")
+            XCTAssertEqual(runner.coursesWithAHowITeachPage(), written ? ["ICS4U"] : [], name)
+
+            let plan: AssistToolOutcome = await run("plan_write_how_i_teach", ["course": "ICS4U", "text": newWords])
+            let path: String = AssistSectionGraph.relativePath(of: pageURL, workspaceURL: workspace.workspaceURL)
+            XCTAssertEqual(plan.detail.contains(AssistWording.howITeachPlanCreates(course: "ICS4U", path: path)), !written,
+                           "\(name): \(plan.detail)")
+
+            let write: AssistToolOutcome = await run("write_how_i_teach", ["course": "ICS4U", "text": newWords])
+            if written {
+                XCTAssertEqual(write.summary, AssistWording.howITeachAlreadyWritten(course: "ICS4U"), name)
+                XCTAssertEqual(bytes(pageURL), original, "\(name): a written page was replaced without its mark")
+            } else {
+                XCTAssertEqual(write.summary, AssistWording.howITeachSaved(course: "ICS4U"), "\(name): \(write.detail)")
+                let expected: String = try XCTUnwrap(testCase["afterWrite"] as? String)
+                XCTAssertEqual(bytes(pageURL), Data(expected.utf8), name)
+                XCTAssertTrue(trail().contains("an outside assistant wrote a new How I Teach page"), "\(name): \(trail())")
+            }
+        }
+    }
 }
+

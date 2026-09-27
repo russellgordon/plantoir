@@ -236,6 +236,14 @@ nonisolated enum AssistWording {
              + "Wait for that to finish, then ask again."
     }
 
+    /// Said when a copy of the course is being saved in Plantoir (#351) — a
+    /// backup, or the archive before a restore or a removal — and the
+    /// assistant was asked to preview or deploy it. Not `courseIsBusy`, whose
+    /// "a preview or a deploy is running" would be untrue.
+    static func courseIsBeingCopied(course: String) -> String {
+        return "A copy of \(course) is being saved in Plantoir. Wait for that to finish, then ask again."
+    }
+
     /// Said when ANOTHER program on this computer is previewing, building or
     /// publishing the course — an assistant working from another app, another
     /// copy of Plantoir, or a deploy set for later (#156) — to a teacher who
@@ -984,6 +992,24 @@ nonisolated enum AssistWording {
 
     // MARK: - Backing a course up
 
+    /// (T) A write refused because the section changed while the copy made
+    /// before it was being saved (#351): what was worked out no longer fits,
+    /// so nothing is written from it.
+    static func changedWhileSavingACopy(course: String, section: String) -> String {
+        return "Nothing was changed: \(course) Section \(section) changed while a copy of it was being "
+             + "saved, so what I worked out no longer fits. Ask again and I’ll work it out afresh."
+    }
+
+    /// Shown under the three dots while the assistant saves a copy of a
+    /// course before changing it (#351) — the wait a teacher approving a
+    /// change used to see as a frozen window. It names the course and says
+    /// why the wait is worth it; the time is said as "a minute" because a
+    /// course full of pictures really does take that long.
+    static func backingUpFirst(course: String) -> String {
+        return "Saving a copy of \(course) first, so this can be undone — a course with lots of "
+             + "pictures can take a minute."
+    }
+
     /// Where the copy went.
     static func backedUpCourse(course: String, to name: String) -> String {
         return "Backed up \(course) to \(name). It is in Plantoir's Backups list, and restoring "
@@ -1454,6 +1480,16 @@ nonisolated enum AssistWording {
              + "at the top of the \(course) course folder beside its other pages — only a page with "
              + "exactly that name, in exactly that place, is kept off the website. The teacher can write "
              + "it there in Obsidian, or you can offer to draft one."
+    }
+
+    /// The page is there and has nothing written in it (#329) — Course
+    /// Settings' "Create and Open" makes exactly that. Said so an agent does
+    /// not read an empty page as the teacher's account, and knows it may
+    /// offer a draft without replacing anything.
+    static func howITeachEmpty(course: String) -> String {
+        return "\(course)’s How I Teach page has been started but has nothing written in it yet, so "
+             + "there is nothing to keep to. The teacher can write it in Obsidian, or you can offer to "
+             + "draft one; saving a draft fills the empty page, and needs no replacing mark."
     }
 
     /// How to offer, and draft, a page: the product decision in prose.

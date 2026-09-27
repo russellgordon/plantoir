@@ -1960,7 +1960,8 @@ def unlink_curriculum_references(text: str, page_names: set) -> str:
     # A link inside code is an example of one, and stays as written (#313,
     # readingALink.whatIsCode): the mask is taken over the whole page, since
     # a fence or a span can cross lines, and applied line by line by offset.
-    code = markdown_code.code_ranges(text)
+    # A link inside a %% comment is not one either (#331), so it is masked too.
+    code = markdown_code.not_a_link_ranges(text)
     result_lines = []
     line_start = 0
     for line in text.split("\n"):

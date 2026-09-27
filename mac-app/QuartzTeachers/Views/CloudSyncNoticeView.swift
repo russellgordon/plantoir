@@ -113,6 +113,10 @@ struct CloudSyncNoticeContentView: View {
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.quaternary.opacity(0.5))
+        // A container element with its own identifier (#353): without `.contain`
+        // SwiftUI applies an identifier on a stack to every element inside it,
+        // and the inner identifiers (cloudSyncDetailsButton, cloudSyncGotItButton) never reach the tree.
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("cloudSyncNotice")
     }
 }
