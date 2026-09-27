@@ -949,8 +949,9 @@ Added 2026-09-19 with [issue #220](https://github.com/russellgordon/plantoir/iss
 through `/bin/zsh -l -c "docker stop …; if command -v colima …"`. The comment
 said a login shell was used "so docker is on PATH wherever it was installed".
 On a teacher's Mac that is not true of any shell: the only `docker` and
-`colima` are the pinned copies the launchers download into `~/Library/
-Application Support/Plantoir/tools/bin`, and **nothing puts that folder on a
+`colima` are the pinned copies the launchers put into `~/Library/
+Application Support/Plantoir/tools/bin` (downloaded then; copied from the app
+since #312), and **nothing puts that folder on a
 login shell's PATH** — only `setup.sh` and its siblings export it, from inside
 the launcher, and no launcher writes a shell profile. Measured on 2026-09-19
 with a login shell whose user profile was emptied (`ZDOTDIR` pointed at an
@@ -6447,14 +6448,22 @@ and the deploy button — are the app's, not the tool's: over MCP the client is
 told which tools write (`readOnlyHint`) and does its own asking. The app itself answers the flag —
 `Plantoir.app/Contents/MacOS/Plantoir --mcp-stdio <working-folder>` — rather
 than shipping a second binary, so no packaging step can leave it out. Claude
-Code is offered a LONGER list than the local model — 35 tools against 13, with
-the local model seeing exactly the thirteen its routing was measured against.
-The thirteen it does not see are off its list for three different reasons: reading
-the curriculum and pointing a page at the expectations that fit, and reading or
-drafting the teacher's How I Teach page (#209), are judgements about meaning; listing the folder's courses and explaining what publishing
-means are things a window scoped to one section never has to ask; and filling
-out a unit, making room in one and taking a copy are things it can already
-reach through a fixed phrasing, matched in code, that never consults a model.
+Code is offered a LONGER list than the local model — 37 tools against 13
+(`assist-cases.json` → `toolSchemas.mcp` and `.local`), with the local model
+seeing exactly the thirteen its routing was measured against. The twenty-four
+it does not see are off its list for several reasons (`AssistToolSurface.localTools`
+says each). Nine of them are among the twenty-two tools both surfaces share:
+the seven `plan_` twins, which plan mode calls in code from the write the model
+already chose; `remember_timetable`, because dates a model supplies may be
+invented and the schedule sheet records them instead; and `re_date_classes`,
+whose phrasings are matched in code. The other fifteen are served
+only over MCP: reading the curriculum and pointing a page at the expectations
+that fit, and reading or drafting the teacher's How I Teach page (#209), are
+judgements about meaning; listing the folder's courses, explaining what
+publishing means and getting a section ready for the start of the year (#96)
+are things a window scoped to one section never has to ask; and filling out a
+unit, making room in one and taking a copy are things it can already reach
+through a fixed phrasing, matched in code, that never consults a model.
 
 How all of that fits together — what the model is, how it is configured, and
 the path a typed sentence takes to become a Swift function call — is
