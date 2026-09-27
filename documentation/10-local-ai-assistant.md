@@ -1730,16 +1730,15 @@ The clearest example is what happens to linked pages:
   Key Links, and any curriculum page, each of which is reached from somewhere
   other than a lesson.
 
-  **Its reach does NOT stop at a class page**, on either platform, and that is
-  the sibling decision rather than an oversight:
-  [issue #201](https://github.com/russellgordon/plantoir/issues/201), held for
-  v1.3.0 because it is the one half Windows does not already behave that way,
-  and folding it into #173 would have put a red shared case into the v1.2.0
-  contract. Until it lands, an unpublish that takes a class down leaves that
-  class NOT coming back when its referrer is republished — publishing stops
-  there now. That exception is written into the code comment it belongs to
-  (`AssistPublishPlan.pageStillLinking`), and it is the strongest argument in
-  #201.
+  **Its reach stops at a class page too, since 2026-09-26**
+  ([issue #201](https://github.com/russellgordon/plantoir/issues/201), decided
+  by Russell to mirror #173): a class comes down when the teacher names it, and
+  a linked class that stays visible is named in the plan with its reason.
+  Before it, NEITHER platform stopped — the decision comment said Windows
+  already did, and that was its publish walk, not its unpublish sweep — so
+  Windows owes the same clause. See
+  ["Unpublishing stops there too (#201)"](#unpublishing-stops-there-too-201)
+  below.
 
 That asymmetry is genuinely subtle. It is exactly the kind of thing a small
 model would get wrong under pressure, and exactly the kind of thing a
@@ -1865,6 +1864,124 @@ widened method is how the divergence happened at all. The contract is
 `contracts/class-planning.json` → `datingPagesAClassBrings.reachStopsAtAClassPage`.
 The three `followingLinks.publishing` booleans stay TRUE: the walk is still
 transitive and still takes what a page links to; it has one stop.
+
+#### Unpublishing stops there too (#201)
+
+Decided 2026-09-26,
+[issue #201](https://github.com/russellgordon/plantoir/issues/201): **an
+unpublish never takes a class page down by following a link.** A class is
+hidden when the teacher names that class, the same as it is published when
+named. The sweep does not collect a linked class and does not ENTER it, so
+material reachable only through it is that class's business. The pages the
+teacher named are never stopped: naming two classes makes both starting
+points, and "unpublish Unit 4" or an unpublish by dates names every class it
+covers. Before this, "hide Unit 2, Day 3" on a page saying "Next: [[Unit 2,
+Day 4]]" also hid Day 4 and Day 4's worksheet whenever nothing else visible
+linked to them.
+
+**A correction the implementer on the other side needs.** The decision
+comment on #201 said "Windows already behaves this way". It does not: its
+PUBLISH walk stops (`AssistWorkspace.cs`, the `IsClassPage` guard in the
+publish branch), but its unpublish sweep runs through `ReasonToKeep`, which
+has no class test, and `LinkGraph.cs` says in its own words that "a class
+page is very much swept". Windows' suite stays green on pull only because
+nothing there walks the new cases; by behaviour it is red on three of the
+four. It owes a MATCH, carried by a `windows` issue.
+
+**Where it lives, and why there.** One clause in
+`AssistPublishPlanner.reasonToKeep`: `page.isClassPage` gives the reason
+`.aClassOfItsOwn`. The walk still REACHES the class (`pagesLinkedFrom` does
+not filter it), because the class has to arrive at the `kept` pass to be
+reported; stopping it in the reach instead is correct about what comes down
+and SILENT, which is #173's "no way to tell 'it decided' from 'it missed
+it'". Because `reasonToKeep` answers nil only for a page that goes down, a
+class that stays is never added to `goingDown`, so its own links are never
+followed — that is what "does not enter it" means in the code.
+
+**The order inside `reasonToKeep` is pinned, both ways.** The class test sits
+BELOW the three exclusions (folder landing page, Key Links, curriculum), so a
+class Key Links points at still says "it is in this section's Key Links" and
+`theOrderIsLoadBearing` is untouched. It sits ABOVE the referrer test,
+because "a class of its own" is the unconditional reason and "“Unit 1, Day 2”
+still links to it" a contingent one: said about a class, it tells the
+teacher the class would follow Day 2 down the day Day 2 is hidden, and it
+would not. The contract cases cannot see the second half (they stay green
+with the clause below the referrer test), so two XCTests pin it:
+`testAClassStaysBecauseItIsAClassEvenWhenAnotherPageStillLinksToIt` and
+`testAClassInKeyLinksIsStillReportedAsKeyLinks`.
+
+**What the teacher is told.** A linked class students can SEE is listed
+among the pages that stay, under the existing "N linked page(s) stay
+visible:" heading, as `wording.linkedClassStaysVisible` ("… stays visible,
+because it is a class of its own."), on the plan card and in the reply after
+Go, since both are `AssistPublishPlan.describe()`. A linked class already
+hidden is not mentioned: it is not "staying visible", and every kept page
+already follows that visible-only rule. The publishing sentence
+(`linkedClassesWereLeftAlone`, "publish it when you get to that class") is
+deliberately not reused, because it is false about a class an unpublish left
+up. `AssistPublishKept.reason` became an enum (`AssistPublishKept.Reason`)
+for this: the reason is decided at plan time, and the noun must follow the
+reader — the model is always given "class", a club's card says "meeting"
+(`…ForAMeeting`, #267). The four older clauses are byte-identical, since the
+Windows suite pins the referrer line.
+
+**Why `appliesTo` and not a fourth exclusion.** The contract states it as
+`followingLinks.stopsAtAClassPage.appliesTo` gaining `"unpublishing"`, with
+four cases in `followingLinks.unpublishing.cases`.
+`neverTakenDownByFollowingLinks` stays at THREE: those are pages reached from
+somewhere other than a lesson, where a link count says nothing; a class is a
+STOP in the walk, the same one publishing and date-moving make. (Windows'
+`ContractTests` also pins that count at three, so a fourth entry would have
+turned it red on pull for a rule already written in the right place.)
+
+**Measured**, on a scratch build of `dev` at ff1213ed with the four cases:
+without the clause **3 of 4 cases red, 7 assertions** (cases 1, 2 and 4 —
+case 3, both classes named, is green either way); with it, all four green.
+The whole-unit shape ("unpublish Unit 4" where Day 2 links to Unit 5, Day 1)
+and the date-range shape (`before:` a date, where the class in range links to
+the one after it) each go red without the clause. Moving the clause below
+the referrer test turns ONLY the order test red. How often a teacher meets
+it is #173's measurement: 0 class→class links in the shipped content, so it
+fires only on a link a teacher wrote — which is a natural one to write.
+
+**The exception it removes.** From #173 until this, the safety argument for
+counting only visible referrers ("publishing is transitive, so a page taken
+down here comes back the moment anything visible needs it again") had one
+hole: a CLASS this sweep took down did not come back by republishing its
+referrer, because publishing stops at a class. Now neither reach enters a
+class, and the argument holds without an exception
+(`AssistPublishPlanner.pageStillLinking`, `followingLinks.unpublishing.why`).
+
+**REJECTED.**
+- *A fourth entry in `neverTakenDownByFollowingLinks`* — the wrong model (see
+  above), and red on Windows on pull.
+- *Stopping in `pagesLinkedFrom`* — silent; kept as a must-fail.
+- *Reusing `linkedClassesWereLeftAlone`* — false for an unpublish.
+- *Naming a hidden linked class too* ("… stays hidden") — noise in a plan
+  read aloud, and not "staying visible".
+- *Leaving the class up but walking past it* to take down material only
+  reachable through it — #173's reason: that material is the class's, and
+  hiding it breaks a class nobody named.
+- *The class reason below the referrer test* — the contingent reason for a
+  page that would stay regardless.
+- *Editing `unpublish_pages`' description* to mention classes. It still says
+  "a page another class still links to stays put", now slightly generous; a
+  description edit is a routing change (110/110 → 90/110 for one sentence,
+  above), and #114 holds what those descriptions should say. If it is wanted,
+  it is a measurement with `research/ai-assist/trimmed-surface-suite.py`, not
+  an edit.
+- *Baking the noun into the reason string at plan time* — puts "meeting" in
+  the model's text.
+
+**A pre-existing shape, not changed here.** A whole-unit unpublish lists no
+kept pages at all: after "unpublish Unit 4" the reply is "Unit 4 was
+unpublished." and does not say that Unit 5, Day 1 stayed. That is how it has
+always treated pages kept for any reason, and it is out of scope for #201; if
+it is wanted, it is its own issue.
+
+No trail event: nothing on the trail records what an unpublish REACHED
+(`assistant chose a tool`, `task started` / `task finished`), and "Unpublished
+N pages." stays true with a smaller N — the same decision #173 made.
 
 ### What counts as a link
 
@@ -2157,7 +2274,8 @@ that vetoed both 3B models.
 published is decided by what the BUILT SITE does with its flag, not by whether
 the line reads `true` — so `publish: maybe`, `publish: on` and `publish: true
 # covered Tuesday` are all pages students can already see. Asked to publish one
-of those, the assistant answers `It's already been published.` and leaves the
+of those, the assistant answers `AssistWording.alreadyPublishedOne` (in
+`contracts/assist-wording.json`) and leaves the
 file exactly as the teacher wrote it: tidying the value would be an edit nobody
 asked for, in a file Obsidian very likely has open. Asked to HIDE the same
 page, it changes and the odd value goes. Settled 2026-09-18 (issue #140); the
@@ -2452,7 +2570,12 @@ whose links lead somewhere students cannot see — that is the whole point.
 - **never** unpublish, whatever the link count: a folder's landing page
   (`index.md` — Concepts, Investigations…), any page in that section's **Key
   Links**, or any **Curriculum** page (detect with `build_site.py`'s own
-  rule: any folder segment containing "curriculum").
+  rule: any folder segment containing "curriculum");
+- **and never take another CLASS page down by following a link** (#201,
+  2026-09-26) — a STOP in the walk rather than a fourth exclusion, the same
+  stop publishing makes; a visible class that stays is named in the plan
+  with "it is a class of its own". See
+  ["Unpublishing stops there too (#201)"](#unpublishing-stops-there-too-201).
 
 The plan should say what it **kept** and why — "Ohm's Law stays: Unit 3,
 Day 2 still links to it" — not only what it removed. A teacher needs to see
@@ -2760,6 +2883,13 @@ different in WinUI.
 is shared and must be, because `build_site.py` decides what ships and an app
 that disagreed would report coverage the site does not have. What a coverage
 plan SAYS to a teacher, and how it is offered, is the app's own.
+Since #128 the code rule admits the College Board's `1.A` (skills) and
+`CRD-1.A` (learning objectives) beside `A1.1`, so the assistant offers those
+pages as a course's expectations too — they are what the second coverage map
+counts. What it does NOT yet follow is a declared curriculum folder whose name
+does not mention "curriculum" (an `AP CSP` folder has a map but its pages are
+not offered): `curriculumRules.isCurriculumPage.note` says so, and it is left
+for its own issue.
 
 ### The working-folder path bar — reported missing in use, 2026-08-16
 
@@ -3739,6 +3869,63 @@ counting renames alone printed no line at all in exactly the shape that
 re-dates a teacher's whole year, and that is the card they agree to. The
 number is `expectOtherClassesMoving` in each contract case.
 
+#### The PLAN says it too (#185)
+
+**A duplicate that moves other classes now warns on its plan card that "Undo
+that" will not take it back — before Go, where a teacher can still say no.**
+Added 2026-09-26 ([#185](https://github.com/russellgordon/plantoir/issues/185)).
+Make-room's plan has said so since it was written; the duplicate's plan said
+how many later classes would move and nothing about the undo, although a
+duplicate that moves other classes IS a make-room (the table above), and the
+reply then told the teacher after the fact. The warning is
+`AssistWording.makingRoomCannotBeUndone(noun:)` — the SAME key make-room's plan
+says, not a new one — appended in `duplicateClassPlan` under exactly
+`ClassInsertionPlan.movesAnythingElse`, the property `duplicateClass` reads to
+withhold the undo. So the card warns exactly when the undo will be refused and
+never when it will be offered, and the contract pins that per case:
+`contracts/class-planning.json` → `duplication.undoRule.planWarns` (with
+`replySaysWhenWithheld` and `replySaysWhenOffered` for the reply), asserted in
+both directions by `testDuplicatingMatchesTheContract` through each case's
+`expectUndoOffered` — cases 1, 2 and 4 warn, 3 and 5 do not. The card takes
+the course's own noun (`makingRoomCannotBeUndoneForAMeeting` in a club); the
+model's copy of the plan says "class" whatever the course calls them, as every
+#267 plan does, and `ClubNounTests.testTheNounNeverReachesWhatTheModelReads`
+already runs a club duplicate whose later weeks move, so it checks the new line
+without a test of its own.
+
+**One sentence per TENSE, not one sentence.** The issue asked for "one
+sentence" for the caveat, and the literal reading — a single tense-neutral
+sentence for plans and replies — was rejected: it would have changed two
+sentences teachers already read, "moved" is false on a plan (nothing has moved
+yet) and "move" reads oddly after the fact, and Windows' reply form names the
+backup FILE, which exists only after the change. So the pair is deliberate:
+`makingRoomCannotBeUndone` on every PLAN that moves other classes (make-room
+and the duplicate), `otherClassesMoved` on every REPLY (the duplicate and
+make-room). What #185 was really about is that there be no inline copy, and
+the last one is gone: make-room's reply typed the caveat out in full and then
+a tail telling the teacher to look the section over before publishing; it is now
+`otherClassesMoved + " " + lookTheSectionOverBeforePublishing`, byte-identical
+to what it said before (measured against the literal on the unchanged branch
+first).
+
+**Also rejected:** dropping make-room's tail (`lookTheSectionOverBeforePublishing`) so the
+two replies match (it changes a shipped sentence Claude Code reads over MCP
+and buys a teacher nothing — naming it costs one key); one combined key for
+caveat plus tail (a second copy of the caveat's text in the contract, which is
+the thing #185 is about); a new key for the duplicate's warning (identical text
+to `makingRoomCannotBeUndone` — two keys with one value is how they drift);
+renaming `makingRoomCannotBeUndone` to something generic (a rename changes the
+generated file for no gain, and Windows owes the key under its current name in
+#274).
+
+**What Windows owes** is in the `windows` issue opened for #185:
+`DuplicateClassPlan.Describe()` adds `MakingRoomCannotBeUndone` when
+`MovesOtherClasses`, and `Duplication_MatchesContract` reads
+`undoRule.planWarns`. Nothing goes red there when this is pulled —
+`Duplication_MatchesContract` reads fields by name — so it is unrun there,
+not failing. The trap: `OtherClassesMoved` is the past tense and must not go
+on a plan.
+
 #### Three things the duplicate did that nothing was watching
 
 All three were found from the Windows side and closed on the mac in #163.
@@ -4681,7 +4868,7 @@ lateness window was read when it fired). So "read at scheduling" had to mean
   and replacing them would throw those away. The guard makes that impossible
   rather than unlikely (`AssistSettingsFreshnessTests.testReadingAtTheCallNeverTouchesAWindowsCopy`).
 - `AssistToolRunner.coursesAsSavedNow` reads it, and is the ONLY way the runner
-  reads the course list: all eleven reads go through it (`locate`,
+  reads the course list: every read goes through it — eleven when #322 landed, twelve since #209's How I Teach briefing (`coursesWithAHowITeachPage`) was routed through it at #323's merge — (`locate`,
   `course(withCode:)`, the card's `explain`, `list_courses`, the
   reference-course gates, the briefing lines…). Structural rather than one
   call at the top of `run`, because there are six public ways in and a seventh
