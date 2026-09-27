@@ -264,7 +264,7 @@ class WorkspaceModel {
 
     /// Writes down which folder each open window is in, paired with the
     /// window's frame so a restored window can find its own.
-    static func rememberOpenFolders(defaults: UserDefaults = UserDefaults.standard) {
+    static func rememberOpenFolders(defaults: UserDefaults = PlantoirDefaults.shared) {
         var entries: [WindowFolderMemory.Entry] = []
         for model in windowModels {
             if let path = model.workspaceURL?.path {
@@ -696,12 +696,12 @@ class WorkspaceModel {
 
     // MARK: - Initializer
 
-    init(defaults: UserDefaults = UserDefaults.standard) {
+    init(defaults: UserDefaults = PlantoirDefaults.shared) {
         self.defaults = defaults
         // A UI test can point the app at a fixture folder via the
         // environment, which also keeps test runs out of the preferences.
         let environment: [String: String] = ProcessInfo.processInfo.environment
-        if let fixturePath = environment["UITEST_WORKSPACE"] {
+        if RealHome.isUnderUITest, let fixturePath = environment["UITEST_WORKSPACE"] {
             self.isUnderUITest = true
             self.workspaceURL = URL(fileURLWithPath: fixturePath)
         } else {
@@ -728,7 +728,7 @@ class WorkspaceModel {
         if isUnderUITest {
             return false
         }
-        if WorkspaceModel.isRunningTests && defaults === UserDefaults.standard {
+        if WorkspaceModel.isRunningTests && defaults === PlantoirDefaults.shared {
             return false
         }
         return true
@@ -737,8 +737,17 @@ class WorkspaceModel {
     /// Brings settings across from the app's earlier bundle identifier
     /// (ca.russellgordon.QuartzTeachers), once, so renaming the app does
     /// not cost anyone their working folder or remembered windows.
+    ///
+    /// Never under a state folder (#154): a run keeping its state in a
+    /// folder of its own must start from that folder, not import the
+    /// teacher's old preferences into it.
     static func migratePreferencesFromOldName(into defaults: UserDefaults) {
-        if isRunningTests || defaults != UserDefaults.standard {
+        let intoTheSharedStore: Bool = defaults === PlantoirDefaults.shared
+        if !mayMigratePreferences(
+            isRunningTests: isRunningTests,
+            stateDirectory: RealHome.stateDirectory,
+            intoTheSharedStore: intoTheSharedStore
+        ) {
             return
         }
         if defaults.string(forKey: storedPathKey) != nil {
@@ -753,6 +762,19 @@ class WorkspaceModel {
         if let folders = old.array(forKey: WindowFolderMemory.storageKey) {
             defaults.set(folders, forKey: WindowFolderMemory.storageKey)
         }
+    }
+
+    /// Whether the old-name migration may run — the rule above, as a pure
+    /// function: only in the app proper, only into its own store, and never
+    /// under a state folder.
+    nonisolated static func mayMigratePreferences(isRunningTests: Bool, stateDirectory: URL?, intoTheSharedStore: Bool) -> Bool {
+        if isRunningTests {
+            return false
+        }
+        if stateDirectory != nil {
+            return false
+        }
+        return intoTheSharedStore
     }
 
     /// True when a folder is actually there to be worked in.

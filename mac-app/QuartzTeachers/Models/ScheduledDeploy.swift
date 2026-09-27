@@ -249,11 +249,34 @@ enum ScheduledDeploy {
     /// throwaway home as this, so the check below matters only in the app a
     /// UI test drives, which has no XCTest in it but was moved here by #240
     /// and stays moved.
+    ///
+    /// **Under a UI test's state folder (#154) it is that folder**, so the
+    /// scheduled notes and agents land under the one root a test inspects.
     nonisolated static var homeForScheduledNotes: URL {
-        if BuildOutputLocation.isRunningTests {
+        return homeForScheduledNotes(
+            isInsideTestBundle: RealHome.isInsideTestBundle,
+            isUnderUITest: RealHome.isUnderUITest,
+            stateDirectory: RealHome.stateDirectory,
+            homeForFiles: RealHome.forFiles
+        )
+    }
+
+    /// The rule above as a pure function. `homeForFiles` is only consulted
+    /// without a state folder.
+    nonisolated static func homeForScheduledNotes(
+        isInsideTestBundle: Bool,
+        isUnderUITest: Bool,
+        stateDirectory: URL?,
+        homeForFiles: URL
+    ) -> URL {
+        if RealHome.keepsTestStateInThrowawayFolders(
+            isInsideTestBundle: isInsideTestBundle,
+            isUnderUITest: isUnderUITest,
+            stateDirectory: stateDirectory
+        ) {
             return RealHome.homeWhileTesting
         }
-        return RealHome.forFiles
+        return stateDirectory ?? homeForFiles
     }
 
     /// Where the guard above sends a test that forgot, so that even with
@@ -1709,7 +1732,7 @@ enum ScheduledDeploy {
             // the Account ID is the one the teacher set; measured under
             // launchd before this shipped — docs 07, "#323".
             let reading: RunReading = MainActor.assumeIsolated {
-                let accountID: String = UserDefaults.standard.string(forKey: AppSettings.cloudflareAccountIDKey) ?? ""
+                let accountID: String = PlantoirDefaults.shared.string(forKey: AppSettings.cloudflareAccountIDKey) ?? ""
                 return readAtTheRun(
                     label: jobLabel,
                     section: section,
@@ -3297,6 +3320,21 @@ struct LaunchControl: LaunchControlRunning {
         "launchctl was not run: this app is writing its agents somewhere other than "
         + "~/Library/LaunchAgents, which only a test does. Pass FakeLaunchControl."
 
+    /// Whether `run` may hand anything to the real launchd — the refusal
+    /// below, as a pure function.
+    nonisolated static func mayReachLaunchd(overrideIsSet: Bool, isRunningTests: Bool, stateDirectory: URL?) -> Bool {
+        if overrideIsSet {
+            return false
+        }
+        if isRunningTests {
+            return false
+        }
+        if stateDirectory != nil {
+            return false
+        }
+        return true
+    }
+
     /// Runs launchctl and collects what it said.
     ///
     /// **It refuses outright while `launchAgentsDirectoryOverride` is set**,
@@ -3315,8 +3353,17 @@ struct LaunchControl: LaunchControlRunning {
     /// otherwise write its plist somewhere harmless and then hand that plist
     /// to the REAL launchd — the redirect would have un-guarded the one call
     /// it most needed to keep guarded.
+    ///
+    /// **And under a state folder (#154), with or without a UI test.** A
+    /// plist written under a state folder and handed to the real launchd
+    /// would fire a real publish at a real time; nothing about the folder
+    /// the agent was written to stops launchd from running it.
     static func run(arguments: [String]) -> (exitCode: Int32, output: String) {
-        if ScheduledDeploy.launchAgentsDirectoryOverride != nil || BuildOutputLocation.isRunningTests {
+        if !mayReachLaunchd(
+            overrideIsSet: ScheduledDeploy.launchAgentsDirectoryOverride != nil,
+            isRunningTests: BuildOutputLocation.isRunningTests,
+            stateDirectory: RealHome.stateDirectory
+        ) {
             return (exitCode: -1, output: refusedUnderATestRun)
         }
         let process: Process = Process()
