@@ -217,7 +217,12 @@ final class HowITeachTests: XCTestCase {
         for one in cases {
             let text: String = try XCTUnwrap(one["text"] as? String)
             let mark: String = try XCTUnwrap(one["mark"] as? String)
-            XCTAssertEqual(HowITeachPage.mark(of: Data(text.utf8)), mark, text.debugDescription)
+            var bytes: Data = Data()
+            if one["startsWithAByteOrderMark"] as? Bool == true {
+                bytes.append(contentsOf: [0xEF, 0xBB, 0xBF])
+            }
+            bytes.append(Data(text.utf8))
+            XCTAssertEqual(HowITeachPage.mark(of: bytes), mark, text.debugDescription)
         }
     }
 
