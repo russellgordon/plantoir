@@ -714,6 +714,30 @@ skill `.claude/skills/example-content/` and checked by its
 holds the skeleton generator and `lint_skeletons.py`; the skeletons are
 generated output, so never hand-edit `support/skeletons/`.
 
+**How the installer reads a link** ([#314](https://github.com/russellgordon/plantoir/issues/314),
+[#326](https://github.com/russellgordon/plantoir/issues/326)): the three
+readers — which class's date a ready-made page takes (`first_use_dates`),
+pointing a template's placeholder expectation at the course's own
+(`retargeted_expectation_references`), and unlinking the curriculum pages a
+teacher declined (`unlink_curriculum_references`) — follow `shared-rules.json`
+→ `readingALink`, so the escaped pipe Obsidian writes inside a table,
+`[[K1.15\|test cases]]`, is the same link as `[[K1.15|test cases]]`. Until
+then all three read it as a page called `K1.15\`. Unlinking turns it into its
+words and takes the backslash with it, so the table cell stays one cell; a
+retarget keeps the backslash, because dropping it would split the cell.
+Unlinking compares by the page a link NAMES — its last path component — so
+`[[Curriculum/A1.1|words]]` is unlinked too, and an unaliased one reads as the
+page name, `A1.1`, since the folder is one the course does not have. What a
+teacher could see: MCMPR11's Final Evaluation task has an Assessment Matrix
+table with seven such links to British Columbia standards outside any
+`%%curriculum%%` block, and a teacher who declined the curriculum pages got
+seven links to pages that do not exist — measured over every payload with the
+real functions, 7 left, all in that file; 0 after. The other readers are
+latent on shipped content (no escaped pipe in any `per_section/` page, no
+folder-qualified expectation link in `support/`) and bite teacher-written or
+future payload pages. Pinned by `scripts/test_install_link_readers.py`, the
+MCMPR11 file included.
+
 Two payload conventions have changed since these entries, both handled by
 shared Python: course-level pages now arrive with
 `createdSectionN`/`publishForSectionN` (one pair per section — entry 122), and
