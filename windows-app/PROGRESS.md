@@ -340,7 +340,8 @@ cloud session":
   `FolderContainers`) or a handover the parity plan already lists. The gate
   for a cloud session is therefore **"no NEW red"**, judged by diffing the
   failing-test list before and after, not by the totals line alone.
-- The WinUI project's edits (two lines, #144) were NOT compiled. The first
+- The WinUI project's edits (#144: one line in `App.xaml.cs`, one line plus a
+  refusal block in `SectionScheduleDialog.cs`) were NOT compiled. The first
   `dotnet build Plantoir/Plantoir.csproj -c Debug -p:Platform=x64` on the PC
   is the check, and "PT - Dev" is stale until then.
 

@@ -1708,7 +1708,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             // class on tomorrow", which is not a date anybody can check
             // against their timetable a week later.
             return result.Succeeded
-                ? Answering($"Published the class on {day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}.",
+                ? Answering($"Published the class on {DateText.Iso(day)}.",
                             text.ToString())
                 : Answering(text.ToString());
         }
