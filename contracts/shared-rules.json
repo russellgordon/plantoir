@@ -57,7 +57,7 @@
       {
         "carries": "the course code and WHICH check held Save back: deploy folder, cloudflare account id, or additional destination — never the path or the ID. Written once per visit to the course, on the change into the held-back state, not per keystroke.",
         "event": "settings save held back",
-        "why": "#373: a teacher reported that Save would not light up for a section's change, and the trail held nothing, because nothing was pressed — the held-back state is the one place where the form changes and no act follows. Since #373 a destination problem holds Save back only when the unsaved edit moves where the course publishes (savingSettings.whatEnablesSave), so this line also says that is what happened. Example: “could not save the settings for ICS3U yet (deploy folder) — the publishing folder needs attention”."
+        "why": "#373: a teacher reported that Save would not light up for a section's change, and the trail held nothing, because nothing was pressed — the held-back state is the one place where the form changes and no act follows. Since #373 a destination problem holds Save back only when the unsaved edit moves where the course publishes (savingSettings.whatEnablesSave), so this line also says that is what happened. Example: “Save held back for ICS3U (deploy folder) — the publishing folder needs attention”. Worded as a HOLD, not a failure: no Save was pressed, and a reader of the trail must not take it for one that failed (#373 implementation review, N2)."
       },
       {
         "carries": "the course code and the section",
@@ -13930,9 +13930,19 @@
       "llama",
       "qwen",
       "wrangler",
-      "python"
+      "python",
+      "toolchains",
+      "dockers",
+      "containers",
+      "colimas",
+      "scripts",
+      "jsons",
+      "gpus",
+      "llamas",
+      "wranglers",
+      "pythons"
     ],
-    "matching": "Whole word and case-insensitive: “description” does not contain “script”, “Scripts” does not match “script” either (a plural is a different word to this check, and none is in use). Comments are not labels and are skipped.",
+    "matching": "Whole word and case-insensitive: “description” does not contain “script”. A plural is a different word to a whole-word match, so the plurals are LISTED (“scripts”, “containers”, …) rather than inferred — data both platforms read, not a matcher rule each must reimplement (#369 implementation review, N5; measured 2026-09-30 over all of the mac app: zero hits for any of them). Comments are not labels and are skipped.",
     "scope": "On the mac: every string literal passed straight to a call that puts words on screen, in QuartzTeachers/Views — Text, Picker, Toggle, Button, LabeledContent, TextField, SecureField, Label, DisclosureGroup, ExampleCaption, FormSectionHeader, Section, .help, .navigationTitle, .alert, .confirmationDialog. Wording held in a named key is pinned by that key's own contract instead.",
     "exceptions": [
       {
@@ -14504,7 +14514,7 @@
               "value": false
             }
           ],
-          "why": "The legacy Bool is replaced by the per-section map the first time a section is set. It used to be replaced by an EMPTY map, so section 1 silently read the default, true: a change to one section turned another's grade back on (plan review, finding 10). Every section is now seeded with the legacy value first."
+          "why": "The legacy Bool is replaced by the per-section map the first time a section is set. It used to be replaced by an EMPTY map, so section 1 silently read the default, true: a change to one section turned another's grade back on (plan review, finding 10). Every section is now seeded with the legacy value first. KNOWN GAP (#373 review, N6): a section ADDED after that seeding has no entry and reads the default, on, where the untouched legacy Bool would have given it off. Closing it needs a course-wide default inside the map that build_site.py and Windows read too, so it is not done here; only a course with the pre-per-section Bool that has already been toggled can meet it."
         }
       ],
       "perSectionEditExpect": {
