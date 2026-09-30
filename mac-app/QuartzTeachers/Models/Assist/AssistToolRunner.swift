@@ -2783,13 +2783,7 @@ final class AssistToolRunner {
         // Everything the plan refuses is something that would ASK A QUESTION
         // at the scheduled moment, with nobody there to answer it.
         if let problem = asked.plan.problem {
-            ScheduledDeploy.noteRefusedBeforeAnythingWasWritten(
-                course: asked.located.course,
-                sectionNumber: asked.located.sectionNumber,
-                when: asked.when,
-                refusal: problem,
-                refusedOver: asked.plan.refusedOver
-            )
+            ScheduledDeploy.noteRefusedBeforeAnythingWasWritten(plan: asked.plan, course: asked.located.course)
             return AssistToolOutcome.refused("Nothing was scheduled. \(problem)")
         }
 

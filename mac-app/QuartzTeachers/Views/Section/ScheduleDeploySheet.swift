@@ -229,10 +229,7 @@ struct ScheduleDeploySheet: View {
         if let problem = plan.problem {
             // On the trail since #322: a refusal at the button is a teacher
             // who tried to schedule and could not.
-            ScheduledDeploy.noteRefusedBeforeAnythingWasWritten(
-                course: saved, sectionNumber: sectionNumber, when: when, refusal: problem,
-                refusedOver: plan.refusedOver
-            )
+            ScheduledDeploy.noteRefusedBeforeAnythingWasWritten(plan: plan, course: saved)
             return problem
         }
         if let problem = ScheduledDeploy.scheduleDeploy(
