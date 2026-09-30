@@ -134,6 +134,19 @@ public static class AssistWording
     public static string Undid(string whatHappened) =>
         $"Earlier, you {whatHappened}. Then you asked me to undo that, and I have done so.";
 
+    /// <summary>
+    /// Said after a section restore that left one shared page's setting as it
+    /// was, because its settings have no column-0 place for a new line (#308,
+    /// the mac's #182/#186). Past tense and counted, never named.
+    /// </summary>
+    public static string SharedPageWhoseSettingCouldNotBePutBack(string section) =>
+        SharedPagesWhoseSettingsCouldNotBePutBack(1, section);
+
+    /// <summary>The same, for several pages — the mac's one function, split by key here so the walk finds both.</summary>
+    public static string SharedPagesWhoseSettingsCouldNotBePutBack(int count, string section) => count == 1
+        ? $"One shared page kept the setting it has now for Section {section}: the settings at the top of it are written in a way I can’t add to, so I left that page exactly as it is."
+        : $"{count} shared pages kept the settings they have now for Section {section}: the settings at the top of them are written in a way I can’t add to, so I left those pages exactly as they are.";
+
     public static string UndidPartly(string whatHappened, int leftAlone)
     {
         string pages = leftAlone == 1 ? "one page" : $"{leftAlone} pages";

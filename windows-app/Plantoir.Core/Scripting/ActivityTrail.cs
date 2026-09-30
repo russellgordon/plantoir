@@ -216,6 +216,7 @@ public static class ActivityTrail
         /// </summary>
         RememberedTimetableSetAside,
         SectionAdded,
+        PageSettingsLeftAsTheyWere,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -266,6 +267,7 @@ public static class ActivityTrail
         Event.ScheduledPublishFinished => "scheduled publish finished",
         Event.RememberedTimetableSetAside => "remembered timetable set aside",
         Event.SectionAdded => "section added",
+        Event.PageSettingsLeftAsTheyWere => "page settings left as they were",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 
@@ -312,6 +314,10 @@ public static class ActivityTrail
         string entry = $"{DateText.Stamp(when)} · {course}/{section} · asked a question\n{PromptPrefix}{safePrompt}";
         Append(entry);
     }
+
+    /// <summary>The words for `page settings left as they were`, the mac's <c>pageSettingsLeftAsTheyWereLine</c> word for word.</summary>
+    public static string PageSettingsLeftAsTheyWereLine(string act, int pages) =>
+        $"left the settings of {(pages == 1 ? "1 page" : $"{pages} pages")} as they were while {act}: no room at the top for a new setting";
 
     public static void NoteLaunch()
     {
