@@ -78,6 +78,12 @@ public sealed partial class SectionDetailView : UserControl
     /// building is.
     /// </summary>
     private WorkLease.Held? _buildWork;
+
+    /// <summary>
+    /// This view's preview being BUILT, on the app's own record — what the
+    /// quit question counts (#231). Ends with the build claim.
+    /// </summary>
+    private IDisposable? _previewBuildRecord;
     private Uri? _previewUrl;
     private Uri? _lastLoadedUrl;
     private bool _isWaitingForServer;
@@ -905,6 +911,7 @@ public sealed partial class SectionDetailView : UserControl
                 return;
             }
             if (DeclinedAfterTaking(workspacePath, _buildWork.Claim, "the assistant's rebuild")) return;
+            _previewBuildRecord = CourseActivity.BeginPreviewBuild(workspacePath, _course.Code, _sectionNumber);
 
             // The same stop-sweep race the deploy path guards against: a
             // just-stopped preview's sweep would kill this one's build.
@@ -1065,6 +1072,7 @@ public sealed partial class SectionDetailView : UserControl
                 });
                 return;
             }
+            _previewBuildRecord = CourseActivity.BeginPreviewBuild(workspacePath, _course.Code, _sectionNumber);
 
             // The same stop-sweep race the deploy path guards against: a
             // just-stopped preview's sweep would kill this one's build.
@@ -1287,6 +1295,8 @@ public sealed partial class SectionDetailView : UserControl
     {
         _buildWork?.Dispose();
         _buildWork = null;
+        _previewBuildRecord?.Dispose();
+        _previewBuildRecord = null;
     }
 
     /// <summary>

@@ -235,6 +235,14 @@ public static class ActivityTrail
         /// </summary>
         ScheduledPublishReadTheCoursesSettings,
         /// <summary>
+        /// Quitting asked first, because a publish or a preview build was under
+        /// way (#231). Carries what, in the words shown, and which button was
+        /// pressed — "I closed it and it would not close" is the Keep Working
+        /// branch and nothing else explains it. Never written when Windows is
+        /// logging off: nothing is asked then.
+        /// </summary>
+        QuitAskedAboutWorkUnderWay,
+        /// <summary>
         /// A remembered timetable named a date that cannot be a class date —
         /// the file was written by this app before #144, on a PC whose
         /// regional format uses another calendar — and was set aside, so the
@@ -299,6 +307,7 @@ public static class ActivityTrail
         Event.ScheduledPublishWaitedForTheCourse => "scheduled publish waited for the course",
         Event.ScheduledDeployTurnedOff => "scheduled deploy turned off",
         Event.ScheduledPublishReadTheCoursesSettings => "scheduled publish read the course's settings",
+        Event.QuitAskedAboutWorkUnderWay => "quit asked about work under way",
         Event.RememberedTimetableSetAside => "remembered timetable set aside",
         Event.SectionAdded => "section added",
         Event.PageSettingsLeftAsTheyWere => "page settings left as they were",

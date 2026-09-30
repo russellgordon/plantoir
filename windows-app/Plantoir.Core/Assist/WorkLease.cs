@@ -121,6 +121,14 @@ public static class WorkLease
             .Distinct()
             .ToList();
 
+    /// <summary>
+    /// Whether ANOTHER live program holds a build or publish lease on any
+    /// course in this working folder — the quit path's first question (#231).
+    /// </summary>
+    public static bool AnotherProgramIsWorkingIn(string workspacePath) =>
+        Others(workspacePath).Any(other => other.Pid != Environment.ProcessId && other.Alive && other.HasName
+                                           && other.Kind is Building or Publishing);
+
     public static bool IsHeld(string workspacePath, string courseCode, string kind) =>
         HeldBy(workspacePath, courseCode).Contains(kind);
 
