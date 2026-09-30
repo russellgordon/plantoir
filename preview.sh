@@ -115,7 +115,7 @@ _SAVED_ARGS=("$@")
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --image)
-      if [[ $# -lt 2 ]]; then echo "❌ --image requires a value"; exit 1; fi
+      if [[ $# -lt 2 ]]; then echo "❌ --image requires a value"; exit 1; fi  # never shown to a teacher: reached only with --image or --context, which the app never passes
       OVERRIDE_IMAGE="$2"; shift 2 ;;
     *) shift ;;
   esac
@@ -126,7 +126,7 @@ resolve_build_context() {
   if [[ -f "./Dockerfile" ]]; then
     echo "."
   elif [[ -f "./.toolchain/Dockerfile" ]]; then
-    echo "./.toolchain"
+    echo "./.toolchain"  # never shown to a teacher: the answer $(resolve_build_context) captures
   else
     return 1
   fi
@@ -161,7 +161,7 @@ if [[ -n "$OVERRIDE_IMAGE" ]]; then
   IMAGE="$OVERRIDE_IMAGE"
 else
   BUILD_CONTEXT=$(resolve_build_context) || {
-    echo "❌ This folder is missing the toolchain's build recipe."
+    echo "❌ This folder is missing the recipe for its website builder."
     echo "   Open the folder in the app once to refresh it, or run from a"
     echo "   copy of the repository."
     exit 1
@@ -709,6 +709,12 @@ a_deploy_is_running_for() {
       while ((p in parent) && parent[p] != p && !(parent[p] in mine) && parent[p] > 1) {
         p = parent[p]; mine[p] = 1
       }
+      # What the arguments of deploy.sh begin with for THIS course and section.
+      spaced = toupper(course)
+      gsub(/[ \t]+/, " ", spaced)
+      sub(/^ /, "", spaced)
+      sub(/ $/, "", spaced)
+      wanted = spaced " " section " "
       prefix = "ca.russellgordon.Plantoir.deploy." code ".section" section
       pattern = "ca\\.russellgordon\\.Plantoir\\.deploy\\." code "\\.section" section "(\\.[0-9a-f]+)?\\.sh([ \t]|$)"
       for (i = 1; i <= count; i++) {
@@ -732,12 +738,21 @@ a_deploy_is_running_for() {
         # deploy and is counted — does not count. Only the arguments of
         # deploy.sh itself are read for the flags that deploy nothing.
         # (No apostrophes in here: this program sits in single quotes.)
+        # The course and section are read as the text the arguments of
+        # deploy.sh BEGIN with, one space between words, as
+        # the_owners_of_the_work reads them: a course code may hold a space
+        # ("AP CALC", which CourseCodeRule allows), and reading one word for
+        # it missed every deploy of that course (#388).
         n = split(args[pid], word, /[ \t]+/)
         for (w = 1; w + 2 <= n; w++) {
           if (w > 1 && (word[1] !~ /(^|\/)(ba|z|da|k)?sh$/ || word[w] ~ /^-/)) break
-          if (word[w] ~ /(^|\/)deploy\.sh$/ && toupper(word[w + 1]) == toupper(course) && word[w + 2] == section) {
+          if (word[w] !~ /(^|\/)deploy\.sh$/) continue
+          after = ""
+          for (a = w + 1; a <= n; a++) after = after " " word[a]
+          after = toupper(substr(after, 2)) " "
+          if (index(after, wanted) == 1) {
             deploys = 1
-            for (f = w + 3; f <= n; f++) {
+            for (f = w + 1; f <= n; f++) {
               if (word[f] ~ /^(--reset-token|--logout|--help|-h)$/) deploys = 0
             }
             if (deploys) print "deploy " pid
@@ -810,7 +825,7 @@ if [[ -n "${STOP_MODE:-}" ]]; then
     exit 0
   fi
   if ! docker ps --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
-    echo "✅ Nothing to stop — no container is running for this folder."
+    echo "✅ Nothing to stop — this folder's website builder isn't running."
     exit 0
   fi
   echo "🧹 Stopping preview processes for ${COURSE} section ${SECTION}…"
@@ -1099,7 +1114,7 @@ _helper_pins() {
 
 # The same versions as one word, for the line the app reads.
 _helper_pins_word() {
-  printf 'colima=%s,lima=%s,docker=%s,buildx=%s\n' "$COLIMA_VERSION" "$LIMA_VERSION" "$DOCKER_CLI_VERSION" "$BUILDX_VERSION"
+  printf 'colima=%s,lima=%s,docker=%s,buildx=%s\n' "$COLIMA_VERSION" "$LIMA_VERSION" "$DOCKER_CLI_VERSION" "$BUILDX_VERSION"  # never shown to a teacher: a field of a PLANTOIR_ line the app reads
 }
 
 _helper_arch() {
@@ -1119,10 +1134,10 @@ _helper_paths() {
   local tool
   for tool in "$@"; do
     case "$tool" in
-      colima) echo "bin/colima" ;;
-      limactl) echo "bin/limactl bin/lima share/lima" ;;
-      docker) echo "bin/docker" ;;
-      buildx) echo "cli-plugins/docker-buildx" ;;
+      colima) echo "bin/colima" ;;  # never shown to a teacher: a path its caller captures with $( )
+      limactl) echo "bin/limactl bin/lima share/lima" ;;  # never shown to a teacher: a path its caller captures with $( )
+      docker) echo "bin/docker" ;;  # never shown to a teacher: a path its caller captures with $( )
+      buildx) echo "cli-plugins/docker-buildx" ;;  # never shown to a teacher: a path its caller captures with $( )
     esac
   done
 }
@@ -1132,9 +1147,9 @@ _helper_stamped_paths() {
   local tool
   for tool in "$@"; do
     case "$tool" in
-      colima) echo "bin/colima" ;;
-      limactl) echo "bin/limactl bin/lima" ;;
-      docker) echo "bin/docker" ;;
+      colima) echo "bin/colima" ;;  # never shown to a teacher: a path its caller captures with $( )
+      limactl) echo "bin/limactl bin/lima" ;;  # never shown to a teacher: a path its caller captures with $( )
+      docker) echo "bin/docker" ;;  # never shown to a teacher: a path its caller captures with $( )
     esac
   done
 }
@@ -1616,12 +1631,11 @@ ensure_container_runtime() {
 # Set by ensure_container_runtime when this run starts the builder (#234).
 THIS_RUN_STARTED_THE_BUILDER=""
 ensure_container_runtime
-CURRENT_CONTEXT=$(docker context show 2>/dev/null || echo "unknown")
-HOST_ARCH=$(docker info --format '{{.Architecture}}' 2>/dev/null || echo "unknown")
-HOST_OS=$(docker info --format '{{.OSType}}' 2>/dev/null || echo "unknown")
-echo "🔌 Docker context: ${CURRENT_CONTEXT}"
-echo "🧭 Host detected by Docker: ${HOST_OS}/${HOST_ARCH}"
-echo "🖼️  Using image: ${IMAGE}"
+# Which website builder this run uses, by the part of its name that changes
+# with the recipe — worth having in a problem report. Until #382 this also
+# printed the engine's context and the platform it reported, naming the
+# machinery to a teacher (rule 1) at the cost of two more engine calls.
+echo "🧰 Website builder version: ${IMAGE##*:}"
 # ====================================================================
 
 # ---------------- Remove superseded website-builder images ----------------
@@ -1692,8 +1706,8 @@ build_image_if_missing() {
     return 0
   fi
   if [[ -z "$BUILD_CONTEXT" ]]; then
-    echo "❌ Image '$IMAGE' is not on this machine."
-    echo "   Build it first, e.g.: docker buildx build --load -t $IMAGE ."
+    echo "❌ Image '$IMAGE' is not on this machine."  # never shown to a teacher: reached only with --image, which the app never passes
+    echo "   Build it first, e.g.: docker buildx build --load -t $IMAGE ."  # never shown to a teacher: reached only with --image, which the app never passes
     exit 1
   fi
   # The size is said only when there is no earlier website builder on this
@@ -2926,7 +2940,7 @@ fi
 
 run_container_with_mount() {
   retire_legacy_container
-  echo "🔗 Binding host courses to container: $HOST_COURSES ➜ /teaching/courses"
+  echo "🔗 Letting the website builder read and save your courses: $HOST_COURSES"
   # The builds folder is mounted at its OWN absolute path, unconditionally,
   # so that courses/<CODE>/.merged_output — a symlink to a path under
   # $HOME — resolves to the same place inside the container as it does
@@ -2967,7 +2981,7 @@ container_has_builds_mount() {
 DESIRED_IMAGE_ID=$(docker image inspect --format '{{.Id}}' "$IMAGE" 2>/dev/null || echo "")
 RUNNING_IMAGE_ID=$(docker inspect -f '{{.Image}}' "$CONTAINER_NAME" 2>/dev/null || echo "")
 
-echo "🚀 Starting container if needed..."
+echo "🚀 Getting this folder's website builder ready…"
 clear_away_this_folders_other_spelling
 if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
   # Container exists — check its current /teaching/courses mount
@@ -2998,22 +3012,21 @@ if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
   else
     # Mounts match; only start if not already running
     if docker ps --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
-      echo "✅ Container $CONTAINER_NAME is already running with correct mount."
+      echo "✅ This folder's website builder is already running."
     else
-      echo "🚀 Starting existing container $CONTAINER_NAME..."
+      echo "▶️  Starting this folder's website builder…"
       start_the_existing_workspace
     fi
   fi
 else
-  echo "🚀 Creating new container named $CONTAINER_NAME..."
+  echo "🆕 Setting up a website builder for this folder…"
   run_container_with_mount
 fi
 
 # Preflight: nudge if quartz.layout.ts in the container wasn't initialized by setup.sh
 echo "🔎 Preflight: checking Quartz sidebar anchor..."
 if ! docker exec -i "$CONTAINER_NAME" bash -lc 'test -f /opt/quartz/quartz.layout.ts && grep -q "const omit = new Set" /opt/quartz/quartz.layout.ts'; then
-  echo "⚠️  Sidebar omit anchor not found in container's Quartz layout."
-  echo "   Did you run: ./setup.sh and complete setup for '$COURSE'?"
+  echo "⚠️  The website builder could not find where it leaves hidden pages out of the sidebar."
   echo "   (Continuing anyway; the build will attempt a safe fallback.)"
 fi
 

@@ -85,7 +85,7 @@ final class WorkspaceWaitTests: XCTestCase {
     /// launcher now prints for the app.
     private func theWaitAsALauncherPrintsIt(origin: String) -> [String] {
         return [
-            "🚀 Starting container if needed...\r\n",
+            "🚀 Getting this folder's website builder ready…\r\n",
             "♻️  Plantoir has been updated, so it is setting this folder up again to use the update…\r\n",
             "⏳ Waiting for somebody to finish deploying MPM2D section 2 before Plantoir sets this folder up again…\r\n",
             "PLANTOIR_WAITING_FOR: publish MPM2D/2 \(origin)\r\n",

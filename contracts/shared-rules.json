@@ -17839,6 +17839,69 @@
         "why": "ScheduledDeploy.sanitizedCode: upper case, and anything that is not a letter or digit becomes '-'."
       },
       {
+        "name": "a course code with a space is read whole from deploy.sh's arguments",
+        "course": "AP CALC",
+        "section": "2",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./deploy.sh AP CALC 2 --target netlify"
+          ]
+        ],
+        "cwd": {
+          "700": "here"
+        },
+        "expect": "refused",
+        "why": "CourseCodeRule allows a space, and ps shows the one quoted argument as two words. Until #382 the guard read one word for the course, so every deploy of such a course let its preview through (GitHub #388)."
+      },
+      {
+        "name": "a spaced course is matched whole, not by its first words",
+        "course": "AP CALC",
+        "section": "1",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./deploy.sh AP CALC 12"
+          ],
+          [
+            701,
+            1,
+            "/bin/bash ./deploy.sh AP CALCULUS 1"
+          ],
+          [
+            702,
+            1,
+            "/bin/bash ./deploy.sh AP 1"
+          ]
+        ],
+        "cwd": {
+          "700": "here",
+          "701": "here",
+          "702": "here"
+        },
+        "expect": "allowed",
+        "why": "Section 12 is not section 1, AP CALCULUS is another course, and so is AP."
+      },
+      {
+        "name": "a course that ENDS another's code is another course",
+        "course": "CALC",
+        "section": "2",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./deploy.sh AP CALC 2"
+          ]
+        ],
+        "cwd": {
+          "700": "here"
+        },
+        "expect": "allowed",
+        "why": "deploy.sh's arguments must BEGIN with the course: CALC 2 appears inside AP CALC 2, and a match anywhere in them would refuse CALC's preview while AP CALC deploys."
+      },
+      {
         "name": "the unreadable process table lets the preview through",
         "psFails": true,
         "processes": [],

@@ -1610,7 +1610,9 @@ the machinery (rule 1). They now print "🐳 Setting up this Mac…" and
     container is running", which are a contract change of their own. They are
     ONE follow-up issue, listed line by line; a whole-launcher scan belongs to
     it (REJECTED here: a whole-file ratchet with an allow-list, which would
-    freeze the list rather than empty it).
+    freeze the list rather than empty it). That issue was #382, and those lines
+    are gone: [`03-launcher-scripts.md`](03-launcher-scripts.md) → "What the
+    console says about the website builder (GitHub #382)".
 
 **REJECTED — write the tools folder into `~/.zprofile` at install.** Plantoir
 editing a teacher's shell profile is exactly the machinery the product hides, it

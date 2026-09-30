@@ -403,7 +403,8 @@ def mirror_toolchain(workspace: Path) -> None:
     under a UI test, where it deliberately leaves the folder alone so test
     fixtures can keep their stub launchers. The demo folder is a real folder
     being driven by a UI test, so it falls in the gap: without this, creating
-    a course fails with "this folder is missing the toolchain's build recipe",
+    a course fails with "this folder is missing the recipe for its website
+    builder" (worded "the toolchain's build recipe" until #382),
     and the test then waits half an hour for a course that will never appear.
 
     The FOLDER list is not held here: it is read from

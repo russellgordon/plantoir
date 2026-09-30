@@ -256,7 +256,7 @@ final class PreviewAddressTests: XCTestCase {
 
     @MainActor
     func testOrdinaryOutputAnnouncesNothing() {
-        XCTAssertNil(ScriptRunner.previewAddress(in: "🚀 Starting container if needed...\n"))
+        XCTAssertNil(ScriptRunner.previewAddress(in: "🚀 Getting this folder's website builder ready…\n"))
     }
 
     // MARK: - Slow-step reassurance
