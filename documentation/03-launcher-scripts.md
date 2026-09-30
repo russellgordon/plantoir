@@ -1957,8 +1957,9 @@ looked at AGAIN. Still somebody else's: `whenAnotherAccountHasTheAddress
 .sentence`, the `refused` marker, exit 1 with nothing announced — #235's
 shape, so the app needs no change. **Never a second remake**: rebuilding in a
 loop against a listener that follows costs two minutes a turn and fixes
-nothing. The remade workspace skips the earlier "Preflight: checking Quartz
-sidebar anchor" look; it only warns, and the new workspace is made from the
+nothing. The remade workspace skips the earlier "Checking where the sidebar
+leaves hidden pages out" look (worded "Preflight: checking Quartz sidebar
+anchor" until v1.4.1); it only warns, and the new workspace is made from the
 image that was just looked at.
 
 **Why counts, not "is one of them ours".** Colima's forward is IPv4 only
