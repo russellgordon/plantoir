@@ -268,6 +268,10 @@ public partial class App : Application
         return window;
     }
 
+    /// <summary>Whether closing this window quits the app: it is the last one still open (#231).</summary>
+    public static bool ClosingThisQuits(MainWindow window) =>
+        _windows.Where(open => !open.IsClosed).All(open => ReferenceEquals(open, window));
+
     /// <summary>Recorded while the windows still exist — a list rewritten as they close shrinks to nothing.</summary>
     public static void RememberOpenWindows()
     {

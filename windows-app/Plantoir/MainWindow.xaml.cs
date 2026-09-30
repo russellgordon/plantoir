@@ -65,6 +65,12 @@ public sealed partial class MainWindow : Window
         try { AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "Plantoir.ico")); }
         catch { /* a missing icon must never stop the window */ }
 
+        // Quitting asks first when work is under way (#231, the mac's #220/#232).
+        // Quitting here is closing the LAST window. Never when Windows itself
+        // is ending the session: SessionEnding hears WM_QUERYENDSESSION first.
+        Services.SessionEnding.Watch(WinRT.Interop.WindowNative.GetWindowHandle(this));
+        AppWindow.Closing += AskBeforeQuittingThroughWork;
+
         Picker.Attach(this);
         Sidebar.Attach(this);
 
@@ -262,6 +268,50 @@ public sealed partial class MainWindow : Window
                 detail.ShowDetailsForAutomation();
             }
         });
+    }
+
+    /// <summary>Set once the teacher chose Quit Anyway, so the close that follows is not asked about again.</summary>
+    private bool _quitConfirmed;
+
+    /// <summary>
+    /// The quit question (#231; <c>quittingWhileWorkIsUnderWay</c>). Only when
+    /// closing THIS window quits the app, only for the teacher's own quit, and
+    /// only for a publish or a preview being BUILT — never a preview merely
+    /// open. Keep Working is the default: Return without reading keeps the work.
+    /// </summary>
+    private async void AskBeforeQuittingThroughWork(Microsoft.UI.Windowing.AppWindow sender,
+                                                    Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
+    {
+        try
+        {
+            if (_quitConfirmed || !App.ClosingThisQuits(this)) return;
+            var underWay = CourseActivity.UnderWay();
+            var reason = Services.SessionEnding.IsEnding
+                ? QuitConfirmation.Reason.TheSystemIsEnding
+                : QuitConfirmation.Reason.TheTeacherAskedToQuit;
+            if (!QuitConfirmation.ShouldAsk(underWay, reason)) return;
+
+            args.Cancel = true;
+            var (title, message) = QuitConfirmation.Question(underWay);
+            var dialog = new ContentDialog
+            {
+                Title = title,
+                Content = message,
+                PrimaryButtonText = QuitConfirmation.QuitAnyway,
+                CloseButtonText = QuitConfirmation.KeepWorking,
+                DefaultButton = ContentDialogButton.Close,
+                XamlRoot = Content.XamlRoot,
+            };
+            bool quit = await dialog.ShowAsync() == ContentDialogResult.Primary;
+            ActivityTrail.Note(ActivityTrail.Event.QuitAskedAboutWorkUnderWay, QuitConfirmation.TrailLine(underWay, quit));
+            if (!quit) return;
+            _quitConfirmed = true;
+            Close();
+        }
+        catch (Exception ex)
+        {
+            App.LogDiagnostic($"AskBeforeQuittingThroughWork exception: {ex}");
+        }
     }
 
     /// <summary>True once this window has closed; a closed window cannot show anything.</summary>
