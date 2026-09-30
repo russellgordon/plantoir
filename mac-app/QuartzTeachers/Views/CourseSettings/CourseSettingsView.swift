@@ -135,28 +135,25 @@ struct CourseSettingsView: View {
                 // The words the course was made with (#267): shown, and
                 // LOCKED — a club's are chosen in the wizard and are not
                 // switchable afterwards, and an existing course (CODING
-                // included) can never become one from here.
-                Section {
-                    LabeledContent(WizardWording.settingsPageNamingLabel) {
-                        Text(WizardWording.settingsPageNamingValue(configuration.classPageNaming))
-                            .accessibilityIdentifier("pageNamingValue")
+                // included) can never become one from here. Only what the
+                // course RECORDED is shown, and the group goes when that is
+                // nothing — every course but a club made since #267 (#376).
+                let lockedRows: [ClassPagesLockedRows.Row] = ClassPagesLockedRows.rows(for: configuration)
+                if !lockedRows.isEmpty {
+                    Section {
+                        ForEach(lockedRows, id: \.key) { row in
+                            LabeledContent(row.label) {
+                                Text(row.value)
+                                    .accessibilityIdentifier(row.identifier)
+                            }
+                        }
+                        Text(WizardWording.settingsLockedCaption)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } header: {
+                        FormSectionHeader("Class Pages")
                     }
-                    LabeledContent(WizardWording.settingsFrontPageHeadingLabel) {
-                        Text(WizardWording.settingsFrontPageHeadingValue(
-                            configuration.recordedFrontPageHeading
-                        ))
-                        .accessibilityIdentifier("frontPageHeadingValue")
-                    }
-                    LabeledContent(WizardWording.settingsNounLabel) {
-                        Text(configuration.classNoun.rawValue)
-                            .accessibilityIdentifier("classNounValue")
-                    }
-                    Text(WizardWording.settingsLockedCaption)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                } header: {
-                    FormSectionHeader("Class Pages")
                 }
 
                 Section {

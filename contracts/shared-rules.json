@@ -5172,15 +5172,97 @@
         "pageWordCaption": "Pages will be named “{word} 1”, “{word} 2” and so on."
       },
       "settingsRows": {
-        "note": "Course Settings shows the three new settings as LOCKED rows — a label and the value, no control — for every course, with one caption under them. The unit word keeps its own row, whose Rename… button is disabled for a numbered course (specialNames.renameUnitWord.renameLockedNumbered).",
+        "note": "Course Settings shows the three new settings as LOCKED rows — a label and the value, no control — for a course that RECORDED them (shownWhen), with one caption under them. The unit word keeps its own row, whose Rename… button is disabled for a numbered course (specialNames.renameUnitWord.renameLockedNumbered).",
         "pageNaming": "Class pages are named",
         "pageNamingValue": "“{first page}” — the course's own first page name: “Unit 1, Day 1”, “Module 1, Day 1”, “Week 1”",
         "frontPageHeading": "Front page heading",
         "frontPageHeadingValue": "the course's recorded front_page_heading, exactly as stored — never a default",
-        "frontPageHeadingNotSet": "Not recorded — the front page keeps the heading it already has",
-        "frontPageHeadingWhy": "Shown for a course WITHOUT front_page_heading — every course made before #267, CODING included. The first version showed “Most Recent Class” there, and CODING's front page reads “## Most Recent Meeting”: a locked row stating something the page does not say (#267 implementation review, LOW). Nothing rewrites a heading after creation, so the row does not guess.",
+        "frontPageHeadingWhy": "HISTORY: from #267 until #376 a course WITHOUT front_page_heading showed the row with “Not recorded — the front page keeps the heading it already has” (frontPageHeadingNotSet), because the first version had shown “Most Recent Class” there and CODING's front page reads “## Most Recent Meeting”: a locked row stating something the page does not say (#267 implementation review, LOW). RETIRED by Russell, 2026-09-27 (#376): a row that can never change and records nothing tells a teacher nothing, so it is now not drawn at all (shownWhen). Never build the “Not recorded” sentence; Windows never had it.",
         "noun": "The assistant calls a page a",
-        "lockedCaption": "Chosen when the course was made. An existing course keeps these; they cannot be changed here."
+        "lockedCaption": "Chosen when the course was made. An existing course keeps these; they cannot be changed here.",
+        "shownWhen": "Each locked row is drawn only when its key is PRESENT in course_config.json with a non-blank string (surrounding spaces trimmed): pageNaming ← class_page_scheme, frontPageHeading ← front_page_heading, noun ← class_noun. The group, its header and lockedCaption are omitted when no row is drawn. A present value this app does not know (a class_page_scheme written by a newer app) IS drawn, as this app reads it.",
+        "shownWhenWhy": "#376 (Russell, 2026-09-27: “if there's no point in showing the setting (i.e. for a course made before the setting existed) then yes, it should be hidden”). Only the wizard writes the three keys, all together, and only for a club made since #267, so an absent key means an ordinary course. For such a course the page-naming row repeated, word for word, the caption under “What do you call a unit?” three rows above it (plantoir.app's courses-light.png, y≈606 and y≈756), and the noun row said “class” for every course. REJECTED: showing derived defaults for class_page_scheme/class_noun (the repetition above); reading the heading from index.md (#267 rejected it: one section's page, possibly edited on purpose).",
+        "shownWhenCases": [
+          {
+            "name": "an ordinary course records none",
+            "given": {},
+            "expect": []
+          },
+          {
+            "name": "a club made since #267 records all three",
+            "given": {
+              "unit_word": "Meeting",
+              "class_page_scheme": "numbered",
+              "front_page_heading": "Most Recent Meeting",
+              "class_noun": "meeting"
+            },
+            "expect": [
+              "pageNaming",
+              "frontPageHeading",
+              "noun"
+            ],
+            "values": {
+              "pageNaming": "“Meeting 1”",
+              "frontPageHeading": "Most Recent Meeting",
+              "noun": "meeting"
+            }
+          },
+          {
+            "name": "a blank heading is not a recorded one",
+            "given": {
+              "front_page_heading": "   "
+            },
+            "expect": []
+          },
+          {
+            "name": "a hand-edited scheme alone",
+            "given": {
+              "class_page_scheme": "numbered"
+            },
+            "expect": [
+              "pageNaming"
+            ]
+          },
+          {
+            "name": "a scheme from a newer app is shown as this app reads it",
+            "given": {
+              "class_page_scheme": "someday_scheme"
+            },
+            "expect": [
+              "pageNaming"
+            ],
+            "values": {
+              "pageNaming": "“Unit 1, Day 1”"
+            }
+          },
+          {
+            "name": "an empty noun is not a recorded one",
+            "given": {
+              "class_noun": ""
+            },
+            "expect": []
+          },
+          {
+            "name": "a noun alone",
+            "given": {
+              "class_noun": "meeting"
+            },
+            "expect": [
+              "noun"
+            ],
+            "values": {
+              "noun": "meeting"
+            }
+          },
+          {
+            "name": "CODING's real shape",
+            "given": {
+              "course_code": "CODING",
+              "unit_word": "Week"
+            },
+            "expect": []
+          }
+        ]
       },
       "club": {
         "classFolder": "All Meetings",
