@@ -457,7 +457,12 @@ public static class TaskScheduling
                 "function Write-Outcome([string]$kind, [string]$where) {",
                 "  try {",
                 "    New-Item -ItemType Directory -Force -Path $outcomeDir | Out-Null",
-                $"    Set-Content -LiteralPath $outcomeFile -Value @($kind, $where, {PsQuote(courseCode)}, {PsQuote(section.ToString())}) -Encoding utf8",
+                // Assembled OUTSIDE the watched folder and moved in (#218): the
+                // app's watcher fires on the create, and a record written in
+                // place can be read empty at that instant (the mac: 0 of 40).
+                "    $assembling = Join-Path (Split-Path -Parent $outcomeDir) ('outcome-' + [Guid]::NewGuid().ToString('N') + '.partial')",
+                $"    Set-Content -LiteralPath $assembling -Value @($kind, $where, {PsQuote(courseCode)}, {PsQuote(section.ToString())}) -Encoding utf8",
+                "    Move-Item -LiteralPath $assembling -Destination $outcomeFile -Force",
                 // The mark saying this record's trail line has been written
                 // belongs to the PREVIOUS run. Left behind, a record written
                 // within the same second as that mark would be read as already

@@ -116,10 +116,31 @@ public sealed partial class MainWindow : Window
         }
         Views.SectionDetailView.SectionOutcomeDismissed += OutcomeDismissed;
 
+        // A scheduled run finished while this window was open and in front
+        // (#218): the one app-wide watch says a record changed, and the band
+        // and the badge are re-read together, on this window's own thread.
+        // A burst of events (create, then size) is one refresh, not three.
+        bool refreshQueued = false;
+        void ScheduledRecordsChanged()
+        {
+            if (IsClosed || refreshQueued) return;
+            refreshQueued = true;
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                refreshQueued = false;
+                if (IsClosed || Workspace.State != WorkspaceState.Ready) return;
+                Sidebar.Refresh();
+                if (DetailHost.Content is Views.SectionDetailView detail) detail.ShowHowTheScheduledPublishTurnedOut();
+            });
+        }
+        Plantoir.Core.Assist.ScheduledPublishWatcher.RecordsChanged += ScheduledRecordsChanged;
+
         Closed += (_, _) =>
         {
             IsClosed = true;
             Views.SectionDetailView.SectionOutcomeDismissed -= OutcomeDismissed;
+            // The event is static: a subscription left behind would root this window.
+            Plantoir.Core.Assist.ScheduledPublishWatcher.RecordsChanged -= ScheduledRecordsChanged;
             Workspace.UnregisterWindow();
         };
 

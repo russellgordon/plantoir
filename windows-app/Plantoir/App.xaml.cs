@@ -91,6 +91,16 @@ public partial class App : Application
         try { Plantoir.Core.Assist.ScheduledPublishOutcome.NoteFinishedRunsOnTrail(); }
         catch (Exception ex) { LogDiagnostic($"Scheduled-publish trail sweep failed: {ex}"); }
 
+        // ONE watch on the records' folder for the whole app (#218): a run that
+        // finishes while Plantoir is open reaches every window at once, and its
+        // trail line is written then rather than at the next launch (the sweep
+        // is idempotent — each record's line is written once).
+        Plantoir.Core.Assist.ScheduledPublishWatcher.RecordsChanged += () =>
+        {
+            try { Plantoir.Core.Assist.ScheduledPublishOutcome.NoteFinishedRunsOnTrail(); } catch { }
+        };
+        Plantoir.Core.Assist.ScheduledPublishWatcher.Start();
+
         try
         {
             Settings = AppSettings.Load();

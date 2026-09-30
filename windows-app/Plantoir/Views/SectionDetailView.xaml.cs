@@ -479,7 +479,7 @@ public sealed partial class SectionDetailView : UserControl
     /// section still gets one — and that teacher is precisely the one who
     /// writes in to say their site did not update.</para>
     /// </remarks>
-    private void ShowHowTheScheduledPublishTurnedOut()
+    internal void ShowHowTheScheduledPublishTurnedOut()
     {
         ScheduledPublishOutcome.Result? outcome;
         try
