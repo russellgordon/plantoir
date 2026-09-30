@@ -14,10 +14,16 @@ import AppKit
 /// is sandboxed, but its entitlements carry a read-only exception for `/`;
 /// that is measured here on every run rather than assumed.)
 ///
-/// **What it tolerates, by name.** AppKit and SwiftUI write their own window
-/// bookkeeping straight to `UserDefaults.standard` whatever the app does —
-/// `realPreferenceKeysAppKitOwns` — so those keys may change and nothing else
-/// may. That residual is written down in `documentation/09-mac-app.md`.
+/// **It tolerates nothing** (since #361, v1.4.1). AppKit and SwiftUI still
+/// write their own window bookkeeping straight to the real domain, but a run
+/// a test drives puts each of those keys back the moment it changes
+/// (`AppKitBookkeepingGuard`, in the product). So the test RESIZES the main
+/// window — a positive control: a resize that did not happen proves nothing
+/// — and checks the real frame WHILE the app still runs, which is what
+/// catches a guard that only repairs at quit (XCUITest's own terminate never
+/// reaches `willTerminate`). Until #361 it tolerated eight key prefixes by
+/// name; the list now lives in the product as
+/// `PlantoirDefaults.appKitOwnedKeyPrefixes`, as what the guard restores.
 ///
 /// Not opt-in: it takes seconds and needs no model, the standing of its
 /// neighbours. It SKIPS when another Plantoir is running, because that copy's
@@ -26,20 +32,6 @@ import AppKit
 final class StateDirectoryUITests: XCTestCase {
 
     // MARK: - Stored properties
-
-    /// Keys AppKit and SwiftUI write to the app's standard preferences
-    /// themselves, by prefix. Measured by diffing the real domain's key set
-    /// around a UI run; see doc 09.
-    static let realPreferenceKeysAppKitOwns: [String] = [
-        "NSWindow Frame ",
-        "NSSplitView Subview Frames ",
-        "NSNavPanel",
-        "NSNavLastRootDirectory",
-        "NSOSPLastRootDirectory",
-        "NSTableView ",
-        "NSOutlineView ",
-        "NSToolbar Configuration ",
-    ]
 
     /// The real folders compared by name and modification time.
     static let realFoldersWatched: [String] = [
@@ -81,6 +73,37 @@ final class StateDirectoryUITests: XCTestCase {
         if sectionRow.waitForExistence(timeout: 10) {
             sectionRow.click()
         }
+
+        // #361: make AppKit write the main window's frame, and check the
+        // teacher's saved frame is put back WHILE the app runs.
+        let frameKey: String = IsolatedLaunch.mainWindowFrameKey
+        let savedFrameBefore: String? = IsolatedLaunch.realPreference(named: frameKey) as? String
+        let window: XCUIElement = application.windows.firstMatch
+        let sizeBefore: CGSize = window.frame.size
+        window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1))
+            .withOffset(CGVector(dx: -2, dy: -2))
+            .press(forDuration: 0.3, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1))
+                .withOffset(CGVector(dx: -80, dy: -60)))
+        XCTAssertNotEqual(
+            window.frame.size, sizeBefore,
+            "The main window did not resize, so AppKit had nothing to save and the check below would prove nothing."
+        )
+        // Sampled for the WHOLE ten seconds, never "until it matches": the
+        // preferences daemon writes the file lazily, so an early read of an
+        // unflushed file matches trivially. Any sample that differs fails.
+        var framesSeen: [String] = []
+        let frameDeadline: Date = Date().addingTimeInterval(10)
+        while Date() < frameDeadline {
+            let savedFrameNow: String? = IsolatedLaunch.realPreference(named: frameKey) as? String
+            if savedFrameNow != savedFrameBefore {
+                framesSeen.append(savedFrameNow ?? "(absent)")
+            }
+            Thread.sleep(forTimeInterval: 0.5)
+        }
+        XCTAssertEqual(
+            framesSeen, [],
+            "The teacher's saved main-window frame changed while the app under test was running (#361)."
+        )
 
         // ⌘Q rather than `terminate()`, so the app's own quit path runs —
         // the one that writes the open folders and would stop containers.
@@ -191,8 +214,8 @@ struct RealStateSnapshot {
     /// Path → "size mtime", or "absent".
     var files: [String: String] = [:]
 
-    /// The real preferences' keys and their values' descriptions, minus the
-    /// keys AppKit owns.
+    /// The real preferences' keys and their values' descriptions — every key,
+    /// AppKit's own included (#361).
     var preferences: [String: String] = [:]
 
     // MARK: - Functions
@@ -258,9 +281,6 @@ struct RealStateSnapshot {
         let parsed: Any = try PropertyListSerialization.propertyList(from: data, options: [], format: nil)
         let dictionary: [String: Any] = (parsed as? [String: Any]) ?? [:]
         for (key, value) in dictionary {
-            if isOwnedByAppKit(key) {
-                continue
-            }
             snapshot.preferences[key] = String(describing: value)
         }
         return snapshot
@@ -288,15 +308,6 @@ struct RealStateSnapshot {
             result.append("real preference \(key) was added")
         }
         return result.sorted()
-    }
-
-    static func isOwnedByAppKit(_ key: String) -> Bool {
-        for prefix in StateDirectoryUITests.realPreferenceKeysAppKitOwns {
-            if key.hasPrefix(prefix) {
-                return true
-            }
-        }
-        return false
     }
 
     static func describe(_ url: URL) throws -> String {
