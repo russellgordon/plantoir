@@ -219,6 +219,13 @@ struct StartOfYearSheet: View {
         .onAppear {
             model.load()
         }
+        // `.contain` BEFORE the identifier, or not at all (#366, the rule of
+        // #353): SwiftUI applies an identifier on a stack to every element
+        // inside it, and the inner identifiers (startOfYearGo, startOfYearUndo,
+        // startOfYearOfferUndo) never reach the tree — Cancel and Go both read
+        // back as "startOfYearSheet". After the identifier it does nothing;
+        // `ContainerIdentifierTripwireTests` checks the order.
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("startOfYearSheet")
     }
 
