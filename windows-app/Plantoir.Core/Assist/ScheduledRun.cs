@@ -154,6 +154,51 @@ public static class ScheduledRun
         _ => throw new ArgumentOutOfRangeException(nameof(refusal)),
     };
 
+    // ---- What a Save says about them (#347; savingSettings.scheduledDeploys) --
+
+    /// <summary>
+    /// After a Course Settings Save, one sentence per section of the course with
+    /// a deploy set to happen on its own in THIS working folder and still to
+    /// come: it cannot go ahead the way the course is set now (said whether or
+    /// not the Save changed anything), or — when the Save changed where the
+    /// course deploys — it will go where the course deploys now. Otherwise
+    /// nothing. Nothing is refused or undone: the run checks again anyway.
+    /// </summary>
+    /// <param name="scheduled">This folder's deploys of the course: section and moment.</param>
+    /// <param name="before">The course's destinations in the file BEFORE this Save.</param>
+    public static IReadOnlyList<string> WhatASaveSays(
+        IEnumerable<(int Section, DateTime Moment)> scheduled, Course after,
+        IReadOnlyList<CourseConfiguration.DeployDestination> before, string cloudflareAccountID)
+    {
+        var now = after.Configuration.AllDeployDestinations;
+        bool changed = !before.Select(d => (d.Type, d.Path)).SequenceEqual(now.Select(d => (d.Type, d.Path)));
+        var said = new List<string>();
+        foreach (var (section, moment) in scheduled.OrderBy(s => s.Section))
+        {
+            var decision = Decide(after, section, cloudflareAccountID, []);
+            if (decision.DeploysTo is null)
+                said.Add($"Section {section} is set to deploy on its own on {moment:dddd d MMMM, h:mm tt}, but it could not " +
+                         $"go ahead the way this course is set now: {decision.Reason}. Put that right and it will go ahead as set.");
+            else if (changed)
+                said.Add($"Section {section}’s deploy set for {moment:dddd d MMMM, h:mm tt} will go to " +
+                         $"{string.Join(", ", decision.DeploysTo.Select(DeployCommand.DestinationDescription))} now.");
+        }
+        return said;
+    }
+
+    /// <summary>
+    /// This working folder's deploys of the course still to come, with their
+    /// moments — read from the jobs, since the task's own next-run time is
+    /// written in the machine's locale.
+    /// </summary>
+    public static IReadOnlyList<(int Section, DateTime Moment)> StillToCome(string workingFolder, string courseCode) =>
+        TaskScheduling.InFolder(workingFolder)
+            .Where(task => TaskScheduling.SameCode(task.CourseCode, courseCode))
+            .Select(task => (task.Section, Moment: ReadJob(TaskScheduling.JobPath(task.Name))?.ScheduledFor?.LocalDateTime ?? task.NextRun))
+            .Where(entry => entry.Moment is { } when && when > DateTime.Now)
+            .Select(entry => (entry.Section, entry.Moment!.Value))
+            .ToList();
+
     public const string SettingsCouldNotBeRead =
         "its settings could not be read when the time came, so there was no telling where to deploy it";
 

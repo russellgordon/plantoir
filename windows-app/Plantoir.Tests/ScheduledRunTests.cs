@@ -176,6 +176,91 @@ public class ScheduledRunTests : IDisposable
         return course;
     }
 
+    // ---- savingSettings.scheduledDeploys (#347) ------------------------------
+
+    [Fact]
+    public void EverySaveCaseSaysWhatTheContractSays()
+    {
+        var doc = ContractLoader.LoadJson("shared-rules.json");
+        var cases = doc["savingSettings"]!["scheduledDeploys"]!["cases"]!.AsArray();
+        var names = doc["specialNames"]!;
+        string goes = names["settingsSaveScheduledDeployGoesWhereTheCourseDeploysNow"]!["message"]!.ToString();
+        string cannot = names["settingsSaveScheduledDeployCannotGoAheadAsSetNow"]!["message"]!.ToString();
+        var moment = new DateTime(2026, 10, 1, 6, 30, 0);
+        Assert.Equal(5, cases.Count);
+
+        foreach (var c in cases)
+        {
+            string dir = Directory.CreateTempSubdirectory("save-case").FullName;
+            try
+            {
+                var beforeGiven = c!["before"]!.AsObject();
+                var savedGiven = c["saved"]!.AsObject();
+                string site = Path.Combine(dir, "site");
+                Directory.CreateDirectory(site);
+                var before = new List<CourseConfiguration.DeployDestination>
+                    { new(beforeGiven["target"]!.ToString(), beforeGiven["target"]!.ToString() == "local_folder" ? site : "") };
+                var saved = new JsonObject
+                {
+                    ["course_code"] = "ICS3U",
+                    ["section_numbers"] = new JsonArray(1),
+                    ["deploy_target"] = savedGiven["target"]!.ToString(),
+                    ["deploy_folder_path"] = savedGiven["target"]!.ToString() == "local_folder" ? site : "",
+                };
+                var course = new Course("ICS3U", dir, CourseConfiguration.FromBytes(System.Text.Encoding.UTF8.GetBytes(saved.ToJsonString())));
+                if (beforeGiven["hasDeployedBefore"]?.GetValue<bool>() == true)
+                {
+                    string marker = beforeGiven["target"]!.ToString() == "cloudflare_pages" ? ".cloudflare_sites" : ".netlify_sites";
+                    Directory.CreateDirectory(Path.Combine(dir, marker));
+                    File.WriteAllText(Path.Combine(dir, marker, "section1.json"), "{}");
+                }
+                var scheduled = (c["scheduled"] as JsonArray)?.Select(s => (s!.GetValue<int>(), moment)).ToList()
+                                ?? new List<(int, DateTime)>();   // scheduledElsewhere: another folder's alarm, never here
+
+                var said = ScheduledRun.WhatASaveSays(scheduled, course, before, savedGiven["cloudflareAccountID"]?.ToString() ?? "");
+
+                var expect = c["expect"]!.AsArray().Select(e => e!.ToString()).ToList();
+                Assert.True(expect.Count == said.Count, $"\"{c["name"]}\": said {said.Count}");
+                foreach (var (kind, sentence) in expect.Zip(said))
+                {
+                    string template = kind == "goesWhereTheCourseDeploysNow" ? goes : cannot;
+                    string opening = template.Split('{')[0];
+                    Assert.StartsWith(opening.Replace("{section}", "1"), sentence.Replace("Section 1", "Section {section}"));
+                }
+            }
+            finally { try { Directory.Delete(dir, true); } catch { } }
+        }
+    }
+
+    [Fact]
+    public void TheSaveSentencesAreTheContractsOwn()
+    {
+        var names = ContractLoader.LoadJson("shared-rules.json")["specialNames"]!;
+        var moment = new DateTime(2026, 10, 1, 6, 30, 0);
+        string when = $"{moment:dddd d MMMM, h:mm tt}";
+        string dir = Directory.CreateTempSubdirectory("save-words").FullName;
+        try
+        {
+            string site = Path.Combine(dir, "site");
+            Directory.CreateDirectory(site);
+            var toFolder = new Course("ICS3U", dir, CourseConfiguration.FromBytes(System.Text.Encoding.UTF8.GetBytes(
+                new JsonObject { ["deploy_target"] = "local_folder", ["deploy_folder_path"] = site }.ToJsonString())));
+            var goes = ScheduledRun.WhatASaveSays([(1, moment)], toFolder, [new("netlify", "")], "");
+            Assert.Equal(names["settingsSaveScheduledDeployGoesWhereTheCourseDeploysNow"]!["message"]!.ToString()
+                             .Replace("{section}", "1").Replace("{moment}", when).Replace("{destinations}", site),
+                         Assert.Single(goes));
+
+            var toCloudflare = new Course("ICS3U", dir, CourseConfiguration.FromBytes(System.Text.Encoding.UTF8.GetBytes(
+                new JsonObject { ["deploy_target"] = "cloudflare_pages" }.ToJsonString())));
+            var cannot = ScheduledRun.WhatASaveSays([(1, moment)], toCloudflare, [new("netlify", "")], "");
+            Assert.Equal(names["settingsSaveScheduledDeployCannotGoAheadAsSetNow"]!["message"]!.ToString()
+                             .Replace("{section}", "1").Replace("{moment}", when)
+                             .Replace("{reason}", ScheduledRun.ReasonClause(new ScheduledDeploy.Refusal("cloudflareAccountMissing"))),
+                         Assert.Single(cannot));
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
     // ---- The run itself ---------------------------------------------------------
 
     private string Folder(string name = "work", string target = "netlify")
