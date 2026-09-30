@@ -483,7 +483,10 @@ enum AssistPublishPlanner {
         // on. Same teacher, same class, two different results depending on
         // which sentence they used.
         let moves: [AssistPublishDateMove] = dateMovesFollowingClasses(
-            titles: titles, graph: graph, classPages: classPages
+            titles: titles, graph: graph, classPages: classPages,
+            publishedBefore: PublishedPagesRecord.places(
+                courseDirectory: course.directoryURL, section: sectionNumber
+            )
         )
         return plan(
             publishes: true, titles: titles,
@@ -541,7 +544,10 @@ enum AssistPublishPlanner {
         // second rule here with a different condition, which is how the two
         // routes to the same act came to disagree.
         let moves: [AssistPublishDateMove] = dateMovesFollowingClasses(
-            titles: titles, graph: graph, classPages: classPages
+            titles: titles, graph: graph, classPages: classPages,
+            publishedBefore: PublishedPagesRecord.places(
+                courseDirectory: course.directoryURL, section: sectionNumber
+            )
         )
         return .success(plan(
             publishes: true, titles: titles,
@@ -694,6 +700,44 @@ enum AssistPublishPlanner {
             kept: [],
             linkedClassesLeftAlone: [],
             dateMoves: []
+        )
+    }
+
+    /// What publishing EXACTLY these pages would do, carrying the date moves
+    /// the caller has already worked out — the mirror of `planHiding(exactly:)`
+    /// (#379).
+    ///
+    /// For the links checklist, whose pages and dates were decided by the
+    /// build's rule (`datingPagesAClassBrings.fromTheLinksChecklist`): no link
+    /// following here, because following links is what chose the pages. The
+    /// change-building half is `appendChanges`, so the certainty rule and the
+    /// #186 decline mean here what they mean everywhere else.
+    static func planPublishing(
+        exactly pages: [AssistSectionPage],
+        dateMoves: [AssistPublishDateMove],
+        forSection sectionNumber: Int,
+        in course: Course
+    ) -> AssistPublishPlan {
+        var changes: [AssistPublishChange] = []
+        var alreadyRight: [AssistSectionPage] = []
+        var noRoomForAKey: [AssistSectionPage] = []
+        appendChanges(
+            for: pages, becauseLinked: false, publishes: true,
+            forSection: sectionNumber, into: &changes, alreadyRight: &alreadyRight,
+            noRoomForAKey: &noRoomForAKey
+        )
+        return AssistPublishPlan(
+            courseCode: course.code,
+            sectionNumber: sectionNumber,
+            publishes: true,
+            unknownNames: [],
+            namedPages: pages,
+            changes: changes,
+            alreadyRight: alreadyRight,
+            noRoomForAKey: noRoomForAKey,
+            kept: [],
+            linkedClassesLeftAlone: [],
+            dateMoves: dateMoves
         )
     }
 
@@ -1153,16 +1197,16 @@ enum AssistPublishPlanner {
     /// pre-populated course and a hand-published one date their pages the same
     /// way.
     ///
-    /// "Never published" is inferred from the page being hidden now, because
-    /// nothing on disk records a page's history. A page published once and
-    /// later hidden therefore counts as never published, and would take a new
-    /// date. Recording the truth would mean a new frontmatter key on every
-    /// page, agreed with the Python and the Windows app; the inference costs
-    /// nothing and is right in every case anybody has met.
+    /// "Published before" is READ from the section's published-pages record
+    /// since #379 (`publishedBeforeIsRecorded`, replacing the inference that
+    /// every hidden page was never published): a page a deploy put on a site
+    /// and that was hidden since keeps its date. A date on the page is not
+    /// the sign — 7,114 of 7,118 payload pages carry one.
     static func dateMovesFollowingClasses(
         titles: [String],
         graph: AssistSectionGraph,
-        classPages: [ClassPageSummary]
+        classPages: [ClassPageSummary],
+        publishedBefore: Set<String> = []
     ) -> [AssistPublishDateMove] {
         // Only the NAMED pages that are really classes with a date. Publishing
         // an ordinary page moves nothing: there is no class day to inherit.
@@ -1227,6 +1271,11 @@ enum AssistPublishPlanner {
                 if page.date == entry.day {
                     continue
                 }
+                // Published before and hidden again: it keeps its date
+                // (#379, Russell's decision 4; `publishedBeforeIsRecorded`).
+                if PublishedPagesRecord.lists(page.fileURL, in: publishedBefore) {
+                    continue
+                }
                 moves.append(AssistPublishDateMove(
                     page: page, from: page.date, to: entry.day,
                     takenFrom: entry.page.displayTitle
@@ -1247,7 +1296,8 @@ enum AssistPublishPlanner {
     static func apply(
         _ plan: AssistPublishPlan,
         forSection sectionNumber: Int,
-        in course: Course
+        in course: Course,
+        repointsTheFrontPage: Bool = true
     ) throws -> (change: AssistChange, leftAlone: [String]) {
         // Every file this plan touches, gathered first, so a page that both
         // changes visibility and moves date is written once.
@@ -1344,7 +1394,12 @@ enum AssistPublishPlanner {
         // takes the index back with them. An undo that restored the lessons
         // and left the front page pointing at the wrong one would be a worse
         // state than either.
-        if let repointed = SectionIndexPointer.repointIndex(forSection: sectionNumber, in: course) {
+        //
+        // Not for the links checklist (#379, the director's ruling F1): a
+        // class ticked there is published because a link leads to it, and
+        // the front page keeps following the class it follows today.
+        if repointsTheFrontPage,
+           let repointed = SectionIndexPointer.repointIndex(forSection: sectionNumber, in: course) {
             saved.append(repointed)
         }
 

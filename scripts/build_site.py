@@ -2012,6 +2012,466 @@ def _links_into_hidden_pages(content_root: Path) -> list:
     return listed
 
 
+# ---------------------------------------------------------------------------
+# #379: the links checklist — what the section window offers to publish.
+# ---------------------------------------------------------------------------
+# #333's finding said "N links lead to hidden pages" in an alert nobody could
+# act on. The build now also works out WHICH hidden pages publishing would
+# bring back to life, and what date each would take, and writes that OFFER to
+# `courses/<CODE>/.publish_state/section<N>.links-checklist.json`
+# (`contracts/file-formats.json` -> `linksChecklistOffer`). The app shows it as
+# a checklist and writes the pages the teacher ticks. The build itself changes
+# no page's visibility: a scheduled, MCP or terminal publish goes out as it is
+# (`shared-rules.json` -> `linksChecklist.unattendedPublishesAsIs`).
+#
+# The rule is `class-planning.json` -> `datingPagesAClassBrings.
+# fromTheLinksChecklist`; its cases run in scripts/test_links_checklist.py.
+# Why the build and not the app: the build is the one place every publish
+# passes through (#333's own reasoning), the mac cannot run this Python
+# outside the container on demand, and Windows inherits it by sharing it.
+
+LINKS_CHECKLIST_VERSION = 1
+LINKS_CHECKLIST_MARKER = "PLANTOIR_LINKS_CHECKLIST:"
+VISIBLE_PAGES_FILE = ".visible-pages.json"
+BUILD_ID_FILE = ".build-id"
+
+# One id per run of build_section_site, printed on the marker line and carried
+# by the offer and the visible-pages list, so a reader can tell THIS build's
+# files from an earlier one's (plan review of #379, findings 11 and 14).
+_this_build_id: str | None = None
+
+
+def _new_build_id() -> str:
+    import uuid
+    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8]
+
+
+def _place_in_the_course(page: Path, content_root: Path) -> str:
+    """A page's place in the course folder without .md — the same name the
+    #333 finding reports. Never anything written on the page."""
+    source = _vault_sources.get(page)
+    if source is not None:
+        return _name_in_the_course(source[0])
+    relative = page.relative_to(content_root).as_posix()
+    return relative[:-3] if relative.lower().endswith(".md") else relative
+
+
+def _day_as_written(raw) -> str | None:
+    """A `created` value as the calendar day it names, `YYYY-MM-DD`. The day as
+    WRITTEN, not converted: a timestamp near midnight UTC would otherwise move
+    a day in Toronto, which is the trap `_date_pages_from_their_classes`
+    records. The app writes a day (`CalendarDay`), so the offer carries one."""
+    if isinstance(raw, datetime):
+        return raw.date().isoformat()
+    if isinstance(raw, date):
+        return raw.isoformat()
+    if isinstance(raw, str):
+        text = raw.strip()
+        if re.match(r"^\d{4}-\d{2}-\d{2}", text) and _parse_created_value(text) is not None:
+            return text[:10]
+    return None
+
+
+def _published_places(course_dir: Path, section_number: int) -> set:
+    """Every place the section's published-pages record holds: the union of
+    its fragments, one per destination a deploy reached
+    (`file-formats.json` -> `publishedPagesRecord`). An unreadable fragment is
+    skipped rather than trusted."""
+    folder = course_dir / ".publish_state" / f"section{section_number}.published-pages"
+    places: set = set()
+    if not folder.is_dir():
+        return places
+    for fragment in sorted(folder.glob("*.json")):
+        try:
+            data = json.loads(fragment.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        for place in data.get("places", []) or []:
+            if isinstance(place, str):
+                places.add(place)
+    return places
+
+
+def _links_checklist_offer(content_root: Path, section_number: int,
+                           published_before=frozenset()) -> dict:
+    """
+    The offer for one section, worked out from the merged content AFTER the
+    two date passes (so a page a class links directly already carries its
+    class's date). Returns {"firstClass": …, "pages": [row, …]}; the caller
+    adds the course, section and build id and writes it.
+
+    The rule, in five parts (`datingPagesAClassBrings.fromTheLinksChecklist`):
+    1. From every VISIBLE, DATED class, follow links up to TWO steps. A link
+       onto a class page is not entered; a hidden class is not walked from;
+       the walk does not go THROUGH a folder index or Key Links.
+    2. `fromAClass`: every hidden non-class page the walk reaches, claimed by
+       the earliest visible class reaching it (date, then title) — except a
+       page a class links DIRECTLY in the way the build's own date pass reads
+       links, which the build has already dated (`datedByTheBuild`).
+    3. `notReachedByAClass`: every other hidden non-class page a visible page,
+       or an offered page, links to — closed transitively, stopping at class
+       pages — dated as the first class of the year.
+    4. `class`: every hidden class page such a link lands on. Never walked
+       through, never dated, never ticked by default.
+    5. A page in the published-pages record keeps its date; a folder index or
+       Key Links is never dated.
+    Ticked by default: every non-class row, except one that a HIDDEN class
+    links directly while no visible class does (director's ruling on Q1 and
+    plan-review finding 5): that page is the later class's material and
+    comes with it.
+    """
+    all_pages, pages_by_stem, pages_by_rel = _read_pages_for_linking(content_root)
+    text_by_page = {}
+    hidden = {}
+    for page in all_pages:
+        try:
+            text = page.read_text(encoding="utf-8")
+        except Exception:
+            continue
+        text_by_page[page] = text
+        hidden[page] = _is_draft(text)
+
+    def title_of(page: Path) -> str:
+        post = all_pages.get(page)
+        value = str(post.get("title") or "").strip() if post is not None else ""
+        return value or page.stem.strip()
+
+    is_class = {}
+    for page in text_by_page:
+        is_class[page] = _is_class_page(page, title_of(page))
+
+    def is_structural(page: Path) -> bool:
+        return _is_structural_page_name(page.name)
+
+    def resolve(target: str):
+        """The page a link lands on, the finding's way: path first, then
+        name; a name several pages share lands on a hidden one only when
+        EVERY one of them is hidden."""
+        path_form = target.lower()
+        if path_form.endswith(".md"):
+            path_form = path_form[:-3].strip()
+        if path_form in pages_by_rel:
+            candidates = [pages_by_rel[path_form]]
+        else:
+            stem = path_form.split("/")[-1].strip()
+            candidates = list(pages_by_stem.get(stem, []))
+            if not candidates and stem in pages_by_rel:
+                candidates = [pages_by_rel[stem]]
+        known = []
+        for candidate in candidates:
+            if candidate in hidden:
+                known.append(candidate)
+        if not known:
+            return None
+        for candidate in known:
+            if not hidden[candidate]:
+                return candidate
+        return known[0]
+
+    links_cache = {}
+
+    def links_of(page: Path) -> list:
+        if page in links_cache:
+            return links_cache[page]
+        found = []
+        for target in _links_as_written_in_order(text_by_page.get(page, "")):
+            landed = resolve(target)
+            if landed is None or landed == page or landed in found:
+                continue
+            found.append(landed)
+        links_cache[page] = found
+        return found
+
+    def date_of(page: Path):
+        post = all_pages.get(page)
+        raw = post.get("created") if post is not None else None
+        return raw, _parse_created_value(raw)
+
+    # The classes, visible and dated first (earliest, then title), the way the
+    # build's own date pass orders them.
+    dated_classes = []
+    visible_classes = []
+    hidden_classes = []
+    for page in text_by_page:
+        if not is_class[page]:
+            continue
+        raw, parsed = date_of(page)
+        if hidden[page]:
+            hidden_classes.append((parsed, title_of(page).lower(), page))
+            continue
+        visible_classes.append(page)
+        if parsed is not None:
+            dated_classes.append((parsed, title_of(page).lower(), page, raw))
+    dated_classes.sort(key=lambda entry: (entry[0], entry[1]))
+    far_future = datetime.max.replace(tzinfo=timezone.utc)
+    hidden_classes.sort(key=lambda entry: (entry[0] or far_future, entry[1]))
+
+    # What the BUILD's date pass dates: its own link reader, its own claim.
+    dated_by_the_build = {}
+    for _, _, class_page, _ in dated_classes:
+        post = all_pages[class_page]
+        for linked in _pages_a_page_links_to(post, pages_by_stem, pages_by_rel):
+            dated_by_the_build.setdefault(linked, class_page)
+
+    # 1–2: the two-step walk.
+    direct_claim = {}
+    step_two_claim = {}
+    for _, _, class_page, _ in dated_classes:
+        for first in links_of(class_page):
+            if is_class[first]:
+                continue
+            direct_claim.setdefault(first, class_page)
+            if is_structural(first):
+                continue
+            for second in links_of(first):
+                if is_class[second]:
+                    continue
+                step_two_claim.setdefault(second, class_page)
+
+    from_a_class = []
+    for page in text_by_page:
+        if not hidden[page] or is_class[page]:
+            continue
+        if page in direct_claim or page in step_two_claim:
+            from_a_class.append(page)
+    from_a_class_set = set(from_a_class)
+
+    # 3: every other hidden page a visible or offered page links to, closed
+    # transitively; 4: the hidden classes those links land on.
+    not_reached = []
+    not_reached_set = set()
+    class_rows = []
+    class_rows_set = set()
+    queue = []
+    for page in sorted(text_by_page, key=lambda each: each.relative_to(content_root).as_posix()):
+        if not hidden[page]:
+            queue.append(page)
+    for page in from_a_class:
+        queue.append(page)
+    walked = set()
+    while queue:
+        page = queue.pop(0)
+        if page in walked:
+            continue
+        walked.add(page)
+        for landed in links_of(page):
+            if not hidden[landed]:
+                continue
+            if is_class[landed]:
+                if landed not in class_rows_set:
+                    class_rows_set.add(landed)
+                    class_rows.append(landed)
+                continue
+            if landed in from_a_class_set or landed in not_reached_set:
+                continue
+            not_reached_set.add(landed)
+            not_reached.append(landed)
+            queue.append(landed)
+
+    # Which classes link each page directly — for "first used in" and the
+    # ticking rule.
+    visible_class_links = set()
+    for class_page in visible_classes:
+        for landed in links_of(class_page):
+            visible_class_links.add(landed)
+    first_hidden_class_linking = {}
+    for _, _, class_page in hidden_classes:
+        for landed in links_of(class_page):
+            first_hidden_class_linking.setdefault(landed, class_page)
+
+    # Who links each offered page, visible pages first.
+    offered = from_a_class_set | not_reached_set | class_rows_set
+    linked_from = {}
+    for page in sorted(text_by_page, key=lambda each: (hidden[each], _place_in_the_course(each, content_root))):
+        if hidden[page] and page not in offered:
+            continue
+        for landed in links_of(page):
+            if landed in offered:
+                linked_from.setdefault(landed, []).append(_place_in_the_course(page, content_root))
+
+    # The first class of the year, the way `_find_first_class_created` finds
+    # it: the first-class pattern if it is dated, else the earliest class.
+    first_class_page = None
+    first_class_raw = None
+    earliest = None
+    for page in text_by_page:
+        if not is_class[page]:
+            continue
+        raw, parsed = date_of(page)
+        if parsed is None:
+            continue
+        if re.match(first_class_pattern(), page.stem.strip(), re.IGNORECASE) or \
+                re.match(first_class_pattern(), title_of(page), re.IGNORECASE):
+            first_class_page, first_class_raw = page, raw
+            break
+        if earliest is None or (parsed, title_of(page).lower()) < earliest[0]:
+            earliest = ((parsed, title_of(page).lower()), page, raw)
+    if first_class_page is None and earliest is not None:
+        first_class_page, first_class_raw = earliest[1], earliest[2]
+    first_class_day = _day_as_written(first_class_raw) if first_class_page is not None else None
+
+    def row(page: Path, group: str) -> dict:
+        place = _place_in_the_course(page, content_root)
+        entry = {"place": place, "title": title_of(page), "group": group, "ticked": True,
+                 "step": None, "claimedBy": None, "date": None, "why": None,
+                 "firstUsedIn": None, "linkedFrom": (linked_from.get(page) or [])[:10]}
+        if group == "class":
+            entry["ticked"] = False
+            entry["why"] = "classNeverDated"
+            return entry
+        if page not in visible_class_links and page in first_hidden_class_linking:
+            entry["ticked"] = False
+            entry["firstUsedIn"] = _place_in_the_course(first_hidden_class_linking[page], content_root)
+        if group == "fromAClass":
+            if page in direct_claim:
+                entry["step"] = 1
+                claimant = dated_by_the_build.get(page, direct_claim[page])
+            else:
+                entry["step"] = 2
+                claimant = step_two_claim[page]
+            entry["claimedBy"] = _place_in_the_course(claimant, content_root)
+        if is_structural(page):
+            entry["why"] = "structuralNeverDated"
+        elif group == "fromAClass" and page in dated_by_the_build:
+            entry["why"] = "datedByTheBuild"
+        elif place in published_before:
+            entry["why"] = "keepsItsDate"
+        elif group == "fromAClass":
+            entry["why"] = "dated"
+            entry["date"] = _day_as_written(date_of(claimant)[0])
+        elif first_class_day is not None:
+            entry["why"] = "datedAsTheFirstClass"
+            entry["date"] = first_class_day
+        else:
+            entry["why"] = "noClassToDateFrom"
+        return entry
+
+    def claim_order(page: Path):
+        claimant = direct_claim.get(page) or step_two_claim.get(page)
+        parsed = date_of(claimant)[1] if claimant is not None else None
+        return (parsed or far_future, title_of(claimant).lower() if claimant else "",
+                _place_in_the_course(page, content_root))
+
+    rows = []
+    for page in sorted(from_a_class, key=claim_order):
+        rows.append(row(page, "fromAClass"))
+    for page in sorted(not_reached, key=lambda each: _place_in_the_course(each, content_root)):
+        rows.append(row(page, "notReachedByAClass"))
+    class_order = {}
+    for position, (_, _, class_page) in enumerate(hidden_classes):
+        class_order[class_page] = position
+    for page in sorted(class_rows, key=lambda each: class_order.get(each, 0)):
+        rows.append(row(page, "class"))
+
+    first_class = None
+    if first_class_page is not None:
+        first_class = {"place": _place_in_the_course(first_class_page, content_root),
+                       "date": first_class_day}
+    return {"firstClass": first_class, "pages": rows}
+
+
+def _links_checklist_path(course_dir: Path, section_number: int) -> Path:
+    return course_dir / ".publish_state" / f"section{section_number}.links-checklist.json"
+
+
+def _write_json_atomically(path: Path, data: dict) -> None:
+    """A hidden temporary beside the file, then a rename, so a reader never
+    meets half a file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.parent / f".{path.name}.{os.getpid()}.tmp"
+    with open(temporary, "w", encoding="utf-8") as handle:
+        json.dump(data, handle, ensure_ascii=False, indent=1)
+        handle.write("\n")
+    os.replace(temporary, path)
+
+
+def _offer_the_links_checklist(content_root: Path, course_dir: Path, course_code: str,
+                               section_number: int, frozen: bool, build_id: str | None,
+                               printer=print) -> dict | None:
+    """
+    Writes this section's offer, or removes it when there is nothing to offer
+    — so a dead link fixed in Obsidian stops being offered — and prints one
+    marker line the app matches to the build it watched. A course kept for
+    reference (or one whose settings cannot say) gets no offer: last year's
+    course is frozen, and the finding's alert stays exactly as it was.
+    Never fails a build: the offer is a convenience on top of a finding that
+    has already been announced.
+    """
+    path = _links_checklist_path(course_dir, section_number)
+    try:
+        if frozen:
+            if path.exists():
+                path.unlink()
+            return None
+        offer = _links_checklist_offer(content_root, section_number,
+                                       _published_places(course_dir, section_number))
+        if not offer["pages"]:
+            if path.exists():
+                path.unlink()
+            document = None
+        else:
+            document = {"version": LINKS_CHECKLIST_VERSION, "course": course_code,
+                        "section": section_number, "buildId": build_id,
+                        "builtAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        "firstClass": offer["firstClass"], "pages": offer["pages"]}
+            _write_json_atomically(path, document)
+    except Exception as error:
+        printer(f"⚠️  Could not work out which hidden pages to offer to publish: {error}")
+        return None
+    ticked = 0
+    count = 0
+    if document is not None:
+        count = len(document["pages"])
+        for entry in document["pages"]:
+            if entry["ticked"]:
+                ticked += 1
+    printer(LINKS_CHECKLIST_MARKER + " " + json.dumps(
+        {"course": course_code, "section": section_number, "buildId": build_id,
+         "pages": count, "ticked": ticked}))
+    return document
+
+
+def _visible_places(content_root: Path) -> list:
+    """Every page this build shows students, by its place in the course
+    folder: the build's own hide rule, over the content after the How I Teach
+    sweep and the #246 hiding, so a page the build removed is never listed."""
+    places = []
+    for page in sorted(content_root.rglob("*.md")):
+        try:
+            text = page.read_text(encoding="utf-8")
+        except Exception:
+            continue
+        if _is_draft(text):
+            continue
+        places.append(_place_in_the_course(page, content_root))
+    return places
+
+
+def _note_the_build_id(host_output_dir: Path, build_id: str) -> None:
+    """Written as a build STARTS, preview or not: the id of the build the
+    site in this folder belongs to, or is about to. `deploy.py` records the
+    visible-pages list only when its id matches this one."""
+    try:
+        host_output_dir.mkdir(parents=True, exist_ok=True)
+        (host_output_dir / BUILD_ID_FILE).write_text(build_id + "\n", encoding="utf-8")
+    except OSError as error:
+        print(f"⚠️  Could not note which build this is: {error}")
+
+
+def _write_visible_places(host_output_dir: Path, places: list, build_id: str,
+                          course_code: str, section_number: int) -> None:
+    """The pages a published copy of THIS build shows, written only after the
+    site was built and mirrored — never before, or a build that failed half
+    way would leave a list the site does not match (plan review, finding 11).
+    Outside `public/`, so no deploy uploads it."""
+    try:
+        _write_json_atomically(host_output_dir / VISIBLE_PAGES_FILE, {
+            "version": 1, "course": course_code, "section": section_number,
+            "buildId": build_id, "places": places})
+    except OSError as error:
+        print(f"⚠️  Could not note which pages this site shows: {error}")
+
+
 def _find_class_reachable_pages(content_root: Path) -> set[Path]:
     """
     Find all pages in content_root that are reachable (directly or transitively)
@@ -6526,6 +6986,12 @@ def build_section_site(
     # this line, so a change made from here on is one this build cannot have
     # seen. See BUILD_STARTED_MARKER.
     _mark_build_starting(host_output_dir)
+    # This build's id (#379): printed with the links-checklist offer and
+    # carried by the visible-pages list, so the app and deploy.py can tell
+    # this build's files from an earlier one's.
+    global _this_build_id
+    _this_build_id = _new_build_id()
+    _note_the_build_id(host_output_dir, _this_build_id)
 
     # Use fast container-local ext4 storage (/tmp/quartz-builds/<COURSE>/section<N>)
     # for the build workspace so that node_modules, AST walks, and esbuild run at native
@@ -6955,6 +7421,16 @@ def build_section_site(
     announce_dated_pages(dating, course_code, section_number)
     # ===========================================================================
 
+    # === #379: the links checklist ==============================================
+    # AFTER both date passes, so a page a class links directly already carries
+    # its class's date, and after the How I Teach sweep and the #246 hiding.
+    # ALWAYS section: every existing folder picks it up on its next build.
+    # Writes only the offer file; no page's visibility changes here.
+    _offer_the_links_checklist(content_root, course_dir, course_code, section_number,
+                               frozen_course, _this_build_id)
+    visible_places_here = _visible_places(content_root)
+    # ===========================================================================
+
     # Copy course config into output root (back-compat)
     shutil.copy2(config_file, output_dir / "course_config.json")
     print("✅ Copied course_config.json to output directory (root copy)")
@@ -7164,6 +7640,9 @@ def build_section_site(
         # reason in front of it instead of at the step that cannot know why.
         if _sync_public_to_host(output_dir, host_output_dir):
             _mark_build_finished(host_output_dir)
+            # Only now, with the site built and mirrored (#379, finding 11).
+            _write_visible_places(host_output_dir, visible_places_here, _this_build_id,
+                                  course_code, section_number)
             print("✅ Static build complete.")
         else:
             for line in _nothing_to_publish(course_code, section_number, health_facts,

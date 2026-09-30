@@ -171,7 +171,7 @@ final class CopyPageChecklistSizeTests: XCTestCase {
         let height: CGFloat = measuredHeight(of: checklist(rows: 0, sentences: 0))
         XCTAssertLessThanOrEqual(height, 260, "A one-row checklist is \(height) pt tall — it is reserving space it does not use")
         XCTAssertGreaterThanOrEqual(
-            height, 150,
+            height, 200,
             "A one-row checklist is only \(height) pt tall: its row is not showing"
         )
     }

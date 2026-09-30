@@ -6394,8 +6394,27 @@ flag was enough. The plan and the sheet say so (`publishingFromNowOn`), and
 [issue #333](https://github.com/russellgordon/plantoir/issues/333) is the fix,
 and since bundle B it is the BUILD WARNING: the next build names every link on
 a page students can see that leads to a page they cannot (`linksIntoHiddenPages`,
-[05 → Links into hidden pages](05-build-pipeline.md)); the app's publish does
-not take pages along. **So the first build after Get Ready lists links, and
+[05 → Links into hidden pages](05-build-pipeline.md)). Since #379 (2026-09-29)
+that warning is also a CHECKLIST in the section window, which publishes the
+pages a teacher ticks, and after Get Ready its rows mostly start unticked
+because a later class uses them first ([05 → The links checklist
+(#379)](05-build-pipeline.md)). Two assistant-side consequences of #379: the
+finding's sentence, in the in-app assistant and over `--mcp-stdio`
+(`SiteHealthFinding.appending`), is `AssistWording.linksIntoHiddenPagesWillBeOffered`
+instead of ten pairs read aloud — only when the same build printed the
+checklist marker, the offer on disk is that build's, and the teacher has not
+already answered it (so it never promises a sheet that will not come) —
+otherwise the finding's own words. Its callers are the paths with no section
+window (`AssistSiteWork`); an "offered now" sentence for an open window was
+removed on review, because nothing on that path can honestly tell that a
+window on THAT folder's section is open; and the assistant's
+own publish no longer infers "never published" from "hidden now": its date
+moves skip a page the section's published-pages record lists
+(`datingPagesAClassBrings.publishedBeforeIsRecorded`, which replaced
+`neverPublishedIsInferred`), so a page published once, hidden, and published
+again with its class keeps its date on both routes. Its REACH is unchanged —
+transitive, because it publishes a class the teacher named
+(`linksChecklist.knownDifference`). **So the first build after Get Ready lists links, and
 they are true:** the pages Get Ready keeps (Day 1, what it links to, Key Links)
 still link to pages first used by later classes, which it hid — exactly the
 links its own sheet lists under "links left pointing at hidden pages". The

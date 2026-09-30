@@ -1614,6 +1614,15 @@ nonisolated enum AssistWording {
              + "pages, so you can change it in Obsidian any time. It’s never put on your website."
     }
 
+    /// The one sentence an assistant says for the #333 finding when the
+    /// build has written a links checklist offer the teacher has not yet
+    /// answered (#379): the section window will offer to publish the pages,
+    /// so the list of pairs is not read out.
+    static func linksIntoHiddenPagesWillBeOffered(course: String, section: String) -> String {
+        return "Some links on pages students can see lead to pages that are still hidden. "
+             + "Plantoir will offer to publish them when you next open \(course) Section \(section)."
+    }
+
     /// (T) Asked to publish or hide the page by name. The local window can
     /// show this, with no routing change: the model still picks
     /// `publish_pages`, and the refusal is in the tool.

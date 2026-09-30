@@ -1091,6 +1091,57 @@ def print_required_diagnostics(required_shas: list[str], sha_to_pairs: dict[str,
         print(f"⚠️ Could not write diagnostics file: {e}")
 
 # ---------- Main ----------
+
+# ---------------------------------------------------------------------------
+# #379: the published-pages record
+# ---------------------------------------------------------------------------
+VISIBLE_PAGES_FILE = ".visible-pages.json"
+BUILD_ID_FILE = ".build-id"
+
+
+def record_published_pages(course_dir: Path, section_dir: Path, section, destination: str,
+                           printer=print) -> Path | None:
+    """
+    After ONE destination's upload succeeded: add a fragment to the section's
+    published-pages record naming every page the uploaded site shows
+    (`contracts/file-formats.json` -> `publishedPagesRecord`). A page listed
+    there has been on a site students could reach, so when it is hidden and
+    later published again it keeps its date (`class-planning.json` ->
+    `datingPagesAClassBrings.publishedBeforeIsRecorded`).
+
+    One fragment per destination rather than one file rewritten: a Netlify
+    success followed by a failed Cloudflare secondary DID put the pages in
+    front of students, and fragments cannot lose each other when two publishes
+    run at once. The list is the build's own (`visiblePagesList`), written only
+    after that build succeeded; it is recorded only when its build id is the
+    id of the build the site folder belongs to, so a list from an earlier build
+    is never taken for this site's. Never fails a publish that has already
+    happened: a record that could not be written costs, at worst, one page
+    taking its class's date once.
+    """
+    listing = section_dir / VISIBLE_PAGES_FILE
+    id_file = section_dir / BUILD_ID_FILE
+    try:
+        data = json.loads(listing.read_text(encoding="utf-8"))
+        current = id_file.read_text(encoding="utf-8").strip()
+    except (OSError, ValueError):
+        return None
+    if not current or data.get("buildId") != current:
+        return None
+    folder = course_dir / ".publish_state" / f"section{section}.published-pages"
+    stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    target = folder / f"{stamp}-{destination}.json"
+    temporary = folder / f".{target.name}.{os.getpid()}.tmp"
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        temporary.write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        os.replace(temporary, target)
+    except OSError as error:
+        printer(f"⚠️  Could not note which pages this website now shows: {error}")
+        return None
+    return target
+
+
 def main():
     p = argparse.ArgumentParser(
         description="Publish a built section site — to Netlify by delta (file-digest) upload, or to Cloudflare Pages."
@@ -1249,6 +1300,8 @@ def main():
             section=str(args.section),
             teacher_last_name=teacher_last_name,
         )
+        # Only reached when the upload succeeded: every failure above exits.
+        record_published_pages(course_dir, section_dir, args.section, "cloudflare")
         return
 
     # --- Token handling (new, simplified) ---
@@ -1390,6 +1443,9 @@ def main():
         sys.exit(1)
 
     print("\n✅ Deploy complete.")
+    # After the upload succeeded, never before (#379): the record says what
+    # has been on a site students could reach.
+    record_published_pages(course_dir, section_dir, args.section, "netlify")
 
 def run_until_stopped():
     """Run main(); a Cancel in the app (its ^C) or Ctrl-C at a terminal leaves
