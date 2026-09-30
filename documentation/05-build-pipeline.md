@@ -1123,7 +1123,7 @@ publishes and dates the ticked pages. The rule is shared Python, so Windows
 inherits it; the sheet and the writes are each app's.
 
 **The rule** (`_links_checklist_offer` in `build_site.py`; contract
-`class-planning.json` → `datingPagesAClassBrings.fromTheLinksChecklist`, 13
+`class-planning.json` → `datingPagesAClassBrings.fromTheLinksChecklist`, 21
 cases run by `scripts/test_links_checklist.py`). After the merge, the How I
 Teach sweep and BOTH date passes, from every VISIBLE, DATED class of the
 section, links are followed up to TWO steps — by the #333 finding's own
@@ -1170,6 +1170,40 @@ not walked from; the walk does not go through a folder index or Key Links.
   `CalendarDay` exactly as the assistant's date moves do (ruling N9).
 - **Folder indexes and Key Links** can be offered (a hidden one is still a
   dead link) but are never given a date (`structuralNeverDated`).
+- **Rows that come under another row (#385).** A page no page students can
+  see links, reached only through other offered pages, carries `dependsOn`:
+  the offered, NON-class rows that link it, nearest to a visible page first
+  (fewest offered pages between, a breadth-first count), then by place, never
+  truncated. It is `[]` for a page a visible page links and always `[]` for a
+  class row — the walk never goes through a class, and a class publishes what
+  it links through the class plan. The apps publish such a row only when one
+  of those rows is published, and list it under the first
+  (`shared-rules.json` → `linksChecklist.followingARow`; the sheet's half is
+  in [09 → The links checklist](09-mac-app.md#the-links-checklist-379)).
+  Before this, untick a hidden hub and the worksheets behind it stayed ticked
+  and went out with nothing students can see linking to them. Cases l–q; an
+  invariant test checks, over every case, that each parent is a non-class row
+  of the same offer and never the row itself, and that following the first
+  parent always ends (so the sheet's nesting cannot loop). **Measured** over
+  the 39 payloads laid out as an APPROXIMATE Get Ready (an emulation, not Get
+  Ready itself): 2,463 offered rows; 44 depend on another row, in 9 payloads
+  (SNC1W 24, MCR3U 7, SCH4U 3, ADA1O 2, SBI3U 2, SBI4U 2, SCH3U 2, MCV4U 1,
+  SNC2D 1); 18 have two or more parents; 21 sit under a row of the OTHER
+  group; the deepest chain is 2; ADA1O has two pages that link only each
+  other. All 44 sit under a row that starts unticked and start unticked
+  themselves (a later class uses each first), so straight after Get Ready
+  this changes the sheet's LAYOUT, not what a default press publishes; it
+  bites in the ordinary authoring case, a hidden hub with hidden worksheets
+  behind it. **Rejected:** only the NEARER parents (a DAG) — a page linked by
+  a near row that is left and a far one that goes would stay hidden while a
+  published page links it; working `dependsOn` out in the app from
+  `linkedFrom`, which is capped at 10 (176 of 2,463 rows at the cap) and does
+  not say which linkers are visible; a class as a parent or a dependant;
+  giving a dependant its parent's date (#379's dating is not reopened); and
+  changing the build's `title` to the name the sheet shows (`title_of` also
+  feeds class detection and sort keys — the app names rows itself, #362's
+  way). The marker's `ticked` still counts rows whose OWN tick is on: nothing
+  reads it, and the app's trail line carries what would really be published.
 
 **Why two steps is not a build-time rule.** At build time it would rewrite
 VISIBLE pages through hubs on every build — measured and rejected on
@@ -1225,8 +1259,10 @@ terminal or MCP publish leaves no console the app reads); an undo; offering
 the checklist after every build; `fixable: true`; changing the assistant's
 reach to two steps (`linksChecklist.knownDifference`); locked "comes with"
 rows under a ticked class (one summary line instead, a cut the director
-allowed); rows that follow another row's tick (deferred to
-[#385](https://github.com/russellgordon/plantoir/issues/385), v1.4.2).
+allowed; its own follow-up issue since #385); and, with
+[#385](https://github.com/russellgordon/plantoir/issues/385) (v1.4.2), the
+rejections in the bullet "Rows that come under another row" above and in
+`linksChecklist.rejected`.
 
 ### Where they run, and where they honestly do not
 

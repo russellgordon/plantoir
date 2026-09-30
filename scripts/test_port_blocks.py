@@ -50,6 +50,8 @@ BLOCK_START = "# >>> PREVIEW PORT BLOCK >>>"
 BLOCK_END = "# <<< PREVIEW PORT BLOCK <<<"
 MOUNT_START = "# >>> CONTAINER MOUNT BLOCK >>>"
 MOUNT_END = "# <<< CONTAINER MOUNT BLOCK <<<"
+TABLE_START = "# >>> PROCESS TABLE BLOCK >>>"
+TABLE_END = "# <<< PROCESS TABLE BLOCK <<<"
 CONTAINER = "teaching-quartz-0000abcd"
 
 # Bash 3.2 is what /bin/bash is on every Mac, and what the launchers' shebangs
@@ -256,6 +258,9 @@ class PretendMac:
         self.own_ports = []
         self.others_ports = []
         self.other_rows = []
+        # True leaves the PROCESS TABLE BLOCK out of the program, as a
+        # launcher that called the_launchers_running before defining it would.
+        self.without_the_table_block = False
 
     def listening(self, ports: list) -> None:
         """Listening in THIS account: both lists show them."""
@@ -341,6 +346,7 @@ class PretendMac:
             'IMAGE="teaching-quartz:src-test"',
             function_named(text, "note_on_the_trail"),
             between(text, MOUNT_START, MOUNT_END),
+            "" if self.without_the_table_block else between(text, TABLE_START, TABLE_END),
             between(text, BLOCK_START, BLOCK_END),
             place,
             "ensure_build_root() { :; }",
@@ -418,6 +424,59 @@ def lay_out_the_listings(mac: "PretendMac", case: dict, own_ports: list) -> None
         mac.flag("netstat_fails")
     if case.get("accountListFails"):
         mac.flag("lsof_fails")
+
+
+# ======================================================================
+# Text: ONE reader of the process table, shared by all three (#388).
+# ======================================================================
+class TheOneReaderOfTheProcessTable(unittest.TestCase):
+
+    def test_the_block_is_the_same_in_all_three(self):
+        first = between(launcher_text("setup.sh"), TABLE_START, TABLE_END)
+        for launcher in ["preview.sh", "deploy.sh"]:
+            self.assertEqual(first, between(launcher_text(launcher), TABLE_START, TABLE_END),
+                             f"{launcher}'s PROCESS TABLE BLOCK differs from setup.sh's")
+
+    def test_the_table_is_read_in_one_place_only(self):
+        """Exactly one `ps -Ao` code line per launcher, inside the block: a
+        caller that read the table itself would be a second reader again."""
+        for launcher in LAUNCHERS:
+            text = launcher_text(launcher)
+            with self.subTest(launcher=launcher):
+                everywhere = [line for line in text.splitlines()
+                              if "ps -Ao" in line and not line.lstrip().startswith("#")]
+                inside = [line for line in between(text, TABLE_START, TABLE_END).splitlines()
+                          if "ps -Ao" in line and not line.lstrip().startswith("#")]
+                self.assertEqual(len(everywhere), 1, everywhere)
+                self.assertEqual(everywhere, inside)
+
+    def test_the_owner_check_holds_no_reader_of_its_own(self):
+        owners = function_named(between(launcher_text("setup.sh"), BLOCK_START, BLOCK_END), "the_owners_of_the_work")
+        code = "\n".join(line for line in owners.splitlines() if not line.lstrip().startswith("#"))
+        self.assertEqual(code.count("the_launchers_running "), 1)
+        for private in ("ps -Ao", "russellgordon", "sanitized", "label_code", "(preview|deploy|setup)"):
+            self.assertNotIn(private, code, private)
+
+    def test_the_block_comes_before_everything_that_asks_it(self):
+        """bash defines a function only when it reaches it. In every launcher
+        the block comes before the PREVIEW PORT BLOCK; in preview.sh, before
+        the guard's call too — which is asked long before the port block, and
+        which would read "command not found" as an unreadable table and let
+        every preview through."""
+        for launcher in LAUNCHERS:
+            text = launcher_text(launcher)
+            with self.subTest(launcher=launcher):
+                self.assertGreater(text.find(TABLE_START), 0)
+                self.assertLess(text.find(TABLE_START), text.find(BLOCK_START))
+        preview = launcher_text("preview.sh")
+        self.assertLess(preview.find(TABLE_START), preview.find("\n  refuse_a_preview_while_its_section_deploys\n"))
+
+    def test_the_block_prints_nothing_a_teacher_reads(self):
+        block = between(launcher_text("setup.sh"), TABLE_START, TABLE_END)
+        for line in block.splitlines():
+            if line.lstrip().startswith("#"):
+                continue
+            self.assertNotRegex(line, r"\b(echo|read -r[sp]?p)\b", line)
 
 
 # ======================================================================
@@ -1162,12 +1221,16 @@ class TheLookBeforeARemakeIsWritten(unittest.TestCase):
 
     def test_the_owner_is_never_a_remembered_process_number(self):
         """MF-2's reason, written where the next person looks: the proof reads
-        the live table and nothing remembered."""
+        the live table and nothing remembered. Since #388 the table is read by
+        the_launchers_running, so both it and its caller are held to this."""
         owners = function_named(self.block(), "the_owners_of_the_work")
-        self.assertNotIn("kill -0", owners)
-        self.assertNotIn(".lease", owners)
-        self.assertNotIn("activity/", owners)
-        self.assertIn("ps -Ao pid=,ppid=,args=", owners)
+        reader = function_named(between(launcher_text("setup.sh"), TABLE_START, TABLE_END), "the_launchers_running")
+        for text in (owners, reader):
+            self.assertNotIn("kill -0", text)
+            self.assertNotIn(".lease", text)
+            self.assertNotIn("activity/", text)
+        self.assertIn("ps -Ao pid=,ppid=,args=", reader)
+        self.assertIn("the_launchers_running ", owners)
 
     def test_the_only_stop_is_this_folders_workspace_by_its_id(self):
         """MF-3's reason, in the text: every stop and remove in the block takes
@@ -1340,6 +1403,23 @@ class WhatCountsAsRunning(unittest.TestCase):
             with self.subTest(launcher=launcher):
                 result, _ = self.look(launcher, case, as_the_same_section)
                 self.assertEqual(self.answer(result), "nothing|", output_of(result))
+
+    def test_a_reader_that_is_missing_waits_rather_than_ending_a_publish(self):
+        """#388 plan review 2: ANY failure of the_launchers_running counts as
+        every owner running — not only its "unreadable" 2. A launcher that
+        called it before defining it gets 127 ("command not found"), and an
+        owner check that waited only on 2 would read that as every owner
+        gone and end a publish. Run with the PROCESS TABLE BLOCK left out."""
+        case = {"running": True, "top": LOOKS["leftover"], "launchers": []}
+
+        def without_the_reader(pretend: AWorkspaceInUse) -> None:
+            pretend.mac.without_the_table_block = True
+
+        for launcher in LAUNCHERS:
+            with self.subTest(launcher=launcher):
+                result, _ = self.look(launcher, case, without_the_reader)
+                self.assertEqual(self.answer(result), "other work|", output_of(result))
+                self.assertEqual(self.answer(result, "WAITING="), "publish MPM2D/2 -|", output_of(result))
 
     def test_a_process_table_that_cannot_be_read_keeps_the_preview_open(self):
         case = {"running": True, "top": LOOKS["a preview"], "launchers": []}

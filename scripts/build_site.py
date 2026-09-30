@@ -2100,7 +2100,7 @@ def _links_checklist_offer(content_root: Path, section_number: int,
     class's date). Returns {"firstClass": …, "pages": [row, …]}; the caller
     adds the course, section and build id and writes it.
 
-    The rule, in five parts (`datingPagesAClassBrings.fromTheLinksChecklist`):
+    The rule, in six parts (`datingPagesAClassBrings.fromTheLinksChecklist`):
     1. From every VISIBLE, DATED class, follow links up to TWO steps. A link
        onto a class page is not entered; a hidden class is not walked from;
        the walk does not go THROUGH a folder index or Key Links.
@@ -2115,6 +2115,11 @@ def _links_checklist_offer(content_root: Path, section_number: int,
        through, never dated, never ticked by default.
     5. A page in the published-pages record keeps its date; a folder index or
        Key Links is never dated.
+    6. `dependsOn` (#385): for a non-class row no VISIBLE page links, the
+       offered non-class rows that do link it — nearest to a visible page
+       first (fewest offered pages between), then by place, never truncated.
+       The apps publish such a row only with one of them, and list it under
+       the first. A class row is never a parent and never depends on one.
     Ticked by default: every non-class row, except one that a HIDDEN class
     links directly while no visible class does (director's ruling on Q1 and
     plan-review finding 5): that page is the later class's material and
@@ -2289,6 +2294,44 @@ def _links_checklist_offer(content_root: Path, section_number: int,
             if landed in offered:
                 linked_from.setdefault(landed, []).append(_place_in_the_course(page, content_root))
 
+    # #385: which offered pages students could reach ONLY through another
+    # offered page. A page no visible page links is published only with a
+    # row that links it. A class row is never a parent (the walk never goes
+    # through a class) and never depends on one (a class is a row of its own).
+    def place_of(page: Path) -> str:
+        return _place_in_the_course(page, content_root)
+
+    has_a_visible_linker = set()
+    offered_linkers = {}
+    for page in sorted(text_by_page, key=place_of):
+        for landed in links_of(page):
+            if landed not in offered or is_class[landed]:
+                continue
+            if not hidden[page]:
+                has_a_visible_linker.add(landed)
+            elif page in offered and not is_class[page]:
+                offered_linkers.setdefault(landed, []).append(page)
+    nearness = {}
+    frontier = []
+    for page in sorted(offered, key=place_of):
+        if not is_class[page] and page in has_a_visible_linker:
+            nearness[page] = 0
+            frontier.append(page)
+    while frontier:
+        page = frontier.pop(0)
+        for landed in links_of(page):
+            if landed in offered and not is_class[landed] and landed not in nearness:
+                nearness[landed] = nearness[page] + 1
+                frontier.append(landed)
+    depends_on = {}
+    for page in offered:
+        if is_class[page] or page in has_a_visible_linker:
+            depends_on[page] = []
+            continue
+        parents = sorted(offered_linkers.get(page, []),
+                         key=lambda each: (nearness.get(each, 1 << 30), place_of(each)))
+        depends_on[page] = [place_of(each) for each in parents]
+
     # The first class of the year, the way `_find_first_class_created` finds
     # it: the first-class pattern if it is dated, else the earliest class.
     first_class_page = None
@@ -2314,7 +2357,8 @@ def _links_checklist_offer(content_root: Path, section_number: int,
         place = _place_in_the_course(page, content_root)
         entry = {"place": place, "title": title_of(page), "group": group, "ticked": True,
                  "step": None, "claimedBy": None, "date": None, "why": None,
-                 "firstUsedIn": None, "linkedFrom": (linked_from.get(page) or [])[:10]}
+                 "firstUsedIn": None, "linkedFrom": (linked_from.get(page) or [])[:10],
+                 "dependsOn": depends_on.get(page, [])}
         if group == "class":
             entry["ticked"] = False
             entry["why"] = "classNeverDated"

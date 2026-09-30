@@ -107,6 +107,116 @@ final class SharedRulesContractTests: XCTestCase {
         )
     }
 
+    /// The plan's first line names EVERY destination, primary first, in the
+    /// saved order, joined "A, B and C" (#396) — compared WHOLE; the approval
+    /// card names the same ones by type; and the list is the one the job is
+    /// written with (`deployPlan(...).descriptions`).
+    func testTheSchedulePlanNamesEveryDestinationAsTheContractSays() throws {
+        let refusals: [String: Any] = try SharedRulesContractTests.section("scheduledDeployRefusals")
+        let opening: [String: Any] = try XCTUnwrap(refusals["planOpening"] as? [String: Any])
+        let message: String = try XCTUnwrap(opening["message"] as? String)
+        let cases: [[String: Any]] = try XCTUnwrap(opening["cases"] as? [[String: Any]])
+        XCTAssertEqual(cases.count, 3)
+        let accountID: String = "0123456789abcdef0123456789abcdef"
+        let when: Date = try XCTUnwrap(AssistToolRunner.moment(named: "2030-09-09 06:30"))
+
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let made: AssistFixture.Made = try AssistFixture.makeRunner(hasDeployedBefore: true)
+            let root: URL = made.root
+            defer { try? FileManager.default.removeItem(at: root) }
+            let agents: URL = root.appendingPathComponent("LaunchAgents")
+            try FileManager.default.createDirectory(at: agents, withIntermediateDirectories: true)
+            ScheduledDeploy.launchAgentsDirectoryOverride = agents
+            ScheduledDeploy.scheduledScriptsDirectoryOverride = root.appendingPathComponent("scheduled")
+            defer {
+                ScheduledDeploy.launchAgentsDirectoryOverride = nil
+                ScheduledDeploy.scheduledScriptsDirectoryOverride = nil
+            }
+            let folder: URL = root.appendingPathComponent("published-here")
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let courseURL: URL = root.appendingPathComponent("courses/ICS3U")
+            // Every non-folder type has gone out once, so nothing asks a
+            // question and the plan is the plan, not a refusal.
+            for markerFolder in [".netlify_sites", ".cloudflare_sites"] {
+                let marker: URL = courseURL.appendingPathComponent(markerFolder)
+                try FileManager.default.createDirectory(at: marker, withIntermediateDirectories: true)
+                try "{}".write(to: marker.appendingPathComponent("section1.json"), atomically: true, encoding: .utf8)
+            }
+            let configURL: URL = courseURL.appendingPathComponent("course_config.json")
+            let saved: [String: Any] = try XCTUnwrap(testCase["saved"] as? [String: Any])
+            var changes: [String: Any] = [:]
+            for (key, value) in saved {
+                changes[key] = SharedRulesContractTests.withFolder(value, folder.path)
+            }
+            try SharedRulesContractTests.change(configURL, changes)
+            let course: Course = Course(
+                code: "ICS3U", directoryURL: courseURL, configuration: try CourseConfiguration(contentsOf: configURL)
+            )
+
+            // The sheet, and plan_scheduled_deploy's first line.
+            let plan: ScheduledDeployPlan = ScheduledDeploy.plan(
+                course: course, sectionNumber: 1, when: when, now: Date(),
+                cloudflareAccountID: accountID, inWorkingFolder: root
+            )
+            XCTAssertTrue(plan.isSchedulable, "\(name): \(plan.description)")
+            let sheet: String = try XCTUnwrap(testCase["sheet"] as? String)
+                .replacingOccurrences(of: "{folder}", with: folder.path)
+            let firstLine: String = plan.description.components(separatedBy: "\n")[0]
+            XCTAssertEqual(
+                firstLine,
+                SharedRulesContractTests.render(message, [
+                    "course": "ICS3U", "section": "1", "destinations": sheet,
+                    "moment": ScheduledDeploy.dayAndTimeText(when),
+                ]),
+                name
+            )
+
+            // The run's own list, not a second walk of the settings.
+            XCTAssertEqual(
+                plan.destinations,
+                ScheduledDeploy.deployPlan(course: course, sectionNumber: 1, cloudflareAccountID: accountID).descriptions,
+                name
+            )
+
+            // The assistant's approval card, driven through explain(call:).
+            let card: String = try XCTUnwrap(testCase["card"] as? String)
+            let encoded: Data = try JSONSerialization.data(
+                withJSONObject: ["course": "ICS3U", "section": 1, "when": "2030-09-09 06:30"]
+            )
+            let shown: String = made.runner.explain(call: AssistToolCall(
+                id: UUID().uuidString, type: "function",
+                function: AssistToolCall.Function(
+                    name: "schedule_deploy", arguments: String(decoding: encoded, as: UTF8.self)
+                )
+            ))
+            XCTAssertTrue(shown.contains("to \(card) at "), "\(name): the card says \"\(shown)\"")
+        }
+    }
+
+    /// `{folder}` replaced wherever it appears in a contract value, nested
+    /// arrays and objects included.
+    static func withFolder(_ value: Any, _ path: String) -> Any {
+        if let text = value as? String {
+            return text.replacingOccurrences(of: "{folder}", with: path)
+        }
+        if let list = value as? [Any] {
+            var replaced: [Any] = []
+            for item in list {
+                replaced.append(withFolder(item, path))
+            }
+            return replaced
+        }
+        if let entry = value as? [String: Any] {
+            var replaced: [String: Any] = [:]
+            for (key, item) in entry {
+                replaced[key] = withFolder(item, path)
+            }
+            return replaced
+        }
+        return value
+    }
+
     /// A contract template with each `{name}` filled in.
     static func render(_ template: String, _ values: [String: String]) -> String {
         var rendered: String = template
