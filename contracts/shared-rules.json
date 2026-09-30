@@ -5580,6 +5580,15 @@
   "wizard": {
     "note": "What the New Course wizard says. AUTHORED rather than generated, and that is the whole point of the entry: a generated readout cannot fail when the code it reads changes, so a button label written by the generator would simply be rewritten to match whatever the button now says. Written by hand, each platform asserts its own constant against it and a drift goes red. Same reasoning as app-rules.json's split between milestones (a readout) and deployArguments (an expectation).",
     "createCourseButton": "Create Course",
+    "namingHeading": "Units",
+    "namingCaption": "Chosen once, when the course is made — the pages are named this way as they are written",
+    "creatingTitle": "Creating your course",
+    "codeLabel": "Course code",
+    "nameLabel": "Course name",
+    "sectionMarkerCaption": "e.g. “S1” appears beside the course code",
+    "gradeCaption": "e.g. “Grade 12” before the course name",
+    "structureCaption": "Defaults are fine for most courses",
+    "defaultSiteName": "Course Website",
     "noExampleContentNote": "Example content isn’t available for this course code yet, so the course will start with empty folders ready for your own pages.",
     "noStartingContentNote": "This course will start with empty folders ready for your own pages.",
     "skeletonToggleLabel": "Start from {article} {subject} skeleton",
@@ -5617,7 +5626,7 @@
     "structureFromExampleNote": "The example content chooses the folders and files for this course, so every page lands where its links expect it. Turn off pre-populating to start from the subject’s own structure instead, and change it however you like.",
     "whenTheNoteIsShown": "THREE situations under Starting Content, across TWO sentences. The course starts with empty folders in all three; what differs is whether example content exists for the typed code, because one of the sentences says something about that and must not say it when it is false.\n\n(1) The typed code has neither ready-made pages nor a skeleton — in practice, no code typed yet — and (2) the typed code has a skeleton the teacher has turned DOWN: both read noExampleContentNote. These two are one situation for a teacher and neither platform invents a second sentence for them. (3) The typed code HAS ready-made pages, the teacher declined them, and then declined the skeleton those pages' absence revealed: this reads noStartingContentNote, which is the same sentence with its first clause removed. \"Example content isn't available for this course code yet\" is false to somebody who was offered it one question ago, and rewording the shipped sentence to cover all three would change what ~1,900 codes with no payload read, which nobody asked for.\n\nThe mac reads them from WizardWording.noExampleContentNote and WizardWording.noStartingContentNote, choosing between them in noteForACourseStartingEmpty; Windows from NewCourseDialog.NoExampleContentNote() and its sibling. (1) and (2) share the accessibility identifier noExampleContentNote, being branches of the same if and never on screen at once; (3) has its OWN, noStartingContentNote, because a test that found the shared one could no longer say WHICH sentence a teacher is reading. Windows has shown the note while the toggle is off since 2026-09-07; the mac showed it only for a code with no skeleton at all until 2026-09-18 (issue #77), which is the drift this key exists to stop. The third situation could not be reached at all until 2026-09-21 (issue #248), because a code with ready-made pages was never offered a skeleton.",
     "whereTheStartingContentSentencesAreRendered": "All under the Starting Content section. skeletonToggleLabel is the toggle itself, with {article} and {subject} filled as skeletonToggleLabelSubject says (lowercased except proper nouns, a/an by sound — issue #336) — the mac's WizardWording.skeletonToggleLabel(forFamilyNamed:label:), Windows' equivalent. skeletonToggleLabelForAGeneralSkeleton replaces it outright for the GENERAL family, whose own label is \"This Course\" (written for the skeleton's pages) and renders as \"Start from a this course skeleton\" through the template — which has been on screen for club and custom codes since the toggle existed, and which MCMPR11, the one British Columbia code with ready-made pages, now reaches too. The caption below the toggle is skeletonToggleCaption for a code with no ready-made pages and skeletonToggleCaptionWhenExampleContentIsDeclined for a code whose ready-made pages were declined, where the first one's opening clause is false. structureFromExampleNote stands in for the structure editor while the example content is choosing the folders; its second sentence changed with issue #248, since turning pre-populating off now leaves the SUBJECT's lists on screen rather than the school-neutral factory ones.",
-    "whereItIsRendered": "The mac reads it from WizardWording.createCourseButton and renders it in NewCourseWizardView; Windows renders it in NewCourseDialog. Named in prose rather than as a structured key, the way buildOutputLocation names its sources, because nothing reads such a key and a rename would rot it silently.",
+    "whereItIsRendered": "The mac reads it from WizardWording.createCourseButton and renders it in NewCourseWizardView; Windows renders it in NewCourseDialog. With \"This is a club\" ticked the same button reads clubToggle.createButton (#368). The panel's other course words (#368), each with a club twin of the same name in clubToggle: namingHeading and namingCaption are the header of the section the class-page words are chosen in; creatingTitle is the title while the course is being made (not the example course's own title); codeLabel and nameLabel label the code and name fields; sectionMarkerCaption and gradeCaption sit under the two site-title switches; structureCaption is the Structure section's caption when the structure does not come from example content. Named in prose rather than as a structured key, the way buildOutputLocation names its sources, because nothing reads such a key and a rename would rot it silently.",
     "whyThisOneString": "It is the first thing a teacher presses in this app. Both platforms have said Create Course since the wizard existed and nothing pinned it until 2026-09-08 — Windows asserted it only in NewCourseWizardUiTests, which is opt-in behind PLANTOIR_UI_TESTS=1 and part of no gate, and the mac asserted it nowhere. Two apps agreeing by habit is not two apps agreeing on purpose; the first notice of a drift would have been a teacher reading a different button from the one in the other platform's screenshots.",
     "gatedTests": "Each platform's GATED test compares its constant to this key, which pins the constant rather than the rendered button. Only the UI suites see the button itself, and both are opt-in and part of no gate — QuartzTeachersUITests on the mac, [UiFact] under PLANTOIR_UI_TESTS=1 on Windows. Said plainly because the first version of this entry called Windows' arrangement the weakest place a shared sentence can live while the mac had the same arrangement and one fewer test.",
     "skeletonToggle": {
@@ -5863,7 +5872,19 @@
     "clubToggle": {
       "note": "“This is a club” in the New Course wizard (#267). Russell, 2026-09-24: a club starts with empty folders and a first “Week 1” page; it has NO curriculum coverage page and no Curriculum folder (coverage can be turned on later in Course Settings); its words are editable in the wizard and NOT switchable afterwards; the defaults are the `club` words below. The choice is shown for EVERY code and starts ticked for a code ClubCodeRule calls a club (course-management.json), until the teacher touches it. Nothing called is_club is written: the course is a club because of what IS written — class_page_scheme \"numbered\", unit_word, class_folder, front_page_heading and class_noun (file-formats.json) — plus use_skeleton and prepopulate_example_content false and the three curriculum keys false. A club takes no skeleton and no ready-made pages because both are Unit/Day pages, which a numbered course does not read as class pages; setup_course.py refuses to pour either into a numbered course as a second net. Mac: WizardWording, ClubVocabulary and ClubFill.applying (Models/ClubFill.swift); NewCourseWizardView.applyClubChoice.",
       "label": "This is a club",
-      "caption": "A club meets rather than holds classes: its pages are numbered one after another, it has no curriculum, and it starts with a page for its first meeting. The words below can be changed now, but not once the course is made.",
+      "caption": "A club meets rather than holds classes: its pages are numbered one after another, it has no curriculum, and it starts with a page for its first meeting. The words below can be changed now, but not once the club is made.",
+      "panelWordsFollow": "#368: while this box is ticked the panel says the club's words below (createButton, namingHeading, namingCaption, creatingTitle, codeLabel, nameLabel, sectionMarkerCaption, gradeCaption, structureCaption, gradedFolderCaption, defaultSiteName); unticked, the course's keys of the same names in wizard (and wizard.createCourseButton for the button, gradedFolders.wording.caption for the marks list's caption, which Course Settings shows too). gradedFolderCaption is the caption under the marks tick list in Structure: the course's names the curriculum coverage map and says most courses keep Tasks, and a club has no coverage map when it is made (#368 review N3). defaultSiteName is the site's name when the name field is left blank (#368 review N4; the name is written into the course and shown on the site). They follow the TICK BOX, never ClubCodeRule: a teacher can untick it for a club-shaped code, and the words must describe what will be made. The heading is Meetings whatever the noun picker below it says: it would change under the teacher's hand as they choose, and a club whose noun is class is still a club. The caption above says club because it is shown only beside the club choice. The code field's own label changes when typing a club code ticks the box, which is the box doing what it says.",
+      "namingHeading": "Meetings",
+      "namingCaption": "Chosen once, when the club is made — the pages are named this way as they are written",
+      "createButton": "Create Club",
+      "creatingTitle": "Creating your club",
+      "codeLabel": "Club code",
+      "nameLabel": "Club name",
+      "sectionMarkerCaption": "e.g. “S1” appears beside the club code",
+      "gradeCaption": "e.g. “Grade 12” before the club name",
+      "structureCaption": "Defaults are fine for most clubs",
+      "gradedFolderCaption": "Tick the folders holding work that counts for marks. A club starts without a curriculum coverage map, so these matter only if the coverage page is turned on later in Course Settings.",
+      "defaultSiteName": "Club Website",
       "startingContentNote": "A club starts with empty folders and one page for its first meeting — no ready-made pages, no subject skeleton and no curriculum coverage page. The coverage page can be turned on later in Course Settings.",
       "rows": {
         "classFolder": "Folder for meeting pages",
@@ -16317,7 +16338,7 @@
       "nothingReachesStudents": "It changes files and the preview. A deploy puts it in front of students, and it never deploys.",
       "afterwards": "Only the assistant's publish takes the pages a class uses with it. A class published by its own line in Obsidian after this goes live with links to hidden pages, so the plan and the sheet say so (wording.publishingFromNowOn); issue #333 is the fix for that."
     },
-    "planShows": "Every page going into draft with its reason; what stays (the first class and its pages, Key Links and its pages); the links left on pages students will see that will lead to hidden pages, grouped by the page they are on; and three warnings: classes dated before today that are going into draft (wording.alreadyTaught), this section's scheduled deploy in this working folder (wording.scheduledDeploy), and a first class that is itself in draft (wording.firstClassIsHidden).",
+    "planShows": "Every page going into draft with its reason; what stays (the first class and its pages, Key Links and its pages); the links left on pages students will see that will lead to hidden pages, grouped by the page they are on; and three warnings: classes dated before today that are going into draft (wording.alreadyTaught), this section's scheduled deploy in this working folder (wording.scheduledDeploy), and a first class that is itself in draft (wording.firstClassIsHidden). Each page is named by its title (wording.pageName) - the front matter title, else the file name as written, else, for a folder's own page, the folder - which is the one naming rule the app already uses everywhere it names a page. A page whose title another page in the section also has (compared trimmed, ignoring case, in one Unicode form, and NOT the way links are matched) is followed by its folder within the course (wording.pageNameInFolder), in every list the plan and the undo show, and in the links left behind. Never a path to the file, never .md, never courses/. The plan code still covers the files' paths; only the words changed (#362).",
     "planCode": {
       "line": "Plan code: {code}",
       "guards": "That a write is a plan that was MADE, and that the section has not changed since. Each platform issues and checks its own code; only this guarantee is shared, never the algorithm. The code is on a line of its own in the plan's text, in exactly the shape above, so a client or a test harness finds it in one fixed place.",
@@ -16332,7 +16353,7 @@
       "mcp": "undo_last_change, for as long as that MCP session lasts.",
       "separate": "The app's undo, the assistant window's 'undo that' and an outside assistant's undo_last_change are three stores; none reaches another."
     },
-    "howToRunACase": "Lay the course out from `pages`, one section, section 1. kind: class (a class page in the section's classes folder, `publish:`), page (a course-level page, `publishForSection1:`), keyLinks (the section's Key Links page), folderIndex (the index.md of a course-level folder named by the title), curriculum (a page in a course-level folder named Curriculum), sectionFrontPage (the section's own index.md). `visible` sets the flag; `links` are written as `See [[name]].` paragraphs; `date` sets the page's date (default the same day for every page) and `undated` writes none; `strayPublishForSection` adds `publishForSection1: true` to a class page; `embeds` writes one `![[name]]` line per entry (the front page's class embed). `naming` sets the course's unit word, scheme and noun. Then plan and write through the MCP pair, passing the plan's code. Every page in expectDraft must read HIDDEN for section 1 by the built site's reading and keep its body byte for byte; every page in expectUntouched must be byte-identical. `expectWarnings` names warnings the plan must carry; `expectIntroContains` a fragment of the plan's intro; `expectFrontPageEmbeds` names the one class the section's front page must embed afterwards; `runTwice` runs the pair again and expects wording.nothingToDo with nothing written.",
+    "howToRunACase": "Lay the course out from `pages`, one section, section 1. kind: class (a class page in the section's classes folder, `publish:`), page (a course-level page, `publishForSection1:`), keyLinks (the section's Key Links page), folderIndex (the index.md of a course-level folder named by the title), curriculum (a page in a course-level folder named Curriculum), sectionFrontPage (the section's own index.md). `visible` sets the flag; `links` are written as `See [[name]].` paragraphs; `date` sets the page's date (default the same day for every page) and `undated` writes none; `strayPublishForSection` adds `publishForSection1: true` to a class page; `embeds` writes one `![[name]]` line per entry (the front page's class embed). `naming` sets the course's unit word, scheme and noun. Then plan and write through the MCP pair, passing the plan's code. Every page in expectDraft must read HIDDEN for section 1 by the built site's reading and keep its body byte for byte; every page in expectUntouched must be byte-identical. `expectWarnings` names warnings the plan must carry; `expectIntroContains` a fragment of the plan's intro; `expectFrontPageEmbeds` names the one class the section's front page must embed afterwards; `runTwice` runs the pair again and expects wording.nothingToDo with nothing written. `folder` puts a `page` in that course-level folder instead of Concepts; `shownAs` writes that as the page's `title:` while the file keeps `title` as its name (and as the case's key). `visible` defaults to true when it is left out, but every case writes it. `expectPlanNames`: for each entry, the plan's text carries a line beginning `• ` then wording.pageName with {page} (or wording.pageNameInFolder with {page} and {folder} when `folder` is given) then ` — `; and no line of the plan contains `.md` or `courses/`.",
     "cases": [
       {
         "name": "the plain year",
@@ -16875,9 +16896,70 @@
         ],
         "runTwice": true,
         "why": "The second run finds every page already right, writes nothing, and says wording.nothingToDo."
+      },
+      {
+        "name": "a page is named by its title, and by its folder only when another page shares the title",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "links": [
+              "Notes"
+            ]
+          },
+          {
+            "title": "Unit 1, Day 2",
+            "kind": "class",
+            "visible": true,
+            "links": [
+              "Predict the Output"
+            ]
+          },
+          {
+            "title": "Predict the Output",
+            "kind": "page",
+            "visible": true,
+            "folder": "Warm-Ups",
+            "links": []
+          },
+          {
+            "title": "Notes",
+            "kind": "page",
+            "visible": true,
+            "links": []
+          },
+          {
+            "title": "Notes Zeta",
+            "shownAs": "Notes",
+            "kind": "page",
+            "visible": true,
+            "folder": "Zeta",
+            "links": []
+          }
+        ],
+        "expectDraft": [
+          "Unit 1, Day 2",
+          "Predict the Output",
+          "Notes Zeta"
+        ],
+        "expectUntouched": [
+          "Unit 1, Day 1",
+          "Notes"
+        ],
+        "expectPlanNames": [
+          {
+            "page": "Predict the Output"
+          },
+          {
+            "page": "Notes",
+            "folder": "Zeta"
+          }
+        ],
+        "why": "#362: the plan showed `(courses/ICS3U/Warm-Ups/Predict the Output.md)` after every page's title. Predict the Output's title is its own, so it is named by the title alone. The Notes in Zeta shares its shown title with the Notes that STAYS (Day 1 links it), so it is named with its folder: deciding \"shares a title\" across the section's pages, not within the list shown, is what makes it possible to tell which Notes goes. The staying twin is the point of the case."
       }
     ],
-    "wordingNote": "Every sentence the app's sheet says, and the plan an outside assistant is shown. Placeholders: {course} {section} {first} (the first class's name) {noun} {nouns} (\"class\"/\"classes\", or \"meeting\"/\"meetings\" in a club) {page} {pages} (a number with its word: \"1 page\", \"12 pages\") {classes} (the same, with the noun) {links} (\"1 link\", \"3 links\") {moment} {backup} (a backup's file name) {code}. The mac pins StartOfYearWording to these key by key (StartOfYearPlannerTests); the two refusals only an outside assistant meets are AssistWording's, in assist-wording.json (startOfYearNeedsItsPlan, startOfYearPlanHasChanged, startOfYearNeedsABackup).",
+    "wordingNote": "Every sentence the app's sheet says, and the plan an outside assistant is shown. Placeholders: {course} {section} {first} (the first class's name) {noun} {nouns} (\"class\"/\"classes\", or \"meeting\"/\"meetings\" in a club) {page} {pages} (a number with its word: \"1 page\", \"12 pages\") {classes} (the same, with the noun) {links} (\"1 link\", \"3 links\") {name} (a page as named by pageName or pageNameInFolder) {folder} (the folder a page is in, within the course: its segments joined with \"/\", or the course code for a page at the top of the course folder) {reason} (one of the reason clauses) {moment} {backup} (a backup's file name) {code}. The mac pins StartOfYearWording to these key by key (StartOfYearPlannerTests); the two refusals only an outside assistant meets are AssistWording's, in assist-wording.json (startOfYearNeedsItsPlan, startOfYearPlanHasChanged, startOfYearNeedsABackup).",
     "wording": {
       "menuItem": "Get Ready for the Start of the Year…",
       "undoMenuItem": "Undo Getting Ready for the Start of the Year…",
@@ -16896,7 +16978,10 @@
       "staysKeyLinks": "Key Links, and the {pages} it lists",
       "staysEverythingElse": "Every folder's own page, every curriculum page, and every page something students can still see links to.",
       "linksLeftHeading": "After this, links on these pages will lead to pages students cannot see yet:",
-      "linksLeftLine": "“{page}”: {links}",
+      "linksLeftLine": "{name}: {links}",
+      "pageName": "“{page}”",
+      "pageNameInFolder": "“{page}” (in {folder})",
+      "draftLine": "{name} — {reason}",
       "publishingFromNowOn": "From now on, each {noun} you publish needs the pages it uses published with it. Publishing through the assistant does that for you. Publishing a {noun} by changing its page in Obsidian does not, and would leave it with links students cannot follow.",
       "alreadyTaught": "Dated before today, and going into draft: {classes}. If you have already taught them, students will lose them when you next deploy.",
       "scheduledDeploy": "This section is set to deploy on its own at {moment}. That will put these changes in front of students.",

@@ -23,12 +23,14 @@ class MarketingScreenshotCase: XCTestCase {
     static let windowWidth: CGFloat = 1280
     static let windowHeight: CGFloat = 800
 
-    /// The autosave name AppKit gives the app's main window. Passing a frame
-    /// under this key as a launch argument puts it in the argument domain,
-    /// which outranks the saved value — so every capture is the same size
-    /// regardless of where the window was left last time.
-    static let mainWindowFrameKey: String =
-        "NSWindow Frame SwiftUI.ModifiedContent<QuartzTeachers.WindowRootView, SwiftUI._FlexFrameLayout>-1-AppWindow-1"
+    /// The autosave key of the app's main window. Passing a frame under this
+    /// key as a launch argument puts it in the argument domain, which
+    /// outranks the saved value — so every capture is the same size
+    /// regardless of where the window was left last time. `IsolatedLaunch`'s
+    /// constant, not a copy: until #361 this was the name from before the
+    /// window group had an id, which no build reads, so captures opened at
+    /// whatever the teacher's window was left at.
+    static let mainWindowFrameKey: String = IsolatedLaunch.mainWindowFrameKey
 
     /// The assistant keeps its own window frame under its own key and applies
     /// it by hand — SwiftUI owns the autosave name and overwrites anything put
@@ -945,14 +947,11 @@ final class MarketingScenes: MarketingScreenshotCase {
         XCTAssertTrue(item.waitForExistence(timeout: 15), "The section menu should offer to get ready (#96)")
         item.click()
 
-        // The sheet's own identifier is set on its whole stack, and SwiftUI
-        // hands that to every child in place of the children's own —
-        // `startOfYearGo` never reaches the accessibility tree (measured:
-        // Cancel and Go both read `startOfYearSheet`). So Go is the sheet's
-        // button that is not Cancel, and the plan is ready when it exists.
+        // Go by its own identifier: the sheet's stack carries `.contain`
+        // before its identifier (#366), so `startOfYearGo` reaches the tree.
+        // The plan is ready when Go exists.
         let sheet: XCUIElement = application.sheets.firstMatch
-        let go: XCUIElement = sheet.buttons
-            .matching(NSPredicate(format: "label != %@", "Cancel")).firstMatch
+        let go: XCUIElement = application.buttons["startOfYearGo"]
         XCTAssertTrue(go.waitForExistence(timeout: 60), "The plan should appear")
         // An empty plan photographed as the feature is the failure this
         // guards: the button is disabled when the plan changes nothing (#96).
