@@ -64,7 +64,10 @@ final class ClubFillTests: XCTestCase {
         XCTAssertEqual(WizardWording.settingsFrontPageHeadingLabel, settings["frontPageHeading"] as? String)
         XCTAssertEqual(WizardWording.settingsNounLabel, settings["noun"] as? String)
         XCTAssertEqual(WizardWording.settingsLockedCaption, settings["lockedCaption"] as? String)
-        XCTAssertEqual(WizardWording.settingsFrontPageHeadingNotSet, settings["frontPageHeadingNotSet"] as? String)
+        // Retired in #376: the row is not drawn for a course that recorded
+        // no heading, so the contract must not carry the sentence either —
+        // a key left behind is one somebody implements again.
+        XCTAssertNil(settings["frontPageHeadingNotSet"], "frontPageHeadingNotSet was retired in #376")
 
         let club: [String: Any] = try XCTUnwrap(block["club"] as? [String: Any])
         XCTAssertEqual(ClubVocabulary.club.classFolder, club["classFolder"] as? String)
@@ -74,29 +77,35 @@ final class ClubFillTests: XCTestCase {
         XCTAssertEqual(ClubFill.curriculumFolders, block["curriculumFolders"] as? [String])
     }
 
-    /// The locked heading row says what the course RECORDED, and never a
-    /// default: CODING has no `front_page_heading` and its front page reads
-    /// "Most Recent Meeting", so "Most Recent Class" there would be false.
-    func testTheHeadingRowShowsOnlyWhatWasRecorded() {
-        let coding: CourseConfiguration = CourseConfiguration(
-            values: ["code": "CODING", "unit_word": "Unit"], lastSavedData: Data()
-        )
-        XCTAssertNil(coding.recordedFrontPageHeading)
-        XCTAssertEqual(
-            WizardWording.settingsFrontPageHeadingValue(coding.recordedFrontPageHeading),
-            WizardWording.settingsFrontPageHeadingNotSet
-        )
-        let blank: CourseConfiguration = CourseConfiguration(
-            values: ["front_page_heading": "   "], lastSavedData: Data()
-        )
-        XCTAssertNil(blank.recordedFrontPageHeading)
-        let club: CourseConfiguration = CourseConfiguration(
-            values: ["front_page_heading": "Most Recent Meeting"], lastSavedData: Data()
-        )
-        XCTAssertEqual(
-            WizardWording.settingsFrontPageHeadingValue(club.recordedFrontPageHeading),
-            "Most Recent Meeting"
-        )
+    /// The locked rows are drawn only for what a course RECORDED (#376), and
+    /// the heading row shows it verbatim — never a default: CODING has no
+    /// `front_page_heading` and its front page reads "Most Recent Meeting",
+    /// so "Most Recent Class" there would be false.
+    func testTheLockedRowsAreShownOnlyWhenRecorded() throws {
+        let block: [String: Any] = try clubToggle()
+        let settings: [String: Any] = try XCTUnwrap(block["settingsRows"] as? [String: Any])
+        XCTAssertNotNil(settings["shownWhen"] as? String)
+        let cases: [[String: Any]] = try XCTUnwrap(settings["shownWhenCases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 8, "shownWhenCases has shrunk")
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let given: [String: Any] = try XCTUnwrap(testCase["given"] as? [String: Any])
+            let expected: [String] = try XCTUnwrap(testCase["expect"] as? [String])
+            let configuration: CourseConfiguration = CourseConfiguration(values: given, lastSavedData: Data())
+            let rows: [ClassPagesLockedRows.Row] = ClassPagesLockedRows.rows(for: configuration)
+            var keys: [String] = []
+            for row in rows {
+                keys.append(row.key)
+            }
+            XCTAssertEqual(keys, expected, name)
+            if let values = testCase["values"] as? [String: String] {
+                for row in rows {
+                    if let value = values[row.key] {
+                        XCTAssertEqual(row.value, value, name + ": " + row.key)
+                    }
+                }
+            }
+        }
     }
 
     /// The club's class-pages folder gets the checks every other folder
