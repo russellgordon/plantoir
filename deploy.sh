@@ -313,7 +313,7 @@ resolve_build_context() {
   if [[ -f "./Dockerfile" ]]; then
     echo "."
   elif [[ -f "./.toolchain/Dockerfile" ]]; then
-    echo "./.toolchain"
+    echo "./.toolchain"  # never shown to a teacher: the answer $(resolve_build_context) captures
   else
     return 1
   fi
@@ -637,7 +637,7 @@ if [[ -n "$OVERRIDE_IMAGE" ]]; then
   IMAGE="$OVERRIDE_IMAGE"
 else
   BUILD_CONTEXT=$(resolve_build_context) || {
-    echo "❌ This folder is missing the toolchain's build recipe."
+    echo "❌ This folder is missing the recipe for its website builder."
     echo "   Open the folder in the app once to refresh it, or run from a"
     echo "   copy of the repository."
     exit 1
@@ -1601,7 +1601,7 @@ _helper_pins() {
 
 # The same versions as one word, for the line the app reads.
 _helper_pins_word() {
-  printf 'colima=%s,lima=%s,docker=%s,buildx=%s\n' "$COLIMA_VERSION" "$LIMA_VERSION" "$DOCKER_CLI_VERSION" "$BUILDX_VERSION"
+  printf 'colima=%s,lima=%s,docker=%s,buildx=%s\n' "$COLIMA_VERSION" "$LIMA_VERSION" "$DOCKER_CLI_VERSION" "$BUILDX_VERSION"  # never shown to a teacher: a field of a PLANTOIR_ line the app reads
 }
 
 _helper_arch() {
@@ -2201,8 +2201,8 @@ ensure_image_present() {
     return 0
   fi
   if [[ -z "$BUILD_CONTEXT" ]]; then
-    echo "❌ No local image named '$IMAGE'."
-    echo "   Build it first, e.g.: docker buildx build --load -t $IMAGE ."
+    echo "❌ No local image named '$IMAGE'."  # never shown to a teacher: reached only with --image, which the app never passes
+    echo "   Build it first, e.g.: docker buildx build --load -t $IMAGE ."  # never shown to a teacher: reached only with --image, which the app never passes
     exit 1
   fi
   # The size is said only when there is no earlier website builder on this
@@ -3424,7 +3424,7 @@ WORKSPACE_TRAIL_PLACE="${COURSE_CODE}/${SECTION_NUM}"
 run_container_with_mount() {
   ensure_image_present
   retire_legacy_container
-  echo "🔗 Binding host courses to container: $HOST_COURSES ➜ /teaching/courses"
+  echo "🔗 Letting the website builder read and save your courses: $HOST_COURSES"
   # The builds folder is mounted at its OWN absolute path, unconditionally,
   # so that courses/<CODE>/.merged_output — a symlink to a path under
   # $HOME — resolves to the same place inside the container as it does
@@ -3488,7 +3488,7 @@ probe_container_network() {
   docker exec "$CONTAINER_NAME" sh -lc "getent hosts $PROBE_HOST" >/dev/null 2>&1
 }
 
-echo " Ensuring container is running with the correct, writable mount..."
+echo "🚀 Getting this folder's website builder ready…"
 clear_away_this_folders_other_spelling
 if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
   CURRENT_MOUNT_SRC=$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/teaching/courses"}}{{.Source}}{{end}}{{end}}' "$CONTAINER_NAME" 2>/dev/null || echo "")
@@ -3516,10 +3516,10 @@ if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
         echo "🔌 Plantoir lost its connection to the website builder, so it is setting this folder up again…"
         remake_the_workspace
       else
-        echo "✅ Container $CONTAINER_NAME is already running with correct, writable mount."
+        echo "✅ This folder's website builder is already running, and can save into 'courses/'."
       fi
     else
-      echo " Starting existing container $CONTAINER_NAME..."
+      echo "▶️  Starting this folder's website builder…"
       start_the_existing_workspace
       if ! probe_container_write; then
         echo "🛑 The website builder could not save into 'courses/' after it started, so Plantoir is setting this folder up again…"
@@ -3531,7 +3531,7 @@ if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
     fi
   fi
 else
-  echo " Creating new container named $CONTAINER_NAME with correct mount…"
+  echo "🆕 Setting up a website builder for this folder…"
   run_container_with_mount
 fi
 
@@ -3540,9 +3540,9 @@ echo "🚀 Deploying ${COURSE_CODE} S${SECTION_NUM} from: ${SECTION_DIR_IN_CONTA
 
 # --- Securely inject token into container without exposing on host CLI ---
 if [[ "$TARGET" == "cloudflare" ]]; then
-  printf %s "$CF_TOKEN" | docker exec -i "$CONTAINER_NAME" sh -lc 'umask 077; cat > /tmp/deploy_pat'
+  printf %s "$CF_TOKEN" | docker exec -i "$CONTAINER_NAME" sh -lc 'umask 077; cat > /tmp/deploy_pat'  # never shown to a teacher: piped into the website builder, never printed
 else
-  printf %s "$TOKEN" | docker exec -i "$CONTAINER_NAME" sh -lc 'umask 077; cat > /tmp/deploy_pat'
+  printf %s "$TOKEN" | docker exec -i "$CONTAINER_NAME" sh -lc 'umask 077; cat > /tmp/deploy_pat'  # never shown to a teacher: piped into the website builder, never printed
 fi
 
 # Ask for a terminal only when there is one: `docker exec -t` refuses to start

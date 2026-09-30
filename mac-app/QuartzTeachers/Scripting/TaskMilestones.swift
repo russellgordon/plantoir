@@ -36,7 +36,7 @@ enum TaskMilestones {
     static let exampleCourse: [TaskMilestone] = [
         TaskMilestone(label: "Getting this Mac ready…", marker: "Setting up this Mac"),
         TaskMilestone(label: "Building your website builder…", marker: "Building your website builder"),
-        TaskMilestone(label: "Getting things ready…", marker: "Starting container if needed"),
+        TaskMilestone(label: "Getting things ready…", marker: "Getting this folder's website builder ready"),
         TaskMilestone(label: "Copying the example course…", marker: "Example Course installed to"),
         TaskMilestone(label: "Finishing up…", marker: "EXAMPLE_COURSE_CODE="),
     ]
@@ -45,7 +45,7 @@ enum TaskMilestones {
     static let preview: [TaskMilestone] = [
         TaskMilestone(label: "Getting this Mac ready…", marker: "Setting up this Mac"),
         TaskMilestone(label: "Building your website builder…", marker: "Building your website builder"),
-        TaskMilestone(label: "Starting up…", marker: "Starting container if needed"),
+        TaskMilestone(label: "Starting up…", marker: "Getting this folder's website builder ready"),
         TaskMilestone(label: "Gathering your content…", marker: "Copying shared folders"),
         TaskMilestone(label: "Applying your settings…", marker: "Updated pageTitle"),
         TaskMilestone(label: "Preparing components…", marker: "Installing dependencies"),
@@ -66,7 +66,7 @@ enum TaskMilestones {
     static let deploy: [TaskMilestone] = [
         TaskMilestone(label: "Getting this Mac ready…", marker: "Setting up this Mac"),
         TaskMilestone(label: "Building your website builder…", marker: "Building your website builder"),
-        TaskMilestone(label: "Starting up…", marker: "Ensuring container is running"),
+        TaskMilestone(label: "Starting up…", marker: "Getting this folder's website builder ready"),
         TaskMilestone(label: "Checking your site…", marker: "Deploying from local build"),
         TaskMilestone(label: "Connecting to Netlify…", marker: "Netlify site"),
         TaskMilestone(label: "Comparing what changed…", marker: "delta deploy manifest"),
@@ -79,7 +79,7 @@ enum TaskMilestones {
     static let buildAndDeploy: [TaskMilestone] = [
         TaskMilestone(label: "Getting this Mac ready…", marker: "Setting up this Mac"),
         TaskMilestone(label: "Building your website builder…", marker: "Building your website builder"),
-        TaskMilestone(label: "Starting up…", marker: "Starting container if needed"),
+        TaskMilestone(label: "Starting up…", marker: "Getting this folder's website builder ready"),
         TaskMilestone(label: "Gathering your content…", marker: "Copying shared folders"),
         TaskMilestone(label: "Building your site…", marker: "Quartz v4"),
         TaskMilestone(label: "Connecting to Netlify…", marker: "Netlify site"),
@@ -94,7 +94,7 @@ enum TaskMilestones {
     static let deployToCloudflare: [TaskMilestone] = [
         TaskMilestone(label: "Getting this Mac ready…", marker: "Setting up this Mac"),
         TaskMilestone(label: "Building your website builder…", marker: "Building your website builder"),
-        TaskMilestone(label: "Starting up…", marker: "Ensuring container is running"),
+        TaskMilestone(label: "Starting up…", marker: "Getting this folder's website builder ready"),
         TaskMilestone(label: "Checking your site…", marker: "Deploying from local build"),
         TaskMilestone(label: "Connecting to Cloudflare…", marker: "Cloudflare project"),
         TaskMilestone(label: "Uploading your pages…", marker: "Uploading the built site"),
@@ -105,7 +105,7 @@ enum TaskMilestones {
     static let buildAndDeployToCloudflare: [TaskMilestone] = [
         TaskMilestone(label: "Getting this Mac ready…", marker: "Setting up this Mac"),
         TaskMilestone(label: "Building your website builder…", marker: "Building your website builder"),
-        TaskMilestone(label: "Starting up…", marker: "Starting container if needed"),
+        TaskMilestone(label: "Starting up…", marker: "Getting this folder's website builder ready"),
         TaskMilestone(label: "Gathering your content…", marker: "Copying shared folders"),
         TaskMilestone(label: "Building your site…", marker: "Quartz v4"),
         TaskMilestone(label: "Connecting to Cloudflare…", marker: "Cloudflare project"),
@@ -126,7 +126,7 @@ enum TaskMilestones {
     static let buildAndDeployToFolder: [TaskMilestone] = [
         TaskMilestone(label: "Getting this Mac ready…", marker: "Setting up this Mac"),
         TaskMilestone(label: "Building your website builder…", marker: "Building your website builder"),
-        TaskMilestone(label: "Starting up…", marker: "Starting container if needed"),
+        TaskMilestone(label: "Starting up…", marker: "Getting this folder's website builder ready"),
         TaskMilestone(label: "Gathering your content…", marker: "Copying shared folders"),
         TaskMilestone(label: "Building your site…", marker: "Quartz v4"),
         TaskMilestone(label: "Copying your files…", marker: "to a folder"),

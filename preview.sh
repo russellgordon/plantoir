@@ -115,7 +115,7 @@ _SAVED_ARGS=("$@")
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --image)
-      if [[ $# -lt 2 ]]; then echo "❌ --image requires a value"; exit 1; fi
+      if [[ $# -lt 2 ]]; then echo "❌ --image requires a value"; exit 1; fi  # never shown to a teacher: reached only with --image or --context, which the app never passes
       OVERRIDE_IMAGE="$2"; shift 2 ;;
     *) shift ;;
   esac
@@ -126,7 +126,7 @@ resolve_build_context() {
   if [[ -f "./Dockerfile" ]]; then
     echo "."
   elif [[ -f "./.toolchain/Dockerfile" ]]; then
-    echo "./.toolchain"
+    echo "./.toolchain"  # never shown to a teacher: the answer $(resolve_build_context) captures
   else
     return 1
   fi
@@ -161,7 +161,7 @@ if [[ -n "$OVERRIDE_IMAGE" ]]; then
   IMAGE="$OVERRIDE_IMAGE"
 else
   BUILD_CONTEXT=$(resolve_build_context) || {
-    echo "❌ This folder is missing the toolchain's build recipe."
+    echo "❌ This folder is missing the recipe for its website builder."
     echo "   Open the folder in the app once to refresh it, or run from a"
     echo "   copy of the repository."
     exit 1
@@ -825,7 +825,7 @@ if [[ -n "${STOP_MODE:-}" ]]; then
     exit 0
   fi
   if ! docker ps --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
-    echo "✅ Nothing to stop — no container is running for this folder."
+    echo "✅ Nothing to stop — this folder's website builder isn't running."
     exit 0
   fi
   echo "🧹 Stopping preview processes for ${COURSE} section ${SECTION}…"
@@ -1114,7 +1114,7 @@ _helper_pins() {
 
 # The same versions as one word, for the line the app reads.
 _helper_pins_word() {
-  printf 'colima=%s,lima=%s,docker=%s,buildx=%s\n' "$COLIMA_VERSION" "$LIMA_VERSION" "$DOCKER_CLI_VERSION" "$BUILDX_VERSION"
+  printf 'colima=%s,lima=%s,docker=%s,buildx=%s\n' "$COLIMA_VERSION" "$LIMA_VERSION" "$DOCKER_CLI_VERSION" "$BUILDX_VERSION"  # never shown to a teacher: a field of a PLANTOIR_ line the app reads
 }
 
 _helper_arch() {
@@ -1631,12 +1631,11 @@ ensure_container_runtime() {
 # Set by ensure_container_runtime when this run starts the builder (#234).
 THIS_RUN_STARTED_THE_BUILDER=""
 ensure_container_runtime
-CURRENT_CONTEXT=$(docker context show 2>/dev/null || echo "unknown")
-HOST_ARCH=$(docker info --format '{{.Architecture}}' 2>/dev/null || echo "unknown")
-HOST_OS=$(docker info --format '{{.OSType}}' 2>/dev/null || echo "unknown")
-echo "🔌 Docker context: ${CURRENT_CONTEXT}"
-echo "🧭 Host detected by Docker: ${HOST_OS}/${HOST_ARCH}"
-echo "🖼️  Using image: ${IMAGE}"
+# Which website builder this run uses, by the part of its name that changes
+# with the recipe — worth having in a problem report. Until #382 this also
+# printed the engine's context and the platform it reported, naming the
+# machinery to a teacher (rule 1) at the cost of two more engine calls.
+echo "🧰 Website builder version: ${IMAGE##*:}"
 # ====================================================================
 
 # ---------------- Remove superseded website-builder images ----------------
@@ -1707,8 +1706,8 @@ build_image_if_missing() {
     return 0
   fi
   if [[ -z "$BUILD_CONTEXT" ]]; then
-    echo "❌ Image '$IMAGE' is not on this machine."
-    echo "   Build it first, e.g.: docker buildx build --load -t $IMAGE ."
+    echo "❌ Image '$IMAGE' is not on this machine."  # never shown to a teacher: reached only with --image, which the app never passes
+    echo "   Build it first, e.g.: docker buildx build --load -t $IMAGE ."  # never shown to a teacher: reached only with --image, which the app never passes
     exit 1
   fi
   # The size is said only when there is no earlier website builder on this
@@ -2941,7 +2940,7 @@ fi
 
 run_container_with_mount() {
   retire_legacy_container
-  echo "🔗 Binding host courses to container: $HOST_COURSES ➜ /teaching/courses"
+  echo "🔗 Letting the website builder read and save your courses: $HOST_COURSES"
   # The builds folder is mounted at its OWN absolute path, unconditionally,
   # so that courses/<CODE>/.merged_output — a symlink to a path under
   # $HOME — resolves to the same place inside the container as it does
@@ -2982,7 +2981,7 @@ container_has_builds_mount() {
 DESIRED_IMAGE_ID=$(docker image inspect --format '{{.Id}}' "$IMAGE" 2>/dev/null || echo "")
 RUNNING_IMAGE_ID=$(docker inspect -f '{{.Image}}' "$CONTAINER_NAME" 2>/dev/null || echo "")
 
-echo "🚀 Starting container if needed..."
+echo "🚀 Getting this folder's website builder ready…"
 clear_away_this_folders_other_spelling
 if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
   # Container exists — check its current /teaching/courses mount
@@ -3013,22 +3012,21 @@ if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
   else
     # Mounts match; only start if not already running
     if docker ps --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
-      echo "✅ Container $CONTAINER_NAME is already running with correct mount."
+      echo "✅ This folder's website builder is already running."
     else
-      echo "🚀 Starting existing container $CONTAINER_NAME..."
+      echo "▶️  Starting this folder's website builder…"
       start_the_existing_workspace
     fi
   fi
 else
-  echo "🚀 Creating new container named $CONTAINER_NAME..."
+  echo "🆕 Setting up a website builder for this folder…"
   run_container_with_mount
 fi
 
 # Preflight: nudge if quartz.layout.ts in the container wasn't initialized by setup.sh
 echo "🔎 Preflight: checking Quartz sidebar anchor..."
 if ! docker exec -i "$CONTAINER_NAME" bash -lc 'test -f /opt/quartz/quartz.layout.ts && grep -q "const omit = new Set" /opt/quartz/quartz.layout.ts'; then
-  echo "⚠️  Sidebar omit anchor not found in container's Quartz layout."
-  echo "   Did you run: ./setup.sh and complete setup for '$COURSE'?"
+  echo "⚠️  The website builder could not find where it leaves hidden pages out of the sidebar."
   echo "   (Continuing anyway; the build will attempt a safe fallback.)"
 fi
 

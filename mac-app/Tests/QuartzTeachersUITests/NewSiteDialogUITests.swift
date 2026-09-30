@@ -317,7 +317,7 @@ struct StubDeploy {
         echo $$ > \(shellQuoted(pidFileURL.path))
         state=\(shellQuoted(stateURL.path))
         section="$2"
-        echo "Ensuring container is running"
+        echo "Getting this folder's website builder ready…"
         if [ ! -f "$state/surname" ]; then
             printf '%s ' \(shellQuoted(surnameQuestion))
             read -r surname

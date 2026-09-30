@@ -2057,10 +2057,11 @@
         "Setting up this PC",
         "Building your website builder",
         "Ensuring container is running",
-        "Starting container if needed"
+        "Starting container if needed",
+        "Getting this folder's website builder ready"
       ],
-      "note" : "The launcher markers are the two platforms' OWN text and no longer correspond one to one. Until 2026-08-19 they did, and this key was the single pair 'Setting up this Mac' → 'Setting up this PC'; then Windows dropped Docker for a native runtime (GUI-IMPROVEMENTS.md entry 290) and stopped printing that line, and the two container markers stopped having any Windows counterpart at all. Windows' own launcher markers are deliberately NOT carried here — they are the platform's text rather than the product's, so by this folder's own test they do not belong in the contract — and are pinned against the real .ps1 files by TaskMilestoneLauncherMarkerTests in windows-app/Plantoir.Tests/ParsingTests.cs.",
-      "whyTheListIsHere" : "So the other app can assert it never watches for any of them. A milestone matching a string no launcher on that platform prints cannot be reached, and the only symptom is a progress bar that sits still — which reads as a slow build. 'Setting up this PC' is in the list although it is nobody's text now: it was Windows' until the native runtime landed, and a milestone reaching for it again is the same silent stall. Read from here rather than typed into a test, because a hand-kept copy of the OTHER platform's wording goes stale the day that platform changes it."
+      "note" : "The launcher markers are the two platforms' OWN text and no longer correspond one to one. Until 2026-08-19 they did, and this key was the single pair 'Setting up this Mac' → 'Setting up this PC'; then Windows dropped Docker for a native runtime (GUI-IMPROVEMENTS.md entry 290) and stopped printing that line, and the two container markers stopped having any Windows counterpart at all. Those two became ONE plain-words marker on 2026-09-30 (GitHub #382), 'Getting this folder's website builder ready', printed by all three of the mac's launchers. Windows' own launcher markers are deliberately NOT carried here — they are the platform's text rather than the product's, so by this folder's own test they do not belong in the contract — and are pinned against the real .ps1 files by TaskMilestoneLauncherMarkerTests in windows-app/Plantoir.Tests/ParsingTests.cs.",
+      "whyTheListIsHere" : "So the other app can assert it never watches for any of them. A milestone matching a string no launcher on that platform prints cannot be reached, and the only symptom is a progress bar that sits still — which reads as a slow build. 'Setting up this PC' is in the list although it is nobody's text now: it was Windows' until the native runtime landed, and a milestone reaching for it again is the same silent stall. 'Ensuring container is running' and 'Starting container if needed' stay for the same reason: nobody prints them since #382, and a milestone copied from an old transcript would stall on them. Read from here rather than typed into a test, because a hand-kept copy of the OTHER platform's wording goes stale the day that platform changes it."
     },
     "note" : "Where each milestone's marker text actually comes from, which decides whether the two apps must match it. shared-python: printed by scripts/*.py, identical on both platforms, so the string must match EXACTLY. launcher: printed by setup.sh/preview.sh/deploy.sh, whose .ps1 counterparts are written separately — these deliberately differ, and since 2026-08-19 they do not even pair up (see knownDivergence). elsewhere: printed by the Docker build or a tool, and worth checking by hand. Getting this wrong is silent: a progress bar that stops moving looks like a slow build.",
     "origins" : {
@@ -2073,9 +2074,9 @@
       "Deploy complete" : "shared-python",
       "Deploying from local build" : "shared-python",
       "Done processing" : "elsewhere",
-      "Ensuring container is running" : "launcher",
       "Example Course installed to" : "shared-python",
       "EXAMPLE_COURSE_CODE=" : "shared-python",
+      "Getting this folder's website builder ready" : "launcher",
       "Host timezone offset" : "launcher",
       "Installing dependencies" : "shared-python",
       "Launching Quartz preview" : "shared-python",
@@ -2086,7 +2087,6 @@
       "Select folders/files to HIDE" : "shared-python",
       "set up successfully" : "shared-python",
       "Setting up this Mac" : "launcher",
-      "Starting container if needed" : "launcher",
       "timetable section numbers" : "shared-python",
       "to a folder" : "launcher",
       "Updated pageTitle" : "shared-python",
@@ -2106,7 +2106,7 @@
       },
       {
         "label" : "Starting up…",
-        "marker" : "Starting container if needed"
+        "marker" : "Getting this folder's website builder ready"
       },
       {
         "label" : "Gathering your content…",
@@ -2140,7 +2140,7 @@
       },
       {
         "label" : "Starting up…",
-        "marker" : "Starting container if needed"
+        "marker" : "Getting this folder's website builder ready"
       },
       {
         "label" : "Gathering your content…",
@@ -2174,7 +2174,7 @@
       },
       {
         "label" : "Starting up…",
-        "marker" : "Starting container if needed"
+        "marker" : "Getting this folder's website builder ready"
       },
       {
         "label" : "Gathering your content…",
@@ -2238,7 +2238,7 @@
       },
       {
         "label" : "Starting up…",
-        "marker" : "Ensuring container is running"
+        "marker" : "Getting this folder's website builder ready"
       },
       {
         "label" : "Checking your site…",
@@ -2272,7 +2272,7 @@
       },
       {
         "label" : "Starting up…",
-        "marker" : "Ensuring container is running"
+        "marker" : "Getting this folder's website builder ready"
       },
       {
         "label" : "Checking your site…",
@@ -2316,7 +2316,7 @@
       },
       {
         "label" : "Getting things ready…",
-        "marker" : "Starting container if needed"
+        "marker" : "Getting this folder's website builder ready"
       },
       {
         "label" : "Copying the example course…",
@@ -2339,7 +2339,7 @@
       },
       {
         "label" : "Starting up…",
-        "marker" : "Starting container if needed"
+        "marker" : "Getting this folder's website builder ready"
       },
       {
         "label" : "Gathering your content…",
