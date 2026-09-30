@@ -189,6 +189,33 @@ nonisolated enum AssistWording {
         return "The deploy of \(course) Section \(section) did not finish. " + AssistWording.whereTheOutputIs
     }
 
+    /// A deploy from a caller with no window (an assistant in another app,
+    /// or the in-app assistant with no section window open) stopped at a
+    /// question — a site name, a surname, a token — rather than waiting for
+    /// an answer nobody on this path can give (GitHub #378). Nothing was sent
+    /// to students. The window can answer it, and once it is answered it is
+    /// remembered, so the next deploy from here goes through.
+    static func deployNeedsAnAnswer(course: String, section: String) -> String {
+        return "\(course) Section \(section) needs one answer before it can be deployed from here, so nothing "
+             + "was sent to students. Deploy it once from its window in Plantoir, where the question can be "
+             + "answered; after that it can be deployed from here."
+    }
+
+    /// The same, when a course deploys to more than one place and the
+    /// question came from some of them. `destinations` is already joined
+    /// ("Cloudflare Pages", "Netlify and your folder").
+    static func deployNeedsAnAnswerAt(course: String, section: String, destinations: String) -> String {
+        return "\(course) Section \(section) was not deployed to \(destinations): it needs one answer there "
+             + "that can only be given from its window in Plantoir. Deploy it once from there; after that it "
+             + "can be deployed from here."
+    }
+
+    /// Added after `deployNeedsAnAnswerAt` when the other destinations did
+    /// go out, so the teacher is not left thinking nothing happened.
+    static func deployWentOutTo(destinations: String) -> String {
+        return "It did go out to \(destinations)."
+    }
+
     /// Said only when a course has MORE THAN ONE deploy destination
     /// configured and every one of them succeeded — a course with exactly
     /// one destination (the overwhelming majority) always uses `deployed`
@@ -295,6 +322,13 @@ nonisolated enum AssistWording {
     static func rebuiltForACallerWithNoWindow(course: String, section: String) -> String {
         return "Rebuilt the preview for \(course) Section \(section). Open that section in Plantoir "
              + "to look it over."
+    }
+
+    /// A rebuild for a caller with no window stopped at a question rather
+    /// than waiting for ever (#378) — the course-code check a build asks.
+    static func previewBuildNeedsAnAnswer(course: String, section: String) -> String {
+        return "The preview for \(course) Section \(section) needs one answer before it can be built from "
+             + "here. Build it once from its window in Plantoir, where the question can be answered."
     }
 
     static func previewDidNotBuild(course: String, section: String) -> String {

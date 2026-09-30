@@ -3215,6 +3215,20 @@
       },
       {
         "expectEvents" : [
+          "runLauncherDirectly"
+        ],
+        "expectReply" : "wording.deployNeedsAnAnswer",
+        "given" : {
+          "previewRunning" : false,
+          "sectionWindowOpen" : false,
+          "theDeployMeetsAQuestion" : true
+        },
+        "name" : "deploy with no section window open, which meets a question",
+        "when" : "deploy_section",
+        "why" : "GitHub #378. With no window, nobody can answer a question a deploy asks (a site name, a surname, a token), so the launchers run --non-interactive and refuse with exit 3; the reply names that, and where to answer it, rather than saying the deploy 'did not finish'. Before, the question waited for ever on a terminal nobody read, and a session closed meanwhile left it inside the folder's workspace, holding every preview back until the Mac was restarted. The mac's real path is pinned by HeadlessDeployAnswersTests; this case pins that the sentence reaches the reply."
+      },
+      {
+        "expectEvents" : [
           "deploy"
         ],
         "expectReply" : "wording.sectionIsBusy",
