@@ -78,15 +78,6 @@ public class ContractTests
             string.Join(", ", unresolved) + ". Add the member (the mac owns the words; copy them), or " +
             "ledger the key by name against the open issue that owns it.");
 
-        var differs = here
-            .Select(key => (key, member: WordingMember(key)))
-            .Where(entry => entry.member is FieldInfo { FieldType: var type } && type == typeof(string))
-            .Where(entry => (string?)((FieldInfo)entry.member!).GetValue(null) != wording[entry.key]!.ToString())
-            .Select(entry => $"{entry.key}: contract \"{wording[entry.key]}\", here \"{((FieldInfo)entry.member!).GetValue(null)}\"")
-            .ToList();
-        Assert.True(differs.Count == 0,
-            "These sentences differ from assist-wording.json:\n" + string.Join("\n", differs));
-
         // ---- The other direction: a member of AssistWording with no key.
         var keySet = keys.ToHashSet(StringComparer.Ordinal);
         var members = typeof(AssistWording)
@@ -111,6 +102,16 @@ public class ContractTests
             "AssistWording carries sentences assist-wording.json does not name: " + string.Join(", ", keyless) +
             ". The mac owns the sentence (CLAUDE.md rule 2): propose the key on a `mac` issue, or say here " +
             "why the two apps word it differently.");
+
+        // ---- Values last, so a sentence that differs cannot hide a missing key.
+        var differs = here
+            .Select(key => (key, member: WordingMember(key)))
+            .Where(entry => entry.member is FieldInfo { FieldType: var type } && type == typeof(string))
+            .Where(entry => (string?)((FieldInfo)entry.member!).GetValue(null) != wording[entry.key]!.ToString())
+            .Select(entry => $"{entry.key}: contract \"{wording[entry.key]}\", here \"{((FieldInfo)entry.member!).GetValue(null)}\"")
+            .ToList();
+        Assert.True(differs.Count == 0,
+            "These sentences differ from assist-wording.json:\n" + string.Join("\n", differs));
     }
 
     /// <summary>
