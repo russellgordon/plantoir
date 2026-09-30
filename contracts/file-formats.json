@@ -24,17 +24,17 @@
       {
         "key": "class_page_scheme",
         "type": "string (\"unit_day\" or \"numbered\")",
-        "why": "The SHAPE of this course's class-page names (#267). \"unit_day\" is \u201c<unit_word> 2, Day 3\u201d; \"numbered\" is \u201c<unit_word> 3\u201d, one number counting meetings \u2014 what a club writes. ABSENT means \"unit_day\", and so does any value a reader does not know: a scheme a newer app wrote, opened by an older one, reads as today's shape (it then sees no class pages \u2014 degraded, never corrupting) and nothing is rewritten. Written by the new-course wizard for a CLUB only (with front_page_heading and class_noun) \u2014 every other course's file stays byte-for-byte what it was, which absence already describes \u2014 chosen there and NOT switchable afterwards: Course Settings shows it locked. A course made before the key existed (Russell's CODING, whose pages are already \u201cWeek N\u201d) can never become numbered by opening it."
+        "why": "The SHAPE of this course's class-page names (#267). \"unit_day\" is \u201c<unit_word> 2, Day 3\u201d; \"numbered\" is \u201c<unit_word> 3\u201d, one number counting meetings \u2014 what a club writes. ABSENT means \"unit_day\", and so does any value a reader does not know: a scheme a newer app wrote, opened by an older one, reads as today's shape (it then sees no class pages \u2014 degraded, never corrupting) and nothing is rewritten. Written by the new-course wizard for a CLUB only (with front_page_heading and class_noun) \u2014 every other course's file stays byte-for-byte what it was, which absence already describes \u2014 chosen there and NOT switchable afterwards: Course Settings shows it locked, when recorded (shared-rules.json \u2192 wizard.clubToggle.settingsRows.shownWhen). A course made before the key existed (Russell's CODING, whose pages are already \u201cWeek N\u201d) can never become numbered by opening it."
       },
       {
         "key": "front_page_heading",
         "type": "string",
-        "why": "The heading each section's front page is created with, above the embed of the newest class (#267): a club writes \u201cMost Recent Meeting\u201d. ABSENT means \u201cMost Recent Class\u201d for a course being created \u2014 but for a course that already exists it means only that nothing was recorded: its pages say whatever they say (CODING's reads \u201cMost Recent Meeting\u201d), so Course Settings shows the absent key as not recorded, never as this default (shared-rules.json \u2192 wizard.clubToggle.settingsRows.frontPageHeadingNotSet). Read ONLY when a course is created \u2014 the course setup writes it into a new numbered course's front pages \u2014 and never by whatever repoints the front page, which finds the embed by the class page it names, not by the heading; a teacher's own heading is therefore never fought over. Not switchable after the wizard; Course Settings shows it locked."
+        "why": "The heading each section's front page is created with, above the embed of the newest class (#267): a club writes \u201cMost Recent Meeting\u201d. ABSENT means \u201cMost Recent Class\u201d for a course being created \u2014 but for a course that already exists it means only that nothing was recorded: its pages say whatever they say (CODING's reads \u201cMost Recent Meeting\u201d), so Course Settings shows no row for it, never this default (shared-rules.json \u2192 wizard.clubToggle.settingsRows.shownWhen, #376). Read ONLY when a course is created \u2014 the course setup writes it into a new numbered course's front pages \u2014 and never by whatever repoints the front page, which finds the embed by the class page it names, not by the heading; a teacher's own heading is therefore never fought over. Not switchable after the wizard; Course Settings shows it locked, when recorded (shared-rules.json \u2192 wizard.clubToggle.settingsRows.shownWhen)."
       },
       {
         "key": "class_noun",
         "type": "string (\"class\" or \"meeting\")",
-        "why": "What the assistant calls one of this course's class pages when it talks to the teacher (#267): a club writes \"meeting\". ABSENT means \"class\", and so does any unknown value. A closed pair rather than free text because the sentences carry articles and plurals (\u201ca meeting\u201d, \u201cmeetings\u201d); each variant is written out in full in the app's wording. Read by both apps only \u2014 the build never reads it \u2014 and it moves no byte of what the assistant's model is shown. Not switchable after the wizard; Course Settings shows it locked."
+        "why": "What the assistant calls one of this course's class pages when it talks to the teacher (#267): a club writes \"meeting\". ABSENT means \"class\", and so does any unknown value. A closed pair rather than free text because the sentences carry articles and plurals (\u201ca meeting\u201d, \u201cmeetings\u201d); each variant is written out in full in the app's wording. Read by both apps only \u2014 the build never reads it \u2014 and it moves no byte of what the assistant's model is shown. Not switchable after the wizard; Course Settings shows it locked, when recorded (shared-rules.json \u2192 wizard.clubToggle.settingsRows.shownWhen)."
       },
       {
         "key": "graded_folders",
@@ -60,6 +60,11 @@
         "example": "Introduction to Computer Science",
         "key": "course_name",
         "type": "string"
+      },
+      {
+        "key": "color_schemes",
+        "type": "per-section map of strings, e.g. color_schemes.section2",
+        "why": "The colour scheme each section's site is drawn in: a scheme id from support/colour_schemes.json (43 available), used for quartz.config.ts colours and the section's social sharing card. ABSENT, or no entry for a section, means none chosen: the build keeps the site builder's standard colours. A FLAT map keyed section<N> \u2014 unlike emojis/fonts/show_section_marker there is no \"sections\" level. Written by setup and by either app's per-section settings; a Save compares it like every other key (shared-rules.json \u2192 savingSettings.whatEnablesSave). Missing from this list until 2026-09-29 (#373's plan): the key-count test could not see it because the mac read it by subscript, not through forKey:."
       },
       {
         "key": "custom_domains",

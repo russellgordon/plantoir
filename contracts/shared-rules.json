@@ -55,6 +55,11 @@
         "why": "A save that failed leaves the teacher believing it succeeded. Recording only successes would hide exactly the case worth seeing."
       },
       {
+        "carries": "the course code and WHICH check held Save back: deploy folder, cloudflare account id, or additional destination — never the path or the ID. Written once per visit to the course, on the change into the held-back state, not per keystroke.",
+        "event": "settings save held back",
+        "why": "#373: a teacher reported that Save would not light up for a section's change, and the trail held nothing, because nothing was pressed — the held-back state is the one place where the form changes and no act follows. Since #373 a destination problem holds Save back only when the unsaved edit moves where the course publishes (savingSettings.whatEnablesSave), so this line also says that is what happened. Example: “Save held back for ICS3U (deploy folder) — the publishing folder needs attention”. Worded as a HOLD, not a failure: no Save was pressed, and a reader of the trail must not take it for one that failed (#373 implementation review, N2)."
+      },
+      {
         "carries": "the course code and the section",
         "event": "preview started with unsaved settings",
         "why": "A preview reads the SAVED settings file, while Course Settings keeps unsaved edits in memory and goes on showing them after the teacher leaves the form. A preview started in that state disagrees with the switches on screen for a reason nothing on screen explains, so the teacher is told (specialNames.previewUsesSavedSettings) and the trail says it happened (issue #265)."
@@ -5764,15 +5769,97 @@
         "pageWordCaption": "Pages will be named “{word} 1”, “{word} 2” and so on."
       },
       "settingsRows": {
-        "note": "Course Settings shows the three new settings as LOCKED rows — a label and the value, no control — for every course, with one caption under them. The unit word keeps its own row, whose Rename… button is disabled for a numbered course (specialNames.renameUnitWord.renameLockedNumbered).",
+        "note": "Course Settings shows the three new settings as LOCKED rows — a label and the value, no control — for a course that RECORDED them (shownWhen), with one caption under them. The unit word keeps its own row, whose Rename… button is disabled for a numbered course (specialNames.renameUnitWord.renameLockedNumbered).",
         "pageNaming": "Class pages are named",
         "pageNamingValue": "“{first page}” — the course's own first page name: “Unit 1, Day 1”, “Module 1, Day 1”, “Week 1”",
         "frontPageHeading": "Front page heading",
         "frontPageHeadingValue": "the course's recorded front_page_heading, exactly as stored — never a default",
-        "frontPageHeadingNotSet": "Not recorded — the front page keeps the heading it already has",
-        "frontPageHeadingWhy": "Shown for a course WITHOUT front_page_heading — every course made before #267, CODING included. The first version showed “Most Recent Class” there, and CODING's front page reads “## Most Recent Meeting”: a locked row stating something the page does not say (#267 implementation review, LOW). Nothing rewrites a heading after creation, so the row does not guess.",
+        "frontPageHeadingWhy": "HISTORY: from #267 until #376 a course WITHOUT front_page_heading showed the row with “Not recorded — the front page keeps the heading it already has” (frontPageHeadingNotSet), because the first version had shown “Most Recent Class” there and CODING's front page reads “## Most Recent Meeting”: a locked row stating something the page does not say (#267 implementation review, LOW). RETIRED by Russell, 2026-09-27 (#376): a row that can never change and records nothing tells a teacher nothing, so it is now not drawn at all (shownWhen). Never build the “Not recorded” sentence; Windows never had it.",
         "noun": "The assistant calls a page a",
-        "lockedCaption": "Chosen when the course was made. An existing course keeps these; they cannot be changed here."
+        "lockedCaption": "Chosen when the course was made. An existing course keeps these; they cannot be changed here.",
+        "shownWhen": "Each locked row is drawn only when its key is PRESENT in course_config.json with a non-blank string (surrounding spaces trimmed): pageNaming ← class_page_scheme, frontPageHeading ← front_page_heading, noun ← class_noun. The group, its header and lockedCaption are omitted when no row is drawn. A present value this app does not know (a class_page_scheme written by a newer app) IS drawn, as this app reads it.",
+        "shownWhenWhy": "#376 (Russell, 2026-09-27: “if there's no point in showing the setting (i.e. for a course made before the setting existed) then yes, it should be hidden”). Only the wizard writes the three keys, all together, and only for a club made since #267, so an absent key means an ordinary course. For such a course the page-naming row repeated, word for word, the caption under “What do you call a unit?” three rows above it (plantoir.app's courses-light.png, y≈606 and y≈756), and the noun row said “class” for every course. REJECTED: showing derived defaults for class_page_scheme/class_noun (the repetition above); reading the heading from index.md (#267 rejected it: one section's page, possibly edited on purpose).",
+        "shownWhenCases": [
+          {
+            "name": "an ordinary course records none",
+            "given": {},
+            "expect": []
+          },
+          {
+            "name": "a club made since #267 records all three",
+            "given": {
+              "unit_word": "Meeting",
+              "class_page_scheme": "numbered",
+              "front_page_heading": "Most Recent Meeting",
+              "class_noun": "meeting"
+            },
+            "expect": [
+              "pageNaming",
+              "frontPageHeading",
+              "noun"
+            ],
+            "values": {
+              "pageNaming": "“Meeting 1”",
+              "frontPageHeading": "Most Recent Meeting",
+              "noun": "meeting"
+            }
+          },
+          {
+            "name": "a blank heading is not a recorded one",
+            "given": {
+              "front_page_heading": "   "
+            },
+            "expect": []
+          },
+          {
+            "name": "a hand-edited scheme alone",
+            "given": {
+              "class_page_scheme": "numbered"
+            },
+            "expect": [
+              "pageNaming"
+            ]
+          },
+          {
+            "name": "a scheme from a newer app is shown as this app reads it",
+            "given": {
+              "class_page_scheme": "someday_scheme"
+            },
+            "expect": [
+              "pageNaming"
+            ],
+            "values": {
+              "pageNaming": "“Unit 1, Day 1”"
+            }
+          },
+          {
+            "name": "an empty noun is not a recorded one",
+            "given": {
+              "class_noun": ""
+            },
+            "expect": []
+          },
+          {
+            "name": "a noun alone",
+            "given": {
+              "class_noun": "meeting"
+            },
+            "expect": [
+              "noun"
+            ],
+            "values": {
+              "noun": "meeting"
+            }
+          },
+          {
+            "name": "CODING's real shape",
+            "given": {
+              "course_code": "CODING",
+              "unit_word": "Week"
+            },
+            "expect": []
+          }
+        ]
       },
       "club": {
         "classFolder": "All Meetings",
@@ -14412,6 +14499,51 @@
       }
     ]
   },
+  "courseSettingsWording": {
+    "localeLabel": "Language and region",
+    "localeCaption": "Used for dates and the words on your website’s own pages.",
+    "colourSchemeNoneChosen": "Standard colours (none chosen)",
+    "saveHeldBack": "Save is held back until Deploying is fixed: {reason}",
+    "saveHeldBackReason": "{reason} is the destination's own sentence, unchanged: app-rules.json → configurationRules (the deploy-folder and Cloudflare Account ID problems).",
+    "where": "localeLabel names the locale picker in Course Settings AND in the new-course wizard, so the setting has one name wherever it is chosen; localeCaption sits under it in Course Settings. colourSchemeNoneChosen is the colour-scheme picker's entry for a section with no scheme chosen. saveHeldBack is said beside Save (savingSettings.whatEnablesSave).",
+    "why": "#369 (2026-09-27): Course Settings' first settings row read “Language / region (Quartz locale)” from v1.1.0 to v1.4.0, naming the site builder in a label a teacher reads (CLAUDE.md rule 1), and it was the first row in plantoir.app's headline picture. The label scan that found it (userFacingLabelWords) found one more: “Quartz default (none chosen)” in the colour-scheme picker. The wizard said “Language / region”; both now say the same thing. REJECTED: keeping “locale” in brackets (a word only a developer uses); putting these in AssistWording (they are not the assistant's words)."
+  },
+  "userFacingLabelWords": {
+    "forbidden": [
+      "quartz",
+      "toolchain",
+      "docker",
+      "container",
+      "colima",
+      "script",
+      "json",
+      "mcp",
+      "gpu",
+      "llama",
+      "qwen",
+      "wrangler",
+      "python",
+      "toolchains",
+      "dockers",
+      "containers",
+      "colimas",
+      "scripts",
+      "jsons",
+      "gpus",
+      "llamas",
+      "wranglers",
+      "pythons"
+    ],
+    "matching": "Whole word and case-insensitive: “description” does not contain “script”. A plural is a different word to a whole-word match, so the plurals are LISTED (“scripts”, “containers”, …) rather than inferred — data both platforms read, not a matcher rule each must reimplement (#369 implementation review, N5; measured 2026-09-30 over all of the mac app: zero hits for any of them). Comments are not labels and are skipped.",
+    "scope": "On the mac: every string literal passed straight to a call that puts words on screen, in QuartzTeachers/Views — Text, Picker, Toggle, Button, LabeledContent, TextField, SecureField, Label, DisclosureGroup, ExampleCaption, FormSectionHeader, Section, .help, .navigationTitle, .alert, .confirmationDialog. Wording held in a named key is pinned by that key's own contract instead.",
+    "exceptions": [
+      {
+        "what": "the About window's credit to Quartz, by name",
+        "why": "It credits Jacky Zhao's Quartz and asks the reader to sponsor him: naming it is the point. On the mac it is a LocalizedStringKey constant rather than a label literal, so the scan never reaches it; a platform whose scan does reach it exempts it by this entry."
+      }
+    ],
+    "why": "CLAUDE.md rule 1: the GUI never mentions the machinery. Until #369 that rule was enforced only by word lists inside individual features' tests, and no test scanned the labels in the views, which is how “Quartz locale” shipped from v1.1.0 to v1.4.0. Measured on 2026-09-29 with this list and this scope: exactly two hits, both fixed in #369. “terminal” is deliberately NOT on the list — “New Terminal at Folder” is a real macOS action a teacher uses."
+  },
   "savingSettings": {
     "rule": "A Save writes only the settings THIS window changed since it last read or wrote the course's settings file. Every other setting keeps the value the file has now. Compared per TOP-LEVEL key of course_config.json, never inside a list. After a Save, every other window's copy of that course that has nothing unsaved reads the file again; a copy with unsaved changes is left alone, and its own Save follows the same rule.",
     "why": "Issue #265, confirmed by Russell 2026-09-24: two windows were open on one working folder, each holding its own copy of a course's settings, and the Save was a blind whole-file write. Window A saved three sidebar hides; window B, which had not seen that, saved an unrelated setting and the file went back to B's ten hides while both windows said nothing was unsaved - measured with the real CourseConfiguration.swift and a copy of his course. The same stale write came from Add Section, archive, restore, course rename and school year, so the rule is in the ONE write they all use. Per key rather than per list element because merging inside a list needs rules for order and for an item removed on one side and added on the other, and nothing reported needs them. When both sides changed the same key, the Save being made wins and the trail says it replaced a change made elsewhere. Rejected: refusing the Save and reloading (loses what the teacher just did, for a case the trail can record); a file watcher per window (a new moving part for a case the reload-after-Save covers).",
@@ -14556,7 +14688,580 @@
         }
       ]
     },
-    "casesWhy": "base = the file as this window last read or wrote it; onDisk = the file now; mine = this window now; written = what the Save puts in the file (and this window then holds). keptFromElsewhere and replacedChangesFromElsewhere are sorted key names, and are what the 'settings saved' trail line reports."
+    "casesWhy": "base = the file as this window last read or wrote it; onDisk = the file now; mine = this window now; written = what the Save puts in the file (and this window then holds). keptFromElsewhere and replacedChangesFromElsewhere are sorted key names, and are what the 'settings saved' trail line reports.",
+    "whatEnablesSave": {
+      "rule": "Save is enabled exactly when this window's copy of the course's settings differs from what it last read or wrote — compared over EVERY top-level key of course_config.json, course-wide and per-section alike — and no problem holds it back. Revert is enabled exactly when the copy differs. A problem with where the course publishes (configurationRules: the deploy folder, the Cloudflare Account ID on this Mac, an additional destination) holds Save back ONLY when the unsaved changes move where the course publishes — the primary destination, its folder, or any additional destination, compared with what this window last read or wrote. Otherwise Save proceeds and the problem stays reported where it always was, under Deploying. When Save is held back, courseSettingsWording.saveHeldBack is said beside Save with the problem's own sentence as {reason}, and the trail says `settings save held back` once per visit to the course.",
+      "why": "#364 (v1.4.0's dark marketing picture showed Save apparently enabled on a freshly opened course) and #373 (Russell, 2026-09-27: a change made only on a section's page did not enable Save) were filed as one comparison wrong in both directions. Measured on dev 2e11471d with the course in #364's picture, in the real window, in light and dark, in Debug and Release, pressing the real per-section control through accessibility: the comparison is right both ways — a fresh course reads clean, and every per-section change enables Save and Revert. #364's own picture proves it: Revert is disabled in the same frame, (38,38,38), and Save cannot be enabled while Revert is not; Save was a DISABLED accent button, (17,70,126), with a dimmed label (155,177,201), which reads as enabled on a dark window. So the look was fixed (Save wears the accent only when it can be pressed — mac-visual, not in this contract) and both directions are pinned here. The one path that kept Save grey after a per-section change was a destination problem: a local_folder course whose folder is missing on THIS Mac, or a Cloudflare course with no Account ID on this Mac, blocked every save, and nothing near Save said why. That block now applies only to an edit that moves the destination, because a destination already broken on disk is not made worse by saving a colour scheme — the likeliest real #373 (director's ruling on the plan review, 2026-09-29). REJECTED: rewriting the comparison per key or normalising on load (it is not wrong, and normalising on load would itself dirty a fresh form or write changes nobody asked for); `.tint(.gray)` on a disabled accent Save (unmeasured); the system default-button (Return would save from any field).",
+      "perSectionKeys": [
+        "emojis.sections.section<N>",
+        "color_schemes.section<N>",
+        "fonts.sections.section<N>",
+        "show_section_marker.sections.section<N>",
+        "show_grade_in_title.sections.section<N>",
+        "custom_domains.sections.section<N>"
+      ],
+      "perSectionKeysWhy": "Every per-section key a Save writes. Each top-level name is checked against file-formats.json → courseConfigKeys, so a per-section key added later has to be listed here to be tested.",
+      "baseShape": {
+        "class_folder": "All Classes",
+        "color_schemes": {
+          "section1": "quartz-standard",
+          "section2": "quartz-standard"
+        },
+        "course_code": "ICS3U",
+        "course_name": "Intro to Comp Sci",
+        "curriculum_folder": "Curriculum",
+        "curriculum_folders": [
+          "Curriculum",
+          "College Board Curriculum"
+        ],
+        "custom_short_name": "",
+        "deploy_target": "netlify",
+        "emojis": {
+          "sections": {
+            "section1": "📚",
+            "section2": "📚"
+          }
+        },
+        "expandable": [
+          "Concepts",
+          "Warm-Ups",
+          "Explorations",
+          "Exercises",
+          "Programs",
+          "Discussions",
+          "Portfolios",
+          "Tutorials",
+          "Setup",
+          "Style",
+          "Tasks",
+          "College Board Curriculum"
+        ],
+        "expandOnFolderClick": false,
+        "fonts": {
+          "default": {
+            "body": "Helvetica, Arial",
+            "code": "IBM Plex Mono",
+            "header": "Helvetica, Arial"
+          },
+          "sections": {
+            "section1": {
+              "body": "Helvetica, Arial",
+              "code": "IBM Plex Mono",
+              "header": "Helvetica, Arial"
+            },
+            "section2": {
+              "body": "Helvetica, Arial",
+              "code": "IBM Plex Mono",
+              "header": "Helvetica, Arial"
+            }
+          }
+        },
+        "footer_html": "",
+        "graded_folders": [
+          "Tasks"
+        ],
+        "hidden": [
+          "Curriculum",
+          "Learning Goals.md",
+          "Help Sessions.md",
+          "Key Links.md",
+          "Private Notes.md",
+          "Scratch Page.md",
+          "Media",
+          "College Board Curriculum"
+        ],
+        "include_coverage_notes": true,
+        "include_curriculum_coverage": true,
+        "include_curriculum_pages": true,
+        "locale": "en-US",
+        "num_sections": 2,
+        "per_section_files": [
+          "Key Links.md",
+          "Private Notes.md",
+          "Scratch Page.md"
+        ],
+        "per_section_folders": [
+          "All Classes"
+        ],
+        "prepopulate_example_content": true,
+        "section_numbers": [
+          1,
+          2
+        ],
+        "shared_files": [
+          "Learning Goals.md",
+          "Help Sessions.md"
+        ],
+        "shared_folders": [
+          "Concepts",
+          "Warm-Ups",
+          "Explorations",
+          "Exercises",
+          "Programs",
+          "Discussions",
+          "Portfolios",
+          "Tutorials",
+          "Setup",
+          "Style",
+          "Tasks",
+          "Curriculum",
+          "College Board Curriculum"
+        ],
+        "show_grade_in_title": {
+          "sections": {
+            "section1": true,
+            "section2": true
+          }
+        },
+        "show_reading_time": false,
+        "show_section_marker": {
+          "sections": {
+            "section1": true,
+            "section2": true
+          }
+        },
+        "unit_word": "Unit",
+        "use_lcs_terminology": false,
+        "use_skeleton": false
+      },
+      "baseShapeWhy": "The ICS3U course in #364's picture (plantoir.app's courses-light/dark.png), with its destination changed from a folder on one Mac to Netlify so no case depends on a folder that exists only there (plan review S1). course_code is replaced by the test's own fixture code.",
+      "casesWhy": "Each case's configuration is baseShape with `set` applied (top-level keys replaced) and `remove` removed. {missingFolder} and {anotherMissingFolder} are absolute paths that do not exist and {existingFolder} a writable folder that does, made by the test. A change is either {\"section\": N, \"key\": <a perSectionKeys entry>, \"value\": …} — made through the control's own binding — or {\"setting\": \"deployTarget\" | \"deployFolderPath\", \"value\": …}, or {\"setting\": \"addAdditionalDestination\", \"type\": …, \"path\": …}. A font value is the section's whole choice. `written` and `unchanged` are paths into the file after Save.",
+      "freshOpenCases": [
+        {
+          "name": "the course in #364's picture",
+          "set": {},
+          "remove": []
+        },
+        {
+          "name": "curriculum_folder only, no list (a course from before #128)",
+          "set": {},
+          "remove": [
+            "curriculum_folders"
+          ]
+        },
+        {
+          "name": "graded_folders absent (never asked)",
+          "set": {},
+          "remove": [
+            "graded_folders"
+          ]
+        },
+        {
+          "name": "a custom domain in the OLD bare-string shape",
+          "set": {
+            "custom_domains": {
+              "sections": {
+                "section1": "ics3u.school.ca"
+              }
+            }
+          },
+          "remove": []
+        },
+        {
+          "name": "emojis, color_schemes, fonts and footer_html absent",
+          "set": {},
+          "remove": [
+            "emojis",
+            "color_schemes",
+            "fonts",
+            "footer_html"
+          ]
+        },
+        {
+          "name": "a club, with the three words it recorded",
+          "set": {
+            "unit_word": "Meeting",
+            "class_page_scheme": "numbered",
+            "front_page_heading": "Most Recent Meeting",
+            "class_noun": "meeting",
+            "custom_short_name": "Robots"
+          },
+          "remove": []
+        },
+        {
+          "name": "show_grade_in_title as the legacy course-wide Bool",
+          "set": {
+            "show_grade_in_title": false
+          },
+          "remove": []
+        },
+        {
+          "name": "a stored emoji holding two (a hand edit)",
+          "set": {
+            "emojis": {
+              "sections": {
+                "section1": "📚🔬",
+                "section2": "📚"
+              }
+            }
+          },
+          "remove": [],
+          "why": "The emoji field always settles on one emoji and used to write the one it kept the moment the form appeared, so this course read as changed on open (plan review, finding 11). The stored value is now read as one emoji; the file keeps what it has until the teacher chooses."
+        }
+      ],
+      "freshOpenExpect": {
+        "dirty": false,
+        "saveEnabled": false,
+        "revertEnabled": false
+      },
+      "perSectionEditCases": [
+        {
+          "name": "a section's header emoji",
+          "set": {},
+          "change": {
+            "section": 1,
+            "key": "emojis.sections.section<N>",
+            "value": "🔬"
+          },
+          "written": [
+            {
+              "path": [
+                "emojis",
+                "sections",
+                "section1"
+              ],
+              "value": "🔬"
+            }
+          ],
+          "unchanged": [
+            {
+              "path": [
+                "emojis",
+                "sections",
+                "section2"
+              ],
+              "value": "📚"
+            }
+          ]
+        },
+        {
+          "name": "a section's colour scheme — #373's example",
+          "set": {},
+          "change": {
+            "section": 2,
+            "key": "color_schemes.section<N>",
+            "value": "coastal-breeze"
+          },
+          "written": [
+            {
+              "path": [
+                "color_schemes",
+                "section2"
+              ],
+              "value": "coastal-breeze"
+            }
+          ],
+          "unchanged": [
+            {
+              "path": [
+                "color_schemes",
+                "section1"
+              ],
+              "value": "quartz-standard"
+            }
+          ]
+        },
+        {
+          "name": "a section's code font",
+          "set": {},
+          "change": {
+            "section": 1,
+            "key": "fonts.sections.section<N>",
+            "value": {
+              "header": "Helvetica, Arial",
+              "body": "Helvetica, Arial",
+              "code": "Fira Code"
+            }
+          },
+          "written": [
+            {
+              "path": [
+                "fonts",
+                "sections",
+                "section1",
+                "code"
+              ],
+              "value": "Fira Code"
+            }
+          ],
+          "unchanged": [
+            {
+              "path": [
+                "fonts",
+                "sections",
+                "section2",
+                "code"
+              ],
+              "value": "IBM Plex Mono"
+            }
+          ]
+        },
+        {
+          "name": "a section's marker",
+          "set": {},
+          "change": {
+            "section": 2,
+            "key": "show_section_marker.sections.section<N>",
+            "value": false
+          },
+          "written": [
+            {
+              "path": [
+                "show_section_marker",
+                "sections",
+                "section2"
+              ],
+              "value": false
+            }
+          ],
+          "unchanged": [
+            {
+              "path": [
+                "show_section_marker",
+                "sections",
+                "section1"
+              ],
+              "value": true
+            }
+          ]
+        },
+        {
+          "name": "a section's grade in its title",
+          "set": {},
+          "change": {
+            "section": 2,
+            "key": "show_grade_in_title.sections.section<N>",
+            "value": false
+          },
+          "written": [
+            {
+              "path": [
+                "show_grade_in_title",
+                "sections",
+                "section2"
+              ],
+              "value": false
+            }
+          ],
+          "unchanged": [
+            {
+              "path": [
+                "show_grade_in_title",
+                "sections",
+                "section1"
+              ],
+              "value": true
+            }
+          ]
+        },
+        {
+          "name": "a section's custom domain",
+          "set": {},
+          "change": {
+            "section": 1,
+            "key": "custom_domains.sections.section<N>",
+            "destinationType": "netlify",
+            "value": "ics3u.school.ca"
+          },
+          "written": [
+            {
+              "path": [
+                "custom_domains",
+                "sections",
+                "section1",
+                "netlify"
+              ],
+              "value": "ics3u.school.ca"
+            }
+          ],
+          "unchanged": []
+        },
+        {
+          "name": "a section's grade, on a course with the legacy course-wide false",
+          "set": {
+            "show_grade_in_title": false
+          },
+          "change": {
+            "section": 2,
+            "key": "show_grade_in_title.sections.section<N>",
+            "value": true
+          },
+          "written": [
+            {
+              "path": [
+                "show_grade_in_title",
+                "sections",
+                "section2"
+              ],
+              "value": true
+            }
+          ],
+          "unchanged": [
+            {
+              "path": [
+                "show_grade_in_title",
+                "sections",
+                "section1"
+              ],
+              "value": false
+            }
+          ],
+          "why": "The legacy Bool is replaced by the per-section map the first time a section is set. It used to be replaced by an EMPTY map, so section 1 silently read the default, true: a change to one section turned another's grade back on (plan review, finding 10). Every section is now seeded with the legacy value first. KNOWN GAP (#373 review, N6): a section ADDED after that seeding has no entry and reads the default, on, where the untouched legacy Bool would have given it off. Closing it needs a course-wide default inside the map that build_site.py and Windows read too, so it is not done here; only a course with the pre-per-section Bool that has already been toggled can meet it."
+        }
+      ],
+      "perSectionEditExpect": {
+        "dirty": true,
+        "saveEnabled": true,
+        "revertEnabled": true
+      },
+      "heldBackCases": [
+        {
+          "name": "a folder missing on this Mac does not hold back a section's change",
+          "set": {
+            "deploy_target": "local_folder",
+            "deploy_folder_path": "{missingFolder}"
+          },
+          "cloudflareAccountIDOnThisMac": "",
+          "changes": [
+            {
+              "section": 2,
+              "key": "color_schemes.section<N>",
+              "value": "coastal-breeze"
+            }
+          ],
+          "expect": {
+            "saveEnabled": true,
+            "revertEnabled": true,
+            "heldBack": false
+          },
+          "why": "The folder is already in the file; saving a colour scheme cannot make that worse. Before 2026-09-29 this was held back, silently — the likeliest real #373."
+        },
+        {
+          "name": "a Cloudflare course with no Account ID on this Mac saves a section's change",
+          "set": {
+            "deploy_target": "cloudflare_pages"
+          },
+          "cloudflareAccountIDOnThisMac": "",
+          "changes": [
+            {
+              "section": 1,
+              "key": "emojis.sections.section<N>",
+              "value": "🔬"
+            }
+          ],
+          "expect": {
+            "saveEnabled": true,
+            "revertEnabled": true,
+            "heldBack": false
+          }
+        },
+        {
+          "name": "moving the course to a folder that does not exist is held back, and says why",
+          "set": {},
+          "cloudflareAccountIDOnThisMac": "",
+          "changes": [
+            {
+              "setting": "deployTarget",
+              "value": "local_folder"
+            },
+            {
+              "setting": "deployFolderPath",
+              "value": "{missingFolder}"
+            }
+          ],
+          "expect": {
+            "saveEnabled": false,
+            "revertEnabled": true,
+            "heldBack": true,
+            "check": "deploy folder",
+            "sentence": "courseSettingsWording.saveHeldBack",
+            "reason": "That folder doesn’t exist — use Choose… to pick or create one."
+          }
+        },
+        {
+          "name": "moving the course to a folder that exists saves",
+          "set": {},
+          "cloudflareAccountIDOnThisMac": "",
+          "changes": [
+            {
+              "setting": "deployTarget",
+              "value": "local_folder"
+            },
+            {
+              "setting": "deployFolderPath",
+              "value": "{existingFolder}"
+            }
+          ],
+          "expect": {
+            "saveEnabled": true,
+            "revertEnabled": true,
+            "heldBack": false
+          }
+        },
+        {
+          "name": "moving a folder that is missing to another missing folder is held back",
+          "set": {
+            "deploy_target": "local_folder",
+            "deploy_folder_path": "{missingFolder}"
+          },
+          "cloudflareAccountIDOnThisMac": "",
+          "changes": [
+            {
+              "setting": "deployFolderPath",
+              "value": "{anotherMissingFolder}"
+            }
+          ],
+          "expect": {
+            "saveEnabled": false,
+            "revertEnabled": true,
+            "heldBack": true,
+            "check": "deploy folder",
+            "sentence": "courseSettingsWording.saveHeldBack",
+            "reason": "That folder doesn’t exist — use Choose… to pick or create one."
+          }
+        },
+        {
+          "name": "moving the course to Cloudflare Pages on a Mac with no Account ID is held back",
+          "set": {},
+          "cloudflareAccountIDOnThisMac": "",
+          "changes": [
+            {
+              "setting": "deployTarget",
+              "value": "cloudflare_pages"
+            }
+          ],
+          "expect": {
+            "saveEnabled": false,
+            "revertEnabled": true,
+            "heldBack": true,
+            "check": "cloudflare account id",
+            "sentence": "courseSettingsWording.saveHeldBack",
+            "reason": "Paste your Cloudflare Account ID."
+          }
+        },
+        {
+          "name": "adding a second destination in a folder that does not exist is held back",
+          "set": {},
+          "cloudflareAccountIDOnThisMac": "",
+          "changes": [
+            {
+              "setting": "addAdditionalDestination",
+              "type": "local_folder",
+              "path": "{missingFolder}"
+            }
+          ],
+          "expect": {
+            "saveEnabled": false,
+            "revertEnabled": true,
+            "heldBack": true,
+            "check": "additional destination",
+            "sentence": "courseSettingsWording.saveHeldBack",
+            "reason": "That folder doesn’t exist — use Choose… to pick or create one."
+          }
+        }
+      ],
+      "heldBackTrail": "`settings save held back` (activityTrail.mustRecord) carries the course and the check's name as `check` above — never the path or the ID — and is written once per visit, on the change into the held-back state."
+    }
   },
   "workLeases": {
     "note": "A work lease is a file under courses/.internal/activity/ saying which process is doing what to a course or a folder, so another window, another copy of Plantoir or an assistant working from outside can leave that work alone. Its FORMAT is file-formats.json -> workLease. This block is the rules every READER shares. #245 (the import's staging folders) wrote the first of them - who counts as alive (liveness) - and #156 (builds, previews and deploys, both ways) added the second beside it - who stands in whose way (declining) - rather than a second reader.",

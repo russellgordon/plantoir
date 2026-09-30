@@ -55,6 +55,13 @@ nonisolated enum ActivityTrail {
         case workingFolderRefused = "working folder refused"
         case settingsSaved = "settings saved"
         case settingsCouldNotBeSaved = "settings could not be saved"
+        /// Course Settings held changes that could not be saved because they
+        /// moved where the course publishes and that destination has a
+        /// problem (#373). Written once per visit, on the change into that
+        /// state; carries the course and WHICH check (deploy folder,
+        /// cloudflare account id, additional destination) — never the path
+        /// or the ID.
+        case settingsSaveHeldBack = "settings save held back"
         /// A preview started while Course Settings held changes nobody had
         /// saved, and the teacher was told it uses the saved settings (#265).
         case previewStartedWithUnsavedSettings = "preview started with unsaved settings"
