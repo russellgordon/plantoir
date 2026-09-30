@@ -105,9 +105,12 @@ final class ListCoursesTests: XCTestCase {
         let planCases: [[String: Any]] = try XCTUnwrap(opening["cases"] as? [[String: Any]])
         let lineRules: [String: Any] = try XCTUnwrap(opening["listCoursesLine"] as? [String: Any])
         let lineCases: [[String: Any]] = try XCTUnwrap(lineRules["cases"] as? [[String: Any]])
+        // Counted separately, so a case added to either list says WHICH one
+        // grew (#403 implementation review N4).
+        XCTAssertEqual(planCases.count, 3, "planOpening.cases")
+        XCTAssertGreaterThanOrEqual(lineCases.count, 1, "planOpening.listCoursesLine.cases")
         var cases: [[String: Any]] = planCases
         cases.append(contentsOf: lineCases)
-        XCTAssertEqual(cases.count, 4)
 
         for testCase in cases {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
