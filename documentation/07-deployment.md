@@ -2991,7 +2991,11 @@ caused the refusal — a Netlify + Cloudflare course refused over the
 Cloudflare Account ID read "deploying to Netlify: MPM2D also deploys to
 Cloudflare Pages, which needs…". It now names the destination that CAUSED it
 (`ScheduledDeployPlan.refusedOver`, from `ScheduledDeployRefusal.destinationKind`,
-kept only when that refusal's sentence IS the plan's problem), and for a
+kept only when that refusal's sentence IS the plan's problem; the note
+function takes the whole PLAN, `noteRefusedBeforeAnythingWasWritten(plan:course:)`,
+so neither caller can pass the refusal without its cause — the
+implementation review's S1, since for a one-destination course a dropped
+cause reads identically and no test would notice), and for a
 refusal that is not about a destination (a time already passed, a course kept
 for reference) every destination by kind, "Netlify and Cloudflare Pages". For
 a course with one destination the line is what it always was. The
@@ -3032,7 +3036,9 @@ cases; its `note` says which surface compares WHOLE and which CONTAINS),
 an unsaved removal). Mac tests: `SharedRulesContractTests.testTheSchedulePlanNamesEveryDestinationAsTheContractSays`,
 `ScheduledDeployTests.testTheSchedulePlanSaysNothingAboutUnpublishedClasses`,
 `ScheduledDeployAsSetNowTests.testTheDestinationsTheSheetNamesAreTheOnesTheJobIsWrittenWith`
-and `.testARefusalAtTheActNamesTheDestinationThatCausedIt`, and the extended
+and `.testARefusalAtTheActNamesTheDestinationThatCausedIt`, the two call-site
+tests `ActsUseTheSavedSettingsTests.testARefusalAtThePressNamesTheDestinationThatCausedIt`
+and `AssistSettingsFreshnessTests.testARefusalOverAnAdditionalDestinationNamesThatDestination`, and the extended
 `AssistToolRunnerTests.testPlanningAndSettingADeployForLater`. **Windows**
 built the same list twice (`ScheduledDeploy.UnpublishedClassesSentence` in the
 sidebar dialog, and `Describe()`'s block) and has the same primary-only
