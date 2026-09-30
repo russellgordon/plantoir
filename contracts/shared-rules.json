@@ -4181,7 +4181,12 @@
       "note": "What Plantoir offers to put right, and what it says afterwards. Only two of the checks are repairable, and the line is the point: a fix must restore the FEATURE, not merely satisfy the check.",
       "neverOffered": {
         "checks": ["curriculumCoverageFoundNothing", "courseTeachesNothing", "handWrittenCoveragePage", "noGradedFolders", "pageSettingsUnreadable", "linksIntoHiddenPages"],
-        "why": "Recreating an empty curriculum folder would silence \"the curriculum map could not be built\" and leave the map missing, because the folder only counts once it holds a page named for an expectation code. A button that makes a warning go away without fixing anything is worse than no button: the teacher then believes it is dealt with. Decide from the check's NAME, not from the `fixable` flag alone — the flag means \"this kind of thing is repairable\", while what has to be true is that THIS app has a repair for it. linksIntoHiddenPages (#333): the two fixes are opposite choices - publish the page the link leads to, or take the link off the page it is on - and only the teacher knows which one is meant. The assistant's publish already does the first when asked."
+        "why": "Recreating an empty curriculum folder would silence \"the curriculum map could not be built\" and leave the map missing, because the folder only counts once it holds a page named for an expectation code. A button that makes a warning go away without fixing anything is worse than no button: the teacher then believes it is dealt with. Decide from the check's NAME, not from the `fixable` flag alone — the flag means \"this kind of thing is repairable\", while what has to be true is that THIS app has a repair for it. linksIntoHiddenPages stays in this list because the list is about the ALERT's repair button, and that button is still never offered for it; what #379 reversed is the REASON #333 gave here - see reversed.",
+        "reversed": {
+          "check": "linksIntoHiddenPages",
+          "was": "#333: the two fixes are opposite choices - publish the page the link leads to, or take the link off the page it is on - and only the teacher knows which one is meant. The assistant's publish already does the first when asked.",
+          "now": "#379, Russell 2026-09-29: the warning, as shipped, could not be acted on - an alert with OK, ten pairs run together and 'and 1 more'. The teacher still makes the choice: the links checklist (linksChecklist) offers one of the two fixes, publishing, page by page and ticked, and leaving a box unticked is the other. It is a separate path from the alert: fixable stays false, and SiteHealthRepair.canRepair must never offer a Fix button for this check, because anyone porting the alert by the flag would wire one."
+        }
       },
       "offered": {
         "checks": ["mediaFolderMissing", "sectionIndexMissing"],
@@ -4310,7 +4315,7 @@
         "fixable": false,
         "fill": "{page} is the hidden page's place in the course folder without .md, {count} how many links, {from} and {to} the two ends of one link. `sentence` when there is one link and `sentenceForSeveral` otherwise; `detail` names at most ten links, each through `linkLine`, joined with \", \", then `andMore` with the number left over. Every value is filled in ONE pass, so a page a teacher named \"{course} notes\" is named as it is. ONE finding per section build, never one per link: both apps key a finding on name, course and section, so two per-link findings would collide (#246).",
         "rule": "After the merge and after the How I Teach sweep, every page students can see (not held back by its settings) has its links read - wikilinks and embeds, and Markdown-style links in either shape (followingLinks.markdownStyleLinks), all through the code and comment mask (readingALink.whatIsCode, whatIsAComment). A link is resolved by its path first, then by its name; it is listed when it resolves to a page (.md) that is hidden, and, when a name belongs to several pages, only when EVERY one of them is hidden. Not listed: links from hidden pages, links to pages that do not exist, pictures and files, and the How I Teach page (removed rather than hidden, so a link to it resolves to nothing). Each (from, to) pair once, in page order.",
-        "why": "#333, the director's ruling: a class published by its own flag - in Obsidian, by the assistant, or by #96's Get Ready - can link to pages that are still hidden, and students who follow the link find nothing. The build is the one place that sees every publish (the flag flipped by hand, scheduled deploys, the MCP), so it warns there; the app's publish does not start taking pages with it. Measured 2026-09-26 on every payload as installed: 0 links from a visible page into a hidden one across all 39, so a new course is not nagged. An emulation of #96's rule (not its code) flipping SNC1W's second class visible lists Unit 1, Day 2 -> What Counts as Evidence, and a section front page that embeds the newest class lists it once that class is hidden by hand. Not repairable: see repair.neverOffered. The trail line is the family's existing 'found a problem with this course's folders' - a stretch of the word for links, as it already is for pageSettingsUnreadable."
+        "why": "#333, the director's ruling: a class published by its own flag - in Obsidian, by the assistant, or by #96's Get Ready - can link to pages that are still hidden, and students who follow the link find nothing. The build is the one place that sees every publish (the flag flipped by hand, scheduled deploys, the MCP), so it warns there. Since #379 the warning is also an OFFER: the build writes which hidden pages publishing would bring back to life, and the section window shows them as a checklist (linksChecklist) instead of listing the finding in the alert - the alert remains the fallback for a course kept for reference or a folder whose builder has not yet written an offer. Measured 2026-09-26 on every payload as installed: 0 links from a visible page into a hidden one across all 39, so a new course is not nagged. An emulation of #96's rule (not its code) flipping SNC1W's second class visible lists Unit 1, Day 2 -> What Counts as Evidence, and a section front page that embeds the newest class lists it once that class is hidden by hand. Not repairable: see repair.neverOffered. The trail line is the family's existing 'found a problem with this course's folders' - a stretch of the word for links, as it already is for pageSettingsUnreadable."
       }
     ],
     "linksIntoHiddenPages": {
@@ -4630,6 +4635,158 @@
         }
       ]
     }
+  },
+  "linksChecklist": {
+    "appliesOn": [
+      "mac",
+      "windows"
+    ],
+    "note": "#379, Russell 2026-09-29 (issue comment 'Decisions', which wins over the body), with the director's rulings on the plan and its review. Links on pages students can see that lead to hidden pages used to produce an alert nobody could act on (#333: a count, ten pairs run together, 'and 1 more', OK). The build now works out which hidden pages publishing would bring back to life and offers them as a CHECKLIST in the section window; the teacher ticks and presses Publish.",
+    "rule": "The build writes the offer (file-formats.json -> linksChecklistOffer) after the two date passes, on EVERY build of a section, by the rule in class-planning.json -> datingPagesAClassBrings.fromTheLinksChecklist. The app reads it, re-reads every row with its own reader, and shows the checklist; on Publish it makes the ticked pages visible and writes the dates the offer gave, through the same writer the assistant's publish uses (one plan for the whole press, one write per page).",
+    "groups": {
+      "fromAClass": "Used by a class students can see: hidden pages within two steps of a visible, dated class.",
+      "notReachedByAClass": "Linked from other pages students can see: every other hidden page a visible or offered page links to, closed transitively, stopping at class pages. One sheet covers every dead link (Russell's decision 2).",
+      "class": "Classes not yet published: hidden class pages such a link lands on (Russell's decision 1)."
+    },
+    "ticking": "class-planning.json -> datingPagesAClassBrings.fromTheLinksChecklist.ticking. Classes start unticked; a page only a hidden class links directly starts unticked; everything else starts ticked.",
+    "whatAClassBrings": "A class ticked in the sheet is published the way the assistant's publish of that class would publish it (followingLinks.publishing, bothRoutesAgree): the pages it links to, transitively, stopping at other classes, each hidden one dated by that class (datingPagesAClassBrings; published-before pages keep theirs). The class's own date is untouched. Where a page is both a row and brought by a ticked class, the CLASS's date wins - it comes with that class (director's ruling F2). The sheet says how many pages a ticked class brings in one line under its row (the cut the director allowed instead of locked rows). A class published here does NOT repoint the section's front page: the front page keeps following the rule it follows today (director's ruling F1), and the sheet says so in one sentence, only when a class row is present (wording.frontPageStaysPut).",
+    "offeredWhen": {
+      "afterAWatchedBuild": "After a preview or deploy this section window started, once the build has FINISHED, when the build's marker line (marker) named an offer with pages and the offer file carries that marker's buildId. The linksIntoHiddenPages finding is then not listed in the folder-problem alert; any other finding is shown first and the checklist follows when the alert has gone (siteHealth.repair.oneAlertAtATime).",
+      "afterAnUnwatchedPublish": "When the section window appears or becomes key, for a build it did not watch - a scheduled deploy, the assistant, the MCP server, a terminal (Russell's decision 3: those publish AS IS and the checklist is shown later).",
+      "onlyWhenFresh": "Never for an offer older than the course's newest change (app-rules.json -> buildFreshness, hidden entries skipped): a page edited since the build may have lost its link or changed its class, so the offer may be wrong. The per-row re-read is the second guard, not the first (plan-review finding 15).",
+      "onlyWhenSomethingNew": "Only when the offer holds a page the teacher has not already answered (file-formats.json -> linksChecklistAnswered). After Publish or Not Now the same set is not offered again; a page joining it brings the checklist back, with the teacher's earlier unticks remembered.",
+      "onDemand": "A menu item in the section's menu opens it whenever an offer exists, so Not Now is not a one-way door; with a stale offer it says a preview is needed first (wording.needsAPreviewFirst).",
+      "never": "For a course kept for reference, and while this app is publishing the course (it waits and is offered when that finishes)."
+    },
+    "answered": "Publish and Not Now both record the set of places offered and which were left unticked, in the app's own file (linksChecklistAnswered) - never the build's. Two windows or two copies of the app writing it: the last one wins, which is acceptable because the worst outcome is being offered the same checklist once more (plan-review note 13).",
+    "unattendedPublishesAsIs": "Nothing in the build or deploy.py changes a page's visibility; a scheduled, assistant, MCP or terminal publish goes out as it is, and the offer file and the trail are all it leaves (siteHealth.scheduledDeployPublishesAnyway; Russell's decision 3).",
+    "referenceCourse": "No offer is written for a course kept for reference (or one whose settings cannot say), and any offer is removed; the finding's alert is shown exactly as before.",
+    "fallbackWithNoOffer": "A linksIntoHiddenPages finding with NO matching offer (a folder whose builder is older than the app) is shown in the alert exactly as before. A checklist that silently never appears is the failure; the alert is the honest floor.",
+    "knownDifference": "The checklist publishes pages because links lead to them, up to two steps from a class; the assistant publishes a class the teacher named and takes its pages transitively (followingLinks.publishing.why). Their REACH differs on purpose; their dating agrees (publishedBeforeIsRecorded).",
+    "marker": {
+      "prefix": "PLANTOIR_LINKS_CHECKLIST:",
+      "carries": "course, section, buildId, pages (how many rows the offer holds; 0 when none and the file was removed), ticked",
+      "why": "The build announces the #333 finding BEFORE the date passes run, so the offer cannot exist yet when the finding reaches the app (plan-review finding 14). The marker is printed when the offer is written; the app matches its buildId to the file's and reads it only when the build has finished, so it never shows the previous build's offer.",
+      "example": "PLANTOIR_LINKS_CHECKLIST: {\"course\": \"ICS4U\", \"section\": 1, \"buildId\": \"20260929T233000Z-1a2b3c4d\", \"pages\": 11, \"ticked\": 8}"
+    },
+    "wording": {
+      "menuItem": "Publish Pages That Links Lead To…",
+      "sheetTitle": "Links to Hidden Pages in {course} Section {section}",
+      "intro": "Pages students can see link to these pages, which are still hidden. The ticked pages will be published.",
+      "fromAClassHeading": "Used by a class students can see",
+      "notReachedHeading": "Linked from other pages students can see",
+      "classesHeading": "Classes not yet published",
+      "datedLike": "will have the same date as “{class}”",
+      "alreadyDatedLike": "has the same date as “{class}”",
+      "keepsItsDate": "was published before, so it keeps its date",
+      "keepsTheDateItHas": "keeps the date it has",
+      "datedAsTheFirstClass": "will have the date of “{first}”, the first class of the year",
+      "firstUsedIn": "first used in “{class}” — it will come with that class",
+      "classRow": "a class of its own — tick it to publish it now",
+      "comesWith": "brings {count} more {pages} with it",
+      "linkedFrom": "linked from “{page}”",
+      "linkedFromSeveral": "linked from “{page}” and {count} more",
+      "frontPageStaysPut": "Publishing a class here does not change which class the front page shows.",
+      "nothingChangesUntilYouDeploy": "Nothing changes for students until you deploy.",
+      "publishButton": "Publish {count} {pages}",
+      "publishNothingTicked": "Publish",
+      "notNow": "Not Now",
+      "deployUnderWay": "{course} is being published just now. Try again when that has finished.",
+      "needsAPreviewFirst": "Pages in {course} have changed since Section {section} was last previewed or published. Preview it again, and this list will be up to date.",
+      "nothingLeftToPublish": "Those pages have all been published or removed since the website was made.",
+      "pageChangedSince": "“{page}” changed since it was checked, so it was left as it is.",
+      "published": "{count} {pages} will be on the website the next time you deploy.",
+      "fill": "{course} and {section} name the section; {class}, {first} and {page} are a page's title (the last part of its place); {count} a number and {pages} 'page' or 'pages' to agree with it. Every value is filled in one pass.",
+      "machineryCheck": "No sentence names the machinery: never 'file', 'script', 'build step', 'walk', 'frontmatter', 'link graph', 'offer', 'JSON' or 'marker' (CLAUDE.md rule 1; copyingAPageBetweenCourses.wording.machineryCheck)."
+    },
+    "rejected": [
+      "Publishing the linked pages unattended as if every box were ticked, and refusing to publish until the links are dealt with - Russell's decision 3 chose neither.",
+      "A page key such as firstPublishedSection<N> to say 'published before' - datingPagesAClassBrings.publishedBeforeIsRecorded.whyARecordAndNotAKeyOnThePage.",
+      "Making atBuildTime two steps, or dating hidden step-2 pages at build time - fromTheLinksChecklist.whyNotAtBuildTime.",
+      "Computing the offer in Swift from the app's graph: Windows would owe the walk in C#, the mac cannot run the Python outside the container, and the build is the one place every publish passes through.",
+      "Carrying the offer only in a console line: a terminal or MCP publish leaves no console the app reads.",
+      "An undo for the checklist: nothing reaches students until a deploy, hiding a page again is one line, and an undo needs a store with an ending rule (#96 needed three paragraphs of them).",
+      "Offering the checklist after every build: after Get Ready that is a sheet of ~56 pages on every preview. Offered once per answered set, plus the menu item.",
+      "fixable: true on the finding: the flag means 'a repair button exists' to anyone porting the alert by flag; the checklist is a separate path, and SiteHealthRepair.canRepair must not start offering one.",
+      "Changing the assistant's reach to two steps - knownDifference.",
+      "Locked 'comes with' rows under a ticked class - one summary line instead (wording.comesWith), the cut the director allowed for time.",
+      "Rows that follow another row's tick (a page reached only through another offered page, unticked with it) - deferred to its own issue (plan-review note 3); until then such a page stays ticked and is published with nothing visible linking to it."
+    ],
+    "buildCases": [
+      {
+        "name": "i. an unattended build publishes nothing: the offer is written and no page is touched",
+        "pages": [
+          {
+            "path": "section1/All Classes/Unit 1, Day 1",
+            "created": "2026-09-08T07:00:00.000+0000",
+            "links": [
+              "Hub"
+            ]
+          },
+          {
+            "path": "Concepts/Hub",
+            "visible": true,
+            "links": [
+              "Worksheet"
+            ]
+          },
+          {
+            "path": "Exercises/Worksheet",
+            "visible": false
+          }
+        ]
+      },
+      {
+        "name": "ii. an empty offer removes the file: the teacher published the page in Obsidian, the next build offers nothing",
+        "pages": [
+          {
+            "path": "section1/All Classes/Unit 1, Day 1",
+            "created": "2026-09-08T07:00:00.000+0000",
+            "links": [
+              "Hub"
+            ]
+          },
+          {
+            "path": "Concepts/Hub",
+            "visible": true,
+            "links": [
+              "Worksheet"
+            ]
+          },
+          {
+            "path": "Exercises/Worksheet",
+            "visible": false
+          }
+        ],
+        "thenPublished": [
+          "Exercises/Worksheet"
+        ]
+      },
+      {
+        "name": "iii. a course kept for reference gets no offer, and loses any it had",
+        "pages": [
+          {
+            "path": "section1/All Classes/Unit 1, Day 1",
+            "created": "2026-09-08T07:00:00.000+0000",
+            "links": [
+              "Hub"
+            ]
+          },
+          {
+            "path": "Concepts/Hub",
+            "visible": true,
+            "links": [
+              "Worksheet"
+            ]
+          },
+          {
+            "path": "Exercises/Worksheet",
+            "visible": false
+          }
+        ]
+      }
+    ],
+    "howTheBuildCasesRun": "Laid out as class-planning.json -> datingPagesAClassBrings.fromTheLinksChecklist.howTheCasesRun describes, and run by scripts/test_links_checklist.py (OfferFileTests)."
   },
   "unreadablePageSettings": {
     "note": "What the build does with a page whose settings block it cannot read (#246). The words a teacher reads are siteHealth.checks[pageSettingsUnreadable]; these are the cases, run by scripts/test_unreadable_page_settings.py through the real build_site.process_frontmatter and by scripts/check_visibility_against_the_site.py down the rest of the chain to the site.",

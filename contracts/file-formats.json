@@ -414,6 +414,67 @@
     "rule": "Read the marker for the destination the course is configured for NOW — not any marker, and not the other one.",
     "why": "A course deployed to Netlify and then switched to Cloudflare has NEVER been deployed to Cloudflare, and its first Cloudflare deploy will ask what to call the site. Treating the old Netlify marker as proof schedules exactly the deploy that stops at a prompt at half six with nobody there — the failure the 'never been deployed' refusal exists to prevent."
   },
+  "linksChecklistAnswered": {
+    "path": "courses/<CODE>/.publish_state/section<N>.links-checklist-answered.json",
+    "keys": {
+      "version": "1",
+      "answeredAt": "UTC, yyyy-MM-ddTHH:mm:ssZ",
+      "offered": "every place the checklist showed when the teacher answered",
+      "leftUnticked": "the places they left unticked (Publish) or all of them (Not Now)"
+    },
+    "writtenBy": "the app only, after Publish or Not Now - never the build (two writers never share a file). Removed on rollover.",
+    "rule": "shared-rules.json -> linksChecklist.offeredWhen.onlyWhenSomethingNew: an offer whose every page is in `offered` is not shown again on its own; a new page brings it back, and a page in `leftUnticked` starts unticked."
+  },
+  "linksChecklistOffer": {
+    "path": "courses/<CODE>/.publish_state/section<N>.links-checklist.json",
+    "writtenBy": "the build (scripts/build_site.py -> _offer_the_links_checklist), on EVERY build of the section - preview, deploy, scheduled, terminal, MCP - after the two date passes; atomically (a hidden temporary beside it, then a rename). REMOVED when there is nothing to offer, so a dead link fixed in Obsidian stops being offered. Never written for a course kept for reference, and removed from one. Never written by an app.",
+    "readBy": "both apps' section windows (shared-rules.json -> linksChecklist.offeredWhen).",
+    "whyHidden": "`.publish_state` is a hidden folder, and both apps' section fingerprints, BuildFreshness and the scheduled check skip hidden entries (SectionPublishState.swift and SectionPublishState.cs), so the file cannot mark the section '— Edited' or cause an extra build.",
+    "keys": {
+      "version": "1",
+      "course": "the course folder's name (the launcher's code)",
+      "section": "N, a number",
+      "buildId": "the id of the build that wrote it; the build's marker line (shared-rules.json -> linksChecklist.marker) carries the same id",
+      "builtAt": "UTC, yyyy-MM-ddTHH:mm:ssZ",
+      "firstClass": "{place, date} - the first class of the year, or null",
+      "pages": "the rows, in order: fromAClass (by claiming class, then place), then notReachedByAClass (by place), then class (by date, then title)"
+    },
+    "rowKeys": {
+      "place": "the page's place in the course folder without .md - a name, never anything written on the page",
+      "title": "the page's title, or its file name",
+      "group": "fromAClass | notReachedByAClass | class",
+      "ticked": "whether it starts ticked",
+      "step": "1 or 2 for fromAClass, else null",
+      "claimedBy": "the place of the class whose date it takes (fromAClass), else null",
+      "date": "the day to write, yyyy-MM-dd, or null to write none",
+      "why": "one of whyValues",
+      "firstUsedIn": "the place of the earliest hidden class linking it directly, when no visible class does (it then starts unticked), else null",
+      "linkedFrom": "places of pages linking it, visible pages first, at most 10"
+    },
+    "groups": [
+      "fromAClass",
+      "notReachedByAClass",
+      "class"
+    ],
+    "whyValues": [
+      "dated",
+      "datedAsTheFirstClass",
+      "datedByTheBuild",
+      "keepsItsDate",
+      "structuralNeverDated",
+      "classNeverDated",
+      "noClassToDateFrom"
+    ],
+    "whyValuesMean": {
+      "dated": "write `date`, the claiming class's day (step 2, or a step-1 page the build's own date pass does not read as a link)",
+      "datedAsTheFirstClass": "write `date`, the first class's day",
+      "datedByTheBuild": "write no date: the build already gave it the date of the earliest visible class linking it directly, and will again",
+      "keepsItsDate": "write no date: the page is in the published-pages record",
+      "structuralNeverDated": "write no date: a folder's index or Key Links",
+      "classNeverDated": "a class page: never dated",
+      "noClassToDateFrom": "write no date: the section has no dated class"
+    }
+  },
   "note": "The two files both apps WRITE, and the Python then reads. Everything else in these contracts describes behaviour; this describes a format, and a format that drifts corrupts a teacher's course quietly. Both spellings below have already caused a real bug: `SectionAdder` was found writing the OLD frontmatter key on both platforms, so a section added through the app was born in a schema everything else had moved off, and the TEST agreed with the code.",
   "pageVisibility": {
     "keys": {
@@ -1077,6 +1138,22 @@
       }
     ]
   },
+  "publishedPagesRecord": {
+    "path": "courses/<CODE>/.publish_state/section<N>.published-pages/<yyyyMMddTHHmmssZ>-<destination>.json - a FOLDER of fragments, one per destination a deploy reached. Readers take the union of every fragment's `places`.",
+    "keys": {
+      "version": "1",
+      "course": "the course folder's name",
+      "section": "N",
+      "buildId": "the build whose site was uploaded",
+      "places": "every page that build showed students, by its place in the course folder without .md"
+    },
+    "writtenBy": "deploy.py after EACH destination's upload succeeded (Netlify, Cloudflare Pages), and deploy.sh / deploy.ps1 after a folder publish's copy succeeded - the folder branch never enters deploy.py, so it copies the list itself (plan-review finding 10). Each writes the build's visible-pages list (visiblePagesList) as a new fragment, and only when the list's buildId matches the build id beside it: a list from an earlier build than the site in the folder is never recorded (finding 11).",
+    "why": "'A page published before keeps its date' (class-planning.json -> datingPagesAClassBrings.publishedBeforeIsRecorded) needs to know what has been on a site students could reach. One fragment per destination, not one file rewritten: a Netlify success with a failed Cloudflare secondary DID put the pages in front of students, so recording it is the truth, and fragments cannot lose each other in a read-modify-write race between two publishes.",
+    "releasedWhenASectionRollsOver": {
+      "name": "section<N>.published-pages.previous-yyyy-MM-dd_HHmmss, beside the folder it replaces",
+      "rule": "Renamed aside on EVERY rollover of the section, whichever website answer the teacher gave ('same' or 'new'), in the rollover's own write, and restored by the rollover's undo (plan-review finding 12): a new year's site has published nothing yet, so the pages Get Ready hid take this year's class dates. Renamed rather than deleted, like the deploy markers (firstDeployMarkers.releasedWhenASectionRollsOver)."
+    }
+  },
   "sectionTimetable": {
     "fields": [
       {
@@ -1222,6 +1299,19 @@
         }
       ]
     }
+  },
+  "visiblePagesList": {
+    "path": "<the section's built output>/.visible-pages.json, beside public/ and never inside it - <CODE>/.merged_output/section<N>/ on macOS, PLANTOIR_BUILD_ROOT/<CODE>/section<N>/ on Windows (the same two spellings firstDeployMarkers.releasedWhenASectionRollsOver warns about)",
+    "keys": {
+      "version": "1",
+      "course": "the course folder's name",
+      "section": "N",
+      "buildId": "the build that wrote it",
+      "places": "every page the build shows students, by its place in the course folder without .md, read with the build's own hide rule after the How I Teach sweep and the #246 hiding"
+    },
+    "buildIdFile": "<the section's built output>/.build-id - the id of the build that last STARTED there, preview or not, written before anything is read",
+    "writtenBy": "the build, in a build for publishing only, and only after the site was built and mirrored - never before, or a build that failed half way would leave a list the site does not match. A preview never writes one; it writes a new .build-id, so a list from an earlier build no longer matches and is not recorded.",
+    "why": "The record must say what the uploaded site shows, not what the teacher's pages say now."
   },
   "workLease": {
     "note": "A work lease: a file saying which process is doing what, so other windows, other copies of Plantoir and outside assistants leave that work alone. Windows' WorkLease (Plantoir.Core/Assist/WorkLease.cs) set the shape; the mac matches it and adds a fourth line. The rules a reader applies are shared-rules.json -> workLeases. #245 wrote this block for the import's lease; #156 filled in the kinds it writes (build, preview, publish) here rather than a second block. Which leases stand in the way of what is shared-rules.json -> workLeases.declining.",
