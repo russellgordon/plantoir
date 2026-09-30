@@ -5613,13 +5613,13 @@
       "why": "Until #189 the launchers named a folder by the spelling they were handed, the app by the disk's, so an accented folder name stored the Terminal or Windows way — or a folder reached in another case — had a second workspace and a second builds folder. Nothing makes them any more, and nothing else would ever remove them: the app's sweep keeps any builds folder whose folder still exists, and a stopped workspace keeps one of the forty preview blocks for as long as it exists (contracts/app-rules.json -> previewPorts). The builds folder is derived — the next build makes every file again — which is why removing it costs a teacher nothing but that one build.",
       "sayWhenCleared": "🧹 Cleared away {what}, left behind under another spelling of the folder's name. Nothing in your courses was touched.",
       "whatWasCleared": {
-        "workspace": "a second copy of this working folder's workspace",
+        "workspace": "a second copy of this working folder's website builder",
         "builtWebsites": "a second copy of this working folder's built websites",
-        "both": "a second copy of this working folder's workspace and built websites"
+        "both": "a second copy of this working folder's website builder and built websites"
       },
-      "whatWasClearedWhy": "The sentence names only what was removed (review L3): the workspace alone when its builds folder is still mounted by another workspace or its note names another folder, the built websites alone when no workspace was left, both otherwise. The same {what} fills the console sentence and the trail line.",
+      "whatWasClearedWhy": "The sentence names only what was removed (review L3): the workspace alone when its builds folder is still mounted by another workspace or its note names another folder, the built websites alone when no workspace was left, both otherwise. The same {what} fills the console sentence and the trail line. Reworded on 2026-09-29 (GitHub #381, folding in #378's finding that 'workspace' meant nothing to Russell, who wrote the product): 'workspace' became 'website builder', the word the launchers already use for it ('Checking whether your website builder is up to date…'); a trail line written before then says workspace.",
       "sayWhenStillRunning": [
-        "ℹ️  A second copy of this folder's workspace, made under another spelling of the folder's name, is still running ({workspace}).",
+        "ℹ️  A second copy of this folder's website builder, made under another spelling of the folder's name, is still running ({workspace}).",
         "   Plantoir is leaving it as it is, and will clear it away once it has stopped."
       ],
       "onTheTrail": "activityTrail 'built site moved out of the working folder' -> launcherLineWhenASecondCopyIsClearedAway, written only when something WAS removed.",
