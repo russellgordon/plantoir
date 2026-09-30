@@ -6906,7 +6906,7 @@ it by hand. Since #397, pressing **Preview** in a section window asks:
 > [Show on Front Page] [Not Today]
 
 The rule, its cases and the sentences are data: `contracts/class-planning.json`
-→ `todaysClassOnTheFrontPage` (40 cases, run by
+→ `todaysClassOnTheFrontPage` (42 cases, run by
 `TodaysClassOnTheFrontPageTests` through the real readers on real files). In
 short, it asks when a class dated TODAY — the teacher's calendar day
 (`CalendarDay.today()`, the Mac's time zone), against the ten characters written
