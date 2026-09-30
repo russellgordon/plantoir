@@ -304,6 +304,79 @@ final class ScheduledDeployAsSetNowTests: XCTestCase {
         XCTAssertEqual(ScheduledDeploy.scheduledDestinations(from: environment), [folder.path])
     }
 
+    /// The sheet's first sentence names every destination (#396), and the
+    /// list it names is the list the job is WRITTEN with — so it cannot name
+    /// somewhere the job does not go, or leave out somewhere it does.
+    /// `PLANTOIR_SCHEDULED_TO` is documented as "where the teacher was told it
+    /// would go", which before #396 it was not: the sheet named the primary.
+    func testTheDestinationsTheSheetNamesAreTheOnesTheJobIsWrittenWith() throws {
+        try writeSettings([
+            "deploy_target": "netlify",
+            "additional_deploy_targets": [
+                ["type": "cloudflare_pages"],
+                ["type": "local_folder", "path": folder.path],
+            ],
+        ])
+        try markDeployedBefore()
+        try markDeployedBefore(to: ".cloudflare_sites")
+        let accountID: String = "0123456789abcdef0123456789abcdef"
+        let plan: ScheduledDeployPlan = ScheduledDeploy.plan(
+            course: try course(), sectionNumber: 1, when: Date().addingTimeInterval(86_400), now: Date(),
+            cloudflareAccountID: accountID, inWorkingFolder: workspace
+        )
+        XCTAssertTrue(plan.isSchedulable, plan.description)
+        XCTAssertEqual(plan.destinations, ["Netlify", "Cloudflare Pages", folder.path])
+
+        try schedule(accountID: accountID)
+        let plistData: Data = try Data(contentsOf: ScheduledDeploy.plistURL(label: label))
+        let plist: [String: Any] = try XCTUnwrap(
+            try PropertyListSerialization.propertyList(from: plistData, format: nil) as? [String: Any]
+        )
+        let environment: [String: String] = try XCTUnwrap(plist["EnvironmentVariables"] as? [String: String])
+        XCTAssertEqual(ScheduledDeploy.scheduledDestinations(from: environment), plan.destinations)
+    }
+
+    /// A refusal at the act names, on the trail, the destination that CAUSED
+    /// it (#396): for a course that also deploys to Cloudflare Pages, refused
+    /// over the Account ID, "deploying to Cloudflare Pages" — until #396 it
+    /// said "deploying to Netlify" above a sentence about Cloudflare. A
+    /// refusal that is not about a destination names every destination.
+    func testARefusalAtTheActNamesTheDestinationThatCausedIt() throws {
+        try writeSettings([
+            "deploy_target": "netlify",
+            "additional_deploy_targets": [["type": "cloudflare_pages"]],
+        ])
+        try markDeployedBefore()
+        try markDeployedBefore(to: ".cloudflare_sites")
+        let refusedOverTheAccount: ScheduledDeployPlan = ScheduledDeploy.plan(
+            course: try course(), sectionNumber: 1, when: Date().addingTimeInterval(86_400), now: Date(),
+            cloudflareAccountID: "", inWorkingFolder: workspace
+        )
+        let problem: String = try XCTUnwrap(refusedOverTheAccount.problem)
+        XCTAssertEqual(refusedOverTheAccount.refusedOver, "Cloudflare Pages")
+        ScheduledDeploy.noteRefusedBeforeAnythingWasWritten(
+            course: try course(), sectionNumber: 1, when: refusedOverTheAccount.when,
+            refusal: problem, refusedOver: refusedOverTheAccount.refusedOver
+        )
+        var trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(trail.contains("refused before anything was written, deploying to Cloudflare Pages: "), trail)
+        XCTAssertFalse(trail.contains("deploying to Netlify"), trail)
+
+        let alreadyPassed: ScheduledDeployPlan = ScheduledDeploy.plan(
+            course: try course(), sectionNumber: 1, when: Date().addingTimeInterval(-3_600), now: Date(),
+            cloudflareAccountID: "", inWorkingFolder: workspace
+        )
+        XCTAssertNil(alreadyPassed.refusedOver, "a time already passed is not about a destination")
+        ScheduledDeploy.noteRefusedBeforeAnythingWasWritten(
+            course: try course(), sectionNumber: 1, when: alreadyPassed.when,
+            refusal: try XCTUnwrap(alreadyPassed.problem), refusedOver: alreadyPassed.refusedOver
+        )
+        trail = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(
+            trail.contains("refused before anything was written, deploying to Netlify and Cloudflare Pages: "), trail
+        )
+    }
+
     func testAMissingOrUnreadableNoteMeansNothingWasRecorded() {
         XCTAssertNil(ScheduledDeploy.scheduledDestinations(from: [:]))
         XCTAssertNil(ScheduledDeploy.scheduledDestinations(from: [ScheduledDeploy.scheduledToKey: "Netlify"]))

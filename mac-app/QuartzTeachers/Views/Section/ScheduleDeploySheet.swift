@@ -230,7 +230,8 @@ struct ScheduleDeploySheet: View {
             // On the trail since #322: a refusal at the button is a teacher
             // who tried to schedule and could not.
             ScheduledDeploy.noteRefusedBeforeAnythingWasWritten(
-                course: saved, sectionNumber: sectionNumber, when: when, refusal: problem
+                course: saved, sectionNumber: sectionNumber, when: when, refusal: problem,
+                refusedOver: plan.refusedOver
             )
             return problem
         }

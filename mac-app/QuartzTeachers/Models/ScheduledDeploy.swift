@@ -603,47 +603,49 @@ enum ScheduledDeploy {
         inWorkingFolder workingFolderURL: URL,
         locale: Locale = Locale.current
     ) -> ScheduledDeployPlan {
+        let whyNot: String? = problem(
+            course: course,
+            sectionNumber: sectionNumber,
+            when: when,
+            now: now,
+            cloudflareAccountID: cloudflareAccountID,
+            locale: locale
+        )
+        // The destination the refusal was reached for, by kind, when it was a
+        // destination that refused it — for the trail line a refusal at the
+        // act leaves (#322, widened by #396 so a course with two destinations
+        // names the one that caused it). Worked out only on a refusal, and
+        // only kept when the destination's sentence IS the refusal: a time
+        // already passed is checked first, and is not about any destination.
+        var refusedOver: String? = nil
+        if let whyNot {
+            if let destinationProblem = destinationRefusal(
+                course: course, sectionNumber: sectionNumber, cloudflareAccountID: cloudflareAccountID
+            ) {
+                if destinationProblem.sentence(course: course, section: sectionNumber) == whyNot {
+                    refusedOver = destinationProblem.destinationKind
+                }
+            }
+        }
+        // Every destination, in the words the sheet has always used for one,
+        // from the SAME function the job is written with and the run re-reads
+        // (#396). So the sentence cannot name somewhere the job does not go.
+        let destinations: [String] = deployPlan(
+            course: course, sectionNumber: sectionNumber, cloudflareAccountID: cloudflareAccountID
+        ).descriptions
         return ScheduledDeployPlan(
             courseCode: course.code,
             sectionNumber: sectionNumber,
             when: when,
-            destination: DeployCommand.destinationDescription(for: course.configuration),
-            unpublishedClasses: unpublishedClasses(course: course, sectionNumber: sectionNumber),
-            problem: problem(
-                course: course,
-                sectionNumber: sectionNumber,
-                when: when,
-                now: now,
-                cloudflareAccountID: cloudflareAccountID,
-                locale: locale
-            ),
+            destinations: destinations,
+            problem: whyNot,
+            refusedOver: refusedOver,
             replacing: momentBeingReplaced(
                 courseCode: course.code, sectionNumber: sectionNumber, by: when,
                 inWorkingFolder: workingFolderURL, now: now
             ),
             locale: locale
         )
-    }
-
-    /// The section's class pages students cannot see yet, by name.
-    ///
-    /// Not a refusal — a teacher may well be deploying deliberately
-    /// without them — but worth saying before a site goes out on its own.
-    static func unpublishedClasses(course: Course, sectionNumber: Int) -> [String] {
-        var held: [String] = []
-        for page in ClassPages.list(forSection: sectionNumber, in: course) {
-            guard let text = try? String(contentsOf: page.fileURL, encoding: .utf8) else {
-                continue
-            }
-            let isVisible: Bool = AssistPageVisibility.publishes(
-                in: text,
-                forSection: sectionNumber
-            )
-            if !isVisible {
-                held.append(page.title)
-            }
-        }
-        return held
     }
 
     // MARK: - The launchd agent
@@ -1551,28 +1553,35 @@ enum ScheduledDeploy {
     /// the contradiction sits two lines under "saved the settings", readable
     /// without the code. The destination is named by KIND — a folder's path
     /// is not written here — and only the refusal's first sentence is kept.
+    ///
+    /// Which destination (#396): the one the refusal was reached for
+    /// (`ScheduledDeployPlan.refusedOver`), so a course that deploys to
+    /// Netlify AND Cloudflare Pages, refused over the Cloudflare Account ID,
+    /// reads "deploying to Cloudflare Pages" — until #396 it named the
+    /// PRIMARY whatever the cause, and said "deploying to Netlify" above a
+    /// sentence about Cloudflare. A refusal that is not about a destination
+    /// (a time already passed, a course kept for reference) names every
+    /// destination by kind, which for a course with one is what it always said.
     static func noteRefusedBeforeAnythingWasWritten(
         course: Course,
         sectionNumber: Int,
         when: Date,
-        refusal: String
+        refusal: String,
+        refusedOver: String?
     ) {
+        var destination: String = MultiDestinationDeployRunner.joinedWithAnd(
+            SettingsSaveNotice.destinationKinds(of: course.configuration)
+        )
+        if let refusedOver {
+            destination = refusedOver
+        }
         ActivityTrail.note(
             .scheduledDeployCouldNotBeSet,
             "could not set a scheduled deploy for \(dayAndTimeText(when)): refused before anything was written, "
-                + "deploying to \(destinationKind(of: course.configuration)): \(firstSentence(of: refusal))",
+                + "deploying to \(destination): \(firstSentence(of: refusal))",
             course: course.code,
             section: sectionNumber
         )
-    }
-
-    /// Where the course's primary destination is, by kind rather than by
-    /// path: "Netlify", "Cloudflare Pages" or "a folder".
-    static func destinationKind(of configuration: CourseConfiguration) -> String {
-        if configuration.deployTarget == "local_folder" {
-            return "a folder"
-        }
-        return DeployCommand.destinationDescription(for: configuration)
     }
 
     /// The text up to and including its first full stop followed by a
@@ -3185,14 +3194,20 @@ struct ScheduledDeployPlan {
     let sectionNumber: Int
     let when: Date
 
-    /// Where the site would go: "Netlify", "Cloudflare Pages", or a folder.
-    let destination: String
-
-    /// Class pages students cannot see yet, by name.
-    let unpublishedClasses: [String]
+    /// Every place the deploy goes, primary first and then each additional
+    /// destination in the order saved, in the teacher's words ("Netlify",
+    /// "Cloudflare Pages", a folder's path) — the same list the run deploys
+    /// to, `ScheduledDeploy.deployPlan(...).descriptions` (#396).
+    let destinations: [String]
 
     /// Why this cannot be scheduled, or nil when it can be.
     let problem: String?
+
+    /// The destination the refusal was reached for, BY KIND ("Netlify",
+    /// "Cloudflare Pages", "a folder" — never a path), or nil when the plan
+    /// is not refused or its refusal is not about a destination. Read only by
+    /// the trail line a refusal at the act leaves (#322, #396).
+    let refusedOver: String?
 
     /// When the deploy this would replace is set for, or nil when it replaces
     /// nothing (issue #195). Read in the working folder the deploy would be
@@ -3208,6 +3223,13 @@ struct ScheduledDeployPlan {
         return problem == nil
     }
 
+    /// Every destination, joined the way a teacher would say them: "A",
+    /// "A and B", "A, B and C" — no comma before "and", the same joining an
+    /// immediate deploy's result uses.
+    var destinationsText: String {
+        return MultiDestinationDeployRunner.joinedWithAnd(destinations)
+    }
+
     /// The whole plan, in words meant to be read aloud.
     var description: String {
         if let problem {
@@ -3215,7 +3237,12 @@ struct ScheduledDeployPlan {
         }
 
         var lines: [String] = []
-        lines.append("Deploy \(courseCode) Section \(sectionNumber) to \(destination) at \(ScheduledDeploy.dayAndTimeText(when, locale: locale)).")
+        lines.append(ScheduledDeployWording.planOpening(
+            course: courseCode,
+            section: sectionNumber,
+            destinations: destinationsText,
+            moment: ScheduledDeploy.dayAndTimeText(when, locale: locale)
+        ))
         if let replacing {
             lines.append(AssistWording.scheduleReplaces(
                 moment: ScheduledDeploy.dayAndTimeText(replacing, locale: locale)
@@ -3236,25 +3263,6 @@ struct ScheduledDeployPlan {
         // caution the night before.
         lines.append("Anything you write between now and then goes out with it: if the section has changed since it was last built, it is rebuilt first. If that build fails, nothing is deployed and the site students see stays exactly as it is.")
 
-        if !unpublishedClasses.isEmpty {
-            lines.append("")
-            let count: Int = unpublishedClasses.count
-            let isSingle: Bool = count == 1
-            lines.append("One thing first — \(count) class\(isSingle ? " is" : "es are") not published yet:")
-            var shown: Int = 0
-            for title in unpublishedClasses {
-                if shown >= 8 {
-                    break
-                }
-                lines.append("  \(title)")
-                shown += 1
-            }
-            if count > 8 {
-                lines.append("  …and \(count - 8) more.")
-            }
-            lines.append("Deploying now would put the site up without \(isSingle ? "it" : "them"). Publish first, look the preview over, then schedule this.")
-        }
-
         return lines.joined(separator: "\n")
     }
 
@@ -3264,18 +3272,18 @@ struct ScheduledDeployPlan {
         courseCode: String,
         sectionNumber: Int,
         when: Date,
-        destination: String,
-        unpublishedClasses: [String],
+        destinations: [String],
         problem: String?,
+        refusedOver: String? = nil,
         replacing: Date? = nil,
         locale: Locale = Locale.current
     ) {
         self.courseCode = courseCode
         self.sectionNumber = sectionNumber
         self.when = when
-        self.destination = destination
-        self.unpublishedClasses = unpublishedClasses
+        self.destinations = destinations
         self.problem = problem
+        self.refusedOver = refusedOver
         self.replacing = replacing
         self.locale = locale
     }
