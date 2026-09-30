@@ -882,6 +882,19 @@ nonisolated enum ActivityTrail {
         /// must never be silent: "why did my deploy from Claude not go out?"
         /// is answered by this line. Mac only, permanently.
         case leftoverWorkStopped = "left-over work stopped"
+        /// A section's Cloudflare project was made again under the same name,
+        /// because it was not in the Cloudflare account any more — deleted in
+        /// Cloudflare's dashboard, say — and a publish would otherwise have
+        /// failed (2026-09-30). Carries where the publish was for, the
+        /// project's name and the address the website answers at now; never
+        /// the account ID or the token.
+        ///
+        /// Written by the app from the shared `deploy.py`'s
+        /// `PLANTOIR_CLOUDFLARE_REMADE:` line (`CloudflareProjectRemadeReport`),
+        /// in the same two places as `leftoverWorkStopped`. On the trail
+        /// because it changes things a teacher sees weeks later: the address
+        /// can change, and a custom domain went with the deleted project.
+        case cloudflareProjectMadeAgain = "cloudflare project made again"
         /// A preview's address was held by something else on this Mac
         /// (GitHub #310, found in the #204 rehearsal with two macOS accounts
         /// signed in). Carries where the preview was for, the address — a

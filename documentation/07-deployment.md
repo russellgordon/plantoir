@@ -639,6 +639,19 @@ Per-section state lives in `courses/<CODE>/.cloudflare_sites/section<N>.json`,
 mirroring the Netlify marker, so re-publishing reuses the same project rather
 than creating a second one.
 
+**The one real limit: 25 MB per file.** Cloudflare refuses anything larger,
+and the failure otherwise surfaces from deep inside the upload as an
+unhelpful error — so `deploy.py` checks sizes *before* uploading anything and
+names the offending files, suggesting a shorter or compressed video, or
+Netlify for that section. Ordinary course material is nowhere near it;
+long-form video is, which is why most teachers embed from YouTube or Vimeo.
+
+Cloudflare's free plan limits builds to 500 a month, but that does not apply
+here: a Direct Upload deployment records `deployment_trigger.type: ad_hoc`
+with stages `clone_repo=idle, build=idle, deploy=success` — no Cloudflare
+build runs, because nothing is pushed to a git repository. Static requests
+and bandwidth are unmetered on the free plan.
+
 ### wrangler is never left a question to ask (2026-09-30)
 
 `deploy_to_cloudflare` runs wrangler with **`CI=1`** — wrangler's documented
@@ -663,9 +676,37 @@ makes wrangler ask has to be settled by `deploy.py` BEFORE it runs:
   every path, the Deploy button included, since `CI` is set on all of them.
   `remake_pages_project_if_gone` now checks the saved name first and, on a
   404, makes the project again under the SAME name and saves the new marker
-  (its `subdomain` can differ, so the address printed is the new one). Other
-  failures of that check are left to the upload, which reports them as
+  (its `subdomain` can differ, so the address printed is the new one). A 409
+  on that remake means the name is taken in this account — the project is
+  there and the 404 was spurious — so the upload goes ahead as it would
+  have; any other refusal to remake it (a token that may not create
+  projects) is raised, since it says more than wrangler would. Other
+  failures of the first check are left to the upload, which reports them as
   before.
+
+**What the deleted project took with it is not brought back.** Remaking the
+project restores the address and the next upload, and nothing else: a
+**custom domain** the teacher had attached went with the deleted project and
+has to be added to the remade one again in Cloudflare's dashboard, and the
+old deployments (Cloudflare's own history of past versions) are gone. The
+console says so in one line, and says the project was "not in this
+Cloudflare account" rather than "no longer on Cloudflare", because the same
+404 is what a teacher sees who moved the section to a DIFFERENT Cloudflare
+account — the old project may well still exist in the old one.
+
+**It leaves a line on the activity trail** (rule 5):
+`contracts/shared-rules.json` → `activityTrail.mustRecord` → "cloudflare
+project made again", carrying the course and section, the project and the
+address it answers at now. `deploy.py` runs inside the website builder on
+the mac and cannot reach the trail, so it prints a
+`PLANTOIR_CLOUDFLARE_REMADE:` marker, which the app reads the way it reads
+`PLANTOIR_LEFTOVER_STOPPED:` — `ScriptRunner` for a run it started (the
+Deploy button, the assistant), `ScheduledDeploy` from a scheduled publish's
+log — and which the console leaves out like every `PLANTOIR_…:` line. The
+line is written at the remake, before the upload, so a remade project whose
+upload then failed is still on the trail. A publish run at the command line
+records nothing, as with every marker-based line. Windows runs the same
+`deploy.py`, so its app owes the same reader.
 
 Found 2026-09-30 when `verify-deploy.sh` went red on all six Cloudflare legs
 (44 passed, 6 failed) after its test project `ada1o-s1-2026-testing` had
@@ -681,20 +722,8 @@ theirs, and re-using it asks nothing — which is also what lets a scheduled
 or windowless publish repair itself. **Rejected: dropping `CI`** so wrangler
 could ask. On a pseudo-terminal nobody is watching it would wait for ever,
 which is exactly what #92 and #378 exist to prevent.
-`scripts/test_deploy_cloudflare_project.py` pins both halves.
-
-**The one real limit: 25 MB per file.** Cloudflare refuses anything larger,
-and the failure otherwise surfaces from deep inside the upload as an
-unhelpful error — so `deploy.py` checks sizes *before* uploading anything and
-names the offending files, suggesting a shorter or compressed video, or
-Netlify for that section. Ordinary course material is nowhere near it;
-long-form video is, which is why most teachers embed from YouTube or Vimeo.
-
-Cloudflare's free plan limits builds to 500 a month, but that does not apply
-here: a Direct Upload deployment records `deployment_trigger.type: ad_hoc`
-with stages `clone_repo=idle, build=idle, deploy=success` — no Cloudflare
-build runs, because nothing is pushed to a git repository. Static requests
-and bandwidth are unmetered on the free plan.
+`scripts/test_deploy_cloudflare_project.py` pins both halves, and
+`CloudflareProjectRemadeReportTests` the app's reader.
 
 ## A folder on this PC (`--to-folder`)
 
