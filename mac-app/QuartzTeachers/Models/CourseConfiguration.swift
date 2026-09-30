@@ -299,7 +299,8 @@ class CourseConfiguration {
 
     /// What is wrong with a folder chosen for local-folder publishing, or
     /// nil when the folder is usable. Both the settings form and the
-    /// wizard check this live — and block saving — so a deploy never
+    /// wizard check this live — and block saving when the edit sets or
+    /// changes the destination (`SaveEnablement`, #373) — so a deploy never
     /// discovers the problem after the fact.
     static func deployFolderProblem(forPath rawPath: String) -> String? {
         let path: String = rawPath.trimmingCharacters(in: .whitespaces)
