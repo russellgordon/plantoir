@@ -17,6 +17,9 @@ struct FailureExplainer {
         if let reason = keptForReferenceExplanation(in: output) {
             return reason
         }
+        if let reason = sectionIsBeingDeployedExplanation(in: output) {
+            return reason
+        }
         if let reason = vaultLinkExplanation(in: output) {
             return reason
         }
@@ -74,6 +77,32 @@ struct FailureExplainer {
     static func folderCopyDidNotFinishExplanation(in output: String) -> String? {
         if output.contains("could be copied into the publishing folder") {
             return folderCopyDidNotFinish
+        }
+        return nil
+    }
+
+    /// The words `preview.sh` refuses a preview with while that same section
+    /// is being deployed (GitHub #381) — `shared-rules.json` →
+    /// `previewWhileItsSectionDeploys.sentences.launcher`, whose first line
+    /// always carries them.
+    static let sectionIsBeingDeployedMarker: String = "is being deployed right now, so it cannot be previewed"
+
+    /// preview.sh refused because a deploy of the same section was running —
+    /// one typed at a command line, or a deploy set for later, which the
+    /// window's own check cannot see. LIFTED, as the kept-for-reference
+    /// refusal is: the launcher's line already is the sentence a teacher can
+    /// act on, and a second wording of one refusal is how one rule comes to
+    /// be said two ways. Pinned by `failureExplanationCases` in the contract.
+    static func sectionIsBeingDeployedExplanation(in output: String) -> String? {
+        for line in output.split(separator: "\n", omittingEmptySubsequences: true) {
+            guard line.contains(sectionIsBeingDeployedMarker) else {
+                continue
+            }
+            var sentence: String = String(line).trimmingCharacters(in: .whitespaces)
+            while let first = sentence.first, first == "❌" || first == " " {
+                sentence.removeFirst()
+            }
+            return sentence.trimmingCharacters(in: .whitespaces)
         }
         return nil
     }
