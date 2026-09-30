@@ -12,7 +12,8 @@
         ]
       },
       "alt": "Three overlapping windows in a diagonal cascade: Markdown notes in Obsidian on the left, Plantoir deploying the site in the middle, and the finished class website in Safari on the right.",
-      "caption": "From your notes in Obsidian, through Plantoir, to a live class website."
+      "caption": "From your notes in Obsidian, through Plantoir, to a live class website.",
+      "windows": false
     },
     {
       "id": "courses",
@@ -98,6 +99,17 @@
       "caption": "The preview is the real site — equations and all."
     },
     {
+      "id": "site-sch3u-chemistry",
+      "capture": {
+        "kind": "browser",
+        "course": "SCH3U",
+        "path": "/style/what-this-site-can-do#mathematics-and-chemistry"
+      },
+      "alt": "A Grade 11 Chemistry class page with two balanced reactions set on lines of their own, states in brackets and subscripts set low, and the sulfate and ammonium ions written with their charges.",
+      "caption": "Chemistry too: formulas, charges, states and reaction arrows, set the way a textbook sets them.",
+      "windows": false
+    },
+    {
       "id": "site-sch3u",
       "capture": {
         "kind": "browser",
@@ -150,7 +162,8 @@
       },
       "static": true,
       "alt": "Three class websites overlapping like a fanned deck of cards, each in a different colour scheme and typeface.",
-      "caption": "Three courses, three colour schemes. Chosen in the app, not in code."
+      "caption": "Three courses, three colour schemes. Chosen in the app, not in code.",
+      "windows": false
     },
     {
       "id": "light-and-dark",
@@ -163,7 +176,8 @@
       },
       "static": true,
       "alt": "The same class website twice, side by side: once in a light colour scheme and once in a dark one.",
-      "caption": "And every site does both, whichever a student prefers."
+      "caption": "And every site does both, whichever a student prefers.",
+      "windows": false
     },
     {
       "id": "schedule",

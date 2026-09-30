@@ -429,14 +429,16 @@ def banner_in_window(number: int, needle: str, destination: Path) -> bool:
     08:13 on 2026-09-27, with Focus off and the notification delivered, were
     reported as "no banner appeared".
 
-    So the window is photographed as it stands, Vision finds the line that
-    names the course, and the banner is the opaque card around that line:
+    So the window is photographed as it stands — `screencapture -x -o -l`,
+    which returns the layer mostly transparent with each banner's REAL
+    corners in its alpha — Vision finds the line that names the course, and
+    the banner is the opaque card around that line:
     the window's background is transparent, and cards are separated by
     transparent gaps, so the run of solid pixels through the line's middle,
     across and down, is exactly the card. Another app's banner stacked above
     it is left out. True when a card was found and saved.
     """
-    from PIL import Image, ImageChops, ImageDraw
+    from PIL import Image
 
     with tempfile.TemporaryDirectory() as scratch:
         whole = Path(scratch) / "notification-center.png"
@@ -444,68 +446,92 @@ def banner_in_window(number: int, needle: str, destination: Path) -> bool:
                                capture_output=True)
         if taken.returncode != 0 or not whole.exists():
             return False
-        result = subprocess.run(["swift", str(OCR_HELPER), "--boxes", str(whole)],
-                                capture_output=True, text=True)
-        wanted = re.sub(r"\s+", "", needle).lower()
-        line_box: tuple[int, int, int, int] | None = None
-        for line in result.stdout.splitlines():
-            if "\t" not in line:
-                continue
-            numbers, text = line.split("\t", 1)
-            if wanted in re.sub(r"\s+", "", text).lower():
-                left, top, width, height = (int(value) for value in numbers.split())
-                line_box = (left, top, width, height)
-                break
-        if line_box is None:
-            return False
+        return banner_from_capture(whole, needle, destination)
 
-        picture = Image.open(whole).convert("RGBA")
-        alpha = picture.getchannel("A")
-        solid = 200
-        middle_x = line_box[0] + line_box[2] // 2
-        middle_y = line_box[1] + line_box[3] // 2
 
-        card_left = middle_x
-        while card_left > 0 and alpha.getpixel((card_left - 1, middle_y)) >= solid:
-            card_left -= 1
-        card_right = middle_x
-        while card_right < picture.width - 1 and alpha.getpixel((card_right + 1, middle_y)) >= solid:
-            card_right += 1
-        card_top = middle_y
-        while card_top > 0 and alpha.getpixel((middle_x, card_top - 1)) >= solid:
-            card_top -= 1
-        card_bottom = middle_y
-        while card_bottom < picture.height - 1 and alpha.getpixel((middle_x, card_bottom + 1)) >= solid:
-            card_bottom += 1
+def banner_from_capture(whole: Path, needle: str, destination: Path) -> bool:
+    """The banner that names `needle`, out of a whole-window capture of
+    Notification Center — see banner_in_window. True when one was saved."""
+    from PIL import Image
 
-        # A card is wider than the words on it and not the whole screen; a
-        # run that reaches an edge means the background was not transparent.
-        if card_right - card_left < line_box[2] or card_left == 0 or card_right >= picture.width - 1:
-            return False
-        if card_bottom - card_top < line_box[3] * 2:
-            return False
-        # The card's corner radius, measured: walking in from its top-left
-        # corner along the diagonal, the first solid pixel is r(1 - 1/√2) in.
-        step = 0
-        while step < 200 and alpha.getpixel((card_left + step, card_top + step)) < solid:
-            step += 1
-        radius = round(step / (1 - 0.7071)) if step else 0
+    result = subprocess.run(["swift", str(OCR_HELPER), "--boxes", str(whole)],
+                            capture_output=True, text=True)
+    wanted = re.sub(r"\s+", "", needle).lower()
+    line_box: tuple[int, int, int, int] | None = None
+    for line in result.stdout.splitlines():
+        if "\t" not in line:
+            continue
+        numbers, text = line.split("\t", 1)
+        if wanted in re.sub(r"\s+", "", text).lower():
+            left, top, width, height = (int(value) for value in numbers.split())
+            line_box = (left, top, width, height)
+            break
+    if line_box is None:
+        return False
 
-        # Cut to the card's own rounded shape. The rectangle round it also
-        # holds the card's SHADOW, which is invisible on a dark desktop and
-        # a grey box round the banner on a light one (seen in the first light
-        # composite, 2026-09-27). Drawn four times larger and shrunk, so the
-        # corners stay smooth.
-        box = (card_left, card_top, card_right + 1, card_bottom + 1)
-        card = picture.crop(box)
-        scale = 4
-        mask = Image.new("L", (card.width * scale, card.height * scale), 0)
-        ImageDraw.Draw(mask).rounded_rectangle(
-            (0, 0, card.width * scale - 1, card.height * scale - 1), radius=radius * scale, fill=255)
-        mask = mask.resize(card.size, Image.LANCZOS)
-        card.putalpha(ImageChops.multiply(card.getchannel("A"), mask))
-        card.save(destination)
-        return True
+    picture = Image.open(whole).convert("RGBA")
+    alpha = picture.getchannel("A")
+    solid = 200
+    middle_x = line_box[0] + line_box[2] // 2
+    middle_y = line_box[1] + line_box[3] // 2
+
+    card_left = middle_x
+    while card_left > 0 and alpha.getpixel((card_left - 1, middle_y)) >= solid:
+        card_left -= 1
+    card_right = middle_x
+    while card_right < picture.width - 1 and alpha.getpixel((card_right + 1, middle_y)) >= solid:
+        card_right += 1
+    card_top = middle_y
+    while card_top > 0 and alpha.getpixel((middle_x, card_top - 1)) >= solid:
+        card_top -= 1
+    card_bottom = middle_y
+    while card_bottom < picture.height - 1 and alpha.getpixel((middle_x, card_bottom + 1)) >= solid:
+        card_bottom += 1
+
+    # A card is wider than the words on it and not the whole screen; a
+    # run that reaches an edge means the background was not transparent.
+    if card_right - card_left < line_box[2] or card_left == 0 or card_right >= picture.width - 1:
+        return False
+    if card_bottom - card_top < line_box[3] * 2:
+        return False
+    # Kept WHOLE, with its real corners: the crop is widened from the
+    # card's own rectangle through its soft shadow until it reaches fully
+    # transparent pixels, so the crop line never passes through the card
+    # (whose corner curve lies inside that rectangle) and the shadow stays
+    # the one macOS drew. Nothing is masked or drawn. (Until 2026-09-27 the
+    # card was cut to its rectangle and a rounded mask was drawn over it,
+    # which is exactly what Russell ruled out.) A neighbouring card's
+    # solid pixels stop the widening, so another banner stacked beside
+    # this one stays out.
+    left, top, right, bottom = card_left, card_top, card_right, card_bottom
+    widest_shadow = 160
+    grew = True
+    while grew:
+        grew = False
+        if left > 0 and card_left - left < widest_shadow and line_can_join(alpha, left - 1, top, left - 1, bottom, solid):
+            left -= 1
+            grew = True
+        if right < picture.width - 1 and right - card_right < widest_shadow \
+                and line_can_join(alpha, right + 1, top, right + 1, bottom, solid):
+            right += 1
+            grew = True
+        if top > 0 and card_top - top < widest_shadow and line_can_join(alpha, left, top - 1, right, top - 1, solid):
+            top -= 1
+            grew = True
+        if bottom < picture.height - 1 and bottom - card_bottom < widest_shadow \
+                and line_can_join(alpha, left, bottom + 1, right, bottom + 1, solid):
+            bottom += 1
+            grew = True
+    picture.crop((left, top, right + 1, bottom + 1)).save(destination)
+    return True
+
+
+def line_can_join(alpha, from_x: int, from_y: int, to_x: int, to_y: int, solid: int) -> bool:
+    """Whether one more row or column belongs round a banner: it still holds
+    some of the banner's shadow (alpha above 0) and none of another card."""
+    region = alpha.crop((from_x, from_y, to_x + 1, to_y + 1))
+    lowest, highest = region.getextrema()
+    return 0 < highest < solid
 
 
 def ask_over_mcp(app_binary: Path, working_folder: Path, tool: str, arguments: dict) -> dict:
@@ -587,9 +613,12 @@ def capture_notification(app_binary: Path, working_folder: Path, destination: Pa
                 problems.append(f"the scheduled run did not succeed: its record says {first_line!r}")
                 break
         for number, bounds in banner_windows().items():
-            if record_seen_at is not None and number in before and bounds[2] >= 800 and bounds[3] >= 600:
+            if record_seen_at is not None and bounds[2] >= 800 and bounds[3] >= 600:
                 # Notification Center's own full-screen window: macOS 26
-                # draws banners inside it (banner_in_window says why).
+                # draws banners inside it (banner_in_window says why). Old
+                # or NEW: on 2026-09-27 the dark pass found it as a window
+                # that had not been there before the run, and the branch
+                # below saved the whole screen-sized layer as "the banner".
                 if banner_in_window(number, course, destination):
                     captured = True
                     break

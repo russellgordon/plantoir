@@ -60,6 +60,7 @@ from images import (  # noqa: E402
     WIDEST_WINDOW_PIXELS,
 )
 from composite import fan, side_by_side, diagonal_hero, FIGURE_WIDTH    # noqa: E402
+from corners import corner_problems, images_the_pages_show  # noqa: E402
 from safari import SafariWindow, verify_appearance, verify_address_bar  # noqa: E402
 import scenes as scene_book  # noqa: E402
 
@@ -134,13 +135,6 @@ ASSISTANT_FRAME = "{{500, 60}, {560, 760}}"
 # frames. (The Windows capture harness has the same dependency if it ever
 # photographs an approval card — its app keeps an equivalent setting.)
 ASSISTANT_ASKS_KEY = "assistantAsksBeforeChanging"
-
-# The width, in points, each captured window is forced to. Only used to work
-# out how many pixels there are per point, so the corner radius comes out
-# right whatever the display.
-WINDOW_POINTS = 1280
-ASSISTANT_WINDOW_POINTS = 560
-
 
 # ---------- Running things ----------
 
@@ -769,15 +763,27 @@ def site_address(code: str) -> str:
 PARTS = SCRATCH / "parts"
 
 
-def capture_parts(window: "SafariWindow", suffix: str) -> None:
-    """Photograph the three course home pages, for the fanned-out figure."""
+def capture_parts(suffix: str) -> None:
+    """Photograph the three course home pages, for the two colour figures.
+
+    In a plain window with no browser around it (`webwindow.swift`), not in
+    Safari: those figures are about the SITES, and three toolbars read as
+    three browsers. The window's own edge is the picture's edge, so its real
+    corners are kept — never a Safari capture with the toolbar cut off and
+    corners painted back on, which is what this used to be.
+    """
     PARTS.mkdir(parents=True, exist_ok=True)
+    helper = Path(__file__).resolve().parent / "webwindow.swift"
     for course in DEMO_COURSES:
-        window.load(site_address(course["code"]) + "/", settle_seconds=3.5)
         destination = PARTS / f"home-{course['code'].lower()}-{suffix}.png"
-        window.capture(destination)
+        result = subprocess.run(
+            ["swift", str(helper), site_address(course["code"]) + "/", "1280", "860",
+             str(destination), "3.5"],
+            capture_output=True, text=True,
+        )
+        if result.returncode != 0 or not destination.exists():
+            raise SystemExit(f"Could not photograph {course['code']}'s home page: {result.stderr.strip()}")
         verify_appearance(destination, suffix == "dark", course["code"])
-        verify_address_bar(destination, course["code"])
         print(f"   part {destination.name}")
 
 
@@ -848,6 +854,12 @@ def build_hero_figures() -> None:
 
 def build_static_figures() -> None:
     """Assemble the figures whose subject is composite or colour."""
+    build_colour_figures()
+    build_hero_figures()
+
+
+def build_colour_figures() -> None:
+    """The fanned colour schemes and the light/dark pair, from whole captures."""
     announce("Assembling the colour figures")
     fanned = [PARTS / f"home-{course['code'].lower()}-light.png" for course in DEMO_COURSES]
     missing = [path.name for path in fanned if not path.exists()]
@@ -863,8 +875,6 @@ def build_static_figures() -> None:
         print("   saved light-and-dark.png")
     else:
         print("   Missing the dark half of the light/dark pair.", file=sys.stderr)
-
-    build_hero_figures()
 
 
 def capture_search(window: "SafariWindow", shot: dict, suffix: str) -> None:
@@ -910,6 +920,46 @@ def shots_of_kind(kind: str) -> list[dict]:
     return wanted
 
 
+def capture_browser_shots(identifiers: list[str]) -> None:
+    """Re-take just these class-site shots, in both appearances.
+
+    For a shot that is new or wrong, without re-taking every other picture
+    `--sites` makes (the phone, search, Obsidian and the hero among them).
+    """
+    wanted: list[dict] = []
+    for shot in browser_shots():
+        if shot["id"] in identifiers:
+            wanted.append(shot)
+    if len(wanted) != len(identifiers):
+        raise SystemExit(f"Not every one of {identifiers} is a class-site shot in shots.json.")
+    announce("Photographing " + ", ".join(identifiers))
+    for dark in (False, True):
+        suffix = "dark" if dark else "light"
+        with Appearance(dark=dark):
+            time.sleep(2)
+            with SafariWindow(1280, 860) as window:
+                for shot in wanted:
+                    capture = shot["capture"]
+                    window.load(site_address(capture["course"]) + capture.get("path", "/"), settle_seconds=3.5)
+                    destination = IMAGE_DIR / f"{shot['id']}-{suffix}.png"
+                    window.capture(destination)
+                    verify_appearance(destination, dark, shot["id"])
+                    verify_address_bar(destination, shot["id"])
+                    prepare(destination, WIDEST_WINDOW_PIXELS)
+                    print(f"   saved {destination.name}")
+
+
+def capture_colour_figures() -> None:
+    """Photograph the three home pages in both appearances and assemble the
+    two colour figures from them — nothing else."""
+    announce("Photographing the course home pages for the colour figures")
+    for dark in (False, True):
+        with Appearance(dark=dark):
+            time.sleep(2)
+            capture_parts("dark" if dark else "light")
+    build_colour_figures()
+
+
 def capture_sites(workspace: Path) -> None:
     announce("Photographing the class websites")
     IMAGE_DIR.mkdir(parents=True, exist_ok=True)
@@ -936,7 +986,7 @@ def capture_sites(workspace: Path) -> None:
                 for shot in search_shots():
                     capture_search(window, shot, suffix)
 
-                capture_parts(window, suffix)
+            capture_parts(suffix)
         capture_phone(dark=dark)
 
 
@@ -1410,6 +1460,11 @@ def run_scenes(folder: Path, chosen: list) -> int:
                             if not picture.exists():
                                 failures.append(f"{scene.name} ({suffix}): {picture.name} was not made")
                                 continue
+                            drawn = corner_problems(picture)
+                            if drawn:
+                                failures.append(f"{scene.name} ({suffix}): {picture.name} is not a whole window "
+                                                f"capture with its own corners — {drawn[0]}")
+                                continue
                             missing = scene_book.missing_words(picture, scene_book.expected_text(name))
                             if missing:
                                 failures.append(f"{scene.name} ({suffix}): {picture.name} does not show {missing} "
@@ -1458,12 +1513,54 @@ def compose_scene_figures(passed: list[str]) -> None:
             else:
                 pair_of_windows(sources, destination)
             prepare(destination, WIDEST_WINDOW_PIXELS)
+            drawn = corner_problems(destination)
+            if drawn:
+                print(f"   ✗ {destination.name}: {drawn[0]}", file=sys.stderr)
+                continue
             passed.append(f"{name}-{suffix}")
             print(f"   saved {destination.name}")
 
 
+def pictures_with_drawn_corners() -> list[str]:
+    """Every picture the pages show whose corners are not a real window's.
+
+    Run before a picture is called finished: the same check as
+    `test_native_corners.py`. A drawn, cropped or square corner is refused,
+    never fixed up — the capture that made it is what is wrong.
+    """
+    problems: list[str] = []
+    for picture in images_the_pages_show(WEBSITE, IMAGE_DIR):
+        problems.extend(corner_problems(picture))
+    return problems
+
+
+def refuse_drawn_corners(only_ids: list[str] | None = None) -> int:
+    """Name every picture with a square or drawn corner, and exit non-zero.
+
+    Pictures written straight to site/img (the class sites, the figures) are
+    already there when this runs: a failure here means "do not commit them",
+    and the exit code says so. Scene pictures are checked earlier, in
+    staging, and a failing one never reaches site/img.
+    """
+    problems: list[str] = []
+    for problem in pictures_with_drawn_corners():
+        if only_ids is None or any(problem.startswith(f"{identifier}-") for identifier in only_ids):
+            problems.append(problem)
+    for problem in problems:
+        print(f"   ✗ {problem}", file=sys.stderr)
+    if problems:
+        print(f"\n   {len(problems)} corner(s) on the site's pictures are not a real window's. "
+              "Re-take them; do not commit them.", file=sys.stderr)
+        return 1
+    print("   Every picture the pages show has its window's own corners.")
+    return 0
+
+
 def promote_captured_shots(passed: list[str]) -> None:
     """Bring shots.json up to date with pictures that now exist.
+
+    Only pictures whose corners are a real window's are promoted: a shot
+    with a drawn or square corner stays as it was, and is named.
 
     A shot taken in BOTH appearances this run loses `awaiting_capture`, and a
     retaken one has its new words (`retake` → alt, caption, expectText, test)
@@ -1476,6 +1573,14 @@ def promote_captured_shots(passed: list[str]) -> None:
     for shot in manifest["shots"]:
         identifier = shot["id"]
         if f"{identifier}-light" not in passed or f"{identifier}-dark" not in passed:
+            continue
+        drawn: list[str] = []
+        for suffix in ("light", "dark"):
+            picture = IMAGE_DIR / f"{identifier}-{suffix}.png"
+            if picture.exists():
+                drawn.extend(corner_problems(picture))
+        if drawn:
+            print(f"   ✗ {identifier} not promoted: {drawn[0]}", file=sys.stderr)
             continue
         if shot.pop("awaiting_capture", None):
             changed.append(f"{identifier}: taken")
@@ -1523,6 +1628,10 @@ def main() -> int:
                              "grants were exercised minutes ago and macOS still remembers them")
     parser.add_argument("--figures", action="store_true",
                         help="only reassemble the static figures from parts already captured")
+    parser.add_argument("--colour-figures", action="store_true",
+                        help="only re-take the three home pages and rebuild colour-schemes and light-and-dark")
+    parser.add_argument("--browser-shots", default=None,
+                        help="only re-take these class-site shots, comma-separated ids from shots.json")
     parser.add_argument("--hero", action="store_true",
                         help="only reassemble the hero composite from parts already captured")
     arguments = parser.parse_args()
@@ -1553,14 +1662,32 @@ def main() -> int:
             if result == 0 and (arguments.scenes or only_scenes):
                 result = run_scenes(marketing, only_scenes or list(scene_book.SCENES))
                 rebuild_site()
+                announce("Checking every picture's corners")
+                if refuse_drawn_corners() != 0:
+                    result = 1
         finally:
             keeping_awake.terminate()
         return result
 
+    if arguments.colour_figures or arguments.browser_shots:
+        keeping_awake = stay_awake()
+        try:
+            if not arguments.skip_preflight:
+                preflight_permissions()
+            if arguments.browser_shots:
+                capture_browser_shots(arguments.browser_shots.split(","))
+            if arguments.colour_figures:
+                capture_colour_figures()
+        finally:
+            keeping_awake.terminate()
+        rebuild_site()
+        announce("Checking every picture's corners")
+        return refuse_drawn_corners()
+
     if arguments.hero:
         build_hero_figures()
         rebuild_site()
-        return 0
+        return refuse_drawn_corners(["hero"])
 
     if arguments.phone:
         # No preflight: the phone shot is simctl and RocketSim end to end —
@@ -1604,6 +1731,9 @@ def main() -> int:
     finally:
         keeping_awake.terminate()
 
+    announce("Checking every picture's corners")
+    if refuse_drawn_corners() != 0:
+        return 1
     announce("Done.")
     return 0
 
