@@ -1020,8 +1020,12 @@ Obsidian, by the assistant, by #96's Get Ready — can link to pages that are
 still hidden, and students who follow such a link find nothing. The director's
 ruling on [#333](https://github.com/russellgordon/plantoir/issues/333): the
 BUILD warns, because it is the one place that sees every publish (a flag
-flipped by hand, scheduled deploys, the MCP server); the app's publish does
-not start taking pages with it.
+flipped by hand, scheduled deploys, the MCP server). **Since #379 the warning
+is also an offer**: the build works out which hidden pages publishing would
+bring back to life and the section window shows them as a checklist — see
+"The links checklist (#379)" below. What #333 said here ("the app's publish
+does not start taking pages with it") was reversed on 2026-09-29, and why is
+written there.
 
 - **The rule** (`_links_into_hidden_pages` in `build_site.py`; contract
   `siteHealth.checks` → `linksIntoHiddenPages.rule`, cases
@@ -1039,10 +1043,15 @@ not start taking pages with it.
 - **One finding per section build**, naming at most ten pairs and counting the
   rest, never one per link: both apps key a finding on name, course and
   section, so per-link findings would collide (#246).
-- **Not repairable.** The two fixes are opposite choices — publish the page
-  the link leads to, or take the link off the page it is on — and only the
-  teacher knows which is meant. Scheduled deploys still publish
-  (`scheduledDeployPublishesAnyway`).
+- **No repair BUTTON — but, since #379, a checklist.** #333 said: the two
+  fixes are opposite choices — publish the page the link leads to, or take the
+  link off the page it is on — and only the teacher knows which is meant. #379
+  keeps the choice with the teacher and offers ONE of the two fixes, page by
+  page: ticking is publishing, leaving a box unticked is the other. The check
+  stays in `siteHealth.repair.neverOffered.checks` because that list is about
+  the alert's Fix button, which is still never offered for it (`fixable`
+  stays false); the #333 reason moved to `neverOffered.reversed`. Scheduled
+  deploys still publish as they are (`scheduledDeployPublishesAnyway`).
 - **The trail line** is the family's existing "found a problem with this
   course's folders (linksIntoHiddenPages)". "Folders" is a stretch for links,
   exactly as it already is for `pageSettingsUnreadable`; rewording the family
@@ -1077,11 +1086,134 @@ not start taking pages with it.
   Two pages sharing a name, one hidden, is deliberately not a shared case: the
   mac's graph holds one page per title.
 
-Rejected: the app's publish taking a class's pages with it (the issue's other
-option — a flag flipped in Obsidian bypasses every app path); one finding per
-link; a repair button; limiting the check to links FROM class pages
-(check_section already lists every visible page's dead links, and two
-definitions of "a dead link" is what #313 ended).
+Rejected (in #333): the app's publish taking a class's pages with it (the
+issue's other option — a flag flipped in Obsidian bypasses every app path);
+one finding per link; a repair button (still rejected — #379's checklist is a
+separate path, not a button on the alert); limiting the check to links FROM
+class pages (check_section already lists every visible page's dead links, and
+two definitions of "a dead link" is what #313 ended).
+
+### The links checklist (#379)
+
+Russell, 2026-09-29, on v1.4.0: after a build, ICS4U Section 1 said "11 links
+on pages students can see … lead to pages hidden from them", then one
+paragraph of ten `"from" → "to"` pairs run together, "and 1 more", and OK. "It
+is TRYING to be helpful, and it is not." A teacher could neither read the list
+nor act on it. The finding stays exactly as it was (its cases, the marker, the
+console line, the trail line, `fixable: false`); what is new is an OFFER the
+build writes beside it, and a checklist in the app that acts on it. Decisions:
+the issue's comment "Decisions — Russell, 2026-09-29" (it wins over the body),
+and the director's rulings on the plan and its review.
+
+**The shape, in one sentence.** The build works out the offer and writes it to
+`courses/<CODE>/.publish_state/section<N>.links-checklist.json`; the app reads
+that file after a build it watched, or when the section window next appears
+after one it did not, and shows a checklist; the app's existing publish writer
+publishes and dates the ticked pages. The rule is shared Python, so Windows
+inherits it; the sheet and the writes are each app's.
+
+**The rule** (`_links_checklist_offer` in `build_site.py`; contract
+`class-planning.json` → `datingPagesAClassBrings.fromTheLinksChecklist`, 13
+cases run by `scripts/test_links_checklist.py`). After the merge, the How I
+Teach sweep and BOTH date passes, from every VISIBLE, DATED class of the
+section, links are followed up to TWO steps — by the #333 finding's own
+reader (path first, then name; a shared name lands on a hidden page only when
+every one is hidden). A link onto a class is not entered; a hidden class is
+not walked from; the walk does not go through a folder index or Key Links.
+
+- **Used by a class** (`fromAClass`): hidden pages reached at step 1 or 2,
+  claimed by the earliest visible class that reaches them (date, then title).
+  A page a class links DIRECTLY in the way the build's date pass reads links
+  already carries that class's date — the build gave it on this build, hidden
+  or not (`atBuildTime`, which has no visibility check) — so the checklist
+  writes no date for it (`why: datedByTheBuild`). This is recorded as an
+  exception to Russell's decision 4 (director's ruling N8): for those pages
+  the build's rule wins even over "published before". Decision 4 governs
+  step-2 and other-group pages.
+- **Linked from other pages** (`notReachedByAClass`): every other hidden page
+  a visible page, OR an offered page, links to — closed transitively, stopping
+  at class pages — so publishing everything ticked leaves no new dead link and
+  the checklist does not come back one layer at a time (Q8). Dated as the
+  first class of the year (`datingNonClassPages`).
+- **Classes not yet published** (`class`): hidden classes such a link lands
+  on. Never walked through, never dated, never ticked by default (decision 1).
+  A class ticked by the teacher is published the way the assistant's publish
+  of that class would be (Q2): its own pages come with it, dated by that class,
+  its date untouched. Where a page is both a row and brought by a ticked class,
+  the CLASS's date wins — one merged plan per press, one write per page
+  (ruling F2). It does NOT repoint the front page (ruling F1): `apply` gained
+  `repointsTheFrontPage`, false from the checklist only, and the sheet says so
+  in one sentence when a class row is shown.
+- **Ticking.** Everything in the two page groups starts ticked (decision 1),
+  EXCEPT a page that a hidden class links directly while no visible class
+  does: it starts unticked, saying which class uses it first ("first used in
+  … — it will come with that class"). Measured by the planner over the 39
+  payloads with an emulation (not the product code): straight after Get Ready
+  (#96) a default-ticked sheet would offer a median of 56 pages (16–82), e.g.
+  SNC1W's Final Examination through "How Marks Work", dated Unit 1, Day 1 — one
+  press would have undone Get Ready and misdated the year. The literal form of
+  that ruling ("a page a hidden class links directly") would ALSO have
+  unticked a visible class's own material when a later class links it too, so
+  the rule is "and no visible class does" (plan review, finding 5; cases j, k).
+- **Dates are days.** The offer carries `YYYY-MM-DD` as the class's value
+  writes it, never converted to another time zone, because the app writes a
+  `CalendarDay` exactly as the assistant's date moves do (ruling N9).
+- **Folder indexes and Key Links** can be offered (a hidden one is still a
+  dead link) but are never given a date (`structuralNeverDated`).
+
+**Why two steps is not a build-time rule.** At build time it would rewrite
+VISIBLE pages through hubs on every build — measured and rejected on
+2026-09-25 (EXC2O: Day 1 claimed 98 of the 105 pages rewritten; ICS4U 133 of
+136 through Learning Goals). And dating a hidden step-2 page at build time
+would write Day 1's date into SNC1W's Final Examination while it is still
+hidden. Two steps applies only to hidden pages, only when the teacher
+publishes them from the sheet.
+
+**"Published before" is a record, not a key on the page** (Q3, accepted;
+`datingPagesAClassBrings.publishedBeforeIsRecorded`, which replaces
+`neverPublishedIsInferred`). The obvious sign — a date already on the page —
+is meaningless: 7,114 of the 7,118 payload pages that carry a publish flag
+also carry `created:`, because `setup_course.py` writes it on every page it
+makes. Reading it as "published" would switch the dating off everywhere while
+every fixture-built test passed; case f carries the page that must move
+anyway. The record and how it is written are in
+[07 → The published-pages record](07-deployment.md#the-published-pages-record-379).
+Honest limit: pages published and hidden before v1.4.1 have no record and take
+the class's date once.
+
+**The file and the marker.** Written atomically on every build (preview,
+deploy, scheduled, terminal, MCP), removed when the offer is empty (a dead
+link fixed in Obsidian stops being offered), never written — and removed —
+for a course kept for reference. `.publish_state` is hidden, so neither
+fingerprint nor `BuildFreshness` sees it. The #333 finding is announced
+BEFORE the date passes run and the offer is written AFTER them, so the app
+does not act on the finding: the build prints `PLANTOIR_LINKS_CHECKLIST:
+{course, section, buildId, pages, ticked}` once the file is written, and the
+app shows the checklist only for an offer carrying that build's id (plan
+review, finding 14). A builder older than the app prints nothing, and the
+finding goes in the alert exactly as before — the alert is the floor.
+
+**Nothing publishes unattended.** Neither the build nor `deploy.py` changes a
+page's visibility (build case i byte-compares every page). A scheduled, MCP
+or terminal publish goes out as it is (decision 3), and the checklist is
+offered when the teacher next opens that section.
+
+**Measured, a build in progress** (plan review, note 16): the sheet refuses
+while the course is being published, but not while a preview builds; the
+build's date writer only renames over an unchanged page, so nothing is
+corrupted, and the next build offers again correctly.
+
+Rejected: publishing unattended as if every box were ticked, and refusing to
+publish until the links are dealt with (decision 3); a page key such as
+`firstPublishedSection<N>`; making `atBuildTime` two steps; computing the
+offer in Swift (Windows would owe the walk in C#, and the mac cannot run the
+Python outside the builder); carrying the offer only on a console line (a
+terminal or MCP publish leaves no console the app reads); an undo; offering
+the checklist after every build; `fixable: true`; changing the assistant's
+reach to two steps (`linksChecklist.knownDifference`); locked "comes with"
+rows under a ticked class (one summary line instead, a cut the director
+allowed); rows that follow another row's tick (deferred to
+[#385](https://github.com/russellgordon/plantoir/issues/385), v1.4.2).
 
 ### Where they run, and where they honestly do not
 

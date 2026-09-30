@@ -5054,8 +5054,8 @@ screen and Cancel and Copy went with it; Escape was the only way out. Now:
   backup line and Show in Finder outside it — at 380 it measured 612 pt, too
   close to the rule to leave room for the orange problem line.
 
-**Why 620.** The smallest screen worth fitting is a 13-inch MacBook Air at its
-older default of 1280 × 800 points: less a 24 pt menu bar, a ~52 pt title bar
+**Why 620.** The smallest screen worth fitting is a 13-inch MacBook Air set to
+"Larger Text", 1280 × 800 points (its default is 1470 × 956): less a 24 pt menu bar, a ~52 pt title bar
 and a ~70 pt Dock, about 654 pt is left for a sheet. Measured with 11 rows and
 70 sentences: the checklist sheet is 556 pt, the result sheet 552 pt; with one
 row and nothing under it, 214 pt (no reserved hole). Rejected: a cap worked out
@@ -6583,6 +6583,80 @@ a terminal is not seen. It
 is offered once: a partial undo is not offered again, and names the backup.
 This undo, the assistant window's "undo that" and an outside assistant's
 `undo_last_change` are three separate stores.
+
+**After Get Ready, the links checklist (#379).** The first build after Get
+Ready still finds the links Get Ready left pointing at hidden pages (#333's
+warning, true there). Since #379 that finding is a CHECKLIST rather than an
+alert, and nearly every row starts UNTICKED: a page that only a later, hidden
+class links directly is that class's material and "will come with that
+class". So pressing Publish on the defaults does not undo Get Ready. See
+"The links checklist (#379)" below.
+
+## The links checklist (#379)
+
+The section window's answer to #333's alert. The rule that chooses the pages
+is the build's (shared Python, `documentation/05-build-pipeline.md` → "The
+links checklist (#379)"); this is the app's half.
+
+- **Where it comes from.** `ScriptRunner` collects `PLANTOIR_LINKS_CHECKLIST:`
+  lines as they arrive (`linksChecklistMarkers`), beside the health findings.
+  `SectionDetailView.showHealthFindings` routes the #333 finding through
+  `LinksChecklistRouting.route` (pure, unit-tested): a course kept for
+  reference → the alert; no marker yet and the build still going → HELD
+  (`heldLinksFinding`), because the finding is announced before the date
+  passes and the offer after them; the build finished with no marker (a
+  builder older than the app) → the alert; a marker whose `buildId` matches
+  the offer file → the checklist, and the finding leaves the alert. The
+  marker's arrival (`onChange` of the markers' count) and the end of the
+  preview wait / deploy settle a held finding.
+- **Publishes it did not watch.** When the window appears, becomes key, or
+  stops being busy, `offerTheLinksChecklistIfWaiting` reads the offer and shows
+  it when it is FRESH (written after the course's newest content change —
+  `BuildFreshness.newestContentDate`, hidden entries skipped), holds a page the
+  teacher has not answered, the course is not kept for reference and is not
+  being published. The scheduled run's folder-problem record drops the #333
+  finding only when that holds too; otherwise the alert is the floor.
+- **One alert at a time.** Other findings are shown first; the checklist waits
+  in `pendingLinksChecklist` and `showAnythingWaiting` presents it after the
+  alert has gone. Each build's offer is put in front of the teacher once per
+  window (`linksChecklistBuildsHandled`).
+- **The sheet** (`LinksChecklistSheet` + `LinksChecklistSheetModel`, testable
+  without a window): three groups under headings, each row a checkbox with a
+  second line — the date it will have, or "first used in …" for a page that
+  starts unticked, or "a class of its own — tick it to publish it now" plus
+  "brings N more pages with it" once ticked — and where it is linked from.
+  Rows are checked again against the pages as they are now; one that became
+  visible or went away is dropped. It scrolls in a `CappedScrollArea` of 380 pt
+  (#365's), width 560; 100 rows measure within 620 pt. Not Now and Publish both
+  record the answer (`.publish_state/section<N>.links-checklist-answered.json`,
+  the app's own file): the same set is not offered again on its own, a page
+  joining it brings it back, and a page the teacher unticked starts unticked.
+- **Publish** (`LinksChecklistPublisher`): refused while the course is being
+  published; ONE merged plan — the ticked pages through
+  `AssistPublishPlanner.planPublishing(exactly:dateMoves:)` with the offer's
+  days, each ticked class through `planPublishing(titles:)` so it brings its
+  pages as the assistant's publish would, a class's date winning over a row's
+  — written by `AssistPublishPlanner.apply(…, repointsTheFrontPage: false)`,
+  so the front page does not move to a class published here. Declined pages
+  are named (#186). No undo: nothing reaches students until a deploy.
+- **The menu item** "Publish Pages That Links Lead To…" in the section's
+  menu, beside Get Ready, whenever an offer exists — so Not Now is not a
+  one-way door. With a stale offer it says a preview is needed first.
+- **At a rollover** (`re_date_classes` with `rollover`), whichever website
+  answer is given, `PublishedPagesRecord.release` moves the section's record
+  fragments into `section<N>.published-pages.previous-<stamp>/` and removes the
+  answered file, inside the rollover's own `AssistChange` — so "undo that"
+  brings them back (it writes each fragment back into the folder, which is
+  kept for that reason). A rollover that moved no page still releases it, as
+  its own change. Not in `DeployCommand.releaseSite`, which runs only for a
+  NEW website (plan review, finding 12).
+- **Trail:** "offered to publish pages that links lead to" (occasion and
+  counts), "published pages that links led to" (counts and at most ten
+  places), "left pages hidden that links lead to" (Not Now or some unticked).
+- **Tests:** `LinksChecklistTests` (the wording key by key and its machinery
+  check; the marker; every routing branch; freshness; the contract's
+  `linksChecklist.publishCases` on a laid-out course; the sheet's size), with
+  eleven mutations run red — recorded in the piece's ready file.
 
 ## Testing: the real-home tripwire (#264)
 
