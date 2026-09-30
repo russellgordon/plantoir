@@ -94,6 +94,16 @@ public static class ActivityTrail
         /// </summary>
         FolderProblemNotRepaired,
         /// <summary>
+        /// A build rewrote some of the teacher's own pages with their class's
+        /// date (#279; the rule is the shared Python's). Carries the course,
+        /// the section, the count and the pages' places in the course folder
+        /// -- never anything written on them. Read from the build's
+        /// PLANTOIR_DATED: line: from the console for a run the app watches
+        /// (ScriptRunner), and from a scheduled publish's record
+        /// (ScheduledHealthFindings).
+        /// </summary>
+        PagesDatedByTheBuild,
+        /// <summary>
         /// A teacher put a section back to how it was when an assistant
         /// conversation started. Carries the course, the section and the
         /// backup's file name -- never a page. The one line that explains a
@@ -232,6 +242,7 @@ public static class ActivityTrail
         Event.FolderProblemFound => "folder problem found",
         Event.FolderProblemRepaired => "folder problem repaired",
         Event.FolderProblemNotRepaired => "folder problem not repaired",
+        Event.PagesDatedByTheBuild => "pages dated by the build",
         Event.SectionRestored => "section restored",
         Event.AssistantEngineSaid => "assistant engine said",
         Event.ItemExcluded => "item excluded",
