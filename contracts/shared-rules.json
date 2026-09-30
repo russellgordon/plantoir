@@ -17192,6 +17192,23 @@
         "why": "Section 12 is not section 1, AP CALCULUS is another course, and so is AP."
       },
       {
+        "name": "a course that ENDS another's code is another course",
+        "course": "CALC",
+        "section": "2",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./deploy.sh AP CALC 2"
+          ]
+        ],
+        "cwd": {
+          "700": "here"
+        },
+        "expect": "allowed",
+        "why": "deploy.sh's arguments must BEGIN with the course: CALC 2 appears inside AP CALC 2, and a match anywhere in them would refuse CALC's preview while AP CALC deploys."
+      },
+      {
         "name": "the unreadable process table lets the preview through",
         "psFails": true,
         "processes": [],

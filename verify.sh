@@ -1705,7 +1705,8 @@ fi
 # Its own folder, its own container, its own builds folder, all removed
 # afterwards. And removed BEFORE as well, which is the part that matters: the
 # launcher keeps a container it is happy with, so a second run would print
-# "already running with correct mount", never call `docker run`, and pass
+# that its website builder "is already running" (worded "already running with
+# correct mount" until #382), never call `docker run`, and pass
 # having tested nothing — including when the fix has been taken back out.
 VERIFY_COLON_DIR="$HOME/.plantoir-verify-26:27"
 echo ""

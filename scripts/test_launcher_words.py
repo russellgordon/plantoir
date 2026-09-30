@@ -13,7 +13,8 @@ and this reads every other line.
 **What counts as teacher-facing** — the rule, stated once:
 
   - every `echo` and `printf`, wherever it sits on its line (after `then`,
-    `;`, `&&` or `||` as well as at the start), and every `read -p` prompt;
+    `else`, `do`, `;`, `&&`, `||` or a `case` arm's `pattern)` as well as at
+    the start), and every `read -p` prompt;
   - every line of a `cat <<'MSG'` message (the Netlify and Cloudflare
     instructions);
   - the text a teacher sees, not the code that makes it: `$( … )`,
@@ -29,11 +30,16 @@ and this reads every other line.
     about the machinery on purpose;
   - `echo "PLANTOIR_…` lines: machine-readable lines the app reads and keeps
     out of the console, whose fields name the programs on purpose (#312);
-  - a line that ends `# never shown to a teacher: <why>`. That is the ONE
-    way to keep a word, it must say why, and it is meant for lines the app
-    cannot show: a function's answer captured by `$( … )`, text piped into a
-    command, and the lines reached only with `--image`, which the app never
-    passes. It is NOT for a line a teacher can read: rewording those was the
+  - a line that ends `# never shown to a teacher: <why>`. That is the one
+    way a PRINTING line keeps a word, it must say why, and it is meant for
+    lines the app cannot show: a function's answer captured by `$( … )` (the
+    helper-path `case` arms among them), text piped into a command, and the
+    lines reached only with `--image` or `--context`, which the app never
+    passes. 38 lines carry it today (2026-09-30). Everything else a launcher
+    holds keeps its words because it is not printed at all (the list above);
+    what this scan still cannot see is text printed some other way — `cat`
+    of a file, a `python3 -` heredoc's own print, a command's own output —
+    which is why those are not where teacher text is written. It is NOT for a line a teacher can read: rewording those was the
     point of #382. REJECTED: an allow-list kept here, which freezes the list
     rather than emptying it, and which a reader of the launcher never sees.
 
@@ -68,7 +74,7 @@ EXEMPTION = "# never shown to a teacher:"
 SHOWN_HEREDOCS = ("MSG",)
 HELP_HEREDOCS = ("EOF", "USAGE")
 
-PRINTING = re.compile(r"(?:^\s*|[;&|]\s*|\bthen\s+|\belse\s+|\bdo\s+)(echo|printf)\b(.*)$")
+PRINTING = re.compile(r"(?:^\s*|[;&|]\s*|\)\s*|\bthen\s+|\belse\s+|\bdo\s+)(echo|printf)\b(.*)$")
 READ_PROMPT = re.compile(r"\bread\b[^\"']*-[a-z]*p\s*(\"[^\"]*\"|'[^']*')")
 HEREDOC_START = re.compile(r"\bcat\b[^<]*<<-?\s*['\"]?([A-Za-z_]+)['\"]?")
 
@@ -225,6 +231,7 @@ class TheLaunchersNameNoMachinery(unittest.TestCase):
             'echo "🚀 Starting container if needed..."',
             'if true; then echo "Docker context: $X"; fi',
             'foo || echo "no image"',
+            '  *) echo "a container in a case arm" ;;',
             'read -rp "Paste the container id: " answer',
             'echo "✅ ${CONTAINER_NAME} $(_colima_cpus) $IMAGE_ID"',
             '# echo "a container in a comment"',
@@ -239,8 +246,8 @@ class TheLaunchersNameNoMachinery(unittest.TestCase):
         ])
         shown, exemptions = teacher_lines(sample)
         flagged = [number for number, line in shown if machinery_in(line)]
-        self.assertEqual(flagged, [1, 2, 3, 4, 10])
-        self.assertEqual([number for number, _ in exemptions], [8])
+        self.assertEqual(flagged, [1, 2, 3, 4, 5, 11])
+        self.assertEqual([number for number, _ in exemptions], [9])
 
 
 if __name__ == "__main__":
