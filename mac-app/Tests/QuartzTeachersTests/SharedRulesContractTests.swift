@@ -404,7 +404,7 @@ final class SharedRulesContractTests: XCTestCase {
     }
 
     /// Another program saves these keys into a settings file.
-    private static func change(_ configURL: URL, _ changes: [String: Any]) throws {
+    static func change(_ configURL: URL, _ changes: [String: Any]) throws {
         var values: [String: Any] = try XCTUnwrap(
             try JSONSerialization.jsonObject(with: try Data(contentsOf: configURL)) as? [String: Any]
         )

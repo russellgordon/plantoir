@@ -26,8 +26,12 @@ Run with:
 
     python3 scripts/test_course_code_rule.py
 """
+import builtins
+import contextlib
+import io
 import json
 import re
+import shutil
 import sys
 import tempfile
 import unittest
@@ -36,6 +40,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import setup_course  # noqa: E402
+import toolchain_paths  # noqa: E402
 
 REPOSITORY = Path(__file__).resolve().parent.parent
 COURSE_MANAGEMENT_FILE = REPOSITORY / "contracts" / "course-management.json"
@@ -219,6 +224,92 @@ class TheExampleCourseCodes(unittest.TestCase):
                 self.assertIsNone(setup_course.course_code_trouble(code), code)
             # The fallback shape, when every random draw collides.
             self.assertIsNone(setup_course.course_code_trouble("EX012O"))
+
+
+class TheAppsWayIn(unittest.TestCase):
+    """New Course the way BOTH apps drive it, end to end through the wizard.
+
+    mac `NewCourseCreator.createCourse` and Windows' `NewCourseCreator.cs`
+    write courses/<CODE>/course_config.json FIRST, then run the setup and
+    answer every "Enter the course code" prompt with the code and every other
+    prompt with Return. If the Python ever refused a code an app had
+    accepted, the prompt would come back and the app would send the same code
+    until its safety valve — a New Course run that never finishes. So this
+    plays that pump against the REAL `setup_course.setup_course`, in-process
+    (no terminal, no Docker), and asserts the code is asked for exactly ONCE
+    and the course is made. `WORK` is the live case: Windows' rule has no
+    WORK yet, so its New Course accepts it, and the wizard must let the course
+    through with the note rather than refuse it.
+    """
+
+    MOST_PROMPTS = 300
+
+    def create_the_way_an_app_does(self, code):
+        temporary = Path(tempfile.mkdtemp(prefix="plantoir-app-course-"))
+        self.addCleanup(shutil.rmtree, temporary, True)
+        courses = temporary / "courses"
+        course = courses / code
+        course.mkdir(parents=True)
+        # The shape the mac's wizard writes (NewCourseCreatorIntegrationTests'
+        # configuration), before the setup starts.
+        written_first = {
+            "course_code": code,
+            "course_name": "App Created Course",
+            "locale": "en-US",
+            "num_sections": 1,
+            "section_numbers": [1],
+            "shared_folders": ["Concepts", "Exercises"],
+            "per_section_folders": ["All Classes"],
+            "prepopulate_example_content": False,
+            "color_schemes": {"section1": "quartz-standard"},
+        }
+        (course / "course_config.json").write_text(
+            json.dumps(written_first, indent=2) + "\n", encoding="utf-8"
+        )
+
+        code_prompts = [0]
+        prompts = [0]
+
+        def pump(prompt=""):
+            prompts[0] += 1
+            if prompts[0] > self.MOST_PROMPTS:
+                raise RuntimeError("the wizard kept asking; an app would never finish")
+            if "Enter the course code" in str(prompt):
+                code_prompts[0] += 1
+                return code
+            return ""
+
+        original_courses = toolchain_paths.COURSES_DIR
+        original_quartz = toolchain_paths.QUARTZ_DIR
+        original_input = builtins.input
+        original_getch = setup_course.getch
+        output = io.StringIO()
+        toolchain_paths.COURSES_DIR = courses
+        toolchain_paths.QUARTZ_DIR = temporary / "no-quartz-here"
+        builtins.input = pump
+        setup_course.getch = lambda: "ENTER"
+        try:
+            with contextlib.redirect_stdout(output):
+                setup_course.setup_course(no_backup=True)
+        finally:
+            toolchain_paths.COURSES_DIR = original_courses
+            toolchain_paths.QUARTZ_DIR = original_quartz
+            builtins.input = original_input
+            setup_course.getch = original_getch
+
+        written = json.loads((course / "course_config.json").read_text(encoding="utf-8"))
+        return code_prompts[0], written, output.getvalue(), course
+
+    def test_an_app_created_course_is_asked_for_its_code_once(self):
+        for code in ("ZZT2O", "MTEL-12", "AP CALC", "WORK"):
+            with self.subTest(code=code):
+                asked, written, said, course = self.create_the_way_an_app_does(code)
+                self.assertEqual(asked, 1, f"{code}: the app would answer again and again")
+                self.assertEqual(written.get("course_code"), code)
+                self.assertTrue((course / "section1").is_dir(), f"{code}: no section was made")
+                self.assertNotIn("❌", said, f"{code}: {said}")
+                noted = "is kept as it is" in said
+                self.assertEqual(noted, code == "WORK", f"{code}: {said}")
 
 
 if __name__ == "__main__":

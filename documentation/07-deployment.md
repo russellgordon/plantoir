@@ -2982,8 +2982,17 @@ folder on this computer" — never a path (a path is machinery on a card, and a
 folder not chosen yet would be blank; #322's contract case pins "a folder").
 Two vocabularies for one list is pre-existing and deliberate; the contract
 pins both (`planOpening.cases[].sheet` and `.card`). `destination(of:)`, the
-primary-only name, is still used by `list_courses`' "publishes to:" — not
-scheduling, so out of this piece; a follow-up is drafted.
+primary-only name, was still used by `list_courses`' "publishes to:" — not
+scheduling, so out of this piece. It went with
+[#403](https://github.com/russellgordon/plantoir/issues/403): `list_courses`
+now says `everyDestination(of:)` too, and `destination(of:)` is deleted (a
+function with a known wrong answer — a folder course with no path chosen yet
+read "Netlify" — invites reuse). By type, in the card's words, because the
+app's own assistant window shows that line when a teacher asks what courses
+they have; `deployPlan(...).descriptions` was rejected for it, since it names
+a folder by its path. Pinned by `planOpening.listCoursesLine`, which runs
+every `planOpening` case plus one of its own (the folder not chosen yet)
+through `list_courses` on both surfaces.
 
 **The trail.** No new event. One CHANGED line: `scheduled deploy could not
 be set`, for a refusal at the act, used to name the PRIMARY's kind whatever
@@ -3012,7 +3021,7 @@ a course with one destination the line is what it always was. The
 | immediate deploy's results (`deployWentOutTo`, `deployNeedsAnAnswerAt`) | yes | unchanged |
 | assistant's `deploy_section` card | names none, on purpose | unchanged |
 | scheduled-publish notification, after-Save sentence | yes, joined with ", " | unchanged; the different join is known and out of scope — do not "fix" one to match the other in passing |
-| `list_courses` "publishes to:" (MCP) | NO, primary only | follow-up drafted |
+| `list_courses` "publishes to:" (MCP and the app's assistant window) | yes, since #403, by type | `everyDestination(of:)`, `planOpening.listCoursesLine` |
 | refusal trail line | the cause, since #396 | above |
 
 **Rejected**, so nobody proposes them again: keeping the unpublished list
