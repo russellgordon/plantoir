@@ -96,6 +96,9 @@ internal static class NamedGapLedger
     /// <summary><c>class-planning.json</c> → <c>sectionIndexPointer.dateCases</c>, by case <c>name</c>.</summary>
     internal const string FrontPageDateCases = "class-planning.json → sectionIndexPointer.dateCases";
 
+    /// <summary><c>shared-rules.json</c> → <c>gradedFolders.newCourse.cases</c>, by case <c>name</c>.</summary>
+    internal const string GradedFoldersNewCourseCases = "shared-rules.json → gradedFolders.newCourse.cases";
+
     /// <summary>
     /// The milestone every entry below names. While no Windows release is
     /// being cut, an entry may name an open issue on this milestone itself:
@@ -221,6 +224,13 @@ internal static class NamedGapLedger
         Owed(FrontPageDateCases, 274,
             "this app's pointer finds only the class heading; a club's front-page heading arrives with clubs (mac #267)",
             "a club's front page, numbered pages"),
+
+        // ---- shared-rules.json → gradedFolders.newCourse.cases (#317's runner)
+        Owed(GradedFoldersNewCourseCases, 250,
+            "declining a payload does not give the subject's skeleton and its pool here yet (mac #248)",
+            "a declined payload keeping its skeleton takes the SKELETON's pool"),
+        Owed(GradedFoldersNewCourseCases, 274, "this app has no clubs yet (mac #267)",
+            "a club typed with a payload code is not given the payload's pool"),
 
         // ---- app-rules.json → modelTiers.requirements
         Owed(ModelTierRequirements, 196,
