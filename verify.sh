@@ -377,6 +377,13 @@ else
   cat /tmp/verify_preview_sh_questions_test.log
 fi
 
+if (cd scripts && python3 test_preview_while_deploying.py) >/tmp/verify_preview_while_deploying_test.log 2>&1; then
+  pass "preview.sh: a section being deployed cannot be previewed, whoever deploys it, and a build or an unreadable process table does not refuse (scripts/test_preview_while_deploying.py, #381)"
+else
+  fail "preview.sh: a section being deployed cannot be previewed, whoever deploys it, and a build or an unreadable process table does not refuse (scripts/test_preview_while_deploying.py, #381)"
+  cat /tmp/verify_preview_while_deploying_test.log
+fi
+
 if (cd scripts && python3 test_port_blocks.py) >/tmp/verify_port_blocks_test.log 2>&1; then
   pass "the launchers walk forty blocks for a folder's preview addresses, skip any another folder holds, and say so truthfully when none is free (scripts/test_port_blocks.py)"
 else

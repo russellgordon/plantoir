@@ -1483,6 +1483,95 @@ nobody can ever close. The one thing that side does owe is the new
   publishes both ranges. The reachable HOST address is the folder's
   probed block; `preview.sh` prints it.
 
+#### A section being deployed cannot be previewed (#381)
+
+Russell's decision 4 on #378: "a preview of a section cannot start AT ALL
+while that same section is being deployed — from this window or another."
+The rule, its cases and its sentences are `contracts/shared-rules.json` →
+`previewWhileItsSectionDeploys`. Three layers refuse, and this is the one in
+the launcher: the window refuses a deploy by its own copy of the app
+([09](09-mac-app.md) → "A preview of the section this app is deploying"), and
+other programs are refused by their work leases (#156).
+
+**What it closes.** Read from code on 2026-09-29 (the #378 plan review), a
+deploy typed at a command line — in Terminal, or by a Revise with Claude
+session's own shell — writes no lease, so a preview pressed in a window while
+it ran was not refused; and a `./preview.sh C S` typed at a command line was
+refused by nothing at all.
+
+**Where.** `refuse_a_preview_while_its_section_deploys`, between the
+`PREVIEW WHILE DEPLOYING GUARD` markers in `preview.sh` only, called on a
+SERVING run (not `--build-only`, not `--stop`) straight after the arguments
+are checked and before anything changes: no builds link, no website builder
+started, no workspace looked at or set up again. The first placement proposed
+("just before the address is announced") was rejected by the plan review
+(S4): by then a serving run may already have remade the workspace in a
+deploy's host-side stretch — a token being read, the moment between its two
+legs — pulling it out from under the deploy, which is the harm the rule is
+for.
+
+**What counts as a deploy of C/S**, read from the LIVE process table (`ps
+-Ao pid=,ppid=,args=`), never from a remembered process id or a lease file:
+
+- `deploy.sh C S …` as the PROGRAM (the first word, or the script a shell was
+  handed — a process whose text merely mentions it, such as a `claude -p`
+  prompt or a `bash -c` wrapper, does not count; the wrapper's child does) —
+  except when its own arguments carry `--reset-token`, `--logout` or `--help`,
+  which deploy nothing; `--diagnose` DOES deploy (it prints more while it
+  uploads). Only one working in THIS folder counts: its working directory is
+  asked of `lsof -a -p <pid> -d cwd`, because this year's and last year's
+  folders can hold the same course. One whose folder `lsof` cannot answer for
+  still counts: a deploy of this very section is proved, only its folder is
+  not.
+- a deploy set for later of C/S: any process whose arguments name its script,
+  `ca.russellgordon.Plantoir.deploy.<CODE>.section<N>[.<folder id>].sh`
+  (`<CODE>` as `ScheduledDeploy.sanitizedCode` writes it, the section bounded
+  so `section1` is not `section12`, a `.log` being read not counted). launchd
+  runs `Plantoir --run-scheduled-deploy <that script> …` for the whole run,
+  so its build leg counts too. A label naming ANOTHER folder's id is that
+  folder's deploy; a label from before #237 names no folder and counts for
+  any.
+
+**Not a deploy: `preview.sh C S --build-only`.** It is a publish's build leg,
+and it is also exactly what the assistant's "rebuild the preview" runs
+(`AssistSiteWork.rebuildPreview`); nothing on the command line tells the two
+apart, so counting it — the #378 plan's first shape, rejected by its review
+(S3) — would refuse every preview of the section while the assistant
+refreshed it, with a sentence that is false. The window refuses its own build
+leg from its publish record. **The gap that leaves**, named in the contract's
+`knownLimits`: a preview typed in Terminal while ANOTHER program is in the
+build leg of its deploy. A `--for-deploy` flag on the build leg would close
+it; that is a `launcherFlags` change and was not made.
+
+**An unreadable process table lets the preview THROUGH** — the opposite of
+the look before a workspace is remade (above), on purpose. There, failing open
+costs somebody's publish, so an unreadable table counts as "owner running".
+Here, failing closed would refuse every preview for as long as `ps` fails,
+which is the "blocked until a restart" #378 was about; the window's check and
+the leases still stand when this one cannot see.
+
+This run's own ancestors and descendants never count, the rule
+`a_preview_launcher_is_running_for` uses: a shell that ran `./deploy.sh C S
+&& ./preview.sh C S` carries both commands' words after its deploy has ended.
+
+**What it says, and writes.** `sentences.launcher` (the course and section,
+"is being deployed right now, so it cannot be previewed until that has
+finished", then "Nothing was changed."), exit 1, and the trail line
+`launcherLineWhenItsSectionIsBeingDeployed` under `build declined, course
+busy elsewhere`, written by the launcher itself so a refusal typed at a
+command line is on the trail too. The app lifts the first line into the
+panel (`FailureExplainer.sectionIsBeingDeployedExplanation`).
+
+**Tests.** `scripts/test_preview_while_deploying.py` runs every
+`launcherCases` case against the real guard, cut out between its markers,
+with a pretend `ps` and `lsof`; must-fails measured 2026-09-29: counting
+`--build-only` as a deploy, refusing on an unreadable table, matching the
+course without the section, skipping the folder check, dropping the call, and
+dropping this run's family each turn a named case red. Checked once against
+the real process table too: a `deploy.sh ICS4U 2` sleeping in a scratch
+folder refused `preview.sh ICS4U 2` there with no engine call made, while the
+same deploy in ANOTHER folder, and a `--build-only` run, went on.
+
 #### Before building, preview.sh makes sure this Mac can reach the builder (#234)
 
 Between finding the address and announcing it, `preview.sh`

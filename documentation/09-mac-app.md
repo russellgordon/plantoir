@@ -534,8 +534,10 @@ happily — a preview that can start and that no stop is aimed at.
 
 **One note serves both a preview and a deploy deliberately.** They never run at
 once for a section: a deploy stops a running preview and waits for it before
-noting anything of its own, and the Preview button is disabled while a deploy
-runs. A third folder would be a second name for the same one.
+noting anything of its own, and a preview of a section cannot start while that
+section deploys — the button is disabled, and since #381 `startPreview()`
+itself refuses (below, "A preview of the section this app is deploying"). A
+third folder would be a second name for the same one.
 
 It is guarded by a source scan rather than by a behavioural test, and that is
 the honest limit: no real `SectionDetailView` ever mounts in a unit test —
@@ -2666,6 +2668,39 @@ another live program holds `build`, `publish` or `preview` on the course:
 Every decline writes `build declined, course busy elsewhere` on the trail, with
 what was asked for and the other program's process id — from whichever process
 declined, so an outside assistant's refusal is on the trail too.
+
+**A preview of the section this app is deploying (#381).** The table above
+is about OTHER programs, and on purpose `whatBlocksABuild` never counts this
+program's own leases (a window must not decline its own build). So until
+2026-09-29 a preview of a section was refused while the SAME copy of the app
+deployed it only by the Preview button's `.disabled` — not when another window
+of the app deployed it, not when the in-app assistant deployed it with no
+window, and not on the assistant's or the restart path's way into
+`startPreview()`, which do not pass the button. Russell's decision 4 on #378
+made it a rule: `contracts/shared-rules.json` → `previewWhileItsSectionDeploys`.
+
+`startPreview()` now asks `SectionDetailView.refusalWhileThisSectionDeploys`
+FIRST — after the copy check and before the reference lock, the build lease,
+the preview lease or the look at other programs' leases — which reads
+`CourseActivity.sectionPublishIsRunning`: the record the window's Deploy
+(`WorkLeaseRegistry.claimAPublish`) and `AssistSiteWork.deploy` both write.
+It refuses with `wording.sectionIsBeingDeployed` under "Cannot Preview Yet"
+and writes `WorkLeaseRegistry.lineWhenItsSectionIsBeingDeployed` under `build
+declined, course busy elsewhere`. The SECTION, not the course: previewing
+section 1 while section 2 deploys from the same app works, and the decision
+names the same section, so widening it was rejected. A deploy typed at a
+command line is refused by `preview.sh` itself when the window's preview
+reaches it ([03](03-launcher-scripts.md) → "A section being deployed cannot
+be previewed (#381)"), and the panel shows the launcher's own sentence
+(`FailureExplainer.sectionIsBeingDeployedExplanation`). The button's
+`.disabled` is unchanged: a convenience, not the rule.
+The in-app assistant's own preview (`AssistToolRunner.bringThePreviewUpToDate`) asks the same record first,
+before it opens a window, stops a preview or runs a no-window `--build-only`
+rebuild, and answers `wording.sectionIsBeingDeployed` — otherwise the window
+would refuse while the conversation said the preview was on its way (#381's
+review, S1; `WorkLeaseDecliningTests`).
+`PreviewWhileDeployingTests` pins the rule, the order in `startPreview` and the
+sentences.
 
 **A build, preview or publish lease with no name line is treated as gone**
 (added in the fix round after #245's `ProcessLiveness.nameToCompare`, which
