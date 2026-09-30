@@ -624,40 +624,113 @@ public sealed class SharedRuleContractTests : IDisposable
     /// the interface project.</para>
     /// </summary>
     [Fact]
-    public void AScheduledDeployNamesTheClassesStudentsCannotSeeYet()
+    public void AScheduledDeploySaysNothingAboutUnpublishedClassesOnlyTheOnesNamed()
     {
+        // #400 (mac #396), Russell 2026-09-30: the section-wide list of
+        // unpublished classes is REMOVED from scheduling. Only a class a caller
+        // NAMES is checked, each as published or not.
         var doc = ContractLoader.LoadJson("shared-rules.json");
         var alsoSaid = doc["scheduledDeployRefusals"]!["alsoSaid"]!;
-        Assert.Equal("list the class pages students cannot see yet, by name", alsoSaid["rule"]!.ToString());
+        Assert.Equal(
+            "nothing about the section's unpublished classes - only classes a caller NAMES (plan_scheduled_deploy's classes argument) are checked, each as published or not",
+            alsoSaid["rule"]!.ToString());
 
-        var plan = new ScheduledDeploy
+        var named = new ScheduledDeploy
         {
             CourseCode = "ICS3U",
             SectionNumber = 1,
             When = new DateTime(2026, 9, 8, 6, 30, 0),
             Destination = "Netlify",
-            UnpublishedClasses = new[] { "Unit 2, Day 3", "Unit 2, Day 4" },
+            ClassesNamed = [("Unit 2, Day 3", false), ("Unit 2, Day 4", true)],
         };
+        string described = named.Describe();
+        Assert.Contains("  Unit 2, Day 3 — NOT published, so the deploy would ship without it.", described, StringComparison.Ordinal);
+        Assert.Contains("  Unit 2, Day 4 — published, so the deploy would carry it.", described, StringComparison.Ordinal);
+        Assert.DoesNotContain("Publish first", described, StringComparison.Ordinal);
+        Assert.DoesNotContain("Deploying now", described, StringComparison.Ordinal);
 
-        string described = plan.Describe();
-        Assert.Contains("Unit 2, Day 3", described, StringComparison.Ordinal);
-        Assert.Contains("Unit 2, Day 4", described, StringComparison.Ordinal);
-
-        // By NAME is the whole rule: a count alone tells a teacher there is a
-        // problem and not which class it is.
-        Assert.Contains("not published yet", described, StringComparison.Ordinal);
-
-        // And with nothing outstanding it says nothing about it, so the warning
-        // means something on the occasions it appears.
-        var clean = new ScheduledDeploy
+        var none = new ScheduledDeploy
         {
             CourseCode = "ICS3U",
             SectionNumber = 1,
             When = new DateTime(2026, 9, 8, 6, 30, 0),
             Destination = "Netlify",
-            UnpublishedClasses = Array.Empty<string>(),
         };
-        Assert.DoesNotContain("not published yet", clean.Describe(), StringComparison.Ordinal);
+        Assert.DoesNotContain("published", none.Describe(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// <c>scheduledDeployRefusals.planOpening.cases</c> (#400) and
+    /// <c>planOpening.listCoursesLine.cases</c> (#404), through every surface
+    /// the note names: <c>Describe()</c>'s first line WHOLE, the sidebar
+    /// dialog's first sentence CONTAINS "to " + sheet, the card CONTAINS
+    /// "to " + card + " at ", the MCP result "deploys to " + sheet + " at ",
+    /// and list_courses' line WHOLE (through the real tool) — and the plan
+    /// names, in order, the destinations the run deploys to.
+    /// </summary>
+    [Fact]
+    public void EveryPlanOpeningNamesEveryDestinationInTheSavedOrder()
+    {
+        var opening = ContractLoader.LoadJson("shared-rules.json")["scheduledDeployRefusals"]!["planOpening"]!;
+        string message = opening["message"]!.ToString();
+        var cases = opening["cases"]!.AsArray().Select(c => (Case: c!, AllSurfaces: true))
+            .Concat(opening["listCoursesLine"]!["cases"]!.AsArray().Select(c => (Case: c!, AllSurfaces: false)))
+            .ToList();
+        Assert.True(cases.Count >= 4);
+
+        foreach (var (c, allSurfaces) in cases)
+        {
+            string dir = Directory.CreateTempSubdirectory("plan-opening").FullName;
+            try
+            {
+                string folder = Path.Combine(dir, "the folder");
+                Directory.CreateDirectory(folder);
+                File.WriteAllText(Path.Combine(dir, "preview.ps1"), "# marker");
+                var saving = System.Text.Json.Nodes.JsonNode.Parse(
+                    c["saved"]!.ToJsonString().Replace("{folder}", folder.Replace("\\", "\\\\")))!.AsObject();
+                saving["course_code"] = "ICS3U";
+                saving["course_name"] = "Computer Science";
+                saving["section_numbers"] = new System.Text.Json.Nodes.JsonArray(1);
+                string courseDir = Path.Combine(dir, "courses", "ICS3U");
+                Directory.CreateDirectory(courseDir);
+                File.WriteAllText(Path.Combine(courseDir, "course_config.json"), saving.ToJsonString());
+                foreach (string marker in new[] { ".netlify_sites", ".cloudflare_sites" })
+                {
+                    Directory.CreateDirectory(Path.Combine(courseDir, marker));
+                    File.WriteAllText(Path.Combine(courseDir, marker, "section1.json"), "{}");
+                }
+                var config = CourseConfiguration.FromBytes(File.ReadAllBytes(Path.Combine(courseDir, "course_config.json")));
+                string card = c["card"]!.ToString();
+
+                // list_courses, the whole line, through the real tool.
+                string listed = new Plantoir.Mcp.PlantoirTools(new AssistWorkspace(dir, new FakeLauncher()))
+                    .ListCourses().Split('\n').Select(l => l.TrimEnd('\r'))
+                    .Single(l => l.StartsWith("  publishes to: ", StringComparison.Ordinal));
+                Assert.Equal("  publishes to: " + card, listed);
+                if (!allSurfaces) continue;
+
+                string sheet = c["sheet"]!.ToString().Replace("{folder}", folder);
+                var course = new Course("ICS3U", courseDir, config);
+                var when = new DateTime(2026, 10, 1, 6, 30, 0);
+                Assert.Null(ScheduledDeploy.Problem(course, 1, when, when.AddDays(-1), "0123456789abcdef0123456789abcdef"));
+
+                var plan = new ScheduledDeploy
+                {
+                    CourseCode = "ICS3U", SectionNumber = 1, When = when,
+                    Destination = ScheduledDeploy.EveryDestination(config),
+                };
+                Assert.Equal(message.Replace("{course}", "ICS3U").Replace("{section}", "1")
+                                    .Replace("{destinations}", sheet).Replace("{moment}", $"{when:dddd d MMMM, h:mm tt}"),
+                             plan.Describe().Split('\n')[0]);
+                Assert.Contains("to " + sheet + " ", ScheduledDeploy.DialogOpening(course, 1));
+                Assert.Contains("to " + card + " at ", $"Deploy ICS3U Section 1 to {DeployCommand.EveryDestinationByType(config)} at 6:30 AM");
+                // What the plan names is what the run is written to deploy to.
+                Assert.Equal(config.AllDeployDestinations.Select(DeployCommand.DestinationDescription).ToList(),
+                             ScheduledRun.Decide(course, 1, "0123456789abcdef0123456789abcdef", [])
+                                 .DeploysTo!.Select(DeployCommand.DestinationDescription).ToList());
+            }
+            finally { try { Directory.Delete(dir, true); } catch { } }
+        }
     }
 
     // ---- What a window lets go of when it changes working folder ----------

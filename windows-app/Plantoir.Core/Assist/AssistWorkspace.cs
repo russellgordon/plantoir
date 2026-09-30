@@ -2485,18 +2485,19 @@ public sealed class AssistWorkspace
         if (ScheduledDeploy.Problem(course, section, when, DateTime.Now, cloudflareAccountId) is { } problem)
             throw new AssistRefusal(problem);
 
-        var unpublished = new List<string>();
+        // Only the classes the caller NAMED, each said as published or not
+        // (#400: the section-wide unpublished list is gone from scheduling).
+        var named = new List<(string Title, bool? Published)>();
         foreach (string title in classesToCheck ?? Array.Empty<string>())
         {
             try
             {
                 string path = Page(course, section, title);
-                if (PageFrontmatter.IsDraft(File.ReadAllText(path), section))
-                    unpublished.Add(Path.GetFileNameWithoutExtension(path));
+                named.Add((Path.GetFileNameWithoutExtension(path),
+                           !PageFrontmatter.IsDraft(File.ReadAllText(path), section)));
             }
-            // A page that cannot be found is reported by the caller's own
-            // lookup; it is not this check's job to refuse over it.
-            catch (AssistRefusal) { }
+            // A page that cannot be found is said so, not refused over.
+            catch (AssistRefusal) { named.Add((title, null)); }
         }
 
         return new ScheduledDeploy
@@ -2504,8 +2505,9 @@ public sealed class AssistWorkspace
             CourseCode = course.Code,
             SectionNumber = section,
             When = when,
-            UnpublishedClasses = unpublished,
-            Destination = DestinationOf(course),
+            ClassesNamed = named,
+            // EVERY destination, from the list the run deploys to (#400).
+            Destination = ScheduledDeploy.EveryDestination(course.Configuration),
         };
     }
 

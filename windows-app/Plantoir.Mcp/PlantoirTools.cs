@@ -70,11 +70,11 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         foreach (var course in courses)
         {
             var configuration = course.Configuration;
-            string destination = configuration.DeploysToLocalFolder ? "a folder on this computer"
-                : configuration.DeploysToCloudflare ? "Cloudflare Pages" : "Netlify";
             text.AppendLine($"{course.Code} — {configuration.CourseName}");
             text.AppendLine($"  sections: {string.Join(", ", course.SectionNumbers)}");
-            text.AppendLine($"  publishes to: {destination}");
+            // EVERY destination by type (#404, mac #403) — it used to name the
+            // primary alone, and a folder with no path chosen yet as Netlify.
+            text.AppendLine($"  publishes to: {DeployCommand.EveryDestinationByType(configuration)}");
         }
         return text.ToString().TrimEnd();
     }

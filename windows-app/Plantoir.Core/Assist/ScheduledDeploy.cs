@@ -140,75 +140,41 @@ public sealed class ScheduledDeploy
     public required int SectionNumber { get; init; }
     public required DateTime When { get; init; }
 
-
-    /// <summary>Classes that are not published yet, and so would not reach students.</summary>
-    public required IReadOnlyList<string> UnpublishedClasses { get; init; }
+    /// <summary>
+    /// The classes a caller NAMED (plan_scheduled_deploy's <c>classes</c>), each
+    /// with whether it is published — null when no page in the section is called
+    /// that. Only named classes: the section-wide list of unpublished classes
+    /// was REMOVED from scheduling on Russell's decision of 2026-09-30 (#400,
+    /// mac #396, <c>scheduledDeployRefusals.alsoSaid</c>) — classes later in the
+    /// year are unpublished on purpose all year, so it fired on every schedule,
+    /// and its "deploying now" was wrong on a sheet that deploys later.
+    /// </summary>
+    public IReadOnlyList<(string Title, bool? Published)> ClassesNamed { get; init; } = [];
 
     /// <summary>
-    /// Every class page of a section that is still unpublished — the ones a
-    /// deploy would put the site up without. For the sidebar's own "Schedule
-    /// Deploy…", which has no list of named classes the way the assistant's
-    /// tool does. Date-independent, as the contract's
-    /// <c>scheduledDeployRefusals.alsoSaid</c> rule has it ("list the class
-    /// pages students cannot see yet, by name") and as the mac's
-    /// <c>unpublishedClasses(course:sectionNumber:)</c> has always done: a
-    /// class dated after the deploy is still a page students cannot see.
-    ///
-    /// <para>Walks the same folders <c>AssistWorkspace.ClassPages</c> walks —
-    /// the ones the SHARED membership rule counts
-    /// (<c>contracts/class-planning.json</c> → <c>classFolder.membership</c>),
-    /// not every <c>per_section_folder</c> — and leaves out the same
-    /// <c>index.md</c>, for the same reason: a section's front page is not a
-    /// class. That sentence was false between the two of them until
-    /// 2026-09-19, when both stopped walking the whole list; a test now pins
-    /// the two together on one fixture, because a comment claiming agreement
-    /// is exactly what stops anybody checking. Named by FILE name, as this
-    /// app's own tool names them (<c>AssistWorkspace.PlanScheduledDeploy</c>);
-    /// the mac uses the page's title, a recorded difference.</para>
+    /// EVERY destination the deploy goes to, primary first and then each
+    /// additional in the order saved, joined "A", "A and B", "A, B and C" — in
+    /// the sheet's words (a folder by its path). Built from the same list the
+    /// run deploys to, <see cref="Models.CourseConfiguration.AllDeployDestinations"/>
+    /// (<c>scheduledDeployRefusals.planOpening</c>, #400). It used to name the
+    /// primary alone, so MPM2D's Netlify-and-Cloudflare sheet said "to Netlify".
     /// </summary>
-    public static List<string> UnpublishedClassesIn(Course course, int sectionNumber)
-    {
-        var names = new List<string>();
-        foreach (string folder in ClassFolderRule.Names(course.Configuration.ClassFolder,
-                                                        course.Configuration.PerSectionFolders))
-        {
-            string root = Path.Combine(course.SectionDirectory(sectionNumber), folder);
-            if (!Directory.Exists(root)) continue;
-            foreach (string page in PagePaths.MarkdownPages(root, sectionNumber))
-            {
-                if (string.Equals(Path.GetFileName(page), "index.md", StringComparison.OrdinalIgnoreCase))
-                    continue;
-                string text;
-                try { text = File.ReadAllText(page); } catch { continue; }
-                if (PageFrontmatter.IsDraft(text, sectionNumber))
-                    names.Add(Path.GetFileNameWithoutExtension(page));
-            }
-        }
-        names.Sort(StringComparer.OrdinalIgnoreCase);
-        return names;
-    }
-
-    /// <summary>
-    /// The sentence that goes with that list — the same content
-    /// <see cref="Describe"/> gives the assistant, in prose rather than in
-    /// bullets, because a dialog is not a chat transcript. Null when nothing
-    /// is unpublished.
-    /// </summary>
-    public static string? UnpublishedClassesSentence(IReadOnlyList<string> unpublished)
-    {
-        if (unpublished.Count == 0) return null;
-        int count = unpublished.Count;
-        string listed = string.Join(", ", unpublished.Take(8));
-        if (count > 8) listed += $" …and {count - 8} more";
-        string are = count == 1 ? "class is" : "classes are";
-        string them = count == 1 ? "it" : "them";
-        return $"One thing first — {count} {are} not published yet: {listed}. " +
-               $"Deploying now would put the site up without {them}. " +
-               "Publish first, look the preview over, then schedule this.";
-    }
-
-    /// <summary>Where the deploy would land.</summary>
     public required string Destination { get; init; }
+
+    /// <summary>Every destination, in the sheet's words, joined the way a teacher says a list.</summary>
+    public static string EveryDestination(Models.CourseConfiguration configuration) =>
+        Scripting.MultiDestinationDeployRunner.JoinedWithAnd(
+            configuration.AllDeployDestinations.Select(Models.DeployCommand.DestinationDescription).ToList());
+
+    /// <summary>
+    /// The first sentence of the sidebar's Schedule Deploy dialog. It names no
+    /// moment (the time is picked below it), so it CONTAINS "to " + every
+    /// destination rather than adopting planOpening's message (#400).
+    /// </summary>
+    public static string DialogOpening(Models.Course course, int sectionNumber) =>
+        $"{course.Code} Section {sectionNumber} will deploy on its own to {EveryDestination(course.Configuration)} " +
+        "at the time you pick. This computer must be switched on and awake then — plugged in if it is a laptop, " +
+        "with the lid open. Plantoir does not wake it up.";
 
     /// <summary>
     /// What the teacher is agreeing to — including everything that has to be
@@ -230,19 +196,22 @@ public sealed class ScheduledDeploy
             "nothing happens and the site stays as it is.",
         };
 
-        if (UnpublishedClasses.Count > 0)
+        // The only class check left (#400): the classes the caller NAMED, each
+        // said as published or not — the mac's plan_scheduled_deploy lines, so
+        // the two outside assistants read the same thing.
+        if (ClassesNamed.Count > 0)
         {
             lines.Add("");
-            // The failure this exists to prevent: a deploy that runs perfectly
-            // and ships a class students still cannot see.
-            lines.Add($"One thing first — {UnpublishedClasses.Count} " +
-                      $"class{(UnpublishedClasses.Count == 1 ? " is" : "es are")} not published yet:");
-            foreach (string page in UnpublishedClasses.Take(8)) lines.Add($"  {page}");
-            if (UnpublishedClasses.Count > 8)
-                lines.Add($"  …and {UnpublishedClasses.Count - 8} more.");
-            lines.Add("Deploying now would put the site up without " +
-                      $"{(UnpublishedClasses.Count == 1 ? "it" : "them")}. " +
-                      "Publish first, look the preview over, then schedule this.");
+            lines.Add("The classes this deploy is meant to carry:");
+            foreach (var (title, published) in ClassesNamed)
+            {
+                lines.Add(published switch
+                {
+                    null => $"  {title} — no page in this section is called that.",
+                    true => $"  {title} — published, so the deploy would carry it.",
+                    false => $"  {title} — NOT published, so the deploy would ship without it.",
+                });
+            }
         }
 
         return string.Join("\n", lines);

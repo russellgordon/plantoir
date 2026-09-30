@@ -117,7 +117,10 @@ public static class TaskScheduling
             return $"The scheduled deploy could not be written down: {error.Message}";
         }
 
-        string command = TaskRunCommand(runner, jobPath);
+        // The task NAME, not the job's path, is what the command carries:
+        // schtasks refuses a /TR over 261 characters, and runner + job path
+        // came to 548 in a deep folder on this PC (bundle 3's end-to-end probe).
+        string command = TaskRunCommand(runner, taskName);
 
         // schtasks accepts the date in the format the MACHINE's locale uses,
         // and rejects every other one outright — "Invalid Start Date (Date
@@ -171,12 +174,13 @@ public static class TaskScheduling
     }
 
     /// <summary>
-    /// How Task Scheduler starts the run: Plantoir itself, told which job.
-    /// Quoted, because a working folder's path is inside the job path and the
-    /// app may be installed under a path with spaces.
+    /// How Task Scheduler starts the run: Plantoir itself, told which task it
+    /// is — by its own NAME, from which <see cref="JobPath"/> finds the job, so
+    /// the run never recomputes a name (#309's trap). Quoted: names and install
+    /// paths hold spaces.
     /// </summary>
-    internal static string TaskRunCommand(string runner, string jobPath) =>
-        $"\"{runner}\" {RunArgument} \"{jobPath}\"";
+    internal static string TaskRunCommand(string runner, string taskName) =>
+        $"\"{runner}\" {RunArgument} \"{taskName}\"";
 
     /// <summary>
     /// Which Plantoir.exe a task should start. The app scheduling from its own
