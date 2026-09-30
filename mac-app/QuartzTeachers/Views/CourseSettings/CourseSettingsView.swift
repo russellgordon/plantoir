@@ -63,11 +63,16 @@ struct CourseSettingsView: View {
                             .accessibilityIdentifier("customShortNameField")
                     }
 
-                    Picker("Language / region (Quartz locale)", selection: $configuration.locale) {
-                        ForEach(LocaleCatalog.codes, id: \.self) { code in
-                            Text(LocaleCatalog.displayName(forCode: code))
-                                .tag(code)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Picker(CourseSettingsWording.localeLabel, selection: $configuration.locale) {
+                            ForEach(LocaleCatalog.codes, id: \.self) { code in
+                                Text(LocaleCatalog.displayName(forCode: code))
+                                    .tag(code)
+                            }
                         }
+                        .accessibilityIdentifier("localePicker")
+                        ExampleCaption(CourseSettingsWording.localeCaption)
+                            .accessibilityIdentifier("localeCaption")
                     }
 
                     Toggle("Show page read-time estimates to students", isOn: $configuration.showReadingTime)

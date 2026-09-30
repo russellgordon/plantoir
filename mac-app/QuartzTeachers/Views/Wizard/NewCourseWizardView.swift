@@ -1370,7 +1370,7 @@ struct NewCourseWizardView: View {
             // with the ones almost everyone sets.
             Section {
                 DisclosureGroup("Advanced") {
-                    Picker("Language / region", selection: $locale) {
+                    Picker(CourseSettingsWording.localeLabel, selection: $locale) {
                         ForEach(LocaleCatalog.codes, id: \.self) { code in
                             Text(LocaleCatalog.displayName(forCode: code)).tag(code)
                         }
