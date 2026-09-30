@@ -4755,13 +4755,93 @@
               ]
             ],
             "why" : "#378 fix-round review N1: the prefix match ends in a space (\"ICS3U 1 \"), so \"ICS3U 12 …\" never begins with it."
+          },
+          {
+            "expect" : "nothing",
+            "launchers" : [
+              "tail -f /Users/t/Library/Logs/Plantoir/ca.russellgordon.Plantoir.deploy.MPM2D.section2.3975d2cd.log"
+            ],
+            "leftovers" : "publish:MPM2D/2",
+            "name" : "a scheduled deploy's log being read owns nothing",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                410,
+                1,
+                "sh -lc  tok=$(cat /tmp/deploy_pat); rm -f /tmp/deploy_pat; opts=\"\"; [ -n \"$DIAGNOSE\" ] && opts=\"$opts $DIAGNOSE\"; [ \"$NON_INTERACTIVE\" = \"true\" ] && opts=\"$opts --non-interactive\"; [ -n \"$TEAM_SLUG\" ] && opts=\"$opts --team $TEAM_SLUG\"; if [ \"$TARGET\" = \"cloudflare\" ]; then CLOUDFLARE_API_TOKEN=\"$tok\" CLOUDFLARE_ACCOUNT_ID=\"$CF_ACCOUNT\" \\ python3 /opt/scripts/deploy.py --host-os mac --target cloudflare --course MPM2D --section 2 $opts else NETLIFY_AUTH_TOKEN=\"$tok\" \\ python3 /opt/scripts/deploy.py --host-os mac --course MPM2D --section 2 $opts fi "
+              ],
+              [
+                420,
+                410,
+                "python3 /opt/scripts/deploy.py --host-os mac --course MPM2D --section 2"
+              ]
+            ],
+            "why" : "#388: one label rule for both readers of the process table — the name must be the SCRIPT's, ending .sh. Reading the log of a publish set for later is not running it; until #388 this look counted it, and a Terminal tab left open on the log made a gone publish wait ten minutes and then refuse. The twin of previewWhileItsSectionDeploys → launcherCases “a scheduled deploy's log being read is not a deploy”."
+          },
+          {
+            "expect" : "nothing",
+            "launchers" : [
+              "/bin/bash /Users/t/Work/preview.sh AP CALC 1"
+            ],
+            "leftovers" : "preview:CALC/1",
+            "name" : "a launcher for AP CALC 1 does not own a gone preview of CALC 1",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                210,
+                1,
+                "python3 -u /opt/scripts/build_site.py --host-os mac --course=CALC --section=1 --port 8081"
+              ]
+            ],
+            "why" : "#388: a launcher's arguments must BEGIN with the course and section, never merely contain them — “CALC 1 ” is inside “AP CALC 1 ”. The owner-side twin of previewWhileItsSectionDeploys → launcherCases “a course that ENDS another's code is another course”."
+          },
+          {
+            "expect" : "other work",
+            "launchers" : [
+              [
+                6301,
+                1,
+                "/bin/zsh -c ./preview.sh ICS4U 1 --stop; docker exec -i teaching-quartz-0000abcd sh -c python3 /tmp/check.py"
+              ]
+            ],
+            "name" : "one line can be a launcher and a docker exec at once",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                410,
+                1,
+                "sh -lc  tok=$(cat /tmp/deploy_pat); rm -f /tmp/deploy_pat; opts=\"\"; [ -n \"$DIAGNOSE\" ] && opts=\"$opts $DIAGNOSE\"; [ \"$NON_INTERACTIVE\" = \"true\" ] && opts=\"$opts --non-interactive\"; [ -n \"$TEAM_SLUG\" ] && opts=\"$opts --team $TEAM_SLUG\"; if [ \"$TARGET\" = \"cloudflare\" ]; then CLOUDFLARE_API_TOKEN=\"$tok\" CLOUDFLARE_ACCOUNT_ID=\"$CF_ACCOUNT\" \\ python3 /opt/scripts/deploy.py --host-os mac --target cloudflare --course MPM2D --section 2 $opts else NETLIFY_AUTH_TOKEN=\"$tok\" \\ python3 /opt/scripts/deploy.py --host-os mac --course MPM2D --section 2 $opts fi "
+              ],
+              [
+                420,
+                410,
+                "python3 /opt/scripts/deploy.py --host-os mac --course MPM2D --section 2"
+              ]
+            ],
+            "waitingFor" : "publish MPM2D/2 terminal",
+            "why" : "#388 plan review 8: a process is looked at for a launcher, a publish set for later and a docker exec independently, as before the two readers became one. This line names a launcher for another section, which cannot own MPM2D's publish; its docker exec aimed at this workspace can, and does. Stopping after the first kind found on a line would lose the exec and end a publish that is still being waited for."
           }
         ],
         "casesWhy" : "`launchers` rows are either a command line (given pid 7001, 7002… and parent 1) or [pid, parent, command line], so a case can say who started what. `leftovers` is the space-separated WORKSPACE_LEFTOVERS the look must set, `waitingFor` its WORKSPACE_WAITING_FOR; both default to empty. `psFails` makes the process table unreadable. Run through the REAL look by scripts/test_port_blocks.py in all three launchers. `psEmpty` makes `ps` answer 0 with no lines. A course with a space is carried with \"+\" for it (`preview`, `waitingFor`, `leftovers` and the markers), and decoded for every sentence.",
         "knownLimits" : "The owner test is folder-blind: another working folder's launcher for the SAME course and section makes this folder's leftover count as owned (a needless wait, and the status line names that other folder's work, for up to ten minutes — the safe direction; matching by working directory was rejected as a second system query for a failure that only waits). Between the last look and the stop — tens of milliseconds — another launcher can start something in the workspace, which is then ended, and not named: narrowed, not closed. And a workspace remade during a deploy's host-side stretch (the token handed in, before the upload starts) has nothing inside to see. Closing those needs a lock every launcher and the app honour, which is what #156's work leases are for, and they are the app's. A course code shaped like \"ABC --1\" (a space then two dashes) would be cut at the dashes when the look reads --course; CourseCodeRule allows one space but a code beginning a word with \"--\" is not a code anyone writes, and the cost would be a preview read as left over — recorded rather than guarded (#378 fix-round review N2).",
         "originsWhy" : "Who started the owner, read from its ancestors: 'scheduled' first (the app's --run-scheduled-deploy runner is the Plantoir binary with no --mcp-stdio, so it must not be read as a window — plan review N2), then 'claude' / 'codex' / 'assistant' for a Plantoir --mcp-stdio with claude, codex or neither above it, then 'window' for the Plantoir app, then 'claude' / 'codex' for one of them running the launcher directly, and otherwise 'terminal'. '-' when the table could not be read.",
-        "rule" : "One look answers one of three: 'nothing' (not running, gone, only its own first process, or only work whose OWNER has gone), 'a preview' (build_site.py WITHOUT --build-only, with everything it started, AND a preview.sh for that course and section running on this Mac other than this run), or 'other work' (a build, a publish, a course being set up or anything else whose owner is running, and a running workspace that `docker top` did not answer). Every process belongs to the OUTERMOST piece of work above it inside the workspace: deploy.py (the `sh -lc` wrapper and the Python both name it) is a publish of its --course and --section, and the build_site.py --build-only a deploy runs as its own child is part of that publish (#378 plan review S2). The owners, proved from the LIVE process table only: a preview — preview.sh C S without --stop or --build-only; a build — preview.sh C S --build-only, or deploy.sh C S; a publish — deploy.sh C S; a course being set up — setup.sh; anything else — any launcher. Belts, for everything but a preview: a publish set for later, by the scheduled script's path (course sanitized as ScheduledDeploy writes it, 'section<N>' followed by a dot) and, for anything else, any such path; and a live `docker exec` aimed at this workspace by name or id. An open preview wins over other work, because waiting cannot end it. A website builder serving with no build_site.py above it is always left over.",
-        "whyTheLauncherIsAsked" : "Measured 2026-09-25 (plan review) and again 2026-09-29 for #378: killing the host side of `docker exec` leaves the process running inside the workspace, parented to the engine's shim — and under `docker exec -it`, which is how every launcher the app starts runs (on a pseudo-terminal), an in-container process waiting for an answer waits for ever (`read` from a terminal, still there minutes later), while one that is still working finishes on its own. That is how work is left behind when the app is force-quit, a Terminal window is closed or an assistant session ends. Counted as running, it refused every remake of that folder after ten minutes, until the Mac was restarted — which is what #378 reported. So an owner is proved per piece of work, from the process table read once per look, by a live process whose own command line names the same launcher, course and section: never by a remembered process number (no lease file, no pid file, no `kill -0`), so a number reused by another program cannot keep a dead owner alive. The course is matched in either case, the section exactly; this run, its ancestors and its descendants are left out (a login shell wrapping it carries the same words). An assistant session that is merely open owns nothing (#378 decision 1): it owns work only through a launcher it is running. A process table that cannot be read counts as every owner running: a wait and a refusal are recoverable, a publish ended is not."
+        "rule" : "One look answers one of three: 'nothing' (not running, gone, only its own first process, or only work whose OWNER has gone), 'a preview' (build_site.py WITHOUT --build-only, with everything it started, AND a preview.sh for that course and section running on this Mac other than this run), or 'other work' (a build, a publish, a course being set up or anything else whose owner is running, and a running workspace that `docker top` did not answer). Every process belongs to the OUTERMOST piece of work above it inside the workspace: deploy.py (the `sh -lc` wrapper and the Python both name it) is a publish of its --course and --section, and the build_site.py --build-only a deploy runs as its own child is part of that publish (#378 plan review S2). The owners, proved from the LIVE process table only: a preview — preview.sh C S without --stop or --build-only; a build — preview.sh C S --build-only, or deploy.sh C S; a publish — deploy.sh C S; a course being set up — setup.sh; anything else — any launcher. Belts, for everything but a preview: a publish set for later, by the scheduled script's name, ca.russellgordon.Plantoir.deploy.<CODE>.section<N>[.<folder id>].sh, ending .sh (the course written as ScheduledDeploy.sanitizedCode writes it — previewWhileItsSectionDeploys.labelCodeCases) and, for anything else, any such script; and a live `docker exec` aimed at this workspace by name or id. An open preview wins over other work, because waiting cannot end it. A website builder serving with no build_site.py above it is always left over. The table is read by ONE reader, the_launchers_running in the PROCESS TABLE BLOCK every launcher carries, which preview.sh's guard (previewWhileItsSectionDeploys) asks too (#388): the two share how a launcher, its course and section, its flags and a publish set for later are recognised, and when the table is unreadable; each keeps its own policy. This look counts a launcher a line merely NAMES (the guard counts only the program), and any flag on it for a publish or a build, on purpose: `bash -x ./deploy.sh C S` is a running publish whose program word is a flag away — counting too many costs a wait, counting too few ends a publish.",
+        "whyTheLauncherIsAsked" : "Measured 2026-09-25 (plan review) and again 2026-09-29 for #378: killing the host side of `docker exec` leaves the process running inside the workspace, parented to the engine's shim — and under `docker exec -it`, which is how every launcher the app starts runs (on a pseudo-terminal), an in-container process waiting for an answer waits for ever (`read` from a terminal, still there minutes later), while one that is still working finishes on its own. That is how work is left behind when the app is force-quit, a Terminal window is closed or an assistant session ends. Counted as running, it refused every remake of that folder after ten minutes, until the Mac was restarted — which is what #378 reported. So an owner is proved per piece of work, from the process table read once per look, by a live process whose own command line names the same launcher, course and section: never by a remembered process number (no lease file, no pid file, no `kill -0`), so a number reused by another program cannot keep a dead owner alive. The course is matched in either case, the section exactly; this run, its ancestors and its descendants are left out (a login shell wrapping it carries the same words). An assistant session that is merely open owns nothing (#378 decision 1): it owns work only through a launcher it is running. A process table that cannot be read counts as every owner running: a wait and a refusal are recoverable, a publish ended is not. So does ANY other failure of the reader (#388): a caller that waited only on its \"unreadable\" answer would read a reader missing from the launcher — \"command not found\" — as every owner gone."
       },
       "why" : "GitHub #94. Removing a workspace ends everything running inside it, and until this every one of those places stopped it without looking (setup.sh 8, preview.sh 5, deploy.sh 7, plus the three that retired the old shared workspace with -f). A preview open in one window died when another launcher in the same folder remade the workspace — after an update changed the recipe, once per folder for the builds mount, on a publish whose connection had gone stale — and a build or a publish half-way through was killed. The look is the app's own quit rule (documentation/09-mac-app.md: a workspace listing more than its first process is busy, and one that cannot be asked counts as busy), so the app and the launchers agree on what 'running' means. Measured on the development Mac 2026-09-25: an idle workspace lists exactly one process (tail -f /dev/null), `docker top` prints whole command lines, one look costs 23 ms, and a STOPPED workspace cannot be asked at all (exit 1) — hence 'stopped' is checked first. By id: two launchers started together can both find the old workspace idle, and a stop by NAME from the slower one would land on the new workspace the faster one has just made."
     },

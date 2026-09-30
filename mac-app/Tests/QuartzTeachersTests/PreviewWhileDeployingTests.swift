@@ -189,7 +189,64 @@ final class PreviewWhileDeployingTests: XCTestCase {
         XCTAssertTrue(launcher[0].contains(FailureExplainer.sectionIsBeingDeployedMarker))
     }
 
+    // MARK: - The scheduled deploy's label, as the launchers read it (#388, N5)
+
+    /// Every `labelCodeCases` case is what `ScheduledDeploy.sanitizedCode`
+    /// writes into a scheduled deploy's label. The launchers' one reader of
+    /// the process table runs the same cases (scripts/test_preview_while_deploying.py),
+    /// so the two sides are held to one list rather than to each other.
+    func testEveryLabelCodeCaseIsWhatAScheduledDeployIsNamed() throws {
+        let rule: [String: Any] = try WorkLeaseLivenessTests.sharedRules(["previewWhileItsSectionDeploys"])
+        let cases: [[String: Any]] = try XCTUnwrap(rule["labelCodeCases"] as? [[String: Any]])
+        XCTAssertEqual(cases.count, 8)
+        for testCase in cases {
+            let course: String = try XCTUnwrap(testCase["course"] as? String)
+            let labelCode: String = try XCTUnwrap(testCase["labelCode"] as? String)
+            XCTAssertEqual(ScheduledDeploy.sanitizedCode(course), labelCode, "course \"\(course)\"")
+        }
+    }
+
+    /// Swift keeps any letter or digit in a label; the launchers keep only
+    /// A-Z and 0-9. They agree on every code a teacher can make only because
+    /// `CourseCodeRule` refuses every character they disagree on. This walks
+    /// the whole Basic Multilingual Plane and holds that true — so the day
+    /// the rule starts accepting an accented letter (French course names
+    /// are common in Ontario), this fails instead of a scheduled deploy of
+    /// that course quietly going unseen by the launchers.
+    func testEveryCharacterACourseCodeMayHoldIsLabelledAsTheLaunchersLabelIt() {
+        var disagreementsChecked: Int = 0
+        var accepted: [String] = []
+        for value in 0x20...0xFFFF {
+            guard let scalar = Unicode.Scalar(value) else {
+                continue
+            }
+            let character: Character = Character(scalar)
+            let swiftWrites: String = ScheduledDeploy.sanitizedCode(String(character))
+            let launchersWrite: String = launcherLabelCode(of: character)
+            if swiftWrites == launchersWrite {
+                continue
+            }
+            disagreementsChecked += 1
+            let typed: String = "A" + String(character) + "1"
+            if CourseCodeRule.trouble(typed, existingCodes: []) == nil {
+                accepted.append(String(format: "U+%04X", value))
+            }
+        }
+        XCTAssertGreaterThan(disagreementsChecked, 1000, "the walk found almost nothing to check")
+        XCTAssertEqual(accepted, [], "a code holding these is accepted, and Swift and the launchers label it differently")
+    }
+
     // MARK: - Functions
+
+    /// The launchers' label code for one character: an ASCII letter
+    /// upper-cased, an ASCII digit kept, and anything else "-"
+    /// (the_launchers_running's label_code, in the PROCESS TABLE BLOCK).
+    private func launcherLabelCode(of character: Character) -> String {
+        if character.isASCII && (character.isLetter || character.isNumber) {
+            return character.uppercased()
+        }
+        return "-"
+    }
 
     private func trailEntry(_ event: String) throws -> [String: Any] {
         let url: URL = URL(fileURLWithPath: #filePath)

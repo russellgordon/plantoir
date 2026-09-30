@@ -17608,7 +17608,7 @@
     "why": "GitHub #381, split from #378 on 2026-09-29. Russell's decision 4 on #378: 'A preview of a section cannot start AT ALL while that same section is being deployed — from this window or another.' A preview builds into the same folder a deploy is uploading from, and a preview that has to set the folder up again removes the workspace a deploy is about to run in. Read from code on 2026-09-29 (the #378 plan review), the mac refused only four of the six ways in: the same window only through its disabled Preview button (startPreview itself asked nothing, and the in-app assistant and the restart path call it directly); another window of the app and the in-app assistant's windowless deploy NOT AT ALL (startPreview read other programs' leases, never this program's own publishes); a deploy set for later and an outside assistant through their work leases; a command line NOT AT ALL, either way round (a bare launcher writes no lease, and preview.sh checked nothing).",
     "layers": {
       "window": "The one function every preview a window starts goes through (mac: SectionDetailView.startPreview; the button, the in-app assistant and the restart path all call it) asks, FIRST, before any lease is taken or anything is stopped or started, whether THIS copy of the app is deploying that section (mac: CourseActivity.sectionPublishIsRunning, the record the window's Deploy and the assistant's windowless deploy both write). It shows sentences.window under the title 'Cannot Preview Yet' and writes the trail line.",
-      "launcher": "preview.sh, on a serving run only, before it changes anything, reads the LIVE process table for a deploy of the same course and section working in the same folder: deploy.sh C S (not --reset-token, --logout or --help; --diagnose deploys), or a deploy set for later of C/S (its script's name, ca.russellgordon.Plantoir.deploy.<CODE>.section<N>[.<folder id>].sh, <CODE> written as ScheduledDeploy.sanitizedCode writes it). It prints sentences.launcher, writes the trail line, and exits 1. The cases are launcherCases.",
+      "launcher": "preview.sh, on a serving run only, before it changes anything, reads the LIVE process table for a deploy of the same course and section working in the same folder: deploy.sh C S (not --reset-token, --logout or --help; --diagnose deploys), or a deploy set for later of C/S (its script's name, ca.russellgordon.Plantoir.deploy.<CODE>.section<N>[.<folder id>].sh, <CODE> written as ScheduledDeploy.sanitizedCode writes it — labelCodeCases; the name must end .sh, so a log being read is not a deploy). The table is read by the one reader every launcher carries, the_launchers_running in the PROCESS TABLE BLOCK, which the look before a website builder is set up again asks too (#388); a table that cannot be read — `ps` fails, or its answer does not list this run — lets the preview through. It prints sentences.launcher, writes the trail line, and exits 1. The cases are launcherCases.",
       "lease": "Another program on this Mac that is deploying (a deploy set for later, an outside assistant, another copy of the app) holds build and publish work leases for the COURSE; the window's existing take-then-check (workLeases) refuses with wording.courseIsBeingBuiltElsewhere. Unchanged by this rule and course-wide, which is wider than it.",
       "assistant": "The in-app assistant's (and the MCP server's own) preview, before it opens a window, stops a preview or runs a --build-only rebuild (mac: AssistToolRunner.bringThePreviewUpToDate), asks the same in-process publish record and answers wording.sectionIsBeingDeployed, with the same trail line as the window."
     },
@@ -17715,7 +17715,50 @@
         "why": "Not this rule: #156's course-level lease, unchanged, with its own sentence."
       }
     ],
-    "launcherCasesShape": "Run by scripts/test_preview_while_deploying.py against the REAL guard cut out of preview.sh, with a pretend ps and lsof. The preview asked for is course, section (default ICS4U, 2) in the working folder 'here'. processes are [pid, ppid, args] rows of `ps -Ao pid=,ppid=,args=`; this run is pid 5000, whose parent is 4999 ('-bash' unless parentArgs says otherwise). cwd maps a pid to the working directory lsof reports ('here' is this folder, 'elsewhere' another; a pid missing from it means lsof answers nothing). {here} and {elsewhereID} and {hereID} in args are the folder, another folder's id and this folder's id. psFails: the table cannot be read. expect is refused or allowed.",
+    "labelCodeCasesShape": "Each case is a course code as typed and the <CODE> a scheduled deploy's script name carries for it (ScheduledDeploy.agentLabel). Run on the mac through ScheduledDeploy.sanitizedCode (PreviewWhileDeployingTests), and through the launchers' one reader, the_launchers_running (scripts/test_preview_while_deploying.py). The two rules differ outside ASCII — Swift keeps any letter or digit, the launchers keep A-Z and 0-9 — and agree on every code the apps' CourseCodeRule accepts, which the mac pins by walking the Basic Multilingual Plane. #388, N5.",
+    "labelCodeCases": [
+      {
+        "course": "ICS4U",
+        "labelCode": "ICS4U",
+        "why": "Letters and digits are kept."
+      },
+      {
+        "course": "ics4u",
+        "labelCode": "ICS4U",
+        "why": "Upper case, as the launcher and ScheduledDeploy both write it."
+      },
+      {
+        "course": "AP CALC",
+        "labelCode": "AP-CALC",
+        "why": "A space is not a letter or digit."
+      },
+      {
+        "course": "MTEL-12",
+        "labelCode": "MTEL-12",
+        "why": "A dash stays a dash."
+      },
+      {
+        "course": "MMA--09",
+        "labelCode": "MMA--09",
+        "why": "Each character is written on its own; runs are not collapsed."
+      },
+      {
+        "course": "ab c1",
+        "labelCode": "AB-C1",
+        "why": "Lower case and a space together."
+      },
+      {
+        "course": "ICS.4U",
+        "labelCode": "ICS-4U",
+        "why": "Not a code CourseCodeRule allows, but the command-line setup does, and whatCountsAsRunning's case “a publish set for later, course with characters a label cannot hold” uses it."
+      },
+      {
+        "course": "",
+        "labelCode": "COURSE",
+        "why": "An empty code is written COURSE (unreachable: every door refuses an empty code); both sides agree on it."
+      }
+    ],
+    "launcherCasesShape": "Run by scripts/test_preview_while_deploying.py against the REAL guard cut out of preview.sh, with a pretend ps and lsof. The preview asked for is course, section (default ICS4U, 2) in the working folder 'here'. processes are [pid, ppid, args] rows of `ps -Ao pid=,ppid=,args=`; this run is pid 5000, whose parent is 4999 ('-bash' unless parentArgs says otherwise). cwd maps a pid to the working directory lsof reports ('here' is this folder, 'elsewhere' another; a pid missing from it means lsof answers nothing). {here} and {elsewhereID} and {hereID} in args are the folder, another folder's id and this folder's id. psFails: the table cannot be read. psOmitsThisRun: the table is read but does not list this run (#388). expect is refused or allowed.",
     "launcherCases": [
       {
         "name": "deploy.sh for the section, from a command line in this folder",
@@ -17932,6 +17975,39 @@
         "why": "Failing closed would refuse every preview for as long as ps fails. The window's check and the leases still stand."
       },
       {
+        "name": "a process table that does not list this run lets the preview through",
+        "psOmitsThisRun": true,
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./deploy.sh ICS4U 2"
+          ]
+        ],
+        "cwd": {
+          "700": "here"
+        },
+        "expect": "allowed",
+        "why": "#388: one reader of the process table, one meaning of unreadable — `ps` failing, or answering without this very run in it (#378 review N6). The look before a website builder is set up again already did not believe such a table; the guard now reads it the same way, and fails OPEN on it, as it does when `ps` fails."
+      },
+      {
+        "name": "a course typed with two spaces is read as the launcher reads its words",
+        "course": "AP  CALC",
+        "section": "2",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./deploy.sh AP CALC 2"
+          ]
+        ],
+        "cwd": {
+          "700": "here"
+        },
+        "expect": "refused",
+        "why": "#388 plan review 9: runs of blanks in the course asked about are one space, as deploy.sh's own words are rejoined, so a preview typed with a doubled space is still refused while its section deploys."
+      },
+      {
         "name": "a deploy of ANOTHER section does not refuse",
         "processes": [
           [
@@ -18129,7 +18205,8 @@
     "knownLimits": [
       "A preview typed in Terminal while ANOTHER program is in the build leg of its deploy (preview.sh --build-only, before its deploy.sh starts) is not refused by the launcher: the build leg cannot be told from the assistant's rebuild (launcherCases, '--build-only is not a deploy'). A program deploying that way holds work leases, but a preview typed in Terminal reads none. A --for-deploy flag on the build leg would close it; it is a launcherFlags change and was not made for this.",
       "The launcher's look is folder-aware for deploy.sh (its working directory) and for a deploy set for later (its label's folder id), but a deploy set before #237 names no folder and counts for every folder holding that course and section.",
-      "A course code with a letter outside A-Z is written into the label by Swift's isLetter and by the launcher as '-', so a deploy set for later of such a course is not recognised by the launcher (it fails open; the leases still refuse a window's preview)."
+      "A course code with a letter or digit outside A-Z and 0-9 (\"CAFÉ\") is written into a scheduled deploy's label by Swift's isLetter/isNumber as itself and by the launcher as '-', so a deploy set for later of such a course is not recognised by the launcher's label look (it fails open; the leases still refuse a window's preview, and deploy.sh's own row is still recognised by its words). Neither app can make such a code (course-management.json refuses \"CAFÉ\"; labelCodeCases and the mac's walk of the Basic Multilingual Plane pin that every code the apps accept is labelled alike), but the command-line setup can: setup_course.py checks only for a leading dot. Recorded, not fixed here (#388).",
+      "A deploy run as `bash -x ./deploy.sh C S` — a shell given a flag before the script — is not the PROGRAM by the guard's rule, so its preview is let through (fails open; recorded by #388's plan review, unchanged by the fold). Widening the rule to allow shell flags other than -c would close it; it was not done in #388."
     ],
     "rejected": [
       "Counting preview.sh C S --build-only as a deploy (the #378 plan's first shape): it refuses every preview while the assistant rebuilds that section's preview, with a false sentence.",
