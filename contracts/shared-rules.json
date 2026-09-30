@@ -4880,6 +4880,16 @@
           "hidden": true
         },
         {
+          "line": "PLANTOIR_WAITING_FOR: publish MPM2D/2 claude",
+          "hidden": true,
+          "why": "#378: what a launcher waits for before setting a folder up again; the app turns it into the status line, and the console says it in words beside it. Mac-only, but hidden by the one rule on both sides."
+        },
+        {
+          "line": "PLANTOIR_LEFTOVER_STOPPED: ICS4U/1 publish:MPM2D/2",
+          "hidden": true,
+          "why": "#378: work ended because its owner had gone, for the trail's 'left-over work stopped'."
+        },
+        {
           "line": "PLANTOIR_DATED: {\"course\": \"ICS4U\", \"section\": 1, \"pages\": [\"section1/index\"]}",
           "hidden": true
         },
