@@ -1,4 +1,5 @@
 using System.Globalization;
+using Plantoir.Core.Scripting;
 
 namespace Plantoir.Core.Models;
 
@@ -78,7 +79,7 @@ public static class SectionAdder
             }
         }
 
-        ExtendCourseLevelPages(course, number, created);
+        var (givenKeys, heldBack) = ExtendCourseLevelPagesCounting(course, number, created);
 
         // Only after the folder is safely written does the config learn about
         // it — a mid-way failure never leaves settings pointing at nothing.
@@ -87,6 +88,25 @@ public static class SectionAdder
         numbers.Sort();
         config.SetSectionNumbers(numbers);
         config.Write(course.ConfigFilePath);
+
+        // Rule 5: this writes into pages the teacher never opened, so the
+        // trail says it happened and how many - never which (#282, mac #175).
+        ActivityTrail.Note(ActivityTrail.Event.SectionAdded,
+            TrailLine(number, givenKeys, heldBack), course.Code, number);
+    }
+
+    /// <summary>The trail's line for a section added, word for word the mac's <c>SectionAdder.trailLine</c>.</summary>
+    internal static string TrailLine(int sectionNumber, int pagesGivenKeys, int pagesKeptHiddenUnreadable = 0)
+    {
+        string pages = pagesGivenKeys == 1 ? "1 page" : $"{pagesGivenKeys} pages";
+        string line = $"added section {sectionNumber}; {pages} shared by every section "
+            + "given a date and a published-or-hidden setting for it";
+        if (pagesKeptHiddenUnreadable > 0)
+        {
+            string unread = pagesKeptHiddenUnreadable == 1 ? "1 of them was" : $"{pagesKeptHiddenUnreadable} of them were";
+            line += $"; {unread} kept hidden because its setting for the other sections could not be read";
+        }
+        return line;
     }
 
     internal static string? LowestExistingSiblingSectionDirectory(Course course)
@@ -135,47 +155,63 @@ public static class SectionAdder
             return;
         }
 
-        var lines = FrontmatterLines(sourcePath);
-        if (lines == null)
-        {
-            File.WriteAllText(destinationPath, text);
-            return;
-        }
-
         string normalizedRelative = relativePath.Replace('\\', '/');
         bool isRootIndex = normalizedRelative == "index.md";
         bool isTopLevelPerSectionFile = course.Configuration.PerSectionFiles.Contains(normalizedRelative);
+        string? newTitle = isRootIndex ? SectionTitle(course, sectionNumber) : null;
+        string? newCreated = isRootIndex || isTopLevelPerSectionFile ? created : null;
 
-        var newLines = new List<string>();
-        foreach (string line in lines)
-        {
-            if (isRootIndex && line.StartsWith("title:", StringComparison.Ordinal))
-            {
-                string newTitle = SectionTitle(course, sectionNumber);
-                newLines.Add("title: " + newTitle);
-            }
-            else if ((isRootIndex || isTopLevelPerSectionFile) && line.StartsWith("created:", StringComparison.Ordinal))
-            {
-                newLines.Add("created: " + created);
-            }
-            else
-            {
-                newLines.Add(line);
-            }
-        }
-
-        int prefixToDrop = ("---\n" + string.Join("\n", lines)).Length;
-        string textNormalized = text.Replace("\r\n", "\n");
-        string restOfText = textNormalized[prefixToDrop..];
-        string rewritten = "---\n" + string.Join("\n", newLines) + restOfText;
-        File.WriteAllText(destinationPath, rewritten);
+        File.WriteAllText(destinationPath, ReplaceTitleAndCreated(text, newTitle, newCreated));
     }
 
-    internal static void ExtendCourseLevelPages(Course course, int sectionNumber, string created)
+    /// <summary>
+    /// The page with its top-level <c>title:</c> and <c>created:</c> replaced,
+    /// each taking its old value's continuation lines with it and keeping its
+    /// own line ending (#284, the mac's #199). The block is found the way the
+    /// build finds it; a page without one is returned unchanged.
+    /// </summary>
+    /// <remarks>
+    /// Walked from the BOTTOM of the block, so removing one key's continuation
+    /// lines never shifts a key still to come. Until #282/#284 this rebuilt
+    /// <c>"---\n" + block</c> and cut the old text by a character count, which
+    /// assumed exactly <c>---</c> on line 0 and LF — and replaced the key's
+    /// line alone, so a title below its key was read by the site joined to
+    /// the new one.
+    /// </remarks>
+    internal static string ReplaceTitleAndCreated(string text, string? newTitle, string? newCreated)
+    {
+        if (newTitle is null && newCreated is null) return text;
+        if (PageVisibilityReader.FenceIndices(text) is not { } fences) return text;
+
+        var lines = new List<string>(text.Split('\n'));
+        int close = fences.Close;
+        for (int index = close - 1; index > fences.Open; index--)
+        {
+            string bare = PageVisibilityReader.TrimCarriageReturn(lines[index]);
+            if (bare.StartsWith(' ') || bare.StartsWith('\t')) continue;
+            if (newTitle is not null && PageVisibilityReader.ValuePart("title", bare) is not null)
+                close -= PageFrontmatter.ReplaceKeyLine(lines, index, "title", "title: " + newTitle, close);
+            else if (newCreated is not null && PageVisibilityReader.ValuePart("created", bare) is not null)
+                close -= PageFrontmatter.ReplaceKeyLine(lines, index, "created", "created: " + newCreated, close);
+        }
+        return string.Join("\n", lines);
+    }
+
+    internal static void ExtendCourseLevelPages(Course course, int sectionNumber, string created) =>
+        ExtendCourseLevelPagesCounting(course, sectionNumber, created);
+
+    /// <summary>
+    /// Give every course-level page with per-section keys a pair for the new
+    /// section, and say how many were given keys and how many of those were
+    /// held back because the setting they copy could not be read — the two
+    /// numbers the trail's <c>section added</c> line carries.
+    /// </summary>
+    internal static (int GivenKeys, int HeldBack) ExtendCourseLevelPagesCounting(Course course, int sectionNumber, string created)
     {
         var sectionFolderNames = new HashSet<string>(course.Configuration.SectionNumbers.Select(n => $"section{n}"));
-        if (!Directory.Exists(course.DirectoryPath)) return;
+        if (!Directory.Exists(course.DirectoryPath)) return (0, 0);
 
+        int given = 0, heldBack = 0;
         foreach (string file in Directory.GetFiles(course.DirectoryPath, "*.md", SearchOption.AllDirectories))
         {
             string relative = Path.GetRelativePath(course.DirectoryPath, file);
@@ -183,63 +219,77 @@ public static class SectionAdder
             if (sectionFolderNames.Contains(firstSegment))
                 continue;
 
-            ExtendFrontmatter(file, sectionNumber, created);
+            string text;
+            try { text = File.ReadAllText(file); }
+            catch { continue; }
+            var (rewritten, outcome) = ExtendFrontmatter(text, sectionNumber, created);
+            if (outcome == PageOutcome.Untouched) continue;
+            try { File.WriteAllText(file, rewritten); }
+            catch { continue; }
+            given++;
+            if (outcome == PageOutcome.GivenKeysAndKeptHiddenBecauseUnreadable) heldBack++;
         }
+        return (given, heldBack);
     }
 
-    private static void ExtendFrontmatter(string filePath, int sectionNumber, string created)
+    /// <summary>What adding a section did to one course-level page.</summary>
+    internal enum PageOutcome { Untouched, GivenKeys, GivenKeysAndKeptHiddenBecauseUnreadable }
+
+    /// <summary>
+    /// The page with a <c>createdSection&lt;N&gt;</c> and a
+    /// <c>publishForSection&lt;N&gt;</c> for the new section, copied from the
+    /// LOWEST existing section — pinned by
+    /// <c>course-management.json → sectionNumbers.addingKeysToAPage</c>,
+    /// compared as bytes.
+    /// </summary>
+    /// <remarks>
+    /// <para>The block is found with the shared finder (#282, the mac's #175):
+    /// three dashes or more, blank lines before, spaces after. The old strict
+    /// finder SKIPPED a <c>----</c> fence, a blank line before the fence and a
+    /// trailing space — and a page with no key for a section is SHOWN in it,
+    /// so a page hidden in section 1 was published in the new section,
+    /// silently.</para>
+    /// <para>Spliced by LINE INDEX, never by rebuilding <c>"---\n" + block</c>
+    /// and cutting by a character count: measured on the mac, that left a
+    /// stray character on the new date (<c>…-0400e</c>) for the three
+    /// non-<c>---</c> shapes, and here it rewrote a CRLF page as LF. The pair
+    /// goes after the last per-section key's WHOLE value (its continuation
+    /// lines, #181), each new line taking the ending of the line it follows.</para>
+    /// </remarks>
+    internal static (string Text, PageOutcome Outcome) ExtendFrontmatter(string text, int sectionNumber, string created)
     {
-        string text;
-        try { text = File.ReadAllText(filePath); }
-        catch { return; }
+        if (PageVisibilityReader.FenceIndices(text) is not { } fences) return (text, PageOutcome.Untouched);
+        var allLines = new List<string>(text.Split('\n'));
+        var lines = allLines.Skip(fences.Open + 1).Take(fences.Close - fences.Open - 1)
+            .Select(PageVisibilityReader.TrimCarriageReturn).ToList();
+        if (AlreadyHasKeys(sectionNumber, lines)) return (text, PageOutcome.Untouched);
 
-        var lines = FrontmatterLines(filePath);
-        if (lines == null || AlreadyHasKeys(sectionNumber, lines)) return;
-
-        int? lowestSection = null;
-        foreach (string line in lines)
-        {
-            int? num = PerSectionKeyNumber(line);
-            if (num.HasValue)
-            {
-                if (!lowestSection.HasValue || num.Value < lowestSection.Value)
-                    lowestSection = num.Value;
-            }
-        }
-        if (!lowestSection.HasValue) return;
+        var numbered = lines.Select((line, index) => (Index: index, Number: PerSectionKeyNumber(line)))
+            .Where(entry => entry.Number is not null).ToList();
+        if (numbered.Count == 0) return (text, PageOutcome.Untouched);
+        int lowestSection = numbered.Min(entry => entry.Number!.Value);
 
         var addition = new List<string> { $"createdSection{sectionNumber}: {created}" };
-        string? publish = PublishValue(lowestSection.Value, lines);
+        var (publish, couldBeRead) = PublishReading(lowestSection, lines);
         if (publish != null)
         {
-            // An empty value is a null, and `key:` is how YAML spells one —
-            // `key: ` with a trailing space says the same thing and looks like
-            // a typo in the teacher's file.
+            // An empty value is a null, and `key:` is how YAML spells one.
             addition.Add(publish.Length == 0
                 ? $"publishForSection{sectionNumber}:"
                 : $"publishForSection{sectionNumber}: {publish}");
         }
 
-        int lastKeyIndex = -1;
-        for (int i = 0; i < lines.Count; i++)
-        {
-            if (PerSectionKeyNumber(lines[i]) != null)
-                lastKeyIndex = i;
-        }
+        int lastKeyPosition = fences.Open + 1 + numbered[^1].Index;
+        string lineEnding = allLines[lastKeyPosition].EndsWith('\r') ? "\r" : "";
+        string lastKey = lines[numbered[^1].Index];
+        lastKey = lastKey[..lastKey.IndexOf(':')];
+        bool wasEmpty = PageVisibilityReader.ValuePart(lastKey, lines[numbered[^1].Index]) is { } value
+            && PageVisibilityReader.TrimYamlSpaces(value).Length == 0;
+        int valueLines = PageFrontmatter.ContinuationLineCount(allLines, lastKeyPosition, fences.Close, wasEmpty);
+        allLines.InsertRange(lastKeyPosition + 1 + valueLines, addition.Select(line => line + lineEnding));
 
-        var updated = new List<string>();
-        for (int i = 0; i < lines.Count; i++)
-        {
-            updated.Add(lines[i]);
-            if (i == lastKeyIndex)
-                updated.AddRange(addition);
-        }
-
-        string textNormalized = text.Replace("\r\n", "\n");
-        int prefixToDrop = ("---\n" + string.Join("\n", lines)).Length;
-        string body = textNormalized[prefixToDrop..];
-        string rewritten = "---\n" + string.Join("\n", updated) + body;
-        File.WriteAllText(filePath, rewritten);
+        return (string.Join("\n", allLines),
+            couldBeRead ? PageOutcome.GivenKeys : PageOutcome.GivenKeysAndKeptHiddenBecauseUnreadable);
     }
 
     private static bool AlreadyHasKeys(int sectionNumber, List<string> lines)
@@ -247,6 +297,10 @@ public static class SectionAdder
         string[] prefixes = [$"createdSection{sectionNumber}:", $"publishForSection{sectionNumber}:", $"draftSection{sectionNumber}:"];
         return lines.Any(l => prefixes.Any(p => l.StartsWith(p, StringComparison.Ordinal)));
     }
+
+    /// <inheritdoc cref="PublishReading"/>
+    internal static string? PublishValue(int sectionNumber, List<string> lines) =>
+        PublishReading(sectionNumber, lines).Value;
 
     /// <summary>
     /// The value a new section's <c>publishForSection&lt;N&gt;</c> should carry,
@@ -278,7 +332,7 @@ public static class SectionAdder
     /// held back is one a teacher notices and fixes; a page wrongly published
     /// is one nobody notices at all.</para>
     /// </remarks>
-    internal static string? PublishValue(int sectionNumber, List<string> lines)
+    internal static (string? Value, bool CouldBeRead) PublishReading(int sectionNumber, List<string> lines)
     {
         // The reader's own matcher and the reader's own LAST-wins rule, so the
         // value carried across is the value the build reads. A prefix test
@@ -288,7 +342,7 @@ public static class SectionAdder
         {
             bool continues = entry.NextLine is { } below
                 && (below.StartsWith(' ') || below.StartsWith('\t'));
-            if (continues) return "false";
+            if (continues) return ("false", false);
 
             string value = PageVisibilityReader.TrimYamlSpaces(entry.Value);
             if (value.Length == 0)
@@ -296,10 +350,10 @@ public static class SectionAdder
                 // A key with nothing after it is a NULL, which PUBLISHES the
                 // page. Copying the emptiness keeps the new section saying what
                 // the old one says; writing "false" would hide it.
-                return "";
+                return ("", true);
             }
-            if (!PageVisibilityReader.IsCompleteOnItsOwnLine(entry.Value)) return "false";
-            return value;
+            if (!PageVisibilityReader.IsCompleteOnItsOwnLine(entry.Value)) return ("false", false);
+            return (value, true);
         }
 
         if (PageVisibilityReader.LastTopLevelEntry($"draftSection{sectionNumber}", lines) is { } legacy)
@@ -332,11 +386,15 @@ public static class SectionAdder
             // The mac's own #176 fix closes it, since its `publishValue` asks
             // the same reader.
             var scalar = PageVisibilityReader.ReadScalar(legacy.Value, legacy.NextLine);
-            return PageVisibilityReader.DraftFamilyAnswer(scalar) == PageVisibility.Visible
-                ? "true"
-                : "false";
+            var answer = PageVisibilityReader.DraftFamilyAnswer(scalar);
+            return answer switch
+            {
+                PageVisibility.Visible => ("true", true),
+                PageVisibility.Hidden => ("false", true),
+                _ => ("false", false),   // cannot tell: held back, and counted
+            };
         }
-        return null;
+        return (null, true);
     }
 
     internal static int? PerSectionKeyNumber(string line)
@@ -375,15 +433,11 @@ public static class SectionAdder
     {
         string text;
         try { text = File.ReadAllText(path); } catch { return null; }
-        var lines = text.Split('\n');
-        if (lines.Length == 0 || lines[0].TrimEnd('\r') != "---") return null;
-        var collected = new List<string>();
-        for (int i = 1; i < lines.Length; i++)
-        {
-            if (lines[i].TrimEnd('\r') == "---") return collected;
-            collected.Add(lines[i].TrimEnd('\r'));
-        }
-        return null;
+        // The build's own boundary (#282): three dashes or more, blank lines
+        // before, spaces after - the same finder every writer uses.
+        if (PageVisibilityReader.FenceIndices(text) is not { } fences) return null;
+        return text.Split('\n').Skip(fences.Open + 1).Take(fences.Close - fences.Open - 1)
+            .Select(PageVisibilityReader.TrimCarriageReturn).ToList();
     }
 
     /// <summary>
@@ -396,13 +450,10 @@ public static class SectionAdder
         var siblingLines = siblingPath is null ? null : FrontmatterLines(siblingPath);
         if (siblingLines is not null)
         {
-            var rewritten = siblingLines.Select(line =>
-            {
-                if (line.StartsWith("created:", StringComparison.Ordinal)) return "created: " + created;
-                if (line.StartsWith("title:", StringComparison.Ordinal) && newTitle is not null) return "title: " + newTitle;
-                return line;
-            });
-            return string.Join("\n", rewritten);
+            // Through the shared ReplaceKeyLine (#284), bottom up, so a title
+            // or date below its key goes with it rather than joining the new one.
+            string replaced = ReplaceTitleAndCreated("---\n" + string.Join("\n", siblingLines) + "\n---", newTitle, created);
+            return replaced[4..^4];
         }
         // The publish key, not the legacy draft one, and note the polarity is
         // INVERTED: a teacher-eyes-only page is `publish: false`. Missing this

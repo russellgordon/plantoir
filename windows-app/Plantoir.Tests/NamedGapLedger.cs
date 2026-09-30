@@ -159,8 +159,6 @@ internal static class NamedGapLedger
             "class copy not made"),
         Owed(ActivityTrailEvents, 308, "the writers do not yet say when they left a page's settings alone (mac #182/#186/#188)",
             "page settings left as they were"),
-        Owed(ActivityTrailEvents, 282, "adding a section does not record itself yet (mac #175)",
-            "section added"),
         Owed(ActivityTrailEvents, 348, "Revert does not record the exclusions it put back yet (mac #152)",
             "exclusions reverted"),
         Owed(ActivityTrailEvents, 233, "a preview that never appears is not told apart and recorded yet (mac #225/#234/#235/#280)",
