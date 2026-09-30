@@ -1007,16 +1007,18 @@ public class BuildFreshnessTests
             var course = SectionAdderTests.MakeCourse(root, "ICS3U", """{"course_code":"ICS3U"}""");
             string buildsRoot = Path.Combine(root, "builds");
             string index = BuiltIndex(buildsRoot, "ICS3U", 1);
-            File.WriteAllText(index,
-                "<script>const socket = new WebSocket('ws://localhost:9081')</script>");
+            // The client as Quartz writes it (#272): a retyped
+            // <script>...new WebSocket(...)</script> is (rightly) not matched.
+            File.WriteAllText(index, ContractLoader.LoadJson("app-rules.json")["buildFreshness"]!["previewBuild"]!
+                ["signature"]!["asQuartzWritesIt"]!.ToString());
             File.SetLastWriteTimeUtc(index, DateTime.UtcNow.AddMinutes(5));
 
-            Assert.True(BuildFreshness.BuiltForPreview(index));
+            Assert.True(BuildFreshness.BuiltForPreview(Path.GetDirectoryName(index)!));
             Assert.True(BuildFreshness.NeedsRebuild(course, 1, buildsRoot));
 
             File.WriteAllText(index, "a clean production page");
             File.SetLastWriteTimeUtc(index, DateTime.UtcNow.AddMinutes(5));
-            Assert.False(BuildFreshness.BuiltForPreview(index));
+            Assert.False(BuildFreshness.BuiltForPreview(Path.GetDirectoryName(index)!));
             Assert.False(BuildFreshness.NeedsRebuild(course, 1, buildsRoot));
         }
         finally { try { Directory.Delete(root, recursive: true); } catch { } }

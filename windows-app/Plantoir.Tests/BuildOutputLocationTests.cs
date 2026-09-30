@@ -138,9 +138,13 @@ public class BuildOutputLocationTests : IDisposable
     {
         // These five were in app-rules.json -> buildFreshness and had NEVER
         // been run on Windows. Read from the contract so a rule added there
-        // shows up here as a missing case rather than as silence.
+        // shows up here as a missing case rather than as silence. The sixth
+        // (#272 / mac #265, the START of the build) arrived as a request and
+        // is driven by TheStartOfTheBuildIsWhatIsComparedWith below. (The
+        // method keeps its name: the name is on the baseline red list.)
         var rules = ContractLoader.LoadJson("app-rules.json")["buildFreshness"]!["rules"]!.AsArray();
-        Assert.Equal(5, rules.Count);
+        Assert.Equal(6, rules.Count);
+        Assert.Contains(rules, r => r!["when"]!.ToString().StartsWith("something was saved AFTER the build that made the site started", StringComparison.Ordinal));
         var whens = rules.Select(r => r!["when"]!.ToString()).ToList();
         Assert.Contains("nothing has been built yet", whens);
         Assert.Contains("the built site is older than the teacher's newest content", whens);
@@ -173,8 +177,80 @@ public class BuildOutputLocationTests : IDisposable
         // into every page, and publishing that makes a student's browser ask
         // about access to other apps and services on this device.
         var course = CourseWith("ADA1O", "# a lesson", DateTime.UtcNow.AddDays(-2));
-        MakeBuild("ADA1O", 1, "<html><script>new WebSocket('ws://localhost:9081')</script></html>");
+        MakeBuild("ADA1O", 1, ContractLoader.LoadJson("app-rules.json")["buildFreshness"]!["previewBuild"]!
+            ["signature"]!["asQuartzWritesIt"]!.ToString());
         Assert.True(BuildFreshness.NeedsRebuild(course, 1, _buildsRoot));
+    }
+
+    /// <summary>
+    /// The sixth rule (#272 / mac #265): a Save made while the build that made
+    /// the site was running is OLDER than index.html, and still means rebuild,
+    /// because the build read the settings before it. Nothing saved after the
+    /// marker: no rebuild. No marker: index.html, as before.
+    /// </summary>
+    [Fact]
+    public void TheStartOfTheBuildIsWhatIsComparedWith()
+    {
+        var course = CourseWith("ADA1O", "# a lesson", DateTime.UtcNow.AddMinutes(-5));
+        MakeBuild("ADA1O", 1);
+        string index = BuildOutputLocation.BuiltIndexFor(_buildsRoot, "ADA1O", 1);
+        string marker = Path.Combine(BuildOutputLocation.ForSection(_buildsRoot, "ADA1O", 1), BuildFreshness.BuildStartedMarker);
+        // The course's newest file is its settings, written just now by
+        // CourseWith: "the teacher's Save". The site FINISHED after it.
+        File.SetLastWriteTimeUtc(index, DateTime.UtcNow.AddMinutes(2));
+        Assert.False(BuildFreshness.NeedsRebuild(course, 1, _buildsRoot));        // no marker: index.html's time, as before
+
+        File.WriteAllText(marker, "");
+        File.SetLastWriteTimeUtc(marker, DateTime.UtcNow.AddMinutes(-10));          // but it STARTED before the Save
+        Assert.True(BuildFreshness.NeedsRebuild(course, 1, _buildsRoot));
+
+        File.SetLastWriteTimeUtc(marker, DateTime.UtcNow.AddMinutes(1));            // started after the Save
+        Assert.False(BuildFreshness.NeedsRebuild(course, 1, _buildsRoot));
+        Assert.Equal(".build-started",
+            ContractLoader.LoadJson("app-rules.json")["buildFreshness"]!["buildStartedMarker"]!["file"]!.ToString());
+    }
+
+    /// <summary>
+    /// <c>buildFreshness.previewBuild.cases</c>, each tree written to a temp
+    /// <c>public\</c>, through <c>BuiltForPreview</c> — the same list
+    /// <c>deploy.ps1</c>'s reader answers in <see cref="LauncherRulesContractTests"/>.
+    /// An <c>unreadable</c> page is held open with FileShare.None.
+    /// </summary>
+    [Fact]
+    public void EveryPreviewBuildCaseIsAnsweredAsTheContractSays()
+    {
+        var cases = ContractLoader.LoadJson("app-rules.json")["buildFreshness"]!["previewBuild"]!["cases"]!.AsArray();
+        Assert.True(cases.Count >= 15, $"the contract lost previewBuild cases: {cases.Count}");
+        foreach (var c in cases)
+        {
+            string publicDir = Path.Combine(_root, "pb-" + Guid.NewGuid().ToString("N"), "public");
+            Directory.CreateDirectory(publicDir);
+            var invalid = (c!["invalidUTF8Before"] as System.Text.Json.Nodes.JsonArray)?.Select(p => p!.ToString()).ToHashSet()
+                          ?? new HashSet<string>();
+            foreach (var page in c["pages"]!.AsObject())
+            {
+                string file = Path.Combine(publicDir, page.Key.Replace('/', Path.DirectorySeparatorChar));
+                Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+                byte[] bytes = System.Text.Encoding.UTF8.GetBytes(page.Value!.ToString());
+                if (invalid.Contains(page.Key)) bytes = new byte[] { 0xFF, 0x0A }.Concat(bytes).ToArray();
+                File.WriteAllBytes(file, bytes);
+            }
+            // A dot folder is not Hidden by ATTRIBUTE on NTFS, so give it the
+            // attribute too: a reader built on a default EnumerationOptions
+            // (which skips Hidden and System) then goes red, as it should.
+            foreach (string dir in Directory.EnumerateDirectories(publicDir, ".*", SearchOption.AllDirectories))
+                File.SetAttributes(dir, File.GetAttributes(dir) | FileAttributes.Hidden);
+            var held = ((c["unreadable"] as System.Text.Json.Nodes.JsonArray) ?? new System.Text.Json.Nodes.JsonArray())
+                .Select(p => new FileStream(Path.Combine(publicDir, p!.ToString().Replace('/', Path.DirectorySeparatorChar)),
+                                            FileMode.Open, FileAccess.Read, FileShare.None))
+                .ToList();
+            try
+            {
+                Assert.True(BuildFreshness.BuiltForPreview(publicDir) == c["expectPreview"]!.GetValue<bool>(),
+                            c["name"]!.ToString());
+            }
+            finally { held.ForEach(h => h.Dispose()); }
+        }
     }
 
     [Fact]
