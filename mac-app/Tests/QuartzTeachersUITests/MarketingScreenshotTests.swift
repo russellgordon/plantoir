@@ -1022,8 +1022,8 @@ final class MarketingScenes: MarketingScreenshotCase {
         // only works out what the copy would do and lists the linked pages;
         // nothing is written until Copy is pressed again, which this never
         // does. (A page that links to nothing is copied on the first press —
-        // The Unplugged Algorithm links three pages ICS4U does not have,
-        // checked in the folder on 2026-09-27.)
+        // The Unplugged Algorithm links one page ICS4U does not have, B3.1;
+        // it was three until ICS4U gained AAP-2.A and CRD-2.I on 2026-09-29.)
         //
         // It is NOT pressed here. Measured on 2026-09-27 in the marketing
         // folder, the checklist for this page ran to 70-odd lines of "sits
