@@ -276,4 +276,58 @@ public class ScheduledHealthFindingsTests : IDisposable
         Assert.Contains("-SimpleMatch 'PLANTOIR_HEALTH:'", script);
         Assert.DoesNotContain("ConvertFrom-Json", script);
     }
+
+    /// <summary>
+    /// #279: the wrapper's own scan line keeps the build's PLANTOIR_DATED:
+    /// lines too, and what it keeps reaches the trail. The generated
+    /// Select-String line is run for real in Windows PowerShell over a build
+    /// log carrying a dated line, a health line and chatter; what it selects is
+    /// written as the record, and <see cref="ScheduledHealthFindings.TakeFrom"/>
+    /// reads it back. Without the pattern the dated line never reaches the
+    /// record, and an overnight publish — the build likeliest to rewrite pages
+    /// — leaves no trail line.
+    /// </summary>
+    [Fact]
+    public void TheWrappersScanKeepsTheDatedLineAndItReachesTheTrail()
+    {
+        string script = GenerateWrapper();
+        string scanLine = script.Split('\n').Single(line => line.TrimStart().StartsWith("$markers = @(Select-String", StringComparison.Ordinal)).Trim();
+
+        string folder = Path.Combine(Path.GetTempPath(), "wrapper-dated-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        string trail = Path.Combine(folder, "activity.txt");
+        ActivityTrail.SetCustomLogPathForTesting(trail);
+        try
+        {
+            string log = Path.Combine(folder, "build.log");
+            string record = Path.Combine(folder, TaskScheduling.HealthRecordName("ICS4U", 1));
+            File.WriteAllLines(log, new[]
+            {
+                "Building step 3 of 7",
+                "Gave 1 of your pages the date of the first class that links to them",
+                "PLANTOIR_DATED: {\"course\": \"ICS4U\", \"section\": 1, \"pages\": [\"section1/index\"]}",
+                "done",
+            });
+            string command = $"$scanned = @('{log}'); {scanLine}; Set-Content -LiteralPath '{record}' -Value $markers -Encoding utf8";
+            var start = new System.Diagnostics.ProcessStartInfo("powershell.exe", new[] { "-NoProfile", "-NonInteractive", "-Command", command })
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+            };
+            using (var process = System.Diagnostics.Process.Start(start)!)
+            {
+                process.WaitForExit(60_000);
+            }
+
+            Assert.True(File.Exists(record), "the wrapper's scan selected nothing");
+            ScheduledHealthFindings.TakeFrom(folder, "ICS4U", 1);
+            Assert.Contains("the build gave 1 page the date of their class: section1/index", File.ReadAllText(trail));
+        }
+        finally
+        {
+            ActivityTrail.SetCustomLogPathForTesting(null);
+            try { Directory.Delete(folder, recursive: true); } catch { }
+        }
+    }
 }
