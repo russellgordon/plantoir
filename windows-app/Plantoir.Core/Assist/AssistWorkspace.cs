@@ -2794,9 +2794,9 @@ public sealed class AssistWorkspace
             try { text = File.ReadAllText(PagePaths.ResolveInside(_folder, path)); }
             catch { continue; }
 
-            foreach (var match in System.Text.RegularExpressions.Regex
-                         .Matches(text, @"!?\[\[([^\]|#]+)").Cast<System.Text.RegularExpressions.Match>())
-                if (names.Contains(match.Groups[1].Value.Trim())) total++;
+            // The shared rewriter's own count (#339, #318): a link inside code
+            // or a comment is not counted, and an escaped pipe is a link.
+            total += WikiLinks.CountLinksTo(names, text);
         }
         return total;
     }
@@ -3111,15 +3111,10 @@ public sealed class AssistWorkspace
             catch { continue; }
 
             // Only the TARGET is rewritten; an alias after "|" is the
-            // teacher's own words and stays exactly as written.
-            string updated = System.Text.RegularExpressions.Regex.Replace(
-                text, @"(!?\[\[)([^\]|#]+)", match =>
-                {
-                    string target = match.Groups[2].Value;
-                    return byName.TryGetValue(target.Trim(), out string? renamed)
-                        ? match.Groups[1].Value + renamed
-                        : match.Value;
-                });
+            // teacher's own words and stays exactly as written, and so do an
+            // escaping backslash and a link inside code or a comment (#318,
+            // #339) — the one shared rewriter.
+            string updated = WikiLinks.Rewriting(text, byName);
 
             if (updated != text) Save(full, updated);
         }
