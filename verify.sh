@@ -833,6 +833,22 @@ else
   cat /tmp/verify_links_checklist_test.log
 fi
 
+# ---- the published-pages record (#379) ----
+# The build's list of the pages it shows (beside public/, never inside it,
+# written only after the site was built), deploy.py's fragment after each
+# upload, deploy.sh's folder branch recording for itself, and the union read.
+echo ""
+echo "🔎 Checking the record of pages that have been published…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/test_published_pages_record.py" /opt/scripts/test_published_pages_record.py),readonly" \
+  --mount "$(bind_mount_argument "$(pwd)/deploy.sh" /opt/deploy.sh),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_published_pages_record.py >/tmp/verify_published_pages_record_test.log 2>&1; then
+  pass "build_site.py, deploy.py, deploy.sh: the pages a publish put on a site are recorded, and only then (scripts/test_published_pages_record.py, #379)"
+else
+  fail "build_site.py, deploy.py, deploy.sh: the pages a publish put on a site are recorded, and only then (scripts/test_published_pages_record.py, #379)"
+  cat /tmp/verify_published_pages_record_test.log
+fi
+
 # ---- Whether the site shows a page: the contract, run down the REAL chain ----
 # The one check here that is not about a rule being implemented right — it is
 # about the rule being TRUE. Both apps are tested against
