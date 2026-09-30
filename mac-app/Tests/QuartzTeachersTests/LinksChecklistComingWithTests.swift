@@ -270,5 +270,55 @@ final class LinksChecklistComingWithTests: XCTestCase {
         XCTAssertEqual(model.publishButtonTitle, LinksChecklistWording.publishButton(
             count: "47", pages: LinksChecklistWording.pageWord(47)
         ))
+
+        // One full redraw: everything the view asks of every row (#398
+        // implementation review, finding 1 — this was ~11 s in Debug when the
+        // shown state was worked out per row per access).
+        let redrawStarted: Date = Date()
+        var shownTickedCount: Int = 0
+        for group in [LinksChecklistOffer.Group.fromAClass, .notReachedByAClass, .aClass] {
+            for shownRow in model.shownRows(in: group) {
+                let row: LinksChecklistOffer.Row = shownRow.row
+                if model.binding(for: row).wrappedValue {
+                    shownTickedCount += 1
+                }
+                _ = model.isDisabled(row)
+                _ = model.rowTitle(for: row)
+                _ = model.secondLine(for: row)
+                _ = model.secondLine(for: row)
+            }
+        }
+        _ = model.publishButtonTitle
+        let redraw: TimeInterval = Date().timeIntervalSince(redrawStarted)
+        print("LinksChecklistComingWithTests: one redraw of \(model.rows.count) rows took "
+              + "\(String(format: "%.3f", redraw)) s")
+        XCTAssertEqual(shownTickedCount, 47)
+        XCTAssertLessThan(redraw, LinksChecklistComingWithTests.redrawCeiling,
+                          "Drawing every row once took \(redraw) s: the shown state is being worked out per row again")
+
+        // The planner's own answer for THESE two classes, not the whole set
+        // (review note 5): the rows it would change because linked are
+        // exactly the rows shown coming with them.
+        let graph: AssistSectionGraph = AssistSectionGraph.read(forSection: 1, in: made.course, workspaceURL: made.root)
+        let planned: (plan: AssistPublishPlan, outcome: LinksChecklistPublisher.Outcome) = LinksChecklistPublisher.plan(
+            offer: LinksChecklistOffer(course: "ICS3U", section: 1, buildId: "b1",
+                                       firstClassPlace: model.offer.firstClassPlace, rows: model.rows),
+            ticked: model.ticked, graph: graph,
+            classPages: ClassPages.list(forSection: 1, in: made.course),
+            forSection: 1, in: made.course, shownComingWith: []
+        )
+        var written: Set<String> = []
+        for change in planned.plan.changes where change.becauseLinked {
+            written.insert(LinksChecklistPublisher.place(of: change.page.fileURL, in: made.course))
+        }
+        var shownComing: Set<String> = []
+        for place in model.comingWith.keys {
+            shownComing.insert(place)
+        }
+        XCTAssertEqual(shownComing, written, "Two of twenty classes: the sheet and Publish disagree")
     }
+
+    /// Generous: one Debug redraw of 461 rows measures in milliseconds once
+    /// the shown state is worked out once per tick.
+    static let redrawCeiling: TimeInterval = 0.5
 }
