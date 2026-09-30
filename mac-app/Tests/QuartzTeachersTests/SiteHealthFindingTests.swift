@@ -533,12 +533,6 @@ final class ScheduledDeployFolderProblemTests: XCTestCase {
         XCTAssertTrue(said.contains(AssistWording.linksIntoHiddenPagesWillBeOffered(course: "ICS4U", section: "1")), said)
         XCTAssertFalse(said.contains("pairs"), said)
 
-        let shownNow: String? = SiteHealthFinding.sentenceWhenTheChecklistIsOffered(
-            for: try XCTUnwrap(withOffer.healthFindings.first), from: withOffer, courseDirectory: course,
-            aWindowIsOpen: true
-        )
-        XCTAssertEqual(shownNow, AssistWording.linksIntoHiddenPagesAreOfferedNow(course: "ICS4U", section: "1"))
-
         // Answered already (Not Now on the same set): no promise of a sheet.
         try LinksChecklistAnswered(offered: ["Concepts/Worksheet"], leftUnticked: ["Concepts/Worksheet"])
             .write(courseDirectory: course, section: 1)

@@ -150,17 +150,6 @@ final class SectionWindowControllers {
         ]
     }
 
-    /// Whether any window in any folder shows this course's section — for a
-    /// sentence that says the links checklist is being offered there now
-    /// (#379). The course code is the folder's, so two folders with the same
-    /// code both count; the sentence is then still true of one of them.
-    func hasAWindow(courseCode: String, sectionNumber: Int) -> Bool {
-        for key in controllers.keys where key.courseCode == courseCode && key.sectionNumber == sectionNumber {
-            return true
-        }
-        return false
-    }
-
     /// Forget everything. Tests only — the app's windows manage their own.
     func forgetAll() {
         controllers.removeAll()

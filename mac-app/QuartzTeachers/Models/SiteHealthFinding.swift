@@ -134,11 +134,12 @@ struct SiteHealthFinding: Equatable, Identifiable {
     ///
     /// And only when a checklist will really come (implementation review,
     /// N3): the offer on disk is this build's and holds a page the teacher
-    /// has not already answered. With a window on that section open it is
-    /// offered there now, and the sentence says so.
+    /// has not already answered. Its callers are the paths with NO section
+    /// window (`AssistSiteWork`), so "when you next open" is the true
+    /// sentence; an "offered now" variant was removed on review because no
+    /// honest lookup of an open window exists here.
     static func sentenceWhenTheChecklistIsOffered(
-        for finding: SiteHealthFinding, from runner: ScriptRunner, courseDirectory: URL?,
-        aWindowIsOpen: Bool? = nil
+        for finding: SiteHealthFinding, from runner: ScriptRunner, courseDirectory: URL?
     ) -> String? {
         guard finding.name == LinksChecklistRouting.findingName, let courseDirectory else {
             return nil
@@ -157,17 +158,6 @@ struct SiteHealthFinding: Equatable, Identifiable {
         )
         if !LinksChecklistGate.holdsSomethingNew(read.offer, answered: answered) {
             return nil
-        }
-        var isOpen: Bool = aWindowIsOpen ?? false
-        if aWindowIsOpen == nil {
-            isOpen = SectionWindowControllers.shared.hasAWindow(
-                courseCode: finding.course, sectionNumber: finding.section
-            )
-        }
-        if isOpen {
-            return AssistWording.linksIntoHiddenPagesAreOfferedNow(
-                course: finding.course, section: String(finding.section)
-            )
         }
         return AssistWording.linksIntoHiddenPagesWillBeOffered(
             course: finding.course, section: String(finding.section)
