@@ -335,6 +335,24 @@ lands.
 (corrected 2026-09-27; this said the milestone was unsettled between v1.3.2 and
 v1.4.0 — v1.3.2 became v1.4.0).
 
+### Added by the mac's v1.4.1 (2026-09-30)
+
+Nine `windows` issues opened while the mac's v1.4.1 was made, all nine on
+this milestone (the director's ruling R3; #393 with #382's landing). Each is placed beside the
+issue whose code it touches, so work this file's order and meet them there:
+
+| Issue | What it is | Do it |
+|---|---|---|
+| [#389](https://github.com/russellgordon/plantoir/issues/389) | Get Ready for the Start of the Year names pages by title (mac #362) | with #355 |
+| [#390](https://github.com/russellgordon/plantoir/issues/390) | A club's New Course panel says club, Meetings and Create Club (mac #368) | with #274 |
+| [#387](https://github.com/russellgordon/plantoir/issues/387) | Course Settings: what enables Save, Class Pages rows only when recorded, "Language and region", bordered text boxes (mac #364 #373 #374 #376 #369) | its `settingsRows` with #274 |
+| [#386](https://github.com/russellgordon/plantoir/issues/386) | A preview of a section cannot start while that section is being deployed (mac #381) | before #391 — both are in `preview.ps1`/`plantoir-mcp.exe` |
+| [#391](https://github.com/russellgordon/plantoir/issues/391) | An assistant's windowless deploy and rebuild refuse at a question, `--non-interactive` (mac #378) | after #386 |
+| [#393](https://github.com/russellgordon/plantoir/issues/393) | The mac launchers' console says "website builder"; one new launcher marker; check your bars for a dead step (mac #382) | with #386 and #391 (the launchers' console and markers) |
+| [#384](https://github.com/russellgordon/plantoir/issues/384) | Copy a Page's checklist and result scroll as ONE region (mac #365) | with Copy a Page |
+| [#392](https://github.com/russellgordon/plantoir/issues/392) | Links into hidden pages: the checklist, and the published-pages record (mac #379) | after #359 |
+| [#380](https://github.com/russellgordon/plantoir/issues/380) | Marketing pictures keep the window's own corners on Windows too (mac #375) | with #370 |
+
 ---
 
 ## 6. Open `windows` issues NOT on this milestone that touch the same code
