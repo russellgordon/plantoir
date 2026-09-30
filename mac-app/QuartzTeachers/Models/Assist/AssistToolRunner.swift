@@ -306,11 +306,6 @@ final class AssistToolRunner {
         let code: String = text("course", in: arguments)
         let number: Int = number("section", in: arguments) ?? 0
 
-        var destination: String = "the web"
-        for course in coursesAsSavedNow where course.code.lowercased() == code.lowercased() {
-            destination = AssistToolRunner.destination(of: course)
-        }
-
         switch call.function.name {
         case "deploy_section":
             // Two sentences, and neither of them restates the request.
@@ -329,11 +324,18 @@ final class AssistToolRunner {
             // named by the question that follows this, and the section is on
             // the window's own title bar.
             //
-            // `code`, `number` and `destination` are deliberately unused here.
-            // Leave them: `schedule_deploy` below needs all three, and the one
-            // thing this text must never become is a description of a tool.
+            // `code` and `number` are deliberately unused here. Leave them:
+            // `schedule_deploy` below needs both, and the one thing this text
+            // must never become is a description of a tool.
             return AssistWording.deployApproval
         case "schedule_deploy":
+            // EVERY place the deploy goes, by type (#396) — the card said
+            // only the primary until then, and a course that deploys to
+            // Netlify and Cloudflare Pages read "to Netlify".
+            var destination: String = "the web"
+            for course in coursesAsSavedNow where course.code.lowercased() == code.lowercased() {
+                destination = AssistToolRunner.everyDestination(of: course)
+            }
             let raw: String = text("when", in: arguments)
             let when: String = AssistToolRunner.moment(named: raw)
                 .map { moment in ScheduledDeploy.dayAndTimeText(moment) } ?? raw
@@ -2730,11 +2732,14 @@ final class AssistToolRunner {
             return AssistToolOutcome.couldNotRead(AssistToolRefusal.noWorkingFolder.message)
         }
 
-        // `ScheduledDeployPlan` already says what has to be true of the Mac,
-        // and which of the section's classes are still held back. The classes
-        // the TEACHER had in mind are checked here on top of that: a deploy
-        // that runs perfectly and ships a site without tomorrow's class is the
-        // failure worth catching while somebody is awake.
+        // `ScheduledDeployPlan` already says where the deploy goes and what
+        // has to be true of the Mac. Since #396 it no longer lists the
+        // section's unpublished classes — later classes are unpublished on
+        // purpose all year, so that list fired on every schedule (Russell:
+        // "completely unnecessary"). The classes the CALLER names are still
+        // checked here, and are the only class check left: a deploy that runs
+        // perfectly and ships a site without tomorrow's class is the failure
+        // worth catching while somebody is awake.
         var lines: [String] = [asked.plan.description]
         let classes: [String] = names("classes", in: arguments)
         if !classes.isEmpty {
@@ -2778,12 +2783,7 @@ final class AssistToolRunner {
         // Everything the plan refuses is something that would ASK A QUESTION
         // at the scheduled moment, with nobody there to answer it.
         if let problem = asked.plan.problem {
-            ScheduledDeploy.noteRefusedBeforeAnythingWasWritten(
-                course: asked.located.course,
-                sectionNumber: asked.located.sectionNumber,
-                when: asked.when,
-                refusal: problem
-            )
+            ScheduledDeploy.noteRefusedBeforeAnythingWasWritten(plan: asked.plan, course: asked.located.course)
             return AssistToolOutcome.refused("Nothing was scheduled. \(problem)")
         }
 
@@ -2824,7 +2824,7 @@ final class AssistToolRunner {
 
         let moment: String = ScheduledDeploy.dayAndTimeText(asked.when)
         var summary: String = "Scheduled: \(asked.located.course.code) Section "
-            + "\(asked.located.sectionNumber) deploys to \(asked.plan.destination) at \(moment)."
+            + "\(asked.located.sectionNumber) deploys to \(asked.plan.destinationsText) at \(moment)."
         if let replacing {
             summary += " " + AssistWording.scheduleReplaces(
                 moment: ScheduledDeploy.dayAndTimeText(replacing)
@@ -4519,14 +4519,22 @@ final class AssistToolRunner {
             lines.append(
                 "\(course.code) — \(course.configuration.courseName)\n"
                 + "  sections: \(sectionList)\n"
-                // `AssistToolRunner.destination(of:)`, NOT
-                // `DeployCommand.destinationDescription`: that one returns the raw
-                // PATH for a folder destination, which is machinery a teacher is not
-                // the audience for, disagrees with what the deploy card says two
-                // functions away, disagrees with Windows' "a folder on this computer",
-                // and prints BLANK for a course set to a folder that has not been
-                // chosen yet — a state the product models on purpose.
-                + "  publishes to: \(AssistToolRunner.destination(of: course))"
+                // EVERY place the course publishes to (#403), primary first then
+                // each additional destination in the order saved — the same list
+                // a deploy walks (`allDeployDestinations`) — named by TYPE and
+                // joined "A, B and C", in the scheduled deploy card's words
+                // (`planOpening.cardNaming`, #396). This used to name the primary
+                // alone, so a course publishing to Netlify AND Cloudflare Pages
+                // read "Netlify", and one set to a folder not chosen yet read
+                // "Netlify" too. The app's own assistant window shows this line
+                // when a teacher asks what courses they have, so it is a teacher
+                // surface. Rejected: `deployPlan(...).descriptions` and
+                // `DeployCommand.destinationDescription`, which name a folder by
+                // its PATH — machinery on that surface, and BLANK for a folder
+                // that has not been chosen yet, a state the product models on
+                // purpose. Pinned by shared-rules.json →
+                // scheduledDeployRefusals.planOpening.listCoursesLine.
+                + "  publishes to: \(AssistToolRunner.everyDestination(of: course))"
                 + howITeachLine(for: course)
             )
         }
@@ -5255,15 +5263,29 @@ final class AssistToolRunner {
         }
     }
 
-    /// Where a course's site goes, named rather than described.
-    static func destination(of course: Course) -> String {
-        if course.configuration.deploysToLocalFolder {
+    /// One destination, named by TYPE rather than described: "a folder on
+    /// this computer", "Cloudflare Pages" or "Netlify". Never a path — a path
+    /// is machinery here — and never blank for a folder not chosen yet.
+    static func destinationName(of destination: CourseConfiguration.DeployDestination) -> String {
+        if destination.type == "local_folder" {
             return "a folder on this computer"
         }
-        if course.configuration.deploysToCloudflare {
+        if destination.type == "cloudflare_pages" {
             return "Cloudflare Pages"
         }
         return "Netlify"
+    }
+
+    /// Every place a course's site goes, primary first then each additional
+    /// destination in the order saved, named by type and joined "A", "A and
+    /// B", "A, B and C" — the scheduled deploy's approval card (#396). Each
+    /// entry the file lists is named once, as the run deploys to each.
+    static func everyDestination(of course: Course) -> String {
+        var names: [String] = []
+        for destination in course.configuration.allDeployDestinations {
+            names.append(destinationName(of: destination))
+        }
+        return MultiDestinationDeployRunner.joinedWithAnd(names)
     }
 
     // MARK: - Reading the model's arguments

@@ -237,8 +237,9 @@ file — or any file in the working folder.
 | `<CODE>/.netlify_sites/section<N>.json` | Netlify site marker (site id/URL) so re-deploys target the same site. |
 | `<CODE>/.netlify_sites/section<N>.previous-<stamp>.json`<br>`<CODE>/.cloudflare_sites/section<N>.previous-<stamp>.json`<br>the built output's `section<N>/.netlify_site.previous-<stamp>.json` — **and where that is differs by platform**: `<CODE>/.merged_output/section<N>/` on macOS, `%LOCALAPPDATA%\Plantoir\builds\<folder id>\<CODE>\section<N>\` on Windows, because `merged_output_root()` returns `PLANTOIR_BUILD_ROOT/<CODE>` with no `.merged_output` level whenever the launchers set that variable, which on Windows is always | A marker set aside when a section was **rolled over onto a new website** — the assistant renames it rather than deleting it, because it holds the site id and admin address and is the only way back to last year's site. Inert: the scripts build exact marker paths and never scan the folder. See `contracts/file-formats.json` → `firstDeployMarkers.releasedWhenASectionRollsOver`. |
 | `<CODE>/.cloudflare_sites/section<N>.json` | Cloudflare Pages marker (project name/id, subdomain, account) so re-publishing reuses the same project instead of creating a second one. |
-| `<CODE>/.publish_state/section<N>.links-checklist.json` | The links checklist offer (#379): the hidden pages publishing would bring back to life, their groups, ticks and dates. Written by EVERY build of the section, removed when there is nothing to offer, never written — and removed — for a course kept for reference. Read by the mac app's section window; Windows owes the reader (the `windows` issue #392; `contracts/README.md` → `linksChecklist.publishCases`, "owed by Windows"). `contracts/file-formats.json` → `linksChecklistOffer`. |
+| `<CODE>/.publish_state/section<N>.links-checklist.json` | The links checklist offer (#379): the hidden pages publishing would bring back to life, their groups, ticks and dates, and which row each comes under when only other offered pages link it (`dependsOn`, #385). Written by EVERY build of the section, removed when there is nothing to offer, never written — and removed — for a course kept for reference. Read by the mac app's section window; Windows owes the reader (the `windows` issue #392; `contracts/README.md` → `linksChecklist.publishCases`, "owed by Windows"). `contracts/file-formats.json` → `linksChecklistOffer`. |
 | `<CODE>/.publish_state/section<N>.links-checklist-answered.json` | What the teacher last answered in that checklist (Publish or Not Now): the app's own file, never the build's. `linksChecklistAnswered`. |
+| `<CODE>/.publish_state/section<N>.front-page-not-today.json` | Not Today, answered to Preview's question about today's class on the front page (#397): the calendar day and the class offered, so that class is not asked about again that day. The app's own file; never removed, since a record for another day or class stops nothing. `frontPageNotToday`. |
 | `<CODE>/.publish_state/section<N>.published-pages/` | A folder of fragments, one per destination a deploy reached, each naming the pages that site showed — what "published before" means when a page hidden again is published once more (#379). On every rollover its fragments are moved into `section<N>.published-pages.previous-<stamp>/` beside it (the folder itself stays, so the rollover's undo can put them back). `publishedPagesRecord`. |
 | the built output's `section<N>/.visible-pages.json` and `.build-id` | Beside `public/`, never inside it: the pages a build for publishing showed, and the id of the build that last started there; what a deploy records from (`visiblePagesList`). |
 | `<CODE>/Media/` | Shared binary assets; symlinked into every build, always hidden from the sidebar. |
@@ -397,11 +398,11 @@ What happens to `cannotTell` depends on who asked, and this is the part to get
 right:
 
 * **Anything REPORTING to a teacher collapses it to VISIBLE.** The section
-  graph (`AssistSectionGraph`; `AssistWorkspace.Plan` on Windows), the
+  graph (`AssistSectionGraph`; `AssistWorkspace.Plan` on Windows), Windows'
   scheduled deploy's "classes students cannot see yet"
-  (`ScheduledDeploy.unpublishedClasses`, `ScheduledDeploy.UnpublishedClassesIn`
-  — so a page whose flag cannot be read is NOT listed there as one students
-  cannot see, on either platform), the index pointer, the dangling-link check,
+  (`ScheduledDeploy.UnpublishedClassesIn` — so a page whose flag cannot be
+  read is NOT listed there as one students cannot see; the mac has had no
+  such list since #396, and Windows' #396 issue removes theirs), the index pointer, the dangling-link check,
   the "N linked pages stay visible" sweep (`AssistWorkspace.cs:692`), and the
   re-date planner. (No VIEW reads a page's flag — a sentence here said "the
   sidebar" until 2026-09-18 and there is no such reader; the sidebar lists

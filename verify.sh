@@ -280,6 +280,13 @@ else
   cat /tmp/verify_graded_new_course_test.log
 fi
 
+if (cd scripts && python3 test_course_code_rule.py) >/tmp/verify_course_code_rule_test.log 2>&1; then
+  pass "setup_course.py: a typed course code is asked the apps' rule, every courseCode case (scripts/test_course_code_rule.py, #402)"
+else
+  fail "setup_course.py: a typed course code is asked the apps' rule, every courseCode case (scripts/test_course_code_rule.py, #402)"
+  cat /tmp/verify_course_code_rule_test.log
+fi
+
 if (cd scripts && python3 test_contracts.py) >/tmp/verify_contracts_test.log 2>&1; then
   pass "contracts.py: the scripts can read the Plantoir contract (scripts/test_contracts.py)"
 else
@@ -389,6 +396,20 @@ if (cd scripts && python3 test_preview_while_deploying.py) >/tmp/verify_preview_
 else
   fail "preview.sh: a section being deployed cannot be previewed, whoever deploys it, and a build or an unreadable process table does not refuse (scripts/test_preview_while_deploying.py, #381)"
   cat /tmp/verify_preview_while_deploying_test.log
+fi
+
+if (cd scripts && python3 test_colour_scheme_names.py) >/tmp/verify_colour_scheme_names_test.log 2>&1; then
+  pass "a colour scheme's name never names the machinery (scripts/test_colour_scheme_names.py, #383)"
+else
+  fail "a colour scheme's name never names the machinery (scripts/test_colour_scheme_names.py, #383)"
+  cat /tmp/verify_colour_scheme_names_test.log
+fi
+
+if (cd scripts && python3 test_folder_spelling.py) >/tmp/verify_folder_spelling_test.log 2>&1; then
+  pass "one working folder, one spelling: every spelling of a folder names one website builder and one builds folder (scripts/test_folder_spelling.py, #189)"
+else
+  fail "one working folder, one spelling: every spelling of a folder names one website builder and one builds folder (scripts/test_folder_spelling.py, #189)"
+  cat /tmp/verify_folder_spelling_test.log
 fi
 
 if (cd scripts && python3 test_launcher_words.py) >/tmp/verify_launcher_words_test.log 2>&1; then
@@ -802,6 +823,22 @@ if docker run --rm \
 else
   fail "build_site.py: the front page and linked pages take their class's date, per section (scripts/test_dates_follow_the_class.py)"
   cat /tmp/verify_dates_follow_the_class_test.log
+fi
+
+# ---- the line the app writes on a front page still names the class (#397) ----
+# The app's pointer keeps the form the teacher wrote; the build turns a
+# section path into its display name. Every expected line in the contract is
+# run through the build's own rewrite, in the image, because build_site needs
+# python-frontmatter.
+echo ""
+echo "🔎 Checking that every front-page line the app writes still names its class on the site…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/test_front_page_lines_resolve.py" /opt/scripts/test_front_page_lines_resolve.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_front_page_lines_resolve.py >/tmp/verify_front_page_lines_test.log 2>&1; then
+  pass "the app's front-page line names its class once the build has read it (scripts/test_front_page_lines_resolve.py)"
+else
+  fail "the app's front-page line names its class once the build has read it (scripts/test_front_page_lines_resolve.py)"
+  cat /tmp/verify_front_page_lines_test.log
 fi
 
 # ---- build_site.py: a page whose settings cannot be read is hidden ----

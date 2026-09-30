@@ -419,6 +419,17 @@
     "rule": "Read the marker for the destination the course is configured for NOW — not any marker, and not the other one.",
     "why": "A course deployed to Netlify and then switched to Cloudflare has NEVER been deployed to Cloudflare, and its first Cloudflare deploy will ask what to call the site. Treating the old Netlify marker as proof schedules exactly the deploy that stops at a prompt at half six with nobody there — the failure the 'never been deployed' refusal exists to prevent."
   },
+  "frontPageNotToday": {
+    "path": "courses/<CODE>/.publish_state/section<N>.front-page-not-today.json",
+    "keys": {
+      "version": "1",
+      "day": "yyyy-MM-dd, the teacher's calendar day the question was asked on",
+      "class": "the class page offered, by its file name without .md"
+    },
+    "writtenBy": "the app only, when the teacher presses Not Today in answer to class-planning.json -> todaysClassOnTheFrontPage (#397). Never the build, never removed: a record for another day or another class stops nothing, so it expires by itself.",
+    "rule": "It stops the question only when `day` is today AND `class` is the class the question would offer. A class published later the same day is a new question.",
+    "whyHidden": "Inside `.publish_state`, like linksChecklistAnswered: hidden from the course's fingerprint and from the “— Edited” marker, and never published. Not the app's preferences: those are per Mac, and another copy of the app on the same folder would ask again."
+  },
   "linksChecklistAnswered": {
     "path": "courses/<CODE>/.publish_state/section<N>.links-checklist-answered.json",
     "keys": {
@@ -448,13 +459,14 @@
       "place": "the page's place in the course folder without .md - a name, never anything written on the page",
       "title": "the page's title, or its file name",
       "group": "fromAClass | notReachedByAClass | class",
-      "ticked": "whether it starts ticked",
+      "ticked": "whether it starts ticked - its OWN starting tick; a row with `dependsOn` is published only with one of those rows (#385)",
       "step": "1 or 2 for fromAClass, else null",
       "claimedBy": "the place of the class whose date it takes (fromAClass), else null",
       "date": "the day to write, yyyy-MM-dd, or null to write none",
       "why": "one of whyValues",
       "firstUsedIn": "the place of the earliest hidden class linking it directly, when no visible class does (it then starts unticked), else null",
-      "linkedFrom": "places of pages linking it, visible pages first, at most 10"
+      "linkedFrom": "places of pages linking it, visible pages first, at most 10",
+      "dependsOn": "places of the OFFERED, non-class rows that link this page, when no page students can see links it (#385): it is published only with one of them (shared-rules.json -> linksChecklist.followingARow). Nearest to a page students can see first (fewest offered pages between), then by place; the first is the row it is listed under. [] when a page students can see links it, and always [] for a class row. Never truncated. An app reading an offer without this key reads [] for every row, which is #379's behaviour."
     },
     "groups": [
       "fromAClass",

@@ -2156,9 +2156,10 @@ see ["Code is never a link"](#code-is-never-a-link-313).
 `AssistSectionGraph.linksAsWritten` (#167) used to strip the backslash by hand;
 the strip is gone, because a second strip would only hide a regression of the
 first. An eleventh reader is deliberately out of scope:
-`SectionIndexPointer.repointing` hand-splits a front page's whole-line
+`SectionIndexPointer.classLine` hand-splits a front page's whole-line
 `![[…]]` on `|` and `#`, and a line cannot start with `![[` inside a table
-row; 0 such lines ship.
+row; 0 such lines ship. (It does take the code and comment mask since #397 —
+below.)
 
 **Measured** over the 12,128 pages of the 39 payloads and 50 skeletons, with
 `NSRegularExpression`: the old and new patterns match the **same 38,659 links
@@ -2375,17 +2376,26 @@ rewritten become more correct, not untrue.
 
 **Not covered, on purpose — readers of one fixed shape, not of links in
 general, named so nobody has to find them again** (from the implementation
-review): `SectionIndexPointer.repointing` and its build twin
-`build_site._class_embed_target` read a front page's whole-line `![[…]]` by
-hand, so a front page showing `![[Unit 1, Day 2]]` alone on a line inside a
-fence could have that line repointed — 0 of the 89 section front pages in
-`support/` hold a fence; `AssistCurriculumMentions` asks whether a page
+review): `AssistCurriculumMentions` asks whether a page
 already says `[[A1.1]]` with a plain text search, so an example of it in code
 counts as "already there" and the real mention is not added; and
 `build_site.rewrite_section_wikilinks` rewrites a section-path alias link in
 the BUILT copy only, so an example in code is displayed shortened and the
 teacher's file is untouched. Each would take the mask in a line; none has
 shipped content that reaches it.
+
+This list used to open with the front page's class line —
+`SectionIndexPointer` and its build twin `build_site._class_embed_target`,
+"0 of the 89 section front pages hold a fence". #397 made it matter: Preview
+now ASKS whether to show today's class there, and a class line parked in a
+`%%` note (the shipped front pages carry one right under the embed) was read
+as the embed, so the question would call the page "already showing" today's
+class, or Yes would rewrite a line nobody sees and report success. Since
+2026-09-30 both take the mask (`SectionIndexPointer.classLine` over the page
+below its frontmatter, in UTF-16; the build's `_date_pages_from_their_classes`
+over `post.content`), measured red→green by two
+`sectionIndexPointer.dateCases` and three pointer cases —
+`documentation/09-mac-app.md` → "Today's class on the front page (#397)".
 
 #### A comment is never a link (#331)
 
@@ -6232,9 +6242,13 @@ folder path and before any `|` or `#` — and replaces that line. So a course's
 creation, by `setup_course.py`) and CODING's hand-made "## Most Recent Meeting"
 all repoint the same way, and an existing course keeps its heading. Nothing
 here changed in behaviour; what changed is that it is now CONTRACT data,
-`class-planning.json` → `sectionIndexPointer` (9 cases, run by
+`class-planning.json` → `sectionIndexPointer` (9 cases then; 27 since #397, run by
 `ClassPlanningContractTests.testTheFrontPageIsRepointedAsTheContractSays`;
-removing the class-title check turns it red).
+removing the class-title check turns it red). Since #397 (2026-09-30) the
+line is found OUTSIDE code and `%%` comments, only the line found is
+rewritten, and the new line keeps the form the teacher wrote as far as the
+site can draw it (`sectionIndexPointer.writtenAs`) —
+`documentation/09-mac-app.md` → "Today's class on the front page (#397)".
 
 **The date follows the embed, and a page with none keeps its own (#275,
 2026-09-25).** `repointing` used to write the front page's `created` AFTER its
