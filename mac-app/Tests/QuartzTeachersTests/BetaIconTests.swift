@@ -66,6 +66,89 @@ final class BetaIconTests: XCTestCase {
         )
     }
 
+    /// Which configuration wears which icon, read off `project.yml` in the
+    /// style of `AppUpdatesStartTests`. The dangerous drift is not the art but
+    /// this: `Plantoir-Beta` moved into the base settings, or the Release
+    /// exclusion dropped, ships the ribbon to teachers and no other test
+    /// notices. So: the base names `Plantoir`, Debug alone names
+    /// `Plantoir-Beta`, and Release names nothing else and excludes the bundle.
+    func testOnlyDebugNamesTheBetaIcon() throws {
+        let projectFile: URL = macAppFolder.appendingPathComponent("project.yml")
+        let text: String = try String(contentsOf: projectFile, encoding: .utf8)
+        let lines: [String] = splitIntoLines(text)
+        let iconKey: String = "ASSETCATALOG_COMPILER_APPICON_NAME"
+
+        let debugLines: [String] = try XCTUnwrap(block(named: "Debug:", in: lines), "No Debug: block in project.yml")
+        let releaseLines: [String] = try XCTUnwrap(block(named: "Release:", in: lines), "No Release: block in project.yml")
+
+        XCTAssertEqual(value(of: iconKey, in: debugLines), "Plantoir-Beta", "Debug must wear the Beta icon")
+        let releaseIcon: String? = value(of: iconKey, in: releaseLines)
+        XCTAssertTrue(releaseIcon == nil || releaseIcon == "Plantoir", "Release names \(releaseIcon ?? "")")
+        XCTAssertEqual(
+            value(of: "EXCLUDED_SOURCE_FILE_NAMES", in: releaseLines),
+            "Plantoir-Beta.icon",
+            "Release must leave the Beta icon out of the bundle altogether"
+        )
+
+        // Every other line naming the icon is a base setting, and names the real one.
+        var otherIconNames: [String] = []
+        for line in lines {
+            if debugLines.contains(line) {
+                continue
+            }
+            if let named = value(of: iconKey, in: [line]) {
+                otherIconNames.append(named)
+            }
+        }
+        XCTAssertEqual(otherIconNames, ["Plantoir"], "The base setting must be the real icon, and only Debug may differ")
+    }
+
+    func splitIntoLines(_ text: String) -> [String] {
+        var lines: [String] = []
+        for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
+            lines.append(String(line))
+        }
+        return lines
+    }
+
+    /// The lines indented under the first line reading `header`, up to the
+    /// next line indented no deeper than it. Comments and blank lines are skipped.
+    func block(named header: String, in lines: [String]) -> [String]? {
+        var headerIndent: Int? = nil
+        var result: [String] = []
+        for line in lines {
+            let trimmed: String = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty || trimmed.hasPrefix("#") {
+                continue
+            }
+            let indent: Int = line.count - line.drop(while: { (character: Character) -> Bool in character == " " }).count
+            if let opened = headerIndent {
+                if indent <= opened {
+                    return result
+                }
+                result.append(line)
+            } else if trimmed == header {
+                headerIndent = indent
+            }
+        }
+        if headerIndent == nil {
+            return nil
+        }
+        return result
+    }
+
+    /// The unquoted value of `key: value` on the first of `lines` that sets it.
+    func value(of key: String, in lines: [String]) -> String? {
+        for line in lines {
+            let trimmed: String = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix(key + ":") {
+                let rest: String = String(trimmed.dropFirst(key.count + 1)).trimmingCharacters(in: .whitespaces)
+                return rest.replacingOccurrences(of: "\"", with: "")
+            }
+        }
+        return nil
+    }
+
     func readDocument(of icon: URL) throws -> NSDictionary {
         let data: Data = try Data(contentsOf: icon.appendingPathComponent("icon.json"))
         return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? NSDictionary)
