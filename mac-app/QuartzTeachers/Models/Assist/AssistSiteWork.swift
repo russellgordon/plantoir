@@ -181,7 +181,7 @@ final class AssistToolchainWork: AssistSiteWork {
                 to: AssistWording.rebuiltForACallerWithNoWindow(
                     course: course.code, section: String(sectionNumber)
                 ),
-                from: runner
+                from: runner, courseDirectory: course.directoryURL
             )
         )
     }
@@ -295,7 +295,7 @@ final class AssistToolchainWork: AssistSiteWork {
                 course: course.code, section: String(sectionNumber)
             )
             if let runner = deployRunner.legs.first?.runner {
-                message = SiteHealthFinding.appending(to: message, from: runner)
+                message = SiteHealthFinding.appending(to: message, from: runner, courseDirectory: course.directoryURL)
             }
             message = SettingsSaveNotice.addingTheNotice(notice, to: message)
             return AssistSiteWorkResult(succeeded: false, message: message)
@@ -311,7 +311,7 @@ final class AssistToolchainWork: AssistSiteWork {
         // Taken from the FIRST leg: every destination publishes the same built
         // site, so a second leg only repeats the same findings.
         if let runner = deployRunner.legs.first?.runner {
-            message = SiteHealthFinding.appending(to: message, from: runner)
+            message = SiteHealthFinding.appending(to: message, from: runner, courseDirectory: course.directoryURL)
         }
         message = SettingsSaveNotice.addingTheNotice(notice, to: message)
         return AssistSiteWorkResult(

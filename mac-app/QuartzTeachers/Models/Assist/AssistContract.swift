@@ -317,6 +317,9 @@ enum AssistContract {
             "linksIntoHiddenPagesWillBeOffered": AssistWording.linksIntoHiddenPagesWillBeOffered(
                 course: course, section: section
             ),
+            "linksIntoHiddenPagesAreOfferedNow": AssistWording.linksIntoHiddenPagesAreOfferedNow(
+                course: course, section: section
+            ),
             "howITeachBriefing": AssistWording.howITeachBriefing(courses: [course]),
             "howITeachListedAsWritten": AssistWording.howITeachListedAsWritten,
             "howITeachListedAsNotWritten": AssistWording.howITeachListedAsNotWritten,

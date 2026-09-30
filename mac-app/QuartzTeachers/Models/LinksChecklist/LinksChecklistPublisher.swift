@@ -13,6 +13,11 @@ import Foundation
 /// (ruling F1): a class published because a link leads to it does not become
 /// the front page's class.
 ///
+/// **A class is published by TITLE** (`graph.page(titled:)`, which keys on
+/// the file name), so two class pages sharing a name in two folders would
+/// resolve to the first. None of the 39 payloads has one; recorded, not fixed
+/// (implementation review, N9).
+///
 /// **Every row is checked again first.** The offer was worked out by a build
 /// that may be minutes or a night old. A page that is now visible, or gone, is
 /// dropped; if nothing is left, nothing is written.
@@ -23,6 +28,9 @@ enum LinksChecklistPublisher {
 
     /// What one press did — the counts the trail line carries.
     struct Outcome: Equatable {
+
+        // MARK: - Stored properties
+
         var publishedPlaces: [String] = []
         var datedFromAClass: Int = 0
         var datedAsTheFirstClass: Int = 0
@@ -30,6 +38,10 @@ enum LinksChecklistPublisher {
         var classesPublished: Int = 0
         var broughtByClasses: Int = 0
         var leftUnticked: Int = 0
+        /// The places left unticked AND not written by this press — a row a
+        /// ticked class brings is published, so it is not left hidden
+        /// (implementation review, S1).
+        var leftUntickedPlaces: [String] = []
         /// Titles of pages the writer declined (#186).
         var declined: [String] = []
         /// Titles of rows dropped because they changed since the offer.
@@ -99,6 +111,7 @@ enum LinksChecklistPublisher {
         var outcome: Outcome = Outcome()
 
         var rowPages: [AssistSectionPage] = []
+        var untickedPages: [(place: String, path: String)] = []
         var rowMoves: [String: AssistPublishDateMove] = [:]
         var classTitles: [String] = []
         for row in offer.rows {
@@ -116,7 +129,9 @@ enum LinksChecklistPublisher {
                 continue
             }
             if !ticked.contains(row.place) {
-                outcome.leftUnticked += 1
+                // Counted only after the merge below: a ticked class may
+                // bring this page with it.
+                untickedPages.append((place: row.place, path: page.fileURL.path))
                 continue
             }
             if row.group == .aClass {
@@ -198,6 +213,10 @@ enum LinksChecklistPublisher {
         for change in changes {
             outcome.publishedPlaces.append(place(of: change.page.fileURL, in: course))
         }
+        for unticked in untickedPages where !changedPaths.contains(unticked.path) {
+            outcome.leftUntickedPlaces.append(unticked.place)
+        }
+        outcome.leftUnticked = outcome.leftUntickedPlaces.count
         outcome.publishedPlaces.sort()
         for page in noRoom {
             outcome.declined.append(page.displayTitle)
@@ -240,7 +259,8 @@ enum LinksChecklistPublisher {
         )
         var outcome: Outcome = planned.outcome
         if planned.plan.changes.isEmpty && planned.plan.dateMoves.isEmpty && outcome.declined.isEmpty {
-            rememberTheAnswer(offer: offer, ticked: ticked, course: course, sectionNumber: sectionNumber)
+            rememberTheAnswer(offer: offer, leftUnticked: Set(outcome.leftUntickedPlaces),
+                              course: course, sectionNumber: sectionNumber)
             if outcome.leftUnticked > 0 {
                 noteSetAside(course: course, sectionNumber: sectionNumber, notNow: false, count: outcome.leftUnticked)
             }
@@ -256,7 +276,8 @@ enum LinksChecklistPublisher {
         } catch {
             return .refused(AssistToolRefusal.unreadablePage(offer.course).message)
         }
-        rememberTheAnswer(offer: offer, ticked: ticked, course: course, sectionNumber: sectionNumber)
+        rememberTheAnswer(offer: offer, leftUnticked: Set(outcome.leftUntickedPlaces),
+                          course: course, sectionNumber: sectionNumber)
         ActivityTrail.note(
             .pagesPublishedFromLinksChecklist, publishedLine(outcome),
             course: course.code, section: sectionNumber
@@ -278,15 +299,18 @@ enum LinksChecklistPublisher {
 
     /// Press Not Now.
     static func setAside(offer: LinksChecklistOffer, ticked: Set<String>, course: Course, sectionNumber: Int) {
-        rememberTheAnswer(offer: offer, ticked: ticked, course: course, sectionNumber: sectionNumber)
-        noteSetAside(course: course, sectionNumber: sectionNumber, notNow: true, count: offer.rows.count)
-    }
-
-    static func rememberTheAnswer(offer: LinksChecklistOffer, ticked: Set<String>, course: Course, sectionNumber: Int) {
         var unticked: Set<String> = []
         for row in offer.rows where !ticked.contains(row.place) {
             unticked.insert(row.place)
         }
+        rememberTheAnswer(offer: offer, leftUnticked: unticked, course: course, sectionNumber: sectionNumber)
+        noteSetAside(course: course, sectionNumber: sectionNumber, notNow: true, count: offer.rows.count)
+    }
+
+    /// Records the answer. `leftUnticked` is what stayed hidden: for Not Now
+    /// every unticked row, for Publish only those no ticked class brought.
+    static func rememberTheAnswer(offer: LinksChecklistOffer, leftUnticked unticked: Set<String>,
+                                  course: Course, sectionNumber: Int) {
         let answered: LinksChecklistAnswered = LinksChecklistAnswered(offered: offer.places, leftUnticked: unticked)
         try? answered.write(courseDirectory: course.directoryURL, section: sectionNumber)
     }

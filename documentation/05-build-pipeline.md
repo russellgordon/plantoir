@@ -1179,13 +1179,16 @@ every fixture-built test passed; case f carries the page that must move
 anyway. The record and how it is written are in
 [07 → The published-pages record](07-deployment.md#the-published-pages-record-379).
 Honest limit: pages published and hidden before v1.4.1 have no record and take
-the class's date once.
+the class's date once — the first deploy records only the pages visible at
+that deploy.
 
 **The file and the marker.** Written atomically on every build (preview,
 deploy, scheduled, terminal, MCP), removed when the offer is empty (a dead
 link fixed in Obsidian stops being offered), never written — and removed —
 for a course kept for reference. `.publish_state` is hidden, so neither
-fingerprint nor `BuildFreshness` sees it. The #333 finding is announced
+fingerprint nor `BuildFreshness` sees it. The offer is renamed into place
+before the marker below is printed, so reading it when the marker ARRIVES —
+mid-build, before the site is built — is safe. The #333 finding is announced
 BEFORE the date passes run and the offer is written AFTER them, so the app
 does not act on the finding: the build prints `PLANTOIR_LINKS_CHECKLIST:
 {course, section, buildId, pages, ticked}` once the file is written, and the
@@ -1198,7 +1201,7 @@ page's visibility (build case i byte-compares every page). A scheduled, MCP
 or terminal publish goes out as it is (decision 3), and the checklist is
 offered when the teacher next opens that section.
 
-**Measured, a build in progress** (plan review, note 16): the sheet refuses
+**Noted, not measured: a build in progress** (plan review, note 16): the sheet refuses
 while the course is being published, but not while a preview builds; the
 build's date writer only renames over an unchanged page, so nothing is
 corrupted, and the next build offers again correctly.

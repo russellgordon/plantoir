@@ -6842,6 +6842,26 @@ links checklist (#379)"); this is the app's half.
 - **Trail:** "offered to publish pages that links lead to" (occasion and
   counts), "published pages that links led to" (counts and at most ten
   places), "left pages hidden that links lead to" (Not Now or some unticked).
+- **Known limits, recorded from the implementation review (2026-09-30):**
+  the front page not moving (F1) holds for THIS press only — the next
+  assistant publish or hide repoints it by `mostRecentVisibleClass`, which may
+  then pick a future class ticked here (N10); a row a ticked class also brings
+  but that shows no "first used in" line (case k, or a group-2 row the class
+  reaches) is published with the class even if unticked, and the class's line
+  gives only a count (N2, the allowed cut; #385 is the place to close it); a
+  page published from the checklist and later hidden again by hand, with a
+  visible page still linking to it, is in the answered set, so neither the
+  alert nor the checklist returns for it until a rollover — the menu item
+  still opens it (N4); the refusal covers this app's own publishes only, not a
+  scheduled or MCP deploy in another process, the race plan note 16 accepted
+  (N8); a ticked class is published by TITLE through `graph.page(titled:)`,
+  so two class pages sharing a file name in two folders would resolve to the
+  first — none of the 39 payloads has one (N9). Fixed in the same round: the
+  sheet is offered only on the window that became key for THIS section (N5);
+  an older builder's #333 alert is shown once, not twice (N6); the scheduled
+  run's record drops the #333 finding when the teacher already answered that
+  offer (N7); a row a ticked class brings is not counted, remembered or
+  reported as left hidden (S1).
 - **Tests:** `LinksChecklistTests` (the wording key by key and its machinery
   check; the marker; every routing branch; freshness; the contract's
   `linksChecklist.publishCases` on a laid-out course; the sheet's size), with

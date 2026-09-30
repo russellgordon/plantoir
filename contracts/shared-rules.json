@@ -4677,7 +4677,7 @@
     "ticking": "class-planning.json -> datingPagesAClassBrings.fromTheLinksChecklist.ticking. Classes start unticked; a page only a hidden class links directly starts unticked; everything else starts ticked.",
     "whatAClassBrings": "A class ticked in the sheet is published the way the assistant's publish of that class would publish it (followingLinks.publishing, bothRoutesAgree): the pages it links to, transitively, stopping at other classes, each hidden one dated by that class (datingPagesAClassBrings; published-before pages keep theirs). The class's own date is untouched. Where a page is both a row and brought by a ticked class, the CLASS's date wins - it comes with that class (director's ruling F2). The sheet says how many pages a ticked class brings in one line under its row (the cut the director allowed instead of locked rows). A class published here does NOT repoint the section's front page: the front page keeps following the rule it follows today (director's ruling F1), and the sheet says so in one sentence, only when a class row is present (wording.frontPageStaysPut).",
     "offeredWhen": {
-      "afterAWatchedBuild": "After a preview or deploy this section window started, once the build has FINISHED, when the build's marker line (marker) named an offer with pages and the offer file carries that marker's buildId. The linksIntoHiddenPages finding is then not listed in the folder-problem alert; any other finding is shown first and the checklist follows when the alert has gone (siteHealth.repair.oneAlertAtATime).",
+      "afterAWatchedBuild": "After a preview or deploy this section window started, when the build's marker line (marker) ARRIVES naming an offer with pages and the offer file carries that marker's buildId - mid-build, before the site itself is built: the file is complete then, because the build writes it atomically BEFORE printing the marker, and the id check excludes an earlier build's offer. Never on the #333 finding itself, which is announced before the offer exists; a build that ends without a marker (an older builder) gets the alert. The linksIntoHiddenPages finding is then not listed in the folder-problem alert; any other finding is shown first and the checklist follows when the alert has gone (siteHealth.repair.oneAlertAtATime).",
       "afterAnUnwatchedPublish": "When the section window appears or becomes key, for a build it did not watch - a scheduled deploy, the assistant, the MCP server, a terminal (Russell's decision 3: those publish AS IS and the checklist is shown later).",
       "onlyWhenFresh": "Never for an offer older than the course's newest change (app-rules.json -> buildFreshness, hidden entries skipped): a page edited since the build may have lost its link or changed its class, so the offer may be wrong. The per-row re-read is the second guard, not the first (plan-review finding 15).",
       "onlyWhenSomethingNew": "Only when the offer holds a page the teacher has not already answered (file-formats.json -> linksChecklistAnswered). After Publish or Not Now the same set is not offered again; a page joining it brings the checklist back, with the teacher's earlier unticks remembered.",
@@ -4692,7 +4692,7 @@
     "marker": {
       "prefix": "PLANTOIR_LINKS_CHECKLIST:",
       "carries": "course, section, buildId, pages (how many rows the offer holds; 0 when none and the file was removed), ticked",
-      "why": "The build announces the #333 finding BEFORE the date passes run, so the offer cannot exist yet when the finding reaches the app (plan-review finding 14). The marker is printed when the offer is written; the app matches its buildId to the file's and reads it only when the build has finished, so it never shows the previous build's offer.",
+      "why": "The build announces the #333 finding BEFORE the date passes run, so the offer cannot exist yet when the finding reaches the app (plan-review finding 14). The offer is renamed into place BEFORE the marker is printed, so the app reads the file when the marker arrives - mid-build, not at the end (a preview never ends) - and matches its buildId to the file's, so it never shows the previous build's offer.",
       "example": "PLANTOIR_LINKS_CHECKLIST: {\"course\": \"ICS4U\", \"section\": 1, \"buildId\": \"20260929T233000Z-1a2b3c4d\", \"pages\": 11, \"ticked\": 8}"
     },
     "wording": {
@@ -5123,6 +5123,110 @@
         ]
       },
       {
+        "name": "iv-d. a row a ticked class brings is published with it, so it is not counted, remembered or reported as left hidden",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "date": "2026-09-08",
+            "links": [
+              "How Marks Work"
+            ]
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "kind": "class",
+            "visible": false,
+            "date": "2026-10-20",
+            "links": [
+              "Worksheet",
+              "Class Notes"
+            ]
+          },
+          {
+            "title": "How Marks Work",
+            "kind": "page",
+            "visible": true,
+            "date": "2026-09-08",
+            "links": [
+              "Worksheet",
+              "Published Once"
+            ]
+          },
+          {
+            "title": "Worksheet",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          },
+          {
+            "title": "Published Once",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          },
+          {
+            "title": "Class Notes",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          }
+        ],
+        "offer": [
+          {
+            "place": "Concepts/Worksheet",
+            "group": "fromAClass",
+            "ticked": false,
+            "step": 2,
+            "claimedBy": "section1/All Classes/Unit 1, Day 1",
+            "date": "2026-09-08",
+            "why": "dated",
+            "firstUsedIn": "section1/All Classes/Unit 2, Day 5"
+          },
+          {
+            "place": "Concepts/Published Once",
+            "group": "fromAClass",
+            "ticked": true,
+            "step": 2,
+            "claimedBy": "section1/All Classes/Unit 1, Day 1",
+            "date": null,
+            "why": "keepsItsDate",
+            "firstUsedIn": null
+          },
+          {
+            "place": "section1/All Classes/Unit 2, Day 5",
+            "group": "class",
+            "ticked": false,
+            "step": null,
+            "claimedBy": null,
+            "date": null,
+            "why": "classNeverDated",
+            "firstUsedIn": null
+          }
+        ],
+        "tick": [
+          "section1/All Classes/Unit 2, Day 5"
+        ],
+        "expect": {
+          "Worksheet": {
+            "visible": true,
+            "date": "2026-10-20"
+          },
+          "Class Notes": {
+            "visible": true,
+            "date": "2026-10-20"
+          },
+          "Published Once": {
+            "visible": false,
+            "date": "2026-02-01"
+          }
+        },
+        "expectLeftHidden": [
+          "Concepts/Published Once"
+        ]
+      },
+      {
         "name": "v. an answered set is not offered again; a page joining it brings the checklist back, with the earlier unticks remembered",
         "pages": [
           {
@@ -5226,7 +5330,7 @@
         ]
       }
     ],
-    "howThePublishCasesRun": "Run by the mac through LinksChecklistPublisher and LinksChecklistSheetModel on a laid-out course (LinksChecklistTests); owed by Windows. `pages` are laid out in section 1: a `class` in the class folder with publish/created, a `page` in Concepts with publishForSection1/createdSection1 (a course-level page). `offer` is the rows the build would have written (the file's other keys are filled in by the runner). `tick` lists the places ticked when Publish is pressed; `expect` maps a page's title to its visibility and date afterwards; `expectFrontPageUnchanged` means the section's front page is byte for byte as it was (ruling F1). `madeVisibleSince` pages are made visible after the offer and before the sheet opens; `expectOffered` is the rows the sheet then shows. For v: `answer` notNow with `untick` unticked, then the same offer must not be offered again, and the offer with `thenOfferAlso` added must be, starting `expectStartsUnticked` unticked."
+    "howThePublishCasesRun": "Run by the mac through LinksChecklistPublisher and LinksChecklistSheetModel on a laid-out course (LinksChecklistTests); owed by Windows. `pages` are laid out in section 1: a `class` in the class folder with publish/created, a `page` in Concepts with publishForSection1/createdSection1 (a course-level page). `offer` is the rows the build would have written (the file's other keys are filled in by the runner). `tick` lists the places ticked when Publish is pressed; `expect` maps a page's title to its visibility and date afterwards; `expectFrontPageUnchanged` means the section's front page is byte for byte as it was (ruling F1). `expectLeftHidden` lists every place the press left hidden - the trail's count, the set-aside line and the answered file's leftUnticked - which never includes a page a ticked class brought (implementation review, S1). `madeVisibleSince` pages are made visible after the offer and before the sheet opens; `expectOffered` is the rows the sheet then shows. For v: `answer` notNow with `untick` unticked, then the same offer must not be offered again, and the offer with `thenOfferAlso` added must be, starting `expectStartsUnticked` unticked."
   },
   "unreadablePageSettings": {
     "note": "What the build does with a page whose settings block it cannot read (#246). The words a teacher reads are siteHealth.checks[pageSettingsUnreadable]; these are the cases, run by scripts/test_unreadable_page_settings.py through the real build_site.process_frontmatter and by scripts/check_visibility_against_the_site.py down the rest of the chain to the site.",

@@ -181,6 +181,10 @@ struct SectionDetailView: View {
     /// build's date passes, and the offer after them (plan review, F14).
     @State var heldLinksFinding: (finding: SiteHealthFinding, cameFromPublishing: Bool)?
 
+    /// This view's own window, by identity only — never retained — so the
+    /// links checklist is offered on the window that became key (#379).
+    @State var ownWindowID: ObjectIdentifier?
+
     /// Offers already put in front of the teacher from this window, by build,
     /// so the second look at a build's findings does not ask twice.
     @State var linksChecklistBuildsHandled: Set<String> = []
@@ -327,13 +331,22 @@ struct SectionDetailView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             refreshEditedMarker()
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { notification in
             refreshEditedMarker()
             // A publish this window did not watch — scheduled, the assistant,
             // the MCP server, a terminal — published as it is; the checklist
-            // is offered now (Russell's decision 3 on #379).
+            // is offered now (Russell's decision 3 on #379). Only when THIS
+            // window became key: the notification is app-wide, and the sheet
+            // belongs on the window the teacher is looking at (review, N5).
+            if let window = notification.object as? NSWindow, let ownWindowID,
+               ObjectIdentifier(window) != ownWindowID {
+                return
+            }
             offerTheLinksChecklistIfWaiting()
         }
+        .background(WindowAccessor { window in
+            ownWindowID = ObjectIdentifier(window)
+        })
         // A scheduled run is a separate process, so the FILE it writes is the
         // only event there is. Reading the watcher's counter here is what
         // registers this view as an observer of it; when it moves — a record
@@ -513,8 +526,19 @@ struct SectionDetailView: View {
             // The #333 finding leaves the alert only when the checklist will
             // really be shown after it; otherwise the alert is the floor.
             let checklist: LinksChecklistSheetModel? = linksChecklistWaiting(occasion: .onOpening)
+            // Also left out when the teacher has already answered this very
+            // offer — shown while the window was open, say — so the alert does
+            // not return for a finding they acted on (implementation review, N7).
+            var alreadyAnswered: Bool = false
+            if checklist == nil, !course.isKeptForReference,
+               let read = LinksChecklistOffer.read(courseDirectory: course.directoryURL, section: sectionNumber) {
+                alreadyAnswered = !LinksChecklistGate.holdsSomethingNew(
+                    read.offer,
+                    answered: LinksChecklistAnswered.read(courseDirectory: course.directoryURL, section: sectionNumber)
+                )
+            }
             let waiting: [SiteHealthFinding] = LinksChecklistRouting.findingsForTheAlert(
-                taken, checklistWillBeShown: checklist != nil
+                taken, checklistWillBeShown: checklist != nil || alreadyAnswered
             )
             if !waiting.isEmpty {
                 healthFindings = waiting
@@ -637,6 +661,9 @@ struct SectionDetailView: View {
         // The build's word that it wrote the links checklist offer (#379).
         // Printed after the date passes, so it follows the #333 finding.
         .onChange(of: previewRunner.linksChecklistMarkers.count) { _, _ in
+            // The build has said whether it wrote an offer — mid-build, which
+            // is enough: the file is written before the marker. So the held
+            // finding is settled as though the build had finished.
             settleHeldLinksFinding(from: previewRunner, buildHasFinished: true)
         }
         .sheet(item: $linksChecklist, onDismiss: {
@@ -896,6 +923,11 @@ struct SectionDetailView: View {
             )
             switch route {
             case .alert:
+                // The same finding held earlier goes to the alert once, not
+                // again when it is settled (implementation review, N6).
+                if heldLinksFinding?.finding == finding {
+                    heldLinksFinding = nil
+                }
                 forTheAlert.append(finding)
             case .waitForTheBuild:
                 heldLinksFinding = (finding: finding, cameFromPublishing: cameFromPublishing)
