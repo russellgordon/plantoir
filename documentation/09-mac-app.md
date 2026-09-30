@@ -7678,6 +7678,26 @@ and `backupsTotal` was dead; the header's own identifier (`backupsGroup`, read b
 nothing) was dropped in the review round, and the text carries `backupsTotal`. No unit test: in process the tree does not
 reach hosted SwiftUI.
 
+**Two more, found after the sweep (#366, v1.4.1):** the start-of-year sheet
+(`startOfYearSheet` — its Go, Undo and "Undo This" buttons all read back as the
+sheet, so the marketing scene had to find Go as "the button that is not
+Cancel") and the stopped-publish band (`stoppedPublishNotice` swallowed
+`dismissStoppedPublish`). #353's sweep missed the sheet because its buttons
+come from a computed property (`buttons`), so a scan for "an identifier on a
+stack whose body holds an identified control" never sees them in the same
+place. Hence a NAMED list rather than a discovered one:
+`ContainerIdentifierTripwireTests` (gated) holds the six containers known to
+hold identified controls and fails any whose `.accessibilityIdentifier(…)` is
+not IMMEDIATELY preceded by `.accessibilityElement(children: .contain)` —
+order-aware, because `.contain` placed after the identifier compiles and does
+nothing — and fails a name no product file uses any more. Add a container to
+it when you give one an identifier. The opt-in
+`ContainerIdentifiersUITests.testTheStartOfYearSheetKeepsItsButtonsIdentifiers`
+finds `startOfYearGo` off the real tree (run it with
+`TEST_RUNNER_PLANTOIR_UI_TESTS=1` — xcodebuild passes only `TEST_RUNNER_`
+variables to the runner, and without it the test skips). VoiceOver was never
+affected: it speaks labels, not identifiers.
+
 ## A field in a labelled row has no title of its own (#354)
 
 In a grouped form a `TextField("Unit", …)` draws its title beside the field, so

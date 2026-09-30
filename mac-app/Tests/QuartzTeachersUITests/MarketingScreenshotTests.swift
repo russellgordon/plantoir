@@ -945,14 +945,11 @@ final class MarketingScenes: MarketingScreenshotCase {
         XCTAssertTrue(item.waitForExistence(timeout: 15), "The section menu should offer to get ready (#96)")
         item.click()
 
-        // The sheet's own identifier is set on its whole stack, and SwiftUI
-        // hands that to every child in place of the children's own —
-        // `startOfYearGo` never reaches the accessibility tree (measured:
-        // Cancel and Go both read `startOfYearSheet`). So Go is the sheet's
-        // button that is not Cancel, and the plan is ready when it exists.
+        // Go by its own identifier: the sheet's stack carries `.contain`
+        // before its identifier (#366), so `startOfYearGo` reaches the tree.
+        // The plan is ready when Go exists.
         let sheet: XCUIElement = application.sheets.firstMatch
-        let go: XCUIElement = sheet.buttons
-            .matching(NSPredicate(format: "label != %@", "Cancel")).firstMatch
+        let go: XCUIElement = application.buttons["startOfYearGo"]
         XCTAssertTrue(go.waitForExistence(timeout: 60), "The plan should appear")
         // An empty plan photographed as the feature is the failure this
         // guards: the button is disabled when the plan changes nothing (#96).
