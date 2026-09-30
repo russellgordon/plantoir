@@ -13820,6 +13820,41 @@
       }
     ]
   },
+  "courseSettingsWording": {
+    "localeLabel": "Language and region",
+    "localeCaption": "Used for dates and the words on your website’s own pages.",
+    "colourSchemeNoneChosen": "Standard colours (none chosen)",
+    "saveHeldBack": "Save is held back until Deploying is fixed: {reason}",
+    "saveHeldBackReason": "{reason} is the destination's own sentence, unchanged: app-rules.json → configurationRules (the deploy-folder and Cloudflare Account ID problems).",
+    "where": "localeLabel names the locale picker in Course Settings AND in the new-course wizard, so the setting has one name wherever it is chosen; localeCaption sits under it in Course Settings. colourSchemeNoneChosen is the colour-scheme picker's entry for a section with no scheme chosen. saveHeldBack is said beside Save (savingSettings.whatEnablesSave).",
+    "why": "#369 (2026-09-27): Course Settings' first settings row read “Language / region (Quartz locale)” from v1.1.0 to v1.4.0, naming the site builder in a label a teacher reads (CLAUDE.md rule 1), and it was the first row in plantoir.app's headline picture. The label scan that found it (userFacingLabelWords) found one more: “Quartz default (none chosen)” in the colour-scheme picker. The wizard said “Language / region”; both now say the same thing. REJECTED: keeping “locale” in brackets (a word only a developer uses); putting these in AssistWording (they are not the assistant's words)."
+  },
+  "userFacingLabelWords": {
+    "forbidden": [
+      "quartz",
+      "toolchain",
+      "docker",
+      "container",
+      "colima",
+      "script",
+      "json",
+      "mcp",
+      "gpu",
+      "llama",
+      "qwen",
+      "wrangler",
+      "python"
+    ],
+    "matching": "Whole word and case-insensitive: “description” does not contain “script”, “Scripts” does not match “script” either (a plural is a different word to this check, and none is in use). Comments are not labels and are skipped.",
+    "scope": "On the mac: every string literal passed straight to a call that puts words on screen, in QuartzTeachers/Views — Text, Picker, Toggle, Button, LabeledContent, TextField, SecureField, Label, DisclosureGroup, ExampleCaption, FormSectionHeader, Section, .help, .navigationTitle, .alert, .confirmationDialog. Wording held in a named key is pinned by that key's own contract instead.",
+    "exceptions": [
+      {
+        "what": "the About window's credit to Quartz, by name",
+        "why": "It credits Jacky Zhao's Quartz and asks the reader to sponsor him: naming it is the point. On the mac it is a LocalizedStringKey constant rather than a label literal, so the scan never reaches it; a platform whose scan does reach it exempts it by this entry."
+      }
+    ],
+    "why": "CLAUDE.md rule 1: the GUI never mentions the machinery. Until #369 that rule was enforced only by word lists inside individual features' tests, and no test scanned the labels in the views, which is how “Quartz locale” shipped from v1.1.0 to v1.4.0. Measured on 2026-09-29 with this list and this scope: exactly two hits, both fixed in #369. “terminal” is deliberately NOT on the list — “New Terminal at Folder” is a real macOS action a teacher uses."
+  },
   "savingSettings": {
     "rule": "A Save writes only the settings THIS window changed since it last read or wrote the course's settings file. Every other setting keeps the value the file has now. Compared per TOP-LEVEL key of course_config.json, never inside a list. After a Save, every other window's copy of that course that has nothing unsaved reads the file again; a copy with unsaved changes is left alone, and its own Save follows the same rule.",
     "why": "Issue #265, confirmed by Russell 2026-09-24: two windows were open on one working folder, each holding its own copy of a course's settings, and the Save was a blind whole-file write. Window A saved three sidebar hides; window B, which had not seen that, saved an unrelated setting and the file went back to B's ten hides while both windows said nothing was unsaved - measured with the real CourseConfiguration.swift and a copy of his course. The same stale write came from Add Section, archive, restore, course rename and school year, so the rule is in the ONE write they all use. Per key rather than per list element because merging inside a list needs rules for order and for an item removed on one side and added on the other, and nothing reported needs them. When both sides changed the same key, the Save being made wins and the trail says it replaced a change made elsewhere. Rejected: refusing the Save and reloading (loses what the teacher just did, for a case the trail can record); a file watcher per window (a new moving part for a case the reload-after-Save covers).",
