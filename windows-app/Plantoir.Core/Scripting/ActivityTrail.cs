@@ -207,6 +207,15 @@ public static class ActivityTrail
         /// </remarks>
         ScheduledPublishFinished,
         /// <summary>
+        /// A build was declined because ANOTHER program on this computer holds
+        /// the course's build, publish or preview lease (#289, mac #156).
+        /// Carries the course, the section, what was asked for, what the other
+        /// holds and its process id — never anything written on a page.
+        /// Also (#386, mac #381): a PREVIEW refused because this copy of the
+        /// app was deploying that same section (lineWhenItsSectionIsBeingDeployed).
+        /// </summary>
+        BuildDeclinedCourseBusyElsewhere,
+        /// <summary>
         /// A remembered timetable named a date that cannot be a class date —
         /// the file was written by this app before #144, on a PC whose
         /// regional format uses another calendar — and was set aside, so the
@@ -281,6 +290,7 @@ public static class ActivityTrail
         Event.ScheduledPublishNeededAnAnswer => "scheduled publish needed an answer",
         Event.ScheduledPublishDidNotFinish => "scheduled publish did not finish",
         Event.ScheduledPublishFinished => "scheduled publish finished",
+        Event.BuildDeclinedCourseBusyElsewhere => "build declined, course busy elsewhere",
         Event.RememberedTimetableSetAside => "remembered timetable set aside",
         Event.SectionAdded => "section added",
         Event.PageSettingsLeftAsTheyWere => "page settings left as they were",

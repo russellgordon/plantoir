@@ -369,6 +369,13 @@ public sealed class CourseConfiguration
     {
         string path = rawPath.Trim();
         if (path.Length == 0) return "Choose the folder this course deploys into.";
+        // #304 (mac #227): a partial path is refused BEFORE the folder is looked
+        // for. Directory.Exists would resolve it against THIS app's current
+        // folder while deploy.ps1 publishes from the working folder - checked
+        // in one place and published into another. IsPathFullyQualified also
+        // refuses drive-relative "C:out" and root-relative "\out".
+        if (!Path.IsPathFullyQualified(path))
+            return "That isn’t a full folder location — use Choose… to pick the folder.";
         if (File.Exists(path)) return "That’s a file — deploying needs a folder.";
         if (!Directory.Exists(path)) return "That folder doesn’t exist — use Choose… to pick or create one.";
         try

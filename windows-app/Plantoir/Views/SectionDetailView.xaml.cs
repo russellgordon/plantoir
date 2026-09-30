@@ -873,6 +873,8 @@ public sealed partial class SectionDetailView : UserControl
         {
             if (_previewRunner.IsRunning) { StopPreview(); return; }
             if (_window.Workspace.WorkspacePath is not { } workspacePath) return;
+            // FIRST, before any lease is released or taken (#386).
+            if (await RefusedWhileThisSectionDeploys(workspacePath)) return;
             // Decided here, so the stop that follows names the same folder.
             _folderThisSectionWorksIn = workspacePath;
 
@@ -983,11 +985,41 @@ public sealed partial class SectionDetailView : UserControl
         return true;
     }
 
+    /// <summary>
+    /// A preview of a section cannot start while THIS copy of the app is
+    /// deploying that same section — from this window or another (#386 / mac
+    /// #381, <c>shared-rules.json → previewWhileItsSectionDeploys</c>, layer
+    /// <c>window</c>). Asked FIRST on every way into a preview (the button,
+    /// the assistant and the restart path), from the in-process publish record
+    /// every Deploy writes. The disabled button was the only thing in the way
+    /// before, and it covered only this window's own Deploy. Another
+    /// program's deploy is refused by its work lease, course-wide; a command
+    /// line's by preview.ps1 reading the process table.
+    /// </summary>
+    private async Task<bool> RefusedWhileThisSectionDeploys(string workspacePath)
+    {
+        if (!CourseActivity.IsPublishingSection(workspacePath, _course.Code, _sectionNumber)) return false;
+        ActivityTrail.Note(ActivityTrail.Event.BuildDeclinedCourseBusyElsewhere,
+                           "declined Preview \u00b7 this section is being deployed by this copy of Plantoir",
+                           _course.Code, _sectionNumber);
+        var dialog = new ContentDialog
+        {
+            Title = "Cannot Preview Yet",
+            Content = AssistWording.SectionIsBeingDeployed(_course.Code, _sectionNumber.ToString()),
+            CloseButtonText = "OK",
+        };
+        await ShowDialogSafelyAsync(dialog);
+        return true;
+    }
+
     private async void PreviewOrStop_Click(object sender, RoutedEventArgs e)
     {
         try
         {
             if (_previewRunner.IsRunning) { StopPreview(); return; }
+            // FIRST, before any lease is taken or anything stopped (#386).
+            if (_window.Workspace.WorkspacePath is { } deployingFolder &&
+                await RefusedWhileThisSectionDeploys(deployingFolder)) return;
             if (await TheAssistantIsBuilding()) return;
             if (_window.Workspace.WorkspacePath is not { } workspacePath) return;
             // Decided here, so the stop that follows names the same folder.
