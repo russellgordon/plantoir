@@ -23,12 +23,14 @@ class MarketingScreenshotCase: XCTestCase {
     static let windowWidth: CGFloat = 1280
     static let windowHeight: CGFloat = 800
 
-    /// The autosave name AppKit gives the app's main window. Passing a frame
-    /// under this key as a launch argument puts it in the argument domain,
-    /// which outranks the saved value — so every capture is the same size
-    /// regardless of where the window was left last time.
-    static let mainWindowFrameKey: String =
-        "NSWindow Frame SwiftUI.ModifiedContent<QuartzTeachers.WindowRootView, SwiftUI._FlexFrameLayout>-1-AppWindow-1"
+    /// The autosave key of the app's main window. Passing a frame under this
+    /// key as a launch argument puts it in the argument domain, which
+    /// outranks the saved value — so every capture is the same size
+    /// regardless of where the window was left last time. `IsolatedLaunch`'s
+    /// constant, not a copy: until #361 this was the name from before the
+    /// window group had an id, which no build reads, so captures opened at
+    /// whatever the teacher's window was left at.
+    static let mainWindowFrameKey: String = IsolatedLaunch.mainWindowFrameKey
 
     /// The assistant keeps its own window frame under its own key and applies
     /// it by hand — SwiftUI owns the autosave name and overwrites anything put
@@ -945,14 +947,11 @@ final class MarketingScenes: MarketingScreenshotCase {
         XCTAssertTrue(item.waitForExistence(timeout: 15), "The section menu should offer to get ready (#96)")
         item.click()
 
-        // The sheet's own identifier is set on its whole stack, and SwiftUI
-        // hands that to every child in place of the children's own —
-        // `startOfYearGo` never reaches the accessibility tree (measured:
-        // Cancel and Go both read `startOfYearSheet`). So Go is the sheet's
-        // button that is not Cancel, and the plan is ready when it exists.
+        // Go by its own identifier: the sheet's stack carries `.contain`
+        // before its identifier (#366), so `startOfYearGo` reaches the tree.
+        // The plan is ready when Go exists.
         let sheet: XCUIElement = application.sheets.firstMatch
-        let go: XCUIElement = sheet.buttons
-            .matching(NSPredicate(format: "label != %@", "Cancel")).firstMatch
+        let go: XCUIElement = application.buttons["startOfYearGo"]
         XCTAssertTrue(go.waitForExistence(timeout: 60), "The plan should appear")
         // An empty plan photographed as the feature is the failure this
         // guards: the button is disabled when the plan changes nothing (#96).
@@ -1022,14 +1021,15 @@ final class MarketingScenes: MarketingScreenshotCase {
         // only works out what the copy would do and lists the linked pages;
         // nothing is written until Copy is pressed again, which this never
         // does. (A page that links to nothing is copied on the first press —
-        // The Unplugged Algorithm links three pages ICS4U does not have,
-        // checked in the folder on 2026-09-27.)
+        // The Unplugged Algorithm links one page ICS4U does not have, B3.1;
+        // it was three until ICS4U gained AAP-2.A and CRD-2.I on 2026-09-29.)
         //
         // It is NOT pressed here. Measured on 2026-09-27 in the marketing
         // folder, the checklist for this page ran to 70-odd lines of "sits
         // outside the course's folders" and "is already in this course" —
         // the links are followed page to page, the College Board embeds among
-        // them — and the sheet grew taller than the screen, Cancel with it.
+        // them — and the sheet grew taller than the screen, Cancel with it
+        // (fixed by #365: the rows and those lines now scroll in one area).
         // That is a finding for the app, not a picture; the scene shows the
         // question the sheet asks instead: which page, into which course,
         // and whether to bring the pages it links to.

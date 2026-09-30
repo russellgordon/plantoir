@@ -129,6 +129,10 @@ struct ScheduledPublishNoticeView: View {
         // (240.7, 240.7, 240.7) in light over 2,812 points sampled between
         // x = 350 and x = 1090 and y = 6 and y = 44 in window coordinates.
         .background(bandColour.opacity(0.12), ignoresSafeAreaEdges: [])
+        // `.contain` BEFORE the identifier (#366, the rule of #353): SwiftUI
+        // applies an identifier on a stack to every element inside it, and the
+        // inner identifier (dismissStoppedPublish) never reaches the tree.
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("stoppedPublishNotice")
     }
 }

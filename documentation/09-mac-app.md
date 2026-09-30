@@ -534,8 +534,10 @@ happily — a preview that can start and that no stop is aimed at.
 
 **One note serves both a preview and a deploy deliberately.** They never run at
 once for a section: a deploy stops a running preview and waits for it before
-noting anything of its own, and the Preview button is disabled while a deploy
-runs. A third folder would be a second name for the same one.
+noting anything of its own, and a preview of a section cannot start while that
+section deploys — the button is disabled, and since #381 `startPreview()`
+itself refuses (below, "A preview of the section this app is deploying"). A
+third folder would be a second name for the same one.
 
 It is guarded by a source scan rather than by a behavioural test, and that is
 the honest limit: no real `SectionDetailView` ever mounts in a unit test —
@@ -1175,12 +1177,19 @@ issue #220 one level down — a line that will be believed.
    FAILS the container counts as busy**, because "I could not ask" must never
    mean "nobody is using it".
 
-   Since GitHub #94 the launchers use the same count before they REMAKE a
-   folder's container (`remake_the_workspace`, documentation/03 → "Before a
-   workspace is remade"), so the app and the launchers agree on what
-   "running" means. They add one refinement the quit path does not need: a
-   preview whose `preview.sh` is no longer running on the Mac is an orphan
-   and counts as nothing, because refusing for it would refuse for ever.
+   Since GitHub #94 the launchers LOOK before they remake a folder's
+   container (`remake_the_workspace`, documentation/03 → "Before a workspace
+   is remade"), but since GitHub #378 they no longer count the same way this
+   does, and the difference is deliberate. The launchers ask, for each piece
+   of work inside, whether the program that OWNS it is still running on this
+   Mac, and end work whose owner has gone (documentation/03 → "Work left
+   behind, and proving its owner has gone"); this quit path counts anything
+   beyond the first process as busy, left-over work included. So a folder
+   holding only left-over work keeps the virtual machine running at quit —
+   the safe direction for a path that stops things wholesale, and outside
+   #378's scope. The leftover is ended the next time a launcher has to set the
+   folder up again (after an update, for example); until then it is
+   harmless, but this quit path keeps the virtual machine running for it.
 
 Check 1 exists because check 2 is **blind to the long windows**. A launcher
 that has to build the image, start Colima or download the pinned tools does all
@@ -1601,7 +1610,9 @@ the machinery (rule 1). They now print "🐳 Setting up this Mac…" and
     container is running", which are a contract change of their own. They are
     ONE follow-up issue, listed line by line; a whole-launcher scan belongs to
     it (REJECTED here: a whole-file ratchet with an allow-list, which would
-    freeze the list rather than empty it).
+    freeze the list rather than empty it). That issue was #382, and those lines
+    are gone: [`03-launcher-scripts.md`](03-launcher-scripts.md) → "What the
+    console says about the website builder (GitHub #382)".
 
 **REJECTED — write the tools folder into `~/.zprofile` at install.** Plantoir
 editing a teacher's shell profile is exactly the machinery the product hides, it
@@ -2468,6 +2479,141 @@ publish still says them; nothing is refused or undone. The trail's `settings
 saved` line carries the same facts from `SettingsSaveNotice.scheduledDeploys`.
 Contract: `savingSettings.scheduledDeploys`; the whole story is docs 07, "Where
 it deploys is read when it runs (#323)".
+
+### What enables Save, and why the dark picture looked enabled (#364, #373)
+
+**The rule** (`contracts/shared-rules.json` → `savingSettings.whatEnablesSave`,
+decided in `SaveEnablement`): Save is enabled exactly when this window's copy
+differs from what it last read or wrote — `CourseConfiguration.hasUnsavedChanges`
+compares the WHOLE `values` dictionary, course-wide and per-section keys alike —
+and nothing holds it back. Revert is enabled exactly when the copy differs.
+
+**Measured, not assumed.** #364 (Save apparently enabled on a freshly opened
+course, dark picture only) and #373 (Russell, 2026-09-27: a change made only on
+a section's page did not enable Save) were filed as one comparison wrong in both
+directions. On dev 2e11471d, with the course in #364's picture, in the real
+window, light and dark, Debug and Release, pressing the real per-section
+toggle through accessibility: the comparison is right both ways. #364's own
+frame proves it — Revert is disabled there, (38,38,38), and Save cannot be
+enabled while Revert is not. Save was a DISABLED `.borderedProminent`: its
+fill (17,70,126) in dark and (146,198,255) in light is the accent at about 40%,
+its label dimmed to (155,177,201). On a dark window that reads as enabled.
+#373 did not reproduce on any path; it stays open for Russell to try the new
+build.
+
+**What changed.**
+- **Save wears the accent only when it can be pressed.** `saveButton` draws
+  `.borderedProminent` when `SaveEnablement.saveWearsTheAccent` and
+  `.bordered` otherwise — Revert's own disabled look in both appearances. ONE
+  predicate decides the look and the state. `SaveEnablesTests` scans the view
+  for any other `.borderedProminent`. This is mac-visual, so it is not in the
+  contract; the Windows issue asks them to check a disabled accent button in
+  their dark theme.
+- **A destination problem holds Save back only when the edit moves the
+  destination** (director's ruling on the plan review, folded in). The one
+  path that kept Save grey after a per-section change was `savingProblem`: a
+  `local_folder` course whose folder is missing on THIS Mac (a folder from
+  another Mac or account), or a Cloudflare course with no Account ID on this
+  Mac, blocked every Save, and nothing near the button said why. A destination
+  already on disk is not made worse by saving a colour scheme, so the block now
+  needs `CourseConfiguration.deployDestinationsDifferFromSaved` (the primary
+  destination, its folder or any additional destination, against what this
+  copy last read or wrote). The problem is still said under Deploying, as
+  before. This is the likeliest real #373.
+- **When Save IS held back, the reason is said beside it**:
+  `CourseSettingsWording.saveHeldBack(reason:)` with the destination's own
+  sentence, identifier `saveHeldBackReason`; the press-time `saveProblem` wins
+  when both exist. And the trail says `settings save held back` once per visit
+  to the course (`heldBackWasNoted`, reset by `.id(code)`), with WHICH check
+  (deploy folder, cloudflare account id, additional destination) and never the
+  path or the ID — the held-back state is the one place where the form changes
+  and no act follows, so a "Save would not light up" report found nothing.
+- **Two ways a form could change on its own, closed.** A stored emoji holding
+  two ("📚🔬", a hand edit) reached the emoji field, which always settles on
+  one and wrote it back the moment the form appeared, so a course nobody had
+  touched read as changed: `emoji(forSection:)` now reads it as one emoji
+  (`CourseConfiguration.oneEmoji`), and the file keeps what it has. And the
+  legacy course-wide `show_grade_in_title` Bool was replaced by an EMPTY
+  per-section map the first time a section was toggled, so on a course that
+  stored `false`, toggling section 2 turned section 1's grade back on: the map
+  is now seeded with the legacy value for every section first.
+- `color_schemes` is in `file-formats.json` → `courseConfigKeys` at last; the
+  key count could not see it because it was read by subscript, not `forKey:`.
+
+**Pinned.** `SaveEnablesTests` runs the contract: eight fresh-open shapes
+(the #364 course with its destination moved to Netlify so no case depends on a
+folder on one Mac, plus the legacy and absent-key shapes) opened in the real
+window and left to settle, then Save and Revert read through accessibility; one
+edit per per-section key made through the section's own binding, then saved and
+read back; the held-back cases; the toggle pressed through accessibility; and
+the held-back sentence and trail line. Every real-window test has a model half
+that never skips. Must-fails are in the #373 comment and `GUI-IMPROVEMENTS.md`.
+
+**REJECTED.** Rewriting the comparison per key, or normalising on load (it is
+not wrong, and normalising on load would itself dirty a fresh form or write
+changes nobody asked for); `.tint(.gray)` on a disabled accent Save (how a
+tinted disabled prominent button renders was not measured, and Revert's own
+look needs no measuring); `.keyboardShortcut(.defaultAction)` for Save (Return
+in any field would save); reading #364 as an ordering bug between two launches
+(the same frame shows Revert disabled).
+## Every text field is bordered, and says nothing about the machinery (#374, #369)
+
+**One modifier.** Russell, 2026-09-27 (#374): every text field wears the
+bordered, rounded style Course name has, never the borderless "clean" look.
+The audit found every editable field ALREADY bordered — the two rows in his
+picture, "Class pages are named" and "Front page heading", are read-only
+`LabeledContent { Text }` values, not fields, and after #376 only a club shows
+them at all. So the change is structural: `.borderedTextField()`
+(`Views/Helpers/BorderedTextField.swift`) is the ONE place `.roundedBorder` is
+written, and the 21 fields that wrote it themselves now call it.
+`TextFieldStyleScanTests` walks every `TextField(`/`SecureField(` in
+`QuartzTeachers/Views` (comments and string contents masked, parentheses
+matched, the chain stopping where the next field begins) and fails on a field
+whose chain has neither `.borderedTextField()` nor a bordered chrome, and on
+any field that chooses a style of its own — even alongside
+`.borderedTextField()`, because the style nearest the view wins and a `.plain`
+there draws it borderless. A second test allows `.textFieldStyle(` only in the
+modifier, inside the two chromes' definitions, and in the listed exceptions.
+
+**Per row, for the closing comment.** *Class pages are named / Front page
+heading / The assistant calls a page a*: read-only locked values (not fields),
+kept as plain secondary text under their caption; shown only when recorded
+(#376). *What do you call a unit? — Unit [Rename…]*: a read-only value with an
+action; the button says where it is changed, and `renameLockedNumbered` says
+why when it is disabled. Neither needs a border, because neither can be typed
+in.
+
+**Allowed, with the reason, because each draws its own border:**
+`WizardFieldChrome` (the wizard's 24pt fields beside the course-code picker;
+`.roundedBorder` is 26pt — Russell, 2026-08-23; 12, "Metrics"),
+`SearchablePickerChrome` (24pt for the same reason), the sidebar's
+`renameField` (`.plain` inside its own card, because the row sits on the
+selection colour, #293), the assistant's `assistComposerField` (`.plain`
+inside the composer's own rounded stroke), and `taskAnswerField` (inside an
+`.alert`, where AppKit draws the field). An exception whose field has gone
+fails the test until it leaves the list. `TextEditor`s are not text fields;
+the footer's already strokes its own border.
+
+REJECTED: converting the wizard's chrome fields to `.roundedBorder` (2pt out
+of line with the picker, measured); a scan for `.plain` alone (an unstyled
+field in a grouped `Form` is the borderless look and carries no `.plain`); a
+lock glyph on the read-only rows (cut by the director — Russell did not ask
+for it, and after #376 only clubs see them).
+
+**The machinery in a label (#369).** Course Settings' first settings row read
+"Language / region (Quartz locale)" from v1.1.0 to v1.4.0. It is now
+`CourseSettingsWording.localeLabel` ("Language and region") with
+`localeCaption` under it, and the wizard's picker uses the same key. Rule 1 had
+been enforced only by word lists inside individual features' tests, so
+`UserFacingLabelWordsTests` now scans every string literal passed to a
+label-bearing call in the views (`Text`, `Picker`, `Toggle`, `Button`,
+`LabeledContent`, `TextField`, `Label`, `Section`, `.help`, `.alert`, …)
+against `shared-rules.json` → `userFacingLabelWords.forbidden`, whole-word and
+case-insensitive, comments skipped ("description" is not "script"). It found
+exactly two hits: that row and the colour picker's "Quartz default (none
+chosen)", now `colourSchemeNoneChosen`. It cannot see DATA: the catalog
+scheme "Quartz Standard Colours" (`support/colour_schemes.json`) is issue #383.
+
 ## Two programs, one course: the build, preview and publish leases (#156)
 
 Written 2026-09-25 for [issue #156](https://github.com/russellgordon/plantoir/issues/156).
@@ -2531,6 +2677,39 @@ another live program holds `build`, `publish` or `preview` on the course:
 Every decline writes `build declined, course busy elsewhere` on the trail, with
 what was asked for and the other program's process id — from whichever process
 declined, so an outside assistant's refusal is on the trail too.
+
+**A preview of the section this app is deploying (#381).** The table above
+is about OTHER programs, and on purpose `whatBlocksABuild` never counts this
+program's own leases (a window must not decline its own build). So until
+2026-09-29 a preview of a section was refused while the SAME copy of the app
+deployed it only by the Preview button's `.disabled` — not when another window
+of the app deployed it, not when the in-app assistant deployed it with no
+window, and not on the assistant's or the restart path's way into
+`startPreview()`, which do not pass the button. Russell's decision 4 on #378
+made it a rule: `contracts/shared-rules.json` → `previewWhileItsSectionDeploys`.
+
+`startPreview()` now asks `SectionDetailView.refusalWhileThisSectionDeploys`
+FIRST — after the copy check and before the reference lock, the build lease,
+the preview lease or the look at other programs' leases — which reads
+`CourseActivity.sectionPublishIsRunning`: the record the window's Deploy
+(`WorkLeaseRegistry.claimAPublish`) and `AssistSiteWork.deploy` both write.
+It refuses with `wording.sectionIsBeingDeployed` under "Cannot Preview Yet"
+and writes `WorkLeaseRegistry.lineWhenItsSectionIsBeingDeployed` under `build
+declined, course busy elsewhere`. The SECTION, not the course: previewing
+section 1 while section 2 deploys from the same app works, and the decision
+names the same section, so widening it was rejected. A deploy typed at a
+command line is refused by `preview.sh` itself when the window's preview
+reaches it ([03](03-launcher-scripts.md) → "A section being deployed cannot
+be previewed (#381)"), and the panel shows the launcher's own sentence
+(`FailureExplainer.sectionIsBeingDeployedExplanation`). The button's
+`.disabled` is unchanged: a convenience, not the rule.
+The in-app assistant's own preview (`AssistToolRunner.bringThePreviewUpToDate`) asks the same record first,
+before it opens a window, stops a preview or runs a no-window `--build-only`
+rebuild, and answers `wording.sectionIsBeingDeployed` — otherwise the window
+would refuse while the conversation said the preview was on its way (#381's
+review, S1; `WorkLeaseDecliningTests`).
+`PreviewWhileDeployingTests` pins the rule, the order in `startPreview` and the
+sentences.
 
 **A build, preview or publish lease with no name line is treated as gone**
 (added in the fix round after #245's `ProcessLiveness.nameToCompare`, which
@@ -2936,7 +3115,8 @@ The trail's `course created` line says "created CODING as a club, with pages
 named “Week 1” in “All Meetings”" (read from the file just written).
 
 **Course Settings shows the three settings LOCKED** — a Class Pages section with
-three label/value rows and one caption, for every course — and disables the
+up to three label/value rows and one caption, for a course that RECORDED them
+(#376, below) — and disables the
 unit word's Rename… button for a numbered course, with
 `renameLockedNumbered` under it. Russell, 2026-09-24: a club's words are not
 switchable after the wizard. Consequence: an existing course, CODING included,
@@ -2945,18 +3125,77 @@ renames pages between shapes (not asked for, and converting 80 "Unit 2, Day 3"
 pages to week numbers is its own piece); a front-page heading rename across
 every section (dropped with the same answer).
 
-**The heading row shows what the course RECORDED**
-(`CourseConfiguration.recordedFrontPageHeading`), and for a course with no
-`front_page_heading` — every course made before #267, CODING included — the
-named sentence `WizardWording.settingsFrontPageHeadingNotSet`. The first version
-filled in "Most Recent Class", so CODING's locked row contradicted its own
-front page ("## Most Recent Meeting"). Nothing rewrites a heading after
-creation, so the row does not guess one. REJECTED: reading the heading off
-section 1's `index.md` (a row about the course would then report one section's
-page, and a teacher may have edited it on purpose).
+**A locked row is drawn only when the course RECORDED its key (#376).**
+`ClassPagesLockedRows.rows(for:)` gives the rows to draw: page naming when
+`class_page_scheme` is present and non-blank, the heading when
+`front_page_heading` is (`CourseConfiguration.recordedFrontPageHeading`, shown
+verbatim), the noun when `class_noun` is. When none is, the whole Class Pages
+group — header and caption — is not drawn. Only the wizard writes the three
+keys, together, and only for a club, so that is every other course, CODING and
+the ICS3U/ICS4U copies included. Russell, 2026-09-27: "if there's no point in
+showing the setting (i.e. for a course made before the setting existed) then
+yes, it should be hidden." Measured on plantoir.app's own `courses-light.png`:
+for an ordinary course the page-naming row said "“Unit 1, Day 1”", repeating
+word for word the caption under "What do you call a unit?" three rows above it
+(y≈606 and y≈756), and the noun row said "class" — the same for every course.
+A present value this app does not know (a scheme written by a newer app) is
+drawn as this app reads it, because that is what governs its behaviour here.
+
+History, so nobody rebuilds it: from #267 until #376 the heading row was drawn
+for every course, and a course with no `front_page_heading` read
+`WizardWording.settingsFrontPageHeadingNotSet` ("Not recorded — the front page
+keeps the heading it already has"). That replaced a first version that filled
+in "Most Recent Class", which contradicted CODING's front page ("## Most Recent
+Meeting"). The sentence is retired from the code and the contract, and
+`ClubFillTests` fails if the contract key comes back. REJECTED: showing derived
+defaults for the scheme and the noun (the repetition above); reading the heading
+off section 1's `index.md` (a row about the course would then report one
+section's page, and a teacher may have edited it on purpose). Contract:
+`wizard.clubToggle.settingsRows.shownWhen` and its eight `shownWhenCases`.
 
 Every sentence is in `WizardWording` / `UnitWordRenameWording` and pinned in
 `shared-rules.json` (`wizard.clubToggle`, `specialNames.renameUnitWord`).
+
+**The panel says club when it is making a club (#368, v1.4.1).** Until v1.4.1,
+with the box ticked, a club's own fields ("Folder for meeting pages", "Pages are
+named Week") sat under a "Units" heading captioned "Chosen once, when the course
+is made…", beside "Course code" and "Course name", above "Create Course" — and
+the tick box's own caption ended "…but not once the course is made", a few rows
+above the club's. Nine places now follow the TICK BOX through
+`WizardWording.panelWords(isClub:)` (a `WizardPanelWords` for each side): the
+naming section's heading and caption (Meetings / "Chosen once, when the club is
+made…"), the button (Create Club; its identifier stays `createCourseButton`, which
+tests and the marketing scene find it by), the progress title (Creating your club,
+set when Create is pressed; the example course's "Adding the example course" is
+untouched), the code and name labels (Club code / Club name), the two site-title
+captions ("…beside the club code", "…before the club name"), the Structure
+caption ("Defaults are fine for most clubs") and — folded in from the
+implementation review — the caption under the marks tick list (a course keeps
+`gradedFolders.wording.caption`, which names the coverage map and says most
+courses keep Tasks; a club's, `clubToggle.gradedFolderCaption`, says a club
+starts without a coverage map) and the name a blank name field gives the site
+("Club Website", not "Course Website": `defaultSiteName`); the toggle caption
+now ends "…once the club is made". Keys: the course's under `wizard` (`namingHeading`,
+`namingCaption`, `creatingTitle`, `codeLabel`, `nameLabel`, `sectionMarkerCaption`,
+`gradeCaption`, `structureCaption`, and the existing `createCourseButton`), the
+club's under `wizard.clubToggle` with the same names plus `createButton`;
+`clubToggle.panelWordsFollow` states the rule. **Why the tick box and not
+`ClubCodeRule`:** a teacher can untick it for a club-shaped code, and the words
+must describe what will be made. **Why the heading ignores the noun picker:** it
+would change under the teacher's hand as they choose the row beneath it, and a
+club whose noun is "class" is still a club. The code field's label does change
+when typing CODING ticks the box — that is the box doing what it says. Gated:
+`ClubFillTests.testThePanelsWordsFollowTheToggle` (every key both ways, and each
+pair must differ) and `testThePanelHasNoCourseOnlyWordsOfItsOwn` (no course-only
+literal left in `NewCourseWizardView`, with a positive count of the calls). The
+opt-in `UnitWordRowUITests.testAClubsPanelSaysMeetingsAndCreateClub` types
+CODING, scrolls the lazy form until the naming rows exist, asserts PRESENCE
+(Meetings, the button's label) before absence, then unticks and checks the
+course's words come back; run it with
+`TEST_RUNNER_PLANTOIR_UI_TESTS=1 xcodebuild -project Plantoir.xcodeproj -scheme Plantoir -configuration Debug test -only-testing:QuartzTeachersUITests/UnitWordRowUITests/testAClubsPanelSaysMeetingsAndCreateClub`
+(plain `PLANTOIR_UI_TESTS=1` does not reach the runner and the test skips).
+Not changed, on purpose: "Enter a course code." (a refusal before anything is
+known) and the grade-in-title warning's own words.
 
 ## Renaming a course's word for a unit
 
@@ -5033,6 +5272,51 @@ and LOOKED at without a window, which is how it was first seen at all — and ho
 a `ScrollView` that reserved its cap and drew a 320 pt hole with the rows
 nowhere in it was found and taken out.
 
+### The checklist and the result screen fit on the screen (#365)
+
+**Everything that grows with the number of pages scrolls in ONE capped area;
+the sheet is at most 620 pt tall, whatever it lists.** Only the rows used to be
+capped. The sentences under them — one per page that will be skipped, the links
+that will lead nowhere, the pictures lines — sat outside the scroll area, and a
+well-linked lesson (The Unplugged Algorithm, last year's ICS3U into ICS4U) has
+about seventy of them: every curriculum embed outside the course's folders and
+every shared page ICS4U already has. The sheet grew past the bottom of the
+screen and Cancel and Copy went with it; Escape was the only way out. Now:
+
+- the checklist's heading (`CopyPageWording.willCopy`) and "Copies start
+  hidden…" stay fixed; the rows AND every per-page sentence scroll inside one
+  `CappedScrollArea` (`Views/Helpers/CappedScrollArea.swift`) of at most 380 pt
+  (`CopyPageChecklist.tallestList`);
+- the result screen (`CopyPageResultView`, split out of the sheet so it can be
+  measured) does the same with its per-page sentences, at 320 pt
+  (`CopyPageResultView.tallestSentenceList`), keeping the first sentence, the
+  backup line and Show in Finder outside it — at 380 it measured 612 pt, too
+  close to the rule to leave room for the orange problem line.
+
+**Why 620.** The smallest screen worth fitting is a 13-inch MacBook Air set to
+"Larger Text", 1280 × 800 points (its default is 1470 × 956): less a 24 pt menu bar, a ~52 pt title bar
+and a ~70 pt Dock, about 654 pt is left for a sheet. Measured with 11 rows and
+70 sentences: the checklist sheet is 556 pt, the result sheet 552 pt; with one
+row and nothing under it, 214 pt (no reserved hole). Rejected: a cap worked out
+from `NSScreen` — a sheet that changes size with the display is one no test can
+pin. Rejected for now: grouping the skip sentences ("8 pages are already in
+ICS4U"), which #365 floated — it is new contract wording Windows would owe, and
+the scroll alone fixes the fault.
+
+**`CappedScrollArea` is a `Layout`, not a measured `@State` height**, and that
+is the part that would pass review wrongly. The obvious version measures the
+content with `.onGeometryChange` into a `@State` and frames the scroll view at
+`min(measured, cap)`; that state starts at zero and learns the real height a
+pass later, so a size test reading the sheet once measures an EMPTY area and
+"at most 620 pt" passes with every row invisible. The `Layout` asks the scroll
+view for its natural height at the offered width in the same pass (a scroll
+view's ideal height along its axis is its content's) and returns the smaller of
+that and the cap. `CopyPageChecklistSizeTests` pins BOTH directions — at most
+620 pt, and at least cap + the fixed lines, so a collapsed area fails — and four
+mutations were run red: sentences moved back outside the area (checklist 3,356
+pt), the result's sentences outside (3,024 pt), the cap always reserved (a
+one-row checklist 556 pt), the area collapsed to zero (checklist 176 pt).
+
 ### What was REJECTED, and why
 
 | Not built | Why |
@@ -6503,12 +6787,50 @@ ready for the start of the year"; the contract is `shared-rules.json` →
 anything is written: the intro; the warnings (classes dated before today that
 are going into draft; this folder's scheduled deploy for the section, which
 would put the change in front of students; a first class that is itself in
-draft); every class and every other page going into draft, each with its
-reason, in disclosure groups; what stays; the links left on pages students will
+draft); every class and every other page going into draft, each by its
+title with its reason, in disclosure groups; what stays; the links left on pages students will
 see that will lead to hidden pages, grouped by page with a count; the sentence
 that publishing a class by hand after this leaves it with dead links (issue
 #333); and that the undo ends when Plantoir quits. Go is disabled when there is
 nothing to do.
+
+**Pages are named by title, never by path (#362, v1.4.1).** Until v1.4.1 the
+pages list printed `“Predict the Output” (courses/ICS3U/Warm-Ups/Predict the
+Output.md)`, and the undo sheet printed the bare path with no title at all —
+the working folder's layout and the `.md` the product otherwise hides. Now a
+page is `“{title}”` (`startOfYear.wording.pageName`), and ONLY when another page
+in the section has the same title does it become `“Notes” (in Zeta)`
+(`pageNameInFolder`: the folder within the course, "/"-joined, or the course
+code for a page at the top of the course folder). The title is the app's one
+naming rule — `AssistSectionPage.displayTitle`: front matter title, else the
+file name as written, else the folder for an `index.md` — which the assistant,
+the publish plan and the re-date planner already use; the "(in …)" suffix is
+this sheet's alone, so do not copy it into the assistant's replies without
+deciding to. One builder, `StartOfYearPlan.line(for:first:)` (`draftLine`),
+serves both disclosure lists AND the MCP plan text (`describe()`), and the
+links-left list takes the same name. "Shares a title" is decided across EVERY
+page the section's graph read, not within the list shown — a "Notes" going into
+draft whose twin STAYS is exactly the case a teacher could not otherwise tell
+apart (the contract case "a page is named by its title, and by its folder only
+when another page shares the title" keeps its twin for that reason). Titles
+are compared trimmed, precomposed and case-folded, and NOT with the graph's
+`normalized`, which is for link targets and would make "Input/Output" and
+"Output" one title. The folder comes from the URLs' components compared in one
+Unicode form, not from string-dropping `courses/<CODE>/` off `relativePath`
+(file names are bytes: an NFD working folder would defeat the prefix). The
+undo holds files rather than the graph, so its lists name each file from what
+it says now and decide "shared" within the list (`StartOfYearPageNaming.names`).
+Measured over the 39 payloads: the only title more than one page shares is
+`_DUPLICATE ME`, always `publish: false`, so it never reaches a plan — the
+suffix costs nothing on a fresh course. **The plan code is unchanged**: it
+hashes each change's path, not the words. REJECTED: dropping only `.md` (still
+the folder layout); the folder always (noise on every line of a 90-page list);
+deciding "shared" within the list shown (misleads when the twin stays); a
+separate rule for the MCP text; a humanised file name (would disagree with the
+reasons' own names, which use `displayTitle`). Pinned by
+`StartOfYearNamingTests` (the undo names, the Unicode and "Input/Output"
+comparisons, and a source scan that neither the sheet nor the planner
+interpolates a `relativePath` into a line).
 
 **Go** (`StartOfYearPreparation.carryOut`), in order: re-plan from disk and,
 if the plan differs from the one on screen, write nothing and show the new one
@@ -6538,6 +6860,100 @@ a terminal is not seen. It
 is offered once: a partial undo is not offered again, and names the backup.
 This undo, the assistant window's "undo that" and an outside assistant's
 `undo_last_change` are three separate stores.
+
+**After Get Ready, the links checklist (#379).** The first build after Get
+Ready still finds the links Get Ready left pointing at hidden pages (#333's
+warning, true there). Since #379 that finding is a CHECKLIST rather than an
+alert, and nearly every row starts UNTICKED: a page that only a later, hidden
+class links directly is that class's material and "will come with that
+class". So pressing Publish on the defaults does not undo Get Ready. See
+"The links checklist (#379)" below.
+
+## The links checklist (#379)
+
+The section window's answer to #333's alert. The rule that chooses the pages
+is the build's (shared Python, `documentation/05-build-pipeline.md` → "The
+links checklist (#379)"); this is the app's half.
+
+- **Where it comes from.** `ScriptRunner` collects `PLANTOIR_LINKS_CHECKLIST:`
+  lines as they arrive (`linksChecklistMarkers`), beside the health findings.
+  `SectionDetailView.showHealthFindings` routes the #333 finding through
+  `LinksChecklistRouting.route` (pure, unit-tested): a course kept for
+  reference → the alert; no marker yet and the build still going → HELD
+  (`heldLinksFinding`), because the finding is announced before the date
+  passes and the offer after them; the build finished with no marker (a
+  builder older than the app) → the alert; a marker whose `buildId` matches
+  the offer file → the checklist, and the finding leaves the alert. The
+  marker's arrival (`onChange` of the markers' count) and the end of the
+  preview wait / deploy settle a held finding.
+- **Publishes it did not watch.** When the window appears, becomes key, or
+  stops being busy, `offerTheLinksChecklistIfWaiting` reads the offer and shows
+  it when it is FRESH (written after the course's newest content change —
+  `BuildFreshness.newestContentDate`, hidden entries skipped), holds a page the
+  teacher has not answered, the course is not kept for reference and is not
+  being published. The scheduled run's folder-problem record drops the #333
+  finding only when that holds too; otherwise the alert is the floor.
+- **One alert at a time.** Other findings are shown first; the checklist waits
+  in `pendingLinksChecklist` and `showAnythingWaiting` presents it after the
+  alert has gone. Each build's offer is put in front of the teacher once per
+  window (`linksChecklistBuildsHandled`).
+- **The sheet** (`LinksChecklistSheet` + `LinksChecklistSheetModel`, testable
+  without a window): three groups under headings, each row a checkbox with a
+  second line — the date it will have, or "first used in …" for a page that
+  starts unticked, or "a class of its own — tick it to publish it now" plus
+  "brings N more pages with it" once ticked — and where it is linked from.
+  Rows are checked again against the pages as they are now; one that became
+  visible or went away is dropped. It scrolls in a `CappedScrollArea` of 380 pt
+  (#365's), width 560; 100 rows measure within 620 pt. Not Now and Publish both
+  record the answer (`.publish_state/section<N>.links-checklist-answered.json`,
+  the app's own file): the same set is not offered again on its own, a page
+  joining it brings it back, and a page the teacher unticked starts unticked.
+- **Publish** (`LinksChecklistPublisher`): refused while the course is being
+  published; ONE merged plan — the ticked pages through
+  `AssistPublishPlanner.planPublishing(exactly:dateMoves:)` with the offer's
+  days, each ticked class through `planPublishing(titles:)` so it brings its
+  pages as the assistant's publish would, a class's date winning over a row's
+  — written by `AssistPublishPlanner.apply(…, repointsTheFrontPage: false)`,
+  so the front page does not move to a class published here. Declined pages
+  are named (#186). No undo: nothing reaches students until a deploy.
+- **The menu item** "Publish Pages That Links Lead To…" in the section's
+  menu, beside Get Ready, whenever an offer exists — so Not Now is not a
+  one-way door. With a stale offer it says a preview is needed first.
+- **At a rollover** (`re_date_classes` with `rollover`), whichever website
+  answer is given, `PublishedPagesRecord.release` moves the section's record
+  fragments into `section<N>.published-pages.previous-<stamp>/` and removes the
+  answered file, inside the rollover's own `AssistChange` — so "undo that"
+  brings them back (it writes each fragment back into the folder, which is
+  kept for that reason). A rollover that moved no page still releases it, as
+  its own change. Not in `DeployCommand.releaseSite`, which runs only for a
+  NEW website (plan review, finding 12).
+- **Trail:** "offered to publish pages that links lead to" (occasion and
+  counts), "published pages that links led to" (counts and at most ten
+  places), "left pages hidden that links lead to" (Not Now or some unticked).
+- **Known limits, recorded from the implementation review (2026-09-30):**
+  the front page not moving (F1) holds for THIS press only — the next
+  assistant publish or hide repoints it by `mostRecentVisibleClass`, which may
+  then pick a future class ticked here (N10); a row a ticked class also brings
+  but that shows no "first used in" line (case k, or a group-2 row the class
+  reaches) is published with the class even if unticked, and the class's line
+  gives only a count (N2, the allowed cut; #385 is the place to close it); a
+  page published from the checklist and later hidden again by hand, with a
+  visible page still linking to it, is in the answered set, so neither the
+  alert nor the checklist returns for it until a rollover — the menu item
+  still opens it (N4); the refusal covers this app's own publishes only, not a
+  scheduled or MCP deploy in another process, the race plan note 16 accepted
+  (N8); a ticked class is published by TITLE through `graph.page(titled:)`,
+  so two class pages sharing a file name in two folders would resolve to the
+  first — none of the 39 payloads has one (N9). Fixed in the same round: the
+  sheet is offered only on the window that became key for THIS section (N5);
+  an older builder's #333 alert is shown once, not twice (N6); the scheduled
+  run's record drops the #333 finding when the teacher already answered that
+  offer (N7); a row a ticked class brings is not counted, remembered or
+  reported as left hidden (S1).
+- **Tests:** `LinksChecklistTests` (the wording key by key and its machinery
+  check; the marker; every routing branch; freshness; the contract's
+  `linksChecklist.publishCases` on a laid-out course; the sheet's size), with
+  eleven mutations run red — recorded in the piece's ready file.
 
 ## Testing: the real-home tripwire (#264)
 
@@ -6801,7 +7217,8 @@ in `NewSiteDialogUITests`). The one exception is the marketing captures
 (`MarketingScreenshotTests`, `AssistantTreeDump`), which drive the REAL
 toolchain — a real preview, real helper programs on the PATH — and so do not
 take a state folder at all: they still write the real trail, run by
-`website/shots/capture.py`, by hand, rarely. Windows documents the same edge
+`website/shots/capture.py`, by hand, rarely — but not his window frames, since
+#361 (below). Windows documents the same edge
 for its own `--state-dir` (doc 12).
 
 ### What was wrong
@@ -6897,16 +7314,88 @@ Then the negative half: every real item unchanged, polled the same 10 s. It
 skips when another Plantoir is running — that copy's writes could not be told
 apart from a leak — and never quits the teacher's copy to make room.
 
-**The residual it tolerates, by name:** AppKit and SwiftUI write their own
-bookkeeping — `NSWindow Frame …`, `NSSplitView Subview Frames …`, open/save
-panel keys — straight to `UserDefaults.standard`, whatever the app does. So a
-UI test can still move where the teacher's main window next opens. The allowed
-prefixes are `StateDirectoryUITests.realPreferenceKeysAppKitOwns`; any other
-real key that changes is red. `-ApplePersistenceIgnoreState YES` (passed by
-`IsolatedLaunch`) keeps the app from restoring the teacher's windows.
-The real domain's key NAMES were read around each UI run on 2026-09-26 (75
-before and after, none added or removed); values of AppKit's keys may still
-change, which is why they are allowed by prefix rather than listed.
+**AppKit's own bookkeeping is put back (#361, v1.4.1).** AppKit and SwiftUI
+write their window frames, split-view positions and open/save panel folders
+straight to `UserDefaults.standard` — the app's REAL domain, the one the
+teacher's copy reads — whatever store the app picks, and no public API points
+those writes elsewhere. Until v1.4.1 the test tolerated them by prefix, and
+they cost something: the unit gate's `InAppUserInterfaceTests` `setFrame`
+left the teacher's main window at 1100×720 on every run (the host IS
+`ca.russellgordon.Plantoir`), a UI run on 2026-09-27 moved it again and the
+rollover test met a window that covered the assistant.
+
+Now **a run a test drives puts each of those keys back the moment it
+changes.** `AppKitBookkeepingGuard` (in `PlantoirDefaults.swift`, the
+preferences seam) copies the keys matching `PlantoirDefaults.appKitOwnedKeyPrefixes`
+from the PERSISTENT domain at `applicationWillFinishLaunching` — before any
+window exists, so before AppKit's first write; never from
+`dictionaryRepresentation`, which would take `IsolatedLaunch`'s argument-domain
+frame for the saved one — and on every `UserDefaults.didChangeNotification`
+compares again and writes back what changed (a key added since is removed); a
+last pass runs at `willTerminate`. Only those prefixes: the teacher's own
+settings are never touched. **Armed** by `PlantoirDefaults.guardsAppKitBookkeeping`,
+a pure function, when XCTest is loaded (the unit host), under a UI test
+(`UITEST_WORKSPACE`, which the marketing captures set too) or with
+`--state-dir` — and never otherwise, which `AppKitBookkeepingGuardTests` pins
+(no flags must be false; armed for a teacher, every window move would be undone
+the moment it was saved, silently). **Armed ONLY from
+`applicationWillFinishLaunching`, never `QuartzTeachersApp.init`:**
+`RealHome.isInsideTestBundle` is a `static let`, and a first read at `init`,
+before XCTest is loaded in the unit host, could freeze it false for the whole
+process and point the unit suite at the real home.
+
+**Step 0, measured (2026-09-30, hosted unit suite):** AppKit's frame save
+posts `didChangeNotification` in-process — `setFrame` on the host's main window
+posted it twice and the guard made one repair —
+`AppKitBookkeepingGuardTests.testResizingTheHostsMainWindowLeavesTheRealFrameAsItWas`,
+gated, which asserts both that the guard ACTED (`repairsMade` grew) and that
+the saved value is the one from before. So the window-notification fallback
+the plan held in reserve was not needed. That was MEASURED for the window frame
+only; the split-view, table, toolbar and open-panel keys are covered by the same
+path because this app is not sandboxed (no `app-sandbox` entitlement), so AppKit
+and the open/save panels write them through the same in-process
+`UserDefaults.standard` — an out-of-process write would post no notification
+and be put back only at quit. `StateDirectoryUITests` therefore tolerates
+NOTHING: it resizes the main window (asserting the size changed — a positive
+control), samples the real `NSWindow Frame main-AppWindow-1` for the whole ten
+seconds while the app still runs (never "until it matches": `cfprefsd` flushes
+the file lazily, so an early read matches trivially), then quits and compares
+every real key. With the guard unarmed it is red at the mid-run check (14
+samples of `1592 35 1022 662 …`); armed, green. `IsolatedLaunch` also passes
+`-NSWindow Frame main-AppWindow-1 "40 60 1100 720 …"` in the argument domain,
+so every isolated launch opens at the same size whatever the teacher left
+(`IsolatedLaunch.mainWindowFrameKey`, the one constant the marketing captures
+read too — theirs had been the dead
+`NSWindow Frame SwiftUI.ModifiedContent<…>-1-AppWindow-1` name from before the
+window group had an id). `-ApplePersistenceIgnoreState YES` stays: saved
+application state is a second path for frames.
+
+**Its honest limit.** The domain is shared by every copy of Plantoir running
+as the same user. A frame, split-view or open-panel change the teacher's own
+`/Applications` copy saves WHILE a test app runs is put back too, at the test
+app's next write or when the test app quits (the `willTerminate` pass) — only
+AppKit's keys, only during that overlap. That includes the UNIT GATE: its host is
+armed, so a window move the teacher makes in their own open copy while a gate
+runs is undone when the gate's host next writes or quits. And copies
+built before #361 (another worktree's unit gate) still write the key
+unguarded until they carry it.
+
+**REJECTED:** a distinct suite or an "application domain" launch argument (none
+exists, and no public API retargets `standardUserDefaults`, which is what
+AppKit writes through — `PlantoirDefaults` already moves OUR writes);
+`setFrameAutosaveName` per state folder or "" (SwiftUI names the window itself
+and replaced a name set from `WindowAccessor`, measured `bf157cc4`; and it
+covers frames only); a volatile or argument-domain frame alone (read layers,
+never where writes go — the argument frame is kept for determinism only);
+restoring the key from the test runner (sandboxed, read-only on `/`, and a
+tearDown never runs after a crash); a separate bundle identifier for test
+launches (removes the whole class, but changes TCC grants, notification
+permission and Sparkle's defaults, and needs a second app target — too big for
+a point release); swizzling `NSWindow.saveFrame(usingName:)` (private call
+path, Objective-C runtime tricks in code a student should be able to read);
+and tolerating it (it moved his window, and the unit gate moved it every run).
+Windows has no analogue — WinUI has no frame autosave, and its placements live
+in `AppSettings`, which `--state-dir` moves (doc 12).
 
 ### The assistant's weights under a state folder
 
@@ -7064,7 +7553,9 @@ teacher's app) restoring a full-screen window. Checked 2026-09-25 after the
 full-screen probe: there is no `Saved Application State` folder for
 `ca.russellgordon.Plantoir`, the saved main-window frame
 (`NSWindow Frame main-AppWindow-1`) is 1100×720 — the size
-`InAppUserInterfaceTests` sets — and no full-screen key is stored.
+`InAppUserInterfaceTests` sets — and no full-screen key is stored. (Since #361,
+v1.4.1, the unit gate no longer leaves that size behind: the host puts AppKit's
+keys back — "AppKit's own bookkeeping is put back", above.)
 
 **Rejected, with the numbers:**
 
@@ -7678,6 +8169,26 @@ and `backupsTotal` was dead; the header's own identifier (`backupsGroup`, read b
 nothing) was dropped in the review round, and the text carries `backupsTotal`. No unit test: in process the tree does not
 reach hosted SwiftUI.
 
+**Two more, found after the sweep (#366, v1.4.1):** the start-of-year sheet
+(`startOfYearSheet` — its Go, Undo and "Undo This" buttons all read back as the
+sheet, so the marketing scene had to find Go as "the button that is not
+Cancel") and the stopped-publish band (`stoppedPublishNotice` swallowed
+`dismissStoppedPublish`). #353's sweep missed the sheet because its buttons
+come from a computed property (`buttons`), so a scan for "an identifier on a
+stack whose body holds an identified control" never sees them in the same
+place. Hence a NAMED list rather than a discovered one:
+`ContainerIdentifierTripwireTests` (gated) holds the eight containers known to
+hold identified controls (`copyPageChecklist`, given `.contain` by #365, and `linksChecklistSheet`, #379, among them) and fails any whose `.accessibilityIdentifier(…)` is
+not IMMEDIATELY preceded by `.accessibilityElement(children: .contain)` —
+order-aware, because `.contain` placed after the identifier compiles and does
+nothing — and fails a name no product file uses any more. Add a container to
+it when you give one an identifier. The opt-in
+`ContainerIdentifiersUITests.testTheStartOfYearSheetKeepsItsButtonsIdentifiers`
+finds `startOfYearGo` off the real tree (run it with
+`TEST_RUNNER_PLANTOIR_UI_TESTS=1` — xcodebuild passes only `TEST_RUNNER_`
+variables to the runner, and without it the test skips). VoiceOver was never
+affected: it speaks labels, not identifiers.
+
 ## A field in a labelled row has no title of its own (#354)
 
 In a grouped form a `TextField("Unit", …)` draws its title beside the field, so
@@ -7729,3 +8240,74 @@ the link is sent, which is the "wait on the file" the ruling asked for, and a
 timed delay was not added. Russell's `obsidian.json` was backed up first,
 restored byte for byte, and his three open vaults reopened.
 
+
+## Telling the Debug build from the release: the Beta ribbon
+
+Russell teaches with the RELEASED Plantoir and develops with the Debug build
+that his Dock icon points at (`~/Library/Developer/Xcode/DerivedData/
+Plantoir-*/Build/Products/Debug/Plantoir.app`). Both carry the same bundle
+identifier and, until 2026-09-27, the same icon, so the two could not be told
+apart at a glance. The Debug build now wears the icon with an orange band
+across its lower third reading **BETA**; a Release build is unchanged.
+
+**What is generated, and from what.** `mac-app/Plantoir-Beta.icon` is a
+second Icon Composer bundle written by `mac-app/make-beta-icon.py`: a copy of
+`Plantoir.icon` — every drawing byte for byte, the same `icon.json` content
+(re-serialised, so not byte-identical) — plus one extra group in front holding `beta-ribbon.svg`, drawn by the script. The
+letters are SVG PATHS, not `<text>`, because the icon compiler has no font to
+rely on, and they are chunky block letters so they survive the Dock's 64
+pixels (checked by rendering at 64 and 128 with Icon Composer's own `ictool`).
+It is committed, so `xcodegen generate` and a Debug build produce the ribbon
+with no manual step. **Never edit it in Icon Composer**: edit `Plantoir.icon`
+and re-run `python3 mac-app/make-beta-icon.py`. `BetaIconTests` fails when the
+two have drifted — a changed drawing or `icon.json` — and says to run it.
+
+**How it is selected.** `project.yml` lists both bundles as resources and
+sets, under `configs:`, `ASSETCATALOG_COMPILER_APPICON_NAME: Plantoir-Beta`
+for Debug and `EXCLUDED_SOURCE_FILE_NAMES: Plantoir-Beta.icon` for Release.
+The exclusion matters: with it, a Release build's `actool` call is the same
+command it always was — one input, `--app-icon Plantoir` — so what
+`publish.sh -Sign` ships cannot have picked the Beta icon up by accident.
+Measured on 2026-09-27 against a Release build of `dev` at 2e11471d: the
+compiled `Plantoir.icns` is byte-identical (SHA-1 `fcb0be92…`), the Info.plist
+identical, the signing identity unchanged. `Assets.car` differs byte-wise, but
+so do two `actool` runs on the SAME unchanged `Plantoir.icon` minutes apart —
+it embeds a timestamp and fresh rendition identifiers — so that is not a
+comparison anything can pass.
+
+**The screenshots on plantoir.app are the exception to watch.** They are taken
+from a Debug build, and the notification banner scene shows the app icon, so
+`website/shots/capture.py` passes `ASSETCATALOG_COMPILER_APPICON_NAME=Plantoir`
+to every `xcodebuild` it starts. That alone does not make the banner safe: a
+notification-only run with `--skip-preflight` starts no build at all, and would
+photograph whatever the last ordinary Debug build left — the ribbon, since
+rule 10 ends every piece with one. So before the banner scene the script reads
+`CFBundleIconName` from the bundle's own Info.plist, rebuilds it plain if it is
+not `Plantoir`, and fails the scene by name if that does not take — asking the
+bundle rather than guessing which path built it. The side effect: after a
+capture run, the Dock's Debug bundle is ribbonless until the next ordinary
+Debug build.
+
+**Rejected:** adding "Beta" to the Debug bundle's display name
+(`CFBundleDisplayName`). The About panel reads that key, and so — through
+`kCGWindowOwnerName` — can the window matching in `MarketingScreenshotTests`,
+which looks for windows owned by "Plantoir"; a name that differs by
+configuration is a quiet way to break a capture run. And Finder and the Dock
+use that key only for an app with a localised name (Apple's documentation for
+`CFBundleDisplayName`), which Plantoir is not — the label comes from the file
+name — so the change would have bought almost nothing where it was wanted.
+Not measured by launching, since the Debug bundle is Russell's to launch. The ribbon alone is the fix.
+Also rejected: badging the icon at run time with `NSApp.dockTile` — it shows
+only while the app runs, and the whole point is telling the two apart in the
+Dock before either is launched.
+
+No teacher ever sees a Debug build, so there is nothing for Windows to mirror
+(its development copy is a separate problem on a separate machine, and Windows
+has no Debug icon variant); the change still has a `GUI-IMPROVEMENTS.md` row,
+because that log is where somebody asks when the Debug icon changed. What
+keeps a Release build from ever wearing the ribbon is pinned by
+`BetaIconTests.testOnlyDebugNamesTheBetaIcon`, a scan of `project.yml`: the
+base setting names `Plantoir`, only Debug names `Plantoir-Beta`, and Release
+excludes the Beta bundle. And the note under "The Windows icon derives from
+`mac-app/Plantoir.icon`" in [11. Release strategy](11-release-strategy.md)
+says to re-run the script when the art changes.

@@ -55,6 +55,11 @@
         "why": "A save that failed leaves the teacher believing it succeeded. Recording only successes would hide exactly the case worth seeing."
       },
       {
+        "carries": "the course code and WHICH check held Save back: deploy folder, cloudflare account id, or additional destination — never the path or the ID. Written once per visit to the course, on the change into the held-back state, not per keystroke.",
+        "event": "settings save held back",
+        "why": "#373: a teacher reported that Save would not light up for a section's change, and the trail held nothing, because nothing was pressed — the held-back state is the one place where the form changes and no act follows. Since #373 a destination problem holds Save back only when the unsaved edit moves where the course publishes (savingSettings.whatEnablesSave), so this line also says that is what happened. Example: “Save held back for ICS3U (deploy folder) — the publishing folder needs attention”. Worded as a HOLD, not a failure: no Save was pressed, and a reader of the trail must not take it for one that failed (#373 implementation review, N2)."
+      },
+      {
         "carries": "the course code and the section",
         "event": "preview started with unsaved settings",
         "why": "A preview reads the SAVED settings file, while Course Settings keeps unsaved edits in memory and goes on showing them after the teacher leaves the form. A preview started in that state disagrees with the switches on screen for a reason nothing on screen explains, so the teacher is told (specialNames.previewUsesSavedSettings) and the trail says it happened (issue #265)."
@@ -82,7 +87,7 @@
       {
         "carries": "the launcher, the outcome, and how long it took",
         "event": "task finished",
-        "why": "The outcome distinguishes a failure from a task stopped on purpose and from one backed out of at a question - all three exit non-zero, and only one is a fault."
+        "why": "The outcome distinguishes a failure from a task stopped on purpose and from one backed out of at a question - all three exit non-zero, and only one is a fault. Since #378 a fourth: exit 3, a launcher run with --non-interactive that reached a question and refused rather than wait for an answer nobody could give ('stopped at a question nobody was there to answer (exit 3)'). The headless assistant path (an assistant working from another app, or the in-app assistant with no section window) runs its launchers that way, so a deploy that needs a site name, a surname or a token says so on this line instead of 'failed (exit 3)' — or, before #378, instead of never finishing at all."
       },
       {
         "carries": "which credential was asked for, never the answer",
@@ -466,8 +471,11 @@
         "why": "A teacher's own backups are never pruned (Russell's decision on #242, 2026-09-21: keep every backup a teacher makes, and make the space visible), so a backup that has gone was deleted by a person - and 'my backup is gone' is answered by this line and nothing else. Until #242 there was no line for deleting a backup at all, one or many. The file NAMES are recorded rather than only a count (the #242 plan review's L2): a name is a course code, a timestamp and a maker, carries no content, and answers 'which one' exactly - the same reason 'section restored from the start of an assistant conversation' records its backup's file name. Written by the single delete and the delete-several alike, because the single one is the one-item case of the same function. One line per delete, and none when nothing was deleted. No appliesOn: Windows lists backups too and owes the same line - the red suite that follows is the request, said so in the windows issue drafted from #242."
       },
       {
-        "carries": "the course, the section asked about, what was asked for (Preview, Deploy, the assistant's rebuild or deploy, an outside assistant's rebuild or deploy), what the other program holds (building, publishing or previewing) and its process id - never anything written on a page",
+        "carries": "the course, the section asked about, what was asked for (Preview, Deploy, the assistant's rebuild or deploy, an outside assistant's rebuild or deploy), what the other program holds (building, publishing or previewing) and its process id - never anything written on a page. Or (GitHub #381) that a PREVIEW was refused because that same section was being deployed: by the window, when this copy of the app was deploying it (lineWhenItsSectionIsBeingDeployed), or by preview.sh, when the process table showed a deploy of it (launcherLineWhenItsSectionIsBeingDeployed)",
         "event": "build declined, course busy elsewhere",
+        "lineWhenItsSectionIsBeingDeployed": "declined Preview — this section is being deployed by this copy of Plantoir",
+        "launcherLineWhenItsSectionIsBeingDeployed": "{course}/{section} · the preview stopped before building — this section was being deployed",
+        "lineWhenItsSectionIsBeingDeployedWhy": "GitHub #381 (decision 4 on #378): shared-rules.json -> previewWhileItsSectionDeploys. Filed under THIS event rather than a new one, as the #378 plan decided: it already means 'a build was declined because something else is working on this course', and a second name for the same fact would split what a report reads. The window writes it with the course and section; preview.sh writes the launcher line itself (note_on_the_trail), because a preview typed at a command line has no app to read a marker, and a refusal a teacher met there is exactly the one nobody else saw. No process id: the window's own deploy is this program, and the launcher's line comes from the process table, which a teacher's report cannot use. scripts/test_preview_while_deploying.py checks the launcher against this field; PreviewWhileDeployingTests the window.",
         "why": "Added with #156, when the mac began reading the work leases other programs write. The program in the way is invisible from where the teacher is: an outside assistant, another copy of Plantoir, a publish set for later. A teacher who reports 'Preview said somebody else was using it' can be answered only by the process id - on the lease file itself, and on this line; the window's own 'app opened' line names it too when the other program is a copy of the app, while the --mcp-stdio and scheduled processes write no opening line - and without a line at all a declined press reads exactly like a button that did nothing. Written by whichever program declined; the MCP process writes the same trail."
       },
       {
@@ -476,26 +484,73 @@
         "why": "Added with #156. A publish set for later that finds another program building the course waits up to ten minutes (workLeases.declining.whyTheScheduledPublishWaits). A publish that went out ten minutes late, or not at all, looks from outside exactly like one that misfired; this line says it waited, for whom, and what it then did. A stand-down ALSO writes 'scheduled deploy turned off' (the job is cleared) and leaves the section's courseWasBusy record."
       },
       {
-        "carries": "where the run was for (course and section, or the word setup), and which of three happened: it WAITED for something in the working folder to finish before updating the folder's workspace, and how many seconds; it stopped because a PREVIEW from the folder was still open, and which one; or it stopped because something was still being built or published after the whole wait",
+        "carries": "where the run was for (course and section, or the word setup), and which of three happened: it WAITED for work in the working folder to finish before setting the folder up again, how many seconds, and — since #378 — WHAT it waited for (a build, a deploy or a course being set up, with its course and section) and who had started it (Revise with Claude, a scheduled deploy, another Plantoir window, a command in Terminal…); it stopped because a PREVIEW from the folder was still open, and which one; or it stopped because that work was still going after the whole wait, naming it the same way",
         "event": "workspace was in use",
         "marker": {
           "prefix": "PLANTOIR_WORKSPACE_IN_USE:",
-          "shape": "PLANTOIR_WORKSPACE_IN_USE: <waited|preview|work> <seconds> <course>/<section or the word setup> [<the open preview as course/section>]",
+          "shape": "PLANTOIR_WORKSPACE_IN_USE: <waited|preview|work> <seconds> <course>/<section or the word setup> [<what>] [<origin>] — what is the open preview as course/section for `preview`; for `waited` and `work` it is the item waited for (<build|publish|preview>:<course>/<section>, or the word setup or work) followed by who started it (claude, codex, assistant, window, scheduled, terminal, or - when it is not known). An older launcher's three-word line still reads.",
           "examples": [
             "PLANTOIR_WORKSPACE_IN_USE: waited 14 ICS4U/1",
+            "PLANTOIR_WORKSPACE_IN_USE: waited 14 ICS4U/1 publish:MPM2D/2 claude",
             "PLANTOIR_WORKSPACE_IN_USE: preview 20 ICS4U/2 ICS4U/1",
-            "PLANTOIR_WORKSPACE_IN_USE: work 600 setup"
+            "PLANTOIR_WORKSPACE_IN_USE: work 600 setup build:ICS4U/1 scheduled",
+            "PLANTOIR_WORKSPACE_IN_USE: work 600 setup work terminal"
           ],
           "why": "Printed by the launchers (the function they share in the PREVIEW PORT BLOCK, app-rules.json -> previewPorts.whenTheWorkspaceIsInUse) and read by the APP, which writes the line: ScriptRunner from the console of a run it started, ScheduledDeploy from the log of a publish launchd ran — the same two readers, for the same reason, as pagesDatedByTheBuild's PLANTOIR_DATED line. The console a teacher reads leaves it out (rule 1: it is machinery). Read rather than written by the launcher itself because the app then has a real call site for the event (ActivityTrailWiringTests) and one writer for its words; the cost, stated: a run typed at the command line leaves the console sentence and no trail line."
         },
-        "lineWhenItWaited": "{place} · waited {seconds} s for something in this working folder to finish before updating its workspace, then went ahead",
-        "lineWhenAPreviewWasOpen": "{place} · stopped before starting — this working folder's workspace needed updating and the preview of {preview} was still open",
-        "lineWhenWorkDidNotFinish": "{place} · stopped before starting — this working folder's workspace needed updating and something in it was still being built or published after {seconds} s",
-        "why": "GitHub #94. A launcher that must remake a folder's workspace no longer ends what is running in it: it waits for a build or publish and refuses while a preview is open. Both are new ways for a run to be slow or not to happen, and each arrives later as a different report — 'my publish did not go out last night', 'my preview took ages to start', 'it told me to close a preview I had not opened' (an orphan whose launcher had not quite gone). A refusal the app shows only as a run that did not finish is otherwise invisible. A remake with nothing running writes nothing, as before: a line on every update would bury the one that matters. {place} is the literal word setup for setup.sh, which has no course.",
+        "lineWhenItWaited": "{place} · waited {seconds} s for {what} to finish before setting this folder up again, then went ahead",
+        "lineWhenAPreviewWasOpen": "{place} · stopped before starting — this folder needed setting up again and the preview of {preview} was still open",
+        "lineWhenWorkDidNotFinish": "{place} · stopped before starting — this folder needed setting up again and {what} was still going after {seconds} s",
+        "whatInTheLines": {
+          "build": "a build of {course} section {section}",
+          "publish": "a deploy of {course} section {section}",
+          "preview": "the preview of {course} section {section}",
+          "setup": "the setting up of a course",
+          "work": "something else in this folder",
+          "unnamed": "something in this folder",
+          "startedBy": " started by {origin}",
+          "why": "{what} is the item's words, followed by startedBy with the origin in app-rules.json -> previewPorts.whenTheWorkspaceIsInUse.sentences.origins when the origin is known (not '-'). An older launcher's line names nothing and reads as 'unnamed'."
+        },
+        "why": "GitHub #94, and #378. A launcher that must set a folder up again no longer ends what is running in it while that work's owner is still running: it waits for a build, a deploy or a course being set up, and refuses while a preview is open. Both are ways for a run to be slow or not to happen, and each arrives later as a different report — 'my publish did not go out last night', 'my preview took ages to start', 'it told me to close a preview I had not opened'. A refusal the app shows only as a run that did not finish is otherwise invisible. #378 made the lines NAME what was waited for and who started it, and took 'workspace' out of them (Russell, who wrote the product, did not know what it meant) — a changed behaviour changes its line (rule 5); the event keeps its name, because renaming it would orphan every trail already on disk. A remake with nothing running writes nothing, as before: a line on every update would bury the one that matters. {place} is the literal word setup for setup.sh, which has no course.",
         "appliesOn": [
           "mac"
         ],
         "appliesOnWhy": "PERMANENT, the same case as 'website builder stopped': Windows builds natively and has no workspace to remake (app-rules.json -> previewPorts.whenTheWorkspaceIsInUse.appliesOnWhy)."
+      },
+      {
+        "carries": "where the run was for (course and section, or the word setup), and each piece of work that was ended because the program that started it had closed: a build, a deploy or a preview with its course and section, the setting up of a course, or something unnamed. Never a command line, a path, a process number or a page name.",
+        "event": "left-over work stopped",
+        "marker": {
+          "prefix": "PLANTOIR_LEFTOVER_STOPPED:",
+          "shape": "PLANTOIR_LEFTOVER_STOPPED: <course>/<section or the word setup> <item> [<item>…], each item <build|publish|preview>:<course>/<section>, or the word setup or other",
+          "examples": [
+            "PLANTOIR_LEFTOVER_STOPPED: ICS4U/1 publish:MPM2D/2",
+            "PLANTOIR_LEFTOVER_STOPPED: setup build:ICS4U/1 preview:ICS4U/2 other"
+          ],
+          "why": "Printed by the same function as PLANTOIR_WORKSPACE_IN_USE (remake_the_workspace, in the PREVIEW PORT BLOCK), just before the stop, and read by the app the same way and in the same two places: ScriptRunner from a run it started, ScheduledDeploy from a publish launchd ran. Machinery, so the console leaves it out; the console says app-rules.json -> previewPorts.whenTheWorkspaceIsInUse.sentences.whenLeftoverWorkIsStopped instead. A run typed at the command line leaves that sentence and no trail line, as for 'workspace was in use'."
+        },
+        "line": "{place} · stopped {what}, left running in this folder after the program that started it had closed, before setting the folder up again",
+        "whatInTheLine": "Each item in app-rules.json -> previewPorts.whenTheWorkspaceIsInUse.sentences.leftovers words, joined as that key's `joined` says.",
+        "why": "GitHub #378, decision 2. A Revise with Claude session was closed while a deploy it had started sat at a question nobody could answer; the question stayed inside the folder's workspace, and every preview after it waited ten minutes and refused, until the Mac was restarted. Plantoir now ENDS work whose owner has gone (proved from the live process table: app-rules.json -> previewPorts.whenTheWorkspaceIsInUse.whatCountsAsRunning) and carries on. Ending somebody's work must never be silent: if a teacher later asks why a deploy from Claude did not go out, or why a preview they had left running closed, this line is the answer. An orphaned preview — its launcher gone — was ended silently since #94; it is on this line now too, because 'the trail records what was stopped' is only true if it records everything the remake ends.",
+        "appliesOn": [
+          "mac"
+        ],
+        "appliesOnWhy": "PERMANENT, the same case as 'workspace was in use': Windows builds natively and has no workspace in which work could be left behind."
+      },
+      {
+        "carries": "the course and section, the Cloudflare project's name and the address the website answers at now. Never the account ID, never the token.",
+        "event": "cloudflare project made again",
+        "marker": {
+          "prefix": "PLANTOIR_CLOUDFLARE_REMADE:",
+          "shape": "PLANTOIR_CLOUDFLARE_REMADE: <course>/<section> <project name> <address>, the course's one permitted space written +",
+          "examples": [
+            "PLANTOIR_CLOUDFLARE_REMADE: ICS4U/1 ics4u-s1-2026-gordon ics4u-s1-2026-gordon.pages.dev",
+            "PLANTOIR_CLOUDFLARE_REMADE: AP+CALC/2 ap-calc-s2-2026-gordon ap-calc-s2-2026-gordon-7x2.pages.dev"
+          ],
+          "why": "Printed by the shared scripts/deploy.py (remake_pages_project_if_gone's caller), which runs inside the website builder on the mac and natively on Windows, so neither can write the host's trail itself. Read by the app the same way as PLANTOIR_LEFTOVER_STOPPED and in the same two places on the mac: ScriptRunner from a run it started (the Deploy button, the assistant's deploy), ScheduledDeploy from a publish launchd ran. Machinery, so the console leaves it out (transcriptStripping.machineLines); the console says it in words on the line before. A marker that is not this shape — a path, anything with a space where a name should be — records nothing."
+        },
+        "line": "{place} · the Cloudflare project {project} was not in this Cloudflare account, so it was made again; the website is now at {address}",
+        "why": "Found 2026-09-30, when verify-deploy.sh went red on every Cloudflare leg: a section's saved project had been deleted in Cloudflare's dashboard, wrangler (always run with CI set) wanted to ask whether to create it, could not, and every publish of that section failed. deploy.py now makes the project again under the same name (documentation/07-deployment.md -> 'wrangler is never left a question to ask'), and that is a changed thing a teacher can see weeks later without knowing why: the address can change (a remade project may be given a different .pages.dev address), a custom domain the teacher had attached went with the deleted project and is not re-attached, and the project's past deployments are gone. 'My class site's address changed', 'my own domain stopped working' and 'my old versions vanished' are the reports, and the console that said so is long gone by then. The address is carried because it is the fact that changed; the account is not, because 'not in this account' is also what a teacher who switched the section to a different Cloudflare account sees, and the account ID is not a thing to put in a report. Both platforms run the same deploy.py, so this carries no appliesOn."
       },
       {
         "carries": "where the preview was for (course and section), the preview address in question (a number on this Mac, never a path or a name), and which of four happened: a STOPPED workspace's address was being used by something else, so the workspace was set up again on free addresses BEFORE it started; the address a running workspace was about to announce was held by another account on this Mac or by macOS itself, so the workspace was set up again once; the address was STILL held after that, so the preview stopped before building; or the check was NOT made, because the run was pointed at an engine other than the one Plantoir sets up",
@@ -511,9 +566,9 @@
           ],
           "why": "Printed by preview.sh (the look before a start is in the shared PREVIEW PORT BLOCK, switched on by WORKSPACE_WILL_SERVE, which only preview.sh sets; the look before the announcement is preview.sh's own - app-rules.json -> previewPorts.whenAnotherAccountHasTheAddress) and read by the APP, which writes the line: ScriptRunner from the console of a run it started. Written the way 'workspace was in use' is, and for the same reason: one writer for the event's words and a real call site (ActivityTrailWiringTests). A scheduled publish never prints it - deploy.sh never serves - so ScheduledDeploy does not read it. The console a teacher reads leaves it out (rule 1: it is machinery). The cost, stated: a preview run typed at the command line leaves the console sentence and no trail line."
         },
-        "lineWhenRemadeBeforeStarting": "{place} · something else on this Mac was using preview address {address} while this working folder's workspace was stopped, so it was set up again on free addresses before starting",
-        "lineWhenRemade": "{place} · another account on this Mac, or macOS itself, was using preview address {address}, so this working folder's workspace was set up again on free addresses",
-        "lineWhenRefused": "{place} · the preview stopped before building — another account on this Mac, or macOS itself, was still using its address {address} after this working folder's workspace was set up again on free addresses",
+        "lineWhenRemadeBeforeStarting": "{place} · something else on this Mac was using preview address {address} while this working folder's website builder was stopped, so it was set up again on free addresses before starting",
+        "lineWhenRemade": "{place} · another account on this Mac, or macOS itself, was using preview address {address}, so this working folder's website builder was set up again on free addresses",
+        "lineWhenRefused": "{place} · the preview stopped before building — another account on this Mac, or macOS itself, was still using its address {address} after this working folder's website builder was set up again on free addresses",
         "lineWhenUnchecked": "{place} · did not check whether another account on this Mac was using preview address {address}: this run was pointed at a website builder Plantoir did not set up",
         "why": "GitHub #310, found in the #204 rehearsal. Two macOS accounts on one Mac each ran Plantoir; the second was handed an address the first held, its builder's forward failed without a word, and its Preview opened the other person's site. Every one of the four outcomes arrives later as a report that reads like something else: a two-minute preview for no reason ('Plantoir got slow'), a preview that would not start ('Preview doesn't work' - #225's story again), or a wrong site. Its OWN event rather than a launcher line under 'workspace was in use' (the plan's first proposal): that event is written by the app from its own marker and says 'a remake with nothing running writes nothing', so a launcher-written line there would have given one event two writers and falsified a sentence nobody was told to change; nor under 'preview did not appear', because three of the four outcomes are previews that DID appear. The address is carried because it is the one thing that tells two accounts' reports apart when both reach support. before-start covers any listener, this account's own programs included, since a stopped workspace listens on nothing itself; the other three are proven to be another account's or the system's (the kernel shows more listeners on the address than this account owns). remade and before-start are printed only AFTER the rebuild succeeded: when #94 refuses the remake, or the remove is refused, the existing refusal line is what the trail gets - never a claim of a rebuild that did not happen (the #310 implementation review). unchecked is written once per preview, and only when DOCKER_HOST names an engine other than Colima - a developer's setting the app never makes - so a check that silently stopped happening cannot pass for one that found nothing. {place} is course/section.",
         "appliesOn": [
@@ -716,6 +771,24 @@
           "mac"
         ],
         "appliesOnWhy": "PERMANENT: Windows builds natively. PlantoirSetup.exe carries its whole runtime and nothing is downloaded or built for building (documentation/12-windows-app.md, the like-for-like table), so there is no builder to get ready in the background (app-rules.json -> builderWarmUp.appliesOn)."
+      },
+      {
+        "event": "offered to publish pages that links lead to",
+        "carries": "the course and section; how many pages in each group (used by a class students can see, linked from other pages, classes) and how many start ticked; the occasion: after a preview, after publishing, on opening after a publish Plantoir did not watch (scheduled, the assistant, outside), or from the menu. Never a page's name.",
+        "line": "{course}/{section} · offered to publish pages that links lead to {occasion} — {N} used by a class, {N} linked from other pages, {N} classes; {N} ticked",
+        "why": "Added with #379. #333's alert was shown and nobody could tell afterwards whether it had been seen; 'why did it ask me to publish 40 pages?' is answered by the occasion and the counts."
+      },
+      {
+        "event": "published pages that links led to",
+        "carries": "the course and section; how many pages were published, how many dated from a class, dated as the first class, kept their date; how many classes were published and how many pages they brought; how many were left unticked; the PLACES of the published pages, at most ten then 'and N more' - names in the course folder, never anything written on a page (the pagesDatedByTheBuild precedent). A page the writer declined is recorded by 'page settings left as they were' (#186), not here.",
+        "line": "{course}/{section} · published pages that links led to — {N pages} ({N} dated from a class, {N} dated as the first class, {N} kept their date), {N classes} bringing {N} more, {N} left unticked: {places}",
+        "why": "Added with #379. It changes what students will see and rewrites dates in the teacher's own files; 'why is this page visible?' and 'why did its date change?' are asked weeks later."
+      },
+      {
+        "event": "left pages hidden that links lead to",
+        "carries": "the course and section; whether it was Not Now or Publish with some unticked; how many pages were left hidden.",
+        "line": "{course}/{section} · left pages hidden that links lead to — {Not Now|some unticked}, {N pages} left hidden",
+        "why": "Added with #379. When a student reports a dead link, the trail shows that the teacher was offered it and chose."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty.",
@@ -4181,7 +4254,12 @@
       "note": "What Plantoir offers to put right, and what it says afterwards. Only two of the checks are repairable, and the line is the point: a fix must restore the FEATURE, not merely satisfy the check.",
       "neverOffered": {
         "checks": ["curriculumCoverageFoundNothing", "courseTeachesNothing", "handWrittenCoveragePage", "noGradedFolders", "pageSettingsUnreadable", "linksIntoHiddenPages"],
-        "why": "Recreating an empty curriculum folder would silence \"the curriculum map could not be built\" and leave the map missing, because the folder only counts once it holds a page named for an expectation code. A button that makes a warning go away without fixing anything is worse than no button: the teacher then believes it is dealt with. Decide from the check's NAME, not from the `fixable` flag alone — the flag means \"this kind of thing is repairable\", while what has to be true is that THIS app has a repair for it. linksIntoHiddenPages (#333): the two fixes are opposite choices - publish the page the link leads to, or take the link off the page it is on - and only the teacher knows which one is meant. The assistant's publish already does the first when asked."
+        "why": "Recreating an empty curriculum folder would silence \"the curriculum map could not be built\" and leave the map missing, because the folder only counts once it holds a page named for an expectation code. A button that makes a warning go away without fixing anything is worse than no button: the teacher then believes it is dealt with. Decide from the check's NAME, not from the `fixable` flag alone — the flag means \"this kind of thing is repairable\", while what has to be true is that THIS app has a repair for it. linksIntoHiddenPages stays in this list because the list is about the ALERT's repair button, and that button is still never offered for it; what #379 reversed is the REASON #333 gave here - see reversed.",
+        "reversed": {
+          "check": "linksIntoHiddenPages",
+          "was": "#333: the two fixes are opposite choices - publish the page the link leads to, or take the link off the page it is on - and only the teacher knows which one is meant. The assistant's publish already does the first when asked.",
+          "now": "#379, Russell 2026-09-29: the warning, as shipped, could not be acted on - an alert with OK, ten pairs run together and 'and 1 more'. The teacher still makes the choice: the links checklist (linksChecklist) offers one of the two fixes, publishing, page by page and ticked, and leaving a box unticked is the other. It is a separate path from the alert: fixable stays false, and SiteHealthRepair.canRepair must never offer a Fix button for this check, because anyone porting the alert by the flag would wire one."
+        }
       },
       "offered": {
         "checks": ["mediaFolderMissing", "sectionIndexMissing"],
@@ -4310,7 +4388,7 @@
         "fixable": false,
         "fill": "{page} is the hidden page's place in the course folder without .md, {count} how many links, {from} and {to} the two ends of one link. `sentence` when there is one link and `sentenceForSeveral` otherwise; `detail` names at most ten links, each through `linkLine`, joined with \", \", then `andMore` with the number left over. Every value is filled in ONE pass, so a page a teacher named \"{course} notes\" is named as it is. ONE finding per section build, never one per link: both apps key a finding on name, course and section, so two per-link findings would collide (#246).",
         "rule": "After the merge and after the How I Teach sweep, every page students can see (not held back by its settings) has its links read - wikilinks and embeds, and Markdown-style links in either shape (followingLinks.markdownStyleLinks), all through the code and comment mask (readingALink.whatIsCode, whatIsAComment). A link is resolved by its path first, then by its name; it is listed when it resolves to a page (.md) that is hidden, and, when a name belongs to several pages, only when EVERY one of them is hidden. Not listed: links from hidden pages, links to pages that do not exist, pictures and files, and the How I Teach page (removed rather than hidden, so a link to it resolves to nothing). Each (from, to) pair once, in page order.",
-        "why": "#333, the director's ruling: a class published by its own flag - in Obsidian, by the assistant, or by #96's Get Ready - can link to pages that are still hidden, and students who follow the link find nothing. The build is the one place that sees every publish (the flag flipped by hand, scheduled deploys, the MCP), so it warns there; the app's publish does not start taking pages with it. Measured 2026-09-26 on every payload as installed: 0 links from a visible page into a hidden one across all 39, so a new course is not nagged. An emulation of #96's rule (not its code) flipping SNC1W's second class visible lists Unit 1, Day 2 -> What Counts as Evidence, and a section front page that embeds the newest class lists it once that class is hidden by hand. Not repairable: see repair.neverOffered. The trail line is the family's existing 'found a problem with this course's folders' - a stretch of the word for links, as it already is for pageSettingsUnreadable."
+        "why": "#333, the director's ruling: a class published by its own flag - in Obsidian, by the assistant, or by #96's Get Ready - can link to pages that are still hidden, and students who follow the link find nothing. The build is the one place that sees every publish (the flag flipped by hand, scheduled deploys, the MCP), so it warns there. Since #379 the warning is also an OFFER: the build writes which hidden pages publishing would bring back to life, and the section window shows them as a checklist (linksChecklist) instead of listing the finding in the alert - the alert remains the fallback for a course kept for reference or a folder whose builder has not yet written an offer. Measured 2026-09-26 on every payload as installed: 0 links from a visible page into a hidden one across all 39, so a new course is not nagged. An emulation of #96's rule (not its code) flipping SNC1W's second class visible lists Unit 1, Day 2 -> What Counts as Evidence, and a section front page that embeds the newest class lists it once that class is hidden by hand. Not repairable: see repair.neverOffered. The trail line is the family's existing 'found a problem with this course's folders' - a stretch of the word for links, as it already is for pageSettingsUnreadable."
       }
     ],
     "linksIntoHiddenPages": {
@@ -4631,6 +4709,676 @@
       ]
     }
   },
+  "linksChecklist": {
+    "appliesOn": [
+      "mac",
+      "windows"
+    ],
+    "note": "#379, Russell 2026-09-29 (issue comment 'Decisions', which wins over the body), with the director's rulings on the plan and its review. Links on pages students can see that lead to hidden pages used to produce an alert nobody could act on (#333: a count, ten pairs run together, 'and 1 more', OK). The build now works out which hidden pages publishing would bring back to life and offers them as a CHECKLIST in the section window; the teacher ticks and presses Publish.",
+    "rule": "The build writes the offer (file-formats.json -> linksChecklistOffer) after the two date passes, on EVERY build of a section, by the rule in class-planning.json -> datingPagesAClassBrings.fromTheLinksChecklist. The app reads it, re-reads every row with its own reader, and shows the checklist; on Publish it makes the ticked pages visible and writes the dates the offer gave, through the same writer the assistant's publish uses (one plan for the whole press, one write per page).",
+    "groups": {
+      "fromAClass": "Used by a class students can see: hidden pages within two steps of a visible, dated class.",
+      "notReachedByAClass": "Linked from other pages students can see: every other hidden page a visible or offered page links to, closed transitively, stopping at class pages. One sheet covers every dead link (Russell's decision 2).",
+      "class": "Classes not yet published: hidden class pages such a link lands on (Russell's decision 1)."
+    },
+    "ticking": "class-planning.json -> datingPagesAClassBrings.fromTheLinksChecklist.ticking. Classes start unticked; a page only a hidden class links directly starts unticked; everything else starts ticked.",
+    "whatAClassBrings": "A class ticked in the sheet is published the way the assistant's publish of that class would publish it (followingLinks.publishing, bothRoutesAgree): the pages it links to, transitively, stopping at other classes, each hidden one dated by that class (datingPagesAClassBrings; published-before pages keep theirs). The class's own date is untouched. Where a page is both a row and brought by a ticked class, the CLASS's date wins - it comes with that class (director's ruling F2). The sheet says how many pages a ticked class brings in one line under its row (the cut the director allowed instead of locked rows). A class published here does NOT repoint the section's front page: the front page keeps following the rule it follows today (director's ruling F1), and the sheet says so in one sentence, only when a class row is present (wording.frontPageStaysPut).",
+    "offeredWhen": {
+      "afterAWatchedBuild": "After a preview or deploy this section window started, when the build's marker line (marker) ARRIVES naming an offer with pages and the offer file carries that marker's buildId - mid-build, before the site itself is built: the file is complete then, because the build writes it atomically BEFORE printing the marker, and the id check excludes an earlier build's offer. Never on the #333 finding itself, which is announced before the offer exists; a build that ends without a marker (an older builder) gets the alert. The linksIntoHiddenPages finding is then not listed in the folder-problem alert; any other finding is shown first and the checklist follows when the alert has gone (siteHealth.repair.oneAlertAtATime).",
+      "afterAnUnwatchedPublish": "When the section window appears or becomes key, for a build it did not watch - a scheduled deploy, the assistant, the MCP server, a terminal (Russell's decision 3: those publish AS IS and the checklist is shown later).",
+      "onlyWhenFresh": "Never for an offer older than the course's newest change (app-rules.json -> buildFreshness, hidden entries skipped): a page edited since the build may have lost its link or changed its class, so the offer may be wrong. The per-row re-read is the second guard, not the first (plan-review finding 15).",
+      "onlyWhenSomethingNew": "Only when the offer holds a page the teacher has not already answered (file-formats.json -> linksChecklistAnswered). After Publish or Not Now the same set is not offered again; a page joining it brings the checklist back, with the teacher's earlier unticks remembered.",
+      "onDemand": "A menu item in the section's menu opens it whenever an offer exists, so Not Now is not a one-way door; with a stale offer it says a preview is needed first (wording.needsAPreviewFirst).",
+      "never": "For a course kept for reference, and while this app is publishing the course (it waits and is offered when that finishes)."
+    },
+    "answered": "Publish and Not Now both record the set of places offered and which were left unticked, in the app's own file (linksChecklistAnswered) - never the build's. Two windows or two copies of the app writing it: the last one wins, which is acceptable because the worst outcome is being offered the same checklist once more (plan-review note 13).",
+    "unattendedPublishesAsIs": "Nothing in the build or deploy.py changes a page's visibility; a scheduled, assistant, MCP or terminal publish goes out as it is, and the offer file and the trail are all it leaves (siteHealth.scheduledDeployPublishesAnyway; Russell's decision 3).",
+    "referenceCourse": "No offer is written for a course kept for reference (or one whose settings cannot say), and any offer is removed; the finding's alert is shown exactly as before.",
+    "fallbackWithNoOffer": "A linksIntoHiddenPages finding with NO matching offer (a folder whose builder is older than the app) is shown in the alert exactly as before. A checklist that silently never appears is the failure; the alert is the honest floor.",
+    "knownDifference": "The checklist publishes pages because links lead to them, up to two steps from a class; the assistant publishes a class the teacher named and takes its pages transitively (followingLinks.publishing.why). Their REACH differs on purpose; their dating agrees (publishedBeforeIsRecorded).",
+    "marker": {
+      "prefix": "PLANTOIR_LINKS_CHECKLIST:",
+      "carries": "course, section, buildId, pages (how many rows the offer holds; 0 when none and the file was removed), ticked",
+      "why": "The build announces the #333 finding BEFORE the date passes run, so the offer cannot exist yet when the finding reaches the app (plan-review finding 14). The offer is renamed into place BEFORE the marker is printed, so the app reads the file when the marker arrives - mid-build, not at the end (a preview never ends) - and matches its buildId to the file's, so it never shows the previous build's offer.",
+      "example": "PLANTOIR_LINKS_CHECKLIST: {\"course\": \"ICS4U\", \"section\": 1, \"buildId\": \"20260929T233000Z-1a2b3c4d\", \"pages\": 11, \"ticked\": 8}"
+    },
+    "wording": {
+      "menuItem": "Publish Pages That Links Lead To…",
+      "sheetTitle": "Links to Hidden Pages in {course} Section {section}",
+      "intro": "Pages students can see link to these pages, which are still hidden. The ticked pages will be published.",
+      "fromAClassHeading": "Used by a class students can see",
+      "notReachedHeading": "Linked from other pages students can see",
+      "classesHeading": "Classes not yet published",
+      "datedLike": "will have the same date as “{class}”",
+      "alreadyDatedLike": "has the same date as “{class}”",
+      "keepsItsDate": "was published before, so it keeps its date",
+      "keepsTheDateItHas": "keeps the date it has",
+      "datedAsTheFirstClass": "will have the date of “{first}”, the first class of the year",
+      "firstUsedIn": "first used in “{class}” — it will come with that class",
+      "classRow": "a class of its own — tick it to publish it now",
+      "comesWith": "brings {count} more {pages} with it",
+      "linkedFrom": "linked from “{page}”",
+      "linkedFromSeveral": "linked from “{page}” and {count} more",
+      "frontPageStaysPut": "Publishing a class here does not change which class the front page shows.",
+      "nothingChangesUntilYouDeploy": "Nothing changes for students until you deploy.",
+      "publishButton": "Publish {count} {pages}",
+      "publishNothingTicked": "Publish",
+      "notNow": "Not Now",
+      "deployUnderWay": "{course} is being published just now. Try again when that has finished.",
+      "needsAPreviewFirst": "Pages in {course} have changed since Section {section} was last previewed or published. Preview it again, and this list will be up to date.",
+      "nothingLeftToPublish": "Those pages have all been published or removed since the website was made.",
+      "pageChangedSince": "“{page}” changed since it was checked, so it was left as it is.",
+      "published": "{count} {pages} will be on the website the next time you deploy.",
+      "fill": "{course} and {section} name the section; {class}, {first} and {page} are a page's title (the last part of its place); {count} a number and {pages} 'page' or 'pages' to agree with it. Every value is filled in one pass.",
+      "machineryCheck": "No sentence names the machinery: never 'file', 'script', 'build step', 'walk', 'frontmatter', 'link graph', 'offer', 'JSON' or 'marker' (CLAUDE.md rule 1; copyingAPageBetweenCourses.wording.machineryCheck)."
+    },
+    "rejected": [
+      "Publishing the linked pages unattended as if every box were ticked, and refusing to publish until the links are dealt with - Russell's decision 3 chose neither.",
+      "A page key such as firstPublishedSection<N> to say 'published before' - datingPagesAClassBrings.publishedBeforeIsRecorded.whyARecordAndNotAKeyOnThePage.",
+      "Making atBuildTime two steps, or dating hidden step-2 pages at build time - fromTheLinksChecklist.whyNotAtBuildTime.",
+      "Computing the offer in Swift from the app's graph: Windows would owe the walk in C#, the mac cannot run the Python outside the container, and the build is the one place every publish passes through.",
+      "Carrying the offer only in a console line: a terminal or MCP publish leaves no console the app reads.",
+      "An undo for the checklist: nothing reaches students until a deploy, hiding a page again is one line, and an undo needs a store with an ending rule (#96 needed three paragraphs of them).",
+      "Offering the checklist after every build: after Get Ready that is a sheet of ~56 pages on every preview. Offered once per answered set, plus the menu item.",
+      "fixable: true on the finding: the flag means 'a repair button exists' to anyone porting the alert by flag; the checklist is a separate path, and SiteHealthRepair.canRepair must not start offering one.",
+      "Changing the assistant's reach to two steps - knownDifference.",
+      "Locked 'comes with' rows under a ticked class - one summary line instead (wording.comesWith), the cut the director allowed for time.",
+      "Rows that follow another row's tick (a page reached only through another offered page, unticked with it) - deferred to GitHub #385, milestone v1.4.2 (plan-review note 3); until then such a page stays ticked and is published with nothing visible linking to it."
+    ],
+    "buildCases": [
+      {
+        "name": "i. an unattended build publishes nothing: the offer is written and no page is touched",
+        "pages": [
+          {
+            "path": "section1/All Classes/Unit 1, Day 1",
+            "created": "2026-09-08T07:00:00.000+0000",
+            "links": [
+              "Hub"
+            ]
+          },
+          {
+            "path": "Concepts/Hub",
+            "visible": true,
+            "links": [
+              "Worksheet"
+            ]
+          },
+          {
+            "path": "Exercises/Worksheet",
+            "visible": false
+          }
+        ]
+      },
+      {
+        "name": "ii. an empty offer removes the file: the teacher published the page in Obsidian, the next build offers nothing",
+        "pages": [
+          {
+            "path": "section1/All Classes/Unit 1, Day 1",
+            "created": "2026-09-08T07:00:00.000+0000",
+            "links": [
+              "Hub"
+            ]
+          },
+          {
+            "path": "Concepts/Hub",
+            "visible": true,
+            "links": [
+              "Worksheet"
+            ]
+          },
+          {
+            "path": "Exercises/Worksheet",
+            "visible": false
+          }
+        ],
+        "thenPublished": [
+          "Exercises/Worksheet"
+        ]
+      },
+      {
+        "name": "iii. a course kept for reference gets no offer, and loses any it had",
+        "pages": [
+          {
+            "path": "section1/All Classes/Unit 1, Day 1",
+            "created": "2026-09-08T07:00:00.000+0000",
+            "links": [
+              "Hub"
+            ]
+          },
+          {
+            "path": "Concepts/Hub",
+            "visible": true,
+            "links": [
+              "Worksheet"
+            ]
+          },
+          {
+            "path": "Exercises/Worksheet",
+            "visible": false
+          }
+        ]
+      }
+    ],
+    "howTheBuildCasesRun": "Laid out as class-planning.json -> datingPagesAClassBrings.fromTheLinksChecklist.howTheCasesRun describes, and run by scripts/test_links_checklist.py (OfferFileTests).",
+    "publishCases": [
+      {
+        "name": "iv-a. the ticked pages are published with the offer's dates; a page published before keeps its date; an unticked class is left alone",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "date": "2026-09-08",
+            "links": [
+              "How Marks Work"
+            ]
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "kind": "class",
+            "visible": false,
+            "date": "2026-10-20",
+            "links": [
+              "Worksheet",
+              "Class Notes"
+            ]
+          },
+          {
+            "title": "How Marks Work",
+            "kind": "page",
+            "visible": true,
+            "date": "2026-09-08",
+            "links": [
+              "Worksheet",
+              "Published Once"
+            ]
+          },
+          {
+            "title": "Worksheet",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          },
+          {
+            "title": "Published Once",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          },
+          {
+            "title": "Class Notes",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          }
+        ],
+        "offer": [
+          {
+            "place": "Concepts/Worksheet",
+            "group": "fromAClass",
+            "ticked": false,
+            "step": 2,
+            "claimedBy": "section1/All Classes/Unit 1, Day 1",
+            "date": "2026-09-08",
+            "why": "dated",
+            "firstUsedIn": "section1/All Classes/Unit 2, Day 5"
+          },
+          {
+            "place": "Concepts/Published Once",
+            "group": "fromAClass",
+            "ticked": true,
+            "step": 2,
+            "claimedBy": "section1/All Classes/Unit 1, Day 1",
+            "date": null,
+            "why": "keepsItsDate",
+            "firstUsedIn": null
+          },
+          {
+            "place": "section1/All Classes/Unit 2, Day 5",
+            "group": "class",
+            "ticked": false,
+            "step": null,
+            "claimedBy": null,
+            "date": null,
+            "why": "classNeverDated",
+            "firstUsedIn": null
+          }
+        ],
+        "tick": [
+          "Concepts/Worksheet",
+          "Concepts/Published Once"
+        ],
+        "expect": {
+          "Worksheet": {
+            "visible": true,
+            "date": "2026-09-08"
+          },
+          "Published Once": {
+            "visible": true,
+            "date": "2026-02-01"
+          },
+          "Unit 2, Day 5": {
+            "visible": false,
+            "date": "2026-10-20"
+          },
+          "Class Notes": {
+            "visible": false,
+            "date": "2026-02-01"
+          }
+        },
+        "expectFrontPageUnchanged": true
+      },
+      {
+        "name": "iv-b. a ticked class is published with its own pages, dated by that class, its own date untouched; a row it also brings takes the CLASS's date; the front page does not move",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "date": "2026-09-08",
+            "links": [
+              "How Marks Work"
+            ]
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "kind": "class",
+            "visible": false,
+            "date": "2026-10-20",
+            "links": [
+              "Worksheet",
+              "Class Notes"
+            ]
+          },
+          {
+            "title": "How Marks Work",
+            "kind": "page",
+            "visible": true,
+            "date": "2026-09-08",
+            "links": [
+              "Worksheet",
+              "Published Once"
+            ]
+          },
+          {
+            "title": "Worksheet",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          },
+          {
+            "title": "Published Once",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          },
+          {
+            "title": "Class Notes",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          }
+        ],
+        "offer": [
+          {
+            "place": "Concepts/Worksheet",
+            "group": "fromAClass",
+            "ticked": false,
+            "step": 2,
+            "claimedBy": "section1/All Classes/Unit 1, Day 1",
+            "date": "2026-09-08",
+            "why": "dated",
+            "firstUsedIn": "section1/All Classes/Unit 2, Day 5"
+          },
+          {
+            "place": "Concepts/Published Once",
+            "group": "fromAClass",
+            "ticked": true,
+            "step": 2,
+            "claimedBy": "section1/All Classes/Unit 1, Day 1",
+            "date": null,
+            "why": "keepsItsDate",
+            "firstUsedIn": null
+          },
+          {
+            "place": "section1/All Classes/Unit 2, Day 5",
+            "group": "class",
+            "ticked": false,
+            "step": null,
+            "claimedBy": null,
+            "date": null,
+            "why": "classNeverDated",
+            "firstUsedIn": null
+          }
+        ],
+        "tick": [
+          "Concepts/Worksheet",
+          "section1/All Classes/Unit 2, Day 5"
+        ],
+        "expect": {
+          "Unit 2, Day 5": {
+            "visible": true,
+            "date": "2026-10-20"
+          },
+          "Class Notes": {
+            "visible": true,
+            "date": "2026-10-20"
+          },
+          "Worksheet": {
+            "visible": true,
+            "date": "2026-10-20"
+          },
+          "Published Once": {
+            "visible": false,
+            "date": "2026-02-01"
+          }
+        },
+        "expectFrontPageUnchanged": true
+      },
+      {
+        "name": "iv-c. a page made visible since the offer was worked out is dropped, not written again",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "date": "2026-09-08",
+            "links": [
+              "How Marks Work"
+            ]
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "kind": "class",
+            "visible": false,
+            "date": "2026-10-20",
+            "links": [
+              "Worksheet",
+              "Class Notes"
+            ]
+          },
+          {
+            "title": "How Marks Work",
+            "kind": "page",
+            "visible": true,
+            "date": "2026-09-08",
+            "links": [
+              "Worksheet",
+              "Published Once"
+            ]
+          },
+          {
+            "title": "Worksheet",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          },
+          {
+            "title": "Published Once",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          },
+          {
+            "title": "Class Notes",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          }
+        ],
+        "offer": [
+          {
+            "place": "Concepts/Worksheet",
+            "group": "fromAClass",
+            "ticked": false,
+            "step": 2,
+            "claimedBy": "section1/All Classes/Unit 1, Day 1",
+            "date": "2026-09-08",
+            "why": "dated",
+            "firstUsedIn": "section1/All Classes/Unit 2, Day 5"
+          },
+          {
+            "place": "Concepts/Published Once",
+            "group": "fromAClass",
+            "ticked": true,
+            "step": 2,
+            "claimedBy": "section1/All Classes/Unit 1, Day 1",
+            "date": null,
+            "why": "keepsItsDate",
+            "firstUsedIn": null
+          },
+          {
+            "place": "section1/All Classes/Unit 2, Day 5",
+            "group": "class",
+            "ticked": false,
+            "step": null,
+            "claimedBy": null,
+            "date": null,
+            "why": "classNeverDated",
+            "firstUsedIn": null
+          }
+        ],
+        "tick": [
+          "Concepts/Published Once"
+        ],
+        "madeVisibleSince": [
+          "Published Once"
+        ],
+        "expectOffered": [
+          "Concepts/Worksheet",
+          "section1/All Classes/Unit 2, Day 5"
+        ]
+      },
+      {
+        "name": "iv-d. a row a ticked class brings is published with it, so it is not counted, remembered or reported as left hidden",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "date": "2026-09-08",
+            "links": [
+              "How Marks Work"
+            ]
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "kind": "class",
+            "visible": false,
+            "date": "2026-10-20",
+            "links": [
+              "Worksheet",
+              "Class Notes"
+            ]
+          },
+          {
+            "title": "How Marks Work",
+            "kind": "page",
+            "visible": true,
+            "date": "2026-09-08",
+            "links": [
+              "Worksheet",
+              "Published Once"
+            ]
+          },
+          {
+            "title": "Worksheet",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          },
+          {
+            "title": "Published Once",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          },
+          {
+            "title": "Class Notes",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          }
+        ],
+        "offer": [
+          {
+            "place": "Concepts/Worksheet",
+            "group": "fromAClass",
+            "ticked": false,
+            "step": 2,
+            "claimedBy": "section1/All Classes/Unit 1, Day 1",
+            "date": "2026-09-08",
+            "why": "dated",
+            "firstUsedIn": "section1/All Classes/Unit 2, Day 5"
+          },
+          {
+            "place": "Concepts/Published Once",
+            "group": "fromAClass",
+            "ticked": true,
+            "step": 2,
+            "claimedBy": "section1/All Classes/Unit 1, Day 1",
+            "date": null,
+            "why": "keepsItsDate",
+            "firstUsedIn": null
+          },
+          {
+            "place": "section1/All Classes/Unit 2, Day 5",
+            "group": "class",
+            "ticked": false,
+            "step": null,
+            "claimedBy": null,
+            "date": null,
+            "why": "classNeverDated",
+            "firstUsedIn": null
+          }
+        ],
+        "tick": [
+          "section1/All Classes/Unit 2, Day 5"
+        ],
+        "expect": {
+          "Worksheet": {
+            "visible": true,
+            "date": "2026-10-20"
+          },
+          "Class Notes": {
+            "visible": true,
+            "date": "2026-10-20"
+          },
+          "Published Once": {
+            "visible": false,
+            "date": "2026-02-01"
+          }
+        },
+        "expectLeftHidden": [
+          "Concepts/Published Once"
+        ]
+      },
+      {
+        "name": "v. an answered set is not offered again; a page joining it brings the checklist back, with the earlier unticks remembered",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "date": "2026-09-08",
+            "links": [
+              "How Marks Work"
+            ]
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "kind": "class",
+            "visible": false,
+            "date": "2026-10-20",
+            "links": [
+              "Worksheet",
+              "Class Notes"
+            ]
+          },
+          {
+            "title": "How Marks Work",
+            "kind": "page",
+            "visible": true,
+            "date": "2026-09-08",
+            "links": [
+              "Worksheet",
+              "Published Once"
+            ]
+          },
+          {
+            "title": "Worksheet",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          },
+          {
+            "title": "Published Once",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          },
+          {
+            "title": "Class Notes",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          }
+        ],
+        "offer": [
+          {
+            "place": "Concepts/Worksheet",
+            "group": "fromAClass",
+            "ticked": false,
+            "step": 2,
+            "claimedBy": "section1/All Classes/Unit 1, Day 1",
+            "date": "2026-09-08",
+            "why": "dated",
+            "firstUsedIn": "section1/All Classes/Unit 2, Day 5"
+          },
+          {
+            "place": "Concepts/Published Once",
+            "group": "fromAClass",
+            "ticked": true,
+            "step": 2,
+            "claimedBy": "section1/All Classes/Unit 1, Day 1",
+            "date": null,
+            "why": "keepsItsDate",
+            "firstUsedIn": null
+          },
+          {
+            "place": "section1/All Classes/Unit 2, Day 5",
+            "group": "class",
+            "ticked": false,
+            "step": null,
+            "claimedBy": null,
+            "date": null,
+            "why": "classNeverDated",
+            "firstUsedIn": null
+          }
+        ],
+        "answer": "notNow",
+        "untick": [
+          "Concepts/Published Once"
+        ],
+        "thenOfferAlso": {
+          "place": "Concepts/How Marks Work Extra",
+          "group": "notReachedByAClass",
+          "ticked": true,
+          "step": null,
+          "claimedBy": null,
+          "date": "2026-09-08",
+          "why": "datedAsTheFirstClass",
+          "firstUsedIn": null
+        },
+        "expectOfferedAgainBeforeTheNewPage": false,
+        "expectOfferedAgainAfter": true,
+        "expectStartsUnticked": [
+          "Concepts/Published Once"
+        ]
+      }
+    ],
+    "howThePublishCasesRun": "Run by the mac through LinksChecklistPublisher and LinksChecklistSheetModel on a laid-out course (LinksChecklistTests); owed by Windows. `pages` are laid out in section 1: a `class` in the class folder with publish/created, a `page` in Concepts with publishForSection1/createdSection1 (a course-level page). `offer` is the rows the build would have written (the file's other keys are filled in by the runner). `tick` lists the places ticked when Publish is pressed; `expect` maps a page's title to its visibility and date afterwards; `expectFrontPageUnchanged` means the section's front page is byte for byte as it was (ruling F1). `expectLeftHidden` lists every place the press left hidden - the trail's count, the set-aside line and the answered file's leftUnticked - which never includes a page a ticked class brought (implementation review, S1). `madeVisibleSince` pages are made visible after the offer and before the sheet opens; `expectOffered` is the rows the sheet then shows. For v: `answer` notNow with `untick` unticked, then the same offer must not be offered again, and the offer with `thenOfferAlso` added must be, starting `expectStartsUnticked` unticked."
+  },
   "unreadablePageSettings": {
     "note": "What the build does with a page whose settings block it cannot read (#246). The words a teacher reads are siteHealth.checks[pageSettingsUnreadable]; these are the cases, run by scripts/test_unreadable_page_settings.py through the real build_site.process_frontmatter and by scripts/check_visibility_against_the_site.py down the rest of the chain to the site.",
     "rule": "A page whose settings block the build cannot read is treated as HIDDEN in every section, whatever it says, and named in ONE site-health finding per section build, with the line the reader stopped near where it can tell. Only the build's copy is changed - its settings become publish: false and its body is kept - and the teacher's file is never touched. A copy that cannot be rewritten is removed, and a build that can do neither stops rather than produce a site that might show it. An unreadable FRONT PAGE is hidden too, so the section has no website: the last built one is cleared, as for a missing front page, and a publish says why in its own words (app-rules.json -> failureExplanations) rather than the missing front page's. Nothing new goes on the trail: the finding reaches it through the existing `folder problem found` line, which carries the check's name and never a page's.",
@@ -4848,6 +5596,21 @@
           "hidden": true
         },
         {
+          "line": "PLANTOIR_WAITING_FOR: publish MPM2D/2 claude",
+          "hidden": true,
+          "why": "#378: what a launcher waits for before setting a folder up again; the app turns it into the status line, and the console says it in words beside it. Mac-only, but hidden by the one rule on both sides."
+        },
+        {
+          "line": "PLANTOIR_LEFTOVER_STOPPED: ICS4U/1 publish:MPM2D/2",
+          "hidden": true,
+          "why": "#378: work ended because its owner had gone, for the trail's 'left-over work stopped'."
+        },
+        {
+          "line": "PLANTOIR_CLOUDFLARE_REMADE: ICS4U/1 ics4u-s1-2026-gordon ics4u-s1-2026-gordon.pages.dev",
+          "hidden": true,
+          "why": "2026-09-30: a section's Cloudflare project made again, for the trail's 'cloudflare project made again'. Printed by the shared deploy.py, so on both platforms."
+        },
+        {
           "line": "PLANTOIR_DATED: {\"course\": \"ICS4U\", \"section\": 1, \"pages\": [\"section1/index\"]}",
           "hidden": true
         },
@@ -4879,6 +5642,15 @@
   "wizard": {
     "note": "What the New Course wizard says. AUTHORED rather than generated, and that is the whole point of the entry: a generated readout cannot fail when the code it reads changes, so a button label written by the generator would simply be rewritten to match whatever the button now says. Written by hand, each platform asserts its own constant against it and a drift goes red. Same reasoning as app-rules.json's split between milestones (a readout) and deployArguments (an expectation).",
     "createCourseButton": "Create Course",
+    "namingHeading": "Units",
+    "namingCaption": "Chosen once, when the course is made — the pages are named this way as they are written",
+    "creatingTitle": "Creating your course",
+    "codeLabel": "Course code",
+    "nameLabel": "Course name",
+    "sectionMarkerCaption": "e.g. “S1” appears beside the course code",
+    "gradeCaption": "e.g. “Grade 12” before the course name",
+    "structureCaption": "Defaults are fine for most courses",
+    "defaultSiteName": "Course Website",
     "noExampleContentNote": "Example content isn’t available for this course code yet, so the course will start with empty folders ready for your own pages.",
     "noStartingContentNote": "This course will start with empty folders ready for your own pages.",
     "skeletonToggleLabel": "Start from {article} {subject} skeleton",
@@ -4916,7 +5688,7 @@
     "structureFromExampleNote": "The example content chooses the folders and files for this course, so every page lands where its links expect it. Turn off pre-populating to start from the subject’s own structure instead, and change it however you like.",
     "whenTheNoteIsShown": "THREE situations under Starting Content, across TWO sentences. The course starts with empty folders in all three; what differs is whether example content exists for the typed code, because one of the sentences says something about that and must not say it when it is false.\n\n(1) The typed code has neither ready-made pages nor a skeleton — in practice, no code typed yet — and (2) the typed code has a skeleton the teacher has turned DOWN: both read noExampleContentNote. These two are one situation for a teacher and neither platform invents a second sentence for them. (3) The typed code HAS ready-made pages, the teacher declined them, and then declined the skeleton those pages' absence revealed: this reads noStartingContentNote, which is the same sentence with its first clause removed. \"Example content isn't available for this course code yet\" is false to somebody who was offered it one question ago, and rewording the shipped sentence to cover all three would change what ~1,900 codes with no payload read, which nobody asked for.\n\nThe mac reads them from WizardWording.noExampleContentNote and WizardWording.noStartingContentNote, choosing between them in noteForACourseStartingEmpty; Windows from NewCourseDialog.NoExampleContentNote() and its sibling. (1) and (2) share the accessibility identifier noExampleContentNote, being branches of the same if and never on screen at once; (3) has its OWN, noStartingContentNote, because a test that found the shared one could no longer say WHICH sentence a teacher is reading. Windows has shown the note while the toggle is off since 2026-09-07; the mac showed it only for a code with no skeleton at all until 2026-09-18 (issue #77), which is the drift this key exists to stop. The third situation could not be reached at all until 2026-09-21 (issue #248), because a code with ready-made pages was never offered a skeleton.",
     "whereTheStartingContentSentencesAreRendered": "All under the Starting Content section. skeletonToggleLabel is the toggle itself, with {article} and {subject} filled as skeletonToggleLabelSubject says (lowercased except proper nouns, a/an by sound — issue #336) — the mac's WizardWording.skeletonToggleLabel(forFamilyNamed:label:), Windows' equivalent. skeletonToggleLabelForAGeneralSkeleton replaces it outright for the GENERAL family, whose own label is \"This Course\" (written for the skeleton's pages) and renders as \"Start from a this course skeleton\" through the template — which has been on screen for club and custom codes since the toggle existed, and which MCMPR11, the one British Columbia code with ready-made pages, now reaches too. The caption below the toggle is skeletonToggleCaption for a code with no ready-made pages and skeletonToggleCaptionWhenExampleContentIsDeclined for a code whose ready-made pages were declined, where the first one's opening clause is false. structureFromExampleNote stands in for the structure editor while the example content is choosing the folders; its second sentence changed with issue #248, since turning pre-populating off now leaves the SUBJECT's lists on screen rather than the school-neutral factory ones.",
-    "whereItIsRendered": "The mac reads it from WizardWording.createCourseButton and renders it in NewCourseWizardView; Windows renders it in NewCourseDialog. Named in prose rather than as a structured key, the way buildOutputLocation names its sources, because nothing reads such a key and a rename would rot it silently.",
+    "whereItIsRendered": "The mac reads it from WizardWording.createCourseButton and renders it in NewCourseWizardView; Windows renders it in NewCourseDialog. With \"This is a club\" ticked the same button reads clubToggle.createButton (#368). The panel's other course words (#368), each with a club twin of the same name in clubToggle: namingHeading and namingCaption are the header of the section the class-page words are chosen in; creatingTitle is the title while the course is being made (not the example course's own title); codeLabel and nameLabel label the code and name fields; sectionMarkerCaption and gradeCaption sit under the two site-title switches; structureCaption is the Structure section's caption when the structure does not come from example content. Named in prose rather than as a structured key, the way buildOutputLocation names its sources, because nothing reads such a key and a rename would rot it silently.",
     "whyThisOneString": "It is the first thing a teacher presses in this app. Both platforms have said Create Course since the wizard existed and nothing pinned it until 2026-09-08 — Windows asserted it only in NewCourseWizardUiTests, which is opt-in behind PLANTOIR_UI_TESTS=1 and part of no gate, and the mac asserted it nowhere. Two apps agreeing by habit is not two apps agreeing on purpose; the first notice of a drift would have been a teacher reading a different button from the one in the other platform's screenshots.",
     "gatedTests": "Each platform's GATED test compares its constant to this key, which pins the constant rather than the rendered button. Only the UI suites see the button itself, and both are opt-in and part of no gate — QuartzTeachersUITests on the mac, [UiFact] under PLANTOIR_UI_TESTS=1 on Windows. Said plainly because the first version of this entry called Windows' arrangement the weakest place a shared sentence can live while the mac had the same arrangement and one fewer test.",
     "skeletonToggle": {
@@ -5162,7 +5934,19 @@
     "clubToggle": {
       "note": "“This is a club” in the New Course wizard (#267). Russell, 2026-09-24: a club starts with empty folders and a first “Week 1” page; it has NO curriculum coverage page and no Curriculum folder (coverage can be turned on later in Course Settings); its words are editable in the wizard and NOT switchable afterwards; the defaults are the `club` words below. The choice is shown for EVERY code and starts ticked for a code ClubCodeRule calls a club (course-management.json), until the teacher touches it. Nothing called is_club is written: the course is a club because of what IS written — class_page_scheme \"numbered\", unit_word, class_folder, front_page_heading and class_noun (file-formats.json) — plus use_skeleton and prepopulate_example_content false and the three curriculum keys false. A club takes no skeleton and no ready-made pages because both are Unit/Day pages, which a numbered course does not read as class pages; setup_course.py refuses to pour either into a numbered course as a second net. Mac: WizardWording, ClubVocabulary and ClubFill.applying (Models/ClubFill.swift); NewCourseWizardView.applyClubChoice.",
       "label": "This is a club",
-      "caption": "A club meets rather than holds classes: its pages are numbered one after another, it has no curriculum, and it starts with a page for its first meeting. The words below can be changed now, but not once the course is made.",
+      "caption": "A club meets rather than holds classes: its pages are numbered one after another, it has no curriculum, and it starts with a page for its first meeting. The words below can be changed now, but not once the club is made.",
+      "panelWordsFollow": "#368: while this box is ticked the panel says the club's words below (createButton, namingHeading, namingCaption, creatingTitle, codeLabel, nameLabel, sectionMarkerCaption, gradeCaption, structureCaption, gradedFolderCaption, defaultSiteName); unticked, the course's keys of the same names in wizard (and wizard.createCourseButton for the button, gradedFolders.wording.caption for the marks list's caption, which Course Settings shows too). gradedFolderCaption is the caption under the marks tick list in Structure: the course's names the curriculum coverage map and says most courses keep Tasks, and a club has no coverage map when it is made (#368 review N3). defaultSiteName is the site's name when the name field is left blank (#368 review N4; the name is written into the course and shown on the site). They follow the TICK BOX, never ClubCodeRule: a teacher can untick it for a club-shaped code, and the words must describe what will be made. The heading is Meetings whatever the noun picker below it says: it would change under the teacher's hand as they choose, and a club whose noun is class is still a club. The caption above says club because it is shown only beside the club choice. The code field's own label changes when typing a club code ticks the box, which is the box doing what it says.",
+      "namingHeading": "Meetings",
+      "namingCaption": "Chosen once, when the club is made — the pages are named this way as they are written",
+      "createButton": "Create Club",
+      "creatingTitle": "Creating your club",
+      "codeLabel": "Club code",
+      "nameLabel": "Club name",
+      "sectionMarkerCaption": "e.g. “S1” appears beside the club code",
+      "gradeCaption": "e.g. “Grade 12” before the club name",
+      "structureCaption": "Defaults are fine for most clubs",
+      "gradedFolderCaption": "Tick the folders holding work that counts for marks. A club starts without a curriculum coverage map, so these matter only if the coverage page is turned on later in Course Settings.",
+      "defaultSiteName": "Club Website",
       "startingContentNote": "A club starts with empty folders and one page for its first meeting — no ready-made pages, no subject skeleton and no curriculum coverage page. The coverage page can be turned on later in Course Settings.",
       "rows": {
         "classFolder": "Folder for meeting pages",
@@ -5172,15 +5956,97 @@
         "pageWordCaption": "Pages will be named “{word} 1”, “{word} 2” and so on."
       },
       "settingsRows": {
-        "note": "Course Settings shows the three new settings as LOCKED rows — a label and the value, no control — for every course, with one caption under them. The unit word keeps its own row, whose Rename… button is disabled for a numbered course (specialNames.renameUnitWord.renameLockedNumbered).",
+        "note": "Course Settings shows the three new settings as LOCKED rows — a label and the value, no control — for a course that RECORDED them (shownWhen), with one caption under them. The unit word keeps its own row, whose Rename… button is disabled for a numbered course (specialNames.renameUnitWord.renameLockedNumbered).",
         "pageNaming": "Class pages are named",
         "pageNamingValue": "“{first page}” — the course's own first page name: “Unit 1, Day 1”, “Module 1, Day 1”, “Week 1”",
         "frontPageHeading": "Front page heading",
         "frontPageHeadingValue": "the course's recorded front_page_heading, exactly as stored — never a default",
-        "frontPageHeadingNotSet": "Not recorded — the front page keeps the heading it already has",
-        "frontPageHeadingWhy": "Shown for a course WITHOUT front_page_heading — every course made before #267, CODING included. The first version showed “Most Recent Class” there, and CODING's front page reads “## Most Recent Meeting”: a locked row stating something the page does not say (#267 implementation review, LOW). Nothing rewrites a heading after creation, so the row does not guess.",
+        "frontPageHeadingWhy": "HISTORY: from #267 until #376 a course WITHOUT front_page_heading showed the row with “Not recorded — the front page keeps the heading it already has” (frontPageHeadingNotSet), because the first version had shown “Most Recent Class” there and CODING's front page reads “## Most Recent Meeting”: a locked row stating something the page does not say (#267 implementation review, LOW). RETIRED by Russell, 2026-09-27 (#376): a row that can never change and records nothing tells a teacher nothing, so it is now not drawn at all (shownWhen). Never build the “Not recorded” sentence; Windows never had it.",
         "noun": "The assistant calls a page a",
-        "lockedCaption": "Chosen when the course was made. An existing course keeps these; they cannot be changed here."
+        "lockedCaption": "Chosen when the course was made. An existing course keeps these; they cannot be changed here.",
+        "shownWhen": "Each locked row is drawn only when its key is PRESENT in course_config.json with a non-blank string (surrounding spaces trimmed): pageNaming ← class_page_scheme, frontPageHeading ← front_page_heading, noun ← class_noun. The group, its header and lockedCaption are omitted when no row is drawn. A present value this app does not know (a class_page_scheme written by a newer app) IS drawn, as this app reads it.",
+        "shownWhenWhy": "#376 (Russell, 2026-09-27: “if there's no point in showing the setting (i.e. for a course made before the setting existed) then yes, it should be hidden”). Only the wizard writes the three keys, all together, and only for a club made since #267, so an absent key means an ordinary course. For such a course the page-naming row repeated, word for word, the caption under “What do you call a unit?” three rows above it (plantoir.app's courses-light.png, y≈606 and y≈756), and the noun row said “class” for every course. REJECTED: showing derived defaults for class_page_scheme/class_noun (the repetition above); reading the heading from index.md (#267 rejected it: one section's page, possibly edited on purpose).",
+        "shownWhenCases": [
+          {
+            "name": "an ordinary course records none",
+            "given": {},
+            "expect": []
+          },
+          {
+            "name": "a club made since #267 records all three",
+            "given": {
+              "unit_word": "Meeting",
+              "class_page_scheme": "numbered",
+              "front_page_heading": "Most Recent Meeting",
+              "class_noun": "meeting"
+            },
+            "expect": [
+              "pageNaming",
+              "frontPageHeading",
+              "noun"
+            ],
+            "values": {
+              "pageNaming": "“Meeting 1”",
+              "frontPageHeading": "Most Recent Meeting",
+              "noun": "meeting"
+            }
+          },
+          {
+            "name": "a blank heading is not a recorded one",
+            "given": {
+              "front_page_heading": "   "
+            },
+            "expect": []
+          },
+          {
+            "name": "a hand-edited scheme alone",
+            "given": {
+              "class_page_scheme": "numbered"
+            },
+            "expect": [
+              "pageNaming"
+            ]
+          },
+          {
+            "name": "a scheme from a newer app is shown as this app reads it",
+            "given": {
+              "class_page_scheme": "someday_scheme"
+            },
+            "expect": [
+              "pageNaming"
+            ],
+            "values": {
+              "pageNaming": "“Unit 1, Day 1”"
+            }
+          },
+          {
+            "name": "an empty noun is not a recorded one",
+            "given": {
+              "class_noun": ""
+            },
+            "expect": []
+          },
+          {
+            "name": "a noun alone",
+            "given": {
+              "class_noun": "meeting"
+            },
+            "expect": [
+              "noun"
+            ],
+            "values": {
+              "noun": "meeting"
+            }
+          },
+          {
+            "name": "CODING's real shape",
+            "given": {
+              "course_code": "CODING",
+              "unit_word": "Week"
+            },
+            "expect": []
+          }
+        ]
       },
       "club": {
         "classFolder": "All Meetings",
@@ -5610,13 +6476,13 @@
       "why": "Until #189 the launchers named a folder by the spelling they were handed, the app by the disk's, so an accented folder name stored the Terminal or Windows way — or a folder reached in another case — had a second workspace and a second builds folder. Nothing makes them any more, and nothing else would ever remove them: the app's sweep keeps any builds folder whose folder still exists, and a stopped workspace keeps one of the forty preview blocks for as long as it exists (contracts/app-rules.json -> previewPorts). The builds folder is derived — the next build makes every file again — which is why removing it costs a teacher nothing but that one build.",
       "sayWhenCleared": "🧹 Cleared away {what}, left behind under another spelling of the folder's name. Nothing in your courses was touched.",
       "whatWasCleared": {
-        "workspace": "a second copy of this working folder's workspace",
+        "workspace": "a second copy of this working folder's website builder",
         "builtWebsites": "a second copy of this working folder's built websites",
-        "both": "a second copy of this working folder's workspace and built websites"
+        "both": "a second copy of this working folder's website builder and built websites"
       },
-      "whatWasClearedWhy": "The sentence names only what was removed (review L3): the workspace alone when its builds folder is still mounted by another workspace or its note names another folder, the built websites alone when no workspace was left, both otherwise. The same {what} fills the console sentence and the trail line.",
+      "whatWasClearedWhy": "The sentence names only what was removed (review L3): the workspace alone when its builds folder is still mounted by another workspace or its note names another folder, the built websites alone when no workspace was left, both otherwise. The same {what} fills the console sentence and the trail line. Reworded on 2026-09-29 (GitHub #381, folding in #378's finding that 'workspace' meant nothing to Russell, who wrote the product): 'workspace' became 'website builder', the word the launchers already use for it ('Checking whether your website builder is up to date…'); a trail line written before then says workspace.",
       "sayWhenStillRunning": [
-        "ℹ️  A second copy of this folder's workspace, made under another spelling of the folder's name, is still running ({workspace}).",
+        "ℹ️  A second copy of this folder's website builder, made under another spelling of the folder's name, is still running ({workspace}).",
         "   Plantoir is leaving it as it is, and will clear it away once it has stopped."
       ],
       "onTheTrail": "activityTrail 'built site moved out of the working folder' -> launcherLineWhenASecondCopyIsClearedAway, written only when something WAS removed.",
@@ -13820,6 +14686,53 @@
       }
     ]
   },
+  "courseSettingsWording": {
+    "localeLabel": "Language and region",
+    "localeCaption": "Used for dates and the words on your website’s own pages.",
+    "colourSchemeNoneChosen": "Standard colours (none chosen)",
+    "saveHeldBack": "Save is held back until Deploying is fixed: {reason}",
+    "saveHeldBackReason": "{reason} is the destination's own sentence, unchanged: app-rules.json → configurationRules (the deploy-folder and Cloudflare Account ID problems).",
+    "where": "localeLabel names the locale picker in Course Settings AND in the new-course wizard, so the setting has one name wherever it is chosen; localeCaption sits under it in Course Settings. colourSchemeNoneChosen is the colour-scheme picker's entry for a section with no scheme chosen. saveHeldBack is said beside Save (savingSettings.whatEnablesSave).",
+    "why": "#369 (2026-09-27): Course Settings' first settings row read “Language / region (Quartz locale)” from v1.1.0 to v1.4.0, naming the site builder in a label a teacher reads (CLAUDE.md rule 1), and it was the first row in plantoir.app's headline picture. The label scan that found it (userFacingLabelWords) found one more: “Quartz default (none chosen)” in the colour-scheme picker. The wizard said “Language / region”; both now say the same thing. REJECTED: keeping “locale” in brackets (a word only a developer uses); putting these in AssistWording (they are not the assistant's words)."
+  },
+  "userFacingLabelWords": {
+    "forbidden": [
+      "quartz",
+      "toolchain",
+      "docker",
+      "container",
+      "colima",
+      "script",
+      "json",
+      "mcp",
+      "gpu",
+      "llama",
+      "qwen",
+      "wrangler",
+      "python",
+      "workspace",
+      "toolchains",
+      "dockers",
+      "containers",
+      "colimas",
+      "scripts",
+      "jsons",
+      "gpus",
+      "llamas",
+      "wranglers",
+      "pythons",
+      "workspaces"
+    ],
+    "matching": "Whole word and case-insensitive: “description” does not contain “script”. A plural is a different word to a whole-word match, so the plurals are LISTED (“scripts”, “containers”, …) rather than inferred — data both platforms read, not a matcher rule each must reimplement (#369 implementation review, N5; measured 2026-09-30 over all of the mac app: zero hits for any of them). Comments are not labels and are skipped, and so is code interpolated into a label (Swift's `\\(…)`): the sidebar's “No course or club matches “\\(workspace.filterText)”.” names a variable, not the machinery (found when “workspace” joined the list, 2026-09-30).",
+    "scope": "On the mac: every string literal passed straight to a call that puts words on screen, in QuartzTeachers/Views — Text, Picker, Toggle, Button, LabeledContent, TextField, SecureField, Label, DisclosureGroup, ExampleCaption, FormSectionHeader, Section, .help, .navigationTitle, .alert, .confirmationDialog. Wording held in a named key is pinned by that key's own contract instead.",
+    "exceptions": [
+      {
+        "what": "the About window's credit to Quartz, by name",
+        "why": "It credits Jacky Zhao's Quartz and asks the reader to sponsor him: naming it is the point. On the mac it is a LocalizedStringKey constant rather than a label literal, so the scan never reaches it; a platform whose scan does reach it exempts it by this entry."
+      }
+    ],
+    "why": "CLAUDE.md rule 1: the GUI never mentions the machinery. Until #369 that rule was enforced only by word lists inside individual features' tests, and no test scanned the labels in the views, which is how “Quartz locale” shipped from v1.1.0 to v1.4.0. Measured on 2026-09-29 with this list and this scope: exactly two hits, both fixed in #369. “terminal” is deliberately NOT on the list — “New Terminal at Folder” is a real macOS action a teacher uses. “workspace” was added 2026-09-30 (v1.4.1 release sweep): Russell said the word meant nothing to him, and the launchers say “website builder” since #378 and #382; zero label hits when it was added."
+  },
   "savingSettings": {
     "rule": "A Save writes only the settings THIS window changed since it last read or wrote the course's settings file. Every other setting keeps the value the file has now. Compared per TOP-LEVEL key of course_config.json, never inside a list. After a Save, every other window's copy of that course that has nothing unsaved reads the file again; a copy with unsaved changes is left alone, and its own Save follows the same rule.",
     "why": "Issue #265, confirmed by Russell 2026-09-24: two windows were open on one working folder, each holding its own copy of a course's settings, and the Save was a blind whole-file write. Window A saved three sidebar hides; window B, which had not seen that, saved an unrelated setting and the file went back to B's ten hides while both windows said nothing was unsaved - measured with the real CourseConfiguration.swift and a copy of his course. The same stale write came from Add Section, archive, restore, course rename and school year, so the rule is in the ONE write they all use. Per key rather than per list element because merging inside a list needs rules for order and for an item removed on one side and added on the other, and nothing reported needs them. When both sides changed the same key, the Save being made wins and the trail says it replaced a change made elsewhere. Rejected: refusing the Save and reloading (loses what the teacher just did, for a case the trail can record); a file watcher per window (a new moving part for a case the reload-after-Save covers).",
@@ -13964,7 +14877,580 @@
         }
       ]
     },
-    "casesWhy": "base = the file as this window last read or wrote it; onDisk = the file now; mine = this window now; written = what the Save puts in the file (and this window then holds). keptFromElsewhere and replacedChangesFromElsewhere are sorted key names, and are what the 'settings saved' trail line reports."
+    "casesWhy": "base = the file as this window last read or wrote it; onDisk = the file now; mine = this window now; written = what the Save puts in the file (and this window then holds). keptFromElsewhere and replacedChangesFromElsewhere are sorted key names, and are what the 'settings saved' trail line reports.",
+    "whatEnablesSave": {
+      "rule": "Save is enabled exactly when this window's copy of the course's settings differs from what it last read or wrote — compared over EVERY top-level key of course_config.json, course-wide and per-section alike — and no problem holds it back. Revert is enabled exactly when the copy differs. A problem with where the course publishes (configurationRules: the deploy folder, the Cloudflare Account ID on this Mac, an additional destination) holds Save back ONLY when the unsaved changes move where the course publishes — the primary destination, its folder, or any additional destination, compared with what this window last read or wrote. Otherwise Save proceeds and the problem stays reported where it always was, under Deploying. When Save is held back, courseSettingsWording.saveHeldBack is said beside Save with the problem's own sentence as {reason}, and the trail says `settings save held back` once per visit to the course.",
+      "why": "#364 (v1.4.0's dark marketing picture showed Save apparently enabled on a freshly opened course) and #373 (Russell, 2026-09-27: a change made only on a section's page did not enable Save) were filed as one comparison wrong in both directions. Measured on dev 2e11471d with the course in #364's picture, in the real window, in light and dark, in Debug and Release, pressing the real per-section control through accessibility: the comparison is right both ways — a fresh course reads clean, and every per-section change enables Save and Revert. #364's own picture proves it: Revert is disabled in the same frame, (38,38,38), and Save cannot be enabled while Revert is not; Save was a DISABLED accent button, (17,70,126), with a dimmed label (155,177,201), which reads as enabled on a dark window. So the look was fixed (Save wears the accent only when it can be pressed — mac-visual, not in this contract) and both directions are pinned here. The one path that kept Save grey after a per-section change was a destination problem: a local_folder course whose folder is missing on THIS Mac, or a Cloudflare course with no Account ID on this Mac, blocked every save, and nothing near Save said why. That block now applies only to an edit that moves the destination, because a destination already broken on disk is not made worse by saving a colour scheme — the likeliest real #373 (director's ruling on the plan review, 2026-09-29). REJECTED: rewriting the comparison per key or normalising on load (it is not wrong, and normalising on load would itself dirty a fresh form or write changes nobody asked for); `.tint(.gray)` on a disabled accent Save (unmeasured); the system default-button (Return would save from any field).",
+      "perSectionKeys": [
+        "emojis.sections.section<N>",
+        "color_schemes.section<N>",
+        "fonts.sections.section<N>",
+        "show_section_marker.sections.section<N>",
+        "show_grade_in_title.sections.section<N>",
+        "custom_domains.sections.section<N>"
+      ],
+      "perSectionKeysWhy": "Every per-section key a Save writes. Each top-level name is checked against file-formats.json → courseConfigKeys, so a per-section key added later has to be listed here to be tested.",
+      "baseShape": {
+        "class_folder": "All Classes",
+        "color_schemes": {
+          "section1": "quartz-standard",
+          "section2": "quartz-standard"
+        },
+        "course_code": "ICS3U",
+        "course_name": "Intro to Comp Sci",
+        "curriculum_folder": "Curriculum",
+        "curriculum_folders": [
+          "Curriculum",
+          "College Board Curriculum"
+        ],
+        "custom_short_name": "",
+        "deploy_target": "netlify",
+        "emojis": {
+          "sections": {
+            "section1": "📚",
+            "section2": "📚"
+          }
+        },
+        "expandable": [
+          "Concepts",
+          "Warm-Ups",
+          "Explorations",
+          "Exercises",
+          "Programs",
+          "Discussions",
+          "Portfolios",
+          "Tutorials",
+          "Setup",
+          "Style",
+          "Tasks",
+          "College Board Curriculum"
+        ],
+        "expandOnFolderClick": false,
+        "fonts": {
+          "default": {
+            "body": "Helvetica, Arial",
+            "code": "IBM Plex Mono",
+            "header": "Helvetica, Arial"
+          },
+          "sections": {
+            "section1": {
+              "body": "Helvetica, Arial",
+              "code": "IBM Plex Mono",
+              "header": "Helvetica, Arial"
+            },
+            "section2": {
+              "body": "Helvetica, Arial",
+              "code": "IBM Plex Mono",
+              "header": "Helvetica, Arial"
+            }
+          }
+        },
+        "footer_html": "",
+        "graded_folders": [
+          "Tasks"
+        ],
+        "hidden": [
+          "Curriculum",
+          "Learning Goals.md",
+          "Help Sessions.md",
+          "Key Links.md",
+          "Private Notes.md",
+          "Scratch Page.md",
+          "Media",
+          "College Board Curriculum"
+        ],
+        "include_coverage_notes": true,
+        "include_curriculum_coverage": true,
+        "include_curriculum_pages": true,
+        "locale": "en-US",
+        "num_sections": 2,
+        "per_section_files": [
+          "Key Links.md",
+          "Private Notes.md",
+          "Scratch Page.md"
+        ],
+        "per_section_folders": [
+          "All Classes"
+        ],
+        "prepopulate_example_content": true,
+        "section_numbers": [
+          1,
+          2
+        ],
+        "shared_files": [
+          "Learning Goals.md",
+          "Help Sessions.md"
+        ],
+        "shared_folders": [
+          "Concepts",
+          "Warm-Ups",
+          "Explorations",
+          "Exercises",
+          "Programs",
+          "Discussions",
+          "Portfolios",
+          "Tutorials",
+          "Setup",
+          "Style",
+          "Tasks",
+          "Curriculum",
+          "College Board Curriculum"
+        ],
+        "show_grade_in_title": {
+          "sections": {
+            "section1": true,
+            "section2": true
+          }
+        },
+        "show_reading_time": false,
+        "show_section_marker": {
+          "sections": {
+            "section1": true,
+            "section2": true
+          }
+        },
+        "unit_word": "Unit",
+        "use_lcs_terminology": false,
+        "use_skeleton": false
+      },
+      "baseShapeWhy": "The ICS3U course in #364's picture (plantoir.app's courses-light/dark.png), with its destination changed from a folder on one Mac to Netlify so no case depends on a folder that exists only there (plan review S1). course_code is replaced by the test's own fixture code.",
+      "casesWhy": "Each case's configuration is baseShape with `set` applied (top-level keys replaced) and `remove` removed. {missingFolder} and {anotherMissingFolder} are absolute paths that do not exist and {existingFolder} a writable folder that does, made by the test. A change is either {\"section\": N, \"key\": <a perSectionKeys entry>, \"value\": …} — made through the control's own binding — or {\"setting\": \"deployTarget\" | \"deployFolderPath\", \"value\": …}, or {\"setting\": \"addAdditionalDestination\", \"type\": …, \"path\": …}. A font value is the section's whole choice. `written` and `unchanged` are paths into the file after Save.",
+      "freshOpenCases": [
+        {
+          "name": "the course in #364's picture",
+          "set": {},
+          "remove": []
+        },
+        {
+          "name": "curriculum_folder only, no list (a course from before #128)",
+          "set": {},
+          "remove": [
+            "curriculum_folders"
+          ]
+        },
+        {
+          "name": "graded_folders absent (never asked)",
+          "set": {},
+          "remove": [
+            "graded_folders"
+          ]
+        },
+        {
+          "name": "a custom domain in the OLD bare-string shape",
+          "set": {
+            "custom_domains": {
+              "sections": {
+                "section1": "ics3u.school.ca"
+              }
+            }
+          },
+          "remove": []
+        },
+        {
+          "name": "emojis, color_schemes, fonts and footer_html absent",
+          "set": {},
+          "remove": [
+            "emojis",
+            "color_schemes",
+            "fonts",
+            "footer_html"
+          ]
+        },
+        {
+          "name": "a club, with the three words it recorded",
+          "set": {
+            "unit_word": "Meeting",
+            "class_page_scheme": "numbered",
+            "front_page_heading": "Most Recent Meeting",
+            "class_noun": "meeting",
+            "custom_short_name": "Robots"
+          },
+          "remove": []
+        },
+        {
+          "name": "show_grade_in_title as the legacy course-wide Bool",
+          "set": {
+            "show_grade_in_title": false
+          },
+          "remove": []
+        },
+        {
+          "name": "a stored emoji holding two (a hand edit)",
+          "set": {
+            "emojis": {
+              "sections": {
+                "section1": "📚🔬",
+                "section2": "📚"
+              }
+            }
+          },
+          "remove": [],
+          "why": "The emoji field always settles on one emoji and used to write the one it kept the moment the form appeared, so this course read as changed on open (plan review, finding 11). The stored value is now read as one emoji; the file keeps what it has until the teacher chooses."
+        }
+      ],
+      "freshOpenExpect": {
+        "dirty": false,
+        "saveEnabled": false,
+        "revertEnabled": false
+      },
+      "perSectionEditCases": [
+        {
+          "name": "a section's header emoji",
+          "set": {},
+          "change": {
+            "section": 1,
+            "key": "emojis.sections.section<N>",
+            "value": "🔬"
+          },
+          "written": [
+            {
+              "path": [
+                "emojis",
+                "sections",
+                "section1"
+              ],
+              "value": "🔬"
+            }
+          ],
+          "unchanged": [
+            {
+              "path": [
+                "emojis",
+                "sections",
+                "section2"
+              ],
+              "value": "📚"
+            }
+          ]
+        },
+        {
+          "name": "a section's colour scheme — #373's example",
+          "set": {},
+          "change": {
+            "section": 2,
+            "key": "color_schemes.section<N>",
+            "value": "coastal-breeze"
+          },
+          "written": [
+            {
+              "path": [
+                "color_schemes",
+                "section2"
+              ],
+              "value": "coastal-breeze"
+            }
+          ],
+          "unchanged": [
+            {
+              "path": [
+                "color_schemes",
+                "section1"
+              ],
+              "value": "quartz-standard"
+            }
+          ]
+        },
+        {
+          "name": "a section's code font",
+          "set": {},
+          "change": {
+            "section": 1,
+            "key": "fonts.sections.section<N>",
+            "value": {
+              "header": "Helvetica, Arial",
+              "body": "Helvetica, Arial",
+              "code": "Fira Code"
+            }
+          },
+          "written": [
+            {
+              "path": [
+                "fonts",
+                "sections",
+                "section1",
+                "code"
+              ],
+              "value": "Fira Code"
+            }
+          ],
+          "unchanged": [
+            {
+              "path": [
+                "fonts",
+                "sections",
+                "section2",
+                "code"
+              ],
+              "value": "IBM Plex Mono"
+            }
+          ]
+        },
+        {
+          "name": "a section's marker",
+          "set": {},
+          "change": {
+            "section": 2,
+            "key": "show_section_marker.sections.section<N>",
+            "value": false
+          },
+          "written": [
+            {
+              "path": [
+                "show_section_marker",
+                "sections",
+                "section2"
+              ],
+              "value": false
+            }
+          ],
+          "unchanged": [
+            {
+              "path": [
+                "show_section_marker",
+                "sections",
+                "section1"
+              ],
+              "value": true
+            }
+          ]
+        },
+        {
+          "name": "a section's grade in its title",
+          "set": {},
+          "change": {
+            "section": 2,
+            "key": "show_grade_in_title.sections.section<N>",
+            "value": false
+          },
+          "written": [
+            {
+              "path": [
+                "show_grade_in_title",
+                "sections",
+                "section2"
+              ],
+              "value": false
+            }
+          ],
+          "unchanged": [
+            {
+              "path": [
+                "show_grade_in_title",
+                "sections",
+                "section1"
+              ],
+              "value": true
+            }
+          ]
+        },
+        {
+          "name": "a section's custom domain",
+          "set": {},
+          "change": {
+            "section": 1,
+            "key": "custom_domains.sections.section<N>",
+            "destinationType": "netlify",
+            "value": "ics3u.school.ca"
+          },
+          "written": [
+            {
+              "path": [
+                "custom_domains",
+                "sections",
+                "section1",
+                "netlify"
+              ],
+              "value": "ics3u.school.ca"
+            }
+          ],
+          "unchanged": []
+        },
+        {
+          "name": "a section's grade, on a course with the legacy course-wide false",
+          "set": {
+            "show_grade_in_title": false
+          },
+          "change": {
+            "section": 2,
+            "key": "show_grade_in_title.sections.section<N>",
+            "value": true
+          },
+          "written": [
+            {
+              "path": [
+                "show_grade_in_title",
+                "sections",
+                "section2"
+              ],
+              "value": true
+            }
+          ],
+          "unchanged": [
+            {
+              "path": [
+                "show_grade_in_title",
+                "sections",
+                "section1"
+              ],
+              "value": false
+            }
+          ],
+          "why": "The legacy Bool is replaced by the per-section map the first time a section is set. It used to be replaced by an EMPTY map, so section 1 silently read the default, true: a change to one section turned another's grade back on (plan review, finding 10). Every section is now seeded with the legacy value first. KNOWN GAP (#373 review, N6): a section ADDED after that seeding has no entry and reads the default, on, where the untouched legacy Bool would have given it off. Closing it needs a course-wide default inside the map that build_site.py and Windows read too, so it is not done here; only a course with the pre-per-section Bool that has already been toggled can meet it."
+        }
+      ],
+      "perSectionEditExpect": {
+        "dirty": true,
+        "saveEnabled": true,
+        "revertEnabled": true
+      },
+      "heldBackCases": [
+        {
+          "name": "a folder missing on this Mac does not hold back a section's change",
+          "set": {
+            "deploy_target": "local_folder",
+            "deploy_folder_path": "{missingFolder}"
+          },
+          "cloudflareAccountIDOnThisMac": "",
+          "changes": [
+            {
+              "section": 2,
+              "key": "color_schemes.section<N>",
+              "value": "coastal-breeze"
+            }
+          ],
+          "expect": {
+            "saveEnabled": true,
+            "revertEnabled": true,
+            "heldBack": false
+          },
+          "why": "The folder is already in the file; saving a colour scheme cannot make that worse. Before 2026-09-29 this was held back, silently — the likeliest real #373."
+        },
+        {
+          "name": "a Cloudflare course with no Account ID on this Mac saves a section's change",
+          "set": {
+            "deploy_target": "cloudflare_pages"
+          },
+          "cloudflareAccountIDOnThisMac": "",
+          "changes": [
+            {
+              "section": 1,
+              "key": "emojis.sections.section<N>",
+              "value": "🔬"
+            }
+          ],
+          "expect": {
+            "saveEnabled": true,
+            "revertEnabled": true,
+            "heldBack": false
+          }
+        },
+        {
+          "name": "moving the course to a folder that does not exist is held back, and says why",
+          "set": {},
+          "cloudflareAccountIDOnThisMac": "",
+          "changes": [
+            {
+              "setting": "deployTarget",
+              "value": "local_folder"
+            },
+            {
+              "setting": "deployFolderPath",
+              "value": "{missingFolder}"
+            }
+          ],
+          "expect": {
+            "saveEnabled": false,
+            "revertEnabled": true,
+            "heldBack": true,
+            "check": "deploy folder",
+            "sentence": "courseSettingsWording.saveHeldBack",
+            "reason": "That folder doesn’t exist — use Choose… to pick or create one."
+          }
+        },
+        {
+          "name": "moving the course to a folder that exists saves",
+          "set": {},
+          "cloudflareAccountIDOnThisMac": "",
+          "changes": [
+            {
+              "setting": "deployTarget",
+              "value": "local_folder"
+            },
+            {
+              "setting": "deployFolderPath",
+              "value": "{existingFolder}"
+            }
+          ],
+          "expect": {
+            "saveEnabled": true,
+            "revertEnabled": true,
+            "heldBack": false
+          }
+        },
+        {
+          "name": "moving a folder that is missing to another missing folder is held back",
+          "set": {
+            "deploy_target": "local_folder",
+            "deploy_folder_path": "{missingFolder}"
+          },
+          "cloudflareAccountIDOnThisMac": "",
+          "changes": [
+            {
+              "setting": "deployFolderPath",
+              "value": "{anotherMissingFolder}"
+            }
+          ],
+          "expect": {
+            "saveEnabled": false,
+            "revertEnabled": true,
+            "heldBack": true,
+            "check": "deploy folder",
+            "sentence": "courseSettingsWording.saveHeldBack",
+            "reason": "That folder doesn’t exist — use Choose… to pick or create one."
+          }
+        },
+        {
+          "name": "moving the course to Cloudflare Pages on a Mac with no Account ID is held back",
+          "set": {},
+          "cloudflareAccountIDOnThisMac": "",
+          "changes": [
+            {
+              "setting": "deployTarget",
+              "value": "cloudflare_pages"
+            }
+          ],
+          "expect": {
+            "saveEnabled": false,
+            "revertEnabled": true,
+            "heldBack": true,
+            "check": "cloudflare account id",
+            "sentence": "courseSettingsWording.saveHeldBack",
+            "reason": "Paste your Cloudflare Account ID."
+          }
+        },
+        {
+          "name": "adding a second destination in a folder that does not exist is held back",
+          "set": {},
+          "cloudflareAccountIDOnThisMac": "",
+          "changes": [
+            {
+              "setting": "addAdditionalDestination",
+              "type": "local_folder",
+              "path": "{missingFolder}"
+            }
+          ],
+          "expect": {
+            "saveEnabled": false,
+            "revertEnabled": true,
+            "heldBack": true,
+            "check": "additional destination",
+            "sentence": "courseSettingsWording.saveHeldBack",
+            "reason": "That folder doesn’t exist — use Choose… to pick or create one."
+          }
+        }
+      ],
+      "heldBackTrail": "`settings save held back` (activityTrail.mustRecord) carries the course and the check's name as `check` above — never the path or the ID — and is written once per visit, on the change into the held-back state."
+    }
   },
   "workLeases": {
     "note": "A work lease is a file under courses/.internal/activity/ saying which process is doing what to a course or a folder, so another window, another copy of Plantoir or an assistant working from outside can leave that work alone. Its FORMAT is file-formats.json -> workLease. This block is the rules every READER shares. #245 (the import's staging folders) wrote the first of them - who counts as alive (liveness) - and #156 (builds, previews and deploys, both ways) added the second beside it - who stands in whose way (declining) - rather than a second reader.",
@@ -14916,7 +16402,7 @@
       "nothingReachesStudents": "It changes files and the preview. A deploy puts it in front of students, and it never deploys.",
       "afterwards": "Only the assistant's publish takes the pages a class uses with it. A class published by its own line in Obsidian after this goes live with links to hidden pages, so the plan and the sheet say so (wording.publishingFromNowOn); issue #333 is the fix for that."
     },
-    "planShows": "Every page going into draft with its reason; what stays (the first class and its pages, Key Links and its pages); the links left on pages students will see that will lead to hidden pages, grouped by the page they are on; and three warnings: classes dated before today that are going into draft (wording.alreadyTaught), this section's scheduled deploy in this working folder (wording.scheduledDeploy), and a first class that is itself in draft (wording.firstClassIsHidden).",
+    "planShows": "Every page going into draft with its reason; what stays (the first class and its pages, Key Links and its pages); the links left on pages students will see that will lead to hidden pages, grouped by the page they are on; and three warnings: classes dated before today that are going into draft (wording.alreadyTaught), this section's scheduled deploy in this working folder (wording.scheduledDeploy), and a first class that is itself in draft (wording.firstClassIsHidden). Each page is named by its title (wording.pageName) - the front matter title, else the file name as written, else, for a folder's own page, the folder - which is the one naming rule the app already uses everywhere it names a page. A page whose title another page in the section also has (compared trimmed, ignoring case, in one Unicode form, and NOT the way links are matched) is followed by its folder within the course (wording.pageNameInFolder), in every list the plan and the undo show, and in the links left behind. Never a path to the file, never .md, never courses/. The plan code still covers the files' paths; only the words changed (#362).",
     "planCode": {
       "line": "Plan code: {code}",
       "guards": "That a write is a plan that was MADE, and that the section has not changed since. Each platform issues and checks its own code; only this guarantee is shared, never the algorithm. The code is on a line of its own in the plan's text, in exactly the shape above, so a client or a test harness finds it in one fixed place.",
@@ -14931,7 +16417,7 @@
       "mcp": "undo_last_change, for as long as that MCP session lasts.",
       "separate": "The app's undo, the assistant window's 'undo that' and an outside assistant's undo_last_change are three stores; none reaches another."
     },
-    "howToRunACase": "Lay the course out from `pages`, one section, section 1. kind: class (a class page in the section's classes folder, `publish:`), page (a course-level page, `publishForSection1:`), keyLinks (the section's Key Links page), folderIndex (the index.md of a course-level folder named by the title), curriculum (a page in a course-level folder named Curriculum), sectionFrontPage (the section's own index.md). `visible` sets the flag; `links` are written as `See [[name]].` paragraphs; `date` sets the page's date (default the same day for every page) and `undated` writes none; `strayPublishForSection` adds `publishForSection1: true` to a class page; `embeds` writes one `![[name]]` line per entry (the front page's class embed). `naming` sets the course's unit word, scheme and noun. Then plan and write through the MCP pair, passing the plan's code. Every page in expectDraft must read HIDDEN for section 1 by the built site's reading and keep its body byte for byte; every page in expectUntouched must be byte-identical. `expectWarnings` names warnings the plan must carry; `expectIntroContains` a fragment of the plan's intro; `expectFrontPageEmbeds` names the one class the section's front page must embed afterwards; `runTwice` runs the pair again and expects wording.nothingToDo with nothing written.",
+    "howToRunACase": "Lay the course out from `pages`, one section, section 1. kind: class (a class page in the section's classes folder, `publish:`), page (a course-level page, `publishForSection1:`), keyLinks (the section's Key Links page), folderIndex (the index.md of a course-level folder named by the title), curriculum (a page in a course-level folder named Curriculum), sectionFrontPage (the section's own index.md). `visible` sets the flag; `links` are written as `See [[name]].` paragraphs; `date` sets the page's date (default the same day for every page) and `undated` writes none; `strayPublishForSection` adds `publishForSection1: true` to a class page; `embeds` writes one `![[name]]` line per entry (the front page's class embed). `naming` sets the course's unit word, scheme and noun. Then plan and write through the MCP pair, passing the plan's code. Every page in expectDraft must read HIDDEN for section 1 by the built site's reading and keep its body byte for byte; every page in expectUntouched must be byte-identical. `expectWarnings` names warnings the plan must carry; `expectIntroContains` a fragment of the plan's intro; `expectFrontPageEmbeds` names the one class the section's front page must embed afterwards; `runTwice` runs the pair again and expects wording.nothingToDo with nothing written. `folder` puts a `page` in that course-level folder instead of Concepts; `shownAs` writes that as the page's `title:` while the file keeps `title` as its name (and as the case's key). `visible` defaults to true when it is left out, but every case writes it. `expectPlanNames`: for each entry, the plan's text carries a line beginning `• ` then wording.pageName with {page} (or wording.pageNameInFolder with {page} and {folder} when `folder` is given) then ` — `; and no line of the plan contains `.md` or `courses/`.",
     "cases": [
       {
         "name": "the plain year",
@@ -15474,9 +16960,70 @@
         ],
         "runTwice": true,
         "why": "The second run finds every page already right, writes nothing, and says wording.nothingToDo."
+      },
+      {
+        "name": "a page is named by its title, and by its folder only when another page shares the title",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "links": [
+              "Notes"
+            ]
+          },
+          {
+            "title": "Unit 1, Day 2",
+            "kind": "class",
+            "visible": true,
+            "links": [
+              "Predict the Output"
+            ]
+          },
+          {
+            "title": "Predict the Output",
+            "kind": "page",
+            "visible": true,
+            "folder": "Warm-Ups",
+            "links": []
+          },
+          {
+            "title": "Notes",
+            "kind": "page",
+            "visible": true,
+            "links": []
+          },
+          {
+            "title": "Notes Zeta",
+            "shownAs": "Notes",
+            "kind": "page",
+            "visible": true,
+            "folder": "Zeta",
+            "links": []
+          }
+        ],
+        "expectDraft": [
+          "Unit 1, Day 2",
+          "Predict the Output",
+          "Notes Zeta"
+        ],
+        "expectUntouched": [
+          "Unit 1, Day 1",
+          "Notes"
+        ],
+        "expectPlanNames": [
+          {
+            "page": "Predict the Output"
+          },
+          {
+            "page": "Notes",
+            "folder": "Zeta"
+          }
+        ],
+        "why": "#362: the plan showed `(courses/ICS3U/Warm-Ups/Predict the Output.md)` after every page's title. Predict the Output's title is its own, so it is named by the title alone. The Notes in Zeta shares its shown title with the Notes that STAYS (Day 1 links it), so it is named with its folder: deciding \"shares a title\" across the section's pages, not within the list shown, is what makes it possible to tell which Notes goes. The staying twin is the point of the case."
       }
     ],
-    "wordingNote": "Every sentence the app's sheet says, and the plan an outside assistant is shown. Placeholders: {course} {section} {first} (the first class's name) {noun} {nouns} (\"class\"/\"classes\", or \"meeting\"/\"meetings\" in a club) {page} {pages} (a number with its word: \"1 page\", \"12 pages\") {classes} (the same, with the noun) {links} (\"1 link\", \"3 links\") {moment} {backup} (a backup's file name) {code}. The mac pins StartOfYearWording to these key by key (StartOfYearPlannerTests); the two refusals only an outside assistant meets are AssistWording's, in assist-wording.json (startOfYearNeedsItsPlan, startOfYearPlanHasChanged, startOfYearNeedsABackup).",
+    "wordingNote": "Every sentence the app's sheet says, and the plan an outside assistant is shown. Placeholders: {course} {section} {first} (the first class's name) {noun} {nouns} (\"class\"/\"classes\", or \"meeting\"/\"meetings\" in a club) {page} {pages} (a number with its word: \"1 page\", \"12 pages\") {classes} (the same, with the noun) {links} (\"1 link\", \"3 links\") {name} (a page as named by pageName or pageNameInFolder) {folder} (the folder a page is in, within the course: its segments joined with \"/\", or the course code for a page at the top of the course folder) {reason} (one of the reason clauses) {moment} {backup} (a backup's file name) {code}. The mac pins StartOfYearWording to these key by key (StartOfYearPlannerTests); the two refusals only an outside assistant meets are AssistWording's, in assist-wording.json (startOfYearNeedsItsPlan, startOfYearPlanHasChanged, startOfYearNeedsABackup).",
     "wording": {
       "menuItem": "Get Ready for the Start of the Year…",
       "undoMenuItem": "Undo Getting Ready for the Start of the Year…",
@@ -15495,7 +17042,10 @@
       "staysKeyLinks": "Key Links, and the {pages} it lists",
       "staysEverythingElse": "Every folder's own page, every curriculum page, and every page something students can still see links to.",
       "linksLeftHeading": "After this, links on these pages will lead to pages students cannot see yet:",
-      "linksLeftLine": "“{page}”: {links}",
+      "linksLeftLine": "{name}: {links}",
+      "pageName": "“{page}”",
+      "pageNameInFolder": "“{page}” (in {folder})",
+      "draftLine": "{name} — {reason}",
       "publishingFromNowOn": "From now on, each {noun} you publish needs the pages it uses published with it. Publishing through the assistant does that for you. Publishing a {noun} by changing its page in Obsidian does not, and would leave it with links students cannot follow.",
       "alreadyTaught": "Dated before today, and going into draft: {classes}. If you have already taught them, students will lose them when you next deploy.",
       "scheduledDeploy": "This section is set to deploy on its own at {moment}. That will put these changes in front of students.",
@@ -16051,5 +17601,546 @@
       "mac",
       "windows"
     ]
+  },
+  "previewWhileItsSectionDeploys": {
+    "rule": "A preview of a section cannot start while that same section is being deployed, whoever started the deploy: the same window, another window of the app, the in-app assistant, an outside assistant (Revise with Claude or Codex), a deploy set for later, or a command line. The preview is refused before anything is changed, with a sentence that says why. A preview of ANOTHER section of the same course is decided as it was before this rule: allowed from the same copy of the app, and refused by the other program's course-level work lease (workLeases) when another program deploys.",
+    "why": "GitHub #381, split from #378 on 2026-09-29. Russell's decision 4 on #378: 'A preview of a section cannot start AT ALL while that same section is being deployed — from this window or another.' A preview builds into the same folder a deploy is uploading from, and a preview that has to set the folder up again removes the workspace a deploy is about to run in. Read from code on 2026-09-29 (the #378 plan review), the mac refused only four of the six ways in: the same window only through its disabled Preview button (startPreview itself asked nothing, and the in-app assistant and the restart path call it directly); another window of the app and the in-app assistant's windowless deploy NOT AT ALL (startPreview read other programs' leases, never this program's own publishes); a deploy set for later and an outside assistant through their work leases; a command line NOT AT ALL, either way round (a bare launcher writes no lease, and preview.sh checked nothing).",
+    "layers": {
+      "window": "The one function every preview a window starts goes through (mac: SectionDetailView.startPreview; the button, the in-app assistant and the restart path all call it) asks, FIRST, before any lease is taken or anything is stopped or started, whether THIS copy of the app is deploying that section (mac: CourseActivity.sectionPublishIsRunning, the record the window's Deploy and the assistant's windowless deploy both write). It shows sentences.window under the title 'Cannot Preview Yet' and writes the trail line.",
+      "launcher": "preview.sh, on a serving run only, before it changes anything, reads the LIVE process table for a deploy of the same course and section working in the same folder: deploy.sh C S (not --reset-token, --logout or --help; --diagnose deploys), or a deploy set for later of C/S (its script's name, ca.russellgordon.Plantoir.deploy.<CODE>.section<N>[.<folder id>].sh, <CODE> written as ScheduledDeploy.sanitizedCode writes it). It prints sentences.launcher, writes the trail line, and exits 1. The cases are launcherCases.",
+      "lease": "Another program on this Mac that is deploying (a deploy set for later, an outside assistant, another copy of the app) holds build and publish work leases for the COURSE; the window's existing take-then-check (workLeases) refuses with wording.courseIsBeingBuiltElsewhere. Unchanged by this rule and course-wide, which is wider than it.",
+      "assistant": "The in-app assistant's (and the MCP server's own) preview, before it opens a window, stops a preview or runs a --build-only rebuild (mac: AssistToolRunner.bringThePreviewUpToDate), asks the same in-process publish record and answers wording.sectionIsBeingDeployed, with the same trail line as the window."
+    },
+    "sentences": {
+      "window": "wording.sectionIsBeingDeployed",
+      "windowTitle": "Cannot Preview Yet",
+      "launcher": [
+        "❌ {course} section {section} is being deployed right now, so it cannot be previewed until that has finished.",
+        "   Nothing was changed."
+      ],
+      "panel": "The app's failure explanation for a preview the launcher refused is the launcher's first line with the cross taken off (failureExplanationCases). Lifted, not rewritten, as failureExplanations lifts the kept-for-reference refusal: a second wording of one refusal is how one rule comes to be said two ways.",
+      "why": "'Deployed' because it is the word on the button the teacher pressed, and the word the rest of the app uses for this act (CourseActivity.availableOnceDeployCompleted). No 'workspace', 'container' or 'script' (CLAUDE.md rule 1)."
+    },
+    "trail": "activityTrail.mustRecord 'build declined, course busy elsewhere' -> lineWhenItsSectionIsBeingDeployed (the window) and launcherLineWhenItsSectionIsBeingDeployed (preview.sh).",
+    "cases": [
+      {
+        "name": "the same window is deploying the section",
+        "deployer": "sameWindow",
+        "previewFrom": "window",
+        "section": "same",
+        "expect": "refused",
+        "layer": "window",
+        "why": "The disabled button was the only thing in the way; the in-app assistant and the restart path reach startPreview without it."
+      },
+      {
+        "name": "another window of the same app is deploying the section",
+        "deployer": "anotherWindow",
+        "previewFrom": "window",
+        "section": "same",
+        "expect": "refused",
+        "layer": "window",
+        "why": "The gap: startPreview read other programs' leases only."
+      },
+      {
+        "name": "the in-app assistant is deploying the section with no window",
+        "deployer": "inAppAssistant",
+        "previewFrom": "window",
+        "section": "same",
+        "expect": "refused",
+        "layer": "window",
+        "why": "The same gap: the assistant's windowless deploy writes the same in-process record and no lease another window reads."
+      },
+      {
+        "name": "an outside assistant (Revise with Claude or Codex) is deploying the section",
+        "deployer": "outsideAssistant",
+        "previewFrom": "window",
+        "section": "same",
+        "expect": "refused",
+        "layer": "lease",
+        "why": "Its own process holds build and publish leases for the course."
+      },
+      {
+        "name": "a deploy set for later is running for the section",
+        "deployer": "scheduled",
+        "previewFrom": "window",
+        "section": "same",
+        "expect": "refused",
+        "layer": "lease",
+        "why": "The scheduled run takes build and publish leases (ScheduledDeploy); the launcher sees its script as well, when the window's preview reaches preview.sh."
+      },
+      {
+        "name": "deploy.sh for the section is running from a command line",
+        "deployer": "commandLine",
+        "previewFrom": "window",
+        "section": "same",
+        "expect": "refused",
+        "layer": "launcher",
+        "why": "A bare launcher writes no lease; the window's preview reaches preview.sh, which sees the deploy in the process table."
+      },
+      {
+        "name": "any deploy of the section, with the preview started from a command line",
+        "deployer": "any",
+        "previewFrom": "commandLine",
+        "section": "same",
+        "expect": "refused",
+        "layer": "launcher",
+        "why": "Russell's rule is about the section, not about who typed the preview."
+      },
+      {
+        "name": "another section of the same course deploying in the same app",
+        "deployer": "anotherWindow",
+        "previewFrom": "window",
+        "section": "another",
+        "expect": "allowed",
+        "layer": "window",
+        "why": "Decision 4 names the same section, and previewing section 1 while section 2 deploys from the same app works today. Widening it would take a working flow away."
+      },
+      {
+        "name": "the in-app assistant asks for the preview of a section this app is deploying",
+        "deployer": "sameWindow",
+        "previewFrom": "inAppAssistant",
+        "section": "same",
+        "expect": "refused",
+        "layer": "assistant",
+        "why": "#381's review, S1. The assistant's preview (AssistToolRunner.bringThePreviewUpToDate) asks the same publish record FIRST, before a window is opened, a preview stopped or a no-window --build-only rebuild run, and answers wording.sectionIsBeingDeployed; otherwise the window would refuse while the conversation said the preview was on its way."
+      },
+      {
+        "name": "another section of the same course deploying in another program",
+        "deployer": "outsideAssistant",
+        "previewFrom": "window",
+        "section": "another",
+        "expect": "refused",
+        "layer": "lease",
+        "why": "Not this rule: #156's course-level lease, unchanged, with its own sentence."
+      }
+    ],
+    "launcherCasesShape": "Run by scripts/test_preview_while_deploying.py against the REAL guard cut out of preview.sh, with a pretend ps and lsof. The preview asked for is course, section (default ICS4U, 2) in the working folder 'here'. processes are [pid, ppid, args] rows of `ps -Ao pid=,ppid=,args=`; this run is pid 5000, whose parent is 4999 ('-bash' unless parentArgs says otherwise). cwd maps a pid to the working directory lsof reports ('here' is this folder, 'elsewhere' another; a pid missing from it means lsof answers nothing). {here} and {elsewhereID} and {hereID} in args are the folder, another folder's id and this folder's id. psFails: the table cannot be read. expect is refused or allowed.",
+    "launcherCases": [
+      {
+        "name": "deploy.sh for the section, from a command line in this folder",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./deploy.sh ICS4U 2"
+          ]
+        ],
+        "cwd": {
+          "700": "here"
+        },
+        "expect": "refused"
+      },
+      {
+        "name": "deploy.sh named by its whole path, as the app runs it",
+        "processes": [
+          [
+            700,
+            600,
+            "/bin/bash {here}/deploy.sh ICS4U 2 --target netlify"
+          ]
+        ],
+        "cwd": {
+          "700": "here"
+        },
+        "expect": "refused"
+      },
+      {
+        "name": "a course typed in lower case",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./deploy.sh ics4u 2"
+          ]
+        ],
+        "cwd": {
+          "700": "here"
+        },
+        "expect": "refused"
+      },
+      {
+        "name": "--diagnose deploys, so it counts",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./deploy.sh ICS4U 2 --diagnose"
+          ]
+        ],
+        "cwd": {
+          "700": "here"
+        },
+        "expect": "refused"
+      },
+      {
+        "name": "a deploy to a folder counts",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./deploy.sh ICS4U 2 --to-folder /Users/t/Sites/ics4u"
+          ]
+        ],
+        "cwd": {
+          "700": "here"
+        },
+        "expect": "refused"
+      },
+      {
+        "name": "a deploy whose working folder cannot be asked still counts",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./deploy.sh ICS4U 2"
+          ]
+        ],
+        "cwd": {},
+        "expect": "refused",
+        "why": "A deploy of this very section is proved; only its folder is not, and the safe side for the deploy is to refuse."
+      },
+      {
+        "name": "a deploy set for later, running under launchd (the app's own runner)",
+        "processes": [
+          [
+            800,
+            1,
+            "/Applications/Plantoir.app/Contents/MacOS/Plantoir --run-scheduled-deploy /Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.ICS4U.section2.{hereID}.sh --scheduled-section {here} ICS4U 2"
+          ]
+        ],
+        "expect": "refused"
+      },
+      {
+        "name": "a deploy set for later, in its build leg",
+        "processes": [
+          [
+            800,
+            1,
+            "/Applications/Plantoir.app/Contents/MacOS/Plantoir --run-scheduled-deploy /Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.ICS4U.section2.{hereID}.sh --scheduled-section {here} ICS4U 2"
+          ],
+          [
+            801,
+            800,
+            "/bin/bash /Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.ICS4U.section2.{hereID}.sh"
+          ],
+          [
+            802,
+            801,
+            "/bin/bash {here}/preview.sh ICS4U 2 --build-only --non-interactive"
+          ]
+        ],
+        "cwd": {
+          "802": "here"
+        },
+        "expect": "refused",
+        "why": "The build leg alone would not count (--build-only), but launchd's runner lives for the whole run."
+      },
+      {
+        "name": "a deploy set for later before #237, whose script names no folder",
+        "processes": [
+          [
+            801,
+            1,
+            "/bin/bash /Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.ICS4U.section2.sh"
+          ]
+        ],
+        "expect": "refused"
+      },
+      {
+        "name": "a course code a label could not carry is matched as the label writes it",
+        "course": "ab c1",
+        "section": "2",
+        "processes": [
+          [
+            801,
+            1,
+            "/bin/bash /Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.AB-C1.section2.{hereID}.sh"
+          ]
+        ],
+        "expect": "refused",
+        "why": "ScheduledDeploy.sanitizedCode: upper case, and anything that is not a letter or digit becomes '-'."
+      },
+      {
+        "name": "a course code with a space is read whole from deploy.sh's arguments",
+        "course": "AP CALC",
+        "section": "2",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./deploy.sh AP CALC 2 --target netlify"
+          ]
+        ],
+        "cwd": {
+          "700": "here"
+        },
+        "expect": "refused",
+        "why": "CourseCodeRule allows a space, and ps shows the one quoted argument as two words. Until #382 the guard read one word for the course, so every deploy of such a course let its preview through (GitHub #388)."
+      },
+      {
+        "name": "a spaced course is matched whole, not by its first words",
+        "course": "AP CALC",
+        "section": "1",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./deploy.sh AP CALC 12"
+          ],
+          [
+            701,
+            1,
+            "/bin/bash ./deploy.sh AP CALCULUS 1"
+          ],
+          [
+            702,
+            1,
+            "/bin/bash ./deploy.sh AP 1"
+          ]
+        ],
+        "cwd": {
+          "700": "here",
+          "701": "here",
+          "702": "here"
+        },
+        "expect": "allowed",
+        "why": "Section 12 is not section 1, AP CALCULUS is another course, and so is AP."
+      },
+      {
+        "name": "a course that ENDS another's code is another course",
+        "course": "CALC",
+        "section": "2",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./deploy.sh AP CALC 2"
+          ]
+        ],
+        "cwd": {
+          "700": "here"
+        },
+        "expect": "allowed",
+        "why": "deploy.sh's arguments must BEGIN with the course: CALC 2 appears inside AP CALC 2, and a match anywhere in them would refuse CALC's preview while AP CALC deploys."
+      },
+      {
+        "name": "the unreadable process table lets the preview through",
+        "psFails": true,
+        "processes": [],
+        "expect": "allowed",
+        "why": "Failing closed would refuse every preview for as long as ps fails. The window's check and the leases still stand."
+      },
+      {
+        "name": "a deploy of ANOTHER section does not refuse",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./deploy.sh ICS4U 3"
+          ]
+        ],
+        "cwd": {
+          "700": "here"
+        },
+        "expect": "allowed"
+      },
+      {
+        "name": "section 12 is not section 1",
+        "section": "1",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./deploy.sh ICS4U 12"
+          ],
+          [
+            801,
+            1,
+            "/bin/bash /Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.ICS4U.section12.{hereID}.sh"
+          ]
+        ],
+        "cwd": {
+          "700": "here"
+        },
+        "expect": "allowed"
+      },
+      {
+        "name": "a deploy of ANOTHER course does not refuse",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./deploy.sh ICS3U 2"
+          ]
+        ],
+        "cwd": {
+          "700": "here"
+        },
+        "expect": "allowed"
+      },
+      {
+        "name": "a build with --build-only is not a deploy",
+        "processes": [
+          [
+            700,
+            600,
+            "/bin/bash {here}/preview.sh ICS4U 2 --build-only"
+          ]
+        ],
+        "cwd": {
+          "700": "here"
+        },
+        "expect": "allowed",
+        "why": "The assistant's 'rebuild the preview' runs exactly this, and nothing on the command line tells it from a publish's build leg (the #378 plan review, S3). The window refuses its own build leg from its publish record."
+      },
+      {
+        "name": "clearing a saved token is not a deploy",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./deploy.sh ICS4U 2 --reset-token"
+          ],
+          [
+            701,
+            1,
+            "/bin/bash ./deploy.sh ICS4U 2 --target cloudflare --logout"
+          ],
+          [
+            702,
+            1,
+            "/bin/bash ./deploy.sh ICS4U 2 --help"
+          ]
+        ],
+        "cwd": {
+          "700": "here",
+          "701": "here",
+          "702": "here"
+        },
+        "expect": "allowed"
+      },
+      {
+        "name": "the same course and section deploying from ANOTHER working folder",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./deploy.sh ICS4U 2"
+          ]
+        ],
+        "cwd": {
+          "700": "elsewhere"
+        },
+        "expect": "allowed",
+        "why": "This year's and last year's folders can hold the same course; one's deploy says nothing about the other's preview."
+      },
+      {
+        "name": "a deploy set for later in ANOTHER working folder",
+        "processes": [
+          [
+            801,
+            1,
+            "/bin/bash /Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.ICS4U.section2.{elsewhereID}.sh"
+          ]
+        ],
+        "expect": "allowed"
+      },
+      {
+        "name": "a scheduled deploy's log being read is not a deploy",
+        "processes": [
+          [
+            900,
+            1,
+            "tail -f /Users/t/Library/Logs/Plantoir/ca.russellgordon.Plantoir.deploy.ICS4U.section2.{hereID}.log"
+          ]
+        ],
+        "expect": "allowed"
+      },
+      {
+        "name": "this run's own ancestors never count",
+        "parentArgs": "/bin/bash ./deploy.sh ICS4U 2",
+        "processes": [],
+        "expect": "allowed",
+        "why": "Whatever started this preview is not a deploy running beside it, whatever its words say."
+      },
+      {
+        "name": "a process whose text merely mentions deploy.sh is not a deploy",
+        "processes": [
+          [
+            700,
+            1,
+            "node /usr/local/bin/claude -p run ./deploy.sh ICS4U 2 now"
+          ],
+          [
+            701,
+            1,
+            "/bin/zsh -c ./deploy.sh ICS4U 2 && echo done"
+          ]
+        ],
+        "cwd": {
+          "700": "here",
+          "701": "here"
+        },
+        "expect": "allowed",
+        "why": "deploy.sh must be the program (the first word, or the script a shell was handed). A prompt that names it, or a shell wrapper whose own child is the deploy, does not count; the child does. #381's review, N3."
+      },
+      {
+        "name": "a folder path with spaces still names the program",
+        "processes": [
+          [
+            700,
+            600,
+            "/bin/bash /Users/t/My Courses/deploy.sh ICS4U 2 --non-interactive"
+          ]
+        ],
+        "cwd": {
+          "700": "here"
+        },
+        "expect": "refused"
+      },
+      {
+        "name": "only deploy.sh's own arguments are read for help",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./deploy.sh ICS4U 2 --to-folder /Users/t/Sites/help"
+          ]
+        ],
+        "cwd": {
+          "700": "here"
+        },
+        "expect": "refused",
+        "why": "A word elsewhere on the line is not a flag of deploy.sh."
+      },
+      {
+        "name": "nothing else running",
+        "processes": [],
+        "expect": "allowed"
+      }
+    ],
+    "failureExplanationCases": [
+      {
+        "output": "❌ ICS4U section 2 is being deployed right now, so it cannot be previewed until that has finished.\n   Nothing was changed.",
+        "expect": "ICS4U section 2 is being deployed right now, so it cannot be previewed until that has finished."
+      }
+    ],
+    "knownLimits": [
+      "A preview typed in Terminal while ANOTHER program is in the build leg of its deploy (preview.sh --build-only, before its deploy.sh starts) is not refused by the launcher: the build leg cannot be told from the assistant's rebuild (launcherCases, '--build-only is not a deploy'). A program deploying that way holds work leases, but a preview typed in Terminal reads none. A --for-deploy flag on the build leg would close it; it is a launcherFlags change and was not made for this.",
+      "The launcher's look is folder-aware for deploy.sh (its working directory) and for a deploy set for later (its label's folder id), but a deploy set before #237 names no folder and counts for every folder holding that course and section.",
+      "A course code with a letter outside A-Z is written into the label by Swift's isLetter and by the launcher as '-', so a deploy set for later of such a course is not recognised by the launcher (it fails open; the leases still refuse a window's preview)."
+    ],
+    "rejected": [
+      "Counting preview.sh C S --build-only as a deploy (the #378 plan's first shape): it refuses every preview while the assistant rebuilds that section's preview, with a false sentence.",
+      "Refusing when the process table cannot be read, as the look before a workspace is remade does: there failing open costs a publish; here failing closed refuses every preview until ps answers again, which is the 'blocked until a restart' #378 was about.",
+      "Widening the window's check to the whole course: previewing section 1 while section 2 deploys from the same app works today, and the decision names the same section.",
+      "Asking the work leases in-process instead of the publish record: this program's own leases are left out of whatBlocksABuild by design (a window must not decline its own build), and the record is what they are derived from.",
+      "Placing the launcher's check just before the preview address is announced (the #378 plan's first placement): by then a serving run may already have set the folder up again, removing the workspace a deploy is about to run in."
+    ],
+    "appliesOn": [
+      "mac",
+      "windows"
+    ],
+    "appliesOnWhy": "The rule and the window's cases are for both apps. The launcherCases are the mac's preview.sh; Windows owes the same guard in preview.ps1 (its own process table, never a remembered process id). Until Windows implements it, its cases are a named gap against the windows issue opened with #381."
   }
 }

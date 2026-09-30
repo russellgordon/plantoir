@@ -2057,10 +2057,11 @@
         "Setting up this PC",
         "Building your website builder",
         "Ensuring container is running",
-        "Starting container if needed"
+        "Starting container if needed",
+        "Getting this folder's website builder ready"
       ],
-      "note" : "The launcher markers are the two platforms' OWN text and no longer correspond one to one. Until 2026-08-19 they did, and this key was the single pair 'Setting up this Mac' → 'Setting up this PC'; then Windows dropped Docker for a native runtime (GUI-IMPROVEMENTS.md entry 290) and stopped printing that line, and the two container markers stopped having any Windows counterpart at all. Windows' own launcher markers are deliberately NOT carried here — they are the platform's text rather than the product's, so by this folder's own test they do not belong in the contract — and are pinned against the real .ps1 files by TaskMilestoneLauncherMarkerTests in windows-app/Plantoir.Tests/ParsingTests.cs.",
-      "whyTheListIsHere" : "So the other app can assert it never watches for any of them. A milestone matching a string no launcher on that platform prints cannot be reached, and the only symptom is a progress bar that sits still — which reads as a slow build. 'Setting up this PC' is in the list although it is nobody's text now: it was Windows' until the native runtime landed, and a milestone reaching for it again is the same silent stall. Read from here rather than typed into a test, because a hand-kept copy of the OTHER platform's wording goes stale the day that platform changes it."
+      "note" : "The launcher markers are the two platforms' OWN text and no longer correspond one to one. Until 2026-08-19 they did, and this key was the single pair 'Setting up this Mac' → 'Setting up this PC'; then Windows dropped Docker for a native runtime (GUI-IMPROVEMENTS.md entry 290) and stopped printing that line, and the two container markers stopped having any Windows counterpart at all. Those two became ONE plain-words marker on 2026-09-30 (GitHub #382), 'Getting this folder's website builder ready', printed by all three of the mac's launchers. Windows' own launcher markers are deliberately NOT carried here — they are the platform's text rather than the product's, so by this folder's own test they do not belong in the contract — and are pinned against the real .ps1 files by TaskMilestoneLauncherMarkerTests in windows-app/Plantoir.Tests/ParsingTests.cs.",
+      "whyTheListIsHere" : "So the other app can assert it never watches for any of them. A milestone matching a string no launcher on that platform prints cannot be reached, and the only symptom is a progress bar that sits still — which reads as a slow build. 'Setting up this PC' is in the list although it is nobody's text now: it was Windows' until the native runtime landed, and a milestone reaching for it again is the same silent stall. 'Ensuring container is running' and 'Starting container if needed' stay for the same reason: nobody prints them since #382, and a milestone copied from an old transcript would stall on them. Read from here rather than typed into a test, because a hand-kept copy of the OTHER platform's wording goes stale the day that platform changes it."
     },
     "note" : "Where each milestone's marker text actually comes from, which decides whether the two apps must match it. shared-python: printed by scripts/*.py, identical on both platforms, so the string must match EXACTLY. launcher: printed by setup.sh/preview.sh/deploy.sh, whose .ps1 counterparts are written separately — these deliberately differ, and since 2026-08-19 they do not even pair up (see knownDivergence). elsewhere: printed by the Docker build or a tool, and worth checking by hand. Getting this wrong is silent: a progress bar that stops moving looks like a slow build.",
     "origins" : {
@@ -2073,9 +2074,9 @@
       "Deploy complete" : "shared-python",
       "Deploying from local build" : "shared-python",
       "Done processing" : "elsewhere",
-      "Ensuring container is running" : "launcher",
       "Example Course installed to" : "shared-python",
       "EXAMPLE_COURSE_CODE=" : "shared-python",
+      "Getting this folder's website builder ready" : "launcher",
       "Host timezone offset" : "launcher",
       "Installing dependencies" : "shared-python",
       "Launching Quartz preview" : "shared-python",
@@ -2086,7 +2087,6 @@
       "Select folders/files to HIDE" : "shared-python",
       "set up successfully" : "shared-python",
       "Setting up this Mac" : "launcher",
-      "Starting container if needed" : "launcher",
       "timetable section numbers" : "shared-python",
       "to a folder" : "launcher",
       "Updated pageTitle" : "shared-python",
@@ -2106,7 +2106,7 @@
       },
       {
         "label" : "Starting up…",
-        "marker" : "Starting container if needed"
+        "marker" : "Getting this folder's website builder ready"
       },
       {
         "label" : "Gathering your content…",
@@ -2140,7 +2140,7 @@
       },
       {
         "label" : "Starting up…",
-        "marker" : "Starting container if needed"
+        "marker" : "Getting this folder's website builder ready"
       },
       {
         "label" : "Gathering your content…",
@@ -2174,7 +2174,7 @@
       },
       {
         "label" : "Starting up…",
-        "marker" : "Starting container if needed"
+        "marker" : "Getting this folder's website builder ready"
       },
       {
         "label" : "Gathering your content…",
@@ -2238,7 +2238,7 @@
       },
       {
         "label" : "Starting up…",
-        "marker" : "Ensuring container is running"
+        "marker" : "Getting this folder's website builder ready"
       },
       {
         "label" : "Checking your site…",
@@ -2272,7 +2272,7 @@
       },
       {
         "label" : "Starting up…",
-        "marker" : "Ensuring container is running"
+        "marker" : "Getting this folder's website builder ready"
       },
       {
         "label" : "Checking your site…",
@@ -2316,7 +2316,7 @@
       },
       {
         "label" : "Getting things ready…",
-        "marker" : "Starting container if needed"
+        "marker" : "Getting this folder's website builder ready"
       },
       {
         "label" : "Copying the example course…",
@@ -2339,7 +2339,7 @@
       },
       {
         "label" : "Starting up…",
-        "marker" : "Starting container if needed"
+        "marker" : "Getting this folder's website builder ready"
       },
       {
         "label" : "Gathering your content…",
@@ -3146,13 +3146,13 @@
     ],
     "hostBlockCeilingWhy" : "Forty is a CHOSEN number, not a measured one. Any number up to 99 is possible - block 100's first port would be 9081, the first block's websocket - and forty keeps the walk under 8888 while the websockets (9081-9474) land only on the x1-x4 of each ten, clear of 9090, 9200 and 9229. A ceiling at all keeps the refusal REACHABLE, so it can be tested and its sentence stays true. Until GitHub #280 (2026-09-25) the launchers tried six blocks and stopped: six working folders' workspaces alive on one Mac - agent worktrees did it first, but a teacher who has used six working folders on a Mac does it too, since a workspace exists (and, before the second pass, kept its block) until something removes it, and nothing removes another folder's - and a seventh folder could neither preview nor publish. Every launcher walks the SAME forty for every run, publishing included: a workspace is made once per folder and serves both, and one made without ports for a publish would have to be remade by the next preview, killing anything running in it and discarding its warm copy of the website builder (109 s cold on a teacher's Mac, #225).",
     "hostBlockClash" : {
-      "saysWhenAStartIsRefused" : "❌ Plantoir could not start this folder's workspace. Try again, or restart this Mac if it happens again.",
+      "saysWhenAStartIsRefused" : "❌ Plantoir could not start the website builder for this folder. Try again, or restart this Mac if it happens again.",
       "saysWhenAStoppedWorkspaceIsRemade" : [
         "♻️  Something else is now using this folder's preview addresses, so Plantoir is setting this folder up again on free ones.",
         "   The next preview will be slower than usual — about two minutes — while it gets ready."
       ],
       "saysWhenCreationClashes" : "↪️  Those preview addresses were taken a moment ago; trying the next ones…",
-      "saysWhy" : "The three things a launcher says in the console on these paths, written in each launcher's shared PREVIEW PORT BLOCK and checked against these keys by scripts/test_port_blocks.py. Mac-only: they are about a workspace, which the native (Windows) preview does not have. The remade line names its cost because the warm website builder lives inside the workspace and is lost (109 s cold, #225). The remade lines are said for all three causes of a remake on free addresses - a Docker refusal at start, a listener on a stopped workspace's port, and (#310) a RUNNING workspace whose announced address turned out to be somebody else's (whenAnotherAccountHasTheAddress) - because to a teacher they are one event; the key keeps its name because two tests read it.",
+      "saysWhy" : "The three things a launcher says in the console on these paths, written in each launcher's shared PREVIEW PORT BLOCK and checked against these keys by scripts/test_port_blocks.py. Mac-only: they are about a workspace, which the native (Windows) preview does not have. The remade line names its cost because the warm website builder lives inside the workspace and is lost (109 s cold, #225). The remade lines are said for all three causes of a remake on free addresses - a Docker refusal at start, a listener on a stopped workspace's port, and (#310) a RUNNING workspace whose announced address turned out to be somebody else's (whenAnotherAccountHasTheAddress) - because to a teacher they are one event; the key keeps its name because two tests read it. saysWhenAStartIsRefused said \"this folder's workspace\" until 2026-09-29 (GitHub #381, #378's finding that the word meant nothing to Russell); it names the website builder now.",
       "whenCreating" : "The probe and the creation are two steps, so two launchers starting together can both see a block free. When the creation is refused in any of these words the half-made workspace is removed WITHOUT force and the walk goes on from the NEXT block, up to the same ceiling. Any other refusal keeps the sentence it had.",
       "whenStarting" : "A stopped workspace whose block has been taken since cannot start. Refused in any of these words - and ONLY these - it is removed without force and made again on free ports, and the console says the next preview will be slower (about two minutes: its warm copy of the website builder is gone). Any other refusal stops the run with the engine's own words and a sentence; before #280, setup.sh and deploy.sh stopped there with the engine's words alone and preview.sh carried on to fail later at a step that could not say why. Since #310 a stopped workspace is also LOOKED AT before it starts, by preview.sh only (WORKSPACE_WILL_SERVE) and under Colima only (whenAnotherAccountHasTheAddress.gate): Colima does NOT refuse a start onto a port another account holds - it exits 0 and its forward silently fails (measured with root's 5900) - so a listener, in any account, on one of the workspace's own ports means the same remake, made before the start. A stopped workspace listens on nothing: its own forward is gone 0.011 s after the stop returns and back 0.011 s after a start (5 of 5 each way, development Mac), so the listener is somebody else's. Before removing anything it asks once more whether the workspace is RUNNING (another launcher for this folder started it a moment ago, and the listener is its own forward): then it is used as it is. setup.sh and deploy.sh never serve, so a squatted forward costs them nothing, and they keep their warm builder rather than pay the remake - a publish at six in the morning is not made slower or given a new way to fail. It is recorded as the before-start outcome of shared-rules.json -> activityTrail.mustRecord.\"preview address held by another account\". The remake that follows a Docker REFUSAL writes nothing on the trail, as before.",
       "why" : "Colima says 'port is already allocated'; Docker Desktop says 'Ports are not available: ... bind: address already in use'. The launchers use any working engine as-is, so matching only Colima's would give a Docker Desktop teacher the old broad sentence for a clash the walk could have stepped past.",
@@ -3497,20 +3497,63 @@
         "rule" : "Stopped and removed by the id read at the start. A remove that fails because that id is gone is no failure (another launcher removed it); a remove that fails with it still there is tried once more two seconds later, then the run stops with hostBlockClash.saysWhenAStartIsRefused. At the making, a refusal because a workspace by this name already exists (Docker: 'is already in use by container') waits two seconds, uses that workspace if it is running, else tries the making once more — and a second such refusal stops the run with the same sentence, never with the home-folder advice a mount refusal gets.",
         "why" : "Two launchers remaking together (two previews started after an update) both find the old workspace idle. By NAME, the slower one's stop and remove landed on the NEW workspace the faster one had just made — #94's shape one step down. By id they land on the old one, already gone. Plan review 2026-09-25 (F4): without the conflict branch the slower launcher's `docker run` was refused with the name taken and told the teacher to keep their folder inside their home folder."
       },
-      "rule" : "Before ANY launcher removes this folder's workspace to make it again — for any of the reasons it has (made for another folder, no builds mount, an older recipe, no live-reload addresses, a courses folder it cannot write, a connection gone stale) — it looks at what is running inside it. Nothing: it is remade at once, as before. A build or a publish: it is waited for, looking every lookEverySeconds, and refused after workSeconds. A preview whose launcher is still running on this Mac: refused after previewSeconds, naming the preview. It is then stopped and removed BY ID, never by name and never with -f. One function does all of this for every launcher, remake_the_workspace in the PREVIEW PORT BLOCK, and each of the launchers' twenty places that remade a workspace calls it; the old shared workspace (teaching-quartz) is retired only when nothing is running in it, and otherwise left, silently.",
+      "rule" : "Before ANY launcher removes this folder's workspace to make it again — for any of the reasons it has (made for another folder, no builds mount, an older recipe, no live-reload addresses, a courses folder it cannot write, a connection gone stale) — it looks at what is running inside it, and asks this Mac, for each piece of work, whether the program that OWNS it is still running (whatCountsAsRunning, GitHub #378). Nothing, or only work whose owner has gone: it is remade at once, and work whose owner has gone is ended with it and said (sentences.whenLeftoverWorkIsStopped, the trail's 'left-over work stopped'). A build, a publish or a course being set up whose owner IS running: it is waited for, looking every lookEverySeconds, naming what it waits for on the console and in the app's status line (PLANTOIR_WAITING_FOR), and refused after workSeconds, naming it again. A preview whose launcher is still running on this Mac: refused after previewSeconds, naming the preview. It is then stopped and removed BY ID, never by name and never with -f, and that stop is the ONLY way anything inside is ended. One function does all of this for every launcher, remake_the_workspace in the PREVIEW PORT BLOCK, and each of the launchers' twenty places that remade a workspace calls it; the old shared workspace (teaching-quartz) is retired only when nothing at all is running in it — leftovers included, since it is not this folder's — and otherwise left, silently.",
       "sentences" : {
+        "doing" : {
+          "build" : "building {course} section {section}",
+          "publish" : "deploying {course} section {section}",
+          "setup" : "setting up a course"
+        },
         "exitCode" : 1,
+        "leftovers" : {
+          "build" : "a build of {course} section {section}",
+          "joined" : "Two are joined with \" and \"; three or more with \", \" and a final \" and \", in the order the marker lists them.",
+          "other" : "something else",
+          "preview" : "a preview of {course} section {section}",
+          "publish" : "a deploy of {course} section {section}",
+          "setup" : "the setting up of a course"
+        },
+        "origins" : {
+          "-" : "Plantoir",
+          "assistant" : "an assistant",
+          "claude" : "Revise with Claude",
+          "codex" : "Revise with Codex",
+          "scheduled" : "a scheduled deploy",
+          "terminal" : "a command in Terminal",
+          "window" : "another Plantoir window"
+        },
+        "statusLine" : {
+          "counter" : " ({seconds}s)",
+          "preview" : "Waiting for the preview of {course} section {section} to close…",
+          "somethingElse" : "Waiting for something else in this folder to finish…",
+          "why" : "GitHub #378, decision 3: what a preview is waiting for is named in the STATUS LINE under the progress bar — no alert, nothing to dismiss, no need to open the details. Rendered by the app from PLANTOIR_WAITING_FOR (the launcher prints it beside its console sentence) with the same origins and doing words, and followed by the counter, which counts from the moment the wait began. PLANTOIR_WAITING_FOR: over, the next milestone reached, or the run ending gives the line back. 'Deploying', not 'publishing': it is the word on the button a teacher pressed.",
+          "work" : "Waiting for {origin} to finish {doing}…"
+        },
         "whenAPreviewIsOpen" : [
-          "❌ The preview of {course} section {section} from this folder is still open, and this folder's workspace needs updating before Plantoir can go on.",
+          "❌ The preview of {course} section {section} from this folder is still open, and Plantoir needs to set this folder up again before it can go on.",
           "   Close that preview — in Plantoir, or wherever it was started — then try again. Nothing was changed."
+        ],
+        "whenItNeedsSettingUpAgain" : {
+          "afterAnUpdate" : "♻️  Plantoir has been updated, so it is setting this folder up again to use the update…",
+          "forBuiltWebsitesOutside" : "♻️  Setting this folder up again so built websites can be kept outside your course folder…",
+          "forSeveralPreviews" : "♻️  Setting this folder up again so several previews can run at once…",
+          "retiringTheOldSharedOne" : "♻️  Clearing away the website builder that older versions of Plantoir shared between folders…",
+          "why" : "The lines a launcher prints just before it sets a folder up again, for the reasons a teacher meets most (an update above all: that is how #378 was met). They replaced 'Your workspace was built from an older version; rebuilding it so the update takes effect…', 'Rebuilding your workspace so …' and 'Retiring the old shared workspace container…' — Russell, who wrote the product, did not know what 'workspace' meant (#378's decisions), and 'container' is a rule-1 word. Checked by scripts/test_port_blocks.py in every launcher that says them. The other lines about this folder's workspace (hostBlockClash.saysWhenAStartIsRefused, the second-spelling lines, and the rarer remake reasons that still say 'container') are GitHub #378's piece B / its follow-up issue, not these keys."
+        },
+        "whenLeftoverWorkIsStopped" : "🧹 Stopped {what}, left running after the program that started it had closed. Your pages were not touched.",
+        "whenSomethingElseDidNotFinish" : [
+          "❌ Something Plantoir was doing in this folder was still going after ten minutes, so it stopped rather than interrupt it.",
+          "   Try again once it has finished. Nothing was changed."
         ],
         "whenTheRemoveFails" : "hostBlockClash.saysWhenAStartIsRefused — the same sentence, after one retry two seconds later, when the old workspace is still there and will not go. It is ALSO what a second name conflict says (idRace).",
         "whenWorkDidNotFinish" : [
-          "❌ Something in this folder was still being built or published after ten minutes, so Plantoir stopped rather than interrupt it.",
+          "❌ After ten minutes, {origin} was still {doing}, so Plantoir stopped rather than interrupt it.",
           "   Try again once it has finished. Nothing was changed."
         ],
-        "whileWaiting" : "⏳ Something in this folder is still running. Plantoir will update this folder's workspace as soon as it has finished…",
-        "why" : "Printed by all three launchers, each once. 'Workspace' is already a teacher's word here (#280's sentences). No machinery words (rule 1). whileWaiting is said once, however long the wait. 'Nothing was changed' is true: nothing has been stopped when either refusal is said."
+        "whileWaitingForAPreview" : "⏳ Waiting for the preview of {course} section {section} to close before Plantoir sets this folder up again…",
+        "whileWaitingForSomethingElse" : "⏳ Waiting for something else Plantoir is doing in this folder to finish before it sets the folder up again…",
+        "whileWaitingForWork" : "⏳ Waiting for {origin} to finish {doing} before Plantoir sets this folder up again…",
+        "why" : "Printed by all three launchers. No machinery words (rule 1), and no 'workspace' either: until #378 this said \"'Workspace' is already a teacher's word here (#280's sentences)\", and #378 is the evidence it is not — Russell, who wrote the product, did not know what it meant. The waiting sentence names WHO is at work and WHAT they are doing, is said once per thing waited for (again only when that changes), and the same words drive the app's status line (statusLine). 'Nothing was changed' is true: nothing has been stopped when either refusal is said. whenLeftoverWorkIsStopped says 'Your pages were not touched' rather than 'nothing was changed', because something WAS: work was ended. It no longer claims a stopped deploy was 'waiting for an answer' — the plan offered that clause, but whether a process is waiting or working is not proved by the look, and a sentence that guesses is worse than one that says less."
       },
       "sequences" : {
         "cases" : [
@@ -3520,6 +3563,9 @@
               "nothing"
             ],
             "name" : "nothing running: remade at once",
+            "said" : [
+
+            ],
             "waited" : 0
           },
           {
@@ -3530,6 +3576,9 @@
               "nothing"
             ],
             "name" : "a build that finishes: waited for, then remade",
+            "said" : [
+              "work publish ICS4U/2 terminal"
+            ],
             "waited" : 4
           },
           {
@@ -3539,6 +3588,9 @@
               "nothing"
             ],
             "name" : "a preview closed a moment ago: waited for, then remade",
+            "said" : [
+              "preview ICS4U/1"
+            ],
             "waited" : 2
           },
           {
@@ -3547,6 +3599,9 @@
               "a preview"
             ],
             "name" : "a preview left open",
+            "said" : [
+              "preview ICS4U/1"
+            ],
             "waited" : 20
           },
           {
@@ -3555,6 +3610,9 @@
               "other work"
             ],
             "name" : "work that never finishes",
+            "said" : [
+              "work publish ICS4U/2 terminal"
+            ],
             "waited" : 600
           },
           {
@@ -3574,10 +3632,55 @@
               "a preview"
             ],
             "name" : "a preview opened while a build was being waited for",
+            "said" : [
+              "work publish ICS4U/2 terminal"
+            ],
+            "saidWhy" : "The preview is first seen after 22 s, past its own twenty: it is refused at once, so its waiting sentence is never said.",
             "waited" : 22
+          },
+          {
+            "expect" : "remade",
+            "looks" : [
+              "leftover"
+            ],
+            "name" : "only work whose owner has gone: remade at once, and what was stopped is said",
+            "said" : [
+
+            ],
+            "stopped" : "publish:MPM2D/2",
+            "waited" : 0
+          },
+          {
+            "expect" : "remade",
+            "looks" : [
+              "other work",
+              "other work",
+              "leftover"
+            ],
+            "name" : "work that is owned, then only leftovers: waited for, then remade",
+            "said" : [
+              "work publish ICS4U/2 terminal"
+            ],
+            "stopped" : "publish:MPM2D/2",
+            "waited" : 4
+          },
+          {
+            "expect" : "remade",
+            "looks" : [
+              "other work",
+              "other build",
+              "other build",
+              "nothing"
+            ],
+            "name" : "what is waited for changes, and each is said once",
+            "said" : [
+              "work publish ICS4U/2 terminal",
+              "work build ICS4U/3 terminal"
+            ],
+            "waited" : 6
           }
         ],
-        "why" : "What the looks add up to, run through the REAL remake_the_workspace against a pretend engine by scripts/test_port_blocks.py. `looks` are what each look finds, the last one repeating. `waited` is the seconds counted before the outcome."
+        "why" : "What the looks add up to, run through the REAL remake_the_workspace against a pretend engine by scripts/test_port_blocks.py. `looks` are what each look finds, the last one repeating: 'nothing', 'a preview' (ICS4U/1, its launcher running), 'other work' (a publish of ICS4U/2, its deploy.sh running), 'other build' (a build of ICS4U/3, its preview.sh --build-only running), and 'leftover' (a publish of MPM2D/2 whose launcher has gone). `waited` is the seconds counted before the outcome; `said` is the waiting sentences in the order they must appear, each once; `stopped` is the leftovers the remake must name."
       },
       "trailMarker" : "The launcher prints `PLANTOIR_WORKSPACE_IN_USE: <waited|preview|work> <seconds> <course>/<section or setup> [<the open preview's course>/<section>]` when it waited or refused, and the app writes the trail line from it — shared-rules.json -> activityTrail.mustRecord.\"workspace was in use\". A remake with nothing running prints nothing.",
       "waiting" : {
@@ -3640,7 +3743,8 @@
                 1,
                 "python3 -u /opt/scripts/build_site.py --host-os mac --course=ICS4U --section=1 --port 8081"
               ]
-            ]
+            ],
+            "waitingFor" : "preview ICS4U/1 -"
           },
           {
             "expect" : "a preview",
@@ -3671,13 +3775,15 @@
                 220,
                 "/opt/quartz/node_modules/@esbuild/linux-arm64/bin/esbuild --service=0.25.1 --ping"
               ]
-            ]
+            ],
+            "waitingFor" : "preview ICS4U/1 -"
           },
           {
             "expect" : "nothing",
             "launchers" : [
 
             ],
+            "leftovers" : "preview:ICS4U/1",
             "name" : "a preview whose launcher has gone",
             "running" : true,
             "top" : [
@@ -3708,6 +3814,7 @@
             "launchers" : [
               "/bin/bash /Users/t/Work/preview.sh ICS4U 1 --stop"
             ],
+            "leftovers" : "preview:ICS4U/1",
             "name" : "a preview whose launcher is only stopping it",
             "running" : true,
             "top" : [
@@ -3733,6 +3840,7 @@
             "launchers" : [
               "/bin/bash /Users/t/Work/preview.sh ICS4U 2"
             ],
+            "leftovers" : "preview:ICS4U/1",
             "name" : "a preview of another section is not this launcher's",
             "running" : true,
             "top" : [
@@ -3753,6 +3861,7 @@
             "launchers" : [
               "/bin/bash /Users/t/Work/preview.sh ICS4U 1"
             ],
+            "leftovers" : "preview:ICS4U/1",
             "name" : "a website builder serving with nothing above it",
             "running" : true,
             "top" : [
@@ -3796,12 +3905,13 @@
                 310,
                 "node /tmp/quartz-builds/ICS4U/section2/quartz/bootstrap-cli.mjs build --concurrency 1"
               ]
-            ]
+            ],
+            "waitingFor" : "build ICS4U/2 terminal"
           },
           {
             "expect" : "other work",
             "launchers" : [
-
+              "/bin/bash /Users/t/Work/deploy.sh ICS4U 2"
             ],
             "name" : "a publish",
             "running" : true,
@@ -3814,19 +3924,20 @@
               [
                 410,
                 1,
-                "sh -lc tok=$(cat /tmp/deploy_pat); python3 /opt/scripts/deploy.py --host-os mac --course ICS4U --section 2"
+                "sh -lc  tok=$(cat /tmp/deploy_pat); rm -f /tmp/deploy_pat; opts=\"\"; [ -n \"$DIAGNOSE\" ] && opts=\"$opts $DIAGNOSE\"; [ \"$NON_INTERACTIVE\" = \"true\" ] && opts=\"$opts --non-interactive\"; [ -n \"$TEAM_SLUG\" ] && opts=\"$opts --team $TEAM_SLUG\"; if [ \"$TARGET\" = \"cloudflare\" ]; then CLOUDFLARE_API_TOKEN=\"$tok\" CLOUDFLARE_ACCOUNT_ID=\"$CF_ACCOUNT\" \\ python3 /opt/scripts/deploy.py --host-os mac --target cloudflare --course ICS4U --section 2 $opts else NETLIFY_AUTH_TOKEN=\"$tok\" \\ python3 /opt/scripts/deploy.py --host-os mac --course ICS4U --section 2 $opts fi "
               ],
               [
                 420,
                 410,
                 "python3 /opt/scripts/deploy.py --host-os mac --course ICS4U --section 2"
               ]
-            ]
+            ],
+            "waitingFor" : "publish ICS4U/2 terminal"
           },
           {
             "expect" : "other work",
             "launchers" : [
-
+              "/bin/bash /Users/t/Work/setup.sh"
             ],
             "name" : "another launcher checking the courses folder",
             "running" : true,
@@ -3841,7 +3952,8 @@
                 1,
                 "sh -lc mkdir -p /teaching/courses && echo ok >/teaching/courses/.write_probe && rm -f /teaching/courses/.write_probe"
               ]
-            ]
+            ],
+            "waitingFor" : "work - terminal"
           },
           {
             "expect" : "other work",
@@ -3850,13 +3962,15 @@
             ],
             "name" : "running, but could not be asked",
             "running" : true,
-            "top" : "fails"
+            "top" : "fails",
+            "waitingFor" : "work - -"
           },
           {
             "expect" : "a preview",
             "launchers" : [
               "/bin/bash /Users/t/Work/preview.sh ICS4U 1"
             ],
+            "leftovers" : "publish:ICS4U/2",
             "name" : "an open preview wins over a publish",
             "preview" : "ICS4U/1",
             "running" : true,
@@ -3876,12 +3990,778 @@
                 1,
                 "python3 /opt/scripts/deploy.py --host-os mac --course ICS4U --section 2"
               ]
+            ],
+            "waitingFor" : "preview ICS4U/1 -"
+          },
+          {
+            "expect" : "nothing",
+            "launchers" : [
+
+            ],
+            "leftovers" : "publish:MPM2D/2",
+            "name" : "a deploy whose launcher has gone, waiting on a question",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                410,
+                1,
+                "sh -lc  tok=$(cat /tmp/deploy_pat); rm -f /tmp/deploy_pat; opts=\"\"; [ -n \"$DIAGNOSE\" ] && opts=\"$opts $DIAGNOSE\"; [ \"$NON_INTERACTIVE\" = \"true\" ] && opts=\"$opts --non-interactive\"; [ -n \"$TEAM_SLUG\" ] && opts=\"$opts --team $TEAM_SLUG\"; if [ \"$TARGET\" = \"cloudflare\" ]; then CLOUDFLARE_API_TOKEN=\"$tok\" CLOUDFLARE_ACCOUNT_ID=\"$CF_ACCOUNT\" \\ python3 /opt/scripts/deploy.py --host-os mac --target cloudflare --course MPM2D --section 2 $opts else NETLIFY_AUTH_TOKEN=\"$tok\" \\ python3 /opt/scripts/deploy.py --host-os mac --course MPM2D --section 2 $opts fi "
+              ],
+              [
+                420,
+                410,
+                "python3 /opt/scripts/deploy.py --host-os mac --course MPM2D --section 2"
+              ]
+            ],
+            "why" : "#378's shape: the program that ran deploy.sh on a terminal was closed while deploy.py waited at a question (the reproduction used `read answer`; the wrapper line is the one `docker top` really prints)."
+          },
+          {
+            "expect" : "nothing",
+            "launchers" : [
+
+            ],
+            "leftovers" : "build:ICS4U/1",
+            "name" : "a build for deploying whose launcher has gone",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                310,
+                1,
+                "python3 -u /opt/scripts/build_site.py --host-os mac --course=ICS4U --section=1 --port 8082 --build-only"
+              ],
+              [
+                320,
+                310,
+                "node /tmp/quartz-builds/ICS4U/section1/quartz/bootstrap-cli.mjs build --concurrency 1"
+              ]
             ]
+          },
+          {
+            "expect" : "other work",
+            "launchers" : [
+              [
+                6001,
+                1,
+                "/Users/t/.local/bin/claude"
+              ],
+              [
+                6002,
+                6001,
+                "/Applications/Plantoir.app/Contents/MacOS/Plantoir --mcp-stdio /Users/t/Work"
+              ],
+              [
+                6003,
+                6002,
+                "/bin/bash /Users/t/Work/preview.sh ICS4U 1 --build-only --non-interactive"
+              ]
+            ],
+            "name" : "a build for deploying, its launcher running under Revise with Claude",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                310,
+                1,
+                "python3 -u /opt/scripts/build_site.py --host-os mac --course=ICS4U --section=1 --port 8082 --build-only"
+              ],
+              [
+                320,
+                310,
+                "node /tmp/quartz-builds/ICS4U/section1/quartz/bootstrap-cli.mjs build --concurrency 1"
+              ]
+            ],
+            "waitingFor" : "build ICS4U/1 claude",
+            "why" : "Decision 1: a session holds a preview back only while it builds or publishes, and says so by name."
+          },
+          {
+            "expect" : "other work",
+            "launchers" : [
+              [
+                6002,
+                1,
+                "/Applications/Plantoir.app/Contents/MacOS/Plantoir"
+              ],
+              [
+                6003,
+                6002,
+                "/bin/bash /Users/t/Work/preview.sh ICS4U 1 --build-only"
+              ]
+            ],
+            "name" : "a build started from a Plantoir window",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                310,
+                1,
+                "python3 -u /opt/scripts/build_site.py --host-os mac --course=ICS4U --section=1 --port 8082 --build-only"
+              ],
+              [
+                320,
+                310,
+                "node /tmp/quartz-builds/ICS4U/section1/quartz/bootstrap-cli.mjs build --concurrency 1"
+              ]
+            ],
+            "waitingFor" : "build ICS4U/1 window"
+          },
+          {
+            "expect" : "other work",
+            "launchers" : [
+              [
+                6101,
+                1,
+                "/Applications/Plantoir.app/Contents/MacOS/Plantoir --run-scheduled-deploy /Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.ICS4U.section2.3975d2cd.sh --scheduled-section /Users/t/Work ICS4U 2"
+              ],
+              [
+                6102,
+                6101,
+                "/bin/bash /Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.ICS4U.section2.3975d2cd.sh"
+              ],
+              [
+                6103,
+                6102,
+                "/bin/bash /Users/t/Work/deploy.sh ICS4U 2 --non-interactive"
+              ]
+            ],
+            "name" : "a publish set for later, its deploy.sh running under launchd",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                410,
+                1,
+                "sh -lc  tok=$(cat /tmp/deploy_pat); rm -f /tmp/deploy_pat; opts=\"\"; [ -n \"$DIAGNOSE\" ] && opts=\"$opts $DIAGNOSE\"; [ \"$NON_INTERACTIVE\" = \"true\" ] && opts=\"$opts --non-interactive\"; [ -n \"$TEAM_SLUG\" ] && opts=\"$opts --team $TEAM_SLUG\"; if [ \"$TARGET\" = \"cloudflare\" ]; then CLOUDFLARE_API_TOKEN=\"$tok\" CLOUDFLARE_ACCOUNT_ID=\"$CF_ACCOUNT\" \\ python3 /opt/scripts/deploy.py --host-os mac --target cloudflare --course ICS4U --section 2 $opts else NETLIFY_AUTH_TOKEN=\"$tok\" \\ python3 /opt/scripts/deploy.py --host-os mac --course ICS4U --section 2 $opts fi "
+              ],
+              [
+                420,
+                410,
+                "python3 /opt/scripts/deploy.py --host-os mac --course ICS4U --section 2"
+              ]
+            ],
+            "waitingFor" : "publish ICS4U/2 scheduled",
+            "why" : "The runner is the Plantoir binary WITHOUT --mcp-stdio, so it is checked for a scheduled path before it could be read as a window (N2)."
+          },
+          {
+            "expect" : "other work",
+            "launchers" : [
+              [
+                6101,
+                1,
+                "/Applications/Plantoir.app/Contents/MacOS/Plantoir --run-scheduled-deploy /Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.ICS4U.section2.3975d2cd.sh --scheduled-section /Users/t/Work ICS4U 2"
+              ]
+            ],
+            "name" : "a publish set for later, between its deploy.sh ending and its Python being reaped",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                410,
+                1,
+                "sh -lc  tok=$(cat /tmp/deploy_pat); rm -f /tmp/deploy_pat; opts=\"\"; [ -n \"$DIAGNOSE\" ] && opts=\"$opts $DIAGNOSE\"; [ \"$NON_INTERACTIVE\" = \"true\" ] && opts=\"$opts --non-interactive\"; [ -n \"$TEAM_SLUG\" ] && opts=\"$opts --team $TEAM_SLUG\"; if [ \"$TARGET\" = \"cloudflare\" ]; then CLOUDFLARE_API_TOKEN=\"$tok\" CLOUDFLARE_ACCOUNT_ID=\"$CF_ACCOUNT\" \\ python3 /opt/scripts/deploy.py --host-os mac --target cloudflare --course ICS4U --section 2 $opts else NETLIFY_AUTH_TOKEN=\"$tok\" \\ python3 /opt/scripts/deploy.py --host-os mac --course ICS4U --section 2 $opts fi "
+              ],
+              [
+                420,
+                410,
+                "python3 /opt/scripts/deploy.py --host-os mac --course ICS4U --section 2"
+              ]
+            ],
+            "waitingFor" : "publish ICS4U/2 scheduled",
+            "why" : "The belt: launchd's runner carries the script's path for the whole run."
+          },
+          {
+            "expect" : "nothing",
+            "launchers" : [
+              [
+                6101,
+                1,
+                "/Applications/Plantoir.app/Contents/MacOS/Plantoir --run-scheduled-deploy /Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.ICS4U.section12.3975d2cd.sh --scheduled-section /Users/t/Work ICS4U 12"
+              ]
+            ],
+            "leftovers" : "publish:ICS4U/1",
+            "name" : "a publish set for later names only its own section",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                410,
+                1,
+                "sh -lc  tok=$(cat /tmp/deploy_pat); rm -f /tmp/deploy_pat; opts=\"\"; [ -n \"$DIAGNOSE\" ] && opts=\"$opts $DIAGNOSE\"; [ \"$NON_INTERACTIVE\" = \"true\" ] && opts=\"$opts --non-interactive\"; [ -n \"$TEAM_SLUG\" ] && opts=\"$opts --team $TEAM_SLUG\"; if [ \"$TARGET\" = \"cloudflare\" ]; then CLOUDFLARE_API_TOKEN=\"$tok\" CLOUDFLARE_ACCOUNT_ID=\"$CF_ACCOUNT\" \\ python3 /opt/scripts/deploy.py --host-os mac --target cloudflare --course ICS4U --section 1 $opts else NETLIFY_AUTH_TOKEN=\"$tok\" \\ python3 /opt/scripts/deploy.py --host-os mac --course ICS4U --section 1 $opts fi "
+              ],
+              [
+                420,
+                410,
+                "python3 /opt/scripts/deploy.py --host-os mac --course ICS4U --section 1"
+              ]
+            ],
+            "why" : "section1 is a prefix of section12: the label's section must be followed by a dot (N3)."
+          },
+          {
+            "expect" : "other work",
+            "launchers" : [
+              [
+                6101,
+                1,
+                "/Applications/Plantoir.app/Contents/MacOS/Plantoir --run-scheduled-deploy /Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.ICS-4U.section2.3975d2cd.sh --scheduled-section /Users/t/Work ICS.4U 2"
+              ]
+            ],
+            "name" : "a publish set for later, course with characters a label cannot hold",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                410,
+                1,
+                "sh -lc  tok=$(cat /tmp/deploy_pat); rm -f /tmp/deploy_pat; opts=\"\"; [ -n \"$DIAGNOSE\" ] && opts=\"$opts $DIAGNOSE\"; [ \"$NON_INTERACTIVE\" = \"true\" ] && opts=\"$opts --non-interactive\"; [ -n \"$TEAM_SLUG\" ] && opts=\"$opts --team $TEAM_SLUG\"; if [ \"$TARGET\" = \"cloudflare\" ]; then CLOUDFLARE_API_TOKEN=\"$tok\" CLOUDFLARE_ACCOUNT_ID=\"$CF_ACCOUNT\" \\ python3 /opt/scripts/deploy.py --host-os mac --target cloudflare --course ICS.4U --section 2 $opts else NETLIFY_AUTH_TOKEN=\"$tok\" \\ python3 /opt/scripts/deploy.py --host-os mac --course ICS.4U --section 2 $opts fi "
+              ],
+              [
+                420,
+                410,
+                "python3 /opt/scripts/deploy.py --host-os mac --course ICS.4U --section 2"
+              ]
+            ],
+            "waitingFor" : "publish ICS.4U/2 scheduled",
+            "why" : "ScheduledDeploy writes the code upper-cased with anything not a letter or digit as '-' (N3)."
+          },
+          {
+            "expect" : "other work",
+            "launchers" : [
+              "/bin/bash ./deploy.sh MPM2D 1"
+            ],
+            "name" : "unnameable work while a launcher from this Mac is running",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                510,
+                1,
+                "sh -c echo asking; read answer"
+              ]
+            ],
+            "waitingFor" : "work - terminal"
+          },
+          {
+            "expect" : "nothing",
+            "launchers" : [
+
+            ],
+            "leftovers" : "other",
+            "name" : "unnameable work with no launcher anywhere",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                510,
+                1,
+                "sh -c echo asking; read answer"
+              ]
+            ],
+            "why" : "The literal reproduction (#378 plan, R3/R5)."
+          },
+          {
+            "expect" : "nothing",
+            "launchers" : [
+
+            ],
+            "leftovers" : "setup",
+            "name" : "a set-up whose setup.sh has gone",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                610,
+                1,
+                "python3 /opt/scripts/setup_course.py --course ICS4U"
+              ]
+            ]
+          },
+          {
+            "expect" : "other work",
+            "launchers" : [
+              "/bin/bash ./setup.sh"
+            ],
+            "name" : "a set-up whose setup.sh is running",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                610,
+                1,
+                "python3 /opt/scripts/setup_course.py --course ICS4U"
+              ]
+            ],
+            "waitingFor" : "setup - terminal"
+          },
+          {
+            "expect" : "nothing",
+            "launchers" : [
+              "/bin/bash /Users/t/Work/preview.sh ICS4U 2 --build-only"
+            ],
+            "leftovers" : "build:ICS4U/1",
+            "name" : "a launcher for ANOTHER section is running; this section's build was left",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                310,
+                1,
+                "python3 -u /opt/scripts/build_site.py --host-os mac --course=ICS4U --section=1 --port 8082 --build-only"
+              ],
+              [
+                320,
+                310,
+                "node /tmp/quartz-builds/ICS4U/section1/quartz/bootstrap-cli.mjs build --concurrency 1"
+              ]
+            ]
+          },
+          {
+            "expect" : "nothing",
+            "launchers" : [
+              [
+                4242,
+                1,
+                "/System/Applications/Mail.app/Contents/MacOS/Mail"
+              ]
+            ],
+            "leaseFile" : "ICS4U.build.4242.lease",
+            "leftovers" : "build:ICS4U/1",
+            "name" : "the owner's old process number now belongs to something else",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                310,
+                1,
+                "python3 -u /opt/scripts/build_site.py --host-os mac --course=ICS4U --section=1 --port 8082 --build-only"
+              ],
+              [
+                320,
+                310,
+                "node /tmp/quartz-builds/ICS4U/section1/quartz/bootstrap-cli.mjs build --concurrency 1"
+              ]
+            ],
+            "why" : "A lease file remembers a process number; the number was reused. Nothing remembered is consulted, so the build is left over (MF-2)."
+          },
+          {
+            "expect" : "other work",
+            "launchers" : [
+
+            ],
+            "name" : "the process table cannot be read",
+            "psFails" : true,
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                310,
+                1,
+                "python3 -u /opt/scripts/build_site.py --host-os mac --course=ICS4U --section=1 --port 8082 --build-only"
+              ],
+              [
+                320,
+                310,
+                "node /tmp/quartz-builds/ICS4U/section1/quartz/bootstrap-cli.mjs build --concurrency 1"
+              ]
+            ],
+            "waitingFor" : "build ICS4U/1 -",
+            "why" : "Fails safe, as #94 did for a preview: a wait and a refusal, never an ended publish."
+          },
+          {
+            "expect" : "other work",
+            "launchers" : [
+              [
+                6201,
+                1,
+                "/Users/t/.local/bin/claude"
+              ],
+              [
+                6202,
+                6201,
+                "/bin/zsh -c docker exec -i teaching-quartz-0000abcd sh -c python3 /tmp/check.py"
+              ],
+              [
+                6203,
+                6202,
+                "docker exec -i teaching-quartz-0000abcd sh -c python3 /tmp/check.py"
+              ]
+            ],
+            "name" : "a live docker exec aimed at this workspace owns what it cannot name",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                710,
+                1,
+                "sh -c python3 /tmp/check.py"
+              ],
+              [
+                720,
+                710,
+                "python3 /tmp/check.py"
+              ]
+            ],
+            "waitingFor" : "work - claude",
+            "why" : "Plan review S7: work started by a live program that is not a launcher (an assistant's own command, an older launcher) is waited for, not ended. Closing a program ends its docker exec too, so leftovers are not kept alive by this."
+          },
+          {
+            "expect" : "nothing",
+            "launchers" : [
+              "docker exec -i teaching-quartz-deadbeef sh -c python3 /tmp/check.py"
+            ],
+            "leftovers" : "other",
+            "name" : "a docker exec aimed at another folder's workspace owns nothing here",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                710,
+                1,
+                "sh -c python3 /tmp/check.py"
+              ]
+            ]
+          },
+          {
+            "expect" : "other work",
+            "launchers" : [
+              "/bin/bash /Users/t/Work/deploy.sh MPM2D 2"
+            ],
+            "leftovers" : "build:ICS4U/1",
+            "name" : "both a deploy that is running and a build that was left",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                410,
+                1,
+                "sh -lc  tok=$(cat /tmp/deploy_pat); rm -f /tmp/deploy_pat; opts=\"\"; [ -n \"$DIAGNOSE\" ] && opts=\"$opts $DIAGNOSE\"; [ \"$NON_INTERACTIVE\" = \"true\" ] && opts=\"$opts --non-interactive\"; [ -n \"$TEAM_SLUG\" ] && opts=\"$opts --team $TEAM_SLUG\"; if [ \"$TARGET\" = \"cloudflare\" ]; then CLOUDFLARE_API_TOKEN=\"$tok\" CLOUDFLARE_ACCOUNT_ID=\"$CF_ACCOUNT\" \\ python3 /opt/scripts/deploy.py --host-os mac --target cloudflare --course MPM2D --section 2 $opts else NETLIFY_AUTH_TOKEN=\"$tok\" \\ python3 /opt/scripts/deploy.py --host-os mac --course MPM2D --section 2 $opts fi "
+              ],
+              [
+                420,
+                410,
+                "python3 /opt/scripts/deploy.py --host-os mac --course MPM2D --section 2"
+              ],
+              [
+                310,
+                1,
+                "python3 -u /opt/scripts/build_site.py --host-os mac --course=ICS4U --section=1 --port 8082 --build-only"
+              ],
+              [
+                320,
+                310,
+                "node /tmp/quartz-builds/ICS4U/section1/quartz/bootstrap-cli.mjs build --concurrency 1"
+              ]
+            ],
+            "waitingFor" : "publish MPM2D/2 terminal"
+          },
+          {
+            "expect" : "other work",
+            "launchers" : [
+              "/bin/bash /Users/t/Work/deploy.sh ICS4U 2"
+            ],
+            "name" : "a deploy rebuilding the site through build_site.py, its deploy.sh running",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                410,
+                1,
+                "sh -lc  tok=$(cat /tmp/deploy_pat); rm -f /tmp/deploy_pat; opts=\"\"; [ -n \"$DIAGNOSE\" ] && opts=\"$opts $DIAGNOSE\"; [ \"$NON_INTERACTIVE\" = \"true\" ] && opts=\"$opts --non-interactive\"; [ -n \"$TEAM_SLUG\" ] && opts=\"$opts --team $TEAM_SLUG\"; if [ \"$TARGET\" = \"cloudflare\" ]; then CLOUDFLARE_API_TOKEN=\"$tok\" CLOUDFLARE_ACCOUNT_ID=\"$CF_ACCOUNT\" \\ python3 /opt/scripts/deploy.py --host-os mac --target cloudflare --course ICS4U --section 2 $opts else NETLIFY_AUTH_TOKEN=\"$tok\" \\ python3 /opt/scripts/deploy.py --host-os mac --course ICS4U --section 2 $opts fi "
+              ],
+              [
+                420,
+                410,
+                "python3 /opt/scripts/deploy.py --host-os mac --course ICS4U --section 2"
+              ],
+              [
+                430,
+                420,
+                "python3 /opt/scripts/build_site.py --course=ICS4U --section=2 --build-only --port 8082"
+              ],
+              [
+                440,
+                430,
+                "node /tmp/quartz-builds/ICS4U/section2/quartz/bootstrap-cli.mjs build --concurrency 1"
+              ]
+            ],
+            "waitingFor" : "publish ICS4U/2 terminal",
+            "why" : "Plan review S2: the rebuild is the deploy's own child, so it belongs to the publish (the OUTERMOST root) and is owned by deploy.sh — never a build whose preview.sh has gone."
+          },
+          {
+            "expect" : "nothing",
+            "launchers" : [
+              [
+                6001,
+                1,
+                "/Users/t/.local/bin/claude"
+              ],
+              [
+                6002,
+                6001,
+                "/Applications/Plantoir.app/Contents/MacOS/Plantoir --mcp-stdio /Users/t/Work"
+              ]
+            ],
+            "leftovers" : "publish:MPM2D/2",
+            "name" : "an assistant session that is open but idle owns nothing",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                410,
+                1,
+                "sh -lc  tok=$(cat /tmp/deploy_pat); rm -f /tmp/deploy_pat; opts=\"\"; [ -n \"$DIAGNOSE\" ] && opts=\"$opts $DIAGNOSE\"; [ \"$NON_INTERACTIVE\" = \"true\" ] && opts=\"$opts --non-interactive\"; [ -n \"$TEAM_SLUG\" ] && opts=\"$opts --team $TEAM_SLUG\"; if [ \"$TARGET\" = \"cloudflare\" ]; then CLOUDFLARE_API_TOKEN=\"$tok\" CLOUDFLARE_ACCOUNT_ID=\"$CF_ACCOUNT\" \\ python3 /opt/scripts/deploy.py --host-os mac --target cloudflare --course MPM2D --section 2 $opts else NETLIFY_AUTH_TOKEN=\"$tok\" \\ python3 /opt/scripts/deploy.py --host-os mac --course MPM2D --section 2 $opts fi "
+              ],
+              [
+                420,
+                410,
+                "python3 /opt/scripts/deploy.py --host-os mac --course MPM2D --section 2"
+              ]
+            ],
+            "why" : "Decision 1: an open session is not an owner; it owns work only through a launcher it is running."
+          },
+          {
+            "expect" : "a preview",
+            "launchers" : [
+              "/bin/bash /Users/t/Work/preview.sh AP CALC 1"
+            ],
+            "name" : "a preview of a course whose code has a space, its launcher running",
+            "preview" : "AP+CALC/1",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                210,
+                1,
+                "python3 -u /opt/scripts/build_site.py --host-os mac --course=AP CALC --section=1 --port 8081"
+              ]
+            ],
+            "waitingFor" : "preview AP+CALC/1 -",
+            "why" : "#378 review S1: a course code may carry one space (CourseCodeRule, \"AP CALC\"). Read word by word, this live preview was course AP, section CALC, and was stopped and reported as left over. The course runs to the next \" --\", is carried with \"+\" for the space, and a launcher's arguments are matched as the text they begin with."
+          },
+          {
+            "expect" : "nothing",
+            "launchers" : [
+
+            ],
+            "leftovers" : "preview:AP+CALC/1",
+            "name" : "a preview of a course whose code has a space, its launcher gone",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                210,
+                1,
+                "python3 -u /opt/scripts/build_site.py --host-os mac --course=AP CALC --section=1 --port 8081"
+              ]
+            ]
+          },
+          {
+            "expect" : "other work",
+            "launchers" : [
+              "/bin/bash ./preview.sh AP CALC 1 --build-only"
+            ],
+            "name" : "a build of a course whose code has a space, its launcher running and no docker exec to vouch for it",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                310,
+                1,
+                "python3 -u /opt/scripts/build_site.py --host-os mac --course=AP CALC --section=1 --port 8082 --build-only"
+              ]
+            ],
+            "waitingFor" : "build AP+CALC/1 terminal"
+          },
+          {
+            "expect" : "other work",
+            "launchers" : [
+              "/bin/bash /Users/t/Work/deploy.sh AP CALC 1"
+            ],
+            "name" : "a deploy of a course whose code has a space, the course quoted in the wrapper",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                410,
+                1,
+                "sh -lc  tok=$(cat /tmp/deploy_pat); rm -f /tmp/deploy_pat; opts=\"\"; NETLIFY_AUTH_TOKEN=\"$tok\" \\ python3 /opt/scripts/deploy.py --host-os mac --course \"AP CALC\" --section 1 $opts "
+              ],
+              [
+                420,
+                410,
+                "python3 /opt/scripts/deploy.py --host-os mac --course AP CALC --section 1"
+              ]
+            ],
+            "waitingFor" : "publish AP+CALC/1 terminal"
+          },
+          {
+            "expect" : "nothing",
+            "launchers" : [
+              "/bin/bash /Users/t/Work/preview.sh AP 1"
+            ],
+            "leftovers" : "preview:AP+CALC/1",
+            "name" : "a launcher for AP 1 does not own a preview of AP CALC 1",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                210,
+                1,
+                "python3 -u /opt/scripts/build_site.py --host-os mac --course=AP CALC --section=1 --port 8081"
+              ]
+            ]
+          },
+          {
+            "expect" : "other work",
+            "launchers" : [
+
+            ],
+            "name" : "the process table is read but lists nothing, not even this run",
+            "psEmpty" : true,
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                310,
+                1,
+                "python3 -u /opt/scripts/build_site.py --host-os mac --course=ICS4U --section=1 --port 8082 --build-only"
+              ]
+            ],
+            "waitingFor" : "build ICS4U/1 -",
+            "why" : "#378 review N6: a table that does not list this run is not believed; it counts as unread, and so as every owner running."
+          },
+          {
+            "expect" : "nothing",
+            "launchers" : [
+              "/bin/bash /Users/t/Work/preview.sh ICS3U 12"
+            ],
+            "leftovers" : "preview:ICS3U/1",
+            "name" : "a running launcher for ICS3U 12 does not own a gone preview of ICS3U 1",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                210,
+                1,
+                "python3 -u /opt/scripts/build_site.py --host-os mac --course=ICS3U --section=1 --port 8081"
+              ]
+            ],
+            "why" : "#378 fix-round review N1: the prefix match ends in a space (\"ICS3U 1 \"), so \"ICS3U 12 …\" never begins with it."
           }
         ],
-        "knownLimits" : "Another working folder's preview.sh for the SAME course and section makes an orphan here count as open (the words are all that is matched; the folder is not). And between the last look and the stop — tens of milliseconds — another launcher can start something in the workspace, which is then ended: narrowed, not closed. Closing it needs a lock every launcher and the app honour, which is what #156's work leases are for, and they are the app's.",
-        "rule" : "One look answers one of three: 'nothing' (not running, gone, or only its own first process), 'a preview' (build_site.py WITHOUT --build-only, with everything it started, AND a preview.sh for that course and section running on this Mac other than this run), or 'other work' (anything else, and a running workspace that `docker top` did not answer). An open preview wins over other work, because waiting cannot end it. A preview whose launcher has gone counts as nothing, and so does a website builder serving with no build_site.py above it, with whatever it started.",
-        "whyTheLauncherIsAsked" : "Measured 2026-09-25 (plan review): killing the host side of `docker exec` leaves the process running inside the workspace, parented to the engine's shim. That is how a preview is left behind when the app is force-quit, a Terminal window is closed or an assistant's client exits. Counted as an open preview it would refuse every remake of that folder for ever, with nothing a teacher could close; the stop rule's own sweep (section processes reclaimed) exists because this happens. The host launcher is matched on the two words after preview.sh — the course, in either case, and the section — because a command-line run names the launcher by a relative path; a --stop or --build-only run is not a preview; and this run, its ancestors and its descendants are left out (a login shell wrapping it carries the same words). A process table that cannot be read counts as the launcher running: a refused remake is recoverable, a killed preview is what #94 is."
+        "casesWhy" : "`launchers` rows are either a command line (given pid 7001, 7002… and parent 1) or [pid, parent, command line], so a case can say who started what. `leftovers` is the space-separated WORKSPACE_LEFTOVERS the look must set, `waitingFor` its WORKSPACE_WAITING_FOR; both default to empty. `psFails` makes the process table unreadable. Run through the REAL look by scripts/test_port_blocks.py in all three launchers. `psEmpty` makes `ps` answer 0 with no lines. A course with a space is carried with \"+\" for it (`preview`, `waitingFor`, `leftovers` and the markers), and decoded for every sentence.",
+        "knownLimits" : "The owner test is folder-blind: another working folder's launcher for the SAME course and section makes this folder's leftover count as owned (a needless wait, and the status line names that other folder's work, for up to ten minutes — the safe direction; matching by working directory was rejected as a second system query for a failure that only waits). Between the last look and the stop — tens of milliseconds — another launcher can start something in the workspace, which is then ended, and not named: narrowed, not closed. And a workspace remade during a deploy's host-side stretch (the token handed in, before the upload starts) has nothing inside to see. Closing those needs a lock every launcher and the app honour, which is what #156's work leases are for, and they are the app's. A course code shaped like \"ABC --1\" (a space then two dashes) would be cut at the dashes when the look reads --course; CourseCodeRule allows one space but a code beginning a word with \"--\" is not a code anyone writes, and the cost would be a preview read as left over — recorded rather than guarded (#378 fix-round review N2).",
+        "originsWhy" : "Who started the owner, read from its ancestors: 'scheduled' first (the app's --run-scheduled-deploy runner is the Plantoir binary with no --mcp-stdio, so it must not be read as a window — plan review N2), then 'claude' / 'codex' / 'assistant' for a Plantoir --mcp-stdio with claude, codex or neither above it, then 'window' for the Plantoir app, then 'claude' / 'codex' for one of them running the launcher directly, and otherwise 'terminal'. '-' when the table could not be read.",
+        "rule" : "One look answers one of three: 'nothing' (not running, gone, only its own first process, or only work whose OWNER has gone), 'a preview' (build_site.py WITHOUT --build-only, with everything it started, AND a preview.sh for that course and section running on this Mac other than this run), or 'other work' (a build, a publish, a course being set up or anything else whose owner is running, and a running workspace that `docker top` did not answer). Every process belongs to the OUTERMOST piece of work above it inside the workspace: deploy.py (the `sh -lc` wrapper and the Python both name it) is a publish of its --course and --section, and the build_site.py --build-only a deploy runs as its own child is part of that publish (#378 plan review S2). The owners, proved from the LIVE process table only: a preview — preview.sh C S without --stop or --build-only; a build — preview.sh C S --build-only, or deploy.sh C S; a publish — deploy.sh C S; a course being set up — setup.sh; anything else — any launcher. Belts, for everything but a preview: a publish set for later, by the scheduled script's path (course sanitized as ScheduledDeploy writes it, 'section<N>' followed by a dot) and, for anything else, any such path; and a live `docker exec` aimed at this workspace by name or id. An open preview wins over other work, because waiting cannot end it. A website builder serving with no build_site.py above it is always left over.",
+        "whyTheLauncherIsAsked" : "Measured 2026-09-25 (plan review) and again 2026-09-29 for #378: killing the host side of `docker exec` leaves the process running inside the workspace, parented to the engine's shim — and under `docker exec -it`, which is how every launcher the app starts runs (on a pseudo-terminal), an in-container process waiting for an answer waits for ever (`read` from a terminal, still there minutes later), while one that is still working finishes on its own. That is how work is left behind when the app is force-quit, a Terminal window is closed or an assistant session ends. Counted as running, it refused every remake of that folder after ten minutes, until the Mac was restarted — which is what #378 reported. So an owner is proved per piece of work, from the process table read once per look, by a live process whose own command line names the same launcher, course and section: never by a remembered process number (no lease file, no pid file, no `kill -0`), so a number reused by another program cannot keep a dead owner alive. The course is matched in either case, the section exactly; this run, its ancestors and its descendants are left out (a login shell wrapping it carries the same words). An assistant session that is merely open owns nothing (#378 decision 1): it owns work only through a launcher it is running. A process table that cannot be read counts as every owner running: a wait and a refusal are recoverable, a publish ended is not."
       },
       "why" : "GitHub #94. Removing a workspace ends everything running inside it, and until this every one of those places stopped it without looking (setup.sh 8, preview.sh 5, deploy.sh 7, plus the three that retired the old shared workspace with -f). A preview open in one window died when another launcher in the same folder remade the workspace — after an update changed the recipe, once per folder for the builds mount, on a publish whose connection had gone stale — and a build or a publish half-way through was killed. The look is the app's own quit rule (documentation/09-mac-app.md: a workspace listing more than its first process is busy, and one that cannot be asked counts as busy), so the app and the launchers agree on what 'running' means. Measured on the development Mac 2026-09-25: an idle workspace lists exactly one process (tail -f /dev/null), `docker top` prints whole command lines, one look costs 23 ms, and a STOPPED workspace cannot be asked at all (exit 1) — hence 'stopped' is checked first. By id: two launchers started together can both find the old workspace idle, and a stop by NAME from the slower one would land on the new workspace the faster one has just made."
     },

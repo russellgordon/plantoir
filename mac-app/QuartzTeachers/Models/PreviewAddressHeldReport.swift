@@ -36,11 +36,11 @@ struct PreviewAddressHeldReport: Equatable {
 
     /// The four lines, pinned by the contract's `lineWhen…` fields.
     nonisolated static let lineWhenRemadeBeforeStarting: String =
-        "{place} · something else on this Mac was using preview address {address} while this working folder's workspace was stopped, so it was set up again on free addresses before starting"
+        "{place} · something else on this Mac was using preview address {address} while this working folder's website builder was stopped, so it was set up again on free addresses before starting"
     nonisolated static let lineWhenRemade: String =
-        "{place} · another account on this Mac, or macOS itself, was using preview address {address}, so this working folder's workspace was set up again on free addresses"
+        "{place} · another account on this Mac, or macOS itself, was using preview address {address}, so this working folder's website builder was set up again on free addresses"
     nonisolated static let lineWhenRefused: String =
-        "{place} · the preview stopped before building — another account on this Mac, or macOS itself, was still using its address {address} after this working folder's workspace was set up again on free addresses"
+        "{place} · the preview stopped before building — another account on this Mac, or macOS itself, was still using its address {address} after this working folder's website builder was set up again on free addresses"
     nonisolated static let lineWhenUnchecked: String =
         "{place} · did not check whether another account on this Mac was using preview address {address}: this run was pointed at a website builder Plantoir did not set up"
 

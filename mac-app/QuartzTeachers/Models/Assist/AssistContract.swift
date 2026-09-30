@@ -228,10 +228,17 @@ enum AssistContract {
                 course: course, section: section
             ),
             "deployDidNotFinish": AssistWording.deployDidNotFinish(course: course, section: section),
+            "deployNeedsAnAnswer": AssistWording.deployNeedsAnAnswer(course: course, section: section),
+            "deployNeedsAnAnswerAt": AssistWording.deployNeedsAnAnswerAt(
+                course: course, section: section, destinations: "{destinations}"
+            ),
+            "deployWentOutTo": AssistWording.deployWentOutTo(destinations: "{destinations}"),
+            "previewBuildNeedsAnAnswer": AssistWording.previewBuildNeedsAnAnswer(course: course, section: section),
             "sectionIsBusy": AssistWording.sectionIsBusy(course: course, section: section),
             "courseIsBusy": AssistWording.courseIsBusy(course: course),
             "courseIsBeingCopied": AssistWording.courseIsBeingCopied(course: course),
             "courseIsBeingBuiltElsewhere": AssistWording.courseIsBeingBuiltElsewhere(course: course),
+            "sectionIsBeingDeployed": AssistWording.sectionIsBeingDeployed(course: course, section: section),
             "previewIsRebuilding": AssistWording.previewIsRebuilding(course: course, section: section),
             "builtWithNoWindowOpen": AssistWording.builtWithNoWindowOpen(course: course, section: section),
             "rebuiltForACallerWithNoWindow": AssistWording.rebuiltForACallerWithNoWindow(
@@ -312,6 +319,10 @@ enum AssistContract {
             "howITeachCarriesNoSettings": AssistWording.howITeachCarriesNoSettings,
             "howITeachSaved": AssistWording.howITeachSaved(course: course),
             "howITeachIsNeverPublished": AssistWording.howITeachIsNeverPublished(course: course),
+            // The links checklist (#379): the finding's sentence for an assistant.
+            "linksIntoHiddenPagesWillBeOffered": AssistWording.linksIntoHiddenPagesWillBeOffered(
+                course: course, section: section
+            ),
             "howITeachBriefing": AssistWording.howITeachBriefing(courses: [course]),
             "howITeachListedAsWritten": AssistWording.howITeachListedAsWritten,
             "howITeachListedAsNotWritten": AssistWording.howITeachListedAsNotWritten,

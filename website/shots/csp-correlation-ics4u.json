@@ -1,0 +1,650 @@
+{
+  "note": "Which ICS4U activity pages reach which AP Computer Science Principles learning objectives, for the marketing working folder (~/Plantoir Marketing) only — never the shipped ICS4U payload. Same shape and rules as csp-correlation.json (ICS3U): marketing_folder.py appends one embed per code inside each page's existing '## Curriculum connection' block, after the Ontario embeds. Drafted 2026-09-27 by reading every ICS4U page in full — the 74 published activity pages that carry a curriculum block, plus the pages without one (which cannot carry an embed) and the class agendas. 'evidence' quotes the ICS4U page (our words, not the College Board's). An objective is tagged only where the page gives students something to do that the objective describes; AAP-4.A is kept to the pages that meet exponential growth, not every page that compares two polynomial algorithms. Every page with a block that is not tagged is listed under 'dropped', with the reason, so it is not proposed again. Checked row by row against each page's full text by two independent Opus readers; their verified findings were applied (three tags removed, six added).",
+  "course": "ICS4U",
+  "folder": "College Board Curriculum",
+  "rows": [
+    {
+      "page": "Concepts/Attributes and Methods",
+      "codes": [
+        "AAP-3.C",
+        "AAP-3.A",
+        "CRD-2.G"
+      ],
+      "reason": "Students read how methods are written inside a class, work out what each call returns in the self-check, and see every method given a docstring saying what it returns and when it refuses.",
+      "evidence": "A method is a function defined inside a class"
+    },
+    {
+      "page": "Concepts/Choosing a Data Structure",
+      "codes": [
+        "AAP-1.D"
+      ],
+      "reason": "Students keep each record whole in a list of objects, and choose a container by the question the program asks most often.",
+      "evidence": "There is no best container."
+    },
+    {
+      "page": "Concepts/Computing's Footprint",
+      "codes": [
+        "IOC-1.A"
+      ],
+      "reason": "Students set the harms of making, running, cooling and discarding computers beside the environmental work computing makes possible, and are told a report giving one side is unfinished.",
+      "evidence": "Both things are true at once"
+    },
+    {
+      "page": "Concepts/Dictionaries",
+      "codes": [
+        "AAP-2.O",
+        "CRD-2.I"
+      ],
+      "reason": "Students write the tally loop that walks a list item by item, and read a KeyError to decide whether the data or the assumption is wrong before choosing the fix.",
+      "evidence": "A missing key is a decision, not an accident"
+    },
+    {
+      "page": "Concepts/Efficiency and Big-O",
+      "codes": [
+        "AAP-4.A",
+        "AAP-4.B",
+        "AAP-2.P"
+      ],
+      "reason": "Students count steps to see how work grows, read the growth classes up to exponential, read that the Halting Problem cannot be decided by any algorithm, and state binary search's need for sorted data.",
+      "evidence": "as the input grows, how does the work grow?"
+    },
+    {
+      "page": "Concepts/Encapsulation",
+      "codes": [
+        "AAP-3.B",
+        "AAP-3.C"
+      ],
+      "reason": "Students route every change through one method so the rule has one home, and see that the stored representation can change without any caller noticing.",
+      "evidence": "The internals can change."
+    },
+    {
+      "page": "Concepts/Ethics, Security, and the Profession",
+      "codes": [
+        "IOC-1.D",
+        "IOC-2.A",
+        "IOC-1.F"
+      ],
+      "reason": "Students ask whose data trained an automated rule and who is missing from it, collect less personal data because a file will travel, and weigh a professional code of ethics that includes crediting others' work.",
+      "evidence": "Whose data trained the rule, and who is missing from it?"
+    },
+    {
+      "page": "Concepts/How Numbers Actually Fit",
+      "codes": [
+        "DAT-1.B",
+        "DAT-1.A",
+        "CRD-2.J"
+      ],
+      "reason": "Students see that a float is stored in binary with a fixed number of bits, meet the round-off and overflow that follow, and test at the boundaries rather than in the middle.",
+      "evidence": "Every number your program holds lives in a fixed number of bits."
+    },
+    {
+      "page": "Concepts/Objects and Classes",
+      "codes": [
+        "AAP-1.D",
+        "CRD-2.F"
+      ],
+      "reason": "Students replace three parallel lists with one object per booking, explaining how naming the grouped data removes a whole class of bug, and design the classes from the client's words before coding.",
+      "evidence": "A class is how you tell the computer they belong together."
+    },
+    {
+      "page": "Concepts/Objects Working Together",
+      "codes": [
+        "AAP-3.B",
+        "CRD-2.F"
+      ],
+      "reason": "Students give each question one owning method so the clash rule exists once, and sketch the design on CRC cards first.",
+      "evidence": "The clash rule now exists once."
+    },
+    {
+      "page": "Concepts/Reading Somebody Else's Code",
+      "codes": [
+        "CRD-2.B",
+        "CRD-2.G"
+      ],
+      "reason": "Students work out what an unfamiliar program does by running it and following one path, then write down what they learned for the next reader.",
+      "evidence": "Read like an investigator, not a reader"
+    },
+    {
+      "page": "Concepts/Recursion",
+      "codes": [
+        "AAP-4.A",
+        "AAP-2.L",
+        "CRD-2.I"
+      ],
+      "reason": "Students see a correct recursive Fibonacci become unusable through exponential growth, set it beside a loop that returns the same numbers, and read a RecursionError to find the missing base case.",
+      "evidence": "The fix is a base case, or a loop."
+    },
+    {
+      "page": "Concepts/Searching",
+      "codes": [
+        "AAP-2.P",
+        "AAP-2.O"
+      ],
+      "reason": "Students write a linear search that traverses the list and a binary search, count how many halvings it needs, and learn that it gives wrong answers on unsorted data.",
+      "evidence": "Binary search works only on sorted data"
+    },
+    {
+      "page": "Concepts/Software Project Management",
+      "codes": [
+        "CRD-2.E",
+        "CRD-1.A",
+        "CRD-1.B"
+      ],
+      "reason": "Students scope a project with the community partner in the room, split it into owned tasks with dates, roles and stand-ups, and plan milestones through testing and review to handover.",
+      "evidence": "write a scope document with the partner in the room"
+    },
+    {
+      "page": "Concepts/Sorting",
+      "codes": [
+        "AAP-2.L",
+        "AAP-3.D"
+      ],
+      "reason": "Students compare three sorts that produce the same order, see that changing > to >= changes how ties come out, and are told to call the built-in sort in real work.",
+      "evidence": "Two algorithms with the same Big-O can still be very different to live with"
+    },
+    {
+      "page": "Concepts/Stacks and Queues",
+      "codes": [
+        "AAP-1.D",
+        "AAP-2.N"
+      ],
+      "reason": "Students build a stack and a queue on an ordinary list with append, pop() and pop(0), and wrap it in a class that offers only the promised operations.",
+      "evidence": "That is what an abstract data type is"
+    },
+    {
+      "page": "Concepts/Testing and Regression",
+      "codes": [
+        "CRD-2.J",
+        "CRD-2.I"
+      ],
+      "reason": "Students write tests of normal, edge and refused inputs against each docstring's promise, and turn every reported bug into a failing test before fixing it.",
+      "evidence": "Every bug becomes a test, before it is fixed"
+    },
+    {
+      "page": "Concepts/Two-Dimensional Data",
+      "codes": [
+        "AAP-2.N",
+        "AAP-2.O"
+      ],
+      "reason": "Students index into a grid row then column, and traverse it with nested loops over every element, one row, one column or a neighbour.",
+      "evidence": "a grid is a list whose elements are themselves lists"
+    },
+    {
+      "page": "Concepts/Version Control",
+      "codes": [
+        "CRD-1.B",
+        "CRD-1.C",
+        "CRD-2.G"
+      ],
+      "reason": "Students use a shared history of commits, branches and merges to work on one program together, resolve a conflict by conversation, and write commit messages as documentation.",
+      "evidence": "A conflict is not a failure and not an accusation."
+    },
+    {
+      "page": "Discussions/Should It Exist",
+      "codes": [
+        "IOC-1.B",
+        "IOC-2.A",
+        "IOC-1.F"
+      ],
+      "reason": "Students argue over useful proposals that carry personal data down unreviewed paths, republish others' listings without asking, or rank people in ways nobody intended.",
+      "evidence": "should somebody make this"
+    },
+    {
+      "page": "Discussions/What Happens When You Leave",
+      "codes": [
+        "CRD-2.G"
+      ],
+      "reason": "Students decide what must be written down so a partner can run and change the program after the team is gone.",
+      "evidence": "the bus factor"
+    },
+    {
+      "page": "Discussions/When Code Hurts",
+      "codes": [
+        "IOC-1.D",
+        "IOC-1.A"
+      ],
+      "reason": "Students examine a model trained on past decisions that applies their patterns as rules, and an automated system that errs less on average while its mistakes land on the same group.",
+      "evidence": "A model trained on records of past decisions."
+    },
+    {
+      "page": "Discussions/Whose Code Is It",
+      "codes": [
+        "CRD-2.H",
+        "IOC-1.F"
+      ],
+      "reason": "Students work out how to credit a teammate, a forum answer, a licensed library or an AI assistant in a comment, and what a licence permits.",
+      "evidence": "Name the source in a comment"
+    },
+    {
+      "page": "Exercises/Classes and Objects Practice",
+      "codes": [
+        "AAP-3.C",
+        "CRD-2.I",
+        "AAP-2.O",
+        "CRD-2.F"
+      ],
+      "reason": "Students write methods on Book and Member, find and fix a missing self and an unassigned attribute, write functions that loop over a list of books, and design a drop-in program on CRC cards.",
+      "evidence": "The missing three characters are self."
+    },
+    {
+      "page": "Exercises/Dictionaries Practice",
+      "codes": [
+        "CRD-2.I",
+        "AAP-2.O",
+        "CRD-2.B"
+      ],
+      "reason": "Students fix a lookup that crashes on a missing item, write a tally that walks a list, and say in one sentence what somebody else's function returns.",
+      "evidence": "Say in one sentence what this returns"
+    },
+    {
+      "page": "Exercises/Efficiency Practice",
+      "codes": [
+        "AAP-4.A",
+        "AAP-2.P"
+      ],
+      "reason": "Students count operations to classify growth, see exponential growth overtake any polynomial, count the halvings binary search makes, and review a change that makes sorted data a new requirement.",
+      "evidence": "exponential growth eventually overtakes any polynomial"
+    },
+    {
+      "page": "Exercises/Methods and Encapsulation Practice",
+      "codes": [
+        "AAP-3.C",
+        "AAP-3.A",
+        "CRD-2.I"
+      ],
+      "reason": "Students write PunchCard's methods, predict the output of a method that changes only a local variable, and correct it.",
+      "evidence": "A method is where a rule lives"
+    },
+    {
+      "page": "Exercises/Recursion Practice",
+      "codes": [
+        "AAP-3.C",
+        "CRD-2.I",
+        "AAP-4.A"
+      ],
+      "reason": "Students write recursive procedures, find missing and unreachable base cases, and count how the calls of naive Fibonacci grow exponentially.",
+      "evidence": "That is exponential growth"
+    },
+    {
+      "page": "Exercises/Searching Practice",
+      "codes": [
+        "AAP-2.P",
+        "CRD-2.I",
+        "AAP-2.O"
+      ],
+      "reason": "Students trace binary search step by step counting comparisons, fix a version that never ends, and write searches that traverse a list.",
+      "evidence": "which is how binary search proves a value is absent"
+    },
+    {
+      "page": "Exercises/Sorting Practice",
+      "codes": [
+        "CRD-2.I",
+        "AAP-2.L",
+        "AAP-2.E"
+      ],
+      "reason": "Students fix a sort that reads past the end, compare > and >= versions that sort the same data differently, and see how > compares strings.",
+      "evidence": "nothing about the sorted-ness differs between them"
+    },
+    {
+      "page": "Exercises/Stacks and Queues Practice",
+      "codes": [
+        "AAP-2.N",
+        "AAP-1.D",
+        "CRD-2.I"
+      ],
+      "reason": "Students evaluate append, pop() and pop(0) on a list, build a Stack class on a list, and correct a hold list that serves the wrong person.",
+      "evidence": "One list, two completely different promises"
+    },
+    {
+      "page": "Explorations/Sorting by Hand",
+      "codes": [
+        "AAP-2.A",
+        "AAP-2.L"
+      ],
+      "reason": "Students invent a sorting rule with cards, write it as numbered steps another group can follow, then compare every group's rule on the same decks.",
+      "evidence": "Writing an algorithm is mostly the work of finding the steps you did not know you were taking."
+    },
+    {
+      "page": "Explorations/The Code Review",
+      "codes": [
+        "CRD-1.C",
+        "CRD-2.I"
+      ],
+      "reason": "Students run a review protocol that keeps the conversation about the code, and find the input that makes a planted list-removal bug appear.",
+      "evidence": "It is what keeps a review about the code and not about the person"
+    },
+    {
+      "page": "Explorations/The Inherited Program",
+      "codes": [
+        "CRD-2.B",
+        "AAP-2.M",
+        "CRD-2.J"
+      ],
+      "reason": "Students describe what an inherited program does, modify its overdue rule on request, and check the change with loans at exactly 11 and 14 days.",
+      "evidence": "write down what it does"
+    },
+    {
+      "page": "Explorations/The Merge Conflict",
+      "codes": [
+        "CRD-1.B",
+        "CRD-1.C"
+      ],
+      "reason": "Students cause and resolve a merge conflict in a shared repository, combining two wanted changes by agreement rather than deleting one.",
+      "evidence": "hands it back to the humans"
+    },
+    {
+      "page": "Explorations/The Race",
+      "codes": [
+        "AAP-2.L"
+      ],
+      "reason": "Students run two programs that give the same answer to the same question and explain why one takes far longer.",
+      "evidence": "Same input, same output, same answer, every time."
+    },
+    {
+      "page": "Explorations/The Wrong Container",
+      "codes": [
+        "AAP-1.D",
+        "AAP-2.N"
+      ],
+      "reason": "Students build a tally from two parallel lists, remove an item with list.remove, and watch the lists fall out of step.",
+      "evidence": "The two lists are joined only by a convention that lives in the programmer's head"
+    },
+    {
+      "page": "Programs/A Program with Two Classes",
+      "codes": [
+        "AAP-3.C",
+        "AAP-3.D"
+      ],
+      "reason": "Students write methods for two collaborating classes and import them from their own module into a separate program, so the classes can be reused.",
+      "evidence": "the classes can be reused"
+    },
+    {
+      "page": "Programs/A Stack and a Queue",
+      "codes": [
+        "AAP-1.D",
+        "AAP-3.C"
+      ],
+      "reason": "Students write Stack and Queue classes whose methods hide an ordinary list behind a fixed set of operations.",
+      "evidence": "Both classes store their items in an ordinary Python list."
+    },
+    {
+      "page": "Programs/Objects in a List",
+      "codes": [
+        "AAP-2.O",
+        "AAP-1.D",
+        "AAP-3.B",
+        "AAP-3.C"
+      ],
+      "reason": "Students traverse a list of volunteer objects to find one, total the hours and find the maximum, reuse the search inside the remove procedure, and write average_hours on top of total_hours.",
+      "evidence": "is the pattern everything else is built on"
+    },
+    {
+      "page": "Programs/Searching and Timing It",
+      "codes": [
+        "AAP-2.P",
+        "CRD-2.J",
+        "AAP-2.L"
+      ],
+      "reason": "Students count binary search's comparisons at growing sizes, check it gives the same answers as linear search before timing it, and break its sorted-data precondition so the two disagree.",
+      "evidence": "A fast wrong answer is not a result"
+    },
+    {
+      "page": "Programs/Sorting and Timing It",
+      "codes": [
+        "AAP-3.D",
+        "AAP-2.E",
+        "AAP-2.M"
+      ],
+      "reason": "Students set their insertion sort beside Python's built-in sort, write selection sort and modify the insertion sort to order objects by hours, and see how > compares strings by character code.",
+      "evidence": "Sorting names is sorting."
+    },
+    {
+      "page": "Programs/Using a Dictionary",
+      "codes": [
+        "DAT-2.D",
+        "DAT-2.C"
+      ],
+      "reason": "Students read a program that turns a sheet of donation lines into totals, the most-donated item and a shortage list, and see why quantities arriving as text must be converted and what one invalid entry does.",
+      "evidence": "Everything arrives from the file as text."
+    },
+    {
+      "page": "Programs/Your First Class",
+      "codes": [
+        "AAP-3.C"
+      ],
+      "reason": "Students read a Volunteer class and write a method of their own that answers the coordinator's question.",
+      "evidence": "Deciding what not to store is a design decision"
+    },
+    {
+      "page": "Setup/Our Classroom Norms",
+      "codes": [
+        "CRD-2.H",
+        "CRD-1.C"
+      ],
+      "reason": "Students agree to name every borrowed or generated piece of code in a comment or commit message, and to review the code, never the coder.",
+      "evidence": "Credit is not optional."
+    },
+    {
+      "page": "Style/Writing About Code",
+      "codes": [
+        "CRD-2.G"
+      ],
+      "reason": "Students write comments, commit messages and handover notes for a reader who cannot see inside their head.",
+      "evidence": "Write for the next person, who might be you"
+    },
+    {
+      "page": "Tasks/Final Examination",
+      "codes": [
+        "AAP-2.C",
+        "DAT-1.B",
+        "AAP-3.B"
+      ],
+      "reason": "Students are examined on integer division and remainders, on where a machine's number representation runs out, and on cutting a long routine into subprograms.",
+      "evidence": "Integer division and remainders"
+    },
+    {
+      "page": "Tasks/The Efficiency Case",
+      "codes": [
+        "CRD-2.J",
+        "AAP-2.M"
+      ],
+      "reason": "Students modify a slow program's algorithm to make it faster, and prove it still correct with tests, boundary cases included, run on both versions.",
+      "evidence": "A faster wrong answer is worthless."
+    },
+    {
+      "page": "Tasks/The Frontier Report",
+      "codes": [
+        "IOC-1.A"
+      ],
+      "reason": "Students report on an emerging technology's effects on people: who gains, who loses, and who is affected differently.",
+      "evidence": "who gains, who loses"
+    },
+    {
+      "page": "Tasks/The Handover",
+      "codes": [
+        "CRD-2.G",
+        "CRD-1.A"
+      ],
+      "reason": "Students watch their community partner use the software unaided, and hand over a written guide, known limits and change notes.",
+      "evidence": "you keep your hands off the keyboard"
+    },
+    {
+      "page": "Tasks/The Maintenance Sprint",
+      "codes": [
+        "CRD-2.I",
+        "CRD-2.J",
+        "CRD-2.B"
+      ],
+      "reason": "Students describe an inherited program, pin its current behaviour with tests, reproduce a reported bug with a failing test and fix it.",
+      "evidence": "Characterise it with tests, before you change a line."
+    },
+    {
+      "page": "Tasks/The Model",
+      "codes": [
+        "CRD-2.F",
+        "CRD-1.A",
+        "CRD-2.G",
+        "AAP-3.C"
+      ],
+      "reason": "Students ask the person who deals with a real thing what they need to know, design a class from their answers with at least three methods that do real work, and document every method.",
+      "evidence": "Ask the person who deals with it what they need to know"
+    },
+    {
+      "page": "Tasks/The Software Project",
+      "codes": [
+        "CRD-2.E",
+        "CRD-1.A",
+        "CRD-1.B",
+        "IOC-2.A"
+      ],
+      "reason": "Students build software for a community partner as a team with roles, milestones, reviews and testing, and collect no personal data they do not need.",
+      "evidence": "Collect nothing you do not need."
+    },
+    {
+      "page": "Tasks/The Structure Study",
+      "codes": [
+        "AAP-2.L",
+        "CRD-2.J"
+      ],
+      "reason": "Students solve one problem with three containers that must give the same answers, checked on one shared test input with awkward cases.",
+      "evidence": "One problem. Three solutions. One defensible answer."
+    },
+    {
+      "page": "Tutorials/Getting Unstuck",
+      "codes": [
+        "CRD-2.I",
+        "CRD-1.C"
+      ],
+      "reason": "Students find bugs by shrinking the program and printing values, and settle a stalled team disagreement with a protocol.",
+      "evidence": "The gap between what you believe and what prints is where bugs live."
+    },
+    {
+      "page": "Tutorials/Reading a Traceback in Someone Else's Code",
+      "codes": [
+        "CRD-2.I"
+      ],
+      "reason": "Students read a long traceback to find what went wrong and the lowest frame they can change.",
+      "evidence": "Read the bottom, then find your code"
+    },
+    {
+      "page": "Tutorials/Using Version Control",
+      "codes": [
+        "CRD-1.B",
+        "CRD-2.G"
+      ],
+      "reason": "Students use git and a shared hosted repository to work on the same files, and write commit messages that explain why.",
+      "evidence": "Commit messages are documentation with a deadline"
+    },
+    {
+      "page": "Tutorials/Working in a Team",
+      "codes": [
+        "CRD-1.C",
+        "CRD-1.B"
+      ],
+      "reason": "Students run stand-ups, rotate roles, review with prepared sentences, and settle disagreements with an agreed protocol.",
+      "evidence": "Design disagreements are normal, and they are a sign the team is thinking."
+    },
+    {
+      "page": "Tutorials/Writing Code Others Can Read",
+      "codes": [
+        "CRD-2.G",
+        "AAP-1.A"
+      ],
+      "reason": "Students write docstrings as contracts, and give classes, variables and settings meaningful names.",
+      "evidence": "The docstring is a promise"
+    },
+    {
+      "page": "Tutorials/Writing Tests",
+      "codes": [
+        "CRD-2.J",
+        "CRD-2.I"
+      ],
+      "reason": "Students choose ordinary and boundary inputs with expected results, watch a test fail, then fix the code it caught.",
+      "evidence": "Watch every new test fail at least once."
+    },
+    {
+      "page": "Warm-Ups/Name That Error",
+      "codes": [
+        "CRD-2.I"
+      ],
+      "reason": "Students diagnose a traceback and decide which frame's code is actually at fault.",
+      "evidence": "The crash site is not the crime scene"
+    },
+    {
+      "page": "Warm-Ups/Predict the Output",
+      "codes": [
+        "AAP-1.B",
+        "AAP-2.N"
+      ],
+      "reason": "Students predict what a variable holds after assignments and an append when three names refer to one list.",
+      "evidence": "three names, one object"
+    },
+    {
+      "page": "Warm-Ups/Read the Diff",
+      "codes": [
+        "AAP-2.P",
+        "AAP-2.L"
+      ],
+      "reason": "Students review a change from linear to binary search that looks equivalent but gives a different answer on unsorted data.",
+      "evidence": "Fast and wrong is worse than slow and right"
+    },
+    {
+      "page": "Warm-Ups/Spot the Bug",
+      "codes": [
+        "CRD-2.I"
+      ],
+      "reason": "Students find an off-by-one bound and a shared default list by reading, and correct each.",
+      "evidence": "The fix is one character of arithmetic"
+    },
+    {
+      "page": "Warm-Ups/Trace It",
+      "codes": [
+        "AAP-3.A"
+      ],
+      "reason": "Students trace a recursive procedure call by call to determine what it returns.",
+      "evidence": "One row per call, not per pass."
+    },
+    {
+      "page": "Warm-Ups/Which One Doesn't Belong",
+      "codes": [
+        "AAP-2.N"
+      ],
+      "reason": "Students compare what append, a key lookup, pop(0) and pop() do to a collection.",
+      "evidence": "Only one removes from the front, and pays for it"
+    }
+  ],
+  "dropped": [
+    {
+      "page": "Discussions/Who Maintains This",
+      "why": "The discussion is about who carries the cost of maintaining software over time; no CSP learning objective covers maintenance, and its one line about naming a rate is not enough to claim documentation or abstraction."
+    },
+    {
+      "page": "Portfolios/Code Journal",
+      "why": "A private reflective log of the student's own work; CSP has no objective on self-reflection, and recording a development process is not developing a program with one."
+    },
+    {
+      "page": "Portfolios/Final Reflection",
+      "why": "A reflection on the student's own growth, team and career pathways; no CSP learning objective covers self-assessment or careers."
+    },
+    {
+      "page": "Portfolios/Judging Your Own Work",
+      "why": "A self-review routine against a task's criteria; CSP has no objective on assessing one's own work."
+    },
+    {
+      "page": "Portfolios/Showing Growth",
+      "why": "Teaches citing one's own journal as evidence of growth; no CSP learning objective covers it."
+    },
+    {
+      "page": "Setup/How This Class Works",
+      "why": "Describes the rhythm of a class period; it asks students to do nothing a CSP learning objective describes."
+    },
+    {
+      "page": "Warm-Ups/Tech Headlines",
+      "why": "Separating what a news story claims from what is known is media literacy; the page names who benefits but never asks students to weigh a harm against a benefit, so IOC-1.A is not reached."
+    },
+    {
+      "page": "Tutorials/Profiling and Timing Code",
+      "why": "Times a linear and a binary search; AAP-4.A asks about reasonable versus unreasonable time, which two polynomial searches never reach, and CSN-2.A's time comparisons concern parallel and distributed solutions."
+    }
+  ]
+}

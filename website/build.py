@@ -909,6 +909,44 @@ def feed_version_refusal(feed: Path, project_yml: Path) -> str | None:
     return None
 
 
+def native_corners_refusal(website: Path = WEBSITE, image_dir: Path = IMAGE_DIR) -> str | None:
+    """Why the pictures must not go live, or None (#375).
+
+    Every picture the pages show a Mac visitor must keep its window's own
+    corners (website/SCREENSHOTS.md → "The one rule"). The gate in
+    `shots/test_native_corners.py` reads them, but it runs only inside
+    `capture.py` or by hand, and the failure it exists for — drawn corners on
+    the live site, 2026-09-27 — was a DEPLOY. So the deploy asks the same
+    question (`shots/corners.py`, about 6 s, Pillow only) and refuses on any
+    failing picture, whoever made it.
+
+    The `-windows-` pictures are not judged, the same scope as the test: they
+    are taken on Windows, whose own harness owes the rule (the `windows` issue
+    opened from #375's hand-over). The three drawn ones — hero, colour-schemes
+    and light-and-dark — are `windows: false` in shots.json meanwhile, so no
+    visitor is shown them; the square single-window shots are Windows' to
+    retake.
+    """
+    sys.path.insert(0, str(website / "shots"))
+    try:
+        import corners
+    except ImportError as error:
+        return (f"Not deploying: the corner check needs Pillow ({error}). "
+                f"Install it (python3 -m pip install pillow) and deploy again.")
+    pictures = corners.images_the_pages_show(website, image_dir)
+    if not pictures:
+        return f"Not deploying: no pictures found in {image_dir} to check."
+    problems: list[str] = []
+    for picture in pictures:
+        problems.extend(corners.corner_problems(picture))
+    if problems:
+        listed = "\n  ".join(problems)
+        return ("Not deploying: these pictures do not keep their window's own corners "
+                "(website/SCREENSHOTS.md → \"The one rule\"; python3 website/shots/test_native_corners.py):\n  "
+                + listed)
+    return None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build plantoir.app into site/.")
     parser.add_argument(
@@ -962,6 +1000,10 @@ def main() -> int:
         if result != 0:
             print("Not deploying: fix the build warnings above first.", file=sys.stderr)
             return result
+        refusal = native_corners_refusal()
+        if refusal:
+            print(refusal, file=sys.stderr)
+            return 1
         refusal = feed_version_refusal(WEBSITE / "updates" / "macos.xml", REPO / "mac-app" / "project.yml")
         if refusal:
             print(refusal, file=sys.stderr)

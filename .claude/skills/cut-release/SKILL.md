@@ -216,11 +216,16 @@ python3 website/update_feed.py macos --version <version> \
    generator drops, for the Mac's update window, the Downloads section with
    its checksum table, every line labelled "(Windows)", and the
    "Windows: …" sentence — which is one more reason to label platform-only
-   lines as the style rules above say. The Keychain asks TWICE to let
-   Sparkle's tools use the `plantoir-macos` key (`generate_appcast`, then
-   `sign_update --verify`); answer **Allow**, not "Always Allow", which would
-   add that tool, in whichever checkout it ran from, to the key's access list
-   for good. Nothing prints the key. It writes
+   lines as the style rules above say. Run it from the main checkout. Since
+   2026-09-29 Sparkle's `generate_appcast` and `sign_update` there are on the
+   `plantoir-macos` key's access list: "Always Allow", Russell's choice so a
+   cut runs unattended. The trade-off he accepted is that those two tools can
+   use the key without asking. So no Keychain prompt appears. From any other
+   checkout or worktree it may still ask, once per tool (`generate_appcast`,
+   then `sign_update --verify`). Answer **Allow** there, and never "Always
+   Allow" for a second copy. If a prompt appears in the main checkout (after
+   `fetch-sparkle.sh` replaced the tools, say), answer **Allow**, finish the
+   cut, and tell Russell the grant needs renewing. Nothing prints the key. It writes
    `website/updates/macos.xml` and `website/updates/macos-notes.html`; commit
    both with the version line in step 2 (stage them by path). A cut with no mac
    DMG leaves both alone. See `RELEASING.md` → "The update feed (macOS)".
@@ -228,8 +233,8 @@ python3 website/update_feed.py macos --version <version> \
    **Deltas (#312).** When the feed already holds earlier builds, the run
    downloads their DMGs (up to three, ~410 MB each, from their own releases),
    makes a delta from each, puts every earlier item back as it was and signs
-   the feed once more — so the Keychain asks a THIRD time (`sign_update`);
-   answer **Allow** again. It prints each `.delta` it wrote beside the DMG.
+   the feed once more — so `sign_update` signs a third time — silently from
+   the main checkout, or with a third prompt elsewhere (answer **Allow**). It prints each `.delta` it wrote beside the DMG.
    **Upload every one of them to THIS release now, before step 2 deploys the
    feed**:
 
@@ -288,6 +293,10 @@ git commit -m "Update website for v<version> release"
 git push origin main
 python3 website/build.py --deploy
 ```
+
+Before publishing, `--deploy` refuses if any picture a Mac visitor is shown
+lacks its window's own corners (#375); that is a stop — retake the picture
+(`marketing-screenshots` skill), never mask or crop it to pass.
 
 `--deploy` fetches `https://plantoir.app` afterward on its own and confirms
 the live version-note line matches `site.json` — watch its output for the

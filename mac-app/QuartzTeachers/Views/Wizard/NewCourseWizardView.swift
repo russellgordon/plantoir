@@ -159,7 +159,7 @@ struct NewCourseWizardView: View {
 
     /// What the progress header is called — the wizard creates a course,
     /// but the same sheet also adds the example course.
-    @State var progressTitle: String = "Creating your course"
+    @State var progressTitle: String = WizardWording.coursePanelWords.creatingTitle
 
     // MARK: - Initializer
 
@@ -775,7 +775,7 @@ struct NewCourseWizardView: View {
                 }
 
                 if !hasStarted {
-                    Button(WizardWording.createCourseButton) {
+                    Button(WizardWording.panelWords(isClub: isClubCourse).createButton) {
                         startCreation()
                     }
                     .buttonStyle(.borderedProminent)
@@ -830,13 +830,13 @@ struct NewCourseWizardView: View {
                     // label from a bare `TextField(title:, text:)` used
                     // as the row's content; `CourseCodePickerView` is a
                     // view of ours, so `Form` had nothing to extract and
-                    // "Course code" stayed INSIDE the field as
+                    // the code label stayed INSIDE the field as
                     // placeholder text, unlike every other row here
                     // (Russell, 2026-08-23, comparing it to Course
                     // name). Writing the label ourselves puts it in the
                     // same leading column as Course name's, and hands
                     // the field the trailing column at the same width.
-                    LabeledContent("Course code") {
+                    LabeledContent(WizardWording.panelWords(isClub: isClubCourse).codeLabel) {
                         CourseCodePickerView(
                             courseCode: $courseCode,
                             isFocused: $courseCodeFieldIsFocused,
@@ -893,7 +893,7 @@ struct NewCourseWizardView: View {
                         // `LabeledContent` the field is ordinary
                         // content again, and its text starts at the
                         // leading edge like any other text field's.
-                        LabeledContent("Course name") {
+                        LabeledContent(WizardWording.panelWords(isClub: isClubCourse).nameLabel) {
                             // `WizardFieldChrome`, not
                             // `.roundedBorder`: every AppKit control
                             // this stands in for is 24pt tall and
@@ -1135,7 +1135,7 @@ struct NewCourseWizardView: View {
                 )
                 VStack(alignment: .leading, spacing: 4) {
                     Toggle("Show section marker in the site title", isOn: $showsSectionMarker)
-                    ExampleCaption("e.g. “S1” appears beside the course code")
+                    ExampleCaption(WizardWording.panelWords(isClub: isClubCourse).sectionMarkerCaption)
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     Toggle("Show the grade in the site title", isOn: $showsGradeInTitle)
@@ -1149,7 +1149,7 @@ struct NewCourseWizardView: View {
                             .foregroundStyle(.orange)
                             .accessibilityIdentifier("wizardGradeInTitleWarning")
                     } else {
-                        ExampleCaption("e.g. “Grade 12” before the course name")
+                        ExampleCaption(WizardWording.panelWords(isClub: isClubCourse).gradeCaption)
                     }
                 }
             } header: {
@@ -1184,7 +1184,7 @@ struct NewCourseWizardView: View {
                                 renameClassFolder(to: newValue)
                             }
                         ))
-                        .textFieldStyle(.roundedBorder)
+                        .borderedTextField()
                         .accessibilityIdentifier("clubClassFolderField")
                     }
                     if let problem = NewCourseWizardView.clubClassFolderProblem(
@@ -1197,12 +1197,12 @@ struct NewCourseWizardView: View {
                     }
                     LabeledContent(WizardWording.clubFrontPageHeadingLabel) {
                         TextField("", text: $frontPageHeading)
-                            .textFieldStyle(.roundedBorder)
+                            .borderedTextField()
                             .accessibilityIdentifier("clubFrontPageHeadingField")
                     }
                     LabeledContent(WizardWording.clubPageWordLabel) {
                         TextField("", text: $unitWord)
-                            .textFieldStyle(.roundedBorder)
+                            .borderedTextField()
                             .accessibilityIdentifier("unitWordField")
                     }
                     if let problem = ClassPageTerm.problem(with: unitWord) {
@@ -1225,7 +1225,7 @@ struct NewCourseWizardView: View {
                 // `prompt:`; the club branch above has always been this shape.
                 LabeledContent(UnitWordRenameWording.fieldLabel) {
                     TextField("", text: $unitWord, prompt: Text(ClassPageTerm.standard))
-                        .textFieldStyle(.roundedBorder)
+                        .borderedTextField()
                         .accessibilityIdentifier("unitWordField")
                 }
                 if let problem = ClassPageTerm.problem(with: unitWord) {
@@ -1238,9 +1238,12 @@ struct NewCourseWizardView: View {
                 }
                 }
             } header: {
+                // A club's rows are the meeting words, so the header says so
+                // (#368) — and it follows the tick box, not the noun picker
+                // below it, which would change it under the teacher's hand.
                 FormSectionHeader(
-                    "Units",
-                    caption: "Chosen once, when the course is made — the pages are named this way as they are written"
+                    WizardWording.panelWords(isClub: isClubCourse).namingHeading,
+                    caption: WizardWording.panelWords(isClub: isClubCourse).namingCaption
                 )
             }
             .disabled(!hasChosenCourse)
@@ -1343,7 +1346,7 @@ struct NewCourseWizardView: View {
                             members: gradedFoldersBinding,
                             protection: wizardGradedFolderProtection
                         )
-                        Text(GradedFolderWording.caption)
+                        Text(GradedFolderWording.captionFor(isClub: isClubCourse))
                             .font(.callout)
                             .foregroundStyle(.secondary)
                     }
@@ -1353,7 +1356,7 @@ struct NewCourseWizardView: View {
                 if structureComesFromExampleContent {
                     FormSectionHeader("Structure", caption: "Chosen by the example content")
                 } else {
-                    FormSectionHeader("Structure", caption: "Defaults are fine for most courses")
+                    FormSectionHeader("Structure", caption: WizardWording.panelWords(isClub: isClubCourse).structureCaption)
                 }
             }
             .disabled(!hasChosenCourse)
@@ -1370,7 +1373,7 @@ struct NewCourseWizardView: View {
             // with the ones almost everyone sets.
             Section {
                 DisclosureGroup("Advanced") {
-                    Picker("Language / region", selection: $locale) {
+                    Picker(CourseSettingsWording.localeLabel, selection: $locale) {
                         ForEach(LocaleCatalog.codes, id: \.self) { code in
                             Text(LocaleCatalog.displayName(forCode: code)).tag(code)
                         }
@@ -1743,9 +1746,11 @@ struct NewCourseWizardView: View {
 
         var name: String = courseName.trimmingCharacters(in: .whitespaces)
         if name.isEmpty {
-            name = "Course Website"
+            name = WizardWording.panelWords(isClub: isClubCourse).defaultSiteName
         }
 
+        // What is being made, said while it is made (#368).
+        progressTitle = WizardWording.panelWords(isClub: isClubCourse).creatingTitle
         hasStarted = true
         creator.createCourse(
             configuration: buildConfigurationDictionary(code: code, name: name),

@@ -74,7 +74,7 @@ struct AddSectionSheet: View {
             HStack(spacing: 4) {
                 Text("Section number:")
                 TextField("", text: $entry)
-                    .textFieldStyle(.roundedBorder)
+                    .borderedTextField()
                     .frame(width: 56)
                     .multilineTextAlignment(.trailing)
                     .accessibilityIdentifier("addSectionNumberField")

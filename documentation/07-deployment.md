@@ -652,6 +652,79 @@ with stages `clone_repo=idle, build=idle, deploy=success` — no Cloudflare
 build runs, because nothing is pushed to a git repository. Static requests
 and bandwidth are unmetered on the free plan.
 
+### wrangler is never left a question to ask (2026-09-30)
+
+`deploy_to_cloudflare` runs wrangler with **`CI=1`** — wrangler's documented
+"no questions" switch — whatever started the publish: the Deploy button (a
+pseudo-terminal), a scheduled deploy from launchd (no terminal at all), the
+assistant's windowless deploy (`--non-interactive`, #378) and
+`verify-deploy.sh`. That has been so since the path was written (2026-08-12),
+and it is the right choice: a question wrangler asked would either hang a
+publish nobody is watching or be answered by whatever the terminal happened
+to hold. What `CI` does NOT do is make the question go away. Under it, a
+question wrangler would have asked becomes an error — **"This command cannot
+be run in a non-interactive context"**, exit 1 — so every situation that
+makes wrangler ask has to be settled by `deploy.py` BEFORE it runs:
+
+- the project name, the production branch and the dirty-tree answer are
+  passed as flags (`--project-name`, `--branch=main`, `--commit-dirty=true`),
+  and the account as `CLOUDFLARE_ACCOUNT_ID`;
+- **the project must exist.** wrangler asks "create it?" about a project it
+  cannot find. A section whose saved project was deleted in Cloudflare's
+  dashboard kept its marker, so `deploy.py` skipped `ensure_pages_project`
+  and every publish of that section failed with the sentence above — on
+  every path, the Deploy button included, since `CI` is set on all of them.
+  `remake_pages_project_if_gone` now checks the saved name first and, on a
+  404, makes the project again under the SAME name and saves the new marker
+  (its `subdomain` can differ, so the address printed is the new one). A 409
+  on that remake means the name is taken in this account — the project is
+  there and the 404 was spurious — so the upload goes ahead as it would
+  have; any other refusal to remake it (a token that may not create
+  projects) is raised, since it says more than wrangler would. Other
+  failures of the first check are left to the upload, which reports them as
+  before.
+
+**What the deleted project took with it is not brought back.** Remaking the
+project restores the address and the next upload, and nothing else: a
+**custom domain** the teacher had attached went with the deleted project and
+has to be added to the remade one again in Cloudflare's dashboard, and the
+old deployments (Cloudflare's own history of past versions) are gone. The
+console says so in one line, and says the project was "not in this
+Cloudflare account" rather than "no longer on Cloudflare", because the same
+404 is what a teacher sees who moved the section to a DIFFERENT Cloudflare
+account — the old project may well still exist in the old one.
+
+**It leaves a line on the activity trail** (rule 5):
+`contracts/shared-rules.json` → `activityTrail.mustRecord` → "cloudflare
+project made again", carrying the course and section, the project and the
+address it answers at now. `deploy.py` runs inside the website builder on
+the mac and cannot reach the trail, so it prints a
+`PLANTOIR_CLOUDFLARE_REMADE:` marker, which the app reads the way it reads
+`PLANTOIR_LEFTOVER_STOPPED:` — `ScriptRunner` for a run it started (the
+Deploy button, the assistant), `ScheduledDeploy` from a scheduled publish's
+log — and which the console leaves out like every `PLANTOIR_…:` line. The
+line is written at the remake, before the upload, so a remade project whose
+upload then failed is still on the trail. A publish run at the command line
+records nothing, as with every marker-based line. Windows runs the same
+`deploy.py`, so its app owes the same reader.
+
+Found 2026-09-30 when `verify-deploy.sh` went red on all six Cloudflare legs
+(44 passed, 6 failed) after its test project `ada1o-s1-2026-testing` had
+been deleted by hand following the v1.4.0 run. It was first read as a
+consequence of #378's terminal changes; it was not — `CI=1`, the flags and
+the `docker exec` of the Cloudflare branch were unchanged, and wrangler's own
+log stopped at `GET …/pages/projects/ada1o-s1-2026-testing`, which returned
+404. **Rejected: recreating the project with a new name**, as the Netlify
+path does for a deleted site. Netlify names are global, so a deleted site's
+name may be gone and a new one is a real question; a Pages name is only
+unique inside the teacher's own account, so the name already chosen is still
+theirs, and re-using it asks nothing — which is also what lets a scheduled
+or windowless publish repair itself. **Rejected: dropping `CI`** so wrangler
+could ask. On a pseudo-terminal nobody is watching it would wait for ever,
+which is exactly what #92 and #378 exist to prevent.
+`scripts/test_deploy_cloudflare_project.py` pins both halves, and
+`CloudflareProjectRemadeReportTests` the app's reader.
+
 ## A folder on this PC (`--to-folder`)
 
 Chosen with `deploy_target: "local_folder"` plus `deploy_folder_path`. This
@@ -736,7 +809,7 @@ not starting with `/`, BEFORE it looks for the folder: the app's own current
 folder is `/`, so `Users/Shared` used to pass the check and then be published
 into `<working folder>/Users/Shared`. `Choose…` always yields a full path, so
 only a typed one reaches this. Every caller goes through the one function —
-the settings form and the wizard (Save is blocked), every leg of a
+the settings form and the wizard (Save is blocked when the edit moves the destination, #373 — `savingSettings.whatEnablesSave`), every leg of a
 multi-destination deploy, and a scheduled deploy — so a course that already
 SAVED a partial path is refused at Deploy rather than published somewhere
 else; no migration. `DeployCommand.arguments` also hands the launcher the
@@ -922,6 +995,70 @@ deliberately does not capture the child's output — launchd points stdout at th
 log and the process inherits it, and an unread pipe is what wedged the
 assistant server once. Where a task runner already captures output, use that;
 the log-scrape is a workaround for a constraint not every platform shares.
+
+### Links into hidden pages: published as they are, offered afterwards (#379)
+
+The same rule covers the one finding that now has a checklist behind it. A
+scheduled deploy whose build finds links into hidden pages publishes AS IS —
+nothing the teacher did not choose goes up (Russell's decision 3) — and the
+links checklist is offered the next time the section window appears or
+becomes key, from the offer file the build left
+(`shared-rules.json` → `linksChecklist.offeredWhen.afterAnUnwatchedPublish`).
+The folder-problem record the window reads on appearing keeps the finding; the
+window takes it out of the alert only when the checklist will really be shown
+(an offer on disk, fresh, holding a page not yet answered). Mechanics:
+[05 → The links checklist (#379)](05-build-pipeline.md#the-links-checklist-379).
+
+## The published-pages record (#379)
+
+"A page published before, then hidden again, keeps its date" (Russell's
+decision 4 on #379) needs to know what has been on a site students could
+reach. Nothing did: a date on the page is on 7,114 of the 7,118 payload pages
+that carry a publish flag. So a deploy now RECORDS it
+(`file-formats.json` → `publishedPagesRecord`, `visiblePagesList`).
+
+- **The build writes the list.** A build for publishing writes
+  `.visible-pages.json` into the section's built output, BESIDE `public/`
+  (never inside it, so no destination uploads it) — every page it shows, by
+  its place in the course folder, read with the build's own hide rule after
+  the How I Teach sweep and the #246 hiding. It is written only after Quartz
+  built the site and it was mirrored; a build that fails half way leaves the
+  previous list in place, but it has already written a new `.build-id`, so
+  nothing is recorded from that list until a build for publishing succeeds. Every build, preview
+  or not, first writes `.build-id` beside it; the list carries the id of the
+  build that wrote it.
+- **Each destination records itself, after its upload succeeded.** `deploy.py`
+  adds a fragment `.publish_state/section<N>.published-pages/<UTC stamp>-<netlify|cloudflare>.json`
+  after the Netlify delta deploy completed, or after `publish_to_cloudflare`
+  returned; `deploy.sh`'s folder branch — which never enters `deploy.py` —
+  copies the list itself after rsync succeeded (`record_published_pages`, a
+  plain `cp` with a `grep` for the id: no JSON in bash). Each records ONLY
+  when the list's id is `.build-id`'s, so a list from an earlier build than the
+  site in the folder (a preview has run since) is never recorded.
+- **Why fragments, not one file.** `deploy.py` publishes ONE destination per
+  run and never sees a folder publish, so "after every destination succeeded"
+  cannot be known anywhere (plan review, finding 10). A Netlify success with a
+  failed Cloudflare secondary DID put the pages in front of students — recording
+  it is the truth — and fragments cannot lose each other when two publishes
+  run at once. Readers take the union.
+- **Released on every rollover** of the section, whichever website answer the
+  teacher gave — its fragments moved into `section<N>.published-pages.previous-<stamp>/`
+  — and restored by the rollover's undo — a new year's site has
+  published nothing yet (`publishedPagesRecord.releasedWhenASectionRollsOver`).
+- **Never fails a publish.** The pages are already out; a record that could
+  not be written costs, at worst, one page taking its class's date once.
+
+Tested by `scripts/test_published_pages_record.py` (11: the fragment, an
+earlier build's list not recorded, the call after each upload in `main()`, the
+folder branch cut out of `deploy.sh` and run under bash, the list beside
+`public/` and written only after the site was built, the union read), with
+eight mutations run red. `verify-deploy.sh` is owed for this change (the
+publishing path moved) and does not yet read the record back.
+
+**Windows owes** `deploy.ps1`'s folder half (it copies with PowerShell and
+never enters `deploy.py` either) and the rollover release in its own rollover
+(`AssistWorkspace.ReleaseSite` is the wrong hook on both platforms: it runs
+only for a NEW website, finding 12).
 
 ## Deploys with several destinations
 

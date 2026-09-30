@@ -727,7 +727,15 @@ def deploy_to_cloudflare(public_dir: Path, project_name: str, token: str, accoun
     env = os.environ.copy()
     env["CLOUDFLARE_API_TOKEN"] = token
     env["CLOUDFLARE_ACCOUNT_ID"] = account_id
-    # The app runs this with no console to answer prompts on.
+    # wrangler must never ASK anything: CI is its documented switch for "no
+    # questions", and it is set whatever the caller is — a teacher's Deploy
+    # button (a pseudo-terminal), a scheduled deploy from launchd (none), the
+    # assistant's windowless deploy (--non-interactive) or verify-deploy.sh.
+    # With it set, a question wrangler would have asked becomes an error
+    # ("cannot be run in a non-interactive context"), so every situation that
+    # would make it ask has to be settled here first: the project must exist
+    # (remake_pages_project_if_gone), the branch and the dirty-tree answer are
+    # passed as flags. Pinned by scripts/test_deploy_cloudflare_project.py.
     env["CI"] = "1"
     env.setdefault("WRANGLER_SEND_METRICS", "false")
     cmd = [
@@ -754,6 +762,50 @@ def deploy_to_cloudflare(public_dir: Path, project_name: str, token: str, accoun
         sys.exit(130)
     if completed.returncode != 0:
         raise RuntimeError(f"Cloudflare's deploy tool exited with code {completed.returncode}")
+
+# The marker the app turns into the trail's "cloudflare project made again"
+# line. Machinery: both apps keep every PLANTOIR_…: line out of the console.
+CLOUDFLARE_REMADE_MARKER = "PLANTOIR_CLOUDFLARE_REMADE:"
+
+def remake_pages_project_if_gone(token: str, account_id: str, name: str) -> dict | None:
+    """
+    A section's saved project can outlive the project itself: a teacher (or
+    anybody tidying the account) deletes it in Cloudflare's dashboard, and the
+    marker in `.cloudflare_sites/` still names it. wrangler then finds no
+    project and wants to ASK whether to create one — which it cannot, because
+    it always runs with CI set (see deploy_to_cloudflare) — so every publish of
+    that section failed with "This command cannot be run in a non-interactive
+    context", which a teacher cannot act on. Found 2026-09-30 by
+    verify-deploy.sh, after its test project had been deleted by hand.
+
+    So the saved name is checked first, and when Cloudflare says it does not
+    exist (404) it is made again under the SAME name. The name was chosen
+    already, so nothing needs asking — which is why this is safe under
+    --non-interactive too, unlike Netlify, whose names are global and whose
+    deleted site needs a new name (a question). Returns the new project, or
+    None when the saved one exists or could not be checked: any other failure
+    is left to the upload, which reports it as before, rather than a flaky
+    check stopping a publish that would have worked.
+    """
+    try:
+        cloudflare_api("GET", f"/accounts/{account_id}/pages/projects/{name}", token)
+        return None
+    except RuntimeError as e:
+        if "error 404" not in str(e):
+            return None
+    try:
+        return cloudflare_api(
+            "POST", f"/accounts/{account_id}/pages/projects", token,
+            {"name": name, "production_branch": "main"},
+        )
+    except RuntimeError as e:
+        # A 409 means the name is taken in this account — the project EXISTS
+        # and the 404 was spurious (eventual consistency), so the upload can
+        # go ahead as it would have. Any other refusal (a token that cannot
+        # create projects, say) is raised: it says more than wrangler would.
+        if "error 409" in str(e):
+            return None
+        raise
 
 def publish_to_cloudflare(public_dir: Path, course_dir: Path, course_code: str,
                           section: str, teacher_last_name: str | None):
@@ -789,6 +841,25 @@ def publish_to_cloudflare(public_dir: Path, course_dir: Path, course_code: str,
     if marker and marker.get("name"):
         project_name = marker["name"]
         print(f" Using this section's existing Cloudflare project: {project_name}")
+        remade = remake_pages_project_if_gone(token, account_id, project_name)
+        if remade is not None:
+            project_name = remade.get("name") or project_name
+            save_cloudflare_marker(course_dir, section, {
+                "name": project_name,
+                "id": remade.get("id"),
+                "subdomain": remade.get("subdomain"),
+                "account_id": account_id,
+            })
+            host_now = remade.get("subdomain") or f"{project_name}.pages.dev"
+            print(f"⚠️ The Cloudflare project {project_name} was not in this Cloudflare account, "
+                  "so it has been made again. If the website had its own web address, add it "
+                  "to the project again in Cloudflare.")
+            # For the activity trail (contracts/shared-rules.json ->
+            # activityTrail.mustRecord."cloudflare project made again"): the
+            # app reads this line, the console leaves it out. The course's one
+            # permitted space is written "+", as in every other marker.
+            place = f"{str(course_code).replace(' ', '+')}/{section}"
+            print(f"{CLOUDFLARE_REMADE_MARKER} {place} {project_name} {host_now}")
     else:
         # Same rule as the Netlify path: the surname is asked for only when
         # a NEW project is being named, never on a repeat deploy.
@@ -1091,6 +1162,57 @@ def print_required_diagnostics(required_shas: list[str], sha_to_pairs: dict[str,
         print(f"⚠️ Could not write diagnostics file: {e}")
 
 # ---------- Main ----------
+
+# ---------------------------------------------------------------------------
+# #379: the published-pages record
+# ---------------------------------------------------------------------------
+VISIBLE_PAGES_FILE = ".visible-pages.json"
+BUILD_ID_FILE = ".build-id"
+
+
+def record_published_pages(course_dir: Path, section_dir: Path, section, destination: str,
+                           printer=print) -> Path | None:
+    """
+    After ONE destination's upload succeeded: add a fragment to the section's
+    published-pages record naming every page the uploaded site shows
+    (`contracts/file-formats.json` -> `publishedPagesRecord`). A page listed
+    there has been on a site students could reach, so when it is hidden and
+    later published again it keeps its date (`class-planning.json` ->
+    `datingPagesAClassBrings.publishedBeforeIsRecorded`).
+
+    One fragment per destination rather than one file rewritten: a Netlify
+    success followed by a failed Cloudflare secondary DID put the pages in
+    front of students, and fragments cannot lose each other when two publishes
+    run at once. The list is the build's own (`visiblePagesList`), written only
+    after that build succeeded; it is recorded only when its build id is the
+    id of the build the site folder belongs to, so a list from an earlier build
+    is never taken for this site's. Never fails a publish that has already
+    happened: a record that could not be written costs, at worst, one page
+    taking its class's date once.
+    """
+    listing = section_dir / VISIBLE_PAGES_FILE
+    id_file = section_dir / BUILD_ID_FILE
+    try:
+        data = json.loads(listing.read_text(encoding="utf-8"))
+        current = id_file.read_text(encoding="utf-8").strip()
+    except (OSError, ValueError):
+        return None
+    if not current or data.get("buildId") != current:
+        return None
+    folder = course_dir / ".publish_state" / f"section{section}.published-pages"
+    stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    target = folder / f"{stamp}-{destination}.json"
+    temporary = folder / f".{target.name}.{os.getpid()}.tmp"
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        temporary.write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        os.replace(temporary, target)
+    except OSError as error:
+        printer(f"⚠️  Could not note which pages this website now shows: {error}")
+        return None
+    return target
+
+
 def main():
     p = argparse.ArgumentParser(
         description="Publish a built section site — to Netlify by delta (file-digest) upload, or to Cloudflare Pages."
@@ -1249,6 +1371,8 @@ def main():
             section=str(args.section),
             teacher_last_name=teacher_last_name,
         )
+        # Only reached when the upload succeeded: every failure above exits.
+        record_published_pages(course_dir, section_dir, args.section, "cloudflare")
         return
 
     # --- Token handling (new, simplified) ---
@@ -1390,6 +1514,9 @@ def main():
         sys.exit(1)
 
     print("\n✅ Deploy complete.")
+    # After the upload succeeded, never before (#379): the record says what
+    # has been on a site students could reach.
+    record_published_pages(course_dir, section_dir, args.section, "netlify")
 
 def run_until_stopped():
     """Run main(); a Cancel in the app (its ^C) or Ctrl-C at a terminal leaves

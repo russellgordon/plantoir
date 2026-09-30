@@ -1125,12 +1125,16 @@ the PREVIEW PORT BLOCK the three launchers share (byte-identical, checked by
 | A STOPPED workspace | `docker top` exits 1 — so "stopped" is asked first, with `.State.Running` |
 | `.State.Pid` | the same number `docker top` shows for the first process, so "its own first process" is found by pid, not by position |
 
-One look answers one of three: **nothing** (stopped, gone, or only its first
-process), **other work** (anything else — a build for publishing, a publish,
-a course being set up, another launcher's probe — and a running workspace
-`docker top` did not answer), or **a preview**. The app's quit path uses the
-same count to decide whether a workspace is busy (documentation/09-mac-app.md),
-so the two agree on what "running" means.
+One look answers one of three: **nothing** (stopped, gone, only its first
+process, or — since #378 — only work whose owner has gone), **other work**
+(a build for publishing, a publish, a course being set up or another
+launcher's probe WHOSE OWNER IS STILL RUNNING, and a running workspace `docker
+top` did not answer), or **a preview**. Until #378 the app's quit path and the
+launchers counted the same way; they no longer do. The quit path
+(`FolderContainers.containerBusy`, documentation/09-mac-app.md) still counts
+anything beyond the first process as busy, so a workspace holding only
+left-over work keeps the virtual machine running at quit — the safe
+direction, and out of #378's scope.
 
 **A preview counts as open only while its launcher is running on this Mac.**
 Measured by the plan review: killing the host side of `docker exec` leaves
@@ -1150,11 +1154,15 @@ as a preview is open, so its absence means the preview side is gone). A
 process table that cannot be read counts the launcher as running — a refused
 remake can be retried, a killed preview is what #94 was.
 
-**What it does.** Nothing running: remade at once, as before. Otherwise one
-line (`sentences.whileWaiting`), then a look every 2 s:
+**What it does.** Nothing running: remade at once, as before. Otherwise it
+says what it is waiting for — once, and again only when that changes
+(`sentences.whileWaitingForWork`, `…ForAPreview`, `…ForSomethingElse`, #378) —
+then looks every 2 s:
 
-- **a build or a publish** is waited for up to **600 s**, then refused
-  (`sentences.whenWorkDidNotFinish`, exit 1). Ten minutes is the wait a
+- **a build, a publish or a course being set up whose owner is running** is
+  waited for up to **600 s**, then refused, naming it
+  (`sentences.whenWorkDidNotFinish`, or `whenSomethingElseDidNotFinish` when
+  there is nothing to name; exit 1). Ten minutes is the wait a
   publish set for later already gives a busy course (#156), so a scheduled
   publish and the launcher it runs give up on the same horizon.
 - **an open preview** is refused after **20 s**, naming it
@@ -1184,9 +1192,11 @@ fell through to the mount refusal's advice to keep the folder inside the home
 folder, which was never its trouble (plan review, F4).
 
 **The old shared workspace** (`teaching-quartz`, from before each folder had
-its own) is retired from the same block, only when nothing is running in it,
-by id; otherwise it is left, silently — it holds nothing of the teacher's and
-the port walk already steps round its addresses.
+its own) is retired from the same block, only when NOTHING is running in it —
+left-over work included, since #378: it is not this folder's workspace, so
+nothing this folder's launcher proves about an owner entitles it to end work
+in there — by id; otherwise it is left, silently — it holds nothing of the
+teacher's and the port walk already steps round its addresses.
 
 **On the trail.** When it waited or refused, the launcher prints one
 `PLANTOIR_WORKSPACE_IN_USE:` line, which the console a teacher reads leaves
@@ -1196,7 +1206,172 @@ publish launchd ran, exactly as the build's `PLANTOIR_DATED` line reaches the
 trail. The app writes it rather than the launcher so the event has one writer
 for its words and a real call site (`ActivityTrailWiringTests`); the cost is
 that a run typed at the command line leaves its console sentence and no trail
-line. A remake with nothing running writes nothing.
+line. A remake with nothing running writes nothing. Since #378 the marker
+carries what was waited for and who started it (`waited 14 ICS4U/1
+publish:MPM2D/2 claude`), and the line names them; a three-word line from an
+older launcher still reads.
+
+### Work left behind, and proving its owner has gone (GitHub #378)
+
+**What happened.** Russell closed a Revise with Claude session; every preview
+in that folder afterwards printed "Something in this folder is still running.
+Plantoir will update this folder's workspace as soon as it has finished…",
+waited ten minutes, refused — and did the same every time, until he restarted
+the Mac. Russell's decisions (issue #378, 2026-09-29): an open session holds a
+preview back only while it is building or publishing, and says so by name;
+work whose owner has gone is STOPPED and the preview carries on, with the
+trail saying what was stopped; what is waited for is named in the status
+line.
+
+**The mechanism, measured on the development Mac (2026-09-29, #378 plan and
+implementation).** Every launcher the app starts runs on a pseudo-terminal
+(`ScriptRunner` opens one), so the in-container half runs as `docker exec
+-it`:
+
+| # | What was done | What happened |
+|---|---|---|
+| R2 | `docker exec -i` (a pipe), in-container `read answer`; client SIGKILLed | the in-container process ENDED (its input reached end-of-file) |
+| R3 | `docker exec -it` through a pseudo-terminal, same `read`; client SIGKILLed | it STAYED — `STAT Ss+`, waiting on a terminal read, parented to the engine's shim, still there minutes later |
+| R4 | the same, a process writing 100,000 lines | it FINISHED on its own: work that is still doing something ends by itself; only work waiting for an answer waits for ever |
+| R5 | a Python parent holding a pty (as `ScriptRunner` does) runs `bash -c 'docker exec -it …'`; the PARENT is SIGKILLed, as when a session closes | within 8 s the host `bash` and the `docker exec` client were both gone, and the in-container question was still waiting — so "its owner has gone" is visible from the host's process table |
+| R6 | a remake with R5's leftover inside | the report's two lines word for word, still waiting at 45 s; it would have refused at 600 s, every time |
+| T-real (after the fix) | R5 again with a deploy-shaped question (`sh -lc … /opt/scripts/deploy.py --course MPM2D --section 2`, then `python3 … deploy.py …` under it), then `preview.sh EXC2O 1 --build-only` on a new image | `🧹 Stopped a deploy of MPM2D section 2…`, remade, built, exit 0 in 14 s; with a live `deploy.sh MPM2D 2` on the host it waited and said `⏳ Waiting for Revise with Claude to finish deploying MPM2D section 2…` (this session was the Claude one), and 12 s after that launcher was ended it stopped the leftover and went on |
+| `docker top` on `deploy.sh`'s `sh -lc` wrapper | measured | its many lines are printed as ONE, newlines as spaces, with `--course MPM2D --section 2` written into it (the host expands them before `docker exec`), so the wrapper and the Python both name the publish |
+| cost | measured | `docker top` 0.02 s and `ps -Ao pid=,ppid=,args=` 0.02 s |
+
+The cause of Russell's leftover is inferred, not observed (his workspace was
+cleared by the restart, and the run rules forbid reading his trail): the
+windowless deploy the MCP server ran was not `--non-interactive`, so a
+`deploy.py` question (a site name, the surname) had nobody to answer it. That
+is fixed too — documentation/10-local-ai-assistant.md, "A deploy from another
+app refuses at a question" — but leftovers also come from a Terminal window
+closed, the app force-quit, and older launchers, so the remake has to handle
+them whatever made them.
+
+**Each process belongs to the OUTERMOST piece of work above it.** A deploy
+rebuilds a site by running `build_site.py --build-only` as its own child
+(`deploy.py:rebuild_for_production`), and that build is the deploy's — read
+innermost-first it would be "a build whose `preview.sh` is not running", and a
+live upload would be stopped as left over (#378 plan review, S2). The roots:
+`/opt/scripts/deploy.py` (a publish of its `--course` and `--section`),
+`build_site.py` (a build with `--build-only`, a preview without),
+`setup_course.py` (a course being set up); a website builder serving with no
+`build_site.py` above it is always left over; anything else is "other".
+
+**Its owner, proved from the LIVE process table, once per look.** An owner
+counts only when a running process's OWN command line names it:
+
+| Work | Owner |
+|---|---|
+| a preview C S | `preview.sh C S`, not `--stop`, not `--build-only` (unchanged from #94) |
+| a build C S | `preview.sh C S --build-only`, or `deploy.sh C S` |
+| a publish C S | `deploy.sh C S`, any flags |
+| a course being set up | `setup.sh` (not `--builder-tag`) |
+| anything else | any launcher |
+
+and two belts, for everything but a preview: **a publish set for later** —
+launchd runs `Plantoir --run-scheduled-deploy <…/scheduled/<label>.sh> …`
+for the whole run, including the up-to-ten-minute wait before its script
+starts and the instant between `deploy.sh` exiting and its Python being
+reaped, and the label holds the course as `ScheduledDeploy` writes it (upper
+case, anything not a letter or digit as `-`) and `section<N>` followed by a
+dot, so section 1 never matches section 12; and **a live `docker exec` aimed
+at this workspace** by name or id (#378 plan review S7): work started by a
+live program that is not a launcher — an assistant's own command, an older
+launcher, `verify.sh` — is waited for, and since closing a program ends its
+`docker exec` too (R5), this never keeps a real leftover alive. Courses match
+in either case, sections exactly; this run, its ancestors and descendants
+never count. **A session that is merely open owns nothing** (decision 1): it
+owns work only through a launcher it is running.
+
+**Why args and not process numbers.** Nothing remembered is trusted — no lease
+file, no pid file, no `kill -0` — so a number the system has since given to
+Mail, or to a launcher for another section, cannot keep a dead owner alive
+(MF-2; `test_the_owner_is_never_a_remembered_process_number` pins it in the
+text). The one way to fool it is a process that IS a launcher for the same
+course and section, which is correctly an owner.
+
+**Who started it** is read from the owner's ancestors in the same table:
+`scheduled` first (the scheduled runner is the Plantoir binary without
+`--mcp-stdio`, so it must not be read as a window — plan review N2), then an
+MCP server with claude or codex above it, then the Plantoir app ("another
+Plantoir window"), then claude or codex running the launcher directly, and
+otherwise "a command in Terminal".
+
+**Two readers of the process table in preview.sh, for now.** #381's guard
+(a preview refused while its section is being deployed) has its own reader,
+outside the PREVIEW PORT BLOCK, that recognises `deploy.sh C S` and a
+scheduled run of C/S; this one lives inside the block, because setup.sh and
+deploy.sh need it too. They were written the same night on separate branches
+and were not merged into one helper then; the scheduled-label rule (course
+sanitized, `section<N>` followed by a dot) is the part that must stay the
+same in both. They now read a course code with a space the same way — whole,
+as the text the arguments of `deploy.sh` begin with — since #382 folded that
+one part of #388 into the guard; folding the two readers into one helper is
+still [#388](https://github.com/russellgordon/plantoir/issues/388) (v1.4.2).
+
+**Two fail-safes, and they point different ways.** A process table that cannot
+be read counts as every owner RUNNING (a wait and a refusal are recoverable;
+an ended publish is not). The launcher guard of #381 (a preview refused while
+its section is being deployed) fails the other way — it lets the preview
+through when `ps` cannot be read — because refusing every preview for as long
+as `ps` fails is #378's blocked-until-restart again.
+
+**The stop is the remake's own `docker stop "$id"`, and nothing else.** No
+second way to end work was written: the remake removes the whole workspace a
+moment later anyway, and a finer kill (`docker exec … kill <pid>`) is more
+code that could aim at the wrong thing, in a PID namespace `docker top` does
+not show. `id` is read only from `docker inspect "$CONTAINER_NAME"` (this
+folder's name, a hash of `/bin/pwd -P`) or, in `retire_legacy_container`,
+the old shared name; `test_the_only_stop_is_this_folders_workspace_by_its_id`
+pins that in the text and `TheStopReachesOnlyThisFoldersWorkspace` runs it
+with leftovers in this folder's, another folder's and the old shared
+workspace. Before the stop it prints `sentences.whenLeftoverWorkIsStopped` —
+"🧹 Stopped a deploy of MPM2D section 2, left running after the program that
+started it had closed. Your pages were not touched." — and
+`PLANTOIR_LEFTOVER_STOPPED:` for the trail's `left-over work stopped`. An
+orphaned preview, ended silently since #94, is named there too.
+
+**What the sentence does NOT claim.** The plan offered "…a deploy that was
+waiting for an answer nobody could give". The look does not prove waiting from
+working (the wait channel is readable in `docker top -eo wchan`, but that is a
+second query for a clause), so the clause was dropped rather than guessed.
+
+**What stopping can cost, stated.** A build stopped mid-way may leave a
+half-mirrored `public/`; the next publish's freshness check rebuilds (the
+build-started marker, #265). A Netlify or Cloudflare upload stopped mid-way
+leaves the live site as it was (they publish only once every file is up). A
+folder deploy never runs in the workspace. In every case the owner was gone,
+so nothing would ever have finished the work either.
+
+**A course code with a space** ("AP CALC", which `CourseCodeRule` allows)
+is read to the next ` --` rather than the first blank, carried with `+` for
+the space through the look's pieces and the markers, and a launcher is
+matched by the text its arguments BEGIN with ("AP CALC 1 "), never word by
+word — read word by word, a live preview of AP CALC was course AP, section
+CALC, and was stopped as left over with a false line (#378 review S1). A
+process table that answers but does not list THIS run is treated as
+unreadable (review N6). A leftover is ended only when a launcher next has to
+set the folder up again; until then it is harmless, though the quit path
+keeps the virtual machine running for it (review N2).
+
+**Known limits, not closed.** The owner test is folder-blind: another working
+folder's launcher for the same course and section makes this folder's
+leftover look owned — a needless wait, with the status line naming that other
+folder's work (matching by working directory was rejected as a second system
+query for a failure that only waits). The look-then-stop window (tens of
+milliseconds) and a remake during a deploy's host-side stretch (its token
+handed in, nothing inside yet) are #94's races, not widened here and not
+closed by the proof.
+
+**Rejected.** A targeted `docker exec … kill` (above). A marker the launcher
+plants in every `docker exec` to prove ownership exactly: it cannot help the
+case in the issue, since work started by the PREVIOUS version's launchers
+carries no marker and an update is exactly when a remake happens. Work leases
+as proof (remembered pids; a bare launcher writes none; a force-killed app
+leaves them). Counting an open session as an owner (decision 1). Shortening
+the ten minutes (left, to be measured once this lands). An alert or a button
+(decision 3). Asking before stopping (decision 2).
 
 **Tested** by `scripts/test_port_blocks.py` — every `whatCountsAsRunning` case
 and every `sequences` case through the REAL block under `/bin/bash` 3.2, with
@@ -1414,6 +1589,70 @@ contract case: a shared case Windows cannot implement becomes a named gap
 nobody can ever close. The one thing that side does owe is the new
 `failureExplanations` case.
 
+### What the console says about the website builder (GitHub #382)
+
+Everything a launcher prints reaches the app's console, where a teacher
+reads it, so none of it names the machinery (CLAUDE.md rule 1): the words
+are "website builder" and "this folder's website builder", never container,
+Docker or image. Until #382 the lines around this lifecycle said "Binding
+host courses to container", "Container teaching-quartz-… is already running
+with correct mount", "Creating new container named …", "Running
+setup_course.py inside the Docker container", and the diagnostic trio
+"🔌 Docker context", "🧭 Host detected by Docker", "🖼️ Using image".
+
+- **One progress marker where there were two.** `preview.sh` printed
+  "Starting container if needed" and `deploy.sh` "Ensuring container is
+  running"; both now print `🚀 Getting this folder's website builder ready…`,
+  and so does `setup.sh`, which printed neither. The marker
+  (`TaskMilestones`, generated into `contracts/app-rules.json` →
+  `milestones`) is that sentence less its emoji and ellipsis. `setup.sh`
+  gained the line because the example course's bar watched setup.sh for
+  "Starting container if needed", a line only preview.sh printed — its step 3
+  had never been reachable. It had to be a phrase no earlier line contains:
+  "Starting the website builder" is already the first-run block's line for
+  starting the engine, and a marker matched early moves the bar early. The two
+  old strings stay in `markerOrigins.knownDivergence.macOnlyLauncherMarkers`
+  so nothing on Windows reaches for them.
+- **The diagnostic trio.** "Docker context" and "Host detected by Docker"
+  were dropped, with the two `docker info` calls behind them; "Using image"
+  became `🧰 Website builder version: src-<hash>` — the part of the name that
+  changes with the recipe, which is what a problem report needs. REJECTED:
+  keeping the context line in plain words ("a website builder this Mac
+  already had"), which is still the machinery, and a debug flag, which no
+  teacher's run would carry.
+- **The folder's name for its builder** (`teaching-quartz-<id>`) is no longer
+  printed: it is derived from the folder's path, which the trail records.
+- **A folder still holding the old launchers** is harmless during the
+  change: the app replaces a folder's launchers whenever it opens it
+  (`reloadCourses` → `refreshLaunchersIfNeeded`), and an old copy run some
+  other way (an MCP-driven preview in a folder no window has reopened)
+  only makes a bar skip "Starting up…" — the bar takes the HIGHEST marker
+  it has seen, so it never stalls on the missing one.
+
+**Pinned by `scripts/test_launcher_words.py`**, the whole-launcher scan
+#228 and #263 left for later (the first-run block keeps its own Swift test,
+which also asks that the three copies are identical). What it reads as
+teacher-facing: every `echo` and `printf`, wherever it sits on its line
+(after `then`, `;`, `&&`, `||` or a `case` arm's `pattern)` as well);
+every `read -p` prompt; every line of a `cat <<'MSG'` message — with `$( … )`,
+`${ … }` and `$NAME` removed first. What it leaves out: comments and code,
+the `--help` heredocs, `echo "PLANTOIR_…` lines (the app reads and hides
+them), and a line ending `# never shown to a teacher: <why>` — the ONE way to
+keep a word, for lines the app cannot show (a function's answer captured by
+`$( … )`, the helper-path `case` arms among them, text piped into a
+command, the `--image`/`--context` developer paths; 38 lines today). REJECTED: an allow-list kept in the test, which freezes the list
+rather than emptying it and which a reader of the launcher never sees. It
+forbids toolchain, Docker, container, Colima, Lima, buildx, BuildKit,
+"virtual machine" and image, whole words, any case; not "script", which
+`deploy.sh` rightly uses for a preview's live-reload code. It also asks that
+every launcher marker a bar watches for is PRINTED by a launcher that bar
+reads — the check that would have caught the example course's dead step.
+Must-fails measured 2026-09-30: the old "Starting container if needed" echo
+back in `preview.sh` (1 failure), `setup.sh`'s new line removed (1
+failure, the example course's bar), and "container" put into a `case` arm's
+echo in `workspace_origin_in_words` (1 failure; the scan before the #382 fix
+round passed it).
+
 ## 5. Per-task specifics
 
 ### `setup.sh`
@@ -1482,6 +1721,106 @@ nobody can ever close. The one thing that side does owe is the new
   websocket on port + 1000 (`--wsPort`) — the reason the container
   publishes both ranges. The reachable HOST address is the folder's
   probed block; `preview.sh` prints it.
+
+#### A section being deployed cannot be previewed (#381)
+
+Russell's decision 4 on #378: "a preview of a section cannot start AT ALL
+while that same section is being deployed — from this window or another."
+The rule, its cases and its sentences are `contracts/shared-rules.json` →
+`previewWhileItsSectionDeploys`. Three layers refuse, and this is the one in
+the launcher: the window refuses a deploy by its own copy of the app
+([09](09-mac-app.md) → "A preview of the section this app is deploying"), and
+other programs are refused by their work leases (#156).
+
+**What it closes.** Read from code on 2026-09-29 (the #378 plan review), a
+deploy typed at a command line — in Terminal, or by a Revise with Claude
+session's own shell — writes no lease, so a preview pressed in a window while
+it ran was not refused; and a `./preview.sh C S` typed at a command line was
+refused by nothing at all.
+
+**Where.** `refuse_a_preview_while_its_section_deploys`, between the
+`PREVIEW WHILE DEPLOYING GUARD` markers in `preview.sh` only, called on a
+SERVING run (not `--build-only`, not `--stop`) straight after the arguments
+are checked and before anything changes: no builds link, no website builder
+started, no workspace looked at or set up again. The first placement proposed
+("just before the address is announced") was rejected by the plan review
+(S4): by then a serving run may already have remade the workspace in a
+deploy's host-side stretch — a token being read, the moment between its two
+legs — pulling it out from under the deploy, which is the harm the rule is
+for.
+
+**What counts as a deploy of C/S**, read from the LIVE process table (`ps
+-Ao pid=,ppid=,args=`), never from a remembered process id or a lease file:
+
+- `deploy.sh C S …` as the PROGRAM (the first word, or the script a shell was
+  handed — a process whose text merely mentions it, such as a `claude -p`
+  prompt or a `bash -c` wrapper, does not count; the wrapper's child does) —
+  except when its own arguments carry `--reset-token`, `--logout` or `--help`,
+  which deploy nothing; `--diagnose` DOES deploy (it prints more while it
+  uploads). Only one working in THIS folder counts: its working directory is
+  asked of `lsof -a -p <pid> -d cwd`, because this year's and last year's
+  folders can hold the same course. One whose folder `lsof` cannot answer for
+  still counts: a deploy of this very section is proved, only its folder is
+  not. The course and section are matched as the text the arguments of
+  `deploy.sh` BEGIN with, one space between words and a space after the
+  section ("AP CALC 2 "), the way `the_owners_of_the_work` reads them: a
+  course code may hold a space, which `ps` shows as two words, and until #382
+  the guard compared one word for the course, so no deploy of such a course
+  refused its preview (the known gap #388 named). The trailing space is what
+  keeps section 1 from matching `AP CALC 12`, and "begins with" is what keeps
+  CALC from matching AP CALC; three `launcherCases` pin them.
+- a deploy set for later of C/S: any process whose arguments name its script,
+  `ca.russellgordon.Plantoir.deploy.<CODE>.section<N>[.<folder id>].sh`
+  (`<CODE>` as `ScheduledDeploy.sanitizedCode` writes it, the section bounded
+  so `section1` is not `section12`, a `.log` being read not counted). launchd
+  runs `Plantoir --run-scheduled-deploy <that script> …` for the whole run,
+  so its build leg counts too. A label naming ANOTHER folder's id is that
+  folder's deploy; a label from before #237 names no folder and counts for
+  any.
+
+**Not a deploy: `preview.sh C S --build-only`.** It is a publish's build leg,
+and it is also exactly what the assistant's "rebuild the preview" runs
+(`AssistSiteWork.rebuildPreview`); nothing on the command line tells the two
+apart, so counting it — the #378 plan's first shape, rejected by its review
+(S3) — would refuse every preview of the section while the assistant
+refreshed it, with a sentence that is false. The window refuses its own build
+leg from its publish record. **The gap that leaves**, named in the contract's
+`knownLimits`: a preview typed in Terminal while ANOTHER program is in the
+build leg of its deploy. A `--for-deploy` flag on the build leg would close
+it; that is a `launcherFlags` change and was not made.
+
+**An unreadable process table lets the preview THROUGH** — the opposite of
+the look before a workspace is remade (above), on purpose. There, failing open
+costs somebody's publish, so an unreadable table counts as "owner running".
+Here, failing closed would refuse every preview for as long as `ps` fails,
+which is the "blocked until a restart" #378 was about; the window's check and
+the leases still stand when this one cannot see.
+
+This run's own ancestors and descendants never count, the same rule
+the owner check before a remake uses (`the_owners_of_the_work`, #378): a shell that ran `./deploy.sh C S
+&& ./preview.sh C S` carries both commands' words after its deploy has ended.
+
+**What it says, and writes.** `sentences.launcher` (the course and section,
+"is being deployed right now, so it cannot be previewed until that has
+finished", then "Nothing was changed."), exit 1, and the trail line
+`launcherLineWhenItsSectionIsBeingDeployed` under `build declined, course
+busy elsewhere`, written by the launcher itself so a refusal typed at a
+command line is on the trail too. The app lifts the first line into the
+panel (`FailureExplainer.sectionIsBeingDeployedExplanation`).
+
+**Tests.** `scripts/test_preview_while_deploying.py` runs every
+`launcherCases` case against the real guard, cut out between its markers,
+with a pretend `ps` and `lsof`; must-fails measured 2026-09-29: counting
+`--build-only` as a deploy, refusing on an unreadable table, matching the
+course without the section, skipping the folder check, dropping the call, and
+dropping this run's family each turn a named case red; and (#382) comparing
+one word for the course, or dropping the space after the section, turns the
+spaced-course cases red, and matching the text ANYWHERE in the arguments
+(`index(…) >= 1` for `== 1`) turns "a course that ENDS another's code is
+another course" red (CALC 2 inside `deploy.sh AP CALC 2`). Checked once against
+the real process table too: a `deploy.sh ICS4U 2` sleeping in a scratch
+folder refused `preview.sh ICS4U 2` there with no engine call made, while the
+same deploy in ANOTHER folder, and a `--build-only` run, went on.
 
 #### Before building, preview.sh makes sure this Mac can reach the builder (#234)
 
@@ -1618,8 +1957,9 @@ looked at AGAIN. Still somebody else's: `whenAnotherAccountHasTheAddress
 .sentence`, the `refused` marker, exit 1 with nothing announced — #235's
 shape, so the app needs no change. **Never a second remake**: rebuilding in a
 loop against a listener that follows costs two minutes a turn and fixes
-nothing. The remade workspace skips the earlier "Preflight: checking Quartz
-sidebar anchor" look; it only warns, and the new workspace is made from the
+nothing. The remade workspace skips the earlier "Checking where the sidebar
+leaves hidden pages out" look (worded "Preflight: checking Quartz sidebar
+anchor" until v1.4.1); it only warns, and the new workspace is made from the
 image that was just looked at.
 
 **Why counts, not "is one of them ours".** Colima's forward is IPv4 only
@@ -1706,6 +2046,17 @@ all XNU compares).
   person can replace is the more expensive mistake. Only the app's SCHEDULED
   deploy passes it — pressing Deploy runs this same launcher through a
   pseudo-terminal so a question can come back as a dialog.
+
+  **wrangler is kept out of all of this, deliberately.** Whether the launcher
+  has a terminal, and whether it was given `--non-interactive`, decides what
+  happens to the LAUNCHER's and `deploy.py`'s questions; wrangler, Cloudflare's
+  own deploy tool, is always run with `CI=1` and never asks anything on any
+  path, so the Cloudflare branch's `docker exec -it` or `-i` makes no
+  difference to it. `deploy.py` settles beforehand everything wrangler would
+  otherwise ask — including remaking a project deleted in Cloudflare's
+  dashboard, which is what turned every Cloudflare leg of `verify-deploy.sh`
+  red on 2026-09-30. [`07-deployment.md`](07-deployment.md) → "wrangler is
+  never left a question to ask".
 
   **It is a PREVIEW flag too, as of 2026-09-09 (issue #124).** A scheduled
   publish BUILDS before it publishes, and the build runs `preview.sh` /
@@ -1965,6 +2316,15 @@ deployed"; three things belong here, beside the launchers themselves:
   teacher installs nothing. The check is a `grep` for the key and a second one
   for `course_code`, so the sentence names the code a teacher reads rather than
   the folder.
+- **The folder branch records what it published (#379).** Because it never
+  enters `deploy.py`, it also does `deploy.py`'s new bookkeeping itself: after
+  rsync succeeded, `record_published_pages` copies the build's
+  `.visible-pages.json` into `courses/<CODE>/.publish_state/section<N>.published-pages/`
+  when its build id is `.build-id`'s — plain `cp` and `grep`, no host
+  interpreter, and any failure records nothing and publishes anyway
+  ([`07-deployment.md`](07-deployment.md) → "The published-pages record
+  (#379)"; `scripts/test_published_pages_record.py` cuts the function out of
+  the launcher and runs it). `deploy.ps1`'s folder branch owes the same.
 - **It fails CLOSED.** A settings file that exists and cannot be read refuses.
   A settings file that is absent is left to the course-folder check further
   down, which already says that in its own words.
