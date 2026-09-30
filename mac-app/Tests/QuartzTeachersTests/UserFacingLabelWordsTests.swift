@@ -62,7 +62,8 @@ final class UserFacingLabelWordsTests: XCTestCase {
                 lineNumber += 1
                 for literal in UserFacingLabelWordsTests.labelLiterals(in: line) {
                     labelsRead += 1
-                    let hits: [String] = UserFacingLabelWordsTests.forbiddenWords(in: literal, from: forbidden)
+                    let wordsOnScreen: String = UserFacingLabelWordsTests.withoutInterpolations(literal)
+                    let hits: [String] = UserFacingLabelWordsTests.forbiddenWords(in: wordsOnScreen, from: forbidden)
                     if !hits.isEmpty {
                         findings.append(file.lastPathComponent + ":" + String(lineNumber) + " “" + literal + "” names " + hits.joined(separator: ", "))
                     }
@@ -83,6 +84,19 @@ final class UserFacingLabelWordsTests: XCTestCase {
         XCTAssertEqual(UserFacingLabelWordsTests.labelLiterals(in: "Picker(\"Language\", selection: $x) {"), ["Language"])
         XCTAssertEqual(UserFacingLabelWordsTests.labelLiterals(in: "    .help(\"Edit this\")"), ["Edit this"])
         XCTAssertEqual(UserFacingLabelWordsTests.labelLiterals(in: "MyText(\"not a label call\")"), [])
+    }
+
+    /// Code interpolated into a label is not a word on screen: the sidebar's
+    /// "No course or club matches “\(workspace.filterText)”." names a
+    /// variable, not the machinery. The words around it are still read.
+    func testInterpolatedCodeIsNotRead() {
+        let forbidden: [String] = ["workspace", "docker"]
+        let variable: String = "No course or club matches “\\(workspace.filterText)”."
+        XCTAssertEqual(UserFacingLabelWordsTests.withoutInterpolations(variable), "No course or club matches “”.")
+        XCTAssertEqual(UserFacingLabelWordsTests.forbiddenWords(in: UserFacingLabelWordsTests.withoutInterpolations(variable), from: forbidden), [])
+        let nested: String = "Opened \\(names(for: (a, b)).joined()) in the docker"
+        XCTAssertEqual(UserFacingLabelWordsTests.withoutInterpolations(nested), "Opened  in the docker")
+        XCTAssertEqual(UserFacingLabelWordsTests.forbiddenWords(in: UserFacingLabelWordsTests.withoutInterpolations(nested), from: forbidden), ["docker"])
     }
 
     // MARK: - Helpers
@@ -108,6 +122,35 @@ final class UserFacingLabelWordsTests: XCTestCase {
             }
         }
         return hits
+    }
+
+    /// `literal` (as written in the source) with every interpolation —
+    /// a backslash, then parentheses, nesting counted — taken out, so only
+    /// the words a teacher reads are left to match.
+    static func withoutInterpolations(_ literal: String) -> String {
+        var wordsOnScreen: String = ""
+        var depth: Int = 0
+        var previousWasBackslash: Bool = false
+        for character in literal {
+            if depth > 0 {
+                if character == "(" {
+                    depth += 1
+                } else if character == ")" {
+                    depth -= 1
+                }
+                continue
+            }
+            if previousWasBackslash && character == "(" {
+                // Drop the backslash already kept, and start skipping.
+                wordsOnScreen.removeLast()
+                depth = 1
+                previousWasBackslash = false
+                continue
+            }
+            wordsOnScreen.append(character)
+            previousWasBackslash = (character == "\\") && !previousWasBackslash
+        }
+        return wordsOnScreen
     }
 
     /// The string literals passed straight to a label-bearing call on one
