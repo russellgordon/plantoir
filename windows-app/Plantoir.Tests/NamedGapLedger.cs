@@ -32,9 +32,9 @@ namespace Plantoir.Tests;
 /// <c>ContractTests.SharedRules_ActivityTrailEvents_Exist</c> honours it. That
 /// is the right tool for a difference that is DELIBERATE and permanent — "built
 /// site moved out of the working folder" is mac-only because Windows has never
-/// built inside the working folder, so there is no moment to record. Neither
-/// gap listed below is like that. Windows OWES both of them, at v1.3.0, and
-/// writing <c>appliesOn: ["mac"]</c> would therefore be a lie in the file both
+/// built inside the working folder, so there is no moment to record. None of the
+/// gaps listed below is like that. Windows OWES every one of them, on the parity
+/// milestone, and writing <c>appliesOn: ["mac"]</c> would therefore be a lie in the file both
 /// platforms read as the truth. It would also be a permanent one: <c>appliesOn</c>
 /// has no mend-check, so on the day Windows implemented the event the contract
 /// would still say the event was none of its business, both suites would stay
@@ -84,41 +84,237 @@ internal static class NamedGapLedger
     /// <summary><c>shared-rules.json</c> → <c>specialNames.platformWording.keys</c>, by key.</summary>
     internal const string PlatformWordedKeys = "shared-rules.json → specialNames.platformWording.keys";
 
+    /// <summary><c>assist-wording.json</c> → <c>wording</c>, by key: a sentence with no same-named member on <c>AssistWording</c> or <c>ClassChangeWording</c>.</summary>
+    internal const string AssistWordingKeys = "assist-wording.json → wording";
+
+    /// <summary><c>file-formats.json</c> → <c>courseConfigKeys.keys</c>, by key.</summary>
+    internal const string CourseConfigKeys = "file-formats.json → courseConfigKeys.keys";
+
+    /// <summary><c>app-rules.json</c> → <c>modelTiers.requirements</c>, by <c>rule</c>.</summary>
+    internal const string ModelTierRequirements = "app-rules.json → modelTiers.requirements";
+
+    /// <summary><c>class-planning.json</c> → <c>sectionIndexPointer.dateCases</c>, by case <c>name</c>.</summary>
+    internal const string FrontPageDateCases = "class-planning.json → sectionIndexPointer.dateCases";
+
+    /// <summary>
+    /// The milestone every entry below names. While no Windows release is
+    /// being cut, an entry may name an open issue on this milestone itself:
+    /// the entries are that milestone's BURN-DOWN LIST, and the milestone
+    /// cannot close — nor a Windows release be cut — while any remains
+    /// (Russell, 2026-09-25, reconfirmed 2026-09-30; <c>contracts/README.md</c>
+    /// → "Named gaps"; <c>WINDOWS-PARITY.md</c> → section 8).
+    /// </summary>
+    private const string Parity = "Windows: parity with mac v1.4.0";
+
     /// <summary>
     /// One thing the contract names and this app does not have yet.
     /// </summary>
     /// <param name="Area">Which contract list the key belongs to.</param>
     /// <param name="Key">The event name or sentence key, spelled as the contract spells it.</param>
     /// <param name="Issue">The open GitHub issue that owns the work.</param>
-    /// <param name="Milestone">The milestone that issue carries — LATER than the release being cut.</param>
+    /// <param name="Milestone">The milestone that issue carries. Normally LATER
+    /// than the release being cut; while no Windows release is being cut it may
+    /// be the parity milestone itself, and then the entries ARE that
+    /// milestone's burn-down list — it cannot close while any remains
+    /// (<c>contracts/README.md</c> → "Named gaps").</param>
     /// <param name="Reason">Why it is not built here yet, in a sentence.</param>
     internal sealed record Entry(string Area, string Key, int Issue, string Milestone, string Reason);
 
-    private static readonly Entry[] Entries =
+    /// <summary>Several keys of one area owned by one issue, for one reason.</summary>
+    private static IEnumerable<Entry> Owed(string area, int issue, string reason, params string[] keys) =>
+        keys.Select(key => new Entry(area, key, issue, Parity, reason));
+
+    private static readonly Entry[] Entries = new[]
     {
+        // ---- activityTrail.mustRecord: events this app does not declare yet.
+        // Mapped 2026-09-30 (bundle 1) from each event's own #references to
+        // the open `windows` issue that carries that mac piece. Each goes when
+        // its feature lands, and its mend-check says so.
+        Owed(ActivityTrailEvents, 158, "this app cannot rename a course's word for a unit yet, so there is no moment to record",
+            "word for a unit renamed"),
+        Owed(ActivityTrailEvents, 320, "reopening the last working folder does not record either outcome yet (mac #311)",
+            "working folder reopened", "working folder not reopened"),
+        Owed(ActivityTrailEvents, 387, "Course Settings does not hold a save back yet (mac #373)",
+            "settings save held back"),
+        Owed(ActivityTrailEvents, 272, "the unsaved-settings preview rules of mac #265 are not built here yet",
+            "preview started with unsaved settings", "preview again after settings saved"),
+        Owed(ActivityTrailEvents, 357, "deploying does not re-read the saved settings at the act yet (mac #335)",
+            "deploy used the saved settings"),
+        Owed(ActivityTrailEvents, 250, "the New Course wizard does not record the course it made yet (mac #248/#251/#267)",
+            "course created"),
+        Owed(ActivityTrailEvents, 196, "a cut-off model reply is not detected here yet (mac #198)",
+            "assistant answer was cut off"),
+        Owed(ActivityTrailEvents, 217, "an echoed reply is not refused here yet (mac #215)",
+            "assistant repeated the request back"),
+        Owed(ActivityTrailEvents, 350, "a tool the model was not offered is not refused here yet (mac #327)",
+            "assistant named a tool it was not offered"),
+        Owed(ActivityTrailEvents, 305, "the other-course refusal of mac #167 is not built here yet",
+            "assistant was asked about another course"),
+        Owed(ActivityTrailEvents, 352, "a page list naming no page is not refused in code here yet (mac #197)",
+            "assistant named no page it could find"),
+        Owed(ActivityTrailEvents, 200, "duplicating a class does not record a copy it declined to make yet",
+            "class copy not made"),
+        Owed(ActivityTrailEvents, 308, "the writers do not yet say when they left a page's settings alone (mac #182/#186/#188)",
+            "page settings left as they were"),
+        Owed(ActivityTrailEvents, 282, "adding a section does not record itself yet (mac #175)",
+            "section added"),
+        Owed(ActivityTrailEvents, 348, "Revert does not record the exclusions it put back yet (mac #152)",
+            "exclusions reverted"),
+        Owed(ActivityTrailEvents, 233, "a preview that never appears is not told apart and recorded yet (mac #225/#234/#235/#280)",
+            "preview did not appear"),
+        Owed(ActivityTrailEvents, 239, "removing a course does not turn its scheduled deploy off yet (mac #236)",
+            "scheduled deploy turned off"),
+        Owed(ActivityTrailEvents, 261, "setting a deploy does not say what it replaced or record a refusal yet (mac #195)",
+            "scheduled deploy replaced", "scheduled deploy could not be set"),
+        Owed(ActivityTrailEvents, 347, "a scheduled deploy does not read the course's settings when it RUNS yet (mac #323)",
+            "scheduled publish read the course's settings"),
+        Owed(ActivityTrailEvents, 241, "this app has no courses kept for reference yet (mac #206 branch A)",
+            "course kept for reference", "course could not be kept for reference",
+            "reference course school year changed", "reference course pages locked again"),
+        Owed(ActivityTrailEvents, 244, "this app cannot import courses for reference yet (mac #206 branch B)",
+            "course imported for reference", "course could not be imported for reference",
+            "unfinished import for reference tidied away", "course import for reference stopped"),
+        Owed(ActivityTrailEvents, 247, "this app cannot copy a page from another course yet (mac #207)",
+            "pages copied from another course"),
+        Owed(ActivityTrailEvents, 406, "Preview does not offer today's class for the front page yet (mac #397)",
+            "put today's class on the front page", "left the front page as it was"),
+        Owed(ActivityTrailEvents, 283, "backups cannot be deleted several at once here yet (mac #242)",
+            "backups deleted"),
+        Owed(ActivityTrailEvents, 289, "the lease rules of mac #156 are not built here yet",
+            "build declined, course busy elsewhere", "scheduled publish waited for the course"),
+        Owed(ActivityTrailEvents, 395, "the Cloudflare project remade marker is not read here yet",
+            "cloudflare project made again"),
+        Owed(ActivityTrailEvents, 324, "clicking a scheduled-publish toast is not recorded yet (mac #306)",
+            "scheduled publish notification"),
+        Owed(ActivityTrailEvents, 337, "this app does not find or install its own updates yet (mac #204)",
+            "update found", "update check found nothing new", "update answered", "update held while work is under way",
+            "update installing", "update set aside", "update stopped", "app updated"),
+        Owed(ActivityTrailEvents, 340, "this app has no How I Teach page yet (mac #209)",
+            "How I Teach page read", "How I Teach page written", "How I Teach page kept off the website"),
+        Owed(ActivityTrailEvents, 360, "Course Settings has no How I Teach row yet (mac #329)",
+            "How I Teach page started"),
+        Owed(ActivityTrailEvents, 345, "one coverage map per curriculum folder is not built here yet (mac #128)",
+            "curriculum maps built"),
+        Owed(ActivityTrailEvents, 360, "the assistant's own backup of a course is not recorded yet (mac #351)",
+            "assistant backed up a course"),
+        Owed(ActivityTrailEvents, 355, "this app has no Get Ready for the Start of the Year yet (mac #96)",
+            "section made ready for the start of the year", "start of the year change undone", "start of the year not done"),
+        Owed(ActivityTrailEvents, 392, "the links-into-hidden-pages checklist is not built here yet (mac #379)",
+            "offered to publish pages that links lead to", "published pages that links led to",
+            "left pages hidden that links lead to"),
 
+        // ---- specialNames.platformWording.keys
+        Owed(PlatformWordedKeys, 158, "the sentence belongs to a sheet this app does not have yet, so there is nothing here to word",
+            "renameUnitWord.explanation"),
 
-        // Renaming a course's word for a unit landed on the mac 2026-09-10
-        // (issue #100) and arrived here as the contract moving: the event and
-        // the sentence are both parts of a feature this app has none of yet.
-        // Issue #158 is the whole handover — the renamer, the plan, the sheet,
-        // the sentences and this event — and it is milestoned v1.3.0, after
-        // the v1.2.0 cut. Both entries go when that feature lands; neither can
-        // be deleted on its own without the other's check noticing.
-        new Entry(
-            ActivityTrailEvents,
-            "word for a unit renamed",
-            158,
-            "v1.3.0",
-            "this app cannot rename a course's word for a unit yet, so there is no moment to record"),
+        // ---- file-formats.json → courseConfigKeys: keys CourseConfiguration.cs does not name.
+        Owed(CourseConfigKeys, 345, "one coverage map per declared curriculum folder is not built here yet (mac #128)",
+            "curriculum_folders"),
+        Owed(CourseConfigKeys, 274, "this app has no clubs yet, so a course cannot say its class noun, page scheme or front-page heading (mac #267)",
+            "class_page_scheme", "front_page_heading", "class_noun"),
+        Owed(CourseConfigKeys, 239, "a scheduled deploy that may run late is not built here yet (mac #236)",
+            "scheduled_deploy_may_run_late_days"),
+        Owed(CourseConfigKeys, 241, "this app has no courses kept for reference yet (mac #206 branch A)",
+            "kept_for_reference", "reference_school_year"),
 
-        new Entry(
-            PlatformWordedKeys,
-            "renameUnitWord.explanation",
-            158,
-            "v1.3.0",
-            "the sentence belongs to a sheet this app does not have yet, so there is nothing here to word"),
-    };
+        // ---- class-planning.json → sectionIndexPointer.dateCases (pointAt cases)
+        Owed(FrontPageDateCases, 274,
+            "this app's pointer finds only the class heading; a club's front-page heading arrives with clubs (mac #267)",
+            "a club's front page, numbered pages"),
+
+        // ---- app-rules.json → modelTiers.requirements
+        Owed(ModelTierRequirements, 196,
+            "LocalModel.Ask sends max_tokens 512, but no test reads the contract's cap yet — answered with #196's finish_reason work",
+            "Every request caps how much the model may write"),
+        Owed(ModelTierRequirements, 196, "a cut-off model reply is not detected here yet (mac #198)",
+            "A reply the engine stopped part way runs no tool and says so"),
+        Owed(ModelTierRequirements, 262, "a finished reply that wrote nothing is not checked against the window here yet",
+            "A finished reply that wrote nothing runs a tool only when the window supplies everything that tool needs"),
+
+        // ---- assist-wording.json → wording: sentences with no same-named
+        // member here. Some are said by this app today in words built
+        // inline elsewhere; the walker cannot see those, and hoisting them
+        // into AssistWording under their key is #157's remaining half. The
+        // rest belong to features this app does not have yet.
+        Owed(AssistWordingKeys, 274, "this app has no clubs yet, so it has no meeting-worded sentences (mac #267)",
+            "addedTheNextPageForAMeeting", "allScheduledDatesHaveConcludedForAMeeting", "datesForTheNextPageForAMeeting",
+            "datesNotGivenYetForAMeeting", "datesToDuplicateForAMeeting", "datesToFindADaysPageForAMeeting",
+            "datesToReDateForAMeeting", "datesToReplaceForAMeeting", "everyDateIsSpokenForForAMeeting",
+            "linkedClassesWereLeftAloneForAMeeting", "linkedClassStaysVisibleForAMeeting", "linkedClassWasLeftAloneForAMeeting",
+            "madeRoomForAMeeting", "makingRoomCannotBeUndoneForAMeeting", "mayIAskForYourDatesForAMeeting",
+            "movedToLaterDaysForAMeeting", "movesAndBecomesADraftForAMeeting", "movesToTheFirstDayForAMeeting",
+            "otherClassesWouldMoveAndLinksFollowForAMeeting", "otherClassesWouldMoveKeepingTheirNamesForAMeeting",
+            "pagesAcrossTheDatesForAMeeting", "pagesRunFromForAMeeting", "pagesWithNoDayOfTheirOwnForAMeeting",
+            "publishedTheClassOnForAMeeting", "reDatedForAMeeting", "reDatedOnlyPagesTheyUseForAMeeting",
+            "reDatingOntoTheDatesOnFileForAMeeting", "sharingTheLastDayForAMeeting", "spareDatesAfterTheseForAMeeting",
+            "theNextWouldFallOnForAMeeting", "theSemesterBeginsForAMeeting", "wouldAddPagesForAMeeting",
+            "wouldMakeRoomForAMeeting", "yourNextUpcomingForAMeeting"),
+        Owed(AssistWordingKeys, 340, "this app has no How I Teach page yet (mac #209)",
+            "howITeachAlreadyWritten", "howITeachBriefing", "howITeachCarriesNoSettings", "howITeachChangedSincePlanned",
+            "howITeachCutShort", "howITeachDraftingBrief", "howITeachEmpty", "howITeachIsNeverPublished",
+            "howITeachListedAsNotWritten", "howITeachListedAsWritten", "howITeachMissing", "howITeachNeedsWords",
+            "howITeachPlanCreates", "howITeachPlanReplaces", "howITeachRead", "howITeachSaved", "howITeachTooLong"),
+        Owed(AssistWordingKeys, 355, "this app has no Get Ready for the Start of the Year yet (mac #96)",
+            "startOfYearNeedsABackup", "startOfYearNeedsItsPlan", "startOfYearPlanHasChanged"),
+        Owed(AssistWordingKeys, 203, "the link walk stopping at a class page is not wired here yet (mac #173)",
+            "linkedClassesWereLeftAlone", "linkedClassStaysVisible", "linkedClassWasLeftAlone"),
+        Owed(AssistWordingKeys, 305, "\"what does <page> link to?\" is not answered in code here yet (mac #167)",
+            "linkedPageIsADraft", "linkedPageIsMissing", "pageCouldNotBeRead", "pageLinksTo", "pageLinksToNothing",
+            "askedAboutACourseThatIsNotHere", "askedAboutAnotherCourse"),
+        Owed(AssistWordingKeys, 392, "the links-into-hidden-pages checklist is not built here yet (mac #379)",
+            "linksIntoHiddenPagesWillBeOffered"),
+        Owed(AssistWordingKeys, 196, "a cut-off model reply is not detected here yet (mac #198)",
+            "answerWasCutOff"),
+        Owed(AssistWordingKeys, 262, "a finished reply that wrote nothing is not checked against the window here yet",
+            "answerLeftOutWhatItWasFor"),
+        Owed(AssistWordingKeys, 217, "an echoed reply is not refused here yet (mac #215)",
+            "didNotFollowThat"),
+        Owed(AssistWordingKeys, 281, "\"deploy at 6:30\" with no am or pm is not asked about in code here yet (mac #194)",
+            "morningOrEvening"),
+        Owed(AssistWordingKeys, 288, "a deploy time written a way the family cannot set is not answered in code here yet (mac #277)",
+            "sayTheTimeAs", "sayTheTimeAsWithoutTheComma"),
+        Owed(AssistWordingKeys, 260, "the scheduled deploy's card does not ask its own question yet (mac #184)",
+            "scheduleQuestion"),
+        Owed(AssistWordingKeys, 261, "setting a deploy does not say what it replaces yet (mac #195)",
+            "scheduleReplaces"),
+        Owed(AssistWordingKeys, 241, "this app has no courses kept for reference yet (mac #206 branch A)",
+            "askedAboutAReferenceCourse", "deployRefusedForAReferenceCourse"),
+        Owed(AssistWordingKeys, 200, "duplicating a class does not decline a copy it cannot keep hidden yet",
+            "theCopyCouldNotBeMadeHidden", "theCopyCouldNotBeMadeHiddenNamingTheBackup",
+            "thePlaceForTheCopyIsStillTakenNamingTheBackup"),
+        Owed(AssistWordingKeys, 352, "a page list naming no page is not refused in code here yet (mac #197)",
+            "noPageCalled", "noPagesCalled", "morePagesThanOneAreCalled", "everyPageIsNotAPageToHide",
+            "everyPageIsNotAPageToPublish"),
+        Owed(AssistWordingKeys, 360, "the assistant's own backup of a course is not built as the mac's is yet (mac #351)",
+            "backingUpFirst", "changedWhileSavingACopy", "courseIsBeingCopied"),
+        Owed(AssistWordingKeys, 283, "the backups list does not show sizes yet (mac #242)",
+            "backupSizeCouldNotBeRead", "backupSizeCouldNotBeReadShort"),
+        Owed(AssistWordingKeys, 289, "the lease rules of mac #156 are not built here yet",
+            "courseIsBeingBuiltElsewhere"),
+        Owed(AssistWordingKeys, 386, "a preview cannot yet be refused while that section is being deployed (mac #381)",
+            "sectionIsBeingDeployed"),
+        Owed(AssistWordingKeys, 391, "a windowless deploy or rebuild does not refuse at a question yet (mac #378)",
+            "deployNeedsAnAnswer", "deployNeedsAnAnswerAt", "previewBuildNeedsAnAnswer"),
+        Owed(AssistWordingKeys, 165, "this app says a partial publish in its own multi-destination words (DeployPartiallySucceeded), not the mac's",
+            "deployWentOutTo"),
+        Owed(AssistWordingKeys, 342, "the hide and publish answers for a page already in that state are not the contract's sentences here yet (mac #201)",
+            "alreadyHiddenOne", "alreadyHiddenSeveral", "alreadyPublishedOne", "alreadyPublishedSeveral",
+            "unitAlreadyHidden", "unitAlreadyPublished"),
+        Owed(AssistWordingKeys, 308, "the date writers do not yet say which pages they could not add a date to (mac #186)",
+            "pageWhoseNewDateCouldNotBeSet", "pagesWhoseNewDatesCouldNotBeSet", "pagesWhoseSettingsCannotBeAddedTo",
+            "pagesWhoseSettingsCannotBeAddedToNamingSeveral", "sharedPageWhoseSettingCouldNotBePutBack",
+            "sharedPagesWhoseSettingsCouldNotBePutBack"),
+        Owed(AssistWordingKeys, 157,
+            "said by this app today (or close to it) in words built inline, with no AssistWording member under this key; hoisting it is #157's remaining half",
+            "addedTheNextPage", "allScheduledDatesHaveConcluded", "datesForTheNextPage", "datesToDuplicate",
+            "datesToFindADaysPage", "datesToReDate", "datesToReplace", "everyDateIsSpokenFor", "everyPageIsAlreadyOnItsDay",
+            "lookTheSectionOverBeforePublishing", "madeRoom", "makingRoomCannotBeUndone", "movedToLaterDays",
+            "movesAndBecomesADraft", "movesToTheFirstDay", "noCourseNamed", "noCoursesYet",
+            "otherClassesWouldMoveAndLinksFollow", "otherClassesWouldMoveKeepingTheirNames", "pagesAcrossTheDates",
+            "pagesRunFrom", "pagesWithNoDayOfTheirOwn", "publishedTheClassOn", "reDated", "reDatedOnlyPagesTheyUse",
+            "reDatingOntoTheDatesOnFile", "sharingTheLastDay", "spareDatesAfterThese", "theNextWouldFallOn",
+            "theSemesterBegins", "whatPublishingMeans", "wouldAddPages", "wouldMakeRoom", "yourNextUpcoming"),
+    }.SelectMany(group => group).ToArray();
 
     /// <summary>
     /// Checks the ledger's entries for one contract list, in BOTH directions,
