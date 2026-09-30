@@ -884,6 +884,69 @@ public class AssistWorkspaceTests : IDisposable
     }
 
     [Fact]
+    public void AnotherProgramsPreviewDeclinesTheAssistantsRebuild()
+    {
+        // #289 (mac #156): a --build-only first ends that section's serving
+        // preview, so an assistant's rebuild would take down the page the
+        // teacher is reading. Another program's PREVIEW lease declines a
+        // build — never a write.
+        using var child = StartALongRunningChild();
+        try
+        {
+            WriteWorkLease("ICS3U", WorkLease.Previewing, child.Id, child.ProcessName);
+            var workspace = Open();
+
+            var refusal = Assert.ThrowsAsync<AssistRefusal>(() => workspace.RebuildPreview("ICS3U", 1)).Result;
+
+            Assert.Equal(AssistWording.CourseIsBusy("ICS3U"), refusal.Message);
+            Assert.Empty(_launcher.Runs);
+            Assert.Empty(Directory.EnumerateFiles(Path.Combine(_folder, "courses", ".internal", "activity"),
+                $"*.{Environment.ProcessId}.lease"));   // its own claim was given back
+        }
+        finally { try { child.Kill(entireProcessTree: true); } catch { } }
+    }
+
+    [Fact]
+    public void AWriteGoesAheadWhileAnotherProgramPreviewsAndOnlyItsRebuildIsDeclined()
+    {
+        // The write lands (Markdown never conflicts with a build); the rebuild
+        // after it is declined, and the note where the preview would have been
+        // refreshed says the course is busy.
+        Page("ICS3U", "section1/All Classes/Unit 2, Day 3.md", draft: true);
+        using var child = StartALongRunningChild();
+        try
+        {
+            WriteWorkLease("ICS3U", WorkLease.Previewing, child.Id, child.ProcessName);
+            var workspace = Open();
+            var plan = workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, includeLinked: false);
+
+            var result = workspace.Apply(plan).Result;
+
+            Assert.True(result.Succeeded);
+            Assert.EndsWith(AssistWording.CourseIsBusy("ICS3U"), result.Message);
+            Assert.Empty(_launcher.Runs);
+            Assert.Contains("publish: true",
+                File.ReadAllText(Path.Combine(_folder, "courses", "ICS3U",
+                    "section1", "All Classes", "Unit 2, Day 3.md")));
+        }
+        finally { try { child.Kill(entireProcessTree: true); } catch { } }
+    }
+
+    [Fact]
+    public void AnAssistLeaseNeverDeclinesABuild()
+    {
+        using var child = StartALongRunningChild();
+        try
+        {
+            WriteWorkLease("ICS3U", WorkLease.Assisting, child.Id, child.ProcessName);
+            var result = Open().RebuildPreview("ICS3U", 1).Result;
+            Assert.True(result.Succeeded);
+            Assert.Single(_launcher.Runs);
+        }
+        finally { try { child.Kill(entireProcessTree: true); } catch { } }
+    }
+
+    [Fact]
     public void LinkGraphFollowingLinksExclusionsAndVisibleReferrers()
     {
         Assert.True(LinkGraph.IsLandingPage(@"C:\courses\ICS3U\section1\All Classes\index.md"));
