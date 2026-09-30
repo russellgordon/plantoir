@@ -542,7 +542,7 @@ public static class PageFrontmatter
     /// not <c>"false"</c>, so the page is PUBLISHED while the teacher is told
     /// it was hidden. Measured, python-frontmatter 1.3.0 / PyYAML 6.0.3 /
     /// CPython 3.11.9. When the orphan is a MAPPING it is a <c>ScannerError</c>
-    /// and the whole build stops instead.</para>
+    /// and the build could not parse the page (it stopped until #246; since, the build hides the page and names it).</para>
     ///
     /// <para>The rule is <c>setup_course.per_section_frontmatter</c>'s, which
     /// has taken these lines with the key since 2026-09-18, and it is the
@@ -568,7 +568,7 @@ public static class PageFrontmatter
     /// directly under a key with an empty value. Measured, <c>publish:</c>
     /// with <c>- a</c> under it is the list <c>['a']</c> and the page is
     /// published; leaving the <c>- a</c> behind after a hide is a
-    /// <c>ParserError</c> and the build stops. It is passed only when the
+    /// <c>ParserError</c> and the build cannot parse the page (it stopped until #246; since, it hides it). It is passed only when the
     /// key's own value was empty, because that is the only shape where such a
     /// line can belong to this key.</para>
     ///
@@ -662,7 +662,7 @@ public static class PageFrontmatter
         // ALWAYS separate the value from the colon. YAML needs a space, a tab
         // or the end of the line after a key's colon to make a mapping at all,
         // so `publish:false` is one plain scalar — and beside any other key it
-        // is a ScannerError that STOPS THE BUILD while this app reports the
+        // is a ScannerError (it stopped the build until #246; since, the build HIDES the page) while this app reports the
         // page hidden. Measured, python-frontmatter 1.3.0 / PyYAML 6.0.3.
         //
         // Two lines reached it. `publish:<TAB>false` reads as hidden today

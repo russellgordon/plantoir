@@ -477,7 +477,7 @@ internal static class PageVisibilityReader
     /// line, because that is what makes the line a mapping at all. Measured:
     /// <c>publish:false</c> is one plain scalar, so a page whose whole
     /// frontmatter is that line arrives at Quartz with no keys and is PUBLISHED
-    /// — and a page with another key beside it stops the build. Either way it is
+    /// — and a page with another key beside it cannot be parsed (it stopped the build until #246; since, the build hides the page and names it). Either way it is
     /// not this page's flag, and reading it as one called a live page
     /// hidden.</para>
     /// </remarks>
