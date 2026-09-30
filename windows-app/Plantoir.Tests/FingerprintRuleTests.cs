@@ -94,3 +94,40 @@ public class FingerprintRuleTests
         finally { try { Directory.Delete(course, recursive: true); } catch { } }
     }
 }
+
+/// <summary>
+/// #357 (mac #343): a re-date's reply counts what was WRITTEN, and says one of
+/// three sentences (class-planning.json → reDatingASection.reportedCounts).
+/// </summary>
+public class ReDateReplyTests
+{
+    [Fact]
+    public void TheThreeSentencesAreTheContracts()
+    {
+        var wording = ContractLoader.LoadJson("assist-wording.json")["wording"]!;
+        Assert.Equal(wording["reDated"]!.ToString(), Plantoir.Core.Assist.AssistWording.ReDated(12, 5));
+        Assert.Equal(wording["reDatedOnlyPagesTheyUse"]!.ToString(), Plantoir.Core.Assist.AssistWording.ReDatedOnlyPagesTheyUse(3));
+        Assert.Equal(wording["everyPageIsAlreadyOnItsDay"]!.ToString(), Plantoir.Core.Assist.AssistWording.EveryPageIsAlreadyOnItsDay("ICS3U", "1"));
+    }
+
+    [Fact]
+    public void EachCaseSaysTheSentenceItsCountsCallFor()
+    {
+        var cases = ContractLoader.LoadJson("class-planning.json")["reDatingASection"]!["reportedCounts"]!["cases"]!.AsArray();
+        foreach (var c in cases)
+        {
+            var expect = c!["expect"]!;
+            int classes = expect["classesReDated"]!.GetValue<int>(), pages = expect["pagesTheyUseReDated"]!.GetValue<int>();
+            string key = expect["sentence"]!.ToString();
+            string said = Plantoir.Core.Assist.AssistWording.ReDatedSummary("ICS3U", "1", classes, pages);
+            string want = key switch
+            {
+                "reDated" => Plantoir.Core.Assist.AssistWording.ReDated(classes, pages),
+                "reDatedOnlyPagesTheyUse" => Plantoir.Core.Assist.AssistWording.ReDatedOnlyPagesTheyUse(pages),
+                _ => Plantoir.Core.Assist.AssistWording.EveryPageIsAlreadyOnItsDay("ICS3U", "1"),
+            };
+            Assert.True(want == said, c["name"]!.ToString());
+            Assert.DoesNotContain("-", said.Replace("Re-dated", "").Replace("re-dated", ""));
+        }
+    }
+}

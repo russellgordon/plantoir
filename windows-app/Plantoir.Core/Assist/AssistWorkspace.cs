@@ -2276,12 +2276,11 @@ public sealed class AssistWorkspace
         recording.Done();
 
         // Counted apart, because "moved 91 classes" when 26 classes and 65
-        // materials moved is a sentence a teacher would rightly query.
-        int moved = plan.Moves.Count > 0 ? plan.Moves.Count : plan.Changing.Count();
-        int classCount = plan.ClassCount > 0 ? plan.ClassCount : plan.Dates.Count;
-        int materialsMoved = moved - classCount;
-        string summary = $"Re-dated {classCount} {(classCount == 1 ? "class" : "classes")}" +
-                         $" and {materialsMoved} {(materialsMoved == 1 ? "page" : "pages")} they use.";
+        // materials moved is a sentence a teacher would rightly query — and
+        // each from what was WRITTEN (#357 / mac #343), never one subtracted
+        // from a total: "Re-dated 14 classes and -4 pages they use" came from
+        // (pages whose date changes) - (every class in the section).
+        string summary = AssistWording.ReDatedSummary(course.Code, section.ToString(), classes, materials);
         string detail = summary +
                         $"\n\n{BackedUpNote}" +
                         "\n\nNothing was published or hidden, so students see no change until you deploy.";
