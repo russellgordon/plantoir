@@ -100,6 +100,17 @@ public static class ScheduledHealthFindings
         // The alternative is worse: a record that only ever grows stale.
         try { File.Delete(path); } catch { }
 
+        // The build's PLANTOIR_DATED: lines ride the same record (#279): a
+        // scheduled publish is often the first build after a class goes
+        // visible, so the one likeliest to rewrite the teacher's pages, and
+        // nobody is watching its console. Dated to the record, like the
+        // folder problems below.
+        foreach (var dated in PagesDatedByTheBuild.ReportsIn(lines))
+        {
+            ActivityTrail.Note(ActivityTrail.Event.PagesDatedByTheBuild,
+                               dated.TrailSentence, dated.Course, dated.Section, writtenAt);
+        }
+
         var findings = SiteHealthFinding.FindingsIn(lines);
         foreach (var finding in findings)
         {

@@ -185,7 +185,35 @@ Grep for callers and you will find none — that is the expected answer, and it
 is written here so nobody concludes they have missed a wiring step or deletes
 the types as dead code.
 
+## Parity run, bundle 1: red means something again (2026-09-30)
+
+The suite pulled on 2026-09-30 (dev `0d040a81`) was **61 failed, 1486 passed**,
+every red mapped to an open issue (`plantoir-windows-run\logs\baseline-red-list.md`
+on Russell's machine). Bundle 1 (branch `issue/bundle1-plumbing`) was plumbing,
+so that "did I break something?" has an answer again:
+
+- **`NamedGapLedger` is the parity milestone's burn-down list** — 58 trail
+  events, 140 wording keys, 7 config keys, 3 model requirements and 3 contract
+  cases held open BY NAME against their issues; `documentation/12-windows-app.md`
+  → "Named gaps" has the table. A green totals line now means "green with the
+  debts the ledger names", and the ledger fails the day one is paid.
+- **`AssistWording_MatchesContract` walks `assist-wording.json`** by reflection
+  in both directions (#157); still red on `deployApproval` alone, which #193 owns.
+- **`ActivityTrailWiringTests`** is the source scan the mac has: every declared
+  event must have a call site. All do; `assistant asked` is written by
+  `NotePrompt`, and the scan knows that.
+- **`PLANTOIR_DATED:`** is hidden from the console and recorded on the trail,
+  from the console and from a scheduled publish's record (#279).
+- **A payload course gets its manifest's marks pool** (#317).
+- **Five shared Python test files that failed on Windows pass or skip with a
+  reason** — one was a real shared bug (`build_site._is_draft` did not read
+  CR LF, and the native build writes CR LF copies).
+
 ## ONE activity-trail event is declared without an emitter (2026-09-06; six were then, and all six have callers since 2026-09-07)
+
+> **Superseded 2026-09-30:** `ActivityTrailWiringTests` now checks this on
+> every run, including `AssistantAsked`'s helper; the paragraph below is kept
+> as the history of why the scan exists.
 
 `ActivityTrail.Event` named `folder renamed`, `folder created`,
 `synced folder noticed`, `synced folder accepted` — and, found 2026-09-06,

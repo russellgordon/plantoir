@@ -50,4 +50,78 @@ public static class ExampleContentCatalog
             return false;
         }
     }
+
+    /// <summary>
+    /// The marks pool (<c>graded_folders</c>) a NEW course taking this code's
+    /// ready-made pages is written with — read from the payload's manifest
+    /// exactly as the command line reads it (#317, mirroring the mac's #292
+    /// <c>ExampleContentCatalog.marksPool(fromManifest:)</c>). Null when there
+    /// is no payload or its manifest cannot be read, in which case the caller
+    /// leaves the key absent, as before.
+    /// </summary>
+    public static IReadOnlyList<string>? MarksPool(string exampleContentRoot, string code)
+    {
+        if (ManifestPath(exampleContentRoot, code) is not { } path) return null;
+        try
+        {
+            return MarksPool(JObject.Parse(File.ReadAllText(path)));
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// <c>setup_course.graded_folders_for</c> over a manifest, called the way
+    /// setup calls it for a payload: the shared folders without <c>Media</c>,
+    /// then the per-section folders. A declared name is kept as written when
+    /// it names a folder exactly, respelled to the folder's own spelling when
+    /// it matches ignoring case, and dropped otherwise; blanks, nulls,
+    /// non-strings and repeats are dropped; a declared null or <c>[]</c> gives
+    /// <c>[]</c>; and ONLY when the key is absent, every folder whose name
+    /// contains "task", once each, in list order. Contract:
+    /// <c>shared-rules.json</c> → <c>gradedFolders.newCourse</c>.
+    ///
+    /// <para>Deliberately NOT <c>GradedFolderRule.Reconciled</c>: that is the
+    /// exact-match reconciliation of a teacher's ticks, and the command line
+    /// matches ignoring case and respells — the contract's respelling case is
+    /// red for it.</para>
+    /// </summary>
+    public static IReadOnlyList<string> MarksPool(JObject manifest)
+    {
+        static IEnumerable<string> Names(JToken? list) =>
+            (list as JArray)?.Where(item => item.Type == JTokenType.String)
+                .Select(item => item.ToString())
+                .Where(name => name.Length > 0)
+            ?? Enumerable.Empty<string>();
+
+        var folders = Names(manifest["shared_folders"]).Where(name => name != "Media")
+            .Concat(Names(manifest["per_section_folders"]))
+            .ToList();
+
+        if (manifest.TryGetValue("graded_folders", out var declared))
+        {
+            var exact = folders.ToHashSet(StringComparer.Ordinal);
+            // The LAST folder of a spelling wins, as the Python's dictionary
+            // comprehension does.
+            var ignoringCase = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (string folder in folders) ignoringCase[folder.ToLowerInvariant()] = folder;
+
+            var pool = new List<string>();
+            foreach (string name in Names(declared))
+            {
+                string? target = exact.Contains(name) ? name
+                    : ignoringCase.TryGetValue(name.ToLowerInvariant(), out var spelled) ? spelled
+                    : null;
+                if (target is not null && !pool.Contains(target)) pool.Add(target);
+            }
+            return pool;
+        }
+
+        return folders
+            .Where(name => name.Contains("task", StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+    }
 }

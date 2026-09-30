@@ -8,7 +8,7 @@ namespace Plantoir.Tests;
 /// The three-way reading of a page's visibility flag.
 ///
 /// <para><c>contracts/file-formats.json</c> → <c>pageVisibility.readingCases</c>
-/// carries the 54 answers the two apps must agree on, and
+/// carries the answers the two apps must agree on, and
 /// <c>ContractTests.FileFormats_PageVisibilityReadingCases</c> runs those. This
 /// file covers the half the shared list deliberately leaves out: the forms
 /// where this app says <c>CannotTell</c>, and the corners it handles rather
@@ -465,8 +465,8 @@ public class PageVisibilityWritingTests
     ///
     /// <para>Every one of those lands <c>False -&gt; HIDDEN</c> with the sweep.
     /// The teacher asked for the page to be taken down and was told it had
-    /// been; without this they could still read it. Issue #176 — the mac still
-    /// owes the same fix.</para>
+    /// been; without this they could still read it. Issue #176 — the mac took
+    /// the same fix on 2026-09-19 (#190).</para>
     ///
     /// <para>A complete-LOOKING value with an indented one below it —
     /// <c>publish: false</c> over <c>  false</c> — is the same family and is
@@ -534,9 +534,9 @@ public class PageVisibilityWritingTests
     /// <para>The three-way answer is <c>CannotTell</c>, so REPORTING says
     /// visible — which is what the site does — and any writer writes the flag
     /// out in full. Measured after that write: <c>False -&gt; HIDDEN</c>.
-    /// Changes none of the 54 shared <c>readingCases</c>. The mac reads these
-    /// as <c>hidden</c> and is wrong; that is on issue #176 with the case
-    /// proposed for <c>contracts/file-formats.json</c>.</para>
+    /// Changes none of the shared <c>readingCases</c> (59 on 2026-09-30). The mac
+    /// read these as <c>hidden</c> until #176 landed there on 2026-09-19; the
+    /// two forms are now shared <c>readingCases</c> both suites run (#190).</para>
     /// </remarks>
     [Theory]
     [InlineData("false")]
