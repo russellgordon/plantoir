@@ -4603,6 +4603,18 @@ final class AssistToolRunnerTests: XCTestCase {
             made.root.appendingPathComponent("LaunchAgents").deletingLastPathComponent().appendingPathComponent("scheduled")
 
         try write(page: "Unit 1, Day 1", publish: "false", body: "One.", in: made.course)
+        // Unpublished and NOT named: since #396 nothing lists it (#396).
+        try write(page: "Unit 1, Day 2", publish: "false", body: "Two.", in: made.course)
+        // A second destination, saved on disk, which the result must name
+        // as well as the primary (#396).
+        let alsoHere: URL = made.root.appendingPathComponent("also-published-here")
+        try FileManager.default.createDirectory(at: alsoHere, withIntermediateDirectories: true)
+        let configURL: URL = made.course.directoryURL.appendingPathComponent("course_config.json")
+        var saved: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: try Data(contentsOf: configURL)) as? [String: Any]
+        )
+        saved["additional_deploy_targets"] = [["type": "local_folder", "path": alsoHere.path]]
+        try JSONSerialization.data(withJSONObject: saved, options: [.prettyPrinted]).write(to: configURL)
 
         let planned: AssistToolOutcome = await made.runner.run(call: call(
             "plan_scheduled_deploy",
@@ -4611,6 +4623,12 @@ final class AssistToolRunnerTests: XCTestCase {
         ))
         XCTAssertTrue(planned.shouldContinue, "A plan is a read.")
         XCTAssertTrue(planned.detail.contains("NOT published, so the deploy would ship without it."))
+        // The MCP path is clean of the section-wide list (#396): the class
+        // the caller named is checked, and nothing else is listed.
+        XCTAssertFalse(planned.detail.contains("Unit 1, Day 2"), planned.detail)
+        XCTAssertFalse(planned.detail.contains("not published yet"), planned.detail)
+        XCTAssertFalse(planned.detail.contains("One thing first"), planned.detail)
+        XCTAssertTrue(planned.detail.contains("to Netlify and \(alsoHere.path) at "), planned.detail)
         XCTAssertTrue(planned.detail.contains("awake"))
         XCTAssertTrue(planned.detail.contains("Nothing has been changed."))
 
@@ -4623,6 +4641,7 @@ final class AssistToolRunnerTests: XCTestCase {
         ))
         XCTAssertFalse(set.shouldContinue)
         XCTAssertTrue(set.summary.contains("Scheduled:"))
+        XCTAssertTrue(set.summary.contains("deploys to Netlify and \(alsoHere.path) at "), set.summary)
         XCTAssertNotNil(ScheduledDeploy.nextRun(courseCode: "ICS3U", sectionNumber: 1, inWorkingFolder: made.root))
 
         let cancelled: AssistToolOutcome = await made.runner.run(call: call(

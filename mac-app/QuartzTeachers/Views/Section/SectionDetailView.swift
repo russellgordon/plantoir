@@ -89,22 +89,51 @@ struct SectionDetailView: View {
     /// would be two names for one folder.
     @State var folderThisSectionWorksIn: URL?
 
-    /// Why a preview could not start, or did not appear, shown as an alert.
-    @State var previewRefusal: String?
+    /// What the preview alert says: why a preview could not start or did not
+    /// appear, or — since #397 — the question about today's class on the
+    /// front page.
+    ///
+    /// Each carries its own TITLE, because different things arrive in this
+    /// one alert and one title cannot be true of all of them. "Cannot Preview
+    /// Yet" is right for a refusal to start — another window holds the
+    /// section, so wait and it will work. It is wrong in front of a preview
+    /// that built, was served, and could not be reached: there the remedy is
+    /// restarting the Mac and "Yet" quietly says otherwise. A SECOND `.alert`
+    /// modifier was the obvious alternative and is the one thing this view
+    /// must not have — four alerts on it segfaulted SwiftUI's bridge, which is
+    /// why the folder dialogs share one, and why the #397 question rides this
+    /// one rather than adding a fourth.
+    ///
+    /// **Held after the alert has gone, and replaced only by the next one.**
+    /// Presentation is `previewAlertIsUp`; this is never cleared by the
+    /// dismissal, so the title and buttons cannot change while the alert
+    /// fades — clearing it there flashed "Cannot Preview Yet" behind a
+    /// question the teacher had just answered (#397 plan review, 2).
+    @State var previewAlert: PreviewAlert = .refusal(title: "", sentence: "")
 
-    /// What that alert is CALLED, because two different things now arrive in
-    /// it and one title cannot be true of both.
-    ///
-    /// "Cannot Preview Yet" is right for a refusal to start — another window
-    /// holds the section, so wait and it will work. It is wrong in front of a
-    /// preview that built, was served, and could not be reached: there the
-    /// remedy is restarting the Mac and "Yet" quietly says otherwise. A
-    /// SECOND `.alert` modifier was the obvious alternative and is the one
-    /// thing this view must not have — four alerts on it segfaulted SwiftUI's
-    /// bridge, which is why the folder dialogs share one.
-    ///
-    /// Every write of `previewRefusal` sets this beside it.
-    @State var previewRefusalTitle: String = "Cannot Preview Yet"
+    /// Whether the preview alert is up. Written true only through
+    /// `showPreviewRefusal` and `pressPreview`; SwiftUI writes it false.
+    @State var previewAlertIsUp: Bool = false
+
+    enum PreviewAlert: Equatable {
+        case refusal(title: String, sentence: String)
+        case todaysClass(TodaysClassOnTheFrontPage.Offer)
+    }
+
+    /// A refusal that arrived while the question about today's class was up
+    /// — the assistant can start a preview then — shown once it has gone.
+    @State var heldPreviewRefusal: PreviewAlert?
+
+    /// Set by the question's answer, and acted on once the alert has GONE
+    /// (`afterThePreviewAlert`): the preview starts then, never from inside
+    /// the alert's own button, where a refusal it raised would be lost with
+    /// the dismissal (#397 plan review, 1).
+    @State var startPreviewWhenTheQuestionHasGone: Bool = false
+
+    /// Why the front page was not changed after Show on Front Page, said once
+    /// the question has gone — unless starting the preview had something to
+    /// say first (the trail has both).
+    @State var frontPageNotChanged: String?
 
     /// A publish that was set to happen on its own and did not get through.
     ///
@@ -404,7 +433,10 @@ struct SectionDetailView: View {
                     if previewRunner.isRunning {
                         stopPreview()
                     } else {
-                        startPreview()
+                        // The BUTTON, and only the button, may ask about
+                        // today's class first (#397); every other way in calls
+                        // `startPreview()` and is never held up by a question.
+                        pressPreview()
                     }
                 }
                 // The icon alone doesn't say what these two buttons do, so
@@ -569,12 +601,22 @@ struct SectionDetailView: View {
             }
             stopPreview()
         }
-        .alert(previewRefusalTitle, isPresented: previewRefusalBinding) {
-            Button("OK") {
-                previewRefusal = nil
+        .alert(previewAlertTitle, isPresented: $previewAlertIsUp) {
+            switch previewAlert {
+            case .todaysClass(let offer):
+                // Each answer only RECORDS; the preview starts from
+                // `afterThePreviewAlert`, once this alert has gone.
+                Button(FrontPageWording.show) {
+                    answerTodaysClass(offer, show: true)
+                }
+                Button(FrontPageWording.notToday, role: .cancel) {
+                    answerTodaysClass(offer, show: false)
+                }
+            case .refusal:
+                Button("OK") { }
             }
         } message: {
-            Text(previewRefusal ?? "")
+            Text(previewAlertMessage)
         }
         .alert("Cannot Deploy Yet", isPresented: deployRefusalBinding) {
             Button("OK") {
@@ -656,6 +698,11 @@ struct SectionDetailView: View {
                 healthFindings = []
                 repairOutcome = nil
                 showAnythingWaiting()
+            }
+        }
+        .onChange(of: previewAlertIsUp) { _, isUp in
+            if !isUp {
+                afterThePreviewAlert()
             }
         }
         // The build's word that it wrote the links checklist offer (#379).
@@ -745,7 +792,11 @@ struct SectionDetailView: View {
             healthDialog = .findings
             return
         }
-        // The links checklist follows the alert (#379), never over it.
+        // The links checklist follows the alert (#379), never over it — nor
+        // over the preview alert, which carries the #397 question.
+        if previewAlertIsUp {
+            return
+        }
         if let waiting = pendingLinksChecklist {
             pendingLinksChecklist = nil
             presentLinksChecklist(waiting)
@@ -883,7 +934,9 @@ struct SectionDetailView: View {
         // But HELD, not dropped. Returning early discarded them — and the
         // failed-deploy path can arrive while the overnight findings are
         // already on screen, so this is reachable rather than theoretical.
-        if healthDialog != nil {
+        // Held behind the preview alert too (#397): the question about
+        // today's class can stay up while an assistant's build finishes.
+        if healthDialog != nil || previewAlertIsUp {
             // Appended, not assigned: three arrivals during one dialog used to
             // lose the middle batch.
             heldHealthFindings.append(
@@ -984,7 +1037,7 @@ struct SectionDetailView: View {
         if forTheAlert.isEmpty {
             return
         }
-        if healthDialog != nil {
+        if healthDialog != nil || previewAlertIsUp {
             heldHealthFindings.append((findings: forTheAlert, cameFromPublishing: held.cameFromPublishing))
             return
         }
@@ -998,7 +1051,11 @@ struct SectionDetailView: View {
         if linksChecklist != nil {
             return
         }
-        if healthDialog != nil {
+        // Behind the preview alert too (#397): the question about today's
+        // class invites a look at the front page in Obsidian, and coming back
+        // makes this window key, which offers the checklist — a sheet asked
+        // for under an alert.
+        if healthDialog != nil || previewAlertIsUp {
             pendingLinksChecklist = model
             return
         }
@@ -1009,13 +1066,9 @@ struct SectionDetailView: View {
         if let buildId = model.offer.buildId {
             linksChecklistBuildsHandled.insert(buildId)
         }
-        var ticked: Int = 0
-        for row in model.rows where model.ticked.contains(row.place) {
-            ticked += 1
-        }
         ActivityTrail.note(
             .linksChecklistOffered,
-            LinksChecklistPublisher.offeredLine(model.rows, ticked: ticked, occasion: model.occasion),
+            LinksChecklistPublisher.offeredLine(model: model),
             course: course.code, section: sectionNumber
         )
         linksChecklist = model
@@ -1097,15 +1150,184 @@ struct SectionDetailView: View {
         )
     }
 
-    var previewRefusalBinding: Binding<Bool> {
-        return Binding(
-            get: { previewRefusal != nil },
-            set: { isPresented in
-                if !isPresented {
-                    previewRefusal = nil
-                }
+    var previewAlertTitle: String {
+        switch previewAlert {
+        case .refusal(let title, _):
+            return title
+        case .todaysClass(let offer):
+            return FrontPageWording.question(class: offer.classTitle)
+        }
+    }
+
+    var previewAlertMessage: String {
+        switch previewAlert {
+        case .refusal(_, let sentence):
+            return sentence
+        case .todaysClass(let offer):
+            return FrontPageWording.because(noun: offer.noun.singular, shown: offer.shownTitle)
+        }
+    }
+
+    /// Puts a refusal in the preview alert — or holds it while the question
+    /// about today's class is up, so the question is not replaced under the
+    /// teacher's pointer.
+    func showPreviewRefusal(title: String, sentence: String) {
+        if previewAlertIsUp, case .todaysClass = previewAlert {
+            heldPreviewRefusal = .refusal(title: title, sentence: sentence)
+            return
+        }
+        previewAlert = .refusal(title: title, sentence: sentence)
+        previewAlertIsUp = true
+    }
+
+    /// Two refusals in one alert, the earlier first. The title is the later
+    /// one's, since it is about the preview just asked for.
+    static func joining(_ earlier: PreviewAlert, then later: PreviewAlert) -> PreviewAlert {
+        guard case .refusal(_, let earlierSentence) = earlier,
+              case .refusal(let laterTitle, let laterSentence) = later else {
+            return later
+        }
+        if earlierSentence == laterSentence {
+            return later
+        }
+        return .refusal(title: laterTitle, sentence: earlierSentence + "\n\n" + laterSentence)
+    }
+
+    /// Runs once the preview alert has gone: the preview the question's
+    /// answer asked for, then whatever waited behind the alert.
+    ///
+    /// The preview starts FIRST, and whatever it has to say wins: a refusal
+    /// from `startPreview()` is shown and the front-page sentence is left to
+    /// the trail. The links checklist waits for both (#379, #397).
+    func afterThePreviewAlert() {
+        if startPreviewWhenTheQuestionHasGone {
+            startPreviewWhenTheQuestionHasGone = false
+            if !previewRunner.isRunning {
+                startPreview()
             }
+        }
+        if previewAlertIsUp, let held = heldPreviewRefusal {
+            // The button's own preview was refused too: both are said, the
+            // earlier first, rather than the held one dropped (implementation
+            // review, note 4).
+            previewAlert = SectionDetailView.joining(held, then: previewAlert)
+        } else if !previewAlertIsUp, let held = heldPreviewRefusal {
+            previewAlert = held
+            previewAlertIsUp = true
+        } else if !previewAlertIsUp, let sentence = frontPageNotChanged {
+            previewAlert = .refusal(title: FrontPageWording.notChangedTitle, sentence: sentence)
+            previewAlertIsUp = true
+        }
+        heldPreviewRefusal = nil
+        frontPageNotChanged = nil
+        if !previewAlertIsUp && healthDialog == nil {
+            showAnythingWaiting()
+        }
+    }
+
+    // MARK: - Today's class on the front page (#397)
+
+    /// The Preview button's action. Asks about today's class when there is
+    /// something to ask; otherwise, and after the answer, previews.
+    ///
+    /// **The one caller of `todaysClassOffer()`.** `startPreview()` is the
+    /// door every other way in uses — the assistant, Start of the Year,
+    /// Course Settings, a repair's rebuild — and a question there would hold
+    /// each of them up on a modal nobody may be watching
+    /// (`TodaysClassOnTheFrontPageTests.testOnlyThePreviewButtonAsks`).
+    func pressPreview() {
+        if frontPageQuestionMayBeAsked(), let offer = todaysClassOffer() {
+            previewAlert = .todaysClass(offer)
+            previewAlertIsUp = true
+            return
+        }
+        startPreview()
+    }
+
+    /// The question for this section today, or nil.
+    func todaysClassOffer() -> TodaysClassOnTheFrontPage.Offer? {
+        return TodaysClassOnTheFrontPage.offer(
+            forSection: sectionNumber, in: course, today: CalendarDay.today()
         )
+    }
+
+    /// Whether the front page may be asked about — and, at Show on Front
+    /// Page, still written. Not when the preview would be refused anyway (the
+    /// teacher is told why, as before, with no question first), and never
+    /// while this section is being deployed or another program is building
+    /// the course: the build writes this same file.
+    func frontPageQuestionMayBeAsked() -> Bool {
+        guard let workspaceURL = workspace.workspaceURL else {
+            return false
+        }
+        let sectionIsDeploying: Bool = SectionDetailView.refusalWhileThisSectionDeploys(
+            folderPath: workspaceURL.path,
+            courseCode: course.code,
+            displayCode: course.displayCode,
+            sectionNumber: sectionNumber
+        ) != nil
+        let anotherProgramIsBuilding: Bool = WorkLeaseRegistry.whatBlocksABuild(
+            folderPath: workspaceURL.path, courseCode: course.code, afterTaking: false
+        ) != nil
+        return SectionDetailView.frontPageMayBeAskedAbout(
+            isKeptForReference: course.isKeptForReference,
+            isBeingCopied: workspace.isBeingCopied(course.code),
+            isBusy: isBusy || isPreparingDeploy,
+            sectionIsDeploying: sectionIsDeploying,
+            anotherProgramIsBuilding: anotherProgramIsBuilding
+        )
+    }
+
+    /// The guards of `frontPageQuestionMayBeAsked`, as a rule a test can run.
+    static func frontPageMayBeAskedAbout(
+        isKeptForReference: Bool,
+        isBeingCopied: Bool,
+        isBusy: Bool,
+        sectionIsDeploying: Bool,
+        anotherProgramIsBuilding: Bool
+    ) -> Bool {
+        if isKeptForReference || isBeingCopied || isBusy {
+            return false
+        }
+        if sectionIsDeploying || anotherProgramIsBuilding {
+            return false
+        }
+        return true
+    }
+
+    /// The teacher's answer. Records it — the page written, or Not Today —
+    /// with its trail line, and asks for the preview once the alert has gone.
+    func answerTodaysClass(_ offer: TodaysClassOnTheFrontPage.Offer, show: Bool) {
+        startPreviewWhenTheQuestionHasGone = true
+        if !show {
+            ActivityTrail.note(
+                .frontPageLeftAsItWas,
+                TodaysClassOnTheFrontPage.answerNotToday(offer, courseDirectory: course.directoryURL),
+                course: course.code, section: sectionNumber
+            )
+            return
+        }
+        // Decided again: the section may have become busy while the question
+        // was up (a scheduled deploy, the assistant), and the build writes
+        // this same file (#397 plan review, 4).
+        var outcome: TodaysClassOnTheFrontPage.Outcome = .noLongerOffered
+        if frontPageQuestionMayBeAsked() {
+            outcome = TodaysClassOnTheFrontPage.show(offer, in: course)
+        }
+        let line: (event: ActivityTrail.Event, what: String) = TodaysClassOnTheFrontPage.trailLine(
+            for: outcome, offer: offer
+        )
+        ActivityTrail.note(line.event, line.what, course: course.code, section: sectionNumber)
+        switch outcome {
+        case .shown:
+            refreshEditedMarker()
+        case .alreadyRight:
+            break
+        case .noLongerOffered:
+            frontPageNotChanged = FrontPageWording.noLongerOffered(noun: offer.noun.singular)
+        case .couldNotSave:
+            frontPageNotChanged = FrontPageWording.couldNotSave(shown: offer.shownTitle)
+        }
     }
 
     var consoleArea: some View {
@@ -1368,8 +1590,7 @@ struct SectionDetailView: View {
             WorkLeaseRegistry.noteDeclinedWhileItsSectionDeploys(
                 courseCode: course.code, sectionNumber: sectionNumber
             )
-            previewRefusalTitle = "Cannot Preview Yet"
-            previewRefusal = refusal
+            showPreviewRefusal(title: "Cannot Preview Yet", sentence: refusal)
             return
         }
         // One of the moments the teacher ACTS on a reference course, so the
@@ -1412,8 +1633,7 @@ struct SectionDetailView: View {
             )
         } catch {
             previewBuildWait.end()
-            previewRefusalTitle = "Cannot Preview Yet"
-            previewRefusal = error.localizedDescription
+            showPreviewRefusal(title: "Cannot Preview Yet", sentence: error.localizedDescription)
             return
         }
         previewLease = lease
@@ -1434,8 +1654,10 @@ struct SectionDetailView: View {
             WorkLeaseRegistry.noteDeclined(
                 act: "Preview", courseCode: course.code, sectionNumber: sectionNumber, holding: holding
             )
-            previewRefusalTitle = "Cannot Preview Yet"
-            previewRefusal = AssistWording.courseIsBeingBuiltElsewhere(course: course.displayCode)
+            showPreviewRefusal(
+                title: "Cannot Preview Yet",
+                sentence: AssistWording.courseIsBeingBuiltElsewhere(course: course.displayCode)
+            )
             return
         }
         // Every window's copy of this course, not only this window's: the
@@ -2286,9 +2508,9 @@ struct SectionDetailView: View {
             section: sectionNumber
         )
         stopPreview()
-        previewRefusalTitle = PreviewReachability.alertTitle
-        previewRefusal = PreviewReachability.sentence(
-            for: PreviewReachability.verdictWhenNothingWasAnnounced
+        showPreviewRefusal(
+            title: PreviewReachability.alertTitle,
+            sentence: PreviewReachability.sentence(for: PreviewReachability.verdictWhenNothingWasAnnounced)
         )
     }
 
@@ -2361,7 +2583,9 @@ struct SectionDetailView: View {
             section: sectionNumber
         )
         stopPreview()
-        previewRefusalTitle = PreviewReachability.alertTitle
-        previewRefusal = PreviewReachability.sentence(for: verdict)
+        showPreviewRefusal(
+            title: PreviewReachability.alertTitle,
+            sentence: PreviewReachability.sentence(for: verdict)
+        )
     }
 }

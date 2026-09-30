@@ -29,8 +29,10 @@ be found out from here at all.
 
 **The goal.** Everything a teacher can do in the mac app through v1.4.0, a
 Windows teacher can do too, and it behaves the same way wherever the contract
-says it must. The work is the 46 open issues on the milestone **"Windows:
-parity with mac v1.4.0"**, plus the batch-4 pieces still landing on the mac
+says it must. The work is the open issues on the milestone **"Windows:
+parity with mac v1.4.0"** (106 on 2026-09-30, counted with `gh issue list -m`;
+46 when the phases in section 4 were laid out — count the milestone rather than
+trusting a number), plus the batch-4 pieces still landing on the mac
 (section 5), which join the milestone as they land. It is judged against the
 shared contract, not against the Swift. Nothing in this plan asks a Windows
 session to read Swift. Where an issue points at a Swift file, that is a
@@ -306,7 +308,9 @@ Order matters here. Steps 1–5 each build on the seam the step before left.
 | **#101** | A course code of "work" collides with the build workspace on Windows only. **Decided 2026-09-25: reserved on both.** The mac refuses it now; `CourseCodeValidator` adopts the six new cases (kept-name check after the rename self-check, before the clash) | **DECIDED: reserved**, MATCH | `course-management.json` → `courseCode.problems`; doc 09 → "A course code Plantoir keeps for itself: WORK (#101)" |
 
 **Count: Phase 0: 1 · Phase 1: 5 · Phase 2: 6 · Phase 3: 4 · Phase 4: 4 ·
-Phase 5: 13 · Phase 6: 8 · Phase 7: 5 = 46.**
+Phase 5: 13 · Phase 6: 8 · Phase 7: 5 = 46.** That was the whole milestone
+when the phases were laid out; it has grown since (106 open on 2026-09-30),
+and section 5 places the issues the mac's later pieces added.
 
 ---
 
@@ -353,11 +357,25 @@ issue whose code it touches, so work this file's order and meet them there:
 | [#392](https://github.com/russellgordon/plantoir/issues/392) | Links into hidden pages: the checklist, and the published-pages record (mac #379) | after #359 |
 | [#380](https://github.com/russellgordon/plantoir/issues/380) | Marketing pictures keep the window's own corners on Windows too (mac #375) | with #370 |
 
+### Added by the mac's v1.4.2 (2026-09-30)
+
+Six `windows` issues, all on this milestone (the director's ruling R8). Each is placed beside the
+issues whose code it touches:
+
+| Issue | What it is | Do it |
+|---|---|---|
+| [#399](https://github.com/russellgordon/plantoir/issues/399) (from mac [#385](https://github.com/russellgordon/plantoir/issues/385)) | Links checklist: a page reached only through another offered page follows it; pages named like #362 | with #392 |
+| [#401](https://github.com/russellgordon/plantoir/issues/401) (from mac #383 and #388) | Scheme name "Standard Colours" inherited free (keep the id `quartz-standard`); two notes for your #386 guard: read the process table once, "unreadable" lets the preview through; `labelCodeCases` describe the mac's launchd label, not your task name | with [#386](https://github.com/russellgordon/plantoir/issues/386) |
+| [#400](https://github.com/russellgordon/plantoir/issues/400) (from mac [#396](https://github.com/russellgordon/plantoir/issues/396)) | Schedule Deploy: drop the not-published-yet note, and name every destination (sidebar dialog, `Describe()`, the card, `PlantoirTools.cs`' `schedule_deploy` result). **Turns a GREEN test RED on pull, by design**: `SharedRuleContractTests.AScheduledDeployNamesTheClassesStudentsCannotSeeYet` asserts the old `scheduledDeployRefusals.alsoSaid.rule` — map that red to this issue on the red list | with [#357](https://github.com/russellgordon/plantoir/issues/357) (#335, which adds `actsUseTheSavedSettings`' case 8 here) and [#347](https://github.com/russellgordon/plantoir/issues/347) (#323, whose "one function for the set and the run" is the list the sentence must name) |
+| [#404](https://github.com/russellgordon/plantoir/issues/404) (from mac #403 and #402) | `list_courses` names every destination (`PlantoirTools.cs` `ListCourses`' primary-only ternary; `planOpening.listCoursesLine`). #402 (the command-line course-code rule) is inherited through the shared Python — nothing to build, one thing to KEEP: `NewCourseCreator.cs` writes `course_config.json` before `setup.ps1` asks for the code | with #400 — the same `everyDestination` words and join |
+| [#405](https://github.com/russellgordon/plantoir/issues/405) (from mac [#398](https://github.com/russellgordon/plantoir/issues/398)) | Links checklist: a row a ticked class brings is shown ticked and disabled, "comes with …", until the class is unticked; the button counts rows shown ticked; the published trail line counts rows that came only with a class. Nothing reddens on pull (no Windows test reads `linksChecklist`) | with #392 and #399 — after them, since it changes their sheet |
+| [#406](https://github.com/russellgordon/plantoir/issues/406) (the `windows` issue from mac #397) | Preview asks to show today's class on the section's front page (Preview BUTTON only; `todaysClassOnTheFrontPage`, 42 cases, seven wording keys); your pointer masked and form-keeping (`sectionIndexPointer.writtenAs`: a section path always carries `\|<name>` — wire all 27 cases); the Not Today file (`frontPageNotToday`); two trail events (red in `SharedRules_ActivityTrailEvents_Exist` until recorded or ledgered). Inherited free: the build's masked front-page dating and `test_front_page_lines_resolve.py`. Manual: doc 09 → "Today's class on the front page (#397)". | Beside #400: the same section window's Preview button and alert. |
+
 ---
 
 ## 6. Open `windows` issues NOT on this milestone that touch the same code
 
-These are not in the 46. Several share files with Phase 2 and Phase 3, so a
+These are not on the milestone. Several share files with Phase 2 and Phase 3, so a
 session will meet them whether or not they are in scope. **Russell: in or
 out?**
 

@@ -1774,7 +1774,9 @@ The teacher gets one of three sentences, under a title that is true of all
 three — "Cannot Preview Yet" reads as "wait and it will work" in front of a
 remedy that is restarting the Mac, and a second `.alert` modifier on this view
 is the one thing it must not have (four of them segfaulted SwiftUI's bridge),
-so the shared alert carries its title in state beside its message. The trail
+so the shared alert carries its title in state beside its message (since #397
+both are one `PreviewAlert` value, which also carries the question about
+today's class — "Today's class on the front page (#397)" below). The trail
 gets one line, `preview did not appear`, carrying the course, the section, the
 seconds and which of the three it was. The sentences are in
 `contracts/app-rules.json` → `previewPorts.whenThePreviewNeverAppears`, so
@@ -2612,7 +2614,12 @@ against `shared-rules.json` → `userFacingLabelWords.forbidden`, whole-word and
 case-insensitive, comments skipped ("description" is not "script"). It found
 exactly two hits: that row and the colour picker's "Quartz default (none
 chosen)", now `colourSchemeNoneChosen`. It cannot see DATA: the catalog
-scheme "Quartz Standard Colours" (`support/colour_schemes.json`) is issue #383.
+scheme then named "Quartz Standard Colours" (`support/colour_schemes.json`)
+was issue #383. In v1.4.2 it became "Standard Colours" — the display name only;
+its id `quartz-standard`, which every course stores and both wizards default
+to, did not change — and `scripts/test_colour_scheme_names.py` now holds every
+scheme name against the same `forbidden` list, whole-word. It is pure Python,
+so Windows' `PythonToolchainTests` runs it too (`userFacingLabelWords.data`).
 
 ## Two programs, one course: the build, preview and publish leases (#156)
 
@@ -2948,16 +2955,30 @@ on a Mac before 2026-09-25) can still have its own code re-typed while being
 renamed — it cannot be given the name, and renaming it away is how it leaves.
 The sentence says the name is kept, never what for: rule 1.
 
-**The command line still accepts "work", deliberately.** `setup_course.py`'s
-code prompt has never carried the app's rule — it refuses only a leading dot,
-and does not hold the twelve-character limit or the character rule either — so
-adding one name to it would be a third, partial copy of a rule that has one
-home. The app's rule is the gate a teacher meets: both wizards validate before
-they ever start `setup.sh`/`setup.ps1`. A teacher typing codes into the launcher
-by hand is off the supported path already, and on Windows the damaging half of
-the collision is guarded separately — `BuildOutputLocation.WouldCollideWithEveryCourse`
-refuses to delete by that path. If the command line ever gets the shared rule,
-it gets all of it, WORK included.
+**The command line has the whole rule since #402, WORK included.** Until
+then `setup_course.py`'s code prompt refused only a leading dot, and this page
+said adding WORK alone would be a third, partial copy of a rule with one home —
+"if the command line ever gets the shared rule, it gets all of it". #402 did
+that: `ask_for_course_code` asks `course_code_trouble`, a port of
+`CourseCodeRule.trouble` gated by every `course-management.json →
+courseCode.problems` and `.normalized` case (`scripts/test_course_code_rule.py`),
+and a refused code hears the wizard's full sentence. Three things differ from
+the app's wizard, all on purpose, and `courseCode.commandLine` holds them as
+cases. It passes NO existing codes: re-running the wizard over a course is how
+the command line changes its settings. A leading dot is still refused FIRST,
+whatever is on disk, because a reference import's hidden staging folder has a
+`course_config.json`. And a course that is already here — one bare folder name
+whose `course_config.json` exists — is let through, with a note naming the
+rule and the app's rename when its code is outside it. Both apps write that
+file BEFORE they answer the prompt, so an app's New Course run never meets the
+refusal, and a difference between the two apps' rules (Windows has no WORK
+yet) cannot leave an app answering the same code forever; refusing a
+command-line teacher's own course would only lock them out of it. The
+bare-name condition is there because a path joins rather than appends
+(`courses/` + `ICS4U/` is `courses/ICS4U`; + an absolute path is that path).
+On Windows the damaging half of the WORK collision is still guarded
+separately — `BuildOutputLocation.WouldCollideWithEveryCourse` refuses to
+delete by that path.
 
 ## Renaming a course folder
 
@@ -4100,7 +4121,8 @@ volume resolved the uppercased name, and the run went straight past the
 reference gate — because during the copy there is no marker yet for that gate
 to find. So the refusal is now real rather than assumed: `deploy.sh`,
 `preview.sh` and both `.ps1` twins refuse a course argument beginning with a
-dot before anything else, `setup_course.py` refuses one at its own prompt,
+dot before anything else, `setup_course.py` refuses one at its own prompt
+before anything else too (before its existing-course step, #402),
 `verify.sh` greps all four structurally, and
 `scripts/test_reference_course.py` drives the real `deploy.sh` at it. A
 refusal is the safe direction: no real course code begins with a dot.
@@ -6805,8 +6827,9 @@ code for a page at the top of the course folder). The title is the app's one
 naming rule — `AssistSectionPage.displayTitle`: front matter title, else the
 file name as written, else the folder for an `index.md` — which the assistant,
 the publish plan and the re-date planner already use; the "(in …)" suffix is
-this sheet's alone, so do not copy it into the assistant's replies without
-deciding to. One builder, `StartOfYearPlan.line(for:first:)` (`draftLine`),
+this sheet's and the links checklist's (#385 reuses `StartOfYearPageNaming`
+through `LinksChecklistNaming` — see "The links checklist (#379)" below), so do
+not copy it into the assistant's replies without deciding to. One builder, `StartOfYearPlan.line(for:first:)` (`draftLine`),
 serves both disclosure lists AND the MCP plan text (`describe()`), and the
 links-left list takes the same name. "Shares a title" is decided across EVERY
 page the section's graph read, not within the list shown — a "Notes" going into
@@ -6869,6 +6892,184 @@ class links directly is that class's material and "will come with that
 class". So pressing Publish on the defaults does not undo Get Ready. See
 "The links checklist (#379)" below.
 
+## Today's class on the front page (#397)
+
+Russell, 2026-09-30: "A convenience feature – I often forget to update that
+transclude each day." A section's front page (`section<N>/index.md`) shows one
+class. The assistant's publishes move that line (`SectionIndexPointer`, #267),
+but a class published by editing `publish:` in Obsidian moves nothing, so the
+front page every student lands on shows yesterday's class until somebody edits
+it by hand. Since #397, pressing **Preview** in a section window asks:
+
+> **Show Unit 2, Day 5 on the front page?**
+> Today's class is published, but the front page still shows Unit 2, Day 4.
+> [Show on Front Page] [Not Today]
+
+The rule, its cases and the sentences are data: `contracts/class-planning.json`
+→ `todaysClassOnTheFrontPage` (42 cases, run by
+`TodaysClassOnTheFrontPageTests` through the real readers on real files). In
+short, it asks when a class dated TODAY — the teacher's calendar day
+(`CalendarDay.today()`, the Mac's time zone), against the ten characters written
+in the page, never converted — is CERTAINLY visible for the section (a
+`publish:` the app cannot read is not offered: the build hides it, #246), the
+front page has a class line, and that line names an older, undated or hidden
+class. A line already naming a visible class dated today or LATER is left
+alone: the teacher chose between two classes today, or put tomorrow's up early
+on purpose, and a question that undid that every morning would be the nagging
+the issue anticipated. Two classes today: the later by the course's own
+numbering, `SectionIndexPointer.comesLater`, the pointer's own tie-break. No
+class line at all: not asked, on either platform — Windows' pointer inserts a
+line under the heading when IT repoints, but where a class belongs on a page
+the teacher made without one is the teacher's.
+
+**Only the Preview BUTTON asks.** The toolbar calls `pressPreview()`, which
+asks and otherwise calls `startPreview()`. `startPreview()` is the door every
+other preview uses — the in-app assistant's `rebuild_preview`, Start of the
+Year, Course Settings' "preview again", a repair's rebuild — and a question
+there would hold each of them up on a modal nobody may be watching. The MCP
+server, scheduled deploys and the launchers never reach the view at all. Nor is
+it asked for a course kept for reference, a course being copied, a window
+already busy, a section this app is deploying (`refusalWhileThisSectionDeploys`)
+or a course another program is building (`whatBlocksABuild(afterTaking:
+false)`): a preview that is going to be refused is refused as before, with no
+question first, and the teacher's front page is never written while a build
+may be reading it. A front page that is a symbolic link, a Finder alias or
+locked is not asked about either — the build never writes through one (#276).
+`testOnlyThePreviewButtonAsks` pins where the question may be reached from.
+
+**It rides the preview alert; the window still has three.** A fourth `.alert`
+on this view is the segfault described under "A test host that segfaults"
+and in the comment on `healthDialog`. So the preview alert became ONE value,
+`PreviewAlert` (`.refusal(title, sentence)` or `.todaysClass(offer)`), with
+presentation in `previewAlertIsUp`. The value is never cleared by the
+dismissal — only replaced by the next alert — because clearing it made the
+closing alert re-render as "Cannot Preview Yet" behind a question the teacher
+had just answered (plan review, finding 2). Every refusal goes through
+`showPreviewRefusal`, which HOLDS one that arrives while the question is up
+(the assistant can start a preview then) rather than replacing the question
+under the teacher's pointer.
+
+**The preview starts after the alert has gone, never inside its button.** The
+answer only records — the page written, or Not Today, with its trail line —
+and sets `startPreviewWhenTheQuestionHasGone`; `afterThePreviewAlert`, run from
+`.onChange(of: previewAlertIsUp)`, starts the preview, then shows a held
+refusal or the front-page sentence, then drains the links checklist.
+`startPreview()` raises its refusals synchronously, and one raised inside the
+alert's own action was lost with the dismissal — the teacher pressed Show, the
+page changed, and no preview came (plan review, finding 1). A refusal from the
+preview wins over the front-page sentence; the trail has both.
+
+**The links checklist waits behind it.** The question invites a look at the
+front page in Obsidian, and coming back makes the window key, which offers a
+waiting checklist (#379). `requestLinksChecklist` and `showAnythingWaiting`
+hold it behind the preview alert as they hold it behind the folder dialog
+(plan review, finding 3; `testTheLinksChecklistWaitsBehindThePreviewAlert`). Folder findings wait
+behind it too (`showHealthFindings`, `settleHeldLinksFinding`): an assistant's
+build can finish while the question is up, and a second alert raised then
+loses one of them. They are shown by `showAnythingWaiting` once it has gone.
+A refusal that arrived while the question was up is not dropped if the
+button's own preview is refused as well: the two are said in one alert, the
+earlier first (`SectionDetailView.joining`).
+
+**Show on Front Page decides again.** `TodaysClassOnTheFrontPage.show` reads the
+page again and re-applies the rule for the day the question was ASKED (an
+answer after midnight is about that question, not the new day), with the
+window's guards again. It writes only when the rule still offers the SAME class
+— the teacher may have published the later class, hidden this one or edited
+the page in Obsidian while the question was up — and writes through the
+pointer (`SectionIndexPointer.repointing`): one line, and the page's `created`
+follows the class (#275), every other byte as it was. Then it reads the file
+back. The outcomes: `.shown` ("put today's class on the front page"),
+`.alreadyRight` (the page now shows today's class; nothing written),
+`.noLongerOffered` (anything else changed; nothing written, and the teacher is
+told `noLongerOffered` under "The Front Page Was Not Changed"), `.couldNotSave`
+(said with `couldNotSave`). Not Today is recorded in
+`.publish_state/section<N>.front-page-not-today.json` (`file-formats.json` →
+`frontPageNotToday`) — per section, calendar day and class, so a class
+published later the same day is a new question and the record expires by
+itself. Not in the app's preferences: those are per Mac, and the section's
+other answers live beside it. Escape is Not Today.
+
+**The line keeps the form the teacher wrote, as far as the site can draw it**
+(`sectionIndexPointer.writtenAs`). The pointer used to write the bare title
+whatever was there; Russell's own front pages are written
+`![[section1/All Classes/X|X]]`, and a bare name in a two-section course is
+ambiguous in Obsidian. The first version of #397 kept the path and dropped a
+display name that was not the old class's name — and on MPM2DE's page,
+`![[section1/All Classes/Thread 1, Day 0.5|Thread 1, Day 1]]`, it wrote
+`![[section1/All Classes/Thread 1, Day 2]]`. The build rewrites a
+section-path link to its DISPLAY NAME only when it has one
+(`build_site.rewrite_section_wikilinks`), so that line reached the site as a
+page the site does not have, and the front page showed nothing while the app
+reported success (implementation review, finding 1; reproduced 2026-09-30 by
+running the line through the real function). The director's ruling: a link
+that resolves on the site wins over the teacher's form. So now:
+
+- a path holding a `section<N>` folder is written as the class's FULL place
+  inside the course folder, and ALWAYS with `|<the class's name>`, which the
+  build turns into `![[<name>]]` — what the pointer wrote before #397;
+- any other path is written as the class's place from the SITE's root (Quartz
+  reads a path from there): `Thread 4/Day 15` stays `Thread 4/Day 16` in
+  ICS3U 2023, whose classes are filed in `section1/Thread 4/`;
+- places are read against the course folder, never from the last folders of
+  the disk path, which lost the `section1/` anchor one folder deeper and could
+  pick up the course folder's own name (finding 3);
+- a display name equal to the old class's name follows the class; any other,
+  and a `#heading`, is dropped; a typed `.md`, the spaces around the embed and
+  a Windows line ending stay.
+
+`scripts/test_front_page_lines_resolve.py` (in verify.sh) runs every expected
+line of both case lists through the build's rewrite and requires it to name
+the class's place on the site. This is the pointer's rule, so the assistant's
+publishes write the same form.
+
+**The class line is read outside code and `%%` comments** — in the pointer
+and in the build alike (`documentation/05-build-pipeline.md`, #275's
+section). The shipped front pages put a `%%` note right under the embed, and a
+teacher parking yesterday's line there is natural: read as the embed, the
+question would call the page "already showing" today's class, or Yes would
+rewrite the commented line and report success while students saw yesterday's.
+The pointer also replaced EVERY copy of the line's text (`replacingOccurrences`)
+until now; it rewrites the one line found. Positions are counted in UTF-16, the
+mask's units — counted in characters, a line of emoji above a comment moved the
+embed inside it (the contract case "a long line of emoji above a comment").
+
+**Cost.** The question reads the section's class pages only
+(`AssistSectionGraph.classPages`: the graph's own `isClassPage` rule applied
+to the path before the file is opened, pinned equal to the graph's class pages
+by `testTheClassPagesAreThePointersClassPages`). Measured 2026-09-30 in the unit
+suite on a synthetic 454-page section (300 class pages, 150 others, on this
+Mac): **64 ms** per press, against 180 ms for the whole graph.
+
+**The trail.** "put today's class on the front page — {class} in place of
+{shown}" and "left the front page as it was — {Not Today | already showed
+today's class | it changed while the teacher was asked | could not be saved}:
+{class} offered, it showed {shown}" — file names only. A question never
+answered changed nothing and a question not asked is not an action: neither
+writes a line.
+
+**Rejected** (the contract's `rejected` says why for each): the build detecting
+it and reporting a marker (#379's shape — the answer would come after the
+preview was built, in the container's clock, from every scheduled build too);
+asking inside `startPreview()`; a fourth alert or a sheet; following the
+pointer's newest-visible class (it offers tomorrow's class published early);
+inserting a line into a page that has none; asking at every preview after Not
+Today, or remembering Not Today for the whole section; the app's preferences for
+the record; forbidding "embed" in labels ("Most teachers embed video from
+YouTube" is a real one — the transclude family went onto
+`userFacingLabelWords.forbidden` instead); the assistant mentioning a stale
+front page; asking at Deploy.
+
+**Known limits.** A class line inside a list item (`- ![[…]]`) or a callout
+(`> ![[…]]`) is not the front page's embed — `found` reads a line whose whole
+text is the embed — so the page is not asked about; two contract cases pin it.
+A class line sharing its line with words is not found either. Windows' pointer
+still finds the embed by its heading and is not masked, so on one folder the
+two apps can repoint different lines until the `windows` issue for #397 lands. The write is atomic (`String.write(atomically:)`, as the
+pointer has always written): the file's permissions are kept and any extended
+attributes on the front page are not (implementation review, note 7) — left
+as it is, since no Plantoir feature keeps anything in them.
+
 ## The links checklist (#379)
 
 The section window's answer to #333's alert. The rule that chooses the pages
@@ -6901,13 +7102,136 @@ links checklist (#379)"); this is the app's half.
   without a window): three groups under headings, each row a checkbox with a
   second line — the date it will have, or "first used in …" for a page that
   starts unticked, or "a class of its own — tick it to publish it now" plus
-  "brings N more pages with it" once ticked — and where it is linked from.
+  "brings N more pages with it" once ticked (a count of PAGES, rows or not —
+  key `comesWith`, not to be confused with #398's `comesWithAClass`), or,
+  since #398, "comes with “Unit 3, Day 1” — it goes when that class goes" for
+  a row a ticked class brings (below) — and where it is linked from.
   Rows are checked again against the pages as they are now; one that became
   visible or went away is dropped. It scrolls in a `CappedScrollArea` of 380 pt
   (#365's), width 560; 100 rows measure within 620 pt. Not Now and Publish both
   record the answer (`.publish_state/section<N>.links-checklist-answered.json`,
   the app's own file): the same set is not offered again on its own, a page
   joining it brings it back, and a page the teacher unticked starts unticked.
+- **Rows that come under another row (#385).** A row whose offer entry
+  carries `dependsOn` (no page students can see links it; only other offered
+  rows do — 05 → "Rows that come under another row") is listed UNDER
+  `dependsOn[0]`, inside that row's group, indented 18 pt a level (capped at
+  three levels; `LinksChecklistGate.shownOrder`, which keeps a visited set for
+  a hand-edited file). What the checkbox SHOWS is whether the row GOES
+  (`LinksChecklistGate.going`: own tick on, and no `dependsOn` or one of those
+  rows goes — the LEAST fixed point, so two hidden pages that link only each
+  other never go through each other). A row with `dependsOn` none of which
+  goes is LOCKED: shown unticked and `.disabled`, its own tick kept, never
+  written. The checkbox changes only its own row's tick
+  (`LinksChecklistGate.toggled`) — copying the tick down was measured and
+  rejected: all 44 payload rows under another row start unticked because a
+  later class uses them first, and ticking SNC1W's Final Examination would
+  tick ten pages of later units. It is the Copy a Page lock inverted: there a
+  row is locked TICKED while something that shows it is going; here it is
+  locked UNTICKED while nothing it comes under is going. The second line
+  says "linked from “Hub” — it goes when that page goes" (or "… and N
+  more hidden pages — it goes when one of them goes"; `linkedFromRow`,
+  `linkedFromSeveralRows`) instead of the plain "linked from" part. Never
+  "ONLY linked from": the implementation review (S1) found that every one of
+  the 44 measured rows is also "first used in" a hidden class, whose link
+  `dependsOn` leaves out by design, so "only" was false in the common case
+  (naming case 2 pins it). The Publish button counts rows SHOWN ticked — rows
+  that go and, since #398, rows a ticked class brings — and is disabled when
+  none is. A row a ticked class brings is never locked: it is shown coming
+  with the class instead (next bullet). **The re-read** frees the rows under a page made visible before
+  the sheet OPENED (their `dependsOn` becomes empty — a visible page links
+  them now), drops a gone page from other rows' `dependsOn`, and drops a row
+  left with nothing it could go with, repeated to a fixed point. Nothing is
+  freed at Publish (plan-review finding 2): `plan()` works out `going` from
+  the rows as the sheet showed them, less pages gone since, so a row shown
+  locked is not published because its hub was made visible while the sheet
+  was open (publish case iv-i). A row shown going that is left because its
+  hub has gone since is named in the "changed since it was checked" lines.
+  **Answered file:** only rows whose OWN tick was off are remembered as
+  unticked, so a row left with its hub comes back with it next time.
+- **Rows a ticked class brings (#398).** Ticking a class in "Classes not yet
+  published" has always published every page that class's publish reaches
+  (`whatAClassBrings`, the assistant's rule), whatever those pages' own rows
+  showed. Now each such ROW is shown ticked and `.disabled`, its second line
+  `comesWithAClass` ("comes with “Unit 3, Day 1” — it goes when that class
+  goes") and then only the plain `linkedFrom` part — never the date line (the
+  class's date wins, ruling F2), never `firstUsedIn` (it is going now), never
+  `linkedFromRow` (the class has overruled "goes when that page goes").
+  Precedence per row: coming with a ticked class, then #385's going/locked,
+  then its own tick. The row's OWN tick is kept and the checkbox ignores a
+  step on it while it comes with a class (`LinksChecklistGate.toggled(…,
+  comingWith:)`, which the binding and the contract's pure cases both call),
+  so unticking the class returns the row exactly as it was. Two ticked
+  classes bringing one row: the first in the sheet's order is named.
+  **What a class brings** is worked out ONCE, when the sheet opens
+  (`LinksChecklistPublisher.whatEachClassBrings`): every class row's title
+  goes through `AssistPublishPlanner.planPublishing(titles:)` together — the
+  planner Publish uses — and the pages it would change because they are
+  linked are shared out by each class's own `reachFollowingLinks`. That is
+  exact (reach from several classes is the union of each one's; whether a
+  reached page changes is decided page by page), so a page already visible or
+  one the writer would decline (#186) is not shown as coming, here or at
+  Publish; the class row's "brings N more" count comes from the same call and
+  now equals the trail's "bringing N more". Rows are matched to the plan in
+  composed Unicode form (Swift's own `String` equality is canonical already,
+  so this matters for a port whose string compare is ordinal). Measured on an
+  Apple M4 Pro, 2026-09-30: a synthetic section of 463 pages with 20 hidden
+  classes behind one visible overview (461 rows) opens — graph read and the
+  one planner call — in **0.158 s**
+  (`LinksChecklistComingWithTests.testTwentyClassesAreWorkedOutInOnePlan`).
+  Nothing is re-planned per tick, and what goes, what comes with a class and
+  what is shown ticked are worked out ONCE per change of `ticked` (the
+  model's `didSet`), not per row per redraw: the view asks for them several
+  times for every row, and each answer is a pass over every row. Worked out on
+  every access, as first written, one redraw of that 461-row sheet took
+  **11.8 s** in Debug on the same Mac (about 8× dev's own per-row `going`);
+  cached, **0.031 s**. The test asserts a 0.5 s ceiling on one full redraw
+  (implementation review, finding 1). **At Publish**, `plan(…, shownComingWith:)`
+  receives the rows the sheet showed coming with a class: one not written
+  after all (its class or page changed while the sheet was open) is named in
+  the "changed since it was checked" lines (iv-l: its class was published
+  elsewhere; iv-n: the row itself was). What it leaves behind follows its OWN
+  tick like any other row's — a teacher's own untick of a brought row is
+  remembered like any other untick, as Not Now remembers it (implementation
+  review note 6; the first cut forgot it, "because the teacher saw it
+  ticked", and so forgot a deliberate untick). The published trail
+  line gains "({N} of them on the list)": rows written ONLY because a ticked
+  class brought them (own tick off, or on but nothing they come under went) —
+  `Outcome.cameWithAClass`; a row that went on its own tick is not counted.
+  **Measured once, and judged — do not re-measure it.** Over the 39 payloads
+  after an emulated Get Ready (the planner's emulation, not Get Ready itself),
+  the one class row each payload offers — the exam-day class, which a visible
+  page links and which links "Final Examination", which links most of the
+  course — brings 1,900 of 2,463 rows (1,886 of them were shown unticked, 41
+  locked and 14 with a date they would not get, all published anyway; 1,896
+  are reached through other pages, not `firstUsedIn` that class), because the
+  reach (the assistant's rule, `followingLinks`) walks through visible pages
+  too. So on such a course, ticking that one class ticks about three quarters
+  of the sheet — out of view, since the class group is last (the button's
+  count and the class row's "brings N more" are the in-view cues). Russell,
+  2026-09-30 (ruling R20 of the v1.4.2 run): "highly unlikely to actually
+  occur in real practice. A teacher will almost never link from a current
+  class page to a future class page in that way." So it is not a problem to
+  fix, no `decision` issue was opened, and the reach stays as it is.
+  **Rejected:** letting a brought row be unticked while its class goes (a
+  change to what is published, and a published class linking a hidden page);
+  working the set out from `firstUsedIn`; a second walk (the old count's
+  `reachFollowingLinks` loop, which counted pages the writer declines); one
+  planner call per class row (S6: a mid-year section can offer twenty); copying
+  the class's tick into the rows; dropping the class row's count (it also
+  counts pages that are not rows); listing the brought rows under the class
+  row (the class group is last — up to 81 rows would move on one tick).
+- **Names (#385's notes).** Rows and second lines name pages the way #362's
+  plan does, with the same builder: `LinksChecklistNaming` computes
+  `sharedTitles` over every page of the section's graph (not only the rows —
+  a row whose twin stays visible is still told apart), names a page in a
+  sentence with `StartOfYearPageNaming.name` (`“Title”`, or `“Title” (in
+  Folder)`), and a row's own title with `displayTitle` or `rowInFolder`
+  ("Notes (in Zeta)"). An untitled folder `index.md` is called by its folder
+  (`displayName`'s step 2). A page gone since the offer keeps the build's
+  title (not its file name); a place that is not a row falls back to its last
+  part. The build's own `title` is left as it is (`title_of` feeds class
+  detection).
 - **Publish** (`LinksChecklistPublisher`): refused while the course is being
   published; ONE merged plan — the ticked pages through
   `AssistPublishPlanner.planPublishing(exactly:dateMoves:)` with the offer's
@@ -6928,15 +7252,33 @@ links checklist (#379)"); this is the app's half.
   its own change. Not in `DeployCommand.releaseSite`, which runs only for a
   NEW website (plan review, finding 12).
 - **Trail:** "offered to publish pages that links lead to" (occasion and
-  counts), "published pages that links led to" (counts and at most ten
-  places), "left pages hidden that links lead to" (Not Now or some unticked).
+  counts — since #385 also how many are listed under another page, and
+  "ticked" counts rows that GO, computed by `offeredLine(model:)` rather than
+  at the call sites; since #398 rows SHOWN ticked, identical at opening),
+  "published pages that links led to" (counts, "left unticked" and "left with
+  the page they come under" separately, since #398 how many of the pages the
+  classes brought were rows of the list, and at most ten places), "left pages hidden that links lead to" (Not Now or some
+  unticked; EVERY page left hidden, with how many only because the page they
+  come under was, in brackets — written when that total is above 0).
 - **Known limits, recorded from the implementation review (2026-09-30):**
   the front page not moving (F1) holds for THIS press only — the next
   assistant publish or hide repoints it by `mostRecentVisibleClass`, which may
   then pick a future class ticked here (N10); a row a ticked class also brings
-  but that shows no "first used in" line (case k, or a group-2 row the class
-  reaches) is published with the class even if unticked, and the class's line
-  gives only a count (N2, the allowed cut; #385 is the place to close it); a
+  used to show its own tick (unticked, or since #385 locked) while Publish sent
+  it anyway (N2) — CLOSED by
+  [#398](https://github.com/russellgordon/plantoir/issues/398) (v1.4.2), which
+  leaves two limits of its own (`linksChecklist.comingWithAClass.knownLimit`):
+  what a class brings is worked out when the sheet opens, so a link ADDED to a
+  ticked class while it is open brings a row shown with its own tick (a
+  removed link, or a page made visible, is named instead), and a row under a
+  brought row that is not itself brought (the writer declines it, or the two
+  link readers disagree) stays locked under a row shown ticked, its "goes when
+  that page goes" then false on screen; a row that goes only through a
+  page the writer then DECLINES (no room for a key, #186) is still published
+  with nothing students can see linking it — `going` is worked out before the
+  writer runs, and the teacher is told only that the page above it was
+  declined; rare, recorded in the same `knownLimit`, not handled (#385's
+  implementation review, note 2); a
   page published from the checklist and later hidden again by hand, with a
   visible page still linking to it, is in the answered set, so neither the
   alert nor the checklist returns for it until a rollover — the menu item
@@ -6954,6 +7296,19 @@ links checklist (#379)"); this is the app's half.
   check; the marker; every routing branch; freshness; the contract's
   `linksChecklist.publishCases` on a laid-out course; the sheet's size), with
   eleven mutations run red — recorded in the piece's ready file.
+  `LinksChecklistFollowingTests` (#385): every `followingARow` case through
+  `LinksChecklistGate`, the checkbox through the model's binding, publish
+  cases iv-e to iv-i — and #398's iv-j to iv-n — THROUGH THE SHEET (with the
+  trail captured), the naming
+  case (with a row removed, to prove "shared" is across the section), an
+  older builder's offer, the three trail lines filled from the contract's
+  templates, and a hundred-deep chain within 620 pt; a missing publish case
+  now FAILS rather than skips. `LinksChecklistComingWithTests` (#398): every
+  `comingWithAClass` pure case through the gate, the brought row's inert
+  checkbox through the binding, the sheet's brought rows against what the
+  press's own plan writes (with a page the writer declines and a row spelled
+  decomposed), and the twenty-class timing; sixteen mutations run red —
+  recorded in the piece's ready file.
 
 ## Testing: the real-home tripwire (#264)
 

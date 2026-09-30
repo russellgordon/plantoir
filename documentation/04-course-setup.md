@@ -325,7 +325,16 @@ The skeletons are GENERATED from eleven shapes plus a family table by
 
 ### 1. Course identity
 
-- Prompts for the **course code** (default `ICS3U`), uppercased.
+- Prompts for the **course code** (default `ICS3U`), uppercased, and asks it
+  the apps' own rule (#402): letters, numbers, dashes, single interior spaces,
+  at most twelve characters, not `WORK`. A refused code hears the app
+  wizard's sentence and is asked again; a leading dot is refused first. A
+  course that is already here (its `course_config.json` exists) is let
+  through, with a note naming the rule and the app's rename when its code is
+  outside it — both apps write that file before answering this prompt, so
+  their New Course runs never meet the refusal. The rule, the sentences and
+  every case: `contracts/course-management.json → courseCode` (`problems`,
+  `normalized`, `commandLine`), gated by `scripts/test_course_code_rule.py`.
 - Looks the code up in `ontario_secondary_courses.json` (1,930 entries) and
   offers the short name first ("Intro to Comp Sci"), then the formal name
   ("Introduction to Computer Science, Grade 11, U"), then a custom name. The

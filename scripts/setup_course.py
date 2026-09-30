@@ -392,6 +392,161 @@ def prompt_with_default(prompt_text, default_value):
     response = input(f"{prompt_text} [Default: {default_value}]: ").strip()
     return response if response else default_value
 
+# ---------- Course codes (GitHub #402) ----------------------------------------
+#
+# What a course code may be: the SAME rule both apps ask of a typed code. Its
+# home is the mac's `CourseCodeRule` (mac-app/QuartzTeachers/Models/
+# CourseCodeRule.swift), and its gate is contracts/course-management.json →
+# courseCode: scripts/test_course_code_rule.py runs every `problems` and
+# `normalized` case through the functions below, sentence for sentence, the
+# way both apps' suites do. Change the rule there first.
+#
+# Until #402 this wizard refused only a leading dot, so `./setup.sh` could
+# make "CAFÉ", "C++" or "A;B" — codes neither app can make, and which the
+# launchers' check of who owns a running job can misread as gone (#388's
+# known limits). The words are ported rather than read from the contract at
+# run time: reading them would stop this wizard starting whenever the
+# contract could not be read, and the cases already pin every sentence.
+
+COURSE_CODE_MOST_CHARACTERS = 12
+COURSE_CODE_NAMES_KEPT_FOR_PLANTOIR = ("WORK",)
+
+COURSE_CODE_PROMPT = "Enter the course code (e.g. ICS3U)"
+COURSE_CODE_CANNOT_BEGIN_WITH_A_DOT = "❌ A course code cannot begin with a dot."
+
+# Said when an EXISTING course's code is outside the rule — a course made at
+# the command line before #402, or one the app created a moment ago on a
+# computer whose own rule differs at an edge (Windows has no WORK yet). Worded
+# to be true in both cases: it names the rule's own sentence and where to
+# rename, never how the course came to have the code. It must not end in ":",
+# ">" or "?", because both apps' answer pumps read a line ending that way as a
+# question (test_course_code_rule.py pins it).
+COURSE_CODE_KEPT_AS_IT_IS = (
+    "⚠️ {code} is kept as it is, because a course with this code is already here. "
+    "{rule} To change this course's code, rename the course in Plantoir."
+)
+
+
+def normalized_course_code(raw):
+    """A code as it will be stored: trimmed, then upper-cased — in that order,
+    and BEFORE the characters are checked, as the mac does. Upper-casing first
+    matters at ten characters (ß ı ſ ﬀ ﬁ ﬂ ﬃ ﬄ ﬅ ﬆ), which become plain ASCII."""
+    return raw.strip().upper()
+
+
+def _course_code_character_is_allowed(character):
+    if character == " " or character == "-":
+        return True
+    return character.isascii() and character.isalnum()
+
+
+def course_code_trouble(text, existing_codes=(), current_code=None):
+    """What is wrong with a code, as (full sentence, short form), or None.
+
+    Checked in `CourseCodeRule.trouble`'s order: two spaces in a row, the
+    characters, the length, the course's own code, a kept name, a clash. The
+    wizard never passes `existing_codes` — re-running over an existing course
+    is its ordinary job — but the clash is ported too, so every contract case
+    runs here verbatim.
+    """
+    code = normalized_course_code(text)
+    if code == "":
+        return None
+    if "  " in code:
+        return ("A course code can’t have two spaces in a row.", "No double spaces")
+    for character in code:
+        if not _course_code_character_is_allowed(character):
+            return (
+                "A course code can only use letters, numbers, spaces and dashes.",
+                "Letters, numbers, dashes",
+            )
+    if len(code) > COURSE_CODE_MOST_CHARACTERS:
+        return (
+            f"A course code can be at most {COURSE_CODE_MOST_CHARACTERS} characters.",
+            f"{COURSE_CODE_MOST_CHARACTERS} characters at most",
+        )
+    if current_code is not None and normalized_course_code(current_code) == code:
+        return None
+    for kept_name in COURSE_CODE_NAMES_KEPT_FOR_PLANTOIR:
+        if kept_name == code:
+            return (
+                f"{code} is a name Plantoir keeps for its own use. Choose a different course code.",
+                "Kept for Plantoir’s use",
+            )
+    for existing_code in existing_codes:
+        if normalized_course_code(existing_code) == code:
+            return (
+                f"A course named {code} already exists. "
+                "If that's last year's, keep a copy of it for reference and then remove it.",
+                f"{code} already exists",
+            )
+    return None
+
+
+def _is_a_bare_folder_name(code):
+    """True when `code` can only name a folder directly inside courses/.
+
+    Asked before the existing-course exemption, because pathlib JOINS rather
+    than appends: `courses / "ICS4U/"` is `courses/ICS4U`, and
+    `courses / "/tmp/x"` is `/tmp/x` (on Windows `C:\\x` replaces the base the
+    same way; a driveless "C:X" is drive-RELATIVE there, and the colon is the
+    only thing that stops it). Writing outside courses/ is the damaging
+    direction, so anything that is not plainly one name is refused by the rule
+    instead.
+    """
+    if code in ("", ".", ".."):
+        return False
+    # A trailing dot or space is dropped by Windows when it reads a path, so
+    # "ICS4U." would find ICS4U's course_config.json and then write
+    # "ICS4U." into it — the folder and its settings disagreeing (#402
+    # implementation review N3). Such a name is never a bare folder name.
+    if code != code.rstrip(". "):
+        return False
+    if "/" in code or "\\" in code or ":" in code:
+        return False
+    if Path(code).is_absolute():
+        return False
+    return Path(code).name == code
+
+
+def ask_for_course_code(base_path, ask=None, say=print):
+    """Ask for a course code until one is acceptable, and return it.
+
+    1. A leading dot is refused FIRST, whatever is on disk: a dotted name is
+       one of Plantoir's own (a reference course is built under a hidden
+       `.plantoir-importing-<CODE>` folder, WITH a course_config.json, and
+       renamed into place last), and a course created with one would be
+       invisible in the app. The launchers refuse the same shape.
+    2. A course that is already here — a bare name whose folder holds a
+       course_config.json — is let through, with a note when its code is
+       outside the rule. Both apps write that file BEFORE they answer this
+       prompt, so a refusal here can never catch an app's New Course run on
+       some edge where the app's rule and this one differ; and refusing a
+       command-line teacher's own course would only lock them out of
+       maintaining it. (`CourseCodeRule`'s own precedent: a course never
+       clashes with itself.) A folder with no course_config.json is not a
+       course, and is asked of the rule like any new code.
+    3. Anything else must pass the rule, and hears the app wizard's sentence.
+    """
+    if ask is None:
+        ask = prompt_with_default
+    default_code = "ICS3U"
+    while True:
+        course_code = ask(COURSE_CODE_PROMPT, default_code).upper()
+        if course_code.startswith("."):
+            say(COURSE_CODE_CANNOT_BEGIN_WITH_A_DOT)
+            continue
+        trouble = course_code_trouble(course_code)
+        if _is_a_bare_folder_name(course_code):
+            if (Path(base_path) / course_code / "course_config.json").is_file():
+                if trouble is not None:
+                    say(COURSE_CODE_KEPT_AS_IT_IS.format(code=course_code, rule=trouble[0]))
+                return course_code
+        if trouble is not None:
+            say("❌ " + trouble[0])
+            continue
+        return course_code
+
 def prompt_select_multiple(prompt_text, options, default_selection=None):
     BLUE = "\033[34m"
     RESET_LOCAL = "\033[0m"
@@ -2638,18 +2793,9 @@ def setup_course(no_backup: bool = False):
     except Exception as e:
         print(f"⚠️ Example Course installation step encountered an error and will be skipped: {e}")
 
-    default_code = "ICS3U"
-    course_code = prompt_with_default("Enter the course code (e.g. ICS3U)", default_code).upper()
-    # A course code may not begin with a dot. Plantoir builds a reference
-    # course under a HIDDEN folder inside courses/ and renames it into place
-    # as the last act, so a dotted name is one of ITS names, not a teacher's —
-    # and a folder created here with one would be invisible in the app
-    # afterwards. The launchers refuse the same shape for the same reason.
-    while course_code.startswith("."):
-        print("❌ A course code cannot begin with a dot.")
-        course_code = prompt_with_default(
-            "Enter the course code (e.g. ICS3U)", default_code
-        ).upper()
+    # The same rule both apps ask of a code (#402); a leading dot is still
+    # refused first, whatever is on disk. See ask_for_course_code.
+    course_code = ask_for_course_code(base_path)
     course_path = base_path / course_code
 
     # --- NEW: Automatic backup BEFORE any mutations -------------------------
