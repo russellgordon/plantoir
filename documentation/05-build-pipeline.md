@@ -535,7 +535,17 @@ undated.
   (`sectionIndexPointer.found`) — when that class is VISIBLE and dated. No class
   embed, or an embed naming a hidden or undated class: the page keeps its own
   date and is not written. The build never moves the embed; that is the
-  pointer's job.
+  pointer's job. **The embed is read OUTSIDE code and `%%` comments** (#397,
+  2026-09-30): the front page's body is masked with
+  `markdown_code.not_a_link_ranges`, and a line whose `![[` starts inside the
+  mask is skipped — Quartz never draws a class line a teacher parked in a
+  comment or a fence, so dating the page from it put a date above a class
+  students could not see. A `.md` typed after the class's name is read too.
+  Measured on a scratch copy: before the mask the two new `dateCases` (a
+  comment, a fence) failed (`FAILED (failures=2)`), after it they pass; 0 of
+  the 89 shipped front pages change. The app's pointer reads the line the same
+  way, and Preview's question about today's class depends on it
+  (`documentation/09-mac-app.md` → "Today's class on the front page (#397)").
 - **A page a class links to DIRECTLY** takes the date of the EARLIEST visible,
   dated class of this section that links to it (ties by title), EVEN OVER A DATE
   OF ITS OWN — including one the teacher typed on the page. **A date typed on a
