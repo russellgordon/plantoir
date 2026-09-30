@@ -121,15 +121,15 @@
       "howTheCasesRun": "The shape reachStopsAtAClassPage.cases uses, plus `publishedBefore`: the titles of pages the section's published-pages record lists. Run by the mac harness through the assistant's publish (AssistToolRunnerTests); owed by Windows."
     },
     "fromTheLinksChecklist": {
-      "rule": "When a teacher publishes pages from the links checklist (shared-rules.json -> linksChecklist), each page takes a date worked out by the BUILD and written into the offer (file-formats.json -> linksChecklistOffer). From every VISIBLE, DATED class page of the section, links are followed up to TWO steps - by the #333 finding's reader, path first then name, a name several pages share landing on a hidden one only when EVERY one is hidden. A link that lands on a class page is not entered (followingLinks.stopsAtAClassPage), a hidden class is not walked from (visibleClassesOnly), and the walk does not go THROUGH a folder's index or Key Links. (1) A hidden page reached at step 1 or 2 is 'used by a class' (group fromAClass), claimed by the earliest visible class that reaches it (date, then title - whenSeveralClassesShareAPage). (2) EXCEPT a page a visible, dated class links DIRECTLY in the way the build's own date pass reads links: the build has already given it the earliest direct linker's date (atBuildTime) and would rewrite any other on the next build, so the checklist writes no date for it (why datedByTheBuild). (3) Every other hidden page that a visible page, or an offered page, links to - closed transitively, stopping at class pages - is 'linked from other pages' (group notReachedByAClass) and takes the date of the first class of the year (datingNonClassPages.dateInherited). (4) A hidden class such a link lands on is offered as a class (group class): never walked through, never dated. (5) A page in the section's published-pages record keeps the date it has (publishedBeforeIsRecorded); a folder's index or Key Links is never given a date.",
+      "rule": "When a teacher publishes pages from the links checklist (shared-rules.json -> linksChecklist), each page takes a date worked out by the BUILD and written into the offer (file-formats.json -> linksChecklistOffer). From every VISIBLE, DATED class page of the section, links are followed up to TWO steps - by the #333 finding's reader, path first then name, a name several pages share landing on a hidden one only when EVERY one is hidden. A link that lands on a class page is not entered (followingLinks.stopsAtAClassPage), a hidden class is not walked from (visibleClassesOnly), and the walk does not go THROUGH a folder's index or Key Links. (1) A hidden page reached at step 1 or 2 is 'used by a class' (group fromAClass), claimed by the earliest visible class that reaches it (date, then title - whenSeveralClassesShareAPage). (2) EXCEPT a page a visible, dated class links DIRECTLY in the way the build's own date pass reads links: the build has already given it the earliest direct linker's date (atBuildTime) and would rewrite any other on the next build, so the checklist writes no date for it (why datedByTheBuild). (3) Every other hidden page that a visible page, or an offered page, links to - closed transitively, stopping at class pages - is 'linked from other pages' (group notReachedByAClass) and takes the date of the first class of the year (datingNonClassPages.dateInherited). (4) A hidden class such a link lands on is offered as a class (group class): never walked through, never dated. (5) A page in the section's published-pages record keeps the date it has (publishedBeforeIsRecorded); a folder's index or Key Links is never given a date. (6) A page no page students can see links, reached only through OTHER offered pages, names those pages in `dependsOn` (file-formats.json -> linksChecklistOffer.rowKeys.dependsOn): the offered, non-class rows linking it, nearest to a page students can see first (fewest offered pages between), then by place. It is published only with one of them (shared-rules.json -> linksChecklist.followingARow). A class row never depends on a row and is never one a row depends on (#385).",
       "reach": "two steps",
       "appliesWhen": "a page is published from the links checklist",
       "datesAreDays": "The offer carries a calendar day (YYYY-MM-DD, the day the class's own value names as written, never converted to another time zone), because that is what the apps write - the same CalendarDay the assistant's date moves carry. A page's date is therefore KEPT as that day, not copied character for character (director's ruling N9).",
       "whyNotAtBuildTime": "Two steps is a rule for HIDDEN pages at the moment the teacher publishes them, never a build-time rule. At build time it would rewrite VISIBLE pages on every build through hubs: measured 2026-09-25, Day 1 claimed 98 of the 105 pages EXC2O's first build rewrote, and ICS4U 133 of 136 through Learning Goals (atBuildTime.reach). And dating a hidden step-2 page at build time would write Unit 1, Day 1's date into SNC1W's Final Examination while it is still hidden; published later by its own flag it would go out dated Day 1.",
-      "ticking": "Every row in the two page groups starts TICKED, except a page that a HIDDEN class links directly while NO visible class does: that page is a later class's material, starts UNTICKED, and says which hidden class uses it first (firstUsedIn - the earliest by date, then title). Class rows always start unticked. Russell's decision 1 (2026-09-29) and the director's ruling on the plan's Q1 as narrowed by plan-review finding 5: measured over the 39 payloads, a default-ticked sheet straight after Get Ready (#96) would offer a median of 56 pages (16-82), e.g. SNC1W's Final Examination dated Unit 1, Day 1 through How Marks Work - one press would undo Get Ready and misdate the year. A page a VISIBLE class links directly stays ticked even when a hidden class links it too: it is material of a class students can already open.",
+      "ticking": "Every row in the two page groups starts TICKED, except a page that a HIDDEN class links directly while NO visible class does: that page is a later class's material, starts UNTICKED, and says which hidden class uses it first (firstUsedIn - the earliest by date, then title). Class rows always start unticked. Russell's decision 1 (2026-09-29) and the director's ruling on the plan's Q1 as narrowed by plan-review finding 5: measured over the 39 payloads, a default-ticked sheet straight after Get Ready (#96) would offer a median of 56 pages (16-82), e.g. SNC1W's Final Examination dated Unit 1, Day 1 through How Marks Work - one press would undo Get Ready and misdate the year. A page a VISIBLE class links directly stays ticked even when a hidden class links it too: it is material of a class students can already open. A row's tick is its OWN: a row with `dependsOn` keeps the tick this rule gives it, and is published only when one of those rows is (shared-rules.json -> linksChecklist.followingARow) - the build never copies a row's tick into the rows under it (#385).",
       "tickedAnyway": "A row that started unticked and is ticked by the teacher takes the date its group gives it (step 2: the claiming visible class's; the other group: the first class of the year) - the row shows that date, so the teacher sees what ticking it means.",
       "firstClassException": "Recorded so nobody 'fixes' it (plan-review N8): a page a visible class links DIRECTLY takes that class's date from the BUILD on every build, hidden or not, even when the page was published before and hidden again - so for those pages the build's rule (atBuildTime) wins over publishedBeforeIsRecorded. Decision 4 governs step-2 and other-group pages.",
-      "howTheCasesRun": "Each case lays out pages by their place in the course folder, the way test_links_into_hidden_pages.py does (a page in section1/ lands at the top of the merged content; every page is remembered against its source). A page is a class when its name is a class page's (section1/All Classes/Unit x, Day y). `visible` false writes `publish: false`; `created` is written as the page's date; `links` are [[...]] lines; `published` true puts the page in the section's published-pages record. `expect` maps a page's place to the row the offer must carry for it - only the keys given are compared (null means null); `expectAbsent` lists places that must not be offered at all; `expectNoOffer` true means the offer is empty and no file is written. Run by the build (scripts/test_links_checklist.py) in the image under verify.sh and on Windows by PythonToolchainTests.",
+      "howTheCasesRun": "Each case lays out pages by their place in the course folder, the way test_links_into_hidden_pages.py does (a page in section1/ lands at the top of the merged content; every page is remembered against its source). A page is a class when its name is a class page's (section1/All Classes/Unit x, Day y). `visible` false writes `publish: false`; `created` is written as the page's date; `links` are [[...]] lines; `published` true puts the page in the section's published-pages record. `expect` maps a page's place to the row the offer must carry for it - only the keys given are compared (null means null); `expectAbsent` lists places that must not be offered at all; `expectNoOffer` true means the offer is empty and no file is written. `dependsOn` in `expect` is compared as an ordered list, and every case since #385 names `dependsOn` for every row it expects. Run by the build (scripts/test_links_checklist.py) in the image under verify.sh and on Windows by PythonToolchainTests.",
       "cases": [
         {
           "name": "a. two steps away takes the class's date",
@@ -787,6 +787,361 @@
             }
           ],
           "expectNoOffer": true
+        },
+        {
+          "name": "l. a page reached only through an offered page is listed under it, one row at a time down a chain",
+          "pages": [
+            {
+              "path": "section1/All Classes/Unit 1, Day 1",
+              "visible": true,
+              "created": "2026-09-08T07:00:00.000+0000",
+              "links": []
+            },
+            {
+              "path": "Resources/Useful Links",
+              "visible": true,
+              "links": [
+                "Hidden A"
+              ]
+            },
+            {
+              "path": "Resources/Hidden A",
+              "visible": false,
+              "links": [
+                "Hidden B"
+              ]
+            },
+            {
+              "path": "Resources/Hidden B",
+              "visible": false,
+              "links": [
+                "Hidden C"
+              ]
+            },
+            {
+              "path": "Resources/Hidden C",
+              "visible": false,
+              "links": []
+            }
+          ],
+          "expect": {
+            "Resources/Hidden A": {
+              "group": "notReachedByAClass",
+              "ticked": true,
+              "dependsOn": []
+            },
+            "Resources/Hidden B": {
+              "group": "notReachedByAClass",
+              "ticked": true,
+              "dependsOn": [
+                "Resources/Hidden A"
+              ]
+            },
+            "Resources/Hidden C": {
+              "group": "notReachedByAClass",
+              "ticked": true,
+              "dependsOn": [
+                "Resources/Hidden B"
+              ]
+            }
+          }
+        },
+        {
+          "name": "m. a page two offered pages link, and no visible page, depends on both, the nearer first; a visible page's link frees it",
+          "pages": [
+            {
+              "path": "section1/All Classes/Unit 1, Day 1",
+              "visible": true,
+              "created": "2026-09-08T07:00:00.000+0000",
+              "links": []
+            },
+            {
+              "path": "Resources/Useful Links",
+              "visible": true,
+              "links": [
+                "Hub",
+                "Hidden A",
+                "Also Linked"
+              ]
+            },
+            {
+              "path": "Resources/Hub",
+              "visible": false,
+              "links": [
+                "Shared",
+                "Also Linked"
+              ]
+            },
+            {
+              "path": "Resources/Hidden A",
+              "visible": false,
+              "links": [
+                "Hidden B"
+              ]
+            },
+            {
+              "path": "Resources/Hidden B",
+              "visible": false,
+              "links": [
+                "Shared"
+              ]
+            },
+            {
+              "path": "Resources/Shared",
+              "visible": false,
+              "links": []
+            },
+            {
+              "path": "Resources/Also Linked",
+              "visible": false,
+              "links": []
+            }
+          ],
+          "expect": {
+            "Resources/Shared": {
+              "dependsOn": [
+                "Resources/Hub",
+                "Resources/Hidden B"
+              ]
+            },
+            "Resources/Also Linked": {
+              "dependsOn": []
+            },
+            "Resources/Hub": {
+              "dependsOn": []
+            }
+          }
+        },
+        {
+          "name": "n. pages that link only each other depend on each other and on the row that reaches them",
+          "pages": [
+            {
+              "path": "section1/All Classes/Unit 1, Day 1",
+              "visible": true,
+              "created": "2026-09-08T07:00:00.000+0000",
+              "links": []
+            },
+            {
+              "path": "Resources/Useful Links",
+              "visible": true,
+              "links": [
+                "Hub"
+              ]
+            },
+            {
+              "path": "Resources/Hub",
+              "visible": false,
+              "links": [
+                "A"
+              ]
+            },
+            {
+              "path": "Resources/A",
+              "visible": false,
+              "links": [
+                "B"
+              ]
+            },
+            {
+              "path": "Resources/B",
+              "visible": false,
+              "links": [
+                "A"
+              ]
+            }
+          ],
+          "expect": {
+            "Resources/Hub": {
+              "dependsOn": []
+            },
+            "Resources/A": {
+              "dependsOn": [
+                "Resources/Hub",
+                "Resources/B"
+              ]
+            },
+            "Resources/B": {
+              "dependsOn": [
+                "Resources/A"
+              ]
+            }
+          }
+        },
+        {
+          "name": "o. a step-two page behind a hidden step-one page depends on it, and a page behind that one does too, from the other group",
+          "pages": [
+            {
+              "path": "section1/All Classes/Unit 1, Day 1",
+              "visible": true,
+              "created": "2026-09-08T07:00:00.000+0000",
+              "links": [
+                "Hub"
+              ]
+            },
+            {
+              "path": "Concepts/Hub",
+              "visible": false,
+              "links": [
+                "Worksheet"
+              ]
+            },
+            {
+              "path": "Exercises/Worksheet",
+              "visible": false,
+              "links": [
+                "Deep"
+              ]
+            },
+            {
+              "path": "Exercises/Deep",
+              "visible": false,
+              "links": []
+            }
+          ],
+          "expect": {
+            "Concepts/Hub": {
+              "group": "fromAClass",
+              "step": 1,
+              "dependsOn": []
+            },
+            "Exercises/Worksheet": {
+              "group": "fromAClass",
+              "step": 2,
+              "date": "2026-09-08",
+              "why": "dated",
+              "dependsOn": [
+                "Concepts/Hub"
+              ]
+            },
+            "Exercises/Deep": {
+              "group": "notReachedByAClass",
+              "date": "2026-09-08",
+              "why": "datedAsTheFirstClass",
+              "dependsOn": [
+                "Exercises/Worksheet"
+              ]
+            }
+          }
+        },
+        {
+          "name": "p. a hidden class is never a row's parent, and never listed under another row",
+          "pages": [
+            {
+              "path": "section1/All Classes/Unit 1, Day 1",
+              "visible": true,
+              "created": "2026-09-08T07:00:00.000+0000",
+              "links": []
+            },
+            {
+              "path": "Resources/Useful Links",
+              "visible": true,
+              "links": [
+                "Hub",
+                "Unit 3, Day 1"
+              ]
+            },
+            {
+              "path": "Resources/Hub",
+              "visible": false,
+              "links": [
+                "Worksheet",
+                "Unit 4, Day 1"
+              ]
+            },
+            {
+              "path": "section1/All Classes/Unit 3, Day 1",
+              "visible": false,
+              "created": "2026-10-30T07:00:00.000+0000",
+              "links": [
+                "Worksheet"
+              ]
+            },
+            {
+              "path": "section1/All Classes/Unit 4, Day 1",
+              "visible": false,
+              "created": "2026-11-20T08:00:00.000+0000",
+              "links": []
+            },
+            {
+              "path": "Exercises/Worksheet",
+              "visible": false,
+              "links": []
+            }
+          ],
+          "expect": {
+            "Exercises/Worksheet": {
+              "group": "notReachedByAClass",
+              "ticked": false,
+              "firstUsedIn": "section1/All Classes/Unit 3, Day 1",
+              "dependsOn": [
+                "Resources/Hub"
+              ]
+            },
+            "section1/All Classes/Unit 3, Day 1": {
+              "group": "class",
+              "dependsOn": []
+            },
+            "section1/All Classes/Unit 4, Day 1": {
+              "group": "class",
+              "dependsOn": []
+            }
+          }
+        },
+        {
+          "name": "q. a page under a page that starts unticked keeps its own tick",
+          "pages": [
+            {
+              "path": "section1/All Classes/Unit 1, Day 1",
+              "visible": true,
+              "created": "2026-09-08T07:00:00.000+0000",
+              "links": [
+                "How Marks Work"
+              ]
+            },
+            {
+              "path": "section1/All Classes/Unit 5, Day 20",
+              "visible": false,
+              "created": "2026-12-18T08:00:00.000+0000",
+              "links": [
+                "Final Examination"
+              ]
+            },
+            {
+              "path": "Setup/How Marks Work",
+              "visible": true,
+              "links": [
+                "Final Examination"
+              ]
+            },
+            {
+              "path": "Assessments/Final Examination",
+              "visible": false,
+              "links": [
+                "Formula Sheet"
+              ]
+            },
+            {
+              "path": "Assessments/Formula Sheet",
+              "visible": false,
+              "links": []
+            }
+          ],
+          "expect": {
+            "Assessments/Final Examination": {
+              "group": "fromAClass",
+              "step": 2,
+              "ticked": false,
+              "dependsOn": []
+            },
+            "Assessments/Formula Sheet": {
+              "group": "notReachedByAClass",
+              "ticked": true,
+              "firstUsedIn": null,
+              "dependsOn": [
+                "Assessments/Final Examination"
+              ]
+            }
+          }
         }
       ]
     },

@@ -31,7 +31,12 @@ final class LinksChecklistSheetModel: Identifiable {
     /// How many hidden pages each class row would bring if ticked, by place.
     let broughtByClass: [String: Int]
 
-    /// The places ticked right now.
+    /// How the sheet names pages — #362's builder, over the whole section
+    /// (#385).
+    let naming: LinksChecklistNaming
+
+    /// The places whose OWN tick is on right now. What is shown ticked, and
+    /// published, is `going` (#385).
     var ticked: Set<String>
 
     private(set) var stage: Stage = .choosing
@@ -58,12 +63,19 @@ final class LinksChecklistSheetModel: Identifiable {
         return rowsIn(.aClass)
     }
 
+    /// The rows that go: shown ticked, counted on the button, written by
+    /// Publish (`linksChecklist.followingARow`).
+    var going: Set<String> {
+        return LinksChecklistGate.going(rows, ticked: ticked)
+    }
+
     var publishButtonTitle: String {
-        if ticked.isEmpty {
+        let count: Int = going.count
+        if count == 0 {
             return LinksChecklistWording.publishNothingTicked
         }
         return LinksChecklistWording.publishButton(
-            count: String(ticked.count), pages: LinksChecklistWording.pageWord(ticked.count)
+            count: String(count), pages: LinksChecklistWording.pageWord(count)
         )
     }
 
@@ -87,6 +99,10 @@ final class LinksChecklistSheetModel: Identifiable {
         let pages: [String: AssistSectionPage] = LinksChecklistPublisher.pagesByPlace(graph, in: course)
         let stillOffered: [LinksChecklistOffer.Row] = LinksChecklistPublisher.rowsStillOffered(offer, pages: pages)
         self.rows = stillOffered
+        self.naming = LinksChecklistNaming(
+            graph: graph, pagesByPlace: pages, rows: offer.rows,
+            courseDirectoryURL: course.directoryURL, courseCode: course.code
+        )
         var brought: [String: Int] = [:]
         var startingTicks: Set<String> = []
         for row in stillOffered {
@@ -122,6 +138,28 @@ final class LinksChecklistSheetModel: Identifiable {
         return found
     }
 
+    /// The rows listed under one heading, each with how far in it is shown:
+    /// a row reached only through another is listed under it (#385).
+    func shownRows(in group: LinksChecklistOffer.Group) -> [LinksChecklistGate.ShownRow] {
+        var found: [LinksChecklistGate.ShownRow] = []
+        for shown in LinksChecklistGate.shownOrder(rows) where shown.group == group {
+            found.append(shown)
+        }
+        return found
+    }
+
+    /// True when the row comes under rows none of which is going: shown
+    /// unticked, and it cannot be ticked until one of them is.
+    func isLocked(_ row: LinksChecklistOffer.Row) -> Bool {
+        return LinksChecklistGate.isLocked(row, going: going)
+    }
+
+    /// What the row is called: the page's title, with its folder when another
+    /// page in the section has the same title (#385).
+    func rowTitle(for row: LinksChecklistOffer.Row) -> String {
+        return naming.rowTitle(of: row)
+    }
+
     /// What a row says under its title: what date it will have, or why it
     /// starts unticked, and where it is linked from.
     func secondLine(for row: LinksChecklistOffer.Row) -> String {
@@ -136,17 +174,29 @@ final class LinksChecklistSheetModel: Identifiable {
             return parts.joined(separator: " · ")
         }
         if let firstUsedIn = row.firstUsedIn, !ticked.contains(row.place) {
-            parts.append(LinksChecklistWording.firstUsedIn(class: LinksChecklistOffer.name(ofPlace: firstUsedIn)))
+            parts.append(LinksChecklistWording.firstUsedIn(name: naming.name(ofPlace: firstUsedIn)))
         } else {
             parts.append(dateLine(for: row))
         }
-        if let first = row.linkedFrom.first {
-            let name: String = LinksChecklistOffer.name(ofPlace: first)
+        if let first = row.dependsOn.first {
+            // Reached only through other rows (#385): say which, and that it
+            // goes with them, instead of every page that links it.
+            let name: String = naming.name(ofPlace: first)
+            let more: Int = row.dependsOn.count - 1
+            if more == 0 {
+                parts.append(LinksChecklistWording.linkedFromRow(name: name))
+            } else {
+                parts.append(LinksChecklistWording.linkedFromSeveralRows(
+                    name: name, count: String(more), pages: LinksChecklistWording.pageWord(more)
+                ))
+            }
+        } else if let first = row.linkedFrom.first {
+            let name: String = naming.name(ofPlace: first)
             if row.linkedFrom.count == 1 {
-                parts.append(LinksChecklistWording.linkedFrom(page: name))
+                parts.append(LinksChecklistWording.linkedFrom(name: name))
             } else {
                 parts.append(LinksChecklistWording.linkedFromSeveral(
-                    page: name, count: String(row.linkedFrom.count - 1)
+                    name: name, count: String(row.linkedFrom.count - 1)
                 ))
             }
         }
@@ -154,15 +204,15 @@ final class LinksChecklistSheetModel: Identifiable {
     }
 
     func dateLine(for row: LinksChecklistOffer.Row) -> String {
-        let claimant: String = LinksChecklistOffer.name(ofPlace: row.claimedBy ?? "")
+        let claimant: String = naming.name(ofPlace: row.claimedBy ?? "")
         switch row.why {
         case .dated:
-            return LinksChecklistWording.datedLike(class: claimant)
+            return LinksChecklistWording.datedLike(name: claimant)
         case .datedByTheBuild:
-            return LinksChecklistWording.alreadyDatedLike(class: claimant)
+            return LinksChecklistWording.alreadyDatedLike(name: claimant)
         case .datedAsTheFirstClass:
             return LinksChecklistWording.datedAsTheFirstClass(
-                first: LinksChecklistOffer.name(ofPlace: offer.firstClassPlace ?? "")
+                name: naming.name(ofPlace: offer.firstClassPlace ?? "")
             )
         case .keepsItsDate:
             return LinksChecklistWording.keepsItsDate
@@ -171,17 +221,17 @@ final class LinksChecklistSheetModel: Identifiable {
         }
     }
 
+    /// Shows whether the row GOES; changes only its OWN tick (#385).
     func binding(for row: LinksChecklistOffer.Row) -> Binding<Bool> {
         return Binding(
             get: { [weak self] in
-                return self?.ticked.contains(row.place) ?? false
+                return self?.going.contains(row.place) ?? false
             },
             set: { [weak self] isOn in
-                if isOn {
-                    self?.ticked.insert(row.place)
-                } else {
-                    self?.ticked.remove(row.place)
+                guard let self else {
+                    return
                 }
+                self.ticked = LinksChecklistGate.toggled(self.ticked, place: row.place, isOn: isOn)
             }
         )
     }
@@ -231,6 +281,10 @@ struct LinksChecklistSheet: View {
 
     @Environment(\.dismiss) var dismiss
 
+    /// How far in a row listed under another is drawn, per level. Capped at
+    /// three levels so a long chain cannot push the text off the sheet.
+    static let indentPerLevel: CGFloat = 18
+
     // MARK: - Computed properties
 
     /// The same cap Copy a Page's checklist uses (#365), and for the same
@@ -267,9 +321,9 @@ struct LinksChecklistSheet: View {
                 .fixedSize(horizontal: false, vertical: true)
             CappedScrollArea(cap: LinksChecklistSheet.tallestList) {
                 VStack(alignment: .leading, spacing: 10) {
-                    group(LinksChecklistWording.fromAClassHeading, rows: model.fromAClassRows)
-                    group(LinksChecklistWording.notReachedHeading, rows: model.otherRows)
-                    group(LinksChecklistWording.classesHeading, rows: model.classRows)
+                    group(LinksChecklistWording.fromAClassHeading, rows: model.shownRows(in: .fromAClass))
+                    group(LinksChecklistWording.notReachedHeading, rows: model.shownRows(in: .notReachedByAClass))
+                    group(LinksChecklistWording.classesHeading, rows: model.shownRows(in: .aClass))
                 }
             }
             if !model.classRows.isEmpty {
@@ -283,8 +337,8 @@ struct LinksChecklistSheet: View {
             let count: Int = outcome.publishedPlaces.count
             Text(LinksChecklistWording.published(count: String(count), pages: LinksChecklistWording.pageWord(count)))
                 .fixedSize(horizontal: false, vertical: true)
-            ForEach(outcome.changedSince, id: \.self) { title in
-                Text(LinksChecklistWording.pageChangedSince(page: title))
+            ForEach(outcome.changedSince, id: \.self) { name in
+                Text(LinksChecklistWording.pageChangedSince(name: name))
                     .foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -300,23 +354,26 @@ struct LinksChecklistSheet: View {
     }
 
     @ViewBuilder
-    func group(_ heading: String, rows: [LinksChecklistOffer.Row]) -> some View {
+    func group(_ heading: String, rows: [LinksChecklistGate.ShownRow]) -> some View {
         if !rows.isEmpty {
             VStack(alignment: .leading, spacing: 4) {
                 Text(heading)
                     .font(.subheadline.weight(.semibold))
-                ForEach(rows) { row in
+                ForEach(rows, id: \.row.place) { shown in
+                    let row: LinksChecklistOffer.Row = shown.row
                     Toggle(isOn: model.binding(for: row)) {
                         VStack(alignment: .leading, spacing: 1) {
-                            Text(row.title)
+                            Text(model.rowTitle(for: row))
                             Text(model.secondLine(for: row))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
+                    .disabled(model.isLocked(row))
+                    .padding(.leading, CGFloat(min(shown.depth, 3)) * LinksChecklistSheet.indentPerLevel)
                     // On the control, never its label: see `CopyPageChecklist.row`.
-                    .accessibilityLabel(row.title)
+                    .accessibilityLabel(model.rowTitle(for: row))
                     .accessibilityValue(model.secondLine(for: row))
                     .accessibilityIdentifier("linksChecklistRow-\(row.place)")
                 }
@@ -341,7 +398,7 @@ struct LinksChecklistSheet: View {
                     onPublished()
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(model.ticked.isEmpty)
+                .disabled(model.going.isEmpty)
                 .accessibilityIdentifier("linksChecklistPublish")
             case .done, .problem:
                 Button("Done") {
