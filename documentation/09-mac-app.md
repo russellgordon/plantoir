@@ -1187,7 +1187,9 @@ issue #220 one level down — a line that will be believed.
    beyond the first process as busy, left-over work included. So a folder
    holding only left-over work keeps the virtual machine running at quit —
    the safe direction for a path that stops things wholesale, and outside
-   #378's scope. Its next preview, publish or set-up ends the leftover.
+   #378's scope. The leftover is ended the next time a launcher has to set the
+   folder up again (after an update, for example); until then it is
+   harmless, but this quit path keeps the virtual machine running for it.
 
 Check 1 exists because check 2 is **blind to the long windows**. A launcher
 that has to build the image, start Colima or download the pinned tools does all

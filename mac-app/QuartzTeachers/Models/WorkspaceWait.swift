@@ -68,7 +68,9 @@ enum WorkspaceWords {
         guard let slash = place.firstIndex(of: "/") else {
             return ("", "")
         }
-        let course: String = String(place[place.startIndex..<slash])
+        // A course code may carry one space ("AP CALC"); the launchers write
+        // it with "+" so every marker stays one word per field (#378 review S1).
+        let course: String = String(place[place.startIndex..<slash]).replacingOccurrences(of: "+", with: " ")
         let section: String = String(place[place.index(after: slash)...])
         return (course, section)
     }
@@ -244,7 +246,9 @@ struct LeftoverWorkReport: Equatable {
         for item in items {
             parts.append(WorkspaceWords.leftover(item))
         }
-        var sentence: String = LeftoverWorkReport.line.replacingOccurrences(of: "{place}", with: place)
+        var sentence: String = LeftoverWorkReport.line.replacingOccurrences(
+            of: "{place}", with: place.replacingOccurrences(of: "+", with: " ")
+        )
         sentence = sentence.replacingOccurrences(of: "{what}", with: WorkspaceWords.joined(parts))
         return sentence
     }
@@ -319,7 +323,9 @@ struct LeftoverWorkReport: Equatable {
             return false
         }
         for character in text.unicodeScalars {
-            let allowed: Bool = CharacterSet.alphanumerics.contains(character) || character == "-" || character == "_" || character == "."
+            // "+" stands for the one space a course code may carry.
+            let allowed: Bool = CharacterSet.alphanumerics.contains(character) || character == "-"
+                || character == "_" || character == "." || character == "+"
             if !allowed {
                 return false
             }

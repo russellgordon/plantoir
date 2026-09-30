@@ -1305,8 +1305,10 @@ scheduled run of C/S; this one lives inside the block, because setup.sh and
 deploy.sh need it too. They were written the same night on separate branches
 and were not merged into one helper then; the scheduled-label rule (course
 sanitized, `section<N>` followed by a dot) is the part that must stay the
-same in both, and folding the guard's reader into `the_owners_of_the_work`
-is the follow-up.
+same in both — and already is not quite: #378's fix round reads a course
+code with a space whole, #381's guard still reads two words. Folding them
+into one helper is [#388](https://github.com/russellgordon/plantoir/issues/388)
+(v1.4.2).
 
 **Two fail-safes, and they point different ways.** A process table that cannot
 be read counts as every owner RUNNING (a wait and a refusal are recoverable;
@@ -1341,6 +1343,17 @@ build-started marker, #265). A Netlify or Cloudflare upload stopped mid-way
 leaves the live site as it was (they publish only once every file is up). A
 folder deploy never runs in the workspace. In every case the owner was gone,
 so nothing would ever have finished the work either.
+
+**A course code with a space** ("AP CALC", which `CourseCodeRule` allows)
+is read to the next ` --` rather than the first blank, carried with `+` for
+the space through the look's pieces and the markers, and a launcher is
+matched by the text its arguments BEGIN with ("AP CALC 1 "), never word by
+word — read word by word, a live preview of AP CALC was course AP, section
+CALC, and was stopped as left over with a false line (#378 review S1). A
+process table that answers but does not list THIS run is treated as
+unreadable (review N6). A leftover is ended only when a launcher next has to
+set the folder up again; until then it is harmless, though the quit path
+keeps the virtual machine running for it (review N2).
 
 **Known limits, not closed.** The owner test is folder-blind: another working
 folder's launcher for the same course and section makes this folder's
