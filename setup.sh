@@ -418,9 +418,10 @@ say_this_folder_cannot_be_reached() {
 # the_launchers_running PLACES [NAME] [ID]
 #   PLACES  the places asked about, ";"-joined (an awk -v value cannot hold a
 #           newline), each "<course> <section>" with "+" for a space in the
-#           course (CourseCodeRule refuses a "+"; the command-line setup
-#           does not, and a course like "C++" is then misread — see
-#           whatCountsAsRunning.knownLimits). The course may be empty. The
+#           course (CourseCodeRule refuses a "+", and since #402 so does the
+#           command-line setup; a course made before #402, or given a
+#           course_config.json by hand, can still be "C++" and is then
+#           misread — see whatCountsAsRunning.knownLimits). The course may be empty. The
 #           caller answers work holding ";" or "\" itself: either would
 #           shift the places' numbers (the_owners_of_the_work).
 #   NAME/ID a website builder by its name and its id: a `docker exec` aimed
@@ -2253,7 +2254,8 @@ WORKSPACE_LEFTOVERS=""
 #
 # A course code may carry one space ("AP CALC", CourseCodeRule), so the
 # course in "$1" is written with "+" for the space (CourseCodeRule refuses
-# a "+"; the command-line setup does not — knownLimits), and the_launchers_running compares a launcher's arguments as the text
+# a "+", and since #402 so does the command-line setup; a course made before
+# #402 or by hand can still carry one — knownLimits), and the_launchers_running compares a launcher's arguments as the text
 # that follows the launcher's name — "AP CALC 1 …" begins with "AP CALC 1 " — never word by
 # word (#378 review S1: word by word, a live preview of AP CALC read as
 # course AP, section CALC, and was stopped as left over).
@@ -2262,8 +2264,10 @@ the_owners_of_the_work() {
   # A course holding ";" (the PLACES separator) or "\" (which awk -v reads
   # as the start of an escape, "\073" being ";") would shift every later
   # place's number onto the wrong piece, and a live preview of ANOTHER
-  # course would read as gone. No app can make such a code, but the
-  # command-line setup can (knownLimits), so the answer is the safe one:
+  # course would read as gone. No app can make such a code, nor since #402
+  # can the command-line setup, but a course made before #402 or given a
+  # course_config.json by hand still can (knownLimits), so the answer is
+  # the safe one:
   # every piece owned, a wait rather than a guess (#388 impl review S1).
   case "$1" in
     *";"*|*"\\"*)
