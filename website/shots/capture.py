@@ -1124,8 +1124,8 @@ def provision_marketing(folder: Path) -> int:
     the launchers and build recipe; ICS3U (1, 2) and ICS4U (1) through the
     app; the College Board pages from the public document (fetched once into
     .sources/, hash-checked), into both courses; each course's correlation
-    embeds, ICS4U's declared second curriculum, How I Teach and the folder
-    destination (marketing_folder.py); and a reference copy of ICS3U for
+    embeds and folder destination, ICS4U's declared second curriculum and
+    How I Teach (marketing_folder.py); and a reference copy of ICS3U for
     2025–26, through the app. Declaring ICS3U's second curriculum is NOT
     here: the curriculum-settings scene does it through Course Settings,
     because that is the picture.
