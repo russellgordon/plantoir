@@ -1009,13 +1009,9 @@ struct SectionDetailView: View {
         if let buildId = model.offer.buildId {
             linksChecklistBuildsHandled.insert(buildId)
         }
-        var ticked: Int = 0
-        for row in model.rows where model.ticked.contains(row.place) {
-            ticked += 1
-        }
         ActivityTrail.note(
             .linksChecklistOffered,
-            LinksChecklistPublisher.offeredLine(model.rows, ticked: ticked, occasion: model.occasion),
+            LinksChecklistPublisher.offeredLine(model: model),
             course: course.code, section: sectionNumber
         )
         linksChecklist = model

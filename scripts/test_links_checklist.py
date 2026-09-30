@@ -150,6 +150,37 @@ class OfferRuleTests(unittest.TestCase):
                 self.assertIn(row["group"], _load("file-formats", "linksChecklistOffer", "groups"))
                 self.assertIn(row["why"], _load("file-formats", "linksChecklistOffer", "whyValues"))
 
+    def test_a_row_is_listed_under_a_row_that_is_offered_and_never_under_itself(self):
+        """#385 (shared-rules.json -> linksChecklist.followingARow): every
+        place a row depends on is a NON-CLASS row of the same offer and never
+        the row itself; a class row depends on nothing; and following each
+        row's FIRST parent always ends, so the sheet's nesting cannot loop."""
+        rows_seen = 0
+        for case in self.rule["cases"]:
+            document, _, _ = self.offer_for(case)
+            if document is None:
+                continue
+            rows = rows_by_place(document)
+            for place, row in rows.items():
+                rows_seen += 1
+                with self.subTest(case=case["name"], place=place):
+                    if row["group"] == "class":
+                        self.assertEqual(row["dependsOn"], [], "A class row depends on another row")
+                    for parent in row["dependsOn"]:
+                        self.assertNotEqual(parent, place, "A row depends on itself")
+                        self.assertIn(parent, rows, f"“{parent}” is not a row of this offer")
+                        self.assertNotEqual(rows[parent]["group"], "class", "A class row is a parent")
+                    self.assertEqual(len(row["dependsOn"]), len(set(row["dependsOn"])),
+                                     "A parent is named twice")
+                    visited = set()
+                    current = place
+                    while rows[current]["dependsOn"]:
+                        self.assertNotIn(current, visited,
+                                         f"Following the first parent from “{place}” loops")
+                        visited.add(current)
+                        current = rows[current]["dependsOn"][0]
+        self.assertGreater(rows_seen, 0)
+
 
 class OfferFileTests(unittest.TestCase):
     """shared-rules.json -> linksChecklist.buildCases: what the build does

@@ -6805,8 +6805,9 @@ code for a page at the top of the course folder). The title is the app's one
 naming rule — `AssistSectionPage.displayTitle`: front matter title, else the
 file name as written, else the folder for an `index.md` — which the assistant,
 the publish plan and the re-date planner already use; the "(in …)" suffix is
-this sheet's alone, so do not copy it into the assistant's replies without
-deciding to. One builder, `StartOfYearPlan.line(for:first:)` (`draftLine`),
+this sheet's and the links checklist's (#385 reuses `StartOfYearPageNaming`
+through `LinksChecklistNaming` — see "The links checklist (#379)" below), so do
+not copy it into the assistant's replies without deciding to. One builder, `StartOfYearPlan.line(for:first:)` (`draftLine`),
 serves both disclosure lists AND the MCP plan text (`describe()`), and the
 links-left list takes the same name. "Shares a title" is decided across EVERY
 page the section's graph read, not within the list shown — a "Notes" going into
@@ -6908,6 +6909,52 @@ links checklist (#379)"); this is the app's half.
   record the answer (`.publish_state/section<N>.links-checklist-answered.json`,
   the app's own file): the same set is not offered again on its own, a page
   joining it brings it back, and a page the teacher unticked starts unticked.
+- **Rows that come under another row (#385).** A row whose offer entry
+  carries `dependsOn` (no page students can see links it; only other offered
+  rows do — 05 → "Rows that come under another row") is listed UNDER
+  `dependsOn[0]`, inside that row's group, indented 18 pt a level (capped at
+  three levels; `LinksChecklistGate.shownOrder`, which keeps a visited set for
+  a hand-edited file). What the checkbox SHOWS is whether the row GOES
+  (`LinksChecklistGate.going`: own tick on, and no `dependsOn` or one of those
+  rows goes — the LEAST fixed point, so two hidden pages that link only each
+  other never go through each other). A row with `dependsOn` none of which
+  goes is LOCKED: shown unticked and `.disabled`, its own tick kept, never
+  written. The checkbox changes only its own row's tick
+  (`LinksChecklistGate.toggled`) — copying the tick down was measured and
+  rejected: all 44 payload rows under another row start unticked because a
+  later class uses them first, and ticking SNC1W's Final Examination would
+  tick ten pages of later units. It is the Copy a Page lock inverted: there a
+  row is locked TICKED while something that shows it is going; here it is
+  locked UNTICKED while nothing it comes under is going. The second line
+  says "linked from “Hub” — it goes when that page goes" (or "… and N
+  more hidden pages — it goes when one of them goes"; `linkedFromRow`,
+  `linkedFromSeveralRows`) instead of the plain "linked from" part. Never
+  "ONLY linked from": the implementation review (S1) found that every one of
+  the 44 measured rows is also "first used in" a hidden class, whose link
+  `dependsOn` leaves out by design, so "only" was false in the common case
+  (naming case 2 pins it). The Publish button counts rows that go and is disabled when
+  none does. **The re-read** frees the rows under a page made visible before
+  the sheet OPENED (their `dependsOn` becomes empty — a visible page links
+  them now), drops a gone page from other rows' `dependsOn`, and drops a row
+  left with nothing it could go with, repeated to a fixed point. Nothing is
+  freed at Publish (plan-review finding 2): `plan()` works out `going` from
+  the rows as the sheet showed them, less pages gone since, so a row shown
+  locked is not published because its hub was made visible while the sheet
+  was open (publish case iv-i). A row shown going that is left because its
+  hub has gone since is named in the "changed since it was checked" lines.
+  **Answered file:** only rows whose OWN tick was off are remembered as
+  unticked, so a row left with its hub comes back with it next time.
+- **Names (#385's notes).** Rows and second lines name pages the way #362's
+  plan does, with the same builder: `LinksChecklistNaming` computes
+  `sharedTitles` over every page of the section's graph (not only the rows —
+  a row whose twin stays visible is still told apart), names a page in a
+  sentence with `StartOfYearPageNaming.name` (`“Title”`, or `“Title” (in
+  Folder)`), and a row's own title with `displayTitle` or `rowInFolder`
+  ("Notes (in Zeta)"). An untitled folder `index.md` is called by its folder
+  (`displayName`'s step 2). A page gone since the offer keeps the build's
+  title (not its file name); a place that is not a row falls back to its last
+  part. The build's own `title` is left as it is (`title_of` feeds class
+  detection).
 - **Publish** (`LinksChecklistPublisher`): refused while the course is being
   published; ONE merged plan — the ticked pages through
   `AssistPublishPlanner.planPublishing(exactly:dateMoves:)` with the offer's
@@ -6928,15 +6975,31 @@ links checklist (#379)"); this is the app's half.
   its own change. Not in `DeployCommand.releaseSite`, which runs only for a
   NEW website (plan review, finding 12).
 - **Trail:** "offered to publish pages that links lead to" (occasion and
-  counts), "published pages that links led to" (counts and at most ten
-  places), "left pages hidden that links lead to" (Not Now or some unticked).
+  counts — since #385 also how many are listed under another page, and
+  "ticked" counts rows that GO, computed by `offeredLine(model:)` rather than
+  at the call sites), "published pages that links led to" (counts, "left
+  unticked" and "left with the page they come under" separately, and at most
+  ten places), "left pages hidden that links lead to" (Not Now or some
+  unticked; EVERY page left hidden, with how many only because the page they
+  come under was, in brackets — written when that total is above 0).
 - **Known limits, recorded from the implementation review (2026-09-30):**
   the front page not moving (F1) holds for THIS press only — the next
   assistant publish or hide repoints it by `mostRecentVisibleClass`, which may
   then pick a future class ticked here (N10); a row a ticked class also brings
   but that shows no "first used in" line (case k, or a group-2 row the class
   reaches) is published with the class even if unticked, and the class's line
-  gives only a count (N2, the allowed cut; #385 is the place to close it); a
+  gives only a count (N2, the allowed cut). #385 did NOT close it and widened
+  it: a row under an unticked row is now shown LOCKED and unticked even when a
+  ticked class reaches it and will publish it (the counts stay honest — it is
+  not "left hidden" — the checkbox does not). Both variants are
+  [#398](https://github.com/russellgordon/plantoir/issues/398) "Links
+  checklist: show the rows a ticked class brings as coming with it (N2)"
+  (`linksChecklist.followingARow.knownLimit`); a row that goes only through a
+  page the writer then DECLINES (no room for a key, #186) is still published
+  with nothing students can see linking it — `going` is worked out before the
+  writer runs, and the teacher is told only that the page above it was
+  declined; rare, recorded in the same `knownLimit`, not handled (#385's
+  implementation review, note 2); a
   page published from the checklist and later hidden again by hand, with a
   visible page still linking to it, is in the answered set, so neither the
   alert nor the checklist returns for it until a rollover — the menu item
@@ -6954,6 +7017,13 @@ links checklist (#379)"); this is the app's half.
   check; the marker; every routing branch; freshness; the contract's
   `linksChecklist.publishCases` on a laid-out course; the sheet's size), with
   eleven mutations run red — recorded in the piece's ready file.
+  `LinksChecklistFollowingTests` (#385): every `followingARow` case through
+  `LinksChecklistGate`, the checkbox through the model's binding, publish
+  cases iv-e to iv-i THROUGH THE SHEET (with the trail captured), the naming
+  case (with a row removed, to prove "shared" is across the section), an
+  older builder's offer, the three trail lines filled from the contract's
+  templates, and a hundred-deep chain within 620 pt; a missing publish case
+  now FAILS rather than skips.
 
 ## Testing: the real-home tripwire (#264)
 
