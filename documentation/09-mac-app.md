@@ -1774,7 +1774,9 @@ The teacher gets one of three sentences, under a title that is true of all
 three — "Cannot Preview Yet" reads as "wait and it will work" in front of a
 remedy that is restarting the Mac, and a second `.alert` modifier on this view
 is the one thing it must not have (four of them segfaulted SwiftUI's bridge),
-so the shared alert carries its title in state beside its message. The trail
+so the shared alert carries its title in state beside its message (since #397
+both are one `PreviewAlert` value, which also carries the question about
+today's class — "Today's class on the front page (#397)" below). The trail
 gets one line, `preview did not appear`, carrying the course, the section, the
 seconds and which of the three it was. The sentences are in
 `contracts/app-rules.json` → `previewPorts.whenThePreviewNeverAppears`, so
@@ -6868,6 +6870,156 @@ alert, and nearly every row starts UNTICKED: a page that only a later, hidden
 class links directly is that class's material and "will come with that
 class". So pressing Publish on the defaults does not undo Get Ready. See
 "The links checklist (#379)" below.
+
+## Today's class on the front page (#397)
+
+Russell, 2026-09-30: "A convenience feature – I often forget to update that
+transclude each day." A section's front page (`section<N>/index.md`) shows one
+class. The assistant's publishes move that line (`SectionIndexPointer`, #267),
+but a class published by editing `publish:` in Obsidian moves nothing, so the
+front page every student lands on shows yesterday's class until somebody edits
+it by hand. Since #397, pressing **Preview** in a section window asks:
+
+> **Show Unit 2, Day 5 on the front page?**
+> Today's class is published, but the front page still shows Unit 2, Day 4.
+> [Show on Front Page] [Not Today]
+
+The rule, its cases and the sentences are data: `contracts/class-planning.json`
+→ `todaysClassOnTheFrontPage` (40 cases, run by
+`TodaysClassOnTheFrontPageTests` through the real readers on real files). In
+short, it asks when a class dated TODAY — the teacher's calendar day
+(`CalendarDay.today()`, the Mac's time zone), against the ten characters written
+in the page, never converted — is CERTAINLY visible for the section (a
+`publish:` the app cannot read is not offered: the build hides it, #246), the
+front page has a class line, and that line names an older, undated or hidden
+class. A line already naming a visible class dated today or LATER is left
+alone: the teacher chose between two classes today, or put tomorrow's up early
+on purpose, and a question that undid that every morning would be the nagging
+the issue anticipated. Two classes today: the later by the course's own
+numbering, `SectionIndexPointer.comesLater`, the pointer's own tie-break. No
+class line at all: not asked, on either platform — Windows' pointer inserts a
+line under the heading when IT repoints, but where a class belongs on a page
+the teacher made without one is the teacher's.
+
+**Only the Preview BUTTON asks.** The toolbar calls `pressPreview()`, which
+asks and otherwise calls `startPreview()`. `startPreview()` is the door every
+other preview uses — the in-app assistant's `rebuild_preview`, Start of the
+Year, Course Settings' "preview again", a repair's rebuild — and a question
+there would hold each of them up on a modal nobody may be watching. The MCP
+server, scheduled deploys and the launchers never reach the view at all. Nor is
+it asked for a course kept for reference, a course being copied, a window
+already busy, a section this app is deploying (`refusalWhileThisSectionDeploys`)
+or a course another program is building (`whatBlocksABuild(afterTaking:
+false)`): a preview that is going to be refused is refused as before, with no
+question first, and the teacher's front page is never written while a build
+may be reading it. A front page that is a symbolic link, a Finder alias or
+locked is not asked about either — the build never writes through one (#276).
+`testOnlyThePreviewButtonAsks` pins where the question may be reached from.
+
+**It rides the preview alert; the window still has three.** A fourth `.alert`
+on this view is the segfault described under "A test host that segfaults"
+and in the comment on `healthDialog`. So the preview alert became ONE value,
+`PreviewAlert` (`.refusal(title, sentence)` or `.todaysClass(offer)`), with
+presentation in `previewAlertIsUp`. The value is never cleared by the
+dismissal — only replaced by the next alert — because clearing it made the
+closing alert re-render as "Cannot Preview Yet" behind a question the teacher
+had just answered (plan review, finding 2). Every refusal goes through
+`showPreviewRefusal`, which HOLDS one that arrives while the question is up
+(the assistant can start a preview then) rather than replacing the question
+under the teacher's pointer.
+
+**The preview starts after the alert has gone, never inside its button.** The
+answer only records — the page written, or Not Today, with its trail line —
+and sets `startPreviewWhenTheQuestionHasGone`; `afterThePreviewAlert`, run from
+`.onChange(of: previewAlertIsUp)`, starts the preview, then shows a held
+refusal or the front-page sentence, then drains the links checklist.
+`startPreview()` raises its refusals synchronously, and one raised inside the
+alert's own action was lost with the dismissal — the teacher pressed Show, the
+page changed, and no preview came (plan review, finding 1). A refusal from the
+preview wins over the front-page sentence; the trail has both.
+
+**The links checklist waits behind it.** The question invites a look at the
+front page in Obsidian, and coming back makes the window key, which offers a
+waiting checklist (#379). `requestLinksChecklist` and `showAnythingWaiting`
+hold it behind the preview alert as they hold it behind the folder dialog
+(plan review, finding 3; `testTheLinksChecklistWaitsBehindThePreviewAlert`).
+
+**Show on Front Page decides again.** `TodaysClassOnTheFrontPage.show` reads the
+page again and re-applies the rule for the day the question was ASKED (an
+answer after midnight is about that question, not the new day), with the
+window's guards again. It writes only when the rule still offers the SAME class
+— the teacher may have published the later class, hidden this one or edited
+the page in Obsidian while the question was up — and writes through the
+pointer (`SectionIndexPointer.repointing`): one line, and the page's `created`
+follows the class (#275), every other byte as it was. Then it reads the file
+back. The outcomes: `.shown` ("put today's class on the front page"),
+`.alreadyRight` (the page now shows today's class; nothing written),
+`.noLongerOffered` (anything else changed; nothing written, and the teacher is
+told `noLongerOffered` under "The Front Page Was Not Changed"), `.couldNotSave`
+(said with `couldNotSave`). Not Today is recorded in
+`.publish_state/section<N>.front-page-not-today.json` (`file-formats.json` →
+`frontPageNotToday`) — per section, calendar day and class, so a class
+published later the same day is a new question and the record expires by
+itself. Not in the app's preferences: those are per Mac, and the section's
+other answers live beside it. Escape is Not Today.
+
+**The line keeps the form the teacher wrote** (`sectionIndexPointer.writtenAs`,
+the director's ruling on the plan review). The pointer used to write the bare
+title whatever was there; Russell's own front pages are written
+`![[section1/All Classes/X|X]]`, and a bare name in a two-section course is
+ambiguous in Obsidian. Now a folder path keeps its DEPTH and names where the
+new class actually is — `Thread 4/Day 15` becomes `Thread 5/Day 1` when that
+class is filed in Thread 5, because copying the path as written would name a
+page that does not exist while the app reported success. A display name equal
+to the old class's name follows the class; any other display name, and a
+`#heading`, is dropped (the next class may have no such heading, and an embed
+of a missing heading shows nothing). A typed `.md` stays; the spaces around
+the embed and a Windows line ending stay. This is the pointer's rule, so the
+assistant's publishes write the same form.
+
+**The class line is read outside code and `%%` comments** — in the pointer
+and in the build alike (`documentation/05-build-pipeline.md`, #275's
+section). The shipped front pages put a `%%` note right under the embed, and a
+teacher parking yesterday's line there is natural: read as the embed, the
+question would call the page "already showing" today's class, or Yes would
+rewrite the commented line and report success while students saw yesterday's.
+The pointer also replaced EVERY copy of the line's text (`replacingOccurrences`)
+until now; it rewrites the one line found. Positions are counted in UTF-16, the
+mask's units — counted in characters, a line of emoji above a comment moved the
+embed inside it (the contract case "a long line of emoji above a comment").
+
+**Cost.** The question reads the section's class pages only
+(`AssistSectionGraph.classPages`: the graph's own `isClassPage` rule applied
+to the path before the file is opened, pinned equal to the graph's class pages
+by `testTheClassPagesAreThePointersClassPages`). Measured 2026-09-30 in the unit
+suite on a synthetic 454-page section (300 class pages, 150 others, on this
+Mac): **64 ms** per press, against 180 ms for the whole graph.
+
+**The trail.** "put today's class on the front page — {class} in place of
+{shown}" and "left the front page as it was — {Not Today | already showed
+today's class | it changed while the teacher was asked | could not be saved}:
+{class} offered, it showed {shown}" — file names only. A question never
+answered changed nothing and a question not asked is not an action: neither
+writes a line.
+
+**Rejected** (the contract's `rejected` says why for each): the build detecting
+it and reporting a marker (#379's shape — the answer would come after the
+preview was built, in the container's clock, from every scheduled build too);
+asking inside `startPreview()`; a fourth alert or a sheet; following the
+pointer's newest-visible class (it offers tomorrow's class published early);
+inserting a line into a page that has none; asking at every preview after Not
+Today, or remembering Not Today for the whole section; the app's preferences for
+the record; forbidding "embed" in labels ("Most teachers embed video from
+YouTube" is a real one — the transclude family went onto
+`userFacingLabelWords.forbidden` instead); the assistant mentioning a stale
+front page; asking at Deploy.
+
+**Known limits.** A class line inside a list item (`- ![[…]]`) or a callout
+(`> ![[…]]`) is not the front page's embed — `found` reads a line whose whole
+text is the embed — so the page is not asked about; two contract cases pin it.
+A class line sharing its line with words is not found either. Windows' pointer
+still finds the embed by its heading and is not masked, so on one folder the
+two apps can repoint different lines until the `windows` issue for #397 lands.
 
 ## The links checklist (#379)
 
