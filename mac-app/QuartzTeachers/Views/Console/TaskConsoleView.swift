@@ -83,7 +83,7 @@ struct TaskConsoleView: View {
                 Divider()
                 HStack {
                     TextField("If you’re asked a question, type your answer here…", text: $pendingInput)
-                        .textFieldStyle(.roundedBorder)
+                        .borderedTextField()
                         .onSubmit {
                             sendPendingInput()
                         }
