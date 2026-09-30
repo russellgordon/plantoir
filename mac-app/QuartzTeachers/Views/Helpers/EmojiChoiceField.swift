@@ -38,7 +38,7 @@ struct EmojiChoiceField: View {
                 .fixedSize()
 
                 TextField("", text: $entry)
-                    .textFieldStyle(.roundedBorder)
+                    .borderedTextField()
                     .frame(width: 44)
                     .multilineTextAlignment(.center)
                     .focused($fieldHasFocus)
@@ -54,7 +54,10 @@ struct EmojiChoiceField: View {
                     // beside the old emoji.
                     entry = ""
                     fieldHasFocus = true
-                    DispatchQueue.main.async {
+                    // On the next turn of the main actor, once the focus
+                    // change above has reached the field — a hop, not a
+                    // guessed delay.
+                    Task { @MainActor in
                         NSApp.orderFrontCharacterPalette(nil)
                     }
                 } label: {

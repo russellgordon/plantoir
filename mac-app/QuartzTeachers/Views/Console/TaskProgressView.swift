@@ -340,6 +340,9 @@ struct TaskProgressView: View {
         // the title must not promise how many are coming.
         .alert("Input required", isPresented: awaitingInputBinding) {
             TextField("Your answer", text: $answer)
+                // Inside an .alert AppKit draws the field and ignores
+                // SwiftUI's styles — listed in TextFieldStyleScanTests.
+                .accessibilityIdentifier("taskAnswerField")
             Button("Send") {
                 runner.send(line: answer)
                 answer = ""
