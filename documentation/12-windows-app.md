@@ -983,6 +983,32 @@ What replaces the old container concepts:
   whether the program that started it is still running — an orphan counted as
   live refuses for ever.
 
+  **Work left behind by a program that closed is ENDED, not waited on — for
+  Windows to KNOW, and one thing to OWE (GitHub #378, 2026-09-29).** A
+  Revise with Claude session was closed while a deploy it had started sat at
+  a question inside the mac's container; every later preview waited ten
+  minutes and refused, until the Mac was restarted. The mac's launchers now
+  prove each piece of work's OWNER from the live process table (a launcher
+  whose own command line names the same course and section; never a
+  remembered pid), end work whose owner has gone with the remake's own stop,
+  name what they wait for in the status line (`PLANTOIR_WAITING_FOR:`), and
+  record `left-over work stopped` ([03](03-launcher-scripts.md) → "Work left
+  behind, and proving its owner has gone"). **None of that is owed here**:
+  no container, so nothing to wait for and nothing left inside one; the
+  contract block and both trail events are `appliesOn: ["mac"]`,
+  permanently, and no shared Python changed. **What IS owed** is the cause:
+  the mac's MCP deploys and rebuilds were not `--non-interactive`, so a
+  `deploy.py` question (a site name, the surname, a token) waited for ever on
+  a pseudo-terminal nobody read — `deploy.py`'s own header records the
+  Windows twin, a `python.exe` waiting 45 minutes at the site-name prompt.
+  `plantoir-mcp.exe`'s deploy and rebuild should pass `--non-interactive`
+  and turn exit 3 into `wording.deployNeedsAnAnswer` /
+  `deployNeedsAnAnswerAt` / `previewBuildNeedsAnAnswer`; the window's Deploy
+  must NOT (its dialog is the feature). The proposed contract case is
+  `assist-cases.json` → `scenarios` → "deploy with no section window open,
+  which meets a question". ([10](10-local-ai-assistant.md) → "A deploy from
+  another app refuses at a question".)
+
   **A preview cannot start while its own section is being deployed — what
   Windows OWES (GitHub #381, 2026-09-29).** Russell's decision 4 on #378: a
   preview of a section cannot start AT ALL while that same section is being

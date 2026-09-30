@@ -453,6 +453,11 @@ final class StubSiteWork: AssistSiteWork {
     private(set) var previewRebuilds: Int = 0
     private(set) var deploys: Int = 0
 
+    /// A deploy that reaches a question nobody on this path can answer, and
+    /// refuses (#378): the real path's sentence, as `AssistToolchainWork`
+    /// returns it (`HeadlessDeployAnswersTests` runs that path itself).
+    var deployMeetsAQuestion: Bool = false
+
     // MARK: - Functions
 
     // The REAL sentences, not a stub's own words. A fixture that answers
@@ -471,6 +476,12 @@ final class StubSiteWork: AssistSiteWork {
 
     func deploy(course: Course, sectionNumber: Int) async -> AssistSiteWorkResult {
         deploys += 1
+        if deployMeetsAQuestion {
+            return AssistSiteWorkResult(
+                succeeded: false,
+                message: AssistWording.deployNeedsAnAnswer(course: course.code, section: String(sectionNumber))
+            )
+        }
         return AssistSiteWorkResult(
             succeeded: true,
             message: AssistWording.deployed(course: course.code, section: String(sectionNumber))

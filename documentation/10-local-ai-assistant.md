@@ -3762,6 +3762,73 @@ moved (local 13 `46b96562…2cd96cb6`, MCP 32 `9bcc7eb7…9cef36f7`, hashed befo
 and after). The rule lives in code, as "steer the model with code, not with
 tool descriptions" says it must.
 
+### A deploy from another app refuses at a question, and an open session holds nothing back (#378)
+
+Added 2026-09-29. **What happened.** Russell closed a Revise with Claude
+session; every preview in that folder afterwards waited ten minutes on
+"Something in this folder is still running", refused, and did so every time
+until he restarted the Mac. The launchers' half of the fix — ending work whose
+owner has gone, naming what is waited for — is in `03-launcher-scripts.md` →
+"Work left behind, and proving its owner has gone". This section is the
+assistant's half: the likely CAUSE.
+
+**The cause, read from code (not observed: his workspace was gone after the
+restart).** Every launcher the app starts runs on a pseudo-terminal
+(`ScriptRunner`), so a question inside the container waits on a terminal. The
+windowless deploy — `AssistToolchainWork.deploy`, which an outside assistant's
+`deploy_section` takes, and the in-app assistant's when no section window is on
+screen — was not `unattended`, so `deploy.py`'s questions (the surname the
+first time, a site name, a token to paste) and the launchers' course-code check
+had nobody to answer them. The question waited for ever; closing the session
+killed the host half and left the question inside the workspace (measured,
+03 → R5).
+
+**What changed.** `AssistToolchainWork.deploy` passes `unattended: true` to
+`MultiDestinationDeployRunner.run`, so BOTH legs run with `--non-interactive`
+(`preview.sh C S --build-only --non-interactive`, then `deploy.sh …
+--non-interactive`), and `AssistToolchainWork.rebuildPreview` does the same.
+A question then refuses with exit 3 — the code `deploy.py`'s `NEEDS_AN_ANSWER`
+and both launchers already use for a publish set for later — and the runner
+turns it into a named sentence, never `deployDidNotFinish`:
+
+- `wording.deployNeedsAnAnswer` — one destination, or the build leg asked;
+- `wording.deployNeedsAnAnswerAt` (+ `wording.deployWentOutTo` when others
+  went out) — a course deploying to several places, naming which one asked,
+  the build leg and destination leg kept apart as #132 taught
+  `ScheduledDeploy`;
+- `wording.previewBuildNeedsAnAnswer` — the rebuild.
+
+Each tells the teacher to deploy (or build) once from the section's window,
+where the question becomes a dialog and the answer is remembered. The trail's
+`task finished` line says "stopped at a question nobody was there to answer
+(exit 3)" instead of "failed (exit 3)". **The window's Deploy is unchanged**
+and never passes the flag: there the question IS the feature
+(`DeployCommand.arguments`). Nothing that succeeded before refuses now — on
+this path every such question hung.
+
+The console line the launchers print on that refusal still says "This publish
+was set to happen on its own…", which is untrue for a session; it was left,
+because nobody reads that console on this path (the reply carries the named
+sentence) and changing it is a shared-Python and launcher wording change with
+a Windows twin. Recorded here so it is not mistaken for an oversight.
+
+**An open session holds nothing back** (decision 1). The launchers prove an
+owner from the live process table: a session — `claude`, `codex`, `Plantoir
+--mcp-stdio` — owns work only through a launcher it is running. So while
+Claude builds or deploys a section, a preview in that folder waits and the
+status line says "Waiting for Revise with Claude to finish deploying MPM2D
+section 2… (59s)"; while it only edits pages, or sits idle, nothing waits. The
+app's own lease check already agreed: `WorkLeaseRegistry.reconcile` derives
+leases from running work, so an idle MCP server holds none.
+
+**Tested.** `HeadlessDeployAnswersTests` runs the real `AssistToolchainWork`
+against stand-in launchers that write down their words and exit 3 (MF-6), and
+the window's runner without the flag; the contract case is `assist-cases.json`
+→ `scenarios` → "deploy with no section window open, which meets a question".
+Windows owes the same for `plantoir-mcp.exe` (the `windows` issue from #378);
+`deploy.py`'s header records its twin, a `python.exe` waiting 45 minutes at the
+site-name prompt.
+
 ### The model's list is SHORTER than the server's
 
 Two lists, deliberately. `definitions` is what the local model sees;
