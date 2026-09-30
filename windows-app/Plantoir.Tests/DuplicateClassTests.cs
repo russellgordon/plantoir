@@ -433,6 +433,19 @@ public sealed class DuplicateClassTests : IDisposable
             ClassChangeWording.WouldBeCopiedTo("Unit 2, Day 2", "Unit 2, Day 3", new DateOnly(2026, 9, 16)),
             described);
         Assert.Contains(ClassChangeWording.TheCopyStartsHidden, described);
+        // Duplicating the course's last class moves nothing, so the undo is
+        // offered and the card must NOT warn (#346, duplication.undoRule).
+        Assert.DoesNotContain(AssistWording.MakingRoomCannotBeUndone, described);
+    }
+
+    [Fact]
+    public void APlanThatMovesOtherClassesWarnsTheUndoWillNotHelp()
+    {
+        // #346 (the mac's #185): exactly the condition that withholds the undo.
+        FourClasses();
+        var plan = Open().PlanDuplicateClass("ICS3U", 1, "Unit 1, Day 1");
+        Assert.True(plan.MovesOtherClasses);
+        Assert.EndsWith(AssistWording.MakingRoomCannotBeUndone, plan.Describe());
     }
 
     [Fact]
