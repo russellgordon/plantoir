@@ -281,6 +281,7 @@ public class SpecialFolderRenamerTests : IDisposable
         ["renameFolder.explanation"] = SpecialNames.RenameExplanation,
         ["renameFolder.doneNothingWasThere"] = SpecialNames.RenameNothingWasThere,
         ["removeLeavesTheFolderOnDisk.message"] = SpecialNames.RemoveLeavesTheFolderOnDisk,
+        ["renameUnitWord.explanation"] = Plantoir.Core.Models.UnitWordRenameWording.Explanation,
     };
 
     /// <summary>
