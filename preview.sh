@@ -2248,52 +2248,139 @@ clear_away_this_folders_other_spelling() {
 # the old shared workspace) stopped it without looking. Now each of them
 # comes here, and this LOOKS FIRST:
 #   - nothing running          -> remade at once, as before;
-#   - a build or a publish     -> waited for, up to ten minutes (the same
-#                                 horizon a publish set for later waits for a
-#                                 busy course, #156), then refused;
+#   - a build, a publish or a  -> waited for, up to ten minutes (the same
+#     course being set up,        horizon a publish set for later waits for a
+#     whose OWNER is running      busy course, #156), then refused, naming it;
 #   - a preview that is OPEN   -> refused after twenty seconds (a preview
 #                                 closed a moment ago may still be ending; one
 #                                 that is open does not end on its own), and
-#                                 the sentence names which one.
+#                                 the sentence names which one;
+#   - work whose owner has     -> STOPPED with the workspace, at once, and
+#     GONE (GitHub #378)          said: on the console, and on the trail
+#                                 through PLANTOIR_LEFTOVER_STOPPED.
 # The numbers are contracts/app-rules.json -> previewPorts
 # .whenTheWorkspaceIsInUse.waiting; the time is COUNTED in looks rather than
 # read from a clock, as the app's quit path counts its own.
+#
+# Why work is stopped when its owner has gone (#378): a program that ran a
+# launcher on a terminal — the app, a Terminal window, an assistant session —
+# and was closed while something inside the workspace was waiting for an
+# answer leaves that something waiting for ever (measured: killing the host
+# side of `docker exec -it` leaves an in-container `read` parented to the
+# engine's shim, still there minutes later). Waiting for it only ever ended in
+# the ten-minute refusal, and every later preview met the same wait, until the
+# Mac was restarted. Work that is still DOING something finishes on its own;
+# work that waits for an answer never does.
 WORKSPACE_LOOK_EVERY_SECONDS=2
 WORKSPACE_PREVIEW_SECONDS=20
 WORKSPACE_WORK_SECONDS=600
 
 # What the last look found: "nothing", "a preview" or "other work", and for
 # a preview which one ("<course> section <n>" and "<course>/<n>").
+# WORKSPACE_WAITING_FOR is what a wait is for, as the marker names it —
+# "<build|publish|preview|setup|work> <COURSE/S or -> <origin>" — and
+# WORKSPACE_LEFTOVERS is every piece of work whose owner has gone, as
+# "<kind>:<COURSE>/<S>", "setup" or "other", separated by spaces.
 WORKSPACE_IS_RUNNING="nothing"
 WORKSPACE_OPEN_PREVIEW=""
 WORKSPACE_OPEN_PREVIEW_PLACE=""
+WORKSPACE_WAITING_FOR=""
+WORKSPACE_LEFTOVERS=""
 
-# Whether a preview.sh for this course and section is running on this Mac,
-# other than this run and the programs it started or was started by.
+# Whether each piece of work found inside the workspace has an OWNER still
+# running on this Mac, and who that owner was started by.
 #
-# Why the Mac is asked as well as the workspace: a preview whose launcher
-# has gone — the app force-quit, a Terminal window closed, an assistant's
-# client exiting — leaves its website builder running inside the workspace
-# (measured: killing the `docker exec` client left the process in
-# `docker top`, parented to the engine's shim). Nothing a teacher can close
-# is left open, so counting it as an open preview would refuse every remake
-# of that folder for ever. A preview counts as OPEN only while the launcher
-# that started it is still running.
+# $1 is the work, one piece per line: "<kind> <course> <section>" (kind
+# preview, build, publish, setup or other; "-" where there is no course or
+# section). Prints one line per piece: "<owned|gone> <origin> <kind>
+# <course> <section>", origin one of claude, codex, assistant, window,
+# scheduled, terminal or "-".
 #
-# Matched on the word after preview.sh and the one after that, the course
-# (in either case: the launcher upper-cases it) and the section, because a
-# command-line run names the launcher by a relative path. The whole process
-# table is read once, and this run's own
-# ancestors and descendants are left out (a login shell wrapping this run
-# carries the same words). A `--stop` run is not a preview, and neither is
-# a `--build-only` one (a publish's build, which never serves). A table that
-# cannot be read counts as "running":
-# the cost of that is one refused remake, the cost of the other is a killed
-# preview.
-a_preview_launcher_is_running_for() {
+# The proof is the LIVE process table, read once, and nothing else: an owner
+# counts only when a running process's OWN command line names it. There is no
+# remembered process number anywhere in it — no lease file, no pid file, no
+# `kill -0` — so a number the system has since handed to another program
+# (Mail, or a launcher for another section) can never keep a dead owner
+# alive (GitHub #378). The owners:
+#   - a preview: preview.sh for that course and section, not --stop and not
+#     --build-only (a publish's build never serves). Unchanged from #94.
+#   - a build for publishing: preview.sh for that course and section with
+#     --build-only, or deploy.sh for it (it runs that build itself).
+#   - a publish: deploy.sh for that course and section, whatever its flags.
+#   - a course being set up: setup.sh.
+#   - anything else (a launcher's short check, a stop, something typed by
+#     hand): any launcher at all, preview.sh, deploy.sh or setup.sh.
+# And two belts behind those, for everything but a preview:
+#   - a publish set for later: while launchd runs it, the app's scheduled
+#     runner and the script it runs both carry the script's path, whose name
+#     holds the course (as ScheduledDeploy writes it: upper case, anything
+#     not a letter or digit as "-") and "section<N>" followed by a dot — so
+#     section 1 is never read as section 12. That path is on the table from
+#     launchd's first instant to its last, including between the build and
+#     the upload, so a publish launchd is still running is never ended.
+#   - a `docker exec` still aimed at THIS workspace, by its name or its id:
+#     whatever started it (an assistant's own command, an older launcher) is
+#     still waiting for it. Closing a program ends its `docker exec` too
+#     (measured, #378), so this never keeps real leftovers alive.
+# Course names match in either case (the launcher upper-cases), sections
+# exactly. This run, its ancestors and its descendants never count (a login
+# shell wrapping this run carries the same words). A session that is merely
+# OPEN — claude, codex, `Plantoir --mcp-stdio` — owns nothing: it owns work
+# only through a launcher it is running.
+#
+# Who started the owner is read from its ancestors in the same table: a
+# publish set for later first (the app's scheduled runner has no
+# --mcp-stdio, so it must not be read as a window), then an assistant
+# serving another app (claude or codex above it, if either is), then the
+# Plantoir app itself, then claude or codex running the launcher directly,
+# and otherwise "a command in Terminal".
+#
+# A table that cannot be read counts as every owner RUNNING, with no origin:
+# the cost of that is one wait and a refusal, the cost of the other is
+# somebody's publish ended. A table that does not list THIS run counts as
+# unread too (#378 review N6): `ps` answering 0 with nothing in it would
+# otherwise make every piece of work look abandoned.
+#
+# A course code may carry one space ("AP CALC", CourseCodeRule), so the
+# course in "$1" is written with "+" for the space (a code cannot hold a
+# "+"), and a launcher's arguments are compared as the text that follows the
+# launcher's name — "AP CALC 1 …" begins with "AP CALC 1 " — never word by
+# word (#378 review S1: word by word, a live preview of AP CALC read as
+# course AP, section CALC, and was stopped as left over).
+the_owners_of_the_work() {
   local table
-  table="$(ps -Ao pid=,ppid=,args= 2>/dev/null)" || return 0
-  printf '%s\n' "$table" | awk -v self="$$" -v course="$1" -v section="$2" '
+  if ! table="$(ps -Ao pid=,ppid=,args= 2>/dev/null)" \
+    || ! printf '%s\n' "$table" | awk -v self="$$" '$1 == self { found = 1 } END { exit !found }'; then
+    printf '%s\n' "$1" | awk 'NF == 3 { print "owned - " $0 }'
+    return 0
+  fi
+  # One piece per ";" — an awk -v value cannot hold a newline.
+  printf '%s\n' "$table" | awk -v self="$$" -v work="$(printf '%s' "$1" | tr '\n' ';')" \
+    -v name="${CONTAINER_NAME:-}" -v id="${2:-}" '
+    function base(word,    parts, n) { n = split(word, parts, "/"); return tolower(parts[n]) }
+    function sanitized(code,    s) { s = toupper(code); gsub(/[^A-Z0-9]/, "-", s); return s }
+    # Who started process p: the first answer found walking up from it.
+    function origin_of(p,    q, steps, sched, mcp, app, claude, codex, w, n, word) {
+      q = p; steps = 0; sched = 0; mcp = 0; app = 0; claude = 0; codex = 0
+      while ((q in args) && steps < 64) {
+        if (args[q] ~ /\/Plantoir\/scheduled\// || args[q] ~ /--run-scheduled-deploy/) sched = 1
+        if (args[q] ~ /--mcp-stdio/) mcp = 1
+        else if (args[q] ~ /\/Contents\/MacOS\/Plantoir([ \t]|$)/) app = 1
+        n = split(args[q], word, /[ \t]+/)
+        for (w = 1; w <= n && w <= 2; w++) {
+          if (base(word[w]) == "claude") claude = 1
+          if (base(word[w]) == "codex") codex = 1
+        }
+        if (parent[q] == q || parent[q] < 1) break
+        q = parent[q]; steps++
+      }
+      if (sched) return "scheduled"
+      if (mcp) return claude ? "claude" : (codex ? "codex" : "assistant")
+      if (app) return "window"
+      if (claude) return "claude"
+      if (codex) return "codex"
+      return "terminal"
+    }
     {
       pid = $1; parent[pid] = $2
       line = $0
@@ -2307,6 +2394,10 @@ a_preview_launcher_is_running_for() {
       while ((p in parent) && parent[p] != p && !(parent[p] in mine) && parent[p] > 1) {
         p = parent[p]; mine[p] = 1
       }
+      # Every candidate owner, by what it is: L_kind/L_course/L_section/L_flags
+      # for a launcher, S_code/S_section for a publish set for later, X for a
+      # docker exec aimed at this workspace.
+      owners = 0
       for (i = 1; i <= count; i++) {
         pid = order[i]
         if (pid in mine) continue
@@ -2316,20 +2407,84 @@ a_preview_launcher_is_running_for() {
           q = parent[q]; steps++
         }
         if (ours) continue
-        if (args[pid] ~ /[ \t]--(stop|build-only)([ \t]|$)/) continue
         n = split(args[pid], word, /[ \t]+/)
-        for (w = 1; w + 2 <= n; w++) {
-          if (word[w] ~ /(^|\/)preview\.sh$/ && toupper(word[w + 1]) == toupper(course) && word[w + 2] == section) {
-            found = 1
+        for (w = 1; w <= n; w++) {
+          if (word[w] ~ /(^|\/)(preview|deploy|setup)\.sh$/) {
+            owners++
+            O_pid[owners] = pid
+            O_kind[owners] = base(word[w])
+            # Everything after the launcher name, one space between words.
+            after = ""
+            for (a = w + 1; a <= n; a++) after = after " " word[a]
+            O_after[owners] = toupper(substr(after, 2)) " "
+            O_stop[owners] = (args[pid] ~ /[ \t]--stop([ \t]|$)/)
+            O_buildonly[owners] = (args[pid] ~ /[ \t]--build-only([ \t]|$)/)
+            O_tag[owners] = (args[pid] ~ /[ \t]--builder-tag([ \t]|$)/)
+            break
+          }
+        }
+        if (match(args[pid], /\.deploy\.[A-Za-z0-9-]+\.section[0-9]+\./)) {
+          label = substr(args[pid], RSTART + 8, RLENGTH - 9)
+          k = index(label, ".section")
+          owners++
+          O_pid[owners] = pid
+          O_kind[owners] = "scheduled"
+          O_course[owners] = substr(label, 1, k - 1)
+          O_section[owners] = substr(label, k + 8)
+        }
+        client = 0; asked_exec = 0
+        for (w = 1; w <= n; w++) {
+          if (base(word[w]) == "docker") client = 1
+          else if (client && word[w] == "exec") asked_exec = 1
+          else if (asked_exec && ((name != "" && word[w] == name) || (id != "" && (word[w] == id || word[w] == substr(id, 1, 12))))) {
+            owners++
+            O_pid[owners] = pid
+            O_kind[owners] = "exec"
+            break
           }
         }
       }
-      exit(found ? 0 : 1)
+      pieces = split(work, piece, ";")
+      for (j = 1; j <= pieces; j++) {
+        if (split(piece[j], it, " ") != 3) continue
+        kind = it[1]; course = toupper(it[2]); section = it[3]
+        gsub(/\+/, " ", course)
+        # "AP CALC 1 " must be how the launcher arguments begin.
+        wants = course " " section " "
+        found = 0
+        for (o = 1; o <= owners && !found; o++) {
+          k = O_kind[o]
+          if (kind == "preview") {
+            found = (k == "preview.sh" && index(O_after[o], wants) == 1 && !O_stop[o] && !O_buildonly[o])
+            continue
+          }
+          if (k == "exec") { found = 1; continue }
+          if (k == "scheduled") {
+            found = (kind == "other" || (O_course[o] == sanitized(course) && O_section[o] == section))
+            continue
+          }
+          if (kind == "build") {
+            found = (index(O_after[o], wants) == 1 && ((k == "preview.sh" && O_buildonly[o]) || k == "deploy.sh"))
+          } else if (kind == "publish") {
+            found = (k == "deploy.sh" && index(O_after[o], wants) == 1)
+          } else if (kind == "setup") {
+            found = (k == "setup.sh" && !O_tag[o])
+          } else {
+            found = (k == "preview.sh" || k == "deploy.sh" || (k == "setup.sh" && !O_tag[o]))
+          }
+        }
+        if (found) {
+          print "owned " origin_of(O_pid[o - 1]) " " kind " " it[2] " " section
+        } else {
+          print "gone - " kind " " it[2] " " section
+        }
+      }
     }'
 }
 
 # Looks once at what is running in the workspace $1 (an id or a name) and
-# sets WORKSPACE_IS_RUNNING. The rule is contracts/app-rules.json ->
+# sets WORKSPACE_IS_RUNNING, WORKSPACE_WAITING_FOR and WORKSPACE_LEFTOVERS.
+# The rule is contracts/app-rules.json ->
 # previewPorts.whenTheWorkspaceIsInUse.whatCountsAsRunning:
 #   - not running, or gone: "nothing", and the workspace is not asked what
 #     runs in it (a stopped one cannot answer: `docker top` exits 1);
@@ -2337,17 +2492,29 @@ a_preview_launcher_is_running_for() {
 #     count the app's quit path uses before it stops a workspace;
 #   - a preview — `build_site.py` without `--build-only`, with everything it
 #     started — whose launcher is still running on this Mac: "a preview";
-#   - anything else: "other work" — a build for publishing, a publish, a
-#     course being set up, another launcher's check of the folder. A preview
-#     whose launcher has gone, with what it started, counts as nothing.
+#   - any other work whose owner is running (the_owners_of_the_work): "other
+#     work", and WORKSPACE_WAITING_FOR names it;
+#   - work whose owner has gone: nothing to wait for — listed in
+#     WORKSPACE_LEFTOVERS, and ended with the workspace;
 #   - running, but `docker top` did not answer: "other work". An idle
 #     workspace costs a wait; a busy one stopped costs a publish.
 # An open preview wins over other work: waiting cannot end it.
+#
+# Each process belongs to the OUTERMOST piece of work above it (#378): a
+# deploy rebuilds a site by running build_site.py --build-only as its own
+# child, and that build is the deploy's, owned by deploy.sh — read the other
+# way round it would be a build whose preview.sh is not running, and a live
+# upload would be stopped as left over. A deploy shows as two lines, the
+# `sh -lc` wrapper deploy.sh runs and the Python under it; `docker top`
+# prints the wrapper's many lines as one (measured), with the course and
+# section written into it, so both lines name the same publish.
 look_inside_the_workspace() {
-  local state first inside found place course section
+  local state first inside found kind course section owner origin work owners first_named first_other
   WORKSPACE_IS_RUNNING="nothing"
   WORKSPACE_OPEN_PREVIEW=""
   WORKSPACE_OPEN_PREVIEW_PLACE=""
+  WORKSPACE_WAITING_FOR=""
+  WORKSPACE_LEFTOVERS=""
   state="$(docker inspect -f '{{.State.Running}} {{.State.Pid}}' "$1" 2>/dev/null)" || return 0
   case "$state" in
     "true "*) first="${state#true }" ;;
@@ -2355,14 +2522,37 @@ look_inside_the_workspace() {
   esac
   if ! inside="$(docker top "$1" 2>/dev/null)"; then
     WORKSPACE_IS_RUNNING="other work"
+    WORKSPACE_WAITING_FOR="work - -"
     return 0
   fi
   # One line per process after the heading: UID PID PPID C STIME TTY TIME
   # CMD, the command whole (measured: arguments are not cut short). Each
-  # process that is part of a preview prints "preview <course> <section>";
-  # any other prints "other". The workspace's own first process prints
-  # nothing.
+  # process prints the piece of work it belongs to: "<kind> <course>
+  # <section>", "orphan <course> <section>" for a website builder serving
+  # with no build_site.py above it, or "other - -". The workspace's own first
+  # process prints nothing.
   found="$(printf '%s\n' "$inside" | awk -v first="$first" '
+    function named(cmd, flag,    at) {
+      if (match(cmd, flag "[= ][^ \t]+")) {
+        at = substr(cmd, RSTART + length(flag) + 1, RLENGTH - length(flag) - 1)
+        return at
+      }
+      return "-"
+    }
+    # The course runs to the next " --", not to the first blank: a code may
+    # carry one space (#378 review S1). Quotes a shell kept are dropped,
+    # and the space is written "+" so the pieces below stay one word each.
+    function course_of(cmd,    rest, cut) {
+      if (!match(cmd, /--course[= ]/)) return "-"
+      rest = substr(cmd, RSTART + RLENGTH)
+      cut = index(rest, " --")
+      if (cut > 0) rest = substr(rest, 1, cut - 1)
+      gsub(/["\047]/, "", rest)
+      sub(/[ \t]+$/, "", rest)
+      if (rest == "") return "-"
+      gsub(/ /, "+", rest)
+      return toupper(rest)
+    }
     NR == 1 { next }
     NF >= 8 {
       pid = $2; parent[pid] = $3
@@ -2375,53 +2565,238 @@ look_inside_the_workspace() {
       for (i = 1; i <= count; i++) {
         pid = order[i]
         cmd = command[pid]
-        if (cmd ~ /\/opt\/scripts\/build_site\.py/ && cmd !~ /--build-only/) {
-          c = cmd; sub(/.*--course=/, "", c); sub(/[ \t].*/, "", c)
-          s = cmd; sub(/.*--section=/, "", s); sub(/[ \t].*/, "", s)
-          root[pid] = c " " s
+        if (cmd ~ /\/opt\/scripts\/deploy\.py/) {
+          root[pid] = "publish " course_of(cmd) " " named(cmd, "--section")
+        } else if (cmd ~ /\/opt\/scripts\/build_site\.py/) {
+          root[pid] = (cmd ~ /--build-only/ ? "build " : "preview ") course_of(cmd) " " named(cmd, "--section")
+        } else if (cmd ~ /\/opt\/scripts\/setup_course\.py/) {
+          root[pid] = "setup - -"
         } else if (cmd ~ /[ \t]--serve([ \t]|$)/) {
           serving[pid] = 1
+          if (match(cmd, /quartz-builds\/[^\/]+\/section[0-9]+/)) {
+            where = substr(cmd, RSTART + 14, RLENGTH - 14)
+            k = index(where, "/section")
+            place = toupper(substr(where, 1, k - 1))
+            gsub(/ /, "+", place)
+            served_as[pid] = place " " substr(where, k + 8)
+          }
         }
       }
       for (i = 1; i <= count; i++) {
         pid = order[i]
         if (pid == first) continue
-        q = pid; belongs = ""; served = 0; steps = 0
-        while ((q in command) && steps < 64) {
-          if (q in root) { belongs = root[q]; break }
-          if (q in serving) served = 1
+        q = pid; belongs = ""; served = ""; steps = 0
+        while ((q in command) && q != first && steps < 64) {
+          if (q in root) belongs = root[q]
+          if ((q in serving) && served == "") served = (q in served_as) ? served_as[q] : "- -"
           q = parent[q]; steps++
         }
         if (belongs != "") {
-          print "preview " belongs
-        } else if (served) {
-          print "orphan"
+          print belongs
+        } else if (served != "") {
+          print "orphan " served
         } else {
-          print "other"
+          print "other - -"
         }
       }
     }' | sort -u)"
-  # A website builder serving with no build_site.py above it (and whatever
-  # it started) has lost its launcher's side entirely — build_site.py waits
-  # on it for as long as a preview is open — so it is left out like any
-  # other orphaned preview.
-  while IFS=' ' read -r what course section; do
-    case "$what" in
-      preview)
-        if [ "$WORKSPACE_IS_RUNNING" != "a preview" ] \
-          && a_preview_launcher_is_running_for "$course" "$section"; then
-          WORKSPACE_IS_RUNNING="a preview"
-          WORKSPACE_OPEN_PREVIEW="$course section $section"
-          WORKSPACE_OPEN_PREVIEW_PLACE="$course/$section"
+  # The work that can have an owner goes to the_owners_of_the_work in one
+  # question; a website builder serving with nothing above it has lost its
+  # launcher's side entirely (build_site.py waits on it for as long as a
+  # preview is open), so it is left over whatever is running.
+  work=""
+  while IFS=' ' read -r kind course section; do
+    case "$kind" in
+      "") ;;
+      orphan)
+        if [ "$course" = "-" ]; then
+          workspace_left_over "other"
+        else
+          workspace_left_over "preview:$course/$section"
         fi ;;
-      other)
-        if [ "$WORKSPACE_IS_RUNNING" = "nothing" ]; then
-          WORKSPACE_IS_RUNNING="other work"
-        fi ;;
+      *) work="${work}${kind} ${course} ${section}"$'\n' ;;
     esac
   done <<LOOKED
 $found
 LOOKED
+  if [ -z "$work" ]; then
+    return 0
+  fi
+  owners="$(the_owners_of_the_work "$work" "$1")"
+  first_named=""
+  first_other=""
+  while IFS=' ' read -r owner origin kind course section; do
+    case "$owner" in
+      owned)
+        case "$kind" in
+          preview)
+            if [ "$WORKSPACE_IS_RUNNING" != "a preview" ]; then
+              WORKSPACE_IS_RUNNING="a preview"
+              WORKSPACE_OPEN_PREVIEW="${course//+/ } section $section"
+              WORKSPACE_OPEN_PREVIEW_PLACE="$course/$section"
+            fi ;;
+          other)
+            [ -n "$first_other" ] || first_other="work - $origin" ;;
+          setup)
+            [ -n "$first_named" ] || first_named="setup - $origin" ;;
+          *)
+            [ -n "$first_named" ] || first_named="$kind $course/$section $origin" ;;
+        esac ;;
+      gone)
+        case "$kind" in
+          setup|other) workspace_left_over "$kind" ;;
+          *) workspace_left_over "$kind:$course/$section" ;;
+        esac ;;
+    esac
+  done <<OWNERS
+$owners
+OWNERS
+  if [ "$WORKSPACE_IS_RUNNING" = "a preview" ]; then
+    WORKSPACE_WAITING_FOR="preview $WORKSPACE_OPEN_PREVIEW_PLACE -"
+  elif [ -n "$first_named" ]; then
+    WORKSPACE_IS_RUNNING="other work"
+    WORKSPACE_WAITING_FOR="$first_named"
+  elif [ -n "$first_other" ]; then
+    WORKSPACE_IS_RUNNING="other work"
+    WORKSPACE_WAITING_FOR="$first_other"
+  fi
+}
+
+# Adds one piece of work to WORKSPACE_LEFTOVERS, once.
+workspace_left_over() {
+  case " $WORKSPACE_LEFTOVERS " in
+    *" $1 "*) ;;
+    *) WORKSPACE_LEFTOVERS="${WORKSPACE_LEFTOVERS:+$WORKSPACE_LEFTOVERS }$1" ;;
+  esac
+}
+
+# Who started a piece of work, in a teacher's words. Pinned in
+# contracts/app-rules.json -> previewPorts.whenTheWorkspaceIsInUse.sentences
+# .origins; the app's status line uses the same words.
+workspace_origin_in_words() {
+  case "$1" in
+    claude) echo "Revise with Claude" ;;
+    codex) echo "Revise with Codex" ;;
+    assistant) echo "an assistant" ;;
+    window) echo "another Plantoir window" ;;
+    scheduled) echo "a scheduled deploy" ;;
+    terminal) echo "a command in Terminal" ;;
+    *) echo "Plantoir" ;;
+  esac
+}
+
+# What a piece of work is doing, in a teacher's words: "$1" is the kind
+# (build, publish or setup) and "$2" is "<COURSE>/<S>". Pinned in
+# contracts/app-rules.json -> ….sentences.doing.
+workspace_doing_in_words() {
+  local course="${2%/*}" section="${2#*/}"
+  course="${course//+/ }"
+  case "$1" in
+    build) echo "building $course section $section" ;;
+    publish) echo "deploying $course section $section" ;;
+    *) echo "setting up a course" ;;
+  esac
+}
+
+# What a stopped piece of work was, in a teacher's words: "$1" is one item
+# of WORKSPACE_LEFTOVERS. Pinned in contracts/app-rules.json -> ….sentences
+# .leftovers.
+workspace_leftover_in_words() {
+  local place="${1#*:}"
+  local course="${place%/*}" section="${place#*/}"
+  course="${course//+/ }"
+  case "$1" in
+    build:*) echo "a build of $course section $section" ;;
+    publish:*) echo "a deploy of $course section $section" ;;
+    preview:*) echo "a preview of $course section $section" ;;
+    setup) echo "the setting up of a course" ;;
+    *) echo "something else" ;;
+  esac
+}
+
+# The machine lines the app reads. PLANTOIR_WAITING_FOR: turns the status
+# line under the progress bar into the sentence naming what is waited for
+# (GitHub #378, decision 3), and "over" gives it back; PLANTOIR_LEFTOVER_
+# STOPPED: is the trail line for what was ended (contracts/shared-rules.json
+# -> activityTrail.mustRecord."left-over work stopped"). Machinery, so the
+# console a teacher reads leaves both out.
+tell_the_app_what_is_waited_for() {
+  echo "PLANTOIR_WAITING_FOR: $1"
+}
+
+tell_the_app_what_was_stopped() {
+  local place="${WORKSPACE_TRAIL_PLACE:-setup}"
+  echo "PLANTOIR_LEFTOVER_STOPPED: ${place// /+} $1"
+}
+
+# The console sentence for what is waited for, said once each time it
+# changes. "$1" is WORKSPACE_WAITING_FOR. Pinned in contracts/app-rules.json
+# -> previewPorts.whenTheWorkspaceIsInUse.sentences.whileWaitingFor….
+say_what_is_waited_for() {
+  # Split without `read`: every `read` in a launcher is taken for a question
+  # (scripts/test_*_questions.py), and this is not one.
+  local kind="${1%% *}" rest="${1#* }"
+  local place="${rest%% *}" origin="${rest#* }"
+  case "$kind" in
+    preview)
+      course="${place%/*}"
+      echo "⏳ Waiting for the preview of ${course//+/ } section ${place#*/} to close before Plantoir sets this folder up again…" ;;
+    work)
+      echo "⏳ Waiting for something else Plantoir is doing in this folder to finish before it sets the folder up again…" ;;
+    *)
+      echo "⏳ Waiting for $(workspace_origin_in_words "$origin") to finish $(workspace_doing_in_words "$kind" "$place") before Plantoir sets this folder up again…" ;;
+  esac
+  tell_the_app_what_is_waited_for "$1"
+}
+
+# The refusal after ten minutes, naming what was still going when it can.
+say_the_work_did_not_finish() {
+  # Split without `read`: every `read` in a launcher is taken for a question
+  # (scripts/test_*_questions.py), and this is not one.
+  local kind="${1%% *}" rest="${1#* }"
+  local place="${rest%% *}" origin="${rest#* }"
+  case "$kind" in
+    build|publish|setup)
+      echo "❌ After ten minutes, $(workspace_origin_in_words "$origin") was still $(workspace_doing_in_words "$kind" "$place"), so Plantoir stopped rather than interrupt it." ;;
+    *)
+      echo "❌ Something Plantoir was doing in this folder was still going after ten minutes, so it stopped rather than interrupt it." ;;
+  esac
+  echo "   Try again once it has finished. Nothing was changed."
+}
+
+# What the marker's fourth and fifth words say was waited for: the item
+# ("<kind>:<COURSE>/<S>", "setup" or "work") and who started it.
+workspace_waited_for_words() {
+  # Split without `read`: every `read` in a launcher is taken for a question
+  # (scripts/test_*_questions.py), and this is not one.
+  local kind="${1%% *}" rest="${1#* }"
+  local place="${rest%% *}" origin="${rest#* }"
+  case "$kind" in
+    "") ;;
+    setup|work) echo "$kind $origin" ;;
+    *) echo "$kind:$place $origin" ;;
+  esac
+}
+
+# The console sentence and the trail's marker for work ended because its
+# owner had gone. "$1" is WORKSPACE_LEFTOVERS.
+say_what_was_left_over_and_is_stopped() {
+  local item what="" count=0 total=0
+  for item in $1; do
+    total=$((total + 1))
+  done
+  for item in $1; do
+    count=$((count + 1))
+    if [ "$count" -eq 1 ]; then
+      what="$(workspace_leftover_in_words "$item")"
+    elif [ "$count" -eq "$total" ]; then
+      what="$what and $(workspace_leftover_in_words "$item")"
+    else
+      what="$what, $(workspace_leftover_in_words "$item")"
+    fi
+  done
+  echo "🧹 Stopped ${what}, left running after the program that started it had closed. Your pages were not touched."
+  tell_the_app_what_was_stopped "$1"
 }
 
 # The line the app reads onto the activity trail: contracts/shared-rules.json
@@ -2429,14 +2804,17 @@ LOOKED
 # machinery, so the console a teacher reads leaves it out; the app writes the
 # trail line from it (the same way a build's PLANTOIR_DATED line reaches the
 # trail), whether the run was the app's own or a publish launchd ran.
-# "<outcome> <seconds> <where this run was for> [<the open preview>]".
+# "<outcome> <seconds> <where this run was for> [<what> [<origin>]]": what
+# is the open preview ("<course>/<section>") for a preview, and for a wait or
+# a refusal on other work the item waited for and who started it.
 tell_the_app_the_workspace_was_in_use() {
-  echo "PLANTOIR_WORKSPACE_IN_USE: $1 $2 ${WORKSPACE_TRAIL_PLACE:-setup}${3:+ $3}"
+  local place="${WORKSPACE_TRAIL_PLACE:-setup}"
+  echo "PLANTOIR_WORKSPACE_IN_USE: $1 $2 ${place// /+}${3:+ $3}"
 }
 
-# Removes this folder's workspace and makes it again, once nothing is running
-# in it. Every remake goes through here: the launchers' own checks say WHY in
-# one line, then call this.
+# Removes this folder's workspace and makes it again, once nothing whose
+# owner is running is at work in it. Every remake goes through here: the
+# launchers' own checks say WHY in one line, then call this.
 #
 # The workspace is stopped and removed by its ID, never by name and never
 # with -f. Two launchers started together after an update can both find the
@@ -2445,8 +2823,17 @@ tell_the_app_the_workspace_was_in_use() {
 # has just made — which is what stopping by name did, and is #94's shape one
 # step down. A remove that fails while the old one is still there is tried
 # once more, two seconds later, and then the run stops with the sentence.
+#
+# Work left over by a program that has closed (#378) is ended by this same
+# `docker stop "$id"` and nothing else: there is no second way to end work
+# in here, so there is nothing that could aim at another folder's workspace.
+# The id is read from THIS folder's name, which is a hash of the disk's own
+# spelling of the folder (/bin/pwd -P). Only the leftovers counted in the
+# look just before the stop are named: anything that started after it — the
+# look-then-stop window of tens of milliseconds — is ended unnamed, which is
+# #94's own known limit (contracts: whatCountsAsRunning.knownLimits).
 remake_the_workspace() {
-  local id waited=0 said=false
+  local id waited=0 said="" waited_for=""
   id="$(docker inspect -f '{{.Id}}' "$CONTAINER_NAME" 2>/dev/null)" || id=""
   if [ -z "$id" ]; then
     run_container_with_mount
@@ -2459,28 +2846,36 @@ remake_the_workspace() {
         break ;;
       "a preview")
         if [ "$waited" -ge "$WORKSPACE_PREVIEW_SECONDS" ]; then
-          echo "❌ The preview of $WORKSPACE_OPEN_PREVIEW from this folder is still open, and this folder's workspace needs updating before Plantoir can go on."
+          tell_the_app_what_is_waited_for over
+          echo "❌ The preview of $WORKSPACE_OPEN_PREVIEW from this folder is still open, and Plantoir needs to set this folder up again before it can go on."
           echo "   Close that preview — in Plantoir, or wherever it was started — then try again. Nothing was changed."
           tell_the_app_the_workspace_was_in_use preview "$waited" "$WORKSPACE_OPEN_PREVIEW_PLACE"
           exit 1
         fi ;;
       *)
         if [ "$waited" -ge "$WORKSPACE_WORK_SECONDS" ]; then
-          echo "❌ Something in this folder was still being built or published after ten minutes, so Plantoir stopped rather than interrupt it."
-          echo "   Try again once it has finished. Nothing was changed."
-          tell_the_app_the_workspace_was_in_use work "$waited"
+          tell_the_app_what_is_waited_for over
+          say_the_work_did_not_finish "$WORKSPACE_WAITING_FOR"
+          tell_the_app_the_workspace_was_in_use work "$waited" "$(workspace_waited_for_words "$WORKSPACE_WAITING_FOR")"
           exit 1
         fi ;;
     esac
-    if [ "$said" = false ]; then
-      echo "⏳ Something in this folder is still running. Plantoir will update this folder's workspace as soon as it has finished…"
-      said=true
+    if [ "$WORKSPACE_WAITING_FOR" != "$said" ]; then
+      say_what_is_waited_for "$WORKSPACE_WAITING_FOR"
+      said="$WORKSPACE_WAITING_FOR"
+      waited_for="$(workspace_waited_for_words "$WORKSPACE_WAITING_FOR")"
     fi
     sleep "$WORKSPACE_LOOK_EVERY_SECONDS"
     waited=$((waited + WORKSPACE_LOOK_EVERY_SECONDS))
   done
+  if [ -n "$said" ]; then
+    tell_the_app_what_is_waited_for over
+  fi
   if [ "$waited" -gt 0 ]; then
-    tell_the_app_the_workspace_was_in_use waited "$waited"
+    tell_the_app_the_workspace_was_in_use waited "$waited" "$waited_for"
+  fi
+  if [ -n "$WORKSPACE_LEFTOVERS" ]; then
+    say_what_was_left_over_and_is_stopped "$WORKSPACE_LEFTOVERS"
   fi
   docker stop "$id" >/dev/null 2>&1 || true
   if ! docker rm "$id" >/dev/null 2>&1; then
@@ -2499,15 +2894,18 @@ remake_the_workspace() {
 # The one shared workspace from before working folders each had their own.
 # Superseded: it holds no content (everything lives on the host), and left
 # running it would shadow the per-folder workspaces' ports. Retired only when
-# nothing is running in it — the same look as above, without the wait — and
-# otherwise left for another day, silently: it holds nothing of the
-# teacher's, and the walk above already steps round its addresses.
+# nothing at all is running in it — the same look as above, without the wait
+# and WITHOUT ending leftovers (#378): it is not this folder's workspace, so
+# nothing this folder's launcher proves about an owner entitles it to end
+# work in there. Otherwise it is left for another day, silently: it holds
+# nothing of the teacher's, and the walk above already steps round its
+# addresses.
 retire_legacy_container() {
   local id
   id="$(docker inspect -f '{{.Id}}' teaching-quartz 2>/dev/null)" || return 0
   [ -n "$id" ] || return 0
   look_inside_the_workspace "$id"
-  if [ "$WORKSPACE_IS_RUNNING" != "nothing" ]; then
+  if [ "$WORKSPACE_IS_RUNNING" != "nothing" ] || [ -n "$WORKSPACE_LEFTOVERS" ]; then
     return 0
   fi
   echo "♻️  Clearing away the website builder that older versions of Plantoir shared between folders…"
@@ -2575,27 +2973,27 @@ if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
   # Container exists — check its current /teaching/courses mount
   CURRENT_MOUNT_SRC=$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/teaching/courses"}}{{.Source}}{{end}}{{end}}' "$CONTAINER_NAME" 2>/dev/null || echo "")
   if [[ -z "$CURRENT_MOUNT_SRC" ]]; then
-    echo "🧩 Existing container has no /teaching/courses mount; recreating with correct mount…"
+    echo "♻️  Plantoir cannot find your courses from this folder's website builder, so it is setting the folder up again…"
     remake_the_workspace
   elif [[ "$CURRENT_MOUNT_SRC" != "$HOST_COURSES" ]]; then
-    echo "🔄 Detected different working directory:"
-    echo "   • Existing mount: $CURRENT_MOUNT_SRC"
-    echo "   • Desired mount:  $HOST_COURSES"
-    echo "♻️  Recreating container '$CONTAINER_NAME' to point at the new folder…"
+    echo "🔀 This folder's website builder was set up for a folder somewhere else:"
+    echo "   • Set up for:  $CURRENT_MOUNT_SRC"
+    echo "   • This folder: $HOST_COURSES"
+    echo "♻️  Setting it up again for this folder…"
     remake_the_workspace
   elif ! container_has_builds_mount; then
     # Built websites moved out of the working folder, which needs a second
     # mount this container was made without. A mount cannot be added to a
     # container that already exists.
-    echo "♻️  Rebuilding your workspace so built websites can be kept outside your course folder…"
+    echo "♻️  Setting this folder up again so built websites can be kept outside your course folder…"
     remake_the_workspace
   elif [[ -n "$DESIRED_IMAGE_ID" && -n "$RUNNING_IMAGE_ID" && "$RUNNING_IMAGE_ID" != "$DESIRED_IMAGE_ID" ]]; then
-    echo "♻️  Your workspace was built from an older version; rebuilding it so the update takes effect…"
+    echo "♻️  Plantoir has been updated, so it is setting this folder up again to use the update…"
     remake_the_workspace
   elif ! docker inspect -f '{{json .HostConfig.PortBindings}}' "$CONTAINER_NAME" 2>/dev/null | grep -q '9084/tcp'; then
     # An older container publishes only 8081, and published ports cannot
     # be changed after creation — recreating is the only way to add them.
-    echo "♻️  Rebuilding your workspace so several previews can run at once…"
+    echo "♻️  Setting this folder up again so several previews can run at once…"
     remake_the_workspace
   else
     # Mounts match; only start if not already running
@@ -2850,9 +3248,14 @@ announce_the_preview_address || exit 1
 
 # A terminal is what makes the container's prompts and live progress work, so
 # ask for one when there IS one. But `docker exec -t` refuses to start at all
-# when stdin is not a terminal — from a script, from CI, or from Plantoir's
-# MCP server — and it fails here, minutes into the build, saying only "the
-# input device is not a TTY". Without a terminal, run python unbuffered so
+# when stdin is not a terminal — from a script or from CI — and it fails here,
+# minutes into the build, saying only "the input device is not a TTY".
+# (Everything Plantoir itself starts — a window's buttons, its assistant, and
+# the MCP server an assistant in another app talks to — runs on a
+# pseudo-terminal, ScriptRunner, so it takes the -it branch. That is why a
+# question asked inside the container waits for an answer, and why Plantoir's
+# windowless callers pass --non-interactive: a question with nobody to answer
+# it, left behind when its program closed, is GitHub #378.) Without a terminal, run python unbuffered so
 # progress still arrives line by line. (verify.sh refuses up front for the
 # same reason; this makes refusing unnecessary.)
 if [[ -t 0 ]]; then

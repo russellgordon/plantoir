@@ -38,6 +38,13 @@ class MultiDestinationDeployRunner {
         /// "could not be built" rather than "did not finish", which would
         /// wrongly suggest the build was fine and only the upload failed.
         var buildFailed: Bool = false
+        /// True when this leg was run for nobody (`unattended`) and stopped
+        /// at a question — exit 3 — rather than failing (#378). The build
+        /// step's and the destination's own are kept apart, the lesson
+        /// `ScheduledDeploy` learned on #132: the teacher is told which
+        /// one asked.
+        var buildNeededAnAnswer: Bool = false
+        var neededAnAnswer: Bool = false
     }
 
     // MARK: - Stored properties
@@ -80,20 +87,36 @@ class MultiDestinationDeployRunner {
     /// shared build) is not counted as failed — it simply never ran.
     var outcome: Outcome {
         var failed: [CourseConfiguration.DeployDestination] = []
+        var succeeded: [CourseConfiguration.DeployDestination] = []
+        var askedForAnAnswer: [CourseConfiguration.DeployDestination] = []
         var anySucceeded: Bool = false
         for leg in legs where leg.isFinished {
             if leg.succeeded {
                 anySucceeded = true
+                succeeded.append(leg.destination)
             } else if !leg.buildFailed {
                 failed.append(leg.destination)
             }
+            if leg.neededAnAnswer {
+                askedForAnAnswer.append(leg.destination)
+            }
         }
-        return Outcome(anySucceeded: anySucceeded, failedDestinations: failed)
+        return Outcome(
+            anySucceeded: anySucceeded,
+            failedDestinations: failed,
+            succeededDestinations: succeeded,
+            destinationsThatNeededAnAnswer: askedForAnAnswer
+        )
     }
 
     struct Outcome {
         let anySucceeded: Bool
         let failedDestinations: [CourseConfiguration.DeployDestination]
+        var succeededDestinations: [CourseConfiguration.DeployDestination] = []
+        /// Destinations whose deploy stopped at a question it was not
+        /// allowed to ask (#378). Always empty for the window's Deploy,
+        /// which is never `unattended`.
+        var destinationsThatNeededAnAnswer: [CourseConfiguration.DeployDestination] = []
 
         var allSucceeded: Bool {
             return anySucceeded && failedDestinations.isEmpty
@@ -175,13 +198,24 @@ class MultiDestinationDeployRunner {
     /// Pass a course read by `Course.asSavedNow()` or by the runner's fresh
     /// reading, and destinations taken from THAT course — never a window's
     /// copy, which may hold unsaved Course Settings edits (#335).
+    ///
+    /// `unattended` is for a caller with nobody to answer a question: the
+    /// headless assistant path (`AssistToolchainWork.deploy`), which an
+    /// assistant in another app reaches over MCP (GitHub #378). Both legs
+    /// then run with `--non-interactive`, so a question refuses with exit 3
+    /// instead of waiting for ever on a terminal nobody reads — which is
+    /// how a closed session left a deploy waiting inside a folder's
+    /// workspace and blocked every preview after it. The window's Deploy
+    /// never passes it: there the question becomes a dialog the teacher
+    /// answers, and that is the feature (`DeployCommand.arguments`).
     func run(
         course: Course,
         sectionNumber: Int,
         destinations: [CourseConfiguration.DeployDestination],
         cloudflareAccountID: String,
         workingDirectory: URL,
-        needsBuild: Bool
+        needsBuild: Bool,
+        unattended: Bool = false
     ) async {
         // The backstop on the function that actually starts `deploy.sh`. Its
         // two callers — the Deploy button and the headless assistant path —
@@ -257,7 +291,9 @@ class MultiDestinationDeployRunner {
                 runner.milestones = MultiDestinationDeployRunner.buildAndDeployMilestones(forDestinationType: destination.type)
                 runner.run(
                     scriptNamed: "preview.sh",
-                    arguments: [course.code, String(sectionNumber), "--build-only"],
+                    arguments: MultiDestinationDeployRunner.buildArguments(
+                        courseCode: course.code, sectionNumber: sectionNumber, unattended: unattended
+                    ),
                     workingDirectory: workingDirectory
                 )
                 if runner.launchProblem != nil {
@@ -285,6 +321,7 @@ class MultiDestinationDeployRunner {
                     runner.isBetweenPhases = false
                     legs[index].isFinished = true
                     legs[index].buildFailed = true
+                    legs[index].buildNeededAnAnswer = unattended && runner.lastExitCode == 3
                     break
                 }
                 // Still true here on the success path — cleared by the
@@ -297,7 +334,8 @@ class MultiDestinationDeployRunner {
                 courseCode: course.code,
                 sectionNumber: sectionNumber,
                 destination: destination,
-                cloudflareAccountID: cloudflareAccountID
+                cloudflareAccountID: cloudflareAccountID,
+                unattended: unattended
             )
             runner.run(
                 scriptNamed: DeployCommand.scriptName,
@@ -312,6 +350,7 @@ class MultiDestinationDeployRunner {
             let deployed: Bool = await runner.waitUntilFinished()
             legs[index].isFinished = true
             legs[index].succeeded = deployed
+            legs[index].neededAnAnswer = !deployed && unattended && runner.lastExitCode == 3
             if runner.wasCancelled || runner.wasStoppedByUser {
                 wasCancelled = wasCancelled || runner.wasCancelled
                 wasStoppedByUser = wasStoppedByUser || runner.wasStoppedByUser
@@ -361,6 +400,16 @@ class MultiDestinationDeployRunner {
         )
     }
 
+    /// The build step's arguments: `preview.sh C S --build-only`, and
+    /// `--non-interactive` for a caller nobody is watching (#378).
+    static func buildArguments(courseCode: String, sectionNumber: Int, unattended: Bool) -> [String] {
+        var arguments: [String] = [courseCode, String(sectionNumber), "--build-only"]
+        if unattended {
+            arguments.append("--non-interactive")
+        }
+        return arguments
+    }
+
     // MARK: - Turning an outcome into words
 
     /// Joins destination names the way a teacher would say them out loud:
@@ -398,6 +447,34 @@ class MultiDestinationDeployRunner {
         destinationCount: Int,
         outcome: Outcome
     ) -> AssistSiteWorkResult {
+        // A deploy that stopped at a question it could not ask (#378) says
+        // so, and says where to answer it — never "did not finish", which
+        // reads as something broken.
+        if !outcome.destinationsThatNeededAnAnswer.isEmpty {
+            if destinationCount <= 1 {
+                return AssistSiteWorkResult(
+                    succeeded: false, message: AssistWording.deployNeedsAnAnswer(course: course, section: section)
+                )
+            }
+            var askedNames: [String] = []
+            for destination in outcome.destinationsThatNeededAnAnswer {
+                askedNames.append(DeployCommand.destinationDescription(for: destination))
+            }
+            var message: String = AssistWording.deployNeedsAnAnswerAt(
+                course: course, section: section,
+                destinations: MultiDestinationDeployRunner.joinedWithAnd(askedNames)
+            )
+            if !outcome.succeededDestinations.isEmpty {
+                var wentOutNames: [String] = []
+                for destination in outcome.succeededDestinations {
+                    wentOutNames.append(DeployCommand.destinationDescription(for: destination))
+                }
+                message += " " + AssistWording.deployWentOutTo(
+                    destinations: MultiDestinationDeployRunner.joinedWithAnd(wentOutNames)
+                )
+            }
+            return AssistSiteWorkResult(succeeded: false, message: message)
+        }
         if destinationCount <= 1 {
             if outcome.anySucceeded {
                 return AssistSiteWorkResult(
