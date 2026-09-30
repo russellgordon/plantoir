@@ -2802,8 +2802,16 @@ public sealed class AssistWorkspace
     }
 
     /// <summary>Carry out the insertion: rename, re-date, relink, then create the blanks.</summary>
-    public AssistResult ApplyInsertClasses(InsertPlan plan, IProgress<string>? progress = null)
+    public AssistResult ApplyInsertClasses(InsertPlan plan, IProgress<string>? progress = null) =>
+        ApplyInsertClasses(plan, progress, out _);
+
+    /// <param name="created">The full paths of the blank class pages this run
+    /// WROTE — a page already standing at a path is not among them. The
+    /// duplicate asks it, because it is the one question link rewriting and
+    /// date moves cannot fool (#200 A).</param>
+    private AssistResult ApplyInsertClasses(InsertPlan plan, IProgress<string>? progress, out List<string> created)
     {
+        created = new List<string>();
         var course = Course(plan.CourseCode);
         int section = Section(course, plan.SectionNumber);
         if (plan.ChangesNothing)
@@ -2883,6 +2891,7 @@ public sealed class AssistWorkspace
             string path = Path.Combine(ClassFolder(course, section), added.Title + ".md");
             if (File.Exists(path)) continue;
             Save(path, ClassSkeleton(added, plan.Unit, plan.Added.Count, tail));
+            created.Add(path);
         }
 
         string said =
@@ -2931,7 +2940,7 @@ public sealed class AssistWorkspace
 
         var numbers = UnitDay.Parse(sourceTitle, course.Configuration.UnitWord)
             ?? throw new AssistRefusal(
-                ClassChangeWording.NotANumberedClassPage(sourceTitle, course.Configuration.UnitWord));
+                ClassChangeWording.NotANumberedClassPage(sourceTitle));
 
         // The source's own next day. Throws the timetable refusal unchanged,
         // which is the sentence that asks for the class dates.
@@ -2985,11 +2994,6 @@ public sealed class AssistWorkspace
         int section = Section(course, plan.SectionNumber);
         string newPath = Path.Combine(ClassFolder(course, section), plan.NewTitle + ".md");
 
-        // Read BEFORE anything moves, so the guard below can tell "the page
-        // that was in the way is still there" from "the new skeleton".
-        string? occupying = null;
-        try { if (File.Exists(newPath)) occupying = File.ReadAllText(newPath); } catch { }
-
         // OUTERMOST, and that is the whole of why this reads the way it does.
         // Begin ignores a nested call, so whoever opens the entry first owns
         // the description — and everything ApplyInsertClasses writes lands in
@@ -2998,35 +3002,53 @@ public sealed class AssistWorkspace
         using var recording = UndoHistory.Record(_undo,
             $"duplicated “{plan.SourceTitle}” as “{plan.NewTitle}”");
 
-        AssistResult inserted = ApplyInsertClasses(plan.Insertion, progress);
+        AssistResult inserted = ApplyInsertClasses(plan.Insertion, progress, out var created);
 
-        // The one case that could destroy a lesson. ApplyInsertClasses
-        // SKIPS a rename whose destination already exists rather than
-        // writing over it — right in itself, but it leaves the page the
-        // copy was meant to become holding somebody's real class. Writing
-        // the copy there anyway would lose it.
-        if (occupying is not null && File.Exists(newPath) && File.ReadAllText(newPath) == occupying)
+        // The one case that could destroy a lesson (#200 A, the mac's #163).
+        // Asked of the PLANNER — did this run write the page standing there? —
+        // not of the page's text. The text comparison this replaced was
+        // defeated by the link pass: a destination whose rename was skipped
+        // but which linked to a page that WAS renamed came back with different
+        // text, read as "not the same page", and the copy was written over the
+        // lesson. Deliberately not ANDed with "was a page there before?": a
+        // sample taken before the shuffle is blind to a page appearing during
+        // it, and Obsidian being open in the other window is the premise.
+        if (!created.Contains(newPath, StringComparer.OrdinalIgnoreCase))
+        {
+            ActivityTrail.Note(ActivityTrail.Event.ClassCopyNotMade,
+                "did not copy a class — the page the copy would have become still held a lesson, " +
+                "and other classes may already have moved", course.Code, section);
             throw new AssistRefusal(
                 ClassChangeWording.ThePlaceForTheCopyIsStillTaken(plan.NewTitle, inserted.BackupPath));
+        }
 
         progress?.Report($"Copying “{plan.SourceTitle}”…");
         bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, newPath);
-        string copied = PageFrontmatter.SetTitle(plan.SourceText, plan.NewTitle);
+        // #200 B: REMOVE what the copy inherited, never add a per-section key
+        // to hide it — see PageFrontmatter.WithoutPerSectionKeys for the page
+        // that could never be published again while the reply said it was.
+        string copied = PageFrontmatter.WithoutPerSectionKeys(plan.SourceText);
+        copied = PageFrontmatter.SetTitle(copied, plan.NewTitle);
         copied = PageFrontmatter.SetCreated(
             copied, PageFrontmatter.CreatedKeyFor(section, sectionLocal), plan.NewDate,
             SiblingTimeAndOffset(course, section, ClassPages(course, section))).Text;
         copied = PageFrontmatter.SetDraft(
             copied, PageFrontmatter.PublishKeyFor(section, sectionLocal), draft: true, section).Text;
 
-        // A shared source carrying publishForSection<N>: true beats the
-        // plain publish: false just written (PageFrontmatter.IsDraft reads
-        // the per-section key FIRST), so the copy would be VISIBLE to this
-        // section's students the moment it existed. Checked rather than
-        // assumed, because the frontmatter the copy inherits is whatever
-        // the teacher's page happened to carry.
-        if (!PageFrontmatter.IsDraft(copied, section))
-            copied = PageFrontmatter.SetDraft(
-                copied, PageFrontmatter.PublishKeyFor(section, isSectionLocal: false), draft: true, section).Text;
+        // Read back what is about to be written and ABANDON the copy rather
+        // than write one this app cannot vouch for. `!= Hidden`, not
+        // `== Visible`: "cannot tell" may well be published by the build.
+        // Reachable — a TAB used as indentation in the source's block, or a
+        // block whose first line is indented (SetDraft declines, #186) — and
+        // safe: the blank the insertion wrote here is `publish: false`.
+        if (PageFrontmatter.Visibility(copied, section) != PageVisibility.Hidden)
+        {
+            ActivityTrail.Note(ActivityTrail.Event.ClassCopyNotMade,
+                "did not copy a class — the copy could not be made certainly hidden, and a copy " +
+                "of a published lesson must never arrive where students can read it", course.Code, section);
+            throw new AssistRefusal(
+                ClassChangeWording.TheCopyCouldNotBeMadeHidden(plan.SourceTitle, plan.NewTitle, inserted.BackupPath));
+        }
 
         Save(newPath, copied);
 
