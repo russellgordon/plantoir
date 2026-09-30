@@ -652,6 +652,79 @@ with stages `clone_repo=idle, build=idle, deploy=success` — no Cloudflare
 build runs, because nothing is pushed to a git repository. Static requests
 and bandwidth are unmetered on the free plan.
 
+### wrangler is never left a question to ask (2026-09-30)
+
+`deploy_to_cloudflare` runs wrangler with **`CI=1`** — wrangler's documented
+"no questions" switch — whatever started the publish: the Deploy button (a
+pseudo-terminal), a scheduled deploy from launchd (no terminal at all), the
+assistant's windowless deploy (`--non-interactive`, #378) and
+`verify-deploy.sh`. That has been so since the path was written (2026-08-12),
+and it is the right choice: a question wrangler asked would either hang a
+publish nobody is watching or be answered by whatever the terminal happened
+to hold. What `CI` does NOT do is make the question go away. Under it, a
+question wrangler would have asked becomes an error — **"This command cannot
+be run in a non-interactive context"**, exit 1 — so every situation that
+makes wrangler ask has to be settled by `deploy.py` BEFORE it runs:
+
+- the project name, the production branch and the dirty-tree answer are
+  passed as flags (`--project-name`, `--branch=main`, `--commit-dirty=true`),
+  and the account as `CLOUDFLARE_ACCOUNT_ID`;
+- **the project must exist.** wrangler asks "create it?" about a project it
+  cannot find. A section whose saved project was deleted in Cloudflare's
+  dashboard kept its marker, so `deploy.py` skipped `ensure_pages_project`
+  and every publish of that section failed with the sentence above — on
+  every path, the Deploy button included, since `CI` is set on all of them.
+  `remake_pages_project_if_gone` now checks the saved name first and, on a
+  404, makes the project again under the SAME name and saves the new marker
+  (its `subdomain` can differ, so the address printed is the new one). A 409
+  on that remake means the name is taken in this account — the project is
+  there and the 404 was spurious — so the upload goes ahead as it would
+  have; any other refusal to remake it (a token that may not create
+  projects) is raised, since it says more than wrangler would. Other
+  failures of the first check are left to the upload, which reports them as
+  before.
+
+**What the deleted project took with it is not brought back.** Remaking the
+project restores the address and the next upload, and nothing else: a
+**custom domain** the teacher had attached went with the deleted project and
+has to be added to the remade one again in Cloudflare's dashboard, and the
+old deployments (Cloudflare's own history of past versions) are gone. The
+console says so in one line, and says the project was "not in this
+Cloudflare account" rather than "no longer on Cloudflare", because the same
+404 is what a teacher sees who moved the section to a DIFFERENT Cloudflare
+account — the old project may well still exist in the old one.
+
+**It leaves a line on the activity trail** (rule 5):
+`contracts/shared-rules.json` → `activityTrail.mustRecord` → "cloudflare
+project made again", carrying the course and section, the project and the
+address it answers at now. `deploy.py` runs inside the website builder on
+the mac and cannot reach the trail, so it prints a
+`PLANTOIR_CLOUDFLARE_REMADE:` marker, which the app reads the way it reads
+`PLANTOIR_LEFTOVER_STOPPED:` — `ScriptRunner` for a run it started (the
+Deploy button, the assistant), `ScheduledDeploy` from a scheduled publish's
+log — and which the console leaves out like every `PLANTOIR_…:` line. The
+line is written at the remake, before the upload, so a remade project whose
+upload then failed is still on the trail. A publish run at the command line
+records nothing, as with every marker-based line. Windows runs the same
+`deploy.py`, so its app owes the same reader.
+
+Found 2026-09-30 when `verify-deploy.sh` went red on all six Cloudflare legs
+(44 passed, 6 failed) after its test project `ada1o-s1-2026-testing` had
+been deleted by hand following the v1.4.0 run. It was first read as a
+consequence of #378's terminal changes; it was not — `CI=1`, the flags and
+the `docker exec` of the Cloudflare branch were unchanged, and wrangler's own
+log stopped at `GET …/pages/projects/ada1o-s1-2026-testing`, which returned
+404. **Rejected: recreating the project with a new name**, as the Netlify
+path does for a deleted site. Netlify names are global, so a deleted site's
+name may be gone and a new one is a real question; a Pages name is only
+unique inside the teacher's own account, so the name already chosen is still
+theirs, and re-using it asks nothing — which is also what lets a scheduled
+or windowless publish repair itself. **Rejected: dropping `CI`** so wrangler
+could ask. On a pseudo-terminal nobody is watching it would wait for ever,
+which is exactly what #92 and #378 exist to prevent.
+`scripts/test_deploy_cloudflare_project.py` pins both halves, and
+`CloudflareProjectRemadeReportTests` the app's reader.
+
 ## A folder on this PC (`--to-folder`)
 
 Chosen with `deploy_target: "local_folder"` plus `deploy_folder_path`. This
