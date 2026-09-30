@@ -205,7 +205,7 @@ class DatesFollowTheClassTests(unittest.TestCase):
 
     def test_the_front_page_takes_the_date_of_the_class_it_shows(self):
         cases = self.front_page_cases["cases"]
-        self.assertGreaterEqual(len(cases), 9, "the contract lost front-page date cases")
+        self.assertGreaterEqual(len(cases), 12, "the contract lost front-page date cases")
         for index, case in enumerate(cases):
             with self.subTest(case=case["name"]):
                 self.use_the_course_words(case)
@@ -224,9 +224,16 @@ class DatesFollowTheClassTests(unittest.TestCase):
                                      "a front page that keeps its own date must not be written")
                     self.assertEqual(result["rewritten"], [])
                 else:
+                    # `embedNames` says which class the embed names where the
+                    # title also appears elsewhere on the page (in a comment,
+                    # in a fence, #397); otherwise it is the last class whose
+                    # title the page holds.
                     named = None
                     for page_class in case["classes"]:
-                        if page_class["title"] in case["indexText"]:
+                        if "embedNames" in case:
+                            if page_class["title"] == case["embedNames"]:
+                                named = page_class["created"]
+                        elif page_class["title"] in case["indexText"]:
                             named = page_class["created"]
                     self.assertEqual(site_date, named)
                     self.assertTrue(str(site_date).startswith(expected_day))
