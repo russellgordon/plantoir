@@ -448,13 +448,14 @@
       "place": "the page's place in the course folder without .md - a name, never anything written on the page",
       "title": "the page's title, or its file name",
       "group": "fromAClass | notReachedByAClass | class",
-      "ticked": "whether it starts ticked",
+      "ticked": "whether it starts ticked - its OWN starting tick; a row with `dependsOn` is published only with one of those rows (#385)",
       "step": "1 or 2 for fromAClass, else null",
       "claimedBy": "the place of the class whose date it takes (fromAClass), else null",
       "date": "the day to write, yyyy-MM-dd, or null to write none",
       "why": "one of whyValues",
       "firstUsedIn": "the place of the earliest hidden class linking it directly, when no visible class does (it then starts unticked), else null",
-      "linkedFrom": "places of pages linking it, visible pages first, at most 10"
+      "linkedFrom": "places of pages linking it, visible pages first, at most 10",
+      "dependsOn": "places of the OFFERED, non-class rows that link this page, when no page students can see links it (#385): it is published only with one of them (shared-rules.json -> linksChecklist.followingARow). Nearest to a page students can see first (fewest offered pages between), then by place; the first is the row it is listed under. [] when a page students can see links it, and always [] for a class row. Never truncated. An app reading an offer without this key reads [] for every row, which is #379's behaviour."
     },
     "groups": [
       "fromAClass",
