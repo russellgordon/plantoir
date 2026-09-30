@@ -496,18 +496,26 @@ public sealed class LocalModel : IChatModel, IDisposable
     }
 
     /// <summary>
+    /// The body of one request to the local engine. Every request carries
+    /// max_tokens 512 — <c>app-rules.json</c> → <c>modelTiers.requirements</c>
+    /// → "Every request caps how much the model may write", whose <c>cap</c>
+    /// a test reads.
+    /// </summary>
+    internal static JsonObject Request(JsonArray messages, JsonArray tools) => new()
+    {
+        ["model"] = "local",
+        ["temperature"] = 0,
+        ["max_tokens"] = 512,
+        ["messages"] = messages.DeepClone(),
+        ["tools"] = tools.DeepClone(),
+    };
+
+    /// <summary>
     /// One turn of the conversation. Returns the raw assistant message.
     /// </summary>
     public async Task<JsonObject?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation)
     {
-        var request = new JsonObject
-        {
-            ["model"] = "local",
-            ["temperature"] = 0,
-            ["max_tokens"] = 512,
-            ["messages"] = messages.DeepClone(),
-            ["tools"] = tools.DeepClone(),
-        };
+        var request = Request(messages, tools);
 
         using var content = new StringContent(request.ToJsonString(), Encoding.UTF8, "application/json");
         try

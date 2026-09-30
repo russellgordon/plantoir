@@ -1108,6 +1108,13 @@ public class AssistSurfaceContractTests
             LocalModel.BuildArguments("model.gguf", 8080, threads: 4, useGpu: true));
         Answer("The model runs on the HOST, with hardware acceleration");
 
+        // Every request carries the contract's cap, read from the file.
+        int cap = doc["modelTiers"]!["requirements"]!.AsArray()
+            .First(r => r!["rule"]!.ToString() == "Every request caps how much the model may write")!["cap"]!
+            .GetValue<int>();
+        Assert.Equal(cap, LocalModel.Request(new JsonArray(), new JsonArray())["max_tokens"]!.GetValue<int>());
+        Answer("Every request caps how much the model may write");
+
         // The one that genuinely cannot be executed, named rather than dropped.
         // A polarity veto is a rule about how a MODEL is chosen: it governs the
         // routing suite in research/ai-assist/, which is measured by hand and
