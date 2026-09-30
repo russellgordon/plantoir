@@ -71,7 +71,7 @@ never copied by `build.py`.
 | `layout/base.html` | The page skeleton every page is poured into — head tags, top bar, footer. |
 | `assets/style.css` | The whole stylesheet, copied to `site/assets/`. |
 | `pages/*.html` | One file per page: a front matter block, then the body. The file name is the URL (`features.html` → `/features`), except `index.html`, which is the front page. |
-| `shots/` | The screenshot harness. See below. `shots/scenes.py` lists the v1.4.0 scenes; `shots/marketing_folder.py` sets up the kept marketing folder; `shots/csp-correlation.json` says which ICS3U activities reach which AP CSP learning objectives; `shots/marketing/` holds the College Board source's address and hash (never its text) and the How I Teach page. |
+| `shots/` | The screenshot harness. See below. `shots/scenes.py` lists the v1.4.0 scenes; `shots/marketing_folder.py` sets up the kept marketing folder; `shots/csp-correlation.json` and `shots/csp-correlation-ics4u.json` say which ICS3U and ICS4U activities reach which AP CSP learning objectives; `shots/marketing/` holds the College Board source's address and hash (never its text) and the How I Teach page. |
 
 ## Writing a page
 
@@ -124,13 +124,14 @@ There are two working folders, and each picture is taken in one of them:
 
 - **`~/Plantoir Marketing`** — the KEPT marketing folder, for every app scene
   new in v1.4.0: ICS3U (sections 1 and 2) and ICS4U (section 1) from their
-  ready-made content, a reference copy of ICS3U, and ICS3U revised to answer
-  to AP Computer Science Principles as well. See "Regenerating every image".
+  ready-made content, a reference copy of ICS3U, and ICS3U and ICS4U revised to
+  answer to AP Computer Science Principles as well. See "Regenerating every image".
 - **`~/Desktop/Teaching`** — the demo folder: ENG2D, MCV4U and SCH3U, whose
   sections are published as the live example sites. The hero, the class-site
   shots, search, the phone and the colour figures come from here, because a
-  visitor can follow those to a real site. ICS3U is never published to a
-  public site: an embedded curriculum page puts its text on the page, and
+  visitor can follow those to a real site. ICS3U and ICS4U are never
+  published to a public site: an embedded curriculum page puts its text on
+  the page, and
   the College Board's words were cleared for Russell's own folder, not for
   the web (ruling Q2).
 
@@ -201,9 +202,10 @@ Written down because each cost an afternoon:
   publish that never happened.
 - **An embedded curriculum page publishes its text.** A class site shows the
   full wording of every expectation a lesson embeds, even with the curriculum
-  folder hidden from the sidebar — which is why ICS3U, whose College Board
-  pages are the College Board's words, is photographed in the in-app preview
-  and never published to a public site.
+  folder hidden from the sidebar — which is why ICS3U and ICS4U, whose
+  College Board pages are the College Board's words, are photographed in the
+  in-app preview and never published to a public site: each publishes to a
+  folder inside the kept folder.
 - **The class site inside the app's preview renders dark even in a light
   capture.** Quartz reads `(prefers-color-scheme: light)` and treats anything
   else as dark, and the embedded web view does not report a light preference.
@@ -249,8 +251,8 @@ minute; answer both and walk away.
 kept. `--provision` makes ICS3U and ICS4U through the app when they are
 missing, then, in the folder only — never the shipped payload:
 
-- a **College Board Curriculum** folder with one page per AP CSP *learning
-  objective* (`CRD-1.A` …), the objective's exact text with its essential
+- in BOTH ICS3U and ICS4U (`CSP_COURSES`), a **College Board Curriculum**
+  folder with one page per AP CSP *learning objective* (`CRD-1.A` …), the objective's exact text with its essential
   knowledge statements verbatim beneath (`college_board.py`). The words are
   read from the College Board's public Course and Exam Description, fetched
   into the folder's `.sources/` and checked against the SHA-256 in
@@ -267,15 +269,28 @@ missing, then, in the folder only — never the shipped payload:
   words drawn with nesting shown by indentation, the drawn boxes around
   arguments left out and a box standing for a list or an index written as
   `[ ]`;
-- an embed per objective in each activity `shots/csp-correlation.json` names,
-  inside its existing `## Curriculum connection` block after the Ontario ones
-  (the map counts transclusions, never plain links);
-- `How I Teach.md` (our own words, `shots/marketing/`), and a folder
-  destination (`School Web Space`) so the scheduled publish makes nothing
-  public. The new-course panel writes `deploy_target: netlify` for every
-  course, so `netlify` with no site recorded (`.netlify_sites/`, or a
-  section's older `.netlify_site.json`) is not a choice and is replaced; any
-  other destination, or Netlify once a site is recorded, is left alone;
+- an embed per objective in each activity the course's correlation names
+  (`shots/csp-correlation.json` for ICS3U, `shots/csp-correlation-ics4u.json`
+  for ICS4U), inside its existing `## Curriculum connection` block after the
+  Ontario ones (the map counts transclusions, never plain links). Each is data:
+  a row per page with its codes, a reason in our own words and an evidence
+  phrase the tests find on the page; pages read and not tagged are listed
+  under `dropped` with the reason. ICS4U's was made on 2026-09-27 by reading
+  every page of the payload and checked row by row by two Opus readers; a test fails if an ICS4U activity page with a
+  curriculum block is neither tagged nor dropped;
+- ICS4U's second curriculum DECLARED (`curriculum_folders` gains
+  `College Board Curriculum` after `Curriculum`, what ticking the box writes);
+- a folder destination for each of the two courses, so nothing they
+  publish — the scheduled publish included — reaches a public site, since
+  their pages print the College Board's words (ruling Q2): ICS3U publishes to
+  `School Web Space`, ICS4U to `School Web Space/ICS4U` (a folder destination
+  writes `<folder>/section<N>` with `rsync --delete`, so one shared folder
+  would let each course overwrite the other's section 1). The new-course
+  panel writes `deploy_target: netlify` for every course, so `netlify` with
+  no site recorded (`.netlify_sites/`, or a section's older
+  `.netlify_site.json`) is not a choice and is replaced; any other
+  destination, or Netlify once a site is recorded, is left alone;
+- `How I Teach.md` for ICS3U (our own words, `shots/marketing/`);
 - ICS3U section 2 moved to a second semester (its dates shifted by whole
   weeks so its first class is in the week of 2027-02-01; section 1 keeps the
   payload's dates), so the start-of-year scene is the week before school
@@ -286,8 +301,9 @@ missing, then, in the folder only — never the shipped payload:
 Every step says "made" or "already there", a second run changes nothing, a file
 you changed is "left as you changed it", and a folder holding any course but
 ICS3U, ICS4U and their reference copies is refused before anything is written.
-Declaring the second curriculum is not a set-up step: the `curriculum-settings`
-scene does it in Course Settings, because that is the picture.
+Declaring ICS3U's second curriculum is not a set-up step: the
+`curriculum-settings` scene does it in Course Settings, because that is the
+picture. No scene photographs ICS4U's, so for ICS4U the set-up writes it.
 
 **The scenes** are listed in `website/shots/scenes.py` with what each sets up.
 Most are `MarketingScenes` UI tests; the notification banner is a REAL
