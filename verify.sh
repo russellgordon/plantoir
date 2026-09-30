@@ -329,6 +329,13 @@ else
   cat /tmp/verify_deploy_non_interactive_test.log
 fi
 
+if (cd scripts && python3 test_deploy_cloudflare_project.py) >/tmp/verify_deploy_cloudflare_project_test.log 2>&1; then
+  pass "deploy: Cloudflare's own deploy tool is never left a question to ask, and a deleted project is made again (scripts/test_deploy_cloudflare_project.py)"
+else
+  fail "deploy: Cloudflare's own deploy tool is never left a question to ask, and a deleted project is made again (scripts/test_deploy_cloudflare_project.py)"
+  cat /tmp/verify_deploy_cloudflare_project_test.log
+fi
+
 if (cd scripts && python3 test_reference_course.py) >/tmp/verify_reference_course_test.log 2>&1; then
   pass "a course kept for reference is never deployed, at every door the shared toolchain owns (scripts/test_reference_course.py)"
 else
