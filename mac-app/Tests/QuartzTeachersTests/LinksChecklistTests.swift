@@ -15,6 +15,9 @@ final class LinksChecklistTests: XCTestCase {
     // MARK: - Types
 
     struct MissingCase: Error {
+
+        // MARK: - Stored properties
+
         let start: String
     }
 
@@ -130,8 +133,8 @@ final class LinksChecklistTests: XCTestCase {
             "comesWith": LinksChecklistWording.comesWith(count: "{count}", pages: "{pages}"),
             "linkedFrom": LinksChecklistWording.linkedFrom(name: "{name}"),
             "linkedFromSeveral": LinksChecklistWording.linkedFromSeveral(name: "{name}", count: "{count}"),
-            "onlyLinkedFrom": LinksChecklistWording.onlyLinkedFrom(name: "{name}"),
-            "onlyLinkedFromSeveral": LinksChecklistWording.onlyLinkedFromSeveral(
+            "linkedFromRow": LinksChecklistWording.linkedFromRow(name: "{name}"),
+            "linkedFromSeveralRows": LinksChecklistWording.linkedFromSeveralRows(
                 name: "{name}", count: "{count}", pages: "{pages}"
             ),
             "rowInFolder": LinksChecklistWording.rowInFolder(page: "{page}", folder: "{folder}"),

@@ -4724,12 +4724,12 @@
     "ticking": "class-planning.json -> datingPagesAClassBrings.fromTheLinksChecklist.ticking. Classes start unticked; a page only a hidden class links directly starts unticked; everything else starts ticked. A row's tick is its OWN: a row reached only through other offered rows (`dependsOn`) keeps the tick it starts with, and goes only with one of those rows (followingARow) (#385).",
     "whatAClassBrings": "A class ticked in the sheet is published the way the assistant's publish of that class would publish it (followingLinks.publishing, bothRoutesAgree): the pages it links to, transitively, stopping at other classes, each hidden one dated by that class (datingPagesAClassBrings; published-before pages keep theirs). The class's own date is untouched. Where a page is both a row and brought by a ticked class, the CLASS's date wins - it comes with that class (director's ruling F2). The sheet says how many pages a ticked class brings in one line under its row (the cut the director allowed instead of locked rows). A class published here does NOT repoint the section's front page: the front page keeps following the rule it follows today (director's ruling F1), and the sheet says so in one sentence, only when a class row is present (wording.frontPageStaysPut).",
     "followingARow": {
-      "rule": "#385. A row whose `dependsOn` is not empty (file-formats.json -> linksChecklistOffer.rowKeys.dependsOn) is reached only through those offered rows: no page students can see links it. It GOES - is shown ticked and is published by Publish - when its OWN tick is on AND at least one row in its `dependsOn` goes. A row with no `dependsOn` goes when its own tick is on. Worked out as the LEAST fixed point: start with nothing going and add rows until no more can be added, so pages that link only each other go only through a row that goes, never through each other. A row with `dependsOn` that does not go is LOCKED: shown unticked and disabled, its own tick kept but not shown, and never written. It is LISTED UNDER `dependsOn[0]` - after that row, inside that row's group, indented (the indent is presentation; the mac caps it at three levels) - and not in its own group's list; its group, date and why are unchanged. A dependsOn place that is not a row of the sheet is not a parent. Class rows are never parents and never have `dependsOn`. The Publish button counts rows that go, and is disabled when none does. Rows a ticked class brings are published by that class whatever their own row shows (whatAClassBrings) - see knownLimit.",
+      "rule": "#385. A row whose `dependsOn` is not empty (file-formats.json -> linksChecklistOffer.rowKeys.dependsOn) is reached only through those offered rows: no page students can see links it. It GOES - is shown ticked and is published by Publish - when its OWN tick is on AND at least one row in its `dependsOn` goes. A row with no `dependsOn` goes when its own tick is on. Worked out as the LEAST fixed point: start with nothing going and add rows until no more can be added, so pages that link only each other go only through a row that goes, never through each other. Its second line says it is linked from `dependsOn[0]` and goes when that page goes (wording.linkedFromRow / linkedFromSeveralRows) - never 'only': a hidden class may link it too (firstUsedIn), which `dependsOn` leaves out by design. A row with `dependsOn` that does not go is LOCKED: shown unticked and disabled, its own tick kept but not shown, and never written. It is LISTED UNDER `dependsOn[0]` - after that row, inside that row's group, indented (the indent is presentation; the mac caps it at three levels) - and not in its own group's list; its group, date and why are unchanged. A dependsOn place that is not a row of the sheet is not a parent. Class rows are never parents and never have `dependsOn`. The Publish button counts rows that go, and is disabled when none does. Rows a ticked class brings are published by that class whatever their own row shows (whatAClassBrings) - see knownLimit.",
       "whyItsOwnTickIsKept": "Copying the parent's tick into the rows under it was measured and rejected (rejected: 'Copying a row's tick'): all 44 rows the 39 payloads put under another row start unticked on their own account, because a later class uses them first. Kept ticks are the Copy a Page lock inverted: there a row is locked TICKED while something that shows it is going; here it is locked UNTICKED while nothing it comes under is going. Untick a hub and tick it again, and the pages under it come back as they were.",
       "answered": "The answered file's leftUnticked (file-formats.json -> linksChecklistAnswered) holds only rows whose OWN tick was off and that were not written. A row left only because the row it comes under was left is NOT remembered as unticked, so the next time that row is ticked it comes with it.",
       "reRead": "When the sheet OPENS, rows are checked against the pages as they are now. A row whose page is now visible is dropped (as before) and the rows under it are FREED - their dependsOn becomes [] - because a page students can see now links them. A row whose page has gone is dropped, and so is its place in other rows' dependsOn; a row left with no dependsOn it could go with is DROPPED too (it could only be published with nothing linking it), repeated until nothing more drops. At PUBLISH the rows are checked again but nothing is freed: a row the sheet showed locked is never published because its parent was made visible while the sheet was open (plan-review finding 2); what goes is worked out from the rows as shown, less any page that has gone since.",
       "measured": "2026-09-30, over the 39 payloads, each laid out as an APPROXIMATE Get Ready (Unit 1, Day 1 visible with the pages it links, Key Links and its pages, folder indexes and curriculum pages; everything else hidden) - an emulation, not Get Ready itself: 2,463 offered rows; 44 depend on another row, in 9 payloads (SNC1W 24, MCR3U 7, SCH4U 3, ADA1O 2, SBI3U 2, SBI4U 2, SCH3U 2, MCV4U 1, SNC2D 1); 18 have two or more parents; 21 are listed under a row of the other group; the deepest chain is 2; ADA1O has two pages that link only each other. All 44 sit under a row that starts unticked and start unticked themselves, so straight after Get Ready this changes the LAYOUT of the sheet, not what a default press publishes. The behaviour change bites in the ordinary authoring case - a hidden hub with hidden worksheets behind it - which the payloads do not contain.",
-      "knownLimit": "A row that a TICKED class brings is published with that class (whatAClassBrings), whatever its own row shows - including a row under an unticked row, which is shown locked and unticked although the class will publish it. The counts are honest (it is not 'left hidden'); the checkbox is not. Recorded, not closed here: its own GitHub issue ('show the rows a ticked class brings as coming with it').",
+      "knownLimit": "Two, recorded and not closed here. (1) N2: a row that a TICKED class brings is published with that class (whatAClassBrings), whatever its own row shows - including a row under an unticked row, which is shown locked and unticked although the class will publish it. The counts are honest (it is not 'left hidden'); the checkbox is not. GitHub #398 ('Links checklist: show the rows a ticked class brings as coming with it (N2)'). (2) A row that goes only through a page the writer then DECLINES (no room for a key - noRoomForAKey, #186) is still published, with nothing students can see linking it: `going` is worked out before the writer runs. The teacher is told the page was declined, not that the row under it went without it. Rare (a page the writer cannot add a key to); not handled (director's ruling on the implementation review, note 2).",
       "howTheCasesRun": "PURE: no course is laid out. `rows` are the sheet's rows in order, each {place, group, ticked (its own starting tick), dependsOn}. `steps` are applied in order, each {\"tick\": place} or {\"untick\": place}, the way the sheet's checkbox applies them (the mac: LinksChecklistGate.toggled, which the checkbox calls). After the steps, `expectGoing` is exactly the set of places that go and `expectLocked` exactly the set shown locked; `expectShown`, when given, is the order and depth the sheet lists the rows in, as [place, depth] pairs across the groups in the sheet's group order. Run on the mac by LinksChecklistFollowingTests; owed by Windows.",
       "cases": [
         {
@@ -5124,7 +5124,7 @@
     },
     "naming": {
       "rule": "#385's page-naming notes. The sheet names pages the way #362's start-of-year plan does (startOfYear.planShows), with the same builder rather than a second rule: every page in a second line is wording `{name}` - its title (front matter title, else file name, else the folder for a folder's own index page), followed by its folder within the course when ANOTHER PAGE IN THE SECTION has the same title (not only another row). A row's own title is the same title, unquoted, and wording.rowInFolder when it is shared. Never the file name when the page has a title, never a path, never .md.",
-      "howTheCaseRuns": "Laid out in section 1 of a fresh course, the keys as startOfYear.howToRunACase defines them (class, page, folderIndex, `visible`, `links`, `folder`, `shownAs`) - a `folderIndex` is written with NO title. `offer` is the rows as the build would write them; the runner fills `title` with the file name (the last part of the place, as the build's title_of does for a page with no title) and `linkedFrom` from the case. The sheet opens on it. `expectRowTitles` maps a place to what its row is called: {\"wording\": \"rowInFolder\", \"page\", \"folder\"} or {\"plain\": text}; each must also DIFFER from the row's `title` when the page's title does. Every row's second line must contain each of `expectSecondLinesContain` ({\"wording\": \"pageName\", \"page\"}: startOfYear.wording.pageName) and none of `expectSecondLinesNeverContain`. `thenWithout` removes that row from the offer and opens the sheet again: `expectRowTitlesThen` must still hold - the title is shared across the SECTION, so it stays shared with a row gone. Run on the mac by LinksChecklistFollowingTests; owed by Windows.",
+      "howTheCaseRuns": "Laid out in section 1 of a fresh course, the keys as startOfYear.howToRunACase defines them (class, page, folderIndex, `visible`, `links`, `folder`, `shownAs`) - a `folderIndex` is written with NO title. `offer` is the rows as the build would write them; the runner fills `title` with the file name (the last part of the place, as the build's title_of does for a page with no title) and `linkedFrom` from the case. The sheet opens on it. `expectRowTitles` maps a place to what its row is called: {\"wording\": \"rowInFolder\", \"page\", \"folder\"} or {\"plain\": text}; each must also DIFFER from the row's `title` when the page's title does. Every row's second line must contain each of `expectSecondLinesContain` ({\"wording\": \"pageName\", \"page\"}: startOfYear.wording.pageName) and none of `expectSecondLinesNeverContain`. `expectRowTitles` may be absent. `expectSecondLines` maps a place to the parts its second line must contain, each {\"wording\": key, \"name\": page title} rendered with that key and {name} = startOfYear.wording.pageName (a class's title is its page name). `thenWithout` removes that row from the offer and opens the sheet again: `expectRowTitlesThen` must still hold - the title is shared across the SECTION, so it stays shared with a row gone. Run on the mac by LinksChecklistFollowingTests; owed by Windows.",
       "cases": [
         {
           "name": "rows and second lines name pages by title, a shared title by its folder, a folder's own page by the folder",
@@ -5263,6 +5263,92 @@
               "folder": "Zeta"
             }
           }
+        },
+        {
+          "name": "a row that comes under another row AND is first used in a hidden class says both, and never 'only' (#385, implementation review S1 - contract case p's shape)",
+          "pages": [
+            {
+              "title": "Unit 1, Day 1",
+              "kind": "class",
+              "visible": true,
+              "links": [
+                "How Marks Work"
+              ]
+            },
+            {
+              "title": "Unit 3, Day 1",
+              "kind": "class",
+              "visible": false,
+              "links": [
+                "Worksheet"
+              ]
+            },
+            {
+              "title": "How Marks Work",
+              "kind": "page",
+              "visible": true,
+              "links": [
+                "Hub"
+              ]
+            },
+            {
+              "title": "Hub",
+              "kind": "page",
+              "visible": false,
+              "links": [
+                "Worksheet"
+              ]
+            },
+            {
+              "title": "Worksheet",
+              "kind": "page",
+              "visible": false
+            }
+          ],
+          "offer": [
+            {
+              "place": "Concepts/Hub",
+              "group": "notReachedByAClass",
+              "ticked": true,
+              "step": null,
+              "claimedBy": null,
+              "date": "2026-09-08",
+              "why": "datedAsTheFirstClass",
+              "firstUsedIn": null,
+              "dependsOn": []
+            },
+            {
+              "place": "Concepts/Worksheet",
+              "group": "notReachedByAClass",
+              "ticked": false,
+              "step": null,
+              "claimedBy": null,
+              "date": "2026-09-08",
+              "why": "datedAsTheFirstClass",
+              "firstUsedIn": "section1/All Classes/Unit 3, Day 1",
+              "dependsOn": [
+                "Concepts/Hub"
+              ]
+            }
+          ],
+          "linkedFrom": [
+            "Concepts/How Marks Work"
+          ],
+          "expectSecondLines": {
+            "Concepts/Worksheet": [
+              {
+                "wording": "firstUsedIn",
+                "name": "Unit 3, Day 1"
+              },
+              {
+                "wording": "linkedFromRow",
+                "name": "Hub"
+              }
+            ]
+          },
+          "expectSecondLinesNeverContain": [
+            "only"
+          ]
         }
       ]
     },
@@ -5302,8 +5388,8 @@
       "comesWith": "brings {count} more {pages} with it",
       "linkedFrom": "linked from {name}",
       "linkedFromSeveral": "linked from {name} and {count} more",
-      "onlyLinkedFrom": "only linked from {name} — it goes when that page goes",
-      "onlyLinkedFromSeveral": "only linked from {name} and {count} more hidden {pages} — it goes when one of them goes",
+      "linkedFromRow": "linked from {name} — it goes when that page goes",
+      "linkedFromSeveralRows": "linked from {name} and {count} more hidden {pages} — it goes when one of them goes",
       "rowInFolder": "{page} (in {folder})",
       "frontPageStaysPut": "Publishing a class here does not change which class the front page shows.",
       "nothingChangesUntilYouDeploy": "Nothing changes for students until you deploy.",
@@ -5333,7 +5419,7 @@
       "'A row goes when a row it comes under is TICKED' - #385. Wrong for a chain (the middle row is ticked but not going) and for pages that link only each other (two hidden pages would publish each other with nothing students can see linking either). A row goes only when a row it comes under GOES, worked out from nothing upwards (followingARow.rule).",
       "Naming only the NEARER rows in dependsOn - #385. A page linked by a near row that is left and a farther row that goes would be left hidden while a published page links it: a new dead link nobody chose. The full list decides whether it goes; only the first decides where it is shown.",
       "Working dependsOn out in the app from linkedFrom - #385. linkedFrom is capped at 10 and does not say which linkers students can see (176 of 2,463 rows at the cap over the payloads), and Windows would owe the walk; the build already has the whole picture.",
-      "Listing a row under EVERY row it comes under - two checkboxes for one page. It is listed under the nearest, and its second line says how many more there are (wording.onlyLinkedFromSeveral).",
+      "Listing a row under EVERY row it comes under - two checkboxes for one page. It is listed under the nearest, and its second line says how many more there are (wording.linkedFromSeveralRows).",
       "Leaving a row in its own group with only a sentence saying what it comes under - #385 asks for 'listed under', and 21 of the 44 measured would sit two headings away from the row that decides them.",
       "Changing the build's `title` to the name the sheet shows - #385's page-naming notes. title_of also feeds class detection and sort keys in the build; the app re-reads every row with its own reader anyway and names it the way #362 does (startOfYear.planShows).",
       "Showing the rows a ticked class brings as 'coming with it', locked (the N2 limit) - not #385's; left to its own GitHub issue (followingARow.knownLimit)."

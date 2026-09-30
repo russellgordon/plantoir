@@ -6904,7 +6904,11 @@ links checklist (#379)"); this is the app's half.
   starts unticked, or "a class of its own — tick it to publish it now" plus
   "brings N more pages with it" once ticked — and where it is linked from.
   Rows are checked again against the pages as they are now; one that became
-  visible or went away is dropped.
+  visible or went away is dropped. It scrolls in a `CappedScrollArea` of 380 pt
+  (#365's), width 560; 100 rows measure within 620 pt. Not Now and Publish both
+  record the answer (`.publish_state/section<N>.links-checklist-answered.json`,
+  the app's own file): the same set is not offered again on its own, a page
+  joining it brings it back, and a page the teacher unticked starts unticked.
 - **Rows that come under another row (#385).** A row whose offer entry
   carries `dependsOn` (no page students can see links it; only other offered
   rows do — 05 → "Rows that come under another row") is listed UNDER
@@ -6922,9 +6926,13 @@ links checklist (#379)"); this is the app's half.
   tick ten pages of later units. It is the Copy a Page lock inverted: there a
   row is locked TICKED while something that shows it is going; here it is
   locked UNTICKED while nothing it comes under is going. The second line
-  says "only linked from “Hub” — it goes when that page goes" (or "… and N
-  more hidden pages — it goes when one of them goes") instead of the "linked
-  from" part. The Publish button counts rows that go and is disabled when
+  says "linked from “Hub” — it goes when that page goes" (or "… and N
+  more hidden pages — it goes when one of them goes"; `linkedFromRow`,
+  `linkedFromSeveralRows`) instead of the plain "linked from" part. Never
+  "ONLY linked from": the implementation review (S1) found that every one of
+  the 44 measured rows is also "first used in" a hidden class, whose link
+  `dependsOn` leaves out by design, so "only" was false in the common case
+  (naming case 2 pins it). The Publish button counts rows that go and is disabled when
   none does. **The re-read** frees the rows under a page made visible before
   the sheet OPENED (their `dependsOn` becomes empty — a visible page links
   them now), drops a gone page from other rows' `dependsOn`, and drops a row
@@ -6946,11 +6954,7 @@ links checklist (#379)"); this is the app's half.
   (`displayName`'s step 2). A page gone since the offer keeps the build's
   title (not its file name); a place that is not a row falls back to its last
   part. The build's own `title` is left as it is (`title_of` feeds class
-  detection). It scrolls in a `CappedScrollArea` of 380 pt
-  (#365's), width 560; 100 rows measure within 620 pt. Not Now and Publish both
-  record the answer (`.publish_state/section<N>.links-checklist-answered.json`,
-  the app's own file): the same set is not offered again on its own, a page
-  joining it brings it back, and a page the teacher unticked starts unticked.
+  detection).
 - **Publish** (`LinksChecklistPublisher`): refused while the course is being
   published; ONE merged plan — the ticked pages through
   `AssistPublishPlanner.planPublishing(exactly:dateMoves:)` with the offer's
@@ -6987,9 +6991,15 @@ links checklist (#379)"); this is the app's half.
   gives only a count (N2, the allowed cut). #385 did NOT close it and widened
   it: a row under an unticked row is now shown LOCKED and unticked even when a
   ticked class reaches it and will publish it (the counts stay honest — it is
-  not "left hidden" — the checkbox does not). Both variants are the follow-up
-  issue "Links checklist: show the rows a ticked class brings as coming with
-  it (N2)" (`linksChecklist.followingARow.knownLimit`); a
+  not "left hidden" — the checkbox does not). Both variants are
+  [#398](https://github.com/russellgordon/plantoir/issues/398) "Links
+  checklist: show the rows a ticked class brings as coming with it (N2)"
+  (`linksChecklist.followingARow.knownLimit`); a row that goes only through a
+  page the writer then DECLINES (no room for a key, #186) is still published
+  with nothing students can see linking it — `going` is worked out before the
+  writer runs, and the teacher is told only that the page above it was
+  declined; rare, recorded in the same `knownLimit`, not handled (#385's
+  implementation review, note 2); a
   page published from the checklist and later hidden again by hand, with a
   visible page still linking to it, is in the answered set, so neither the
   alert nor the checklist returns for it until a rollover — the menu item

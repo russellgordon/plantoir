@@ -184,9 +184,9 @@ final class LinksChecklistSheetModel: Identifiable {
             let name: String = naming.name(ofPlace: first)
             let more: Int = row.dependsOn.count - 1
             if more == 0 {
-                parts.append(LinksChecklistWording.onlyLinkedFrom(name: name))
+                parts.append(LinksChecklistWording.linkedFromRow(name: name))
             } else {
-                parts.append(LinksChecklistWording.onlyLinkedFromSeveral(
+                parts.append(LinksChecklistWording.linkedFromSeveralRows(
                     name: name, count: String(more), pages: LinksChecklistWording.pageWord(more)
                 ))
             }
@@ -281,6 +281,10 @@ struct LinksChecklistSheet: View {
 
     @Environment(\.dismiss) var dismiss
 
+    /// How far in a row listed under another is drawn, per level. Capped at
+    /// three levels so a long chain cannot push the text off the sheet.
+    static let indentPerLevel: CGFloat = 18
+
     // MARK: - Computed properties
 
     /// The same cap Copy a Page's checklist uses (#365), and for the same
@@ -348,10 +352,6 @@ struct LinksChecklistSheet: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
-
-    /// How far in a row listed under another is drawn, per level. Capped at
-    /// three levels so a long chain cannot push the text off the sheet.
-    static let indentPerLevel: CGFloat = 18
 
     @ViewBuilder
     func group(_ heading: String, rows: [LinksChecklistGate.ShownRow]) -> some View {

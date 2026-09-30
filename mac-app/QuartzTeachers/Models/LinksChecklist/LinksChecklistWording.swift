@@ -78,13 +78,15 @@ nonisolated enum LinksChecklistWording {
     }
 
     /// A row reached only through other offered rows (#385), named by the
-    /// one it is listed under.
-    static func onlyLinkedFrom(name: String) -> String {
-        return "only linked from \(name) — it goes when that page goes"
+    /// one it is listed under. Never "only linked from": a hidden class may
+    /// link it too (its "first used in" part), which `dependsOn` leaves out
+    /// (implementation review, S1).
+    static func linkedFromRow(name: String) -> String {
+        return "linked from \(name) — it goes when that page goes"
     }
 
-    static func onlyLinkedFromSeveral(name: String, count: String, pages: String) -> String {
-        return "only linked from \(name) and \(count) more hidden \(pages) — it goes when one of them goes"
+    static func linkedFromSeveralRows(name: String, count: String, pages: String) -> String {
+        return "linked from \(name) and \(count) more hidden \(pages) — it goes when one of them goes"
     }
 
     // MARK: - A row's title

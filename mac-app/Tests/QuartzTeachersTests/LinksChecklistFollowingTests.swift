@@ -132,6 +132,9 @@ final class LinksChecklistFollowingTests: XCTestCase {
     // MARK: - publishCases from iv-e: through the sheet
 
     struct SheetRun {
+
+        // MARK: - Stored properties
+
         let testCase: [String: Any]
         let urls: [String: URL]
         let made: AssistFixture.Made
@@ -358,7 +361,7 @@ final class LinksChecklistFollowingTests: XCTestCase {
     func testRowsAreNamedAsTheContractSays() throws {
         let naming: [String: Any] = try XCTUnwrap(LinksChecklistTests.contract()["naming"] as? [String: Any])
         let cases: [[String: Any]] = try XCTUnwrap(naming["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 1)
+        XCTAssertGreaterThanOrEqual(cases.count, 2)
         for testCase in cases {
             let made: AssistFixture.Made = try AssistFixture.makeRunner()
             defer { try? FileManager.default.removeItem(at: made.root) }
@@ -374,7 +377,30 @@ final class LinksChecklistFollowingTests: XCTestCase {
                 offer: try LinksChecklistTests.offer(from: offerRows), answered: nil, occasion: .afterAPreview
             )
             XCTAssertEqual(model.rows.count, offerRows.count, "A row was dropped: \(model.rows)")
-            try checkRowTitles(model, try XCTUnwrap(testCase["expectRowTitles"] as? [String: [String: Any]]))
+            if let titles = testCase["expectRowTitles"] as? [String: [String: Any]] {
+                try checkRowTitles(model, titles)
+            }
+            for (place, parts) in testCase["expectSecondLines"] as? [String: [[String: String]]] ?? [:] {
+                var found: LinksChecklistOffer.Row?
+                for row in model.rows where row.place == place {
+                    found = row
+                }
+                let line: String = model.secondLine(for: try XCTUnwrap(found, "\(place) is not offered"))
+                for part in parts {
+                    let name: String = StartOfYearWording.pageName(page: try XCTUnwrap(part["name"]))
+                    let wanted: String
+                    switch part["wording"] {
+                    case "firstUsedIn":
+                        wanted = LinksChecklistWording.firstUsedIn(name: name)
+                    case "linkedFromRow":
+                        wanted = LinksChecklistWording.linkedFromRow(name: name)
+                    default:
+                        XCTFail("The harness does not know \(part["wording"] ?? "nil")")
+                        wanted = "?"
+                    }
+                    XCTAssertTrue(line.contains(wanted), "\(place): “\(line)” lacks “\(wanted)”")
+                }
+            }
             for row in model.rows {
                 let line: String = model.secondLine(for: row)
                 for wanted in testCase["expectSecondLinesContain"] as? [[String: String]] ?? [] {
