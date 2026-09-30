@@ -1651,6 +1651,36 @@ will not close.
 would rot from uptime in exactly the same way unless the quit path works, so
 fixing the quit path is the prerequisite either way rather than the alternative.
 
+### On Windows since bundle 3 (#231)
+
+Russell decided on 2026-09-25 to match all three rules; Windows did on
+2026-09-30. **The question**: quitting there is closing the LAST window, so
+`MainWindow`'s `AppWindow.Closing` asks (`QuitConfirmation`, all nine contract
+cases, Keep Working the default) when the app's own records show a publish or a
+preview being BUILT (`CourseActivity.BeginPreviewBuild`, from the press until
+the page first answers — never the port lease), and never when Windows is
+ending the session: a window subclass hears `WM_QUERYENDSESSION`, Windows'
+`kAEQuitReason`. Both answers go on the trail. A copy of a course being saved
+counts as the rule says, but Windows zips on the window's own thread, so a quit
+cannot land mid-zip there. Both `appliesOn: ["mac"]` keys were deleted.
+
+**The WSL release** (`FolderContainers.ReleaseEverythingAtQuit`) is reached
+only by a build with no native runtime — never a shipped one — and was hardened
+rather than deleted, because deleting it is a decision about the fallback
+itself: it now leaves everything alone while another program holds a build or
+publish lease in any of the folders (leases first) or while a launcher for one
+of them runs (Windows' own process list: `Win32_Process` command lines
+containing `<folder>\preview.ps1`, `deploy.ps1` or `setup.ps1`, matched
+LITERALLY, the launchers' `--stop` runs excluded — checked against real
+processes in a folder named `C++ 26(27) [quit]…`); it counts the machine idle
+only when `docker ps` ANSWERS (exit 0) and is empty; and it starts PowerShell
+and wsl by their System32 path. **The CHECK #231 asked** — did
+`RunDetached("wsl"/"powershell")` resolve from a PATH a teacher may have
+edited? No: by name, `CreateProcess` looks in the app's folder, the current
+directory (which `Program.Main` sets to the app's folder), then System32, and
+only then PATH — so PATH could not reach them, but a stray `wsl.exe` beside
+the app could have. Full paths close that.
+
 ## A preview that never appears: bounding the QUIET, not the run
 
 Written 2026-09-20 for [issue #225](https://github.com/russellgordon/plantoir/issues/225),
@@ -2924,6 +2954,37 @@ clock (45 s then go ahead; 40 looks then stand down; losing the race; a
 preview not waited for); the stand-down record and its trail line; the MCP
 leaving order. It resets process-wide stores and relies on the scheme's
 `parallelizable = "NO"`, like `CourseActivityTests`.
+
+### On Windows since bundle 3 (#289)
+
+Windows took the same rules on 2026-09-30, so "Windows' only blocking kind is
+build" is history now. `WorkLease` gained the pure seam the contract's lists
+run through — `FirstInTheWay` (all 29 `declining` cases), `IsAlive` on the
+signal and table answers (17 of the 19 `liveness` cases; the two one-line
+IMPORT cases are mac-only), `ReadBody` (the 7 `bodyCases`) — and `Take` now
+answers a `Held` carrying its claim (line 3's moment, the pid).
+
+- **The window** takes its BUILD lease before its preview lease and looks
+  right after (`DeclinedAfterTaking`); Deploy takes its build + publish claim
+  BEFORE it stops the preview, in fields of its own so the stop cannot release
+  them, and the second look after the stop is gone (the claim was up through
+  it). Declined, it says `courseIsBeingBuiltElsewhere` in a Cannot Preview /
+  Cannot Deploy Yet dialog. The Deploy button still greys only for another
+  program's BUILD — the mac rejected greying; Windows keeps it as a courtesy,
+  and the press is the guarantee.
+- **Both assistants** are `plantoir-mcp` on Windows (the in-app window drives
+  it over stdio), so both are told `courseIsBusy` — the outside assistant's
+  sentence. A build path declines on a preview elsewhere
+  (`ClaimTheBuildOrDecline`); a WRITE does not — only the rebuild after it is
+  declined, and the note says `courseIsBusy` where the preview would have been
+  refreshed.
+- **The scheduled publish** now runs as Plantoir (07-deployment → "On Windows
+  since bundle 3") and writes `build` + `publish` leases, waiting for another
+  program's build or publish as the rule says.
+- **Leaving**: `LauncherRunner.StopEverythingItStarted` kills each launcher
+  tree it is waiting on and runs `preview.ps1 <code> <section> --stop`, each up
+  to 15 s, BEFORE the leases go — on stdin close and on process exit
+  (`McpLeavingTests`). A kill skips it, as here.
 
 ## A course code Plantoir keeps for itself: WORK (#101)
 
