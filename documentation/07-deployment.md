@@ -950,7 +950,8 @@ that carry a publish flag. So a deploy now RECORDS it
   its place in the course folder, read with the build's own hide rule after
   the How I Teach sweep and the #246 hiding. It is written only after Quartz
   built the site and it was mirrored; a build that fails half way leaves the
-  previous list, which still matches the previous site. Every build, preview
+  previous list in place, but it has already written a new `.build-id`, so
+  nothing is recorded from that list until a build for publishing succeeds. Every build, preview
   or not, first writes `.build-id` beside it; the list carries the id of the
   build that wrote it.
 - **Each destination records itself, after its upload succeeded.** `deploy.py`
@@ -968,7 +969,8 @@ that carry a publish flag. So a deploy now RECORDS it
   it is the truth — and fragments cannot lose each other when two publishes
   run at once. Readers take the union.
 - **Released on every rollover** of the section, whichever website answer the
-  teacher gave, and restored by the rollover's undo — a new year's site has
+  teacher gave — its fragments moved into `section<N>.published-pages.previous-<stamp>/`
+  — and restored by the rollover's undo — a new year's site has
   published nothing yet (`publishedPagesRecord.releasedWhenASectionRollsOver`).
 - **Never fails a publish.** The pages are already out; a record that could
   not be written costs, at worst, one page taking its class's date once.

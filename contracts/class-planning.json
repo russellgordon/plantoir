@@ -59,8 +59,8 @@
       "from": "the section's published-pages record: courses/<CODE>/.publish_state/section<N>.published-pages/, one fragment per destination a deploy reached (file-formats.json -> publishedPagesRecord). A page listed there has been on a site students could reach; a page hidden now and listed there KEEPS its date when it is published again - from the links checklist and from the assistant's publish alike (Russell's decision 4 on #379, 2026-09-29; the plan's Q5).",
       "replaces": "neverPublishedIsInferred (#173 era): 'a page published once and later hidden counts as never published and takes a new date'. Russell chose the opposite on 2026-09-29.",
       "whyARecordAndNotAKeyOnThePage": "The obvious sign - a date already on the page (created, or createdSection<N> on a course-level page) - means nothing: measured over the 39 payloads, 7,114 of the 7,118 pages that carry a publish flag also carry created, because setup_course.py writes it on every page it makes and a template copied in Obsidian carries its install-day stamp. Reading 'has a date' as 'was published' would switch the dating off everywhere, and every test built from bare fixtures would still pass. A new page key stamped by deploys (firstPublishedSection<N>) was rejected too: a line on every published page, a rewrite of teacher files on nearly every deploy (each day's class brings new pages), each one after a build has started triggering #265's extra build, and a key both apps and the Python must agree on forever.",
-      "honestLimit": "Pages published and hidden again BEFORE the record existed (v1.4.1), or renamed since they were published, are not in it and count as never published - the old inference, once. Accepted by the director (Q3), 2026-09-29: rare, and it corrects itself at the first deploy.",
-      "releasedAtRollover": "The record is renamed aside on EVERY rollover of the section, whichever website answer the teacher gave, and the rollover's undo restores it (file-formats.json -> publishedPagesRecord.releasedWhenASectionRollsOver): a new year's site has published nothing yet, so the pages Get Ready hid take this year's class dates.",
+      "honestLimit": "Pages published and hidden again BEFORE the record existed (v1.4.1), or renamed since they were published, are not in it and count as never published - the old inference, once. Accepted by the director (Q3), 2026-09-29: rare. The first deploy after v1.4.1 records the pages visible AT THAT DEPLOY; a page already hidden then stays unrecorded, and takes its class's date once when it is next published.",
+      "releasedAtRollover": "The record's fragments are moved aside on EVERY rollover of the section, whichever website answer the teacher gave, and the rollover's undo restores it (file-formats.json -> publishedPagesRecord.releasedWhenASectionRollsOver): a new year's site has published nothing yet, so the pages Get Ready hid take this year's class dates.",
       "firstClassException": "datingPagesAClassBrings.fromTheLinksChecklist.firstClassException: a page a visible class links DIRECTLY is dated by the build on every build, record or not.",
       "cases": [
         {
@@ -686,6 +686,88 @@
           "expectAbsent": [
             "Exercises/Deep"
           ]
+        },
+        {
+          "name": "the walk does not go through Key Links or a folder's index: what they link to is the other group, dated as the first class",
+          "pages": [
+            {
+              "path": "section1/All Classes/Unit 1, Day 1",
+              "visible": true,
+              "created": "2026-09-08T07:00:00.000+0000",
+              "links": []
+            },
+            {
+              "path": "section1/All Classes/Unit 1, Day 2",
+              "visible": true,
+              "created": "2026-09-10T07:00:00.000+0000",
+              "links": [
+                "Key Links"
+              ]
+            },
+            {
+              "path": "section1/Key Links",
+              "visible": true,
+              "links": [
+                "Behind Key Links"
+              ]
+            },
+            {
+              "path": "Concepts/Behind Key Links",
+              "visible": false,
+              "links": []
+            }
+          ],
+          "expect": {
+            "Concepts/Behind Key Links": {
+              "group": "notReachedByAClass",
+              "step": null,
+              "claimedBy": null,
+              "date": "2026-09-08",
+              "why": "datedAsTheFirstClass"
+            }
+          }
+        },
+        {
+          "name": "the other group follows links out of its own pages: a hidden page behind a hidden page no class reaches is offered too",
+          "pages": [
+            {
+              "path": "section1/All Classes/Unit 1, Day 1",
+              "visible": true,
+              "created": "2026-09-08T07:00:00.000+0000",
+              "links": []
+            },
+            {
+              "path": "Resources/Useful Links",
+              "visible": true,
+              "links": [
+                "Hidden A"
+              ]
+            },
+            {
+              "path": "Resources/Hidden A",
+              "visible": false,
+              "links": [
+                "Hidden B"
+              ]
+            },
+            {
+              "path": "Resources/Hidden B",
+              "visible": false,
+              "links": []
+            }
+          ],
+          "expect": {
+            "Resources/Hidden A": {
+              "group": "notReachedByAClass",
+              "ticked": true
+            },
+            "Resources/Hidden B": {
+              "group": "notReachedByAClass",
+              "ticked": true,
+              "date": "2026-09-08",
+              "why": "datedAsTheFirstClass"
+            }
+          }
         },
         {
           "name": "nothing to offer when every link leads somewhere students can see",

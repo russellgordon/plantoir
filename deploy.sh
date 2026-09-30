@@ -770,8 +770,11 @@ record_published_pages() {
   local listing="${built}/.visible-pages.json" id_file="${built}/.build-id"
   [[ -f "$listing" && -f "$id_file" ]] || return 0
   local current listed
-  current="$(tr -d '[:space:]' < "$id_file")"
-  listed="$(grep -o '"buildId": *"[^"]*"' "$listing" | head -n 1 | sed -e 's/^"buildId": *"//' -e 's/"$//')"
+  # `|| return 0` on both: under `set -euo pipefail` a list with no buildId
+  # (grep finds nothing) or an unreadable .build-id would otherwise END the
+  # launcher here — after the copy succeeded, before "Published" is said.
+  current="$(tr -d '[:space:]' < "$id_file" 2>/dev/null)" || return 0
+  listed="$(grep -o '"buildId": *"[^"]*"' "$listing" 2>/dev/null | head -n 1 | sed -e 's/^"buildId": *"//' -e 's/"$//')" || return 0
   [[ -n "$current" && "$current" == "$listed" ]] || return 0
   local folder="courses/${course}/.publish_state/section${section}.published-pages"
   mkdir -p "$folder" 2>/dev/null || return 0

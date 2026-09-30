@@ -123,7 +123,7 @@ class FolderPublishRecordsTests(unittest.TestCase):
 
     def run_the_function(self):
         self.assertIsNotNone(self.function, "deploy.sh has no record_published_pages block")
-        script = self.function + f'\nrecord_published_pages "{self.section_dir}" TEST 1 folder\n'
+        script = self.function + f'\nrecord_published_pages "{self.section_dir}" TEST 1 folder\necho "after the call"\n'
         return subprocess.run(["bash", "-c", "set -euo pipefail\n" + script], cwd=self.temporary,
                               capture_output=True, text=True)
 
@@ -140,6 +140,32 @@ class FolderPublishRecordsTests(unittest.TestCase):
         write_listing(self.section_dir, "b6", ["Concepts/Loops"], "b7")
         result = self.run_the_function()
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(fragments(self.course), [])
+
+    def test_a_list_without_a_build_id_records_nothing_and_does_not_end_the_publish(self):
+        """Under `set -euo pipefail` a failed assignment ended the launcher
+        after the copy had succeeded (implementation review, S1)."""
+        self.section_dir.mkdir(parents=True, exist_ok=True)
+        (self.section_dir / ".visible-pages.json").write_text('{"version": 1, "places": []}', encoding="utf-8")
+        (self.section_dir / ".build-id").write_text("b7\n", encoding="utf-8")
+        result = self.run_the_function()
+        self.assertEqual(result.returncode, 0, "The publish was ended by the record: " + result.stderr)
+        self.assertIn("after the call", result.stdout, "The line after the call never ran")
+        self.assertEqual(fragments(self.course), [])
+
+    def test_an_unreadable_build_id_records_nothing_and_does_not_end_the_publish(self):
+        import os
+        if hasattr(os, "geteuid") and os.geteuid() == 0:
+            self.skipTest("root reads a file whatever its mode")
+        write_listing(self.section_dir, "b7", ["Concepts/Loops"], "b7")
+        id_file = self.section_dir / ".build-id"
+        id_file.chmod(0)
+        try:
+            result = self.run_the_function()
+        finally:
+            id_file.chmod(0o644)
+        self.assertEqual(result.returncode, 0, "The publish was ended by the record: " + result.stderr)
+        self.assertIn("after the call", result.stdout)
         self.assertEqual(fragments(self.course), [])
 
     def test_the_folder_branch_records_after_its_copy_succeeded(self):

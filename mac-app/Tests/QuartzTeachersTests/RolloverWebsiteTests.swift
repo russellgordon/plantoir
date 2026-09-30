@@ -280,6 +280,29 @@ final class RolloverWebsiteTests: XCTestCase {
                        "Taking the rollover back must bring the record back")
     }
 
+    /// A rollover whose pages are already on their days moves nothing — and
+    /// still sets the record aside, as its own change that undo takes back
+    /// (the `already` path; implementation review, N11).
+    @MainActor
+    func testARolloverThatMovesNothingStillSetsTheRecordAside() async throws {
+        let (root, course, runner) = try makeSectionNeedingReDating(withMarker: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        // First rollover: pages move onto their days.
+        _ = await reDate(runner, course: course, arguments: ["rollover": "yes", "website": "same"])
+        let folder: URL = PublishedPagesRecord.folderURL(courseDirectory: course.directoryURL, section: 1)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try "{\"places\": [\"Concepts/Worksheet\"]}".write(
+            to: folder.appendingPathComponent("20260901T120000Z-folder.json"), atomically: true, encoding: .utf8
+        )
+        // Second rollover: nothing moves.
+        let said: String = await reDate(runner, course: course, arguments: ["rollover": "yes", "website": "same"])
+        XCTAssertTrue(said.contains(AssistWording.everyPageIsAlreadyOnItsDay(course: course.code, section: 1)),
+                      "The second rollover should have moved nothing: \(said)")
+        XCTAssertEqual(PublishedPagesRecord.places(courseDirectory: course.directoryURL, section: 1), [])
+        _ = await runTool(runner, course: course, arguments: [:], tool: "undo_last_change")
+        XCTAssertEqual(PublishedPagesRecord.places(courseDirectory: course.directoryURL, section: 1), ["Concepts/Worksheet"])
+    }
+
     /// Answering "a new website" cuts the section loose and names where last
     /// year's details went.
     @MainActor

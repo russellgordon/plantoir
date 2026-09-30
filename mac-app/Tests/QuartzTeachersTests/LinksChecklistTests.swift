@@ -263,6 +263,41 @@ final class LinksChecklistTests: XCTestCase {
         try checkExpectations(try runPublishCase("iv-b."))
     }
 
+    /// Ticking only a class publishes the row it brings; that row is not
+    /// "left hidden" on the trail or in the answered file (review S1).
+    func testARowATickedClassBringsIsNotLeftHidden() throws {
+        let testCase: [String: Any] = try LinksChecklistTests.publishCase("iv-d.")
+        let made: AssistFixture.Made = try AssistFixture.makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+        let urls: [String: URL] = try LinksChecklistTests.layOut(testCase, made: made)
+        let offer: LinksChecklistOffer = try LinksChecklistTests.offer(
+            from: try XCTUnwrap(testCase["offer"] as? [[String: Any]])
+        )
+        var ticked: Set<String> = []
+        for place in testCase["tick"] as? [String] ?? [] {
+            ticked.insert(place)
+        }
+        let result: LinksChecklistPublisher.Result = LinksChecklistPublisher.publish(
+            offer: offer, ticked: ticked, course: made.course, sectionNumber: 1, workspaceURL: made.root
+        )
+        guard case .published(let outcome) = result else {
+            return XCTFail("Publish did not publish: \(result)")
+        }
+        let expected: [String] = (testCase["expectLeftHidden"] as? [String] ?? []).sorted()
+        XCTAssertEqual(outcome.leftUntickedPlaces.sorted(), expected)
+        XCTAssertEqual(outcome.leftUnticked, expected.count)
+        XCTAssertFalse(LinksChecklistPublisher.publishedLine(outcome).contains("\(expected.count + 1) left unticked"))
+        let answered: LinksChecklistAnswered = try XCTUnwrap(
+            LinksChecklistAnswered.read(courseDirectory: made.course.directoryURL, section: 1)
+        )
+        XCTAssertEqual(answered.leftUnticked.sorted(), expected,
+                       "The answered file says a page was left hidden that came with its class")
+        for (title, wanted) in try XCTUnwrap(testCase["expect"] as? [String: [String: Any]]) {
+            let url: URL = try XCTUnwrap(urls[title], title)
+            XCTAssertEqual(try LinksChecklistTests.visible(url), wanted["visible"] as? Bool, "\(title): visible")
+        }
+    }
+
     func testAPageMadeVisibleSinceIsDropped() throws {
         let testCase: [String: Any] = try LinksChecklistTests.publishCase("iv-c.")
         let made: AssistFixture.Made = try AssistFixture.makeRunner()
