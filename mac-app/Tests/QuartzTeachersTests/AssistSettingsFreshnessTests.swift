@@ -325,6 +325,28 @@ final class AssistSettingsFreshnessTests: XCTestCase {
         XCTAssertFalse(trail.contains("published-here"), trail)
     }
 
+    /// #396, the implementation review's S1: a course that deploys to Netlify
+    /// AND Cloudflare Pages, refused over the Cloudflare Account ID, names
+    /// Cloudflare Pages on the trail — the destination that caused it, not the
+    /// primary and not every destination. Through the assistant's own call
+    /// site, so a caller that dropped the cause would fail here.
+    func testARefusalOverAnAdditionalDestinationNamesThatDestination() async throws {
+        let world: World = try makeWorld(hasDeployedBefore: true)
+        try saveElsewhere(
+            ["additional_deploy_targets": [["type": "cloudflare_pages"]]], to: "ICS3U", in: world.root
+        )
+        let previousAccountID: String = AppSettings.shared.cloudflareAccountID
+        AppSettings.shared.cloudflareAccountID = ""
+        defer { AppSettings.shared.cloudflareAccountID = previousAccountID }
+
+        let outcome: AssistToolOutcome = await world.runner.run(call: call("schedule_deploy", scheduling))
+
+        XCTAssertTrue(outcome.summary.hasPrefix("Nothing was scheduled."), outcome.summary)
+        let trail: String = trailText()
+        XCTAssertTrue(trail.contains("refused before anything was written, deploying to Cloudflare Pages: "), trail)
+        XCTAssertFalse(trail.contains("deploying to Netlify"), trail)
+    }
+
     /// The card and the plan twin are advisory and repeat; only an attempt
     /// to schedule leaves the line.
     func testTheCardAndThePlanLeaveNoRefusalLine() async throws {

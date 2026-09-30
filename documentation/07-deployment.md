@@ -2883,9 +2883,165 @@ a window's copy to an act a compile error was considered and left for a fourth
 caller; `scheduleDeploy` and `MultiDestinationDeployRunner.run` carry a comment
 saying what to pass.
 
-Contract: `shared-rules.json` → `actsUseTheSavedSettings` (seven cases), the
+Contract: `shared-rules.json` → `actsUseTheSavedSettings` (seven cases; an eighth since #396), the
 three `specialNames` keys and the trail event. Mac tests:
 `ActsUseTheSavedSettingsTests` and the extended `SettingsSaveNoticeTests`.
 **Windows** looks like the same shape (`SidebarPane.xaml.cs` and
 `SectionDetailView.xaml.cs` read `Configuration.AllDeployDestinations` off the
 shared copy) and owes the check, the cases, the keys and the event.
+
+### What the schedule sheet says, and what it no longer lists (#396)
+
+Two decisions of Russell's, 2026-09-30, both about the Schedule a deploy
+sheet and made on v1.4.1 with his own MPM2D in front of him.
+
+**1. The sheet no longer lists the section's unpublished classes.** It used
+to end:
+
+> One thing first — 50 classes are not published yet: … (eight names) …
+> …and 42 more. Deploying now would put the site up without them. Publish
+> first, look the preview over, then schedule this.
+
+His word for it was "completely unnecessary". Classes later in the year are
+unpublished ON PURPOSE all year — they are written ahead and published the
+day they are taught — so the list fired on every schedule, named pages the
+teacher had no intention of publishing, and its last sentence said "deploying
+now" on a sheet whose whole point is deploying later. It is removed from
+scheduling on both surfaces that showed it, because one builder fed both:
+`ScheduledDeployPlan.description`, read by the sheet and by
+`plan_scheduled_deploy` (an outside assistant over MCP). The local assistant
+never showed it — `plan_scheduled_deploy` is kept off its tool list, and the
+`schedule_deploy` card is built by `AssistToolRunner.explain(call:)` from its
+own sentence. `ScheduledDeploy.unpublishedClasses` and the plan's field went
+with it: the sheet re-plans on every redraw (#335, deliberately uncached), so
+keeping the function would have read every class page of the section for
+nothing, and a field the plan carries is an invitation to put the list back.
+
+What STAYS is `plan_scheduled_deploy`'s `classes` argument: a caller that
+NAMES classes is told, for each, "published, so the deploy would carry it." or
+"NOT published, so the deploy would ship without it." That answers somebody
+who asked, and the parameter's description ("Checked for whether they are
+published yet.") is pinned by `assist-cases.json` → `toolDescriptions` and the
+tool-surface digest, so changing it would be a routing change. An immediate
+deploy never listed unpublished classes on either platform — the mac's Deploy
+button has no confirmation and `AssistWording.deployApproval` names no classes
+— and it still does not.
+
+`AssistPageVisibility.publishes(in:forSection:)` has no product caller after
+this, and it is deliberately LEFT: `FileFormatsContractTests` runs all of
+`file-formats.json` → `pageVisibility.readingCases` through it, so it is the
+function the file-format contract is checked with. A "dead code" tidy would
+remove that.
+
+**2. The first sentence names EVERY destination.** MPM2D deploys to Netlify
+AND Cloudflare Pages, and the sheet said "Deploy MPM2D Section 1 to Netlify at
+…", as if only Netlify would receive it. The sentence is now
+`ScheduledDeployWording.planOpening` — "Deploy {course} Section {section} to
+{destinations} at {moment}." — with every destination, primary first then
+each additional in the order saved, in the words the sheet has always used for
+one ("Netlify", "Cloudflare Pages", a folder's path), joined the way an
+immediate multi-destination deploy's result is (`MultiDestinationDeployRunner.joinedWithAnd`:
+"A", "A and B", "A, B and C", no comma before "and"). Byte-identical to the
+old sentence for a course with one destination. `plan_scheduled_deploy`'s
+first line is the same sentence, and `schedule_deploy`'s result now reads
+"Scheduled: … deploys to {every destination} at …".
+
+**How the sentence and the run are kept from disagreeing.** The list is not a
+second walk of the settings: `ScheduledDeployPlan.destinations` is
+`ScheduledDeploy.deployPlan(course:sectionNumber:cloudflareAccountID:).descriptions`,
+the SAME function the job's wrapper is written with at the press (and whose
+descriptions become `PLANTOIR_SCHEDULED_TO`) and the run re-reads when it
+fires (#323). The sheet plans from the course as SAVED on every redraw
+(`asSavedNow()`, #335), and the press reads the file again. So they AGREE AT
+THE PRESS, and the run then follows the file at fire time (#323, with the
+after-Save sentence `settingsSaveScheduledDeployGoesWhereTheCourseDeploysNow`
+when a Save changes where an already-scheduled deploy goes). One window is
+NOT closed, and is accepted: a write to `course_config.json` between the
+sheet's last redraw and the press by a writer the sheet does not observe
+(Windows over a synced folder, a hand edit, the MCP server's own process) is
+followed by the press, but the sheet still showed the old list, and no
+after-Save sentence fires because nothing was scheduled yet when it was
+written. The same is true of the assistant's card, computed once when shown.
+Rejected: comparing the drawn list with the pressed list and refusing on a
+difference — new wording and new state for a race this narrow. A side effect
+worth knowing: `PLANTOIR_SCHEDULED_TO` is documented as "the destinations'
+descriptions the teacher was told" and always held every destination, while
+the sheet named only the primary — so the trail's "was set to deploy to
+Netlify, Cloudflare Pages" had been claiming the teacher was told something
+the sheet never said. It is now true.
+
+Duplicates: the app never writes the same destination type twice
+(`pruningAdditionalTargets` and the setters), but `course_config.json`
+promises no uniqueness, and a hand-edited file can list Netlify twice or two
+folders. The run deploys to every entry, so the sentence names every entry
+once, as the file has it — no silent de-duplication.
+
+**The assistant's card names the same destinations by TYPE.**
+`AssistToolRunner.everyDestination(of:)`: "Netlify", "Cloudflare Pages", "a
+folder on this computer" — never a path (a path is machinery on a card, and a
+folder not chosen yet would be blank; #322's contract case pins "a folder").
+Two vocabularies for one list is pre-existing and deliberate; the contract
+pins both (`planOpening.cases[].sheet` and `.card`). `destination(of:)`, the
+primary-only name, is still used by `list_courses`' "publishes to:" — not
+scheduling, so out of this piece; a follow-up is drafted.
+
+**The trail.** No new event. One CHANGED line: `scheduled deploy could not
+be set`, for a refusal at the act, used to name the PRIMARY's kind whatever
+caused the refusal — a Netlify + Cloudflare course refused over the
+Cloudflare Account ID read "deploying to Netlify: MPM2D also deploys to
+Cloudflare Pages, which needs…". It now names the destination that CAUSED it
+(`ScheduledDeployPlan.refusedOver`, from `ScheduledDeployRefusal.destinationKind`,
+kept only when that refusal's sentence IS the plan's problem; the note
+function takes the whole PLAN, `noteRefusedBeforeAnythingWasWritten(plan:course:)`,
+so neither caller can pass the refusal without its cause — the
+implementation review's S1, since for a one-destination course a dropped
+cause reads identically and no test would notice), and for a
+refusal that is not about a destination (a time already passed, a course kept
+for reference) every destination by kind, "Netlify and Cloudflare Pages". For
+a course with one destination the line is what it always was. The
+`activityTrail.mustRecord` entry's `carries` says so.
+
+**Other places that say where a deploy goes**, audited for this piece:
+
+| Surface | Every destination? | |
+|---|---|---|
+| Schedule a deploy sheet, first line | yes, since #396 | `planOpening` |
+| `plan_scheduled_deploy` result (MCP) | yes, since #396 | same builder |
+| assistant's `schedule_deploy` card | yes, since #396, by type | `everyDestination(of:)` |
+| `schedule_deploy` result | yes, since #396 | `destinationsText` |
+| immediate deploy's results (`deployWentOutTo`, `deployNeedsAnAnswerAt`) | yes | unchanged |
+| assistant's `deploy_section` card | names none, on purpose | unchanged |
+| scheduled-publish notification, after-Save sentence | yes, joined with ", " | unchanged; the different join is known and out of scope — do not "fix" one to match the other in passing |
+| `list_courses` "publishes to:" (MCP) | NO, primary only | follow-up drafted |
+| refusal trail line | the cause, since #396 | above |
+
+**Rejected**, so nobody proposes them again: keeping the unpublished list
+only for classes dated on or before the scheduled day, hiding it behind a
+disclosure, or dropping only its last sentence (Russell decided removal);
+keeping the field and function and only not rendering them (above); also
+removing the named-class check (above); deleting or renaming the contract's
+`alsoSaid` key (Windows reads it with `!`, and a missing key reads like
+damage — the key keeps a NEW rule, so their red is a string difference naming
+#396); putting `planOpening` in `AssistWording` (the precedent for this
+sheet's sentences is `ScheduledDeployWording`, pinned by the authored
+`scheduledDeployRefusals`); a new top-level rule set (a sibling inside the
+existing block changes no census count); naming the card's folder by path;
+and "Netlify and Cloudflare", Russell's own shorthand — the product's name is
+"Cloudflare Pages" everywhere else, and is kept.
+
+Contract: `shared-rules.json` → `scheduledDeployRefusals.planOpening` (3
+cases; its `note` says which surface compares WHOLE and which CONTAINS),
+`scheduledDeployRefusals.alsoSaid` (rule changed, with `rejected`),
+`actsUseTheSavedSettings` case 8 (the sheet names every SAVED destination, not
+an unsaved removal). Mac tests: `SharedRulesContractTests.testTheSchedulePlanNamesEveryDestinationAsTheContractSays`,
+`ScheduledDeployTests.testTheSchedulePlanSaysNothingAboutUnpublishedClasses`,
+`ScheduledDeployAsSetNowTests.testTheDestinationsTheSheetNamesAreTheOnesTheJobIsWrittenWith`
+and `.testARefusalAtTheActNamesTheDestinationThatCausedIt`, the two call-site
+tests `ActsUseTheSavedSettingsTests.testARefusalAtThePressNamesTheDestinationThatCausedIt`
+and `AssistSettingsFreshnessTests.testARefusalOverAnAdditionalDestinationNamesThatDestination`, and the extended
+`AssistToolRunnerTests.testPlanningAndSettingADeployForLater`. **Windows**
+built the same list twice (`ScheduledDeploy.UnpublishedClassesSentence` in the
+sidebar dialog, and `Describe()`'s block) and has the same primary-only
+sentence in `Describe()`, the card and `PlantoirTools.cs`' `schedule_deploy`
+result; what it owes is its `windows` issue from #396, listed in
+`WINDOWS-PARITY.md`.
