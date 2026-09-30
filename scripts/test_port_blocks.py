@@ -201,7 +201,16 @@ FAKE_PS = r"""#!/bin/bash
 echo "ps $*" >> "$FAKE/calls"
 if [ -f "$FAKE/ps_fails" ]; then exit 1; fi
 if [ -f "$FAKE/ps_self" ]; then
-  echo "$PPID $(/bin/ps -o ppid= -p "$PPID" | tr -d ' ') $(cat "$FAKE/ps_self")"
+  # The program that asked, with the words it was run with, and every shell
+  # between it and the run (a question asked from inside $( … ) is asked by
+  # a subshell of a subshell), as a real process table would list them.
+  p="$PPID"; words="$(cat "$FAKE/ps_self")"
+  while [ -n "$p" ] && [ "$p" -gt 1 ]; do
+    pp="$(/bin/ps -o ppid= -p "$p" | tr -d ' ')"
+    echo "$p $pp $words"
+    words="/bin/bash (a shell between)"
+    p="$pp"
+  done
 fi
 cat "$FAKE/ps" 2>/dev/null
 exit 0
@@ -970,14 +979,23 @@ def in_use_trail_entry() -> dict:
 OLD_ID = "0ld0000000000000000000000000000000000000000000000000000000000000"
 THE_OPEN_PREVIEW = "python3 -u /opt/scripts/build_site.py --host-os mac --course=ICS4U --section=1 --port 8081"
 A_PUBLISH = "python3 /opt/scripts/deploy.py --host-os mac --course ICS4U --section 2"
+ANOTHER_BUILD = "python3 -u /opt/scripts/build_site.py --host-os mac --course=ICS4U --section=3 --port 8083 --build-only"
+A_LEFT_PUBLISH = "python3 /opt/scripts/deploy.py --host-os mac --course MPM2D --section 2"
 ITS_LAUNCHER = "/bin/bash /Users/t/Work/preview.sh ICS4U 1"
+# The owners the sequences' "other work" and "other build" need running
+# (#378: work is waited for only while its owner is running). Nothing runs
+# for MPM2D 2, so "leftover" is work whose owner has gone.
+THE_PUBLISHES_LAUNCHER = "/bin/bash /Users/t/Work/deploy.sh ICS4U 2"
+THE_BUILDS_LAUNCHER = "/bin/bash /Users/t/Work/preview.sh ICS4U 3 --build-only"
 
 # What each word of a sequence looks like from outside: the workspace's
 # processes (pid, parent, command), its first process always first.
 LOOKS = {
     "nothing": [[100, 1, "tail -f /dev/null"]],
     "other work": [[100, 1, "tail -f /dev/null"], [410, 1, A_PUBLISH]],
+    "other build": [[100, 1, "tail -f /dev/null"], [310, 1, ANOTHER_BUILD]],
     "a preview": [[100, 1, "tail -f /dev/null"], [210, 1, THE_OPEN_PREVIEW]],
+    "leftover": [[100, 1, "tail -f /dev/null"], [510, 1, A_LEFT_PUBLISH]],
 }
 
 
@@ -1010,10 +1028,15 @@ class AWorkspaceInUse:
             number += 1
 
     def launchers(self, lines: list) -> None:
+        """Each row a command line (pid 7001, 7002… under 1), or [pid,
+        parent, command line] so a case can say who started what."""
         text = ""
         pid = 7001
         for line in lines:
-            text += f"{pid} 1 {line}\n"
+            if isinstance(line, list):
+                text += f"{line[0]} {line[1]} {line[2]}\n"
+            else:
+                text += f"{pid} 1 {line}\n"
             pid += 1
         (self.fake / "ps").write_text(text, encoding="utf-8")
 
@@ -1078,26 +1101,174 @@ class TheLookBeforeARemakeIsWritten(unittest.TestCase):
         self.assertIn(f"\nWORKSPACE_WORK_SECONDS={waiting['workSeconds']}\n", block)
 
     def test_the_sentences_are_the_contracts(self):
+        """The fixed lines are written whole; the ones with blanks are
+        checked by RUNNING the block's own words for every origin, every
+        kind of work and every leftover (WordsForTheWait below)."""
         sentences = in_use_rules()["sentences"]
         block = self.block()
-        self.assertIn(f'echo "{sentences["whileWaiting"]}"', block)
         for line in sentences["whenAPreviewIsOpen"]:
             written = line.replace("{course} section {section}", "$WORKSPACE_OPEN_PREVIEW")
             self.assertIn(f'echo "{written}"', block)
-        for line in sentences["whenWorkDidNotFinish"]:
+        for line in sentences["whenSomethingElseDidNotFinish"]:
             self.assertIn(f'echo "{line}"', block)
+        self.assertIn(f'echo "{sentences["whenWorkDidNotFinish"][1]}"', block)
+        self.assertIn(f'echo "{sentences["whileWaitingForSomethingElse"]}"', block)
+        again = sentences["whenItNeedsSettingUpAgain"]
+        self.assertIn(f'echo "{again["retiringTheOldSharedOne"]}"', block)
+        self.assertNotIn("whileWaiting", sentences, "#378 replaced it with sentences that name what is waited for")
+
+    def test_the_lines_before_setting_a_folder_up_again_are_the_contracts(self):
+        """#378: 'Your workspace was built from an older version…' and its
+        siblings, in every launcher that says them."""
+        again = in_use_rules()["sentences"]["whenItNeedsSettingUpAgain"]
+        says = {"setup.sh": ["afterAnUpdate", "forBuiltWebsitesOutside", "forSeveralPreviews"],
+                "preview.sh": ["afterAnUpdate", "forBuiltWebsitesOutside", "forSeveralPreviews"],
+                "deploy.sh": ["forBuiltWebsitesOutside"]}
+        for launcher, keys in says.items():
+            text = launcher_text(launcher)
+            for key in keys:
+                with self.subTest(launcher=launcher, key=key):
+                    self.assertIn(f'echo "{again[key]}"', text)
+            for gone in ["Your workspace was built from an older version", "Rebuilding your workspace",
+                         "Retiring the old shared workspace container"]:
+                self.assertNotIn(gone, text, launcher)
 
     def test_the_marker_is_the_contracts(self):
         prefix = in_use_trail_entry()["marker"]["prefix"]
         self.assertIn(f'echo "{prefix} $1 $2 ', self.block())
 
+    def test_the_other_two_markers_are_the_contracts(self):
+        block = self.block()
+        self.assertIn('echo "PLANTOIR_WAITING_FOR: $1"', block)
+        self.assertIn(f'echo "{leftover_trail_entry()["marker"]["prefix"]} ${{WORKSPACE_TRAIL_PLACE:-setup}} $1"', block)
+
     def test_the_sentences_name_no_machinery(self):
+        """Rule 1 — and, since #378, not "workspace" either."""
         sentences = in_use_rules()["sentences"]
-        lines = [sentences["whileWaiting"]] + sentences["whenAPreviewIsOpen"] + sentences["whenWorkDidNotFinish"]
+        lines = sentences["whenAPreviewIsOpen"] + sentences["whenWorkDidNotFinish"] + sentences["whenSomethingElseDidNotFinish"]
+        for key in ["whileWaitingForWork", "whileWaitingForAPreview", "whileWaitingForSomethingElse", "whenLeftoverWorkIsStopped"]:
+            lines.append(sentences[key])
+        for group in ["origins", "doing", "leftovers", "statusLine", "whenItNeedsSettingUpAgain"]:
+            for key, value in sentences[group].items():
+                if key not in ("why", "joined"):
+                    lines.append(value)
         for line in lines:
             words = set(re.findall(r"[a-z]+", line.lower()))
-            for forbidden in ["docker", "container", "port", "ports", "toolchain", "script", "localhost", "process"]:
+            for forbidden in ["docker", "container", "port", "ports", "toolchain", "script", "localhost", "process",
+                              "workspace", "launcher", "exec"]:
                 self.assertNotIn(forbidden, words, line)
+
+    def test_the_owner_is_never_a_remembered_process_number(self):
+        """MF-2's reason, written where the next person looks: the proof reads
+        the live table and nothing remembered."""
+        owners = function_named(self.block(), "the_owners_of_the_work")
+        self.assertNotIn("kill -0", owners)
+        self.assertNotIn(".lease", owners)
+        self.assertNotIn("activity/", owners)
+        self.assertIn("ps -Ao pid=,ppid=,args=", owners)
+
+    def test_the_only_stop_is_this_folders_workspace_by_its_id(self):
+        """MF-3's reason, in the text: every stop and remove in the block takes
+        "$id" (or the half-made workspace by this folder's name, never
+        started), and "$id" is only ever read from THIS folder's name or,
+        inside retire_legacy_container, from the old shared one's."""
+        block = self.block()
+        code = "\n".join(line for line in block.splitlines() if not line.lstrip().startswith("#"))
+        calls = re.findall(r"docker (?:container )?(?:stop|rm|kill)[^\n]*", code)
+        self.assertTrue(calls)
+        for call in calls:
+            self.assertRegex(call, r'^docker (stop|rm) ("\$id"|"\$CONTAINER_NAME"|"\$old_name")', call)
+        self.assertNotRegex(block, r"docker exec[^\n]*\bkill\b")
+        assignments = re.findall(r'\bid="\$\(docker inspect -f \'\{\{\.Id\}\}\' ([^ ]+) 2>/dev/null\)"', block)
+        self.assertEqual(sorted(set(assignments)), ['"$CONTAINER_NAME"', "teaching-quartz"], assignments)
+        self.assertEqual(len(re.findall(r'(?<!-v )\bid="(?!")', code)), len(assignments), "id is set some other way too")
+        retire = function_named(block, "retire_legacy_container")
+        self.assertIn('[ -n "$WORKSPACE_LEFTOVERS" ]', retire, "the old shared workspace keeps #94's strictness")
+
+
+def leftover_trail_entry() -> dict:
+    rules = json.loads((REPOSITORY_ROOT / "contracts" / "shared-rules.json").read_text(encoding="utf-8"))
+    for entry in rules["activityTrail"]["mustRecord"]:
+        if entry["event"] == "left-over work stopped":
+            return entry
+    raise AssertionError("the contract has no 'left-over work stopped' event")
+
+
+def origin_words(origin: str) -> str:
+    return in_use_rules()["sentences"]["origins"][origin]
+
+
+def doing_words(kind: str, place: str) -> str:
+    course, section = place.split("/") if "/" in place else ("-", "-")
+    return in_use_rules()["sentences"]["doing"][kind].replace("{course}", course).replace("{section}", section)
+
+
+def waiting_sentence(waiting_for: str) -> str:
+    """The console sentence for a WORKSPACE_WAITING_FOR, from the contract."""
+    sentences = in_use_rules()["sentences"]
+    kind, place, origin = waiting_for.split(" ")
+    if kind == "preview":
+        course, section = place.split("/")
+        return sentences["whileWaitingForAPreview"].replace("{course}", course).replace("{section}", section)
+    if kind == "work":
+        return sentences["whileWaitingForSomethingElse"]
+    return sentences["whileWaitingForWork"].replace("{origin}", origin_words(origin)).replace("{doing}", doing_words(kind, place))
+
+
+def leftover_words(item: str) -> str:
+    leftovers = in_use_rules()["sentences"]["leftovers"]
+    kind, _, place = item.partition(":")
+    if not place:
+        return leftovers[kind]
+    course, section = place.split("/")
+    return leftovers[kind].replace("{course}", course).replace("{section}", section)
+
+
+def stopped_sentence(items: str) -> str:
+    parts = [leftover_words(item) for item in items.split(" ")]
+    if len(parts) == 1:
+        what = parts[0]
+    else:
+        what = ", ".join(parts[:-1]) + " and " + parts[-1]
+    return in_use_rules()["sentences"]["whenLeftoverWorkIsStopped"].replace("{what}", what)
+
+
+@unittest.skipUnless(HAS_BASH, "no bash here that can run a program")
+class WordsForTheWait(unittest.TestCase):
+    """The block's own words, run for every blank the contract has."""
+
+    def say(self, action: str) -> list:
+        with tempfile.TemporaryDirectory() as scratch:
+            result = PretendMac(Path(scratch)).run("setup.sh", action)
+        self.assertEqual(result.returncode, 0, output_of(result))
+        return result.stdout.decode("utf-8").splitlines()
+
+    def test_every_origin_and_kind_of_work(self):
+        for origin in in_use_rules()["sentences"]["origins"]:
+            for kind in in_use_rules()["sentences"]["doing"]:
+                place = "-" if kind == "setup" else "MPM2D/2"
+                waiting = f"{kind} {place} {origin}"
+                with self.subTest(waiting=waiting):
+                    said = self.say(f'say_what_is_waited_for "{waiting}"; say_the_work_did_not_finish "{waiting}"')
+                    refusal = in_use_rules()["sentences"]["whenWorkDidNotFinish"]
+                    self.assertEqual(said, [waiting_sentence(waiting), f"PLANTOIR_WAITING_FOR: {waiting}",
+                                            refusal[0].replace("{origin}", origin_words(origin)).replace("{doing}", doing_words(kind, place)),
+                                            refusal[1]])
+
+    def test_a_preview_and_something_else(self):
+        said = self.say('say_what_is_waited_for "preview ICS4U/1 -"; say_what_is_waited_for "work - terminal"; '
+                        'say_the_work_did_not_finish "work - terminal"')
+        sentences = in_use_rules()["sentences"]
+        self.assertEqual(said, [waiting_sentence("preview ICS4U/1 -"), "PLANTOIR_WAITING_FOR: preview ICS4U/1 -",
+                                sentences["whileWaitingForSomethingElse"], "PLANTOIR_WAITING_FOR: work - terminal"]
+                         + sentences["whenSomethingElseDidNotFinish"])
+
+    def test_every_leftover_and_how_they_are_joined(self):
+        for items in ["build:ICS4U/1", "publish:MPM2D/2", "preview:ICS4U/1", "setup", "other",
+                      "build:ICS4U/1 publish:MPM2D/2", "build:ICS4U/1 setup other preview:ICS4U/2"]:
+            with self.subTest(items=items):
+                said = self.say(f'say_what_was_left_over_and_is_stopped "{items}"')
+                self.assertEqual(said, [stopped_sentence(items), f"{leftover_trail_entry()['marker']['prefix']} setup {items}"])
 
 
 @unittest.skipUnless(HAS_BASH, "no bash here that can run a program")
@@ -1115,18 +1286,27 @@ class WhatCountsAsRunning(unittest.TestCase):
             elif isinstance(case["top"], list):
                 pretend.looks([case["top"]])
             pretend.launchers(case.get("launchers", []))
+            if case.get("psFails"):
+                pretend.flag("ps_fails")
+            if case.get("leaseFile"):
+                # A lease on disk naming a process number something else has
+                # since been given (MF-2): the proof must not consult it.
+                activity = pretend.mac.courses / ".internal" / "activity"
+                activity.mkdir(parents=True, exist_ok=True)
+                (activity / case["leaseFile"]).write_text("", encoding="utf-8")
             if setup is not None:
                 setup(pretend)
             result, calls = pretend.run(
                 launcher,
                 'look_inside_the_workspace "' + OLD_ID + '"; '
-                'echo "LOOKED=$WORKSPACE_IS_RUNNING|$WORKSPACE_OPEN_PREVIEW_PLACE"')
+                'echo "LOOKED=$WORKSPACE_IS_RUNNING|$WORKSPACE_OPEN_PREVIEW_PLACE"; '
+                'echo "WAITING=$WORKSPACE_WAITING_FOR|$WORKSPACE_LEFTOVERS"')
             return result, calls
 
-    def answer(self, result: subprocess.CompletedProcess) -> str:
+    def answer(self, result: subprocess.CompletedProcess, word: str = "LOOKED=") -> str:
         for line in result.stdout.decode("utf-8").splitlines():
-            if line.startswith("LOOKED="):
-                return line[len("LOOKED="):]
+            if line.startswith(word):
+                return line[len(word):]
         raise AssertionError("the look did not finish: " + output_of(result))
 
     def test_every_contract_case(self):
@@ -1135,7 +1315,10 @@ class WhatCountsAsRunning(unittest.TestCase):
                 with self.subTest(case=case["name"], launcher=launcher):
                     result, calls = self.look(launcher, case)
                     self.assertEqual(result.returncode, 0, output_of(result))
-                    self.assertEqual(self.answer(result), case["expect"] + "|" + case.get("preview", ""))
+                    self.assertEqual(self.answer(result), case["expect"] + "|" + case.get("preview", ""),
+                                     output_of(result))
+                    self.assertEqual(self.answer(result, "WAITING="),
+                                     case.get("waitingFor", "") + "|" + case.get("leftovers", ""), output_of(result))
                     if case["top"] == "not asked":
                         self.assertEqual(engine_calls(calls, "top"), [],
                                          "a stopped or missing workspace cannot be asked what runs in it")
@@ -1177,7 +1360,7 @@ class TheRemake(unittest.TestCase):
             for word in looks:
                 answers.append(LOOKS[word])
             pretend.looks(answers)
-            pretend.launchers([ITS_LAUNCHER])
+            pretend.launchers([ITS_LAUNCHER, THE_PUBLISHES_LAUNCHER, THE_BUILDS_LAUNCHER])
             if setup is not None:
                 setup(pretend)
             result, calls = pretend.run(launcher, 'remake_the_workspace; echo "CARRIED ON"')
@@ -1201,7 +1384,27 @@ class TheRemake(unittest.TestCase):
                     said = self.said(result)
                     waited = case["waited"]
                     self.assertEqual(len(sleeps(calls)), waited // rules["waiting"]["lookEverySeconds"], calls)
-                    self.assertEqual(said.count(sentences["whileWaiting"]), 1 if waited else 0, said)
+                    # Each thing waited for is said once, in order, on the
+                    # console and as the status line's marker.
+                    expected_waits = []
+                    for item in case["said"]:
+                        words = item.split(" ")
+                        expected_waits.append(" ".join(words[1:]) if words[0] == "work" else f"preview {words[1]} -")
+                    sentences_said = [line for line in said if line.startswith("⏳")]
+                    self.assertEqual(sentences_said, [waiting_sentence(w) for w in expected_waits], said)
+                    waits_marked = [line for line in said if line.startswith("PLANTOIR_WAITING_FOR:")]
+                    over = ["PLANTOIR_WAITING_FOR: over"] if expected_waits else []
+                    self.assertEqual(waits_marked, [f"PLANTOIR_WAITING_FOR: {w}" for w in expected_waits] + over, said)
+                    stopped = case.get("stopped", "")
+                    stopped_markers = [line for line in said if line.startswith(leftover_trail_entry()["marker"]["prefix"])]
+                    if stopped:
+                        self.assertIn(stopped_sentence(stopped), said)
+                        self.assertEqual(stopped_markers, [f"{leftover_trail_entry()['marker']['prefix']} {place_of(launcher)} {stopped}"])
+                        # Said BEFORE the stop, so a remake that fails still said what it ended.
+                        self.assertLess(said.index(stopped_sentence(stopped)), said.index("CARRIED ON"))
+                    else:
+                        self.assertEqual(stopped_markers, [], said)
+                        self.assertFalse([line for line in said if line.startswith("🧹")], said)
                     markers = [line for line in said if line.startswith(prefix)]
                     if case["expect"] == "remade":
                         self.assertEqual(result.returncode, 0, output_of(result))
@@ -1210,7 +1413,9 @@ class TheRemake(unittest.TestCase):
                         self.assertEqual(engine_calls(calls, "rm"), ["docker rm " + OLD_ID])
                         self.assertEqual(len(engine_calls(calls, "run")), 1)
                         if waited:
-                            self.assertEqual(markers, [f"{prefix} waited {waited} {place_of(launcher)}"])
+                            last = expected_waits[-1].split(" ")
+                            item = last[0] + ":" + last[1] if last[0] not in ("setup", "work") else last[0]
+                            self.assertEqual(markers, [f"{prefix} waited {waited} {place_of(launcher)} {item} {last[2]}"])
                         else:
                             self.assertEqual(markers, [])
                     elif case["expect"] == "refused: a preview":
@@ -1222,9 +1427,11 @@ class TheRemake(unittest.TestCase):
                     else:
                         self.assertEqual(result.returncode, sentences["exitCode"], output_of(result))
                         self.assert_nothing_was_touched(calls, result)
-                        for line in sentences["whenWorkDidNotFinish"]:
-                            self.assertIn(line, said)
-                        self.assertEqual(markers, [f"{prefix} work {waited} {place_of(launcher)}"])
+                        refusal = sentences["whenWorkDidNotFinish"]
+                        self.assertIn(refusal[0].replace("{origin}", origin_words("terminal"))
+                                      .replace("{doing}", doing_words("publish", "ICS4U/2")), said)
+                        self.assertIn(refusal[1], said)
+                        self.assertEqual(markers, [f"{prefix} work {waited} {place_of(launcher)} publish:ICS4U/2 terminal"])
 
     def test_a_stopped_workspace_is_remade_without_asking_what_runs_in_it(self):
         for launcher in LAUNCHERS:
@@ -1326,6 +1533,16 @@ class TheOldSharedWorkspace(unittest.TestCase):
                     self.assertEqual(engine_calls(calls, "stop") + engine_calls(calls, "rm"), [])
                     self.assertNotIn("Retiring", output_of(result))
 
+    def test_one_with_leftover_work_in_it_is_left_alone(self):
+        """#378 ends work whose owner has gone only in THIS folder's
+        workspace; the old shared one keeps #94's strictness."""
+        for launcher in LAUNCHERS:
+            with self.subTest(launcher=launcher):
+                result, calls = self.retire(launcher, LOOKS["leftover"])
+                self.assertEqual(result.returncode, 0, output_of(result))
+                self.assertEqual(engine_calls(calls, "stop") + engine_calls(calls, "rm"), [])
+                self.assertNotIn("🧹", output_of(result))
+
     def test_making_a_workspace_retires_it_through_the_block(self):
         """run_container_with_mount calls the REAL retire, not a stand-in."""
         for launcher in LAUNCHERS:
@@ -1337,6 +1554,31 @@ class TheOldSharedWorkspace(unittest.TestCase):
                     result, calls = pretend.run(launcher, "run_container_with_mount")
                 self.assertEqual(result.returncode, 0, output_of(result))
                 self.assertIn("docker rm 1e9ac7", calls)
+
+
+@unittest.skipUnless(HAS_BASH, "no bash here that can run a program")
+class TheStopReachesOnlyThisFoldersWorkspace(unittest.TestCase):
+    """MF-3 (#378): with left-over work in THIS folder's workspace, in
+    another folder's, and in the old shared one, a launcher that retires the
+    old one and remakes its own stops and removes exactly one thing — its
+    own workspace, by the id read from its own name."""
+
+    def test_only_this_folders_workspace_is_stopped(self):
+        for launcher in LAUNCHERS:
+            with self.subTest(launcher=launcher):
+                with tempfile.TemporaryDirectory() as scratch:
+                    pretend = AWorkspaceInUse(Path(scratch))
+                    pretend.exists({CONTAINER: OLD_ID, "teaching-quartz-deadbeef": "0the4f01de4",
+                                    "teaching-quartz": "1e9ac7"})
+                    pretend.looks([LOOKS["leftover"]])
+                    pretend.launchers([])
+                    result, calls = pretend.run(launcher, 'retire_legacy_container; remake_the_workspace; echo "CARRIED ON"')
+                self.assertEqual(result.returncode, 0, output_of(result))
+                self.assertEqual(engine_calls(calls, "stop"), ["docker stop " + OLD_ID], output_of(result))
+                self.assertEqual(engine_calls(calls, "rm"), ["docker rm " + OLD_ID], output_of(result))
+                self.assertEqual(engine_calls(calls, "kill"), [])
+                self.assertEqual([c for c in calls if c.startswith("docker exec")], [])
+                self.assertIn(stopped_sentence("publish:MPM2D/2"), output_of(result))
 
 
 # ======================================================================
