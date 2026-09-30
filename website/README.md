@@ -403,6 +403,10 @@ used to describe the harness as future work owed once the Windows app shipped;
 it has shipped and this is done. What follows below is now history — how the
 mac's own capture mechanism works and why it could not simply be copied — kept
 because the lessons in it are real, not because the task is still open.
+(Reopened in part on 2026-09-27: the `-windows` pictures owe the native-corners
+rule, and `hero`, `colour-schemes` and `light-and-dark` show Windows visitors
+the Mac picture until they are retaken — `SCREENSHOTS.md` → "The one rule",
+#375.)
 
 ### What Windows built
 
