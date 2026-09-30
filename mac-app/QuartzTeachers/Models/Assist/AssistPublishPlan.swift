@@ -697,6 +697,44 @@ enum AssistPublishPlanner {
         )
     }
 
+    /// What publishing EXACTLY these pages would do, carrying the date moves
+    /// the caller has already worked out — the mirror of `planHiding(exactly:)`
+    /// (#379).
+    ///
+    /// For the links checklist, whose pages and dates were decided by the
+    /// build's rule (`datingPagesAClassBrings.fromTheLinksChecklist`): no link
+    /// following here, because following links is what chose the pages. The
+    /// change-building half is `appendChanges`, so the certainty rule and the
+    /// #186 decline mean here what they mean everywhere else.
+    static func planPublishing(
+        exactly pages: [AssistSectionPage],
+        dateMoves: [AssistPublishDateMove],
+        forSection sectionNumber: Int,
+        in course: Course
+    ) -> AssistPublishPlan {
+        var changes: [AssistPublishChange] = []
+        var alreadyRight: [AssistSectionPage] = []
+        var noRoomForAKey: [AssistSectionPage] = []
+        appendChanges(
+            for: pages, becauseLinked: false, publishes: true,
+            forSection: sectionNumber, into: &changes, alreadyRight: &alreadyRight,
+            noRoomForAKey: &noRoomForAKey
+        )
+        return AssistPublishPlan(
+            courseCode: course.code,
+            sectionNumber: sectionNumber,
+            publishes: true,
+            unknownNames: [],
+            namedPages: pages,
+            changes: changes,
+            alreadyRight: alreadyRight,
+            noRoomForAKey: noRoomForAKey,
+            kept: [],
+            linkedClassesLeftAlone: [],
+            dateMoves: dateMoves
+        )
+    }
+
     /// Of the classes the walk stopped at, the ones worth a sentence.
     ///
     /// **Only the ones students cannot already see, and certainly cannot.** The
@@ -1247,7 +1285,8 @@ enum AssistPublishPlanner {
     static func apply(
         _ plan: AssistPublishPlan,
         forSection sectionNumber: Int,
-        in course: Course
+        in course: Course,
+        repointsTheFrontPage: Bool = true
     ) throws -> (change: AssistChange, leftAlone: [String]) {
         // Every file this plan touches, gathered first, so a page that both
         // changes visibility and moves date is written once.
@@ -1344,7 +1383,12 @@ enum AssistPublishPlanner {
         // takes the index back with them. An undo that restored the lessons
         // and left the front page pointing at the wrong one would be a worse
         // state than either.
-        if let repointed = SectionIndexPointer.repointIndex(forSection: sectionNumber, in: course) {
+        //
+        // Not for the links checklist (#379, the director's ruling F1): a
+        // class ticked there is published because a link leads to it, and
+        // the front page keeps following the class it follows today.
+        if repointsTheFrontPage,
+           let repointed = SectionIndexPointer.repointIndex(forSection: sectionNumber, in: course) {
             saved.append(repointed)
         }
 

@@ -1029,7 +1029,8 @@ final class MarketingScenes: MarketingScreenshotCase {
         // folder, the checklist for this page ran to 70-odd lines of "sits
         // outside the course's folders" and "is already in this course" —
         // the links are followed page to page, the College Board embeds among
-        // them — and the sheet grew taller than the screen, Cancel with it.
+        // them — and the sheet grew taller than the screen, Cancel with it
+        // (fixed by #365: the rows and those lines now scroll in one area).
         // That is a finding for the app, not a picture; the scene shows the
         // question the sheet asks instead: which page, into which course,
         // and whether to bring the pages it links to.

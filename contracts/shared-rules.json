@@ -716,6 +716,24 @@
           "mac"
         ],
         "appliesOnWhy": "PERMANENT: Windows builds natively. PlantoirSetup.exe carries its whole runtime and nothing is downloaded or built for building (documentation/12-windows-app.md, the like-for-like table), so there is no builder to get ready in the background (app-rules.json -> builderWarmUp.appliesOn)."
+      },
+      {
+        "event": "offered to publish pages that links lead to",
+        "carries": "the course and section; how many pages in each group (used by a class students can see, linked from other pages, classes) and how many start ticked; the occasion: after a preview, after publishing, on opening after a publish Plantoir did not watch (scheduled, the assistant, outside), or from the menu. Never a page's name.",
+        "line": "{course}/{section} · offered to publish pages that links lead to {occasion} — {N} used by a class, {N} linked from other pages, {N} classes; {N} ticked",
+        "why": "Added with #379. #333's alert was shown and nobody could tell afterwards whether it had been seen; 'why did it ask me to publish 40 pages?' is answered by the occasion and the counts."
+      },
+      {
+        "event": "published pages that links led to",
+        "carries": "the course and section; how many pages were published, how many dated from a class, dated as the first class, kept their date; how many classes were published and how many pages they brought; how many were left unticked; the PLACES of the published pages, at most ten then 'and N more' - names in the course folder, never anything written on a page (the pagesDatedByTheBuild precedent). A page the writer declined is recorded by 'page settings left as they were' (#186), not here.",
+        "line": "{course}/{section} · published pages that links led to — {N pages} ({N} dated from a class, {N} dated as the first class, {N} kept their date), {N classes} bringing {N} more, {N} left unticked: {places}",
+        "why": "Added with #379. It changes what students will see and rewrites dates in the teacher's own files; 'why is this page visible?' and 'why did its date change?' are asked weeks later."
+      },
+      {
+        "event": "left pages hidden that links lead to",
+        "carries": "the course and section; whether it was Not Now or Publish with some unticked; how many pages were left hidden.",
+        "line": "{course}/{section} · left pages hidden that links lead to — {Not Now|some unticked}, {N pages} left hidden",
+        "why": "Added with #379. When a student reports a dead link, the trail shows that the teacher was offered it and chose."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty.",
@@ -4710,7 +4728,7 @@
       "fixable: true on the finding: the flag means 'a repair button exists' to anyone porting the alert by flag; the checklist is a separate path, and SiteHealthRepair.canRepair must not start offering one.",
       "Changing the assistant's reach to two steps - knownDifference.",
       "Locked 'comes with' rows under a ticked class - one summary line instead (wording.comesWith), the cut the director allowed for time.",
-      "Rows that follow another row's tick (a page reached only through another offered page, unticked with it) - deferred to its own issue (plan-review note 3); until then such a page stays ticked and is published with nothing visible linking to it."
+      "Rows that follow another row's tick (a page reached only through another offered page, unticked with it) - deferred to GitHub #385, milestone v1.4.2 (plan-review note 3); until then such a page stays ticked and is published with nothing visible linking to it."
     ],
     "buildCases": [
       {
@@ -4786,7 +4804,421 @@
         ]
       }
     ],
-    "howTheBuildCasesRun": "Laid out as class-planning.json -> datingPagesAClassBrings.fromTheLinksChecklist.howTheCasesRun describes, and run by scripts/test_links_checklist.py (OfferFileTests)."
+    "howTheBuildCasesRun": "Laid out as class-planning.json -> datingPagesAClassBrings.fromTheLinksChecklist.howTheCasesRun describes, and run by scripts/test_links_checklist.py (OfferFileTests).",
+    "publishCases": [
+      {
+        "name": "iv-a. the ticked pages are published with the offer's dates; a page published before keeps its date; an unticked class is left alone",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "date": "2026-09-08",
+            "links": [
+              "How Marks Work"
+            ]
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "kind": "class",
+            "visible": false,
+            "date": "2026-10-20",
+            "links": [
+              "Worksheet",
+              "Class Notes"
+            ]
+          },
+          {
+            "title": "How Marks Work",
+            "kind": "page",
+            "visible": true,
+            "date": "2026-09-08",
+            "links": [
+              "Worksheet",
+              "Published Once"
+            ]
+          },
+          {
+            "title": "Worksheet",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          },
+          {
+            "title": "Published Once",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          },
+          {
+            "title": "Class Notes",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          }
+        ],
+        "offer": [
+          {
+            "place": "Concepts/Worksheet",
+            "group": "fromAClass",
+            "ticked": false,
+            "step": 2,
+            "claimedBy": "section1/All Classes/Unit 1, Day 1",
+            "date": "2026-09-08",
+            "why": "dated",
+            "firstUsedIn": "section1/All Classes/Unit 2, Day 5"
+          },
+          {
+            "place": "Concepts/Published Once",
+            "group": "fromAClass",
+            "ticked": true,
+            "step": 2,
+            "claimedBy": "section1/All Classes/Unit 1, Day 1",
+            "date": null,
+            "why": "keepsItsDate",
+            "firstUsedIn": null
+          },
+          {
+            "place": "section1/All Classes/Unit 2, Day 5",
+            "group": "class",
+            "ticked": false,
+            "step": null,
+            "claimedBy": null,
+            "date": null,
+            "why": "classNeverDated",
+            "firstUsedIn": null
+          }
+        ],
+        "tick": [
+          "Concepts/Worksheet",
+          "Concepts/Published Once"
+        ],
+        "expect": {
+          "Worksheet": {
+            "visible": true,
+            "date": "2026-09-08"
+          },
+          "Published Once": {
+            "visible": true,
+            "date": "2026-02-01"
+          },
+          "Unit 2, Day 5": {
+            "visible": false,
+            "date": "2026-10-20"
+          },
+          "Class Notes": {
+            "visible": false,
+            "date": "2026-02-01"
+          }
+        },
+        "expectFrontPageUnchanged": true
+      },
+      {
+        "name": "iv-b. a ticked class is published with its own pages, dated by that class, its own date untouched; a row it also brings takes the CLASS's date; the front page does not move",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "date": "2026-09-08",
+            "links": [
+              "How Marks Work"
+            ]
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "kind": "class",
+            "visible": false,
+            "date": "2026-10-20",
+            "links": [
+              "Worksheet",
+              "Class Notes"
+            ]
+          },
+          {
+            "title": "How Marks Work",
+            "kind": "page",
+            "visible": true,
+            "date": "2026-09-08",
+            "links": [
+              "Worksheet",
+              "Published Once"
+            ]
+          },
+          {
+            "title": "Worksheet",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          },
+          {
+            "title": "Published Once",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          },
+          {
+            "title": "Class Notes",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          }
+        ],
+        "offer": [
+          {
+            "place": "Concepts/Worksheet",
+            "group": "fromAClass",
+            "ticked": false,
+            "step": 2,
+            "claimedBy": "section1/All Classes/Unit 1, Day 1",
+            "date": "2026-09-08",
+            "why": "dated",
+            "firstUsedIn": "section1/All Classes/Unit 2, Day 5"
+          },
+          {
+            "place": "Concepts/Published Once",
+            "group": "fromAClass",
+            "ticked": true,
+            "step": 2,
+            "claimedBy": "section1/All Classes/Unit 1, Day 1",
+            "date": null,
+            "why": "keepsItsDate",
+            "firstUsedIn": null
+          },
+          {
+            "place": "section1/All Classes/Unit 2, Day 5",
+            "group": "class",
+            "ticked": false,
+            "step": null,
+            "claimedBy": null,
+            "date": null,
+            "why": "classNeverDated",
+            "firstUsedIn": null
+          }
+        ],
+        "tick": [
+          "Concepts/Worksheet",
+          "section1/All Classes/Unit 2, Day 5"
+        ],
+        "expect": {
+          "Unit 2, Day 5": {
+            "visible": true,
+            "date": "2026-10-20"
+          },
+          "Class Notes": {
+            "visible": true,
+            "date": "2026-10-20"
+          },
+          "Worksheet": {
+            "visible": true,
+            "date": "2026-10-20"
+          },
+          "Published Once": {
+            "visible": false,
+            "date": "2026-02-01"
+          }
+        },
+        "expectFrontPageUnchanged": true
+      },
+      {
+        "name": "iv-c. a page made visible since the offer was worked out is dropped, not written again",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "date": "2026-09-08",
+            "links": [
+              "How Marks Work"
+            ]
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "kind": "class",
+            "visible": false,
+            "date": "2026-10-20",
+            "links": [
+              "Worksheet",
+              "Class Notes"
+            ]
+          },
+          {
+            "title": "How Marks Work",
+            "kind": "page",
+            "visible": true,
+            "date": "2026-09-08",
+            "links": [
+              "Worksheet",
+              "Published Once"
+            ]
+          },
+          {
+            "title": "Worksheet",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          },
+          {
+            "title": "Published Once",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          },
+          {
+            "title": "Class Notes",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          }
+        ],
+        "offer": [
+          {
+            "place": "Concepts/Worksheet",
+            "group": "fromAClass",
+            "ticked": false,
+            "step": 2,
+            "claimedBy": "section1/All Classes/Unit 1, Day 1",
+            "date": "2026-09-08",
+            "why": "dated",
+            "firstUsedIn": "section1/All Classes/Unit 2, Day 5"
+          },
+          {
+            "place": "Concepts/Published Once",
+            "group": "fromAClass",
+            "ticked": true,
+            "step": 2,
+            "claimedBy": "section1/All Classes/Unit 1, Day 1",
+            "date": null,
+            "why": "keepsItsDate",
+            "firstUsedIn": null
+          },
+          {
+            "place": "section1/All Classes/Unit 2, Day 5",
+            "group": "class",
+            "ticked": false,
+            "step": null,
+            "claimedBy": null,
+            "date": null,
+            "why": "classNeverDated",
+            "firstUsedIn": null
+          }
+        ],
+        "tick": [
+          "Concepts/Published Once"
+        ],
+        "madeVisibleSince": [
+          "Published Once"
+        ],
+        "expectOffered": [
+          "Concepts/Worksheet",
+          "section1/All Classes/Unit 2, Day 5"
+        ]
+      },
+      {
+        "name": "v. an answered set is not offered again; a page joining it brings the checklist back, with the earlier unticks remembered",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "date": "2026-09-08",
+            "links": [
+              "How Marks Work"
+            ]
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "kind": "class",
+            "visible": false,
+            "date": "2026-10-20",
+            "links": [
+              "Worksheet",
+              "Class Notes"
+            ]
+          },
+          {
+            "title": "How Marks Work",
+            "kind": "page",
+            "visible": true,
+            "date": "2026-09-08",
+            "links": [
+              "Worksheet",
+              "Published Once"
+            ]
+          },
+          {
+            "title": "Worksheet",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          },
+          {
+            "title": "Published Once",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          },
+          {
+            "title": "Class Notes",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          }
+        ],
+        "offer": [
+          {
+            "place": "Concepts/Worksheet",
+            "group": "fromAClass",
+            "ticked": false,
+            "step": 2,
+            "claimedBy": "section1/All Classes/Unit 1, Day 1",
+            "date": "2026-09-08",
+            "why": "dated",
+            "firstUsedIn": "section1/All Classes/Unit 2, Day 5"
+          },
+          {
+            "place": "Concepts/Published Once",
+            "group": "fromAClass",
+            "ticked": true,
+            "step": 2,
+            "claimedBy": "section1/All Classes/Unit 1, Day 1",
+            "date": null,
+            "why": "keepsItsDate",
+            "firstUsedIn": null
+          },
+          {
+            "place": "section1/All Classes/Unit 2, Day 5",
+            "group": "class",
+            "ticked": false,
+            "step": null,
+            "claimedBy": null,
+            "date": null,
+            "why": "classNeverDated",
+            "firstUsedIn": null
+          }
+        ],
+        "answer": "notNow",
+        "untick": [
+          "Concepts/Published Once"
+        ],
+        "thenOfferAlso": {
+          "place": "Concepts/How Marks Work Extra",
+          "group": "notReachedByAClass",
+          "ticked": true,
+          "step": null,
+          "claimedBy": null,
+          "date": "2026-09-08",
+          "why": "datedAsTheFirstClass",
+          "firstUsedIn": null
+        },
+        "expectOfferedAgainBeforeTheNewPage": false,
+        "expectOfferedAgainAfter": true,
+        "expectStartsUnticked": [
+          "Concepts/Published Once"
+        ]
+      }
+    ],
+    "howThePublishCasesRun": "Run by the mac through LinksChecklistPublisher and LinksChecklistSheetModel on a laid-out course (LinksChecklistTests); owed by Windows. `pages` are laid out in section 1: a `class` in the class folder with publish/created, a `page` in Concepts with publishForSection1/createdSection1 (a course-level page). `offer` is the rows the build would have written (the file's other keys are filled in by the runner). `tick` lists the places ticked when Publish is pressed; `expect` maps a page's title to its visibility and date afterwards; `expectFrontPageUnchanged` means the section's front page is byte for byte as it was (ruling F1). `madeVisibleSince` pages are made visible after the offer and before the sheet opens; `expectOffered` is the rows the sheet then shows. For v: `answer` notNow with `untick` unticked, then the same offer must not be offered again, and the offer with `thenOfferAlso` added must be, starting `expectStartsUnticked` unticked."
   },
   "unreadablePageSettings": {
     "note": "What the build does with a page whose settings block it cannot read (#246). The words a teacher reads are siteHealth.checks[pageSettingsUnreadable]; these are the cases, run by scripts/test_unreadable_page_settings.py through the real build_site.process_frontmatter and by scripts/check_visibility_against_the_site.py down the rest of the chain to the site.",
