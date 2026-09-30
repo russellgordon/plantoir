@@ -419,6 +419,17 @@
     "rule": "Read the marker for the destination the course is configured for NOW — not any marker, and not the other one.",
     "why": "A course deployed to Netlify and then switched to Cloudflare has NEVER been deployed to Cloudflare, and its first Cloudflare deploy will ask what to call the site. Treating the old Netlify marker as proof schedules exactly the deploy that stops at a prompt at half six with nobody there — the failure the 'never been deployed' refusal exists to prevent."
   },
+  "frontPageNotToday": {
+    "path": "courses/<CODE>/.publish_state/section<N>.front-page-not-today.json",
+    "keys": {
+      "version": "1",
+      "day": "yyyy-MM-dd, the teacher's calendar day the question was asked on",
+      "class": "the class page offered, by its file name without .md"
+    },
+    "writtenBy": "the app only, when the teacher presses Not Today in answer to class-planning.json -> todaysClassOnTheFrontPage (#397). Never the build, never removed: a record for another day or another class stops nothing, so it expires by itself.",
+    "rule": "It stops the question only when `day` is today AND `class` is the class the question would offer. A class published later the same day is a new question.",
+    "whyHidden": "Inside `.publish_state`, like linksChecklistAnswered: hidden from the course's fingerprint and from the “— Edited” marker, and never published. Not the app's preferences: those are per Mac, and another copy of the app on the same folder would ask again."
+  },
   "linksChecklistAnswered": {
     "path": "courses/<CODE>/.publish_state/section<N>.links-checklist-answered.json",
     "keys": {

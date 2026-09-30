@@ -30,6 +30,18 @@ import Foundation
 /// heading. Nor does this ever INSERT an embed into a page that has none;
 /// Windows does, under the course's own heading, and
 /// `contracts/class-planning.json` → `sectionIndexPointer` pins both.
+///
+/// **The class line is read outside code and `%%` comments, and only the
+/// line found is rewritten (#397).** A class line a teacher parked in a
+/// comment is not on the page students see; reading it as the embed made
+/// the pointer "move" a line nobody sees and report success. The one link
+/// mask (`MarkdownCode.notALinkRanges`) decides, as it does for every other
+/// link reader, and the build's own reading of the same line
+/// (`build_site._date_pages_from_their_classes`) uses the same mask. The new
+/// line keeps the FORM the teacher wrote — `sectionIndexPointer.writtenAs`.
+/// Preview's question about today's class (`TodaysClassOnTheFrontPage`)
+/// finds the line and writes it through here, so there is one reader and
+/// one writer of it.
 enum SectionIndexPointer {
 
     // MARK: - Types
@@ -47,6 +59,35 @@ enum SectionIndexPointer {
 
         /// The class it used to point at, when that changed.
         let usedToPointAt: String?
+    }
+
+    /// The front page's class line, as found (`sectionIndexPointer.found`).
+    struct ClassLine: Equatable {
+
+        // MARK: - Stored properties
+
+        /// Where it is: an index into the page's lines, split on "\n".
+        let lineIndex: Int
+
+        /// The class it names, as written, without a `.md`.
+        let name: String
+
+        /// How many folders the teacher wrote before the name.
+        let folderDepth: Int
+
+        /// Whether one of those folders is a `section<N>` folder — a path the
+        /// build turns into its display name (`rewrite_section_wikilinks`).
+        let namesASectionFolder: Bool
+
+        /// The display name after `|`, as written, or nil.
+        let displayName: String?
+
+        /// Whether the teacher wrote the file's `.md`.
+        let hasMarkdownExtension: Bool
+
+        /// What surrounds the embed on its line — kept when it is rewritten.
+        let before: String
+        let after: String
     }
 
     // MARK: - Functions
@@ -78,11 +119,7 @@ enum SectionIndexPointer {
                 if day.text < soFarDay.text {
                     continue
                 } else if day.text == soFarDay.text {
-                    if let ud = unitDay, let soFarUD = newestUnitDay {
-                        if ud <= soFarUD {
-                            continue
-                        }
-                    } else if unitDay == nil && newestUnitDay != nil {
+                    if !SectionIndexPointer.comesLater(unitDay, than: newestUnitDay) {
                         continue
                     }
                 }
@@ -92,6 +129,181 @@ enum SectionIndexPointer {
             newestUnitDay = unitDay
         }
         return newest
+    }
+
+    /// The tie-break between two classes on the same day: the higher of the
+    /// course's own numbering wins, a numbered class beats an unnumbered one,
+    /// and between two unnumbered ones the later in the walk does. Shared with
+    /// `TodaysClassOnTheFrontPage`, which chooses between today's classes the
+    /// same way (#397) rather than keeping a copy of the rule.
+    static func comesLater(_ candidate: UnitDay?, than current: UnitDay?) -> Bool {
+        if let candidateNumbers = candidate, let currentNumbers = current {
+            return candidateNumbers > currentNumbers
+        }
+        if candidate == nil && current != nil {
+            return false
+        }
+        return true
+    }
+
+    /// The front page's class line (`sectionIndexPointer.found`), or nil when
+    /// it has none.
+    ///
+    /// Read BELOW the frontmatter and OUTSIDE code and `%%` comments (#397).
+    /// The mask is taken over the body alone, as the build takes it over the
+    /// page's content, and positions are counted in UTF-16 because that is
+    /// what the mask counts in — counted in characters, an emoji above a
+    /// comment moves the embed inside it (the contract case "a long line of
+    /// emoji above a comment").
+    static func classLine(in text: String, classTitles: Set<String>) -> ClassLine? {
+        let lines: [String] = text.components(separatedBy: "\n")
+        var bodyStart: Int = 0
+        if let block = PageFrontmatter.block(in: text) {
+            bodyStart = block.closeIndex + 1
+        }
+        if bodyStart >= lines.count {
+            return nil
+        }
+        var bodyLines: [String] = []
+        for index in bodyStart..<lines.count {
+            bodyLines.append(lines[index])
+        }
+        let notALink: [NSRange] = MarkdownCode.notALinkRanges(in: bodyLines.joined(separator: "\n"))
+
+        let aroundTheEmbed: CharacterSet = CharacterSet.whitespaces.union(CharacterSet(charactersIn: "\r"))
+        var lineStart: Int = 0
+        for (offset, line) in bodyLines.enumerated() {
+            let startOfThisLine: Int = lineStart
+            lineStart += line.utf16.count + 1
+
+            let trimmed: String = line.trimmingCharacters(in: aroundTheEmbed)
+            guard trimmed.hasPrefix("![["), trimmed.hasSuffix("]]"), trimmed.count >= 5,
+                  let opening = line.range(of: "![[") else {
+                continue
+            }
+            let embedAt: Int = startOfThisLine + opening.lowerBound.utf16Offset(in: line)
+            if MarkdownCode.contains(embedAt, in: notALink) {
+                continue
+            }
+
+            let inside: String = String(trimmed.dropFirst(3).dropLast(2))
+            // A transclusion may carry a display name or a heading; the target
+            // is what comes before either.
+            let beforeTheBar: String = inside.components(separatedBy: "|")[0]
+            let target: String = beforeTheBar
+                .components(separatedBy: "#")[0]
+                .trimmingCharacters(in: .whitespaces)
+            let pathParts: [String] = target.components(separatedBy: "/")
+            var name: String = (pathParts.last ?? target).trimmingCharacters(in: .whitespaces)
+            var hasMarkdownExtension: Bool = false
+            if name.lowercased().hasSuffix(".md") {
+                name = String(name.dropLast(3)).trimmingCharacters(in: .whitespaces)
+                hasMarkdownExtension = true
+            }
+            if name.isEmpty || !classTitles.contains(name.lowercased()) {
+                continue
+            }
+
+            var namesASectionFolder: Bool = false
+            for position in 0..<(pathParts.count - 1) {
+                if SectionIndexPointer.isASectionFolder(pathParts[position].trimmingCharacters(in: .whitespaces)) {
+                    namesASectionFolder = true
+                }
+            }
+            var displayName: String?
+            if let bar = inside.range(of: "|") {
+                displayName = String(inside[bar.upperBound...])
+            }
+            let embedStart: String.Index = opening.lowerBound
+            let embedEnd: String.Index = line.index(embedStart, offsetBy: trimmed.count)
+            return ClassLine(
+                lineIndex: bodyStart + offset,
+                name: name,
+                folderDepth: pathParts.count - 1,
+                namesASectionFolder: namesASectionFolder,
+                displayName: displayName,
+                hasMarkdownExtension: hasMarkdownExtension,
+                before: String(line[..<embedStart]),
+                after: String(line[embedEnd...])
+            )
+        }
+        return nil
+    }
+
+    /// The embed that replaces `line`, naming `page` in the form the teacher
+    /// wrote, as far as the SITE can still draw it
+    /// (`sectionIndexPointer.writtenAs`, #397):
+    ///
+    /// * a path holding a `section<N>` folder is written as the class's full
+    ///   place inside the course folder, and ALWAYS with `|<its name>` — the
+    ///   build turns a section path into its display name, and without one
+    ///   leaves a target the site does not have (implementation review,
+    ///   finding 1: MPM2DE's `…|Thread 1, Day 1` lost its name and the front
+    ///   page showed nothing);
+    /// * any other path is written as the class's place from the site's root
+    ///   (inside its section folder, or the course folder for a class outside
+    ///   one), because Quartz reads a path from there;
+    /// * a display name equal to the old class's name follows the class; any
+    ///   other, and a heading, is dropped; a typed `.md` stays.
+    ///
+    /// Places are read against `courseDirectory`, never from the disk path's
+    /// last few folders, which lost the `section1/` anchor one folder deeper
+    /// and could pick up the course folder's own name (finding 3). With no
+    /// course folder to read against, the bare name is written — what the
+    /// pointer always wrote before #397.
+    static func embed(replacing line: ClassLine, with page: AssistSectionPage, courseDirectory: URL?) -> String {
+        var name: String = page.title
+        if line.hasMarkdownExtension {
+            name += ".md"
+        }
+        var written: String = name
+        if line.folderDepth > 0, let courseDirectory,
+           let place = SectionIndexPointer.foldersInsideTheCourse(of: page, courseDirectory: courseDirectory) {
+            var folders: [String] = place
+            if !line.namesASectionFolder, let first = folders.first, SectionIndexPointer.isASectionFolder(first) {
+                folders.removeFirst()
+            }
+            if !folders.isEmpty {
+                written = folders.joined(separator: "/") + "/" + name
+            }
+        }
+        var keepsAName: Bool = line.namesASectionFolder
+        if let displayName = line.displayName,
+           displayName.trimmingCharacters(in: .whitespaces).lowercased() == line.name.lowercased() {
+            keepsAName = true
+        }
+        if keepsAName {
+            written += "|" + page.title
+        }
+        return "![[" + written + "]]"
+    }
+
+    /// The folders between the course folder and `page`, or nil when the page
+    /// is not inside it.
+    static func foldersInsideTheCourse(of page: AssistSectionPage, courseDirectory: URL) -> [String]? {
+        let root: String = courseDirectory.standardizedFileURL.path + "/"
+        let full: String = page.fileURL.standardizedFileURL.path
+        guard full.hasPrefix(root) else {
+            return nil
+        }
+        var parts: [String] = String(full.dropFirst(root.count)).components(separatedBy: "/")
+        parts.removeLast()
+        var folders: [String] = []
+        for part in parts where !part.isEmpty {
+            folders.append(part)
+        }
+        return folders
+    }
+
+    /// `section1`, `section12`: a section's own folder in the course.
+    static func isASectionFolder(_ name: String) -> Bool {
+        guard name.hasPrefix("section"), name.count > "section".count else {
+            return false
+        }
+        for character in name.dropFirst("section".count) where !character.isASCII || !character.isNumber {
+            return false
+        }
+        return true
     }
 
     /// The index rewritten to point at `page`, or nil when nothing needs to
@@ -109,47 +321,30 @@ enum SectionIndexPointer {
         _ text: String,
         at page: AssistSectionPage,
         classTitles: Set<String>,
-        createdTail: String
+        createdTail: String,
+        courseDirectory: URL?
     ) -> Result? {
         var updated: String = text
         var replaced: String?
-        var foundTheClassEmbed: Bool = false
-
-        for line in text.components(separatedBy: "\n") {
-            let trimmed: String = line.trimmingCharacters(in: .whitespaces)
-            guard trimmed.hasPrefix("![["), trimmed.hasSuffix("]]") else {
-                continue
-            }
-            let inside: String = String(trimmed.dropFirst(3).dropLast(2))
-            // A transclusion may carry a display name or a heading; the target
-            // is what comes before either.
-            let target: String = inside
-                .components(separatedBy: "|")[0]
-                .components(separatedBy: "#")[0]
-                .trimmingCharacters(in: .whitespaces)
-            let bare: String = (target.components(separatedBy: "/").last ?? target)
-                .trimmingCharacters(in: .whitespaces)
-
-            if !classTitles.contains(bare.lowercased()) {
-                continue
-            }
-            foundTheClassEmbed = true
-            if bare == page.title {
-                replaced = nil
-            } else {
-                updated = updated.replacingOccurrences(of: trimmed, with: "![[\(page.title)]]")
-                replaced = bare
-            }
-            break
-        }
 
         // A front page with no class embed is one the teacher made without
         // one, or emptied on purpose: it keeps its own date, because there is
         // no class on it for the date to follow (#275,
         // `contracts/class-planning.json` → `sectionIndexPointer.dateCases`).
         // This used to date it to the newest class anyway.
-        if !foundTheClassEmbed {
+        guard let found = SectionIndexPointer.classLine(in: text, classTitles: classTitles) else {
             return nil
+        }
+        if found.name != page.title {
+            // THAT line, by its position — never every line with its text: a
+            // copy of it inside a comment is the teacher's note, and
+            // `replacingOccurrences` rewrote it too until #397.
+            var lines: [String] = text.components(separatedBy: "\n")
+            lines[found.lineIndex] = found.before
+                + SectionIndexPointer.embed(replacing: found, with: page, courseDirectory: courseDirectory)
+                + found.after
+            updated = lines.joined(separator: "\n")
+            replaced = found.name
         }
 
         // The date follows the class it points at.
@@ -204,7 +399,8 @@ enum SectionIndexPointer {
             forSection: sectionNumber
         )
         guard let result = SectionIndexPointer.repointing(
-            before, at: newest, classTitles: classTitles, createdTail: tail
+            before, at: newest, classTitles: classTitles, createdTail: tail,
+            courseDirectory: course.directoryURL
         ) else {
             return nil
         }

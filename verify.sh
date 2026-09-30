@@ -825,6 +825,22 @@ else
   cat /tmp/verify_dates_follow_the_class_test.log
 fi
 
+# ---- the line the app writes on a front page still names the class (#397) ----
+# The app's pointer keeps the form the teacher wrote; the build turns a
+# section path into its display name. Every expected line in the contract is
+# run through the build's own rewrite, in the image, because build_site needs
+# python-frontmatter.
+echo ""
+echo "🔎 Checking that every front-page line the app writes still names its class on the site…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/test_front_page_lines_resolve.py" /opt/scripts/test_front_page_lines_resolve.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_front_page_lines_resolve.py >/tmp/verify_front_page_lines_test.log 2>&1; then
+  pass "the app's front-page line names its class once the build has read it (scripts/test_front_page_lines_resolve.py)"
+else
+  fail "the app's front-page line names its class once the build has read it (scripts/test_front_page_lines_resolve.py)"
+  cat /tmp/verify_front_page_lines_test.log
+fi
+
 # ---- build_site.py: a page whose settings cannot be read is hidden ----
 # GitHub #246. Every case in contracts/shared-rules.json ->
 # unreadablePageSettings through the real process_frontmatter, in the image

@@ -2604,7 +2604,12 @@ def _class_embed_target(line: str) -> str | None:
     is not a transclusion. The same rule as the app's pointer
     (`contracts/class-planning.json` → `sectionIndexPointer.found`): the
     line's trimmed text is `![[…]]`, the target is what comes before any `|`
-    display name or `#` heading, after any folder path.
+    display name or `#` heading, after any folder path, without a `.md` the
+    teacher may have typed (Obsidian accepts one, #397).
+
+    The CALLER masks code and `%%` comments: a line is read one at a time
+    here, and whether it sits inside a fence or a comment is a question about
+    the page around it (`_date_pages_from_their_classes`, #397).
     """
     trimmed = line.strip()
     if not (trimmed.startswith("![[") and trimmed.endswith("]]")):
@@ -2612,6 +2617,8 @@ def _class_embed_target(line: str) -> str | None:
     inside = trimmed[3:-2]
     target = inside.split("|")[0].split("#")[0].strip()
     bare = target.split("/")[-1].strip()
+    if bare.lower().endswith(".md"):
+        bare = bare[:-3].strip()
     return bare.lower() if bare else None
 
 
@@ -3143,9 +3150,23 @@ def _date_pages_from_their_classes(content_root: Path, section_number: int = 1,
     front_page = content_root / "index.md"
     front_post = all_pages.get(front_page)
     if front_post is not None:
-        for line in front_post.content.split("\n"):
+        # The embed is read OUTSIDE code and `%%` comments (#397): Quartz never
+        # draws a class line a teacher parked in a comment or a fence, so it is
+        # not what the front page shows, and dating the page from it put a
+        # date above a class students cannot see. The same mask every link
+        # reader uses (`markdown_code.not_a_link_ranges`, #313, #331), and the
+        # app's pointer reads the page the same way
+        # (`class-planning.json` → `sectionIndexPointer.found`).
+        body = front_post.content
+        not_a_link = markdown_code.not_a_link_ranges(body)
+        line_start = 0
+        for line in body.split("\n"):
+            where = line_start + line.find("![[")
+            line_start += len(line) + 1
             target = _class_embed_target(line)
             if target is None or target not in class_pages_by_name:
+                continue
+            if any(start <= where < end for start, end in not_a_link):
                 continue
             named_created = visible_date_of(class_pages_by_name[target])
             if named_created is not None:
