@@ -525,6 +525,41 @@ public static class PageFrontmatter
         return (Rebuild(lines, newline), new DraftEdit(key, before, draft, Changed: true));
     }
 
+    /// <summary>
+    /// The page without any top-level <c>publishForSection&lt;N&gt;</c>,
+    /// <c>draftSection&lt;N&gt;</c> or <c>createdSection&lt;N&gt;</c> line, each
+    /// with its continuation lines — for a copy that lands inside a section
+    /// folder, where those keys have no business (#200 B, the mac's
+    /// <c>AssistPageVisibility.withoutPerSectionKeys</c>).
+    /// </summary>
+    /// <remarks>
+    /// REMOVE what the copy inherited rather than ADD a per-section key to
+    /// hide it: a copy is section-local for ever, so publishing it later writes
+    /// the plain <c>publish:</c>, and a <c>publishForSection&lt;N&gt;: false</c>
+    /// left on it wins at build time — the page could never be published, and
+    /// the reply said "Published" every time. <c>createdSection&lt;N&gt;</c> goes
+    /// too: the build copies it over <c>created</c>, so an inherited one shows
+    /// the SOURCE's day on the site.
+    /// </remarks>
+    internal static string WithoutPerSectionKeys(string pageText)
+    {
+        if (PageVisibilityReader.FenceIndices(pageText) is not { } fences) return pageText;
+        var lines = new List<string>(pageText.Split('\n'));
+        var removals = new SortedSet<int>();
+        for (int index = fences.Open + 1; index < fences.Close; index++)
+        {
+            string bare = PageVisibilityReader.TrimCarriageReturn(lines[index]);
+            if (bare.StartsWith(' ') || bare.StartsWith('\t')) continue;
+            if (SectionAdder.PerSectionKeyNumber(bare) is null) continue;
+            string key = bare[..bare.IndexOf(':')];
+            removals.Add(index);
+            removals.UnionWith(ContinuationLines(lines, index, fences.Close, ValueIsEmpty(lines[index], key)));
+        }
+        if (removals.Count == 0) return pageText;
+        foreach (int index in removals.Reverse()) lines.RemoveAt(index);
+        return string.Join("\n", lines);
+    }
+
     /// <summary>How many lines below the key at <paramref name="keyIndex"/> belong to its value (see <see cref="ContinuationLines"/>).</summary>
     internal static int ContinuationLineCount(List<string> lines, int keyIndex, int closeIndex, bool keyValueWasEmpty) =>
         ContinuationLines(lines, keyIndex, closeIndex, keyValueWasEmpty).Count;

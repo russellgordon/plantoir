@@ -217,6 +217,7 @@ public static class ActivityTrail
         RememberedTimetableSetAside,
         SectionAdded,
         PageSettingsLeftAsTheyWere,
+        ClassCopyNotMade,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -268,6 +269,7 @@ public static class ActivityTrail
         Event.RememberedTimetableSetAside => "remembered timetable set aside",
         Event.SectionAdded => "section added",
         Event.PageSettingsLeftAsTheyWere => "page settings left as they were",
+        Event.ClassCopyNotMade => "class copy not made",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 
