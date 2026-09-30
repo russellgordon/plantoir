@@ -289,7 +289,11 @@ class Ics4uFileStepTests(unittest.TestCase):
             self.assertFalse(how_i_teach.exists(), "How I Teach is ICS3U's alone")
         self.assertEqual(config["curriculum_folders"], ["Curriculum", mf.COLLEGE_BOARD_FOLDER])
         self.assertIn(mf.COLLEGE_BOARD_FOLDER, config["hidden"])
-        self.assertNotIn("deploy_target", config, "ICS4U's publishing is left alone")
+        # Its pages print the College Board's words, so it publishes to a
+        # folder of its own and never to a public site (ruling Q2).
+        self.assertEqual(config["deploy_target"], mf.FOLDER_DESTINATION)
+        self.assertEqual(config["deploy_folder_path"], str(folder / "School Web Space" / "ICS4U"))
+        self.assertEqual(ics3u["deploy_folder_path"], str(folder / mf.PUBLISH_FOLDER_NAME))
         # ICS3U's tick is the curriculum-settings scene's to make, through the app.
         self.assertEqual(ics3u["curriculum_folders"], ["Curriculum"])
         block = page[page.index("## Curriculum connection"):]

@@ -19,8 +19,10 @@ Principles, each with two curriculum folders:
    what ticking the box in Course Settings writes; ICS3U's is declared through
    the app by the curriculum-settings scene, because that is the picture;
 4. a **How I Teach** page in ICS3U, in our own words (``marketing/How I Teach.md``);
-5. ICS3U publishes to a FOLDER inside the kept folder, so the scheduled-publish
-   scene needs no account, no network, and makes nothing public.
+5. ICS3U and ICS4U each publish to a FOLDER inside the kept folder (ICS3U to
+   ``School Web Space``, ICS4U to ``School Web Space/ICS4U``), so the
+   scheduled-publish scene needs no account, no network, and nothing either
+   course publishes puts the College Board's words on a public site (ruling Q2).
 
 The courses themselves, the reference copy of ICS3U and the declaration of
 ICS3U's second curriculum are made THROUGH THE APP (``capture.py`` runs the UI
@@ -70,12 +72,21 @@ COLLEGE_BOARD_FOLDER = "College Board Curriculum"
 # second curriculum into `curriculum_folders`. ICS3U's is ticked through
 # Course Settings by the curriculum-settings scene, because that tick is the
 # picture; no scene photographs ICS4U's, so the file step writes it.
+# `publish_to`: the folder, inside the kept folder, the course publishes to.
+# EVERY course here publishes to a folder and never to a public site, because
+# its pages print the College Board's words, which were cleared for Russell's
+# own folder and not for the web (ruling Q2). ICS4U gets a folder of its own:
+# a folder destination writes `<folder>/section<N>` with `rsync --delete`
+# (deploy.sh), so two courses sharing one folder would overwrite each other's
+# section 1.
 CSP_COURSES: list[dict] = [
-    {"code": "ICS3U", "correlation": CORRELATION_FILE, "declare": False},
-    {"code": "ICS4U", "correlation": ICS4U_CORRELATION_FILE, "declare": True},
+    {"code": "ICS3U", "correlation": CORRELATION_FILE, "declare": False,
+     "publish_to": "School Web Space"},
+    {"code": "ICS4U", "correlation": ICS4U_CORRELATION_FILE, "declare": True,
+     "publish_to": "School Web Space/ICS4U"},
 ]
-# Where the scheduled-publish scene publishes: a folder inside the kept folder.
-# `deploy_target` spells a folder destination "local_folder"
+# Where the scheduled-publish scene publishes: ICS3U's folder, inside the kept
+# folder. `deploy_target` spells a folder destination "local_folder"
 # (contracts/file-formats.json -> courseConfigKeys).
 PUBLISH_FOLDER_NAME = "School Web Space"
 FOLDER_DESTINATION = "local_folder"
@@ -434,20 +445,18 @@ def move_section_to_second_semester(course_dir: Path, report: Report,
                         f"starting {first.isoformat()} ({moved} pages)")
 
 
-def apply_file_steps(folder: Path, college_board_pages: dict[str, str] | None,
-                     rows: dict[str, list[dict]] | None = None) -> Report:
+def apply_file_steps(folder: Path, college_board_pages: dict[str, str] | None) -> Report:
     """Everything that is files rather than the app, in order.
 
     Needs the courses to exist already (the app makes them); a course that is
     not there yet is named and skipped. For each course in `CSP_COURSES`: its
     College Board pages, the folder kept out of the sidebar, the second
-    curriculum declared where this set-up owns that, and its correlation's
-    embeds. Then ICS3U's own steps: How I Teach, the folder destination and
-    the second-semester section.
+    curriculum declared where this set-up owns that, its correlation's embeds
+    and its folder destination. Then ICS3U's own steps: How I Teach and the
+    second-semester section.
 
     The College Board pages are passed in, because making them needs the
     document (`college_board.build_pages`); None skips that step and says so.
-    `rows` maps a course code to rows used in place of its correlation file.
     """
     refuse_foreign_courses(folder)
     report = Report()
@@ -464,17 +473,13 @@ def apply_file_steps(folder: Path, college_board_pages: dict[str, str] | None,
         keep_out_of_sidebar(course_dir, COLLEGE_BOARD_FOLDER, report)
         if course["declare"]:
             declare_curriculum_folder(course_dir, COLLEGE_BOARD_FOLDER, report)
-        if rows is not None and code in rows:
-            course_rows = rows[code]
-        else:
-            course_rows = load_correlation(course["correlation"])
-        link_activities(course_dir, course_rows, report)
+        link_activities(course_dir, load_correlation(course["correlation"]), report)
+        publish_to_folder(course_dir, folder / course["publish_to"], report)
 
     course_dir = folder / "courses" / CURRICULUM_COURSE
     if read_config(course_dir) is None:
         return report
     add_how_i_teach(course_dir, report)
-    publish_to_folder(course_dir, folder / PUBLISH_FOLDER_NAME, report)
     move_section_to_second_semester(course_dir, report)
     return report
 
