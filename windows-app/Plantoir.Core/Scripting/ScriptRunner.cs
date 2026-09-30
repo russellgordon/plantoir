@@ -110,7 +110,7 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         WasStoppedByUser = false;
         IsBetweenPhases = false;
         StepDetail = "";
-        if (!keepTranscript) _announcedPreviewAddress = null;
+        if (!keepTranscript) { _announcedPreviewAddress = null; _unfinishedPreviewLine = ""; }
         // Findings follow the transcript: a build-then-publish reads as one
         // job, so its folder problems do too. The half-line left over when the
         // previous process ended is dead either way.
@@ -255,7 +255,7 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         // it has long scrolled out of the recent-text window — relying on that
         // window left the app polling the wrong host port when a second folder
         // got a different port block, and its preview never appeared (issue 7).
-        if (OutputParsers.PreviewAddress(text) is { } address) _announcedPreviewAddress = address;
+        CapturePreviewAddress(text);
         LastOutputAt = DateTime.UtcNow;
         if (IsAwaitingInput) { IsAwaitingInput = false; Notify(nameof(IsAwaitingInput)); }
         Notify(nameof(Transcript));
@@ -431,6 +431,7 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         _promptCheck?.Cancel();
         if (IsAwaitingInput) { IsAwaitingInput = false; Notify(nameof(IsAwaitingInput)); }
         FlushBufferedOutput();
+        FlushUnfinishedPreviewLine();
         LastExitCode = exitCode;
         IsRunning = false;
         _process?.Dispose();
@@ -595,6 +596,16 @@ public sealed class ScriptRunner : INotifyPropertyChanged
             return;
         }
 
+        // deploy.py's PLANTOIR_CLOUDFLARE_REMADE: (#395): a section's
+        // Cloudflare project was gone and was made again, so its address may
+        // have changed and a custom domain went with the old one.
+        if (Plantoir.Core.Models.CloudflareProjectRemade.Parse(line) is { } remade)
+        {
+            ActivityTrail.Note(ActivityTrail.Event.CloudflareProjectMadeAgain,
+                               remade.TrailSentence, remade.Course, remade.Section);
+            return;
+        }
+
         var finding = Plantoir.Core.Models.SiteHealthFinding.Parse(line);
         if (finding is null) return;
         // The same section rebuilt in one task reports the same problem twice;
@@ -641,9 +652,62 @@ public sealed class ScriptRunner : INotifyPropertyChanged
 
     private Uri? _announcedPreviewAddress;
 
-    /// <summary>The address the launcher announced — captured when printed, so it survives a long build.</summary>
-    public Uri? PreviewAddress =>
-        _announcedPreviewAddress ?? OutputParsers.PreviewAddress(Transcript.RecentText(8000));
+    /// <summary>
+    /// The HEAD of a line whose end has not arrived yet (#278, mac #235).
+    /// Output arrives in pieces that ignore line breaks, and a piece cut
+    /// after <c>:8</c>, <c>:81</c> or <c>:810</c> of the announcement parses
+    /// as a valid address on the WRONG port; the rest then arrives without
+    /// the marker and the wrong port stays. So only COMPLETE lines are read,
+    /// colour codes are taken out a whole line at a time, and the unfinished
+    /// tail waits for the next piece (or the end of the run).
+    /// </summary>
+    private string _unfinishedPreviewLine = "";
+
+    private static readonly char[] LineBreaks = { '\r', '\n' };
+
+    /// <summary>
+    /// The address the launcher announced — captured as each line arrives, so
+    /// it survives a long build. NEVER read back off the end of the output:
+    /// on a real first build the announcement is ~6,000 characters in with
+    /// ~11,000 after it, so a tail read had lost it (contract:
+    /// app-rules.json → previewPorts.announcedAddress). Null until announced.
+    /// </summary>
+    public Uri? PreviewAddress => _announcedPreviewAddress;
+
+    private void CapturePreviewAddress(string newText)
+    {
+        string text = _unfinishedPreviewLine + newText;
+        int lastBreak = text.LastIndexOfAny(LineBreaks);
+        if (lastBreak < 0)
+        {
+            // A carry with no line end that has outgrown any plausible line
+            // cannot become an announcement unless it holds the marker.
+            _unfinishedPreviewLine = text.Length > 16_000 &&
+                                     !text.Contains(OutputParsers.PreviewAnnouncementMarker, StringComparison.Ordinal)
+                ? "" : text;
+            return;
+        }
+        _unfinishedPreviewLine = text[(lastBreak + 1)..];
+        ReadCompleteLinesForTheAddress(text[..lastBreak]);
+    }
+
+    private void FlushUnfinishedPreviewLine()
+    {
+        string rest = _unfinishedPreviewLine;
+        _unfinishedPreviewLine = "";
+        if (rest.Length > 0) ReadCompleteLinesForTheAddress(rest);
+    }
+
+    private void ReadCompleteLinesForTheAddress(string completeLines)
+    {
+        foreach (string line in completeLines.Split(LineBreaks))
+        {
+            if (!line.Contains(OutputParsers.PreviewAnnouncementMarker, StringComparison.Ordinal)) continue;
+            // Last announcement wins.
+            if (OutputParsers.PreviewAddress(TranscriptBuilder.StripControlSequences(line)) is { } address)
+                _announcedPreviewAddress = address;
+        }
+    }
 
     public Uri? PublishedSiteUrl
     {
