@@ -3043,5 +3043,5 @@ and `AssistSettingsFreshnessTests.testARefusalOverAnAdditionalDestinationNamesTh
 built the same list twice (`ScheduledDeploy.UnpublishedClassesSentence` in the
 sidebar dialog, and `Describe()`'s block) and has the same primary-only
 sentence in `Describe()`, the card and `PlantoirTools.cs`' `schedule_deploy`
-result; what it owes is its `windows` issue from #396, listed in
+result; what it owes is its `windows` issue #400 (from #396), listed in
 `WINDOWS-PARITY.md`.
