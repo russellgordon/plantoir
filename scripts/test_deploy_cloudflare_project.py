@@ -40,9 +40,11 @@ import deploy
 class FakeCloudflare:
     """Stands in for cloudflare_api: a set of projects that exist, and a log."""
 
-    def __init__(self, existing: set, get_failure: str | None = None):
+    def __init__(self, existing: set, get_failure: str | None = None,
+                 post_failure: str | None = None):
         self.existing = set(existing)
         self.get_failure = get_failure
+        self.post_failure = post_failure
         self.calls: list = []
 
     def __call__(self, method, path, token, payload=None):
@@ -55,6 +57,8 @@ class FakeCloudflare:
                 return {"name": name, "id": "old-id", "subdomain": f"{name}.pages.dev"}
             raise RuntimeError("Cloudflare API error 404: Project not found. The specified project name does not match any of your existing projects.")
         if method == "POST":
+            if self.post_failure is not None:
+                raise RuntimeError(self.post_failure)
             name = payload["name"]
             self.existing.add(name)
             # A recreated project can come back on a different address.
@@ -149,6 +153,40 @@ class APublishWhoseSavedProjectWasDeleted(unittest.TestCase):
         self.assertEqual(marker["subdomain"], "ada1o-s1-2026-testing-7x2.pages.dev")
         self.assertIn("https://ada1o-s1-2026-testing-7x2.pages.dev", output,
                       "the address given must be the recreated project's, which can differ")
+        self.assertIn("The Cloudflare project ada1o-s1-2026-testing was not in this Cloudflare account, "
+                      "so it has been made again", output,
+                      "a teacher must be told; the project may still exist in another account, "
+                      "so the line must not say it is gone from Cloudflare")
+
+    def test_the_remake_leaves_the_marker_the_trail_is_written_from(self):
+        # contracts/shared-rules.json -> activityTrail.mustRecord."cloudflare
+        # project made again": the app writes the trail line from this marker.
+        fake = FakeCloudflare(existing=set())
+        output = self.publish(fake)
+        self.assertIn("PLANTOIR_CLOUDFLARE_REMADE: ADA1O/1 ada1o-s1-2026-testing "
+                      "ada1o-s1-2026-testing-7x2.pages.dev", output.splitlines())
+
+    def test_a_project_that_is_left_alone_leaves_no_marker(self):
+        fake = FakeCloudflare(existing={"ada1o-s1-2026-testing"})
+        output = self.publish(fake)
+        self.assertNotIn("PLANTOIR_CLOUDFLARE_REMADE:", output)
+
+    def test_a_name_already_taken_means_the_project_exists_and_the_upload_goes_ahead(self):
+        # A spurious 404 followed by a 409 on the remake: the project is there,
+        # so the publish must go on as it would have before this check existed.
+        fake = FakeCloudflare(existing=set(),
+                              post_failure="Cloudflare API error 409: A project with this name already exists.")
+        output = self.publish(fake)
+        self.assertEqual(self.uploaded_to, ["ada1o-s1-2026-testing"])
+        self.assertEqual(self.saved_marker()["id"], "old-id")
+        self.assertNotIn("PLANTOIR_CLOUDFLARE_REMADE:", output)
+
+    def test_any_other_refusal_to_remake_it_is_reported(self):
+        fake = FakeCloudflare(existing=set(),
+                              post_failure="Cloudflare API error 403: Authentication error")
+        with self.assertRaises(RuntimeError):
+            self.publish(fake)
+        self.assertEqual(self.uploaded_to, [])
 
     def test_remaking_it_asks_nothing_so_a_windowless_publish_does_it_too(self):
         fake = FakeCloudflare(existing=set())
@@ -168,6 +206,20 @@ class APublishWhoseSavedProjectWasDeleted(unittest.TestCase):
         self.publish(fake)
         self.assertEqual(fake.posted(), [], "only a 404 means the project is gone")
         self.assertEqual(self.uploaded_to, ["ada1o-s1-2026-testing"])
+
+
+class TheMarkerIsTheContractsOwn(unittest.TestCase):
+
+    def test_the_prefix_deploy_py_prints_is_the_one_both_apps_read(self):
+        rules_path = Path(__file__).resolve().parent.parent / "contracts" / "shared-rules.json"
+        rules = json.loads(rules_path.read_text(encoding="utf-8"))
+        entries = rules["activityTrail"]["mustRecord"]
+        found = None
+        for entry in entries:
+            if entry["event"] == "cloudflare project made again":
+                found = entry
+        self.assertIsNotNone(found, "the contract has no 'cloudflare project made again' event")
+        self.assertEqual(found["marker"]["prefix"], deploy.CLOUDFLARE_REMADE_MARKER)
 
 
 if __name__ == "__main__":

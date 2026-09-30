@@ -763,6 +763,10 @@ def deploy_to_cloudflare(public_dir: Path, project_name: str, token: str, accoun
     if completed.returncode != 0:
         raise RuntimeError(f"Cloudflare's deploy tool exited with code {completed.returncode}")
 
+# The marker the app turns into the trail's "cloudflare project made again"
+# line. Machinery: both apps keep every PLANTOIR_…: line out of the console.
+CLOUDFLARE_REMADE_MARKER = "PLANTOIR_CLOUDFLARE_REMADE:"
+
 def remake_pages_project_if_gone(token: str, account_id: str, name: str) -> dict | None:
     """
     A section's saved project can outlive the project itself: a teacher (or
@@ -789,10 +793,19 @@ def remake_pages_project_if_gone(token: str, account_id: str, name: str) -> dict
     except RuntimeError as e:
         if "error 404" not in str(e):
             return None
-    return cloudflare_api(
-        "POST", f"/accounts/{account_id}/pages/projects", token,
-        {"name": name, "production_branch": "main"},
-    )
+    try:
+        return cloudflare_api(
+            "POST", f"/accounts/{account_id}/pages/projects", token,
+            {"name": name, "production_branch": "main"},
+        )
+    except RuntimeError as e:
+        # A 409 means the name is taken in this account — the project EXISTS
+        # and the 404 was spurious (eventual consistency), so the upload can
+        # go ahead as it would have. Any other refusal (a token that cannot
+        # create projects, say) is raised: it says more than wrangler would.
+        if "error 409" in str(e):
+            return None
+        raise
 
 def publish_to_cloudflare(public_dir: Path, course_dir: Path, course_code: str,
                           section: str, teacher_last_name: str | None):
@@ -837,7 +850,16 @@ def publish_to_cloudflare(public_dir: Path, course_dir: Path, course_code: str,
                 "subdomain": remade.get("subdomain"),
                 "account_id": account_id,
             })
-            print(f"⚠️ That project was no longer on Cloudflare, so it has been made again: {project_name}")
+            host_now = remade.get("subdomain") or f"{project_name}.pages.dev"
+            print(f"⚠️ The Cloudflare project {project_name} was not in this Cloudflare account, "
+                  "so it has been made again. If the website had its own web address, add it "
+                  "to the project again in Cloudflare.")
+            # For the activity trail (contracts/shared-rules.json ->
+            # activityTrail.mustRecord."cloudflare project made again"): the
+            # app reads this line, the console leaves it out. The course's one
+            # permitted space is written "+", as in every other marker.
+            place = f"{str(course_code).replace(' ', '+')}/{section}"
+            print(f"{CLOUDFLARE_REMADE_MARKER} {place} {project_name} {host_now}")
     else:
         # Same rule as the Netlify path: the surname is asked for only when
         # a NEW project is being named, never on a repeat deploy.

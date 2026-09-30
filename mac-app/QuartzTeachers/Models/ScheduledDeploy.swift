@@ -2588,6 +2588,9 @@ enum ScheduledDeploy {
         // again (#378) — a publish at half six is exactly when nobody would
         // otherwise know.
         LeftoverWorkReport.noteOnTheTrail(from: text)
+        // A section's Cloudflare project made again by this run's publish
+        // (2026-09-30): its address may have changed while nobody watched.
+        CloudflareProjectRemadeReport.noteOnTheTrail(from: text)
         // A scheduled run is started by Plantoir itself, so it carries the
         // app's helpers folder and can install from it, or create the
         // website builder, while nobody is watching (#312).

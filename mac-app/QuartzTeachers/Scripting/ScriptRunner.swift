@@ -760,6 +760,9 @@ class ScriptRunner {
         // Work left in the workspace by a program that had closed, which the
         // launcher ended before setting the folder up again (#378).
         LeftoverWorkReport.noteOnTheTrail(from: text)
+        // A section's Cloudflare project made again because it was not in
+        // the account any more (2026-09-30).
+        CloudflareProjectRemadeReport.noteOnTheTrail(from: text)
         // A preview whose address was held by something else on this Mac,
         // or whose look could not be made (#310).
         PreviewAddressHeldReport.noteOnTheTrail(from: text)
