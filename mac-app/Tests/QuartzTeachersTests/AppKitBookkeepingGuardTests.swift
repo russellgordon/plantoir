@@ -59,11 +59,11 @@ final class AppKitBookkeepingGuardTests: XCTestCase {
     }
 
     func testAnAppKitKeyThatWasRemovedIsWrittenBackAndNothingChangedMeansNothingToDo() {
-        let snapshot: [String: Any] = ["NSNavLastRootDirectory": "~/Documents"]
+        let snapshot: [String: Any] = ["NSNavLastRootDirectory": "/Users/teacher/Documents"]
         let removed: (putBack: [String: Any], remove: [String]) = PlantoirDefaults.repairs(
             snapshot: snapshot, current: [:], prefixes: AppKitBookkeepingGuardTests.prefixes
         )
-        XCTAssertEqual(removed.putBack["NSNavLastRootDirectory"] as? String, "~/Documents")
+        XCTAssertEqual(removed.putBack["NSNavLastRootDirectory"] as? String, "/Users/teacher/Documents")
         let unchanged: (putBack: [String: Any], remove: [String]) = PlantoirDefaults.repairs(
             snapshot: snapshot, current: snapshot, prefixes: AppKitBookkeepingGuardTests.prefixes
         )
