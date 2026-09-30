@@ -31,6 +31,73 @@ final class ClubFillTests: XCTestCase {
         )
     }
 
+    /// The panel's words follow the tick box (#368): a club says Meetings,
+    /// Club code and Create Club; a course keeps the course's words. Each
+    /// side is compared key by key with the contract, and every key the
+    /// contract names on either side must be one the app says.
+    func testThePanelsWordsFollowTheToggle() throws {
+        let club: [String: Any] = try clubToggle()
+        let url: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("contracts/shared-rules.json")
+        let all: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: try Data(contentsOf: url)) as? [String: Any]
+        )
+        let wizard: [String: Any] = try XCTUnwrap(all["wizard"] as? [String: Any])
+        XCTAssertNotNil(club["panelWordsFollow"] as? String)
+
+        let clubWords: WizardPanelWords = WizardWording.panelWords(isClub: true)
+        let courseWords: WizardPanelWords = WizardWording.panelWords(isClub: false)
+        let pairs: [(key: String, club: String, course: String)] = [
+            ("namingHeading", clubWords.namingHeading, courseWords.namingHeading),
+            ("namingCaption", clubWords.namingCaption, courseWords.namingCaption),
+            ("creatingTitle", clubWords.creatingTitle, courseWords.creatingTitle),
+            ("codeLabel", clubWords.codeLabel, courseWords.codeLabel),
+            ("nameLabel", clubWords.nameLabel, courseWords.nameLabel),
+            ("sectionMarkerCaption", clubWords.sectionMarkerCaption, courseWords.sectionMarkerCaption),
+            ("gradeCaption", clubWords.gradeCaption, courseWords.gradeCaption),
+            ("structureCaption", clubWords.structureCaption, courseWords.structureCaption),
+        ]
+        for pair in pairs {
+            XCTAssertEqual(pair.club, club[pair.key] as? String, "club " + pair.key)
+            XCTAssertEqual(pair.course, wizard[pair.key] as? String, "course " + pair.key)
+            XCTAssertNotEqual(pair.club, pair.course, pair.key + " says the same for a club and a course")
+        }
+        XCTAssertEqual(clubWords.createButton, club["createButton"] as? String)
+        XCTAssertEqual(courseWords.createButton, wizard["createCourseButton"] as? String)
+        XCTAssertEqual(courseWords.createButton, WizardWording.createCourseButton)
+        // The club caption beside the tick box says club, not course: it
+        // contradicted the club's naming caption a few rows below.
+        XCTAssertTrue(WizardWording.clubToggleCaption.hasSuffix("not once the club is made."))
+    }
+
+    /// No course-only sentence is left written into the panel (#368): each
+    /// goes through `WizardWording.panelWords(isClub:)`, or a club reads it.
+    func testThePanelHasNoCourseOnlyWordsOfItsOwn() throws {
+        let url: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("QuartzTeachers/Views/Wizard/NewCourseWizardView.swift")
+        let text: String = try String(contentsOf: url, encoding: .utf8)
+        let courseWords: WizardPanelWords = WizardWording.coursePanelWords
+        let literals: [String] = [
+            "\"" + courseWords.namingHeading + "\"",
+            "\"Chosen once, when the course is made",
+            "\"" + courseWords.creatingTitle + "\"",
+            "\"" + courseWords.codeLabel + "\"",
+            "\"" + courseWords.nameLabel + "\"",
+            "\"" + courseWords.sectionMarkerCaption + "\"",
+            "\"" + courseWords.gradeCaption + "\"",
+            "\"" + courseWords.structureCaption + "\"",
+            "WizardWording.createCourseButton",
+        ]
+        for literal in literals {
+            XCTAssertFalse(text.contains(literal), "NewCourseWizardView still says \(literal) whatever is being made (#368)")
+        }
+        // Positive control: the panel does ask.
+        XCTAssertGreaterThanOrEqual(text.components(separatedBy: "WizardWording.panelWords(isClub: isClubCourse)").count - 1, 8)
+    }
+
     func testTheFillMatchesTheContract() throws {
         for testCase in try XCTUnwrap(clubToggle()["cases"] as? [[String: Any]]) {
             let name: String = try XCTUnwrap(testCase["name"] as? String)

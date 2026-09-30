@@ -3147,6 +3147,42 @@ section's page, and a teacher may have edited it on purpose). Contract:
 Every sentence is in `WizardWording` / `UnitWordRenameWording` and pinned in
 `shared-rules.json` (`wizard.clubToggle`, `specialNames.renameUnitWord`).
 
+**The panel says club when it is making a club (#368, v1.4.1).** Until v1.4.1,
+with the box ticked, a club's own fields ("Folder for meeting pages", "Pages are
+named Week") sat under a "Units" heading captioned "Chosen once, when the course
+is made…", beside "Course code" and "Course name", above "Create Course" — and
+the tick box's own caption ended "…but not once the course is made", a few rows
+above the club's. Nine places now follow the TICK BOX through
+`WizardWording.panelWords(isClub:)` (a `WizardPanelWords` for each side): the
+naming section's heading and caption (Meetings / "Chosen once, when the club is
+made…"), the button (Create Club; its identifier stays `createCourseButton`, which
+tests and the marketing scene find it by), the progress title (Creating your club,
+set when Create is pressed; the example course's "Adding the example course" is
+untouched), the code and name labels (Club code / Club name), the two site-title
+captions ("…beside the club code", "…before the club name") and the Structure
+caption ("Defaults are fine for most clubs"); the toggle caption now ends "…once
+the club is made". Keys: the course's under `wizard` (`namingHeading`,
+`namingCaption`, `creatingTitle`, `codeLabel`, `nameLabel`, `sectionMarkerCaption`,
+`gradeCaption`, `structureCaption`, and the existing `createCourseButton`), the
+club's under `wizard.clubToggle` with the same names plus `createButton`;
+`clubToggle.panelWordsFollow` states the rule. **Why the tick box and not
+`ClubCodeRule`:** a teacher can untick it for a club-shaped code, and the words
+must describe what will be made. **Why the heading ignores the noun picker:** it
+would change under the teacher's hand as they choose the row beneath it, and a
+club whose noun is "class" is still a club. The code field's label does change
+when typing CODING ticks the box — that is the box doing what it says. Gated:
+`ClubFillTests.testThePanelsWordsFollowTheToggle` (every key both ways, and each
+pair must differ) and `testThePanelHasNoCourseOnlyWordsOfItsOwn` (no course-only
+literal left in `NewCourseWizardView`, with a positive count of the calls). The
+opt-in `UnitWordRowUITests.testAClubsPanelSaysMeetingsAndCreateClub` types
+CODING, scrolls the lazy form until the naming rows exist, asserts PRESENCE
+(Meetings, the button's label) before absence, then unticks and checks the
+course's words come back; run it with
+`TEST_RUNNER_PLANTOIR_UI_TESTS=1 xcodebuild -project Plantoir.xcodeproj -scheme Plantoir -configuration Debug test -only-testing:QuartzTeachersUITests/UnitWordRowUITests/testAClubsPanelSaysMeetingsAndCreateClub`
+(plain `PLANTOIR_UI_TESTS=1` does not reach the runner and the test skips).
+Not changed, on purpose: "Enter a course code." (a refusal before anything is
+known) and the grade-in-title warning's own words.
+
 ## Renaming a course's word for a unit
 
 Beside the word under Settings — Overall ("What do you call a unit?  Unit
