@@ -52,7 +52,7 @@ public sealed partial class CourseSettingsView : UserControl
     /// <para>BOTH halves are needed and the editor has already done one of
     /// them: the name's ABSENCE from the copy list is the actual mechanism,
     /// and <c>excluded_items</c> is what stops preflight putting it back. The
-    /// build does reconcile the two, but only at the next build — a teacher
+    /// build does reconcile the two, but only at the next build â€” a teacher
     /// reading this list before then would see a folder they had just
     /// removed.</para>
     ///
@@ -72,19 +72,19 @@ public sealed partial class CourseSettingsView : UserControl
         // change -- and on a course numbered [3, 5] it would say "/3", which a
         // person reading the trail would believe.
         ActivityTrail.Note(ActivityTrail.Event.ItemExcluded,
-            $"{_course.Code}: removed the {CourseConfiguration.ScopeInWords(scope)} {kind} “{name}” from this course's site");
+            $"{_course.Code}: removed the {CourseConfiguration.ScopeInWords(scope)} {kind} â€œ{name}â€ from this course's site");
     }
 
     /// <summary>
     /// A teacher added a name back. The trail line goes on ONLY when the name
-    /// really was excluded — an ordinary new folder is not a re-inclusion, and
+    /// really was excluded â€” an ordinary new folder is not a re-inclusion, and
     /// a line saying it was would be believed.
     /// </summary>
     private void RecordReInclusion(string scope, string kind, string name)
     {
         if (!Config.ReInclude(scope, name)) return;
         ActivityTrail.Note(ActivityTrail.Event.ItemReIncluded,
-            $"{_course.Code}: added the {CourseConfiguration.ScopeInWords(scope)} {kind} “{name}” back to this course's site");
+            $"{_course.Code}: added the {CourseConfiguration.ScopeInWords(scope)} {kind} â€œ{name}â€ back to this course's site");
     }
 
     /// <summary>
@@ -125,7 +125,7 @@ public sealed partial class CourseSettingsView : UserControl
     }
 
     /// <summary>
-    /// "What else does Plantoir use my folders for?" — opens the sheet that
+    /// "What else does Plantoir use my folders for?" â€” opens the sheet that
     /// names this course's own special folders.
     ///
     /// <para><b>Nothing is written to the trail when this opens, and that
@@ -133,7 +133,7 @@ public sealed partial class CourseSettingsView : UserControl
     /// reported next week can be looked into; a read-only sheet changes no
     /// state and leaves nothing to diagnose. Recording it would also mean a
     /// new event in <c>activityTrail.mustRecord</c>, which is pinned across
-    /// both platforms — so a help sheet would turn the mac suite red. If it
+    /// both platforms â€” so a help sheet would turn the mac suite red. If it
     /// ever earns a line, it earns one on both sides at once.</para>
     ///
     /// <para>The configuration is read at CLICK time, not captured when the
@@ -172,7 +172,7 @@ public sealed partial class CourseSettingsView : UserControl
     /// AND a redraw of every control whose rows carry a protection state.
     ///
     /// <para>Removing a folder from ONE list can change whether a row in
-    /// ANOTHER may go — the marks floor counts across both folder lists — and
+    /// ANOTHER may go â€” the marks floor counts across both folder lists â€” and
     /// only the touched editor rebuilds itself. It also changes which folders
     /// the Marks checklist should be offering at all.</para>
     /// </summary>
@@ -191,8 +191,8 @@ public sealed partial class CourseSettingsView : UserControl
     }
 
     /// <summary>
-    /// Adding a name CREATES the folder — in every section for a per-section
-    /// one — and says so. It used to write a configuration entry pointing at
+    /// Adding a name CREATES the folder â€” in every section for a per-section
+    /// one â€” and says so. It used to write a configuration entry pointing at
     /// nothing, and the folder had to be made in Obsidian afterwards.
     /// </summary>
     private void CreateFolderForNewEntry(string name, FolderScope scope)
@@ -213,7 +213,7 @@ public sealed partial class CourseSettingsView : UserControl
 
     /// <summary>
     /// The sheet: the wizard's own question, the explanation, the "prose is
-    /// left alone" line, the plan (pages, sections, links — surveyed once,
+    /// left alone" line, the plan (pages, sections, links â€” surveyed once,
     /// OFF the UI thread, when the sheet opens), and a live refusal. Rename
     /// runs the whole rename off the UI thread and the sheet cannot be
     /// dismissed while it runs. The mac's UnitWordRenameSheet.
@@ -338,8 +338,8 @@ public sealed partial class CourseSettingsView : UserControl
 
     /// <summary>
     /// The sheet: the name, the explanation, a live refusal as the teacher
-    /// types, and — when a rename of this folder stopped after the folders
-    /// moved — the field filled in with the name it was heading for and one
+    /// types, and â€” when a rename of this folder stopped after the folders
+    /// moved â€” the field filled in with the name it was heading for and one
     /// line saying why. Rename commits to DISK at once, not at Save: the
     /// folder has really moved, and a Cancel that appeared to undo it would
     /// be a lie. Only the keys a rename carries across are written, so the
@@ -425,7 +425,7 @@ public sealed partial class CourseSettingsView : UserControl
     /// <summary>
     /// Disk first, then the configuration, in that order: a move that fails
     /// leaves the course exactly as it was, where the other order would leave
-    /// a configuration naming a folder that is not there — the state this
+    /// a configuration naming a folder that is not there â€” the state this
     /// whole feature exists to make impossible. Returns the sentence to show
     /// inside the sheet on failure, or null when the rename is whole.
     /// </summary>
@@ -461,12 +461,12 @@ public sealed partial class CourseSettingsView : UserControl
         {
             // Recorded BEFORE returning: the folder has moved and the settings
             // do not know, which is the state somebody will be asked to
-            // explain later. Not "the rename failed" — a rename whose
+            // explain later. Not "the rename failed" â€” a rename whose
             // bookkeeping did not land; the record stays so the next opening
             // of the sheet can finish it.
             ActivityTrail.Note(ActivityTrail.Event.FolderRenamed,
-                $"renamed the folder {oldName} to {newName} in {_course.Code} but could not write it to this course's settings — {error.Message}");
-            return $"“{oldName}” was renamed to “{newName}”, but Plantoir could not write the change to this course's settings: {error.Message}";
+                $"renamed the folder {oldName} to {newName} in {_course.Code} but could not write it to this course's settings â€” {error.Message}");
+            return $"â€œ{oldName}â€ was renamed to â€œ{newName}â€, but Plantoir could not write the change to this course's settings: {error.Message}";
         }
         SpecialFolderRenamer.ClearRenameRecord(courseDirectory);
         ActivityTrail.Note(ActivityTrail.Event.FolderRenamed,
@@ -485,12 +485,12 @@ public sealed partial class CourseSettingsView : UserControl
     ///
     /// <para>Cached for one <see cref="BuildForm"/> pass rather than walked on
     /// demand, because the protection rules are asked afresh for every row of
-    /// every list — a disk walk per row, on the UI thread, for an answer that
+    /// every list â€” a disk walk per row, on the UI thread, for an answer that
     /// cannot change between two rows of the same pass. Everything that DOES
     /// change it goes through <see cref="BuildForm"/> anyway: the constructor,
     /// <see cref="RebuildProtectedRows"/> after any list edit or tick, and
-    /// Revert. The one thing it cannot see is the disk changing underneath —
-    /// a folder made in Obsidian while this page is open — which the next tick
+    /// Revert. The one thing it cannot see is the disk changing underneath â€”
+    /// a folder made in Obsidian while this page is open â€” which the next tick
     /// picks up.</para>
     /// </summary>
     private IReadOnlyList<string> _nestedFolderNames = Array.Empty<string>();
@@ -527,7 +527,7 @@ public sealed partial class CourseSettingsView : UserControl
     // ---- Font sample text ------------------------------------------------
 
     /// <summary>
-    /// Each section's font sample shows that section's OWN site title —
+    /// Each section's font sample shows that section's OWN site title â€”
     /// computed exactly as the build will compute it, so the name, the grade
     /// switch, and the section-marker switch are all reflected in the
     /// candidate typeface.
@@ -543,7 +543,7 @@ public sealed partial class CourseSettingsView : UserControl
     private void RefreshDirtyState()
     {
         bool dirty = Config.HasUnsavedChanges;
-        // A folder-publishing course with a bad folder cannot be saved — a
+        // A folder-publishing course with a bad folder cannot be saved â€” a
         // publish must never discover the problem after the fact (row 102).
         SaveButton.IsEnabled = dirty && _publishingChoice?.Problem is null;
         RevertButton.IsEnabled = dirty;
@@ -563,14 +563,14 @@ public sealed partial class CourseSettingsView : UserControl
             Config.ExcludedItems(CourseConfiguration.SharedScope),
             Config.ExcludedItems(CourseConfiguration.PerSectionScope));
 
-        // -------- Settings — Overall --------
-        Form.Children.Add(FormBuilders.SectionHeaderWithCaption("Settings — Overall", null));
+        // -------- Settings â€” Overall --------
+        Form.Children.Add(FormBuilders.SectionHeaderWithCaption("Settings â€” Overall", null));
 
         var nameBox = new TextBox { Text = Config.CourseName };
         nameBox.TextChanged += (_, _) => { Config.CourseName = nameBox.Text; MarkChanged(); RebuildGradeWarnings(); };
         Form.Children.Add(FormBuilders.LabeledRow("Course name", nameBox));
 
-        // The word for a unit, with Rename… beside it (#158). It commits to
+        // The word for a unit, with Renameâ€¦ beside it (#158). It commits to
         // DISK at once, like a folder rename, so it is a sheet and not a field.
         var unitWord = new TextBlock { Text = Config.UnitWord, VerticalAlignment = VerticalAlignment.Center };
         var renameUnitWord = new Button { Content = UnitWordRenameWording.RenameButton, Margin = new Thickness(12, 0, 0, 0) };
@@ -586,7 +586,7 @@ public sealed partial class CourseSettingsView : UserControl
         {
             var shortBox = new TextBox { Text = Config.CustomShortName, MaxLength = 12 };
             shortBox.TextChanged += (_, _) => { Config.CustomShortName = shortBox.Text; MarkChanged(); };
-            Form.Children.Add(FormBuilders.LabeledRow("Short label beside emoji (clubs, ≤ 12 characters)", shortBox));
+            Form.Children.Add(FormBuilders.LabeledRow("Short label beside emoji (clubs, â‰¤ 12 characters)", shortBox));
         }
 
         var localeBox = new ComboBox { MinWidth = 320 };
@@ -658,7 +658,7 @@ public sealed partial class CourseSettingsView : UserControl
         };
         var notesRow = FormBuilders.LabeledRow("Include explanations on Curriculum Coverage page", notesToggle);
         notesRow.Children.Add(FormBuilders.ExampleCaption(
-            "Shows “What counts” and “Reading it honestly” sections on the page"));
+            "Shows â€œWhat countsâ€ and â€œReading it honestlyâ€ sections on the page"));
         Form.Children.Add(notesRow);
 
         // -------- Publishing (course-level: every section goes the same way) --------
@@ -667,7 +667,7 @@ public sealed partial class CourseSettingsView : UserControl
             () => Config.DeployTarget, v => Config.DeployTarget = v,
             () => Config.DeployFolderPath, v => Config.DeployFolderPath = v,
             // The account identifies the teacher, not the course, so it is
-            // kept in app settings and saved as it is typed — a teacher
+            // kept in app settings and saved as it is typed â€” a teacher
             // should never enter it twice.
             () => _window.Workspace.Settings.CloudflareAccountId,
             v => { _window.Workspace.Settings.CloudflareAccountId = v; _window.Workspace.Settings.Save(); },
@@ -678,7 +678,7 @@ public sealed partial class CourseSettingsView : UserControl
         // -------- Footer --------
         Form.Children.Add(FormBuilders.SectionHeaderWithCaption("Footer", null));
         Form.Children.Add(FormBuilders.ExampleCaption(
-            "Optional: type or paste HTML below to appear at the bottom of every page on your site — many teachers use a Creative Commons licence notice. Leave the box empty for no footer."));
+            "Optional: type or paste HTML below to appear at the bottom of every page on your site â€” many teachers use a Creative Commons licence notice. Leave the box empty for no footer."));
         var footerBox = new TextBox
         {
             Text = Config.FooterHtml,
@@ -686,7 +686,7 @@ public sealed partial class CourseSettingsView : UserControl
             TextWrapping = TextWrapping.Wrap,
             MinHeight = 72,
             FontFamily = new FontFamily("Consolas"),
-            PlaceholderText = "For example: This site is licensed under <a href=\"…\">CC BY 4.0</a>.",
+            PlaceholderText = "For example: This site is licensed under <a href=\"â€¦\">CC BY 4.0</a>.",
         };
         footerBox.TextChanged += (_, _) => { Config.FooterHtml = footerBox.Text; MarkChanged(); };
         Form.Children.Add(footerBox);
@@ -839,7 +839,7 @@ public sealed partial class CourseSettingsView : UserControl
         BuildFontRows(section);
 
         // Advanced: the custom domain, collapsed by default. One field per
-        // destination that can have a domain (never local_folder — a
+        // destination that can have a domain (never local_folder â€” a
         // domain is something a browser visits, and a folder is not).
         // Mirrors the mac's SectionSettingsView (row 307).
         var advanced = new Expander
@@ -866,8 +866,8 @@ public sealed partial class CourseSettingsView : UserControl
             };
             var domainPanel = FormBuilders.LabeledRow(label, domainBox);
             var domainCaption = FormBuilders.ExampleCaption(
-                $"e.g. ics3u.yourschool.ca — links to your live site will use this domain instead of the {serviceName} address. Your site must already answer there (set the domain up in {serviceName} first). Leave empty to use the {serviceName} address.");
-            var domainWarning = FormBuilders.WarningCaption("That doesn't look like a domain — e.g. ics3u.yourschool.ca");
+                $"e.g. ics3u.yourschool.ca â€” links to your live site will use this domain instead of the {serviceName} address. Your site must already answer there (set the domain up in {serviceName} first). Leave empty to use the {serviceName} address.");
+            var domainWarning = FormBuilders.WarningCaption("That doesn't look like a domain â€” e.g. ics3u.yourschool.ca");
             domainWarning.Visibility = Visibility.Collapsed;
             domainPanel.Children.Add(domainWarning);
             domainPanel.Children.Add(domainCaption);
@@ -897,7 +897,7 @@ public sealed partial class CourseSettingsView : UserControl
             pairingBox.Items.Add(FontCatalog.PairingLabel(pairing.Header, pairing.Body));
         if (selected < 0)
         {
-            pairingBox.Items.Add($"Custom: {current.Header} — {current.Body}");
+            pairingBox.Items.Add($"Custom: {current.Header} â€” {current.Body}");
             selected = pairings.Count;
         }
         pairingBox.SelectedIndex = selected;
@@ -976,7 +976,7 @@ public sealed partial class CourseSettingsView : UserControl
         }
         else
         {
-            slot.Text = "e.g. \"Grade 12\" before the course name — applied the next time this section builds";
+            slot.Text = "e.g. \"Grade 12\" before the course name â€” applied the next time this section builds";
             slot.Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
         }
     }
@@ -985,7 +985,7 @@ public sealed partial class CourseSettingsView : UserControl
 
     private void Revert_Click(object sender, RoutedEventArgs e)
     {
-        Config.DiscardChanges();
+        Config.RevertToFile(_course.ConfigFilePath);
         BuildForm();
         RefreshDirtyState();
         HeaderName.Text = Config.CourseName;
@@ -995,14 +995,30 @@ public sealed partial class CourseSettingsView : UserControl
     {
         try
         {
-            Config.Write(_course.ConfigFilePath);
+            var report = Config.Write(_course.ConfigFilePath);
+            // Every OTHER window's copy of this course with nothing unsaved
+            // reads the file again (#272 / mac #265); one with unsaved changes
+            // is left alone, and its own Save merges.
+            Plantoir.ViewModels.WorkspaceViewModel.OtherCopiesReread(_course.ConfigFilePath, Config);
+            BuildForm();
             RefreshDirtyState();
             // The mac's wording, so the two trails read the same. Declared
             // when the trail was built and emitted by nobody until 2026-09-07.
+            // Since #272 it also says what it kept or replaced from elsewhere.
+            string fromElsewhere =
+                (report.KeptFromElsewhere.Count > 0 ? "; kept from elsewhere: " + string.Join(", ", report.KeptFromElsewhere) : "") +
+                (report.ReplacedChangesFromElsewhere.Count > 0 ? "; replaced a change made elsewhere to: " + string.Join(", ", report.ReplacedChangesFromElsewhere) : "");
             ActivityTrail.Note(ActivityTrail.Event.SettingsSaved,
-                "saved the settings for " + _course.Code);
-            SaveStatus.Text = "Saved ✓";
+                "saved the settings for " + _course.Code + fromElsewhere);
             SaveStatus.Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
+            if (report.ReplacedChangesFromElsewhere.Contains("hidden"))
+            {
+                // specialNames.settingsSaveReplacedSidebarChange: the last Save
+                // wins for the whole list, but SAID. It does not fade.
+                SaveStatus.Text = "Saved âœ“ " + CourseConfiguration.SaveReplacedSidebarChange;
+                return;
+            }
+            SaveStatus.Text = "Saved âœ“";
             await Task.Delay(3000);
             SaveStatus.Text = "";
         }
@@ -1015,7 +1031,7 @@ public sealed partial class CourseSettingsView : UserControl
             // line: an account name with a space in it loses only its first
             // word.
             ActivityTrail.Note(ActivityTrail.Event.SettingsCouldNotBeSaved,
-                "could not save the settings for " + _course.Code + " — " + error.Message);
+                "could not save the settings for " + _course.Code + " â€” " + error.Message);
             SaveStatus.Text = $"Could not save: {error.Message}";
             SaveStatus.Foreground = (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"];
         }

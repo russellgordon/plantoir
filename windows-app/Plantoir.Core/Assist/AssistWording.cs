@@ -35,6 +35,27 @@ public static class AssistWording
 
     // MARK: - Deploying
 
+    // ---- A re-date's reply (#357 / mac #343; class-planning.json ->
+    // reDatingASection.reportedCounts). The contract stores the sentences
+    // with example numbers; the counts are the classes and the pages they
+    // use whose dates were WRITTEN.
+
+    public static string ReDated(int classes, int pages) =>
+        $"Re-dated {classes} {(classes == 1 ? "class" : "classes")} and {pages} {(pages == 1 ? "page" : "pages")} they use.";
+
+    public static string ReDatedOnlyPagesTheyUse(int pages) =>
+        $"Every class was already on its day, so only the {pages} {(pages == 1 ? "page" : "pages")} they use " +
+        $"{(pages == 1 ? "was" : "were")} re-dated.";
+
+    public static string EveryPageIsAlreadyOnItsDay(string course, string section) =>
+        $"Every page in {course} Section {section} is already on the day it should be.";
+
+    /// <summary>Which of the three a re-date that wrote these counts says.</summary>
+    internal static string ReDatedSummary(string course, string section, int classes, int pages) =>
+        classes > 0 ? ReDated(classes, pages)
+        : pages > 0 ? ReDatedOnlyPagesTheyUse(pages)
+        : EveryPageIsAlreadyOnItsDay(course, section);
+
     public static string Deployed(string course, string section) =>
         $"{course} Section {section} is deployed. Students can reach it now.";
 
