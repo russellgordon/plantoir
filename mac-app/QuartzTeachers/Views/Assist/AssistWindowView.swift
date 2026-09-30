@@ -393,7 +393,10 @@ struct AssistWindowView: View {
     private var composer: some View {
         HStack(spacing: 6) {
             TextField("Ask about this section…", text: $typing, axis: .vertical)
+                // .plain inside the Messages-shaped rounded border this
+                // composer strokes itself — listed in TextFieldStyleScanTests.
                 .textFieldStyle(.plain)
+                .accessibilityIdentifier("assistComposerField")
                 .lineLimit(1...4)
                 .onSubmit {
                     // Ignored while the assistant is mid-run: it does one

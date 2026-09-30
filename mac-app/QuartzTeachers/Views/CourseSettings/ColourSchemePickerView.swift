@@ -16,7 +16,7 @@ struct ColourSchemePickerView: View {
         VStack(alignment: .leading, spacing: 8) {
             Picker("Colour scheme", selection: $selectedSchemeID) {
                 if selectedSchemeID.isEmpty {
-                    Text("Quartz default (none chosen)").tag("")
+                    Text(CourseSettingsWording.colourSchemeNoneChosen).tag("")
                 }
                 ForEach(ColourSchemeCatalog.schemes) { scheme in
                     Text(scheme.name).tag(scheme.id)
