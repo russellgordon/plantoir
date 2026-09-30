@@ -228,6 +228,12 @@ enum AssistContract {
                 course: course, section: section
             ),
             "deployDidNotFinish": AssistWording.deployDidNotFinish(course: course, section: section),
+            "deployNeedsAnAnswer": AssistWording.deployNeedsAnAnswer(course: course, section: section),
+            "deployNeedsAnAnswerAt": AssistWording.deployNeedsAnAnswerAt(
+                course: course, section: section, destinations: "{destinations}"
+            ),
+            "deployWentOutTo": AssistWording.deployWentOutTo(destinations: "{destinations}"),
+            "previewBuildNeedsAnAnswer": AssistWording.previewBuildNeedsAnAnswer(course: course, section: section),
             "sectionIsBusy": AssistWording.sectionIsBusy(course: course, section: section),
             "courseIsBusy": AssistWording.courseIsBusy(course: course),
             "courseIsBeingCopied": AssistWording.courseIsBeingCopied(course: course),

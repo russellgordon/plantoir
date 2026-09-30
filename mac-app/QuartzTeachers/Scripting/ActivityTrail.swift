@@ -856,7 +856,25 @@ nonisolated enum ActivityTrail {
         /// refusal only as a run that did not finish. A remake with nothing
         /// running writes nothing. Mac only, permanently: Windows builds
         /// natively and has no workspace.
+        ///
+        /// Since GitHub #378 the lines name WHAT was waited for and who had
+        /// started it ("a deploy of MPM2D section 2 started by Revise with
+        /// Claude"), and no longer say "workspace". The key keeps its old
+        /// name so trails already on disk stay readable.
         case workspaceWasInUse = "workspace was in use"
+        /// A launcher setting a folder up again ended work left running in
+        /// it by a program that had since closed (GitHub #378, decision 2) —
+        /// a deploy a closed session left waiting at a question, a build a
+        /// force-quit app left behind, an orphaned preview. Carries where the
+        /// run was for and each piece of work ended, by kind with its course
+        /// and section; never a command line, a path or a process number.
+        ///
+        /// Written by the app from the launcher's `PLANTOIR_LEFTOVER_STOPPED:`
+        /// line (`LeftoverWorkReport`), in the same two places as
+        /// `workspaceWasInUse`. On the trail because ending somebody's work
+        /// must never be silent: "why did my deploy from Claude not go out?"
+        /// is answered by this line. Mac only, permanently.
+        case leftoverWorkStopped = "left-over work stopped"
         /// A preview's address was held by something else on this Mac
         /// (GitHub #310, found in the #204 rehearsal with two macOS accounts
         /// signed in). Carries where the preview was for, the address — a

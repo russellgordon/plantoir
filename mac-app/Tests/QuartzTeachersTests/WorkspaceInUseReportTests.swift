@@ -78,16 +78,47 @@ final class WorkspaceInUseReportTests: XCTestCase {
 
     func testEveryExampleIsUnderstood() throws {
         let lines: [String] = try examples()
-        XCTAssertEqual(lines.count, 3)
+        XCTAssertEqual(lines.count, 5)
+        // An older launcher's three words still read, and name nothing.
         let waited: [WorkspaceInUseReport] = WorkspaceInUseReport.reports(in: lines[0])
         XCTAssertEqual(waited, [WorkspaceInUseReport(outcome: .waited, seconds: 14, place: "ICS4U/1", openPreview: "")])
-        let preview: [WorkspaceInUseReport] = WorkspaceInUseReport.reports(in: lines[1])
+        let named: [WorkspaceInUseReport] = WorkspaceInUseReport.reports(in: lines[1])
+        XCTAssertEqual(named, [WorkspaceInUseReport(
+            outcome: .waited, seconds: 14, place: "ICS4U/1", openPreview: "", waitedFor: "publish:MPM2D/2", origin: "claude"
+        )])
+        let preview: [WorkspaceInUseReport] = WorkspaceInUseReport.reports(in: lines[2])
         XCTAssertEqual(
             preview,
             [WorkspaceInUseReport(outcome: .aPreviewWasOpen, seconds: 20, place: "ICS4U/2", openPreview: "ICS4U/1")]
         )
-        let work: [WorkspaceInUseReport] = WorkspaceInUseReport.reports(in: lines[2])
-        XCTAssertEqual(work, [WorkspaceInUseReport(outcome: .workDidNotFinish, seconds: 600, place: "setup", openPreview: "")])
+        let work: [WorkspaceInUseReport] = WorkspaceInUseReport.reports(in: lines[3])
+        XCTAssertEqual(work, [WorkspaceInUseReport(
+            outcome: .workDidNotFinish, seconds: 600, place: "setup", openPreview: "", waitedFor: "build:ICS4U/1", origin: "scheduled"
+        )])
+        let unnamed: [WorkspaceInUseReport] = WorkspaceInUseReport.reports(in: lines[4])
+        XCTAssertEqual(unnamed.first?.waitedFor, "work")
+    }
+
+    /// #378: the lines name what was waited for and who started it, in the
+    /// contract's words, and never say "workspace".
+    func testTheLinesNameWhatWasWaitedFor() throws {
+        let what: [String: Any] = try XCTUnwrap(entry["whatInTheLines"] as? [String: Any])
+        for (key, value) in WorkspaceInUseReport.whatInTheLines {
+            XCTAssertEqual(value, what[key] as? String, key)
+        }
+        XCTAssertEqual(WorkspaceInUseReport.startedBy, what["startedBy"] as? String)
+        let lines: [String] = try examples()
+        let named: String = try XCTUnwrap(WorkspaceInUseReport.reports(in: lines[1]).first).trailSentence
+        XCTAssertEqual(
+            named,
+            "ICS4U/1 · waited 14 s for a deploy of MPM2D section 2 started by Revise with Claude to finish before setting this folder up again, then went ahead"
+        )
+        let old: String = try XCTUnwrap(WorkspaceInUseReport.reports(in: lines[0]).first).trailSentence
+        XCTAssertTrue(old.contains("for something in this folder to finish"), old)
+        for line in [WorkspaceInUseReport.lineWhenItWaited, WorkspaceInUseReport.lineWhenAPreviewWasOpen,
+                     WorkspaceInUseReport.lineWhenWorkDidNotFinish] {
+            XCTAssertFalse(line.lowercased().contains("workspace"), line)
+        }
     }
 
     func testTheTrailSentenceFillsTheContractsLine() throws {
@@ -115,6 +146,7 @@ final class WorkspaceInUseReportTests: XCTestCase {
         let expected: String = try contractLine("lineWhenItWaited")
             .replacingOccurrences(of: "{place}", with: "ICS4U/1")
             .replacingOccurrences(of: "{seconds}", with: "14")
+            .replacingOccurrences(of: "{what}", with: "something in this folder")
         XCTAssertTrue(trailText().contains(expected), trailText())
     }
 
@@ -130,8 +162,8 @@ final class WorkspaceInUseReportTests: XCTestCase {
         try FileManager.default.createDirectory(
             at: log.deletingLastPathComponent(), withIntermediateDirectories: true
         )
-        let lastNight: String = try examples()[2] + "\n"
-        let tonight: String = "Deploying ICS4U…\n" + (try examples()[1]) + "\n"
+        let lastNight: String = try examples()[3] + "\n"
+        let tonight: String = "Deploying ICS4U…\n" + (try examples()[2]) + "\n"
         try (lastNight + tonight).write(to: log, atomically: true, encoding: .utf8)
 
         ScheduledDeploy.recordFolderProblems(
@@ -163,6 +195,7 @@ final class WorkspaceInUseReportTests: XCTestCase {
         let expected: String = try contractLine("lineWhenItWaited")
             .replacingOccurrences(of: "{place}", with: "ICS4U/1")
             .replacingOccurrences(of: "{seconds}", with: "14")
+            .replacingOccurrences(of: "{what}", with: "something in this folder")
         XCTAssertTrue(trailText().contains(expected), trailText())
     }
 

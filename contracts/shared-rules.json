@@ -82,7 +82,7 @@
       {
         "carries": "the launcher, the outcome, and how long it took",
         "event": "task finished",
-        "why": "The outcome distinguishes a failure from a task stopped on purpose and from one backed out of at a question - all three exit non-zero, and only one is a fault."
+        "why": "The outcome distinguishes a failure from a task stopped on purpose and from one backed out of at a question - all three exit non-zero, and only one is a fault. Since #378 a fourth: exit 3, a launcher run with --non-interactive that reached a question and refused rather than wait for an answer nobody could give ('stopped at a question nobody was there to answer (exit 3)'). The headless assistant path (an assistant working from another app, or the in-app assistant with no section window) runs its launchers that way, so a deploy that needs a site name, a surname or a token says so on this line instead of 'failed (exit 3)' — or, before #378, instead of never finishing at all."
       },
       {
         "carries": "which credential was asked for, never the answer",
