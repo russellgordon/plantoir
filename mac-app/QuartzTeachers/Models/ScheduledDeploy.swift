@@ -2583,6 +2583,14 @@ enum ScheduledDeploy {
         // from the log for the same reason as the line above: nobody is
         // watching a console at half six in the morning.
         WorkspaceInUseReport.noteOnTheTrail(from: text)
+        // Work left behind in the workspace by a program that had closed,
+        // which a launcher of this run ended before setting the folder up
+        // again (#378) — a publish at half six is exactly when nobody would
+        // otherwise know.
+        LeftoverWorkReport.noteOnTheTrail(from: text)
+        // A section's Cloudflare project made again by this run's publish
+        // (2026-09-30): its address may have changed while nobody watched.
+        CloudflareProjectRemadeReport.noteOnTheTrail(from: text)
         // A scheduled run is started by Plantoir itself, so it carries the
         // app's helpers folder and can install from it, or create the
         // website builder, while nobody is watching (#312).

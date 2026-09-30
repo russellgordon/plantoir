@@ -17,7 +17,7 @@ enum WizardWording {
     nonisolated static let clubToggleCaption: String =
         "A club meets rather than holds classes: its pages are numbered one after "
         + "another, it has no curriculum, and it starts with a page for its first "
-        + "meeting. The words below can be changed now, but not once the course is made."
+        + "meeting. The words below can be changed now, but not once the club is made."
 
     /// Under Starting Content for a club, in place of every toggle there.
     nonisolated static let clubStartingContentNote: String =
@@ -39,26 +39,18 @@ enum WizardWording {
 
     /// Course Settings' three LOCKED rows (#267): the words a course was
     /// made with, shown and not changeable (Russell, 2026-09-24: not
-    /// switchable after the wizard).
+    /// switchable after the wizard) — and only when the course RECORDED
+    /// them (#376, `ClassPagesLockedRows`).
     nonisolated static let settingsPageNamingLabel: String = "Class pages are named"
     nonisolated static let settingsFrontPageHeadingLabel: String = "Front page heading"
     nonisolated static let settingsNounLabel: String = "The assistant calls a page a"
     nonisolated static let settingsLockedCaption: String =
         "Chosen when the course was made. An existing course keeps these; they cannot be changed here."
 
-    /// The heading row when the course recorded none (every course made
-    /// before #267): its front page keeps whatever heading it has, and this
-    /// row does not guess which.
-    nonisolated static let settingsFrontPageHeadingNotSet: String =
-        "Not recorded — the front page keeps the heading it already has"
-
-    /// The heading row's value: the recorded heading, or the sentence above.
-    nonisolated static func settingsFrontPageHeadingValue(_ recorded: String?) -> String {
-        guard let recorded else {
-            return settingsFrontPageHeadingNotSet
-        }
-        return recorded
-    }
+    // The heading row used to say "Not recorded — the front page keeps the
+    // heading it already has" for a course without `front_page_heading`.
+    // Retired in #376: the row is now drawn only when the heading was
+    // recorded, and shows it verbatim (`ClassPagesLockedRows`).
 
     /// How a scheme is shown in its locked row: the course's own first page.
     nonisolated static func settingsPageNamingValue(_ naming: ClassPageNaming) -> String {
@@ -161,7 +153,46 @@ enum WizardWording {
         + "suit it, four units of class pages to rename, a page explaining "
         + "what the site can do, and placeholders saying what belongs where."
 
+    /// The panel's words for a course (#368) — `contracts/shared-rules.json`
+    /// → `wizard`. The button keeps `createCourseButton`, which Windows reads.
+    nonisolated static let coursePanelWords: WizardPanelWords = WizardPanelWords(
+        createButton: createCourseButton,
+        namingHeading: "Units",
+        namingCaption: "Chosen once, when the course is made — the pages are named this way as they are written",
+        creatingTitle: "Creating your course",
+        codeLabel: "Course code",
+        nameLabel: "Course name",
+        sectionMarkerCaption: "e.g. “S1” appears beside the course code",
+        gradeCaption: "e.g. “Grade 12” before the course name",
+        structureCaption: "Defaults are fine for most courses",
+        defaultSiteName: "Course Website"
+    )
+
+    /// The same words for a club (#368) — `wizard.clubToggle`.
+    nonisolated static let clubPanelWords: WizardPanelWords = WizardPanelWords(
+        createButton: "Create Club",
+        namingHeading: "Meetings",
+        namingCaption: "Chosen once, when the club is made — the pages are named this way as they are written",
+        creatingTitle: "Creating your club",
+        codeLabel: "Club code",
+        nameLabel: "Club name",
+        sectionMarkerCaption: "e.g. “S1” appears beside the club code",
+        gradeCaption: "e.g. “Grade 12” before the club name",
+        structureCaption: "Defaults are fine for most clubs",
+        defaultSiteName: "Club Website"
+    )
+
     // MARK: - Functions
+
+    /// The panel's words for what will be made (#368). Chosen by the "This is
+    /// a club" TICK BOX, never by `ClubCodeRule`: a teacher can untick it for
+    /// a club-shaped code, and the words must describe what is made.
+    nonisolated static func panelWords(isClub: Bool) -> WizardPanelWords {
+        if isClub {
+            return clubPanelWords
+        }
+        return coursePanelWords
+    }
 
     /// What the skeleton toggle says for one family.
     nonisolated static func skeletonToggleLabel(forFamilyNamed familyName: String,
@@ -220,4 +251,25 @@ enum WizardWording {
         }
         return "a"
     }
+}
+
+/// The New Course panel's words that differ for a club (#368): until v1.4.1 a
+/// club's own fields sat under "Units", beside "Course code", above a "Create
+/// Course" button.
+nonisolated struct WizardPanelWords: Equatable {
+
+    // MARK: - Stored properties
+
+    let createButton: String
+    let namingHeading: String
+    let namingCaption: String
+    let creatingTitle: String
+    let codeLabel: String
+    let nameLabel: String
+    let sectionMarkerCaption: String
+    let gradeCaption: String
+    let structureCaption: String
+
+    /// The site's name when the name field is left blank.
+    let defaultSiteName: String
 }

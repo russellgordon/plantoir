@@ -244,6 +244,37 @@ class WindowsSwapTests(unittest.TestCase):
         shot["windows"] = True
         self.assertIn("data-win-src", build.picture_element(shot, [], "", "./"))
 
+    def test_windows_false_covers_a_static_figure_too(self):
+        # #375: colour-schemes and light-and-dark are one image each; their
+        # Windows versions carried drawn corners, so Windows visitors are
+        # shown the Mac figure until Windows retakes them with real ones.
+        # A -windows file on disk is still not offered.
+        import shutil
+        real = build.IMAGE_DIR / "colour-schemes.png"
+        with tempfile.TemporaryDirectory() as scratch:
+            folder = Path(scratch)
+            shutil.copy(real, folder / "colour-schemes.png")
+            shutil.copy(real, folder / "colour-schemes-windows.png")
+            saved = build.IMAGE_DIR
+            build.IMAGE_DIR = folder
+            try:
+                shot = {"id": "colour-schemes", "alt": "a", "caption": "c", "static": True, "windows": False}
+                self.assertNotIn("data-win", build.picture_element(shot, [], "", "./"))
+                del shot["windows"]
+                self.assertIn("data-win-src", build.picture_element(shot, [], "", "./"))
+            finally:
+                build.IMAGE_DIR = saved
+
+    def test_the_three_drawn_windows_figures_are_not_offered(self):
+        # #375 stopgap (the row-606 mechanism): hero-windows, colour-schemes-
+        # windows and light-and-dark-windows had drawn corners. Until Windows
+        # retakes them natively, these ids stay `windows: false`; the retake
+        # sets `windows: true` and deletes this test.
+        shots = json.loads((Path(build.WEBSITE) / "shots.json").read_text(encoding="utf-8"))
+        for shot in shots["shots"]:
+            if shot["id"] in ("hero", "colour-schemes", "light-and-dark"):
+                self.assertIs(shot.get("windows"), False, shot["id"])
+
 
 class AwaitingCaptureTests(unittest.TestCase):
 

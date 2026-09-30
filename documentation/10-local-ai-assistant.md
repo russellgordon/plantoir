@@ -3352,7 +3352,7 @@ measurement, it is a claim that rots the moment those files are rewritten.**
 so the next launcher rewrite fails a test instead of silently stalling a
 teacher's progress bar again.
 
-**Do NOT copy the mac's seven launcher markers into your milestone lists.**
+**Do NOT copy the mac's launcher markers into your milestone lists.**
 Read your own `.ps1` files and match what they actually print. This fails
 silently in the worst way: the app does not crash, the progress bar simply
 stops advancing part-way and then jumps at the end, which reads as a slow
@@ -3761,6 +3761,73 @@ None of this touches the tool surface: no description, schema or prompt byte
 moved (local 13 `46b96562…2cd96cb6`, MCP 32 `9bcc7eb7…9cef36f7`, hashed before
 and after). The rule lives in code, as "steer the model with code, not with
 tool descriptions" says it must.
+
+### A deploy from another app refuses at a question, and an open session holds nothing back (#378)
+
+Added 2026-09-29. **What happened.** Russell closed a Revise with Claude
+session; every preview in that folder afterwards waited ten minutes on
+"Something in this folder is still running", refused, and did so every time
+until he restarted the Mac. The launchers' half of the fix — ending work whose
+owner has gone, naming what is waited for — is in `03-launcher-scripts.md` →
+"Work left behind, and proving its owner has gone". This section is the
+assistant's half: the likely CAUSE.
+
+**The cause, read from code (not observed: his workspace was gone after the
+restart).** Every launcher the app starts runs on a pseudo-terminal
+(`ScriptRunner`), so a question inside the container waits on a terminal. The
+windowless deploy — `AssistToolchainWork.deploy`, which an outside assistant's
+`deploy_section` takes, and the in-app assistant's when no section window is on
+screen — was not `unattended`, so `deploy.py`'s questions (the surname the
+first time, a site name, a token to paste) and the launchers' course-code check
+had nobody to answer them. The question waited for ever; closing the session
+killed the host half and left the question inside the workspace (measured,
+03 → R5).
+
+**What changed.** `AssistToolchainWork.deploy` passes `unattended: true` to
+`MultiDestinationDeployRunner.run`, so BOTH legs run with `--non-interactive`
+(`preview.sh C S --build-only --non-interactive`, then `deploy.sh …
+--non-interactive`), and `AssistToolchainWork.rebuildPreview` does the same.
+A question then refuses with exit 3 — the code `deploy.py`'s `NEEDS_AN_ANSWER`
+and both launchers already use for a publish set for later — and the runner
+turns it into a named sentence, never `deployDidNotFinish`:
+
+- `wording.deployNeedsAnAnswer` — one destination, or the build leg asked;
+- `wording.deployNeedsAnAnswerAt` (+ `wording.deployWentOutTo` when others
+  went out) — a course deploying to several places, naming which one asked,
+  the build leg and destination leg kept apart as #132 taught
+  `ScheduledDeploy`;
+- `wording.previewBuildNeedsAnAnswer` — the rebuild.
+
+Each tells the teacher to deploy (or build) once from the section's window,
+where the question becomes a dialog and the answer is remembered. The trail's
+`task finished` line says "stopped at a question nobody was there to answer
+(exit 3)" instead of "failed (exit 3)". **The window's Deploy is unchanged**
+and never passes the flag: there the question IS the feature
+(`DeployCommand.arguments`). Nothing that succeeded before refuses now — on
+this path every such question hung.
+
+The console line the launchers print on that refusal still says "This publish
+was set to happen on its own…", which is untrue for a session; it was left,
+because nobody reads that console on this path (the reply carries the named
+sentence) and changing it is a shared-Python and launcher wording change with
+a Windows twin. Recorded here so it is not mistaken for an oversight.
+
+**An open session holds nothing back** (decision 1). The launchers prove an
+owner from the live process table: a session — `claude`, `codex`, `Plantoir
+--mcp-stdio` — owns work only through a launcher it is running. So while
+Claude builds or deploys a section, a preview in that folder waits and the
+status line says "Waiting for Revise with Claude to finish deploying MPM2D
+section 2… (59s)"; while it only edits pages, or sits idle, nothing waits. The
+app's own lease check already agreed: `WorkLeaseRegistry.reconcile` derives
+leases from running work, so an idle MCP server holds none.
+
+**Tested.** `HeadlessDeployAnswersTests` runs the real `AssistToolchainWork`
+against stand-in launchers that write down their words and exit 3 (MF-6), and
+the window's runner without the flag; the contract case is `assist-cases.json`
+→ `scenarios` → "deploy with no section window open, which meets a question".
+Windows owes the same for `plantoir-mcp.exe` (the `windows` issue from #378);
+`deploy.py`'s header records its twin, a `python.exe` waiting 45 minutes at the
+site-name prompt.
 
 ### The model's list is SHORTER than the server's
 
@@ -6259,7 +6326,9 @@ tool or fixed phrasing in this piece (a routing change), and a persistent undo.
 ### The plan code, and its honest limit
 
 `plan_prepare_for_start_of_year` returns the whole plan — every page with its
-reason, not truncated — and a line `Plan code: <8 hex>`
+reason, not truncated, each named by its title and by its folder within the
+course only when another page in the section shares the title (#362; never a
+path to the file — doc 09 → "Pages are named by title, never by path") — and a line `Plan code: <8 hex>`
 (`startOfYear.planCode.line`), always in that shape, so a client or a harness
 finds it in one place. `prepare_for_start_of_year` re-plans from disk and
 writes only when the code given is the current plan's; with no code
@@ -6268,7 +6337,9 @@ writes only when the code given is the current plan's; with no code
 and code. `planCode` is deliberately NOT required in the schema, or the
 no-code call would be unreachable through a real client. The code is a SHA-256
 over the course, section, first class and every change's path and new
-visibility; each platform issues and checks its own. **It proves a plan was
+visibility; each platform issues and checks its own. The code hashes PATHS
+while the text names TITLES, so #362's change of words left every code as it
+was. **It proves a plan was
 MADE, not that a person READ it** — Claude Code can call both in one breath;
 the description asks it to show the teacher and wait.
 
@@ -6316,15 +6387,36 @@ left.
 
 ### Afterwards: publishing a class needs its pages with it
 
-Only the assistant's publish is transitive. A teacher who publishes Day 2 by
+Only the assistant's publish — and, since #379, a class ticked in the section
+window's links checklist — is transitive; a class published by its own line in
+Obsidian is not. A teacher who publishes Day 2 by
 changing its page in Obsidian after this ran gets Day 2 live with links to the
 concepts that went into draft — before, those concepts were visible, so the one
 flag was enough. The plan and the sheet say so (`publishingFromNowOn`), and
 [issue #333](https://github.com/russellgordon/plantoir/issues/333) is the fix,
 and since bundle B it is the BUILD WARNING: the next build names every link on
 a page students can see that leads to a page they cannot (`linksIntoHiddenPages`,
-[05 → Links into hidden pages](05-build-pipeline.md)); the app's publish does
-not take pages along. **So the first build after Get Ready lists links, and
+[05 → Links into hidden pages](05-build-pipeline.md)). Since #379 (2026-09-29)
+that warning is also a CHECKLIST in the section window, which publishes the
+pages a teacher ticks, and after Get Ready its rows mostly start unticked
+because a later class uses them first ([05 → The links checklist
+(#379)](05-build-pipeline.md)). Two assistant-side consequences of #379: the
+finding's sentence, in the in-app assistant and over `--mcp-stdio`
+(`SiteHealthFinding.appending`), is `AssistWording.linksIntoHiddenPagesWillBeOffered`
+instead of ten pairs read aloud — only when the same build printed the
+checklist marker, the offer on disk is that build's, and the teacher has not
+already answered it (so it never promises a sheet that will not come) —
+otherwise the finding's own words. Its callers are the paths with no section
+window (`AssistSiteWork`); an "offered now" sentence for an open window was
+removed on review, because nothing on that path can honestly tell that a
+window on THAT folder's section is open; and the assistant's
+own publish no longer infers "never published" from "hidden now": its date
+moves skip a page the section's published-pages record lists
+(`datingPagesAClassBrings.publishedBeforeIsRecorded`, which replaced
+`neverPublishedIsInferred`), so a page published once, hidden, and published
+again with its class keeps its date on both routes. Its REACH is unchanged —
+transitive, because it publishes a class the teacher named
+(`linksChecklist.knownDifference`). **So the first build after Get Ready lists links, and
 they are true:** the pages Get Ready keeps (Day 1, what it links to, Key Links)
 still link to pages first used by later classes, which it hid — exactly the
 links its own sheet lists under "links left pointing at hidden pages". The

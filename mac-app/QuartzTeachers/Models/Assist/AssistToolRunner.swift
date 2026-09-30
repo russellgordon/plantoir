@@ -2135,6 +2135,24 @@ final class AssistToolRunner {
            CourseActivity.courseIsBeingCopied(folderPath: folder.path, courseCode: course.code) {
             return AssistWording.courseIsBeingCopied(course: course.code)
         }
+        // A preview of a section cannot start while this copy of Plantoir is
+        // deploying that same section (#381). Asked here, before a window is
+        // opened, a preview stopped or a no-window rebuild run, for the same
+        // reason as the copy check above: the window's own Preview refuses, so
+        // going on would stop the teacher's preview, start nothing, and tell
+        // the conversation a preview is on its way (#381's review, S1). Covers
+        // both paths below — the window's and the `--build-only` rebuild's.
+        if let folder = workspace.workspaceURL,
+           CourseActivity.sectionPublishIsRunning(
+               folderPath: folder.path, courseCode: course.code, sectionNumber: sectionNumber
+           ) {
+            WorkLeaseRegistry.noteDeclinedWhileItsSectionDeploys(
+                courseCode: course.code, sectionNumber: sectionNumber
+            )
+            return AssistWording.sectionIsBeingDeployed(
+                course: course.code, section: String(sectionNumber)
+            )
+        }
         // FIRST, before a window is opened or a preview stopped (#156): a
         // build another program is running, or a preview it is showing, is
         // not this conversation's to end.
@@ -3789,6 +3807,23 @@ final class AssistToolRunner {
                 // last year's. An offer that looks like it worked is worse than
                 // no offer at all.
                 var said: String = already
+                // The record is set aside on a rollover that moved no page,
+                // too (#379): the year still turned over.
+                if isARollover(arguments) {
+                    let released: [AssistSavedFile] = PublishedPagesRecord.release(
+                        courseDirectory: asked.located.course.directoryURL,
+                        section: asked.located.sectionNumber
+                    )
+                    if !released.isEmpty {
+                        history.record(AssistChange(
+                            whatHappened: "set aside the record of pages published last year",
+                            courseCode: asked.located.course.code,
+                            sectionNumber: asked.located.sectionNumber,
+                            rebuildsThePreview: false,
+                            files: released
+                        ))
+                    }
+                }
                 let aboutTheWebsite: String = settleTheWebsiteAfterARollover(
                     arguments,
                     course: asked.located.course,
@@ -3812,7 +3847,7 @@ final class AssistToolRunner {
                 for: asked.located.course, sectionNumber: asked.located.sectionNumber
             )
 
-            let change: AssistChange
+            var change: AssistChange
             var leftAlone: [String] = []
             var classesReDated: Int = 0
             var pagesTheyUseReDated: Int = 0
@@ -3829,6 +3864,25 @@ final class AssistToolRunner {
             } catch {
                 return AssistToolOutcome.refused(
                     "Nothing was changed: \(error.localizedDescription)"
+                )
+            }
+            // A rollover sets aside the section's published-pages record
+            // (#379, plan review finding 12): a new year's site has published
+            // nothing yet. Whichever website answer is given, and inside the
+            // rollover's own change, so taking the rollover back brings it back.
+            if isARollover(arguments) {
+                let released: [AssistSavedFile] = PublishedPagesRecord.release(
+                    courseDirectory: asked.located.course.directoryURL,
+                    section: asked.located.sectionNumber
+                )
+                var files: [AssistSavedFile] = change.files
+                for file in released {
+                    files.append(file)
+                }
+                change = AssistChange(
+                    whatHappened: change.whatHappened, courseCode: change.courseCode,
+                    sectionNumber: change.sectionNumber, rebuildsThePreview: change.rebuildsThePreview,
+                    files: files, appliesToTheWholeCourse: change.appliesToTheWholeCourse, kind: change.kind
                 )
             }
             history.record(change)

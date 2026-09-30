@@ -718,7 +718,7 @@ final class QuartzTeachersUITests: XCTestCase {
 
         let stubDeploy: String = """
         #!/bin/bash
-        echo "Ensuring container is running"
+        echo "Getting this folder's website builder ready…"
         echo "Deploying from local build"
         for step in $(seq 1 300); do
           echo "  …uploaded $step/300 required files to the site"

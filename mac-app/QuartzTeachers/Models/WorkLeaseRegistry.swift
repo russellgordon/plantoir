@@ -72,6 +72,13 @@ enum WorkLeaseRegistry {
     /// the lease exists to cover.
     static var isLeaving: Bool = false
 
+    /// The trail line for a preview the window declined because this copy of
+    /// the app is deploying that same section (#381) — the contract's
+    /// `activityTrail.mustRecord` → "build declined, course busy elsewhere" →
+    /// `lineWhenItsSectionIsBeingDeployed`, pinned by PreviewWhileDeployingTests.
+    static let lineWhenItsSectionIsBeingDeployed: String =
+        "declined Preview — this section is being deployed by this copy of Plantoir"
+
     // MARK: - Functions
 
     /// Writes the leases this process should hold and removes the ones it no
@@ -196,6 +203,19 @@ enum WorkLeaseRegistry {
         ActivityTrail.note(
             .buildDeclinedBusyElsewhere,
             "declined \(act) — the course is being \(WorkLeaseFiles.describe(holding)) somewhere else on this Mac",
+            course: courseCode,
+            section: sectionNumber
+        )
+    }
+
+    /// Puts a preview declined for its own section's deploy on the trail
+    /// (#381). Filed under the same event as a decline for another program's
+    /// lease: to a teacher's report both are "Preview said something else was
+    /// using it", and one name for one fact keeps a report searchable.
+    static func noteDeclinedWhileItsSectionDeploys(courseCode: String, sectionNumber: Int) {
+        ActivityTrail.note(
+            .buildDeclinedBusyElsewhere,
+            lineWhenItsSectionIsBeingDeployed,
             course: courseCode,
             section: sectionNumber
         )

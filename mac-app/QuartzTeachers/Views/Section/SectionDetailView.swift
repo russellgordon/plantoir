@@ -171,6 +171,24 @@ struct SectionDetailView: View {
     /// again is what reaches students.
     @State var healthFindingsCameFromPublishing: Bool = false
 
+    /// The links checklist on screen (#379), or waiting for the alert in
+    /// front of it to go (`repair.oneAlertAtATime`).
+    @State var linksChecklist: LinksChecklistSheetModel?
+    @State var pendingLinksChecklist: LinksChecklistSheetModel?
+
+    /// The #333 finding, held while the build that reported it has not yet
+    /// said whether it wrote an offer — the finding is announced BEFORE the
+    /// build's date passes, and the offer after them (plan review, F14).
+    @State var heldLinksFinding: (finding: SiteHealthFinding, cameFromPublishing: Bool)?
+
+    /// This view's own window, by identity only — never retained — so the
+    /// links checklist is offered on the window that became key (#379).
+    @State var ownWindowID: ObjectIdentifier?
+
+    /// Offers already put in front of the teacher from this window, by build,
+    /// so the second look at a build's findings does not ask twice.
+    @State var linksChecklistBuildsHandled: Set<String> = []
+
     /// Why a deploy could not start, shown as an alert.
     @State var deployRefusal: String?
 
@@ -307,14 +325,28 @@ struct SectionDetailView: View {
             // alone but is the other moment the folder has just been read.
             if !nowBusy {
                 refreshEditedMarker()
+                offerTheLinksChecklistIfWaiting()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             refreshEditedMarker()
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { notification in
             refreshEditedMarker()
+            // A publish this window did not watch — scheduled, the assistant,
+            // the MCP server, a terminal — published as it is; the checklist
+            // is offered now (Russell's decision 3 on #379). Only when THIS
+            // window became key: the notification is app-wide, and the sheet
+            // belongs on the window the teacher is looking at (review, N5).
+            if let window = notification.object as? NSWindow, let ownWindowID,
+               ObjectIdentifier(window) != ownWindowID {
+                return
+            }
+            offerTheLinksChecklistIfWaiting()
         }
+        .background(WindowAccessor { window in
+            ownWindowID = ObjectIdentifier(window)
+        })
         // A scheduled run is a separate process, so the FILE it writes is the
         // only event there is. Reading the watcher's counter here is what
         // registers this view as an observer of it; when it moves — a record
@@ -487,9 +519,26 @@ struct SectionDetailView: View {
             guard healthFindings.isEmpty, let workingFolderURL = workspace.workspaceURL else {
                 return
             }
-            let waiting: [SiteHealthFinding] = ScheduledDeploy.takeFolderProblems(
+            let taken: [SiteHealthFinding] = ScheduledDeploy.takeFolderProblems(
                 courseCode: course.code, sectionNumber: sectionNumber,
                 inWorkingFolder: workingFolderURL
+            )
+            // The #333 finding leaves the alert only when the checklist will
+            // really be shown after it; otherwise the alert is the floor.
+            let checklist: LinksChecklistSheetModel? = linksChecklistWaiting(occasion: .onOpening)
+            // Also left out when the teacher has already answered this very
+            // offer — shown while the window was open, say — so the alert does
+            // not return for a finding they acted on (implementation review, N7).
+            var alreadyAnswered: Bool = false
+            if checklist == nil, !course.isKeptForReference,
+               let read = LinksChecklistOffer.read(courseDirectory: course.directoryURL, section: sectionNumber) {
+                alreadyAnswered = !LinksChecklistGate.holdsSomethingNew(
+                    read.offer,
+                    answered: LinksChecklistAnswered.read(courseDirectory: course.directoryURL, section: sectionNumber)
+                )
+            }
+            let waiting: [SiteHealthFinding] = LinksChecklistRouting.findingsForTheAlert(
+                taken, checklistWillBeShown: checklist != nil || alreadyAnswered
             )
             if !waiting.isEmpty {
                 healthFindings = waiting
@@ -497,6 +546,10 @@ struct SectionDetailView: View {
                 // students are still seeing the old site.
                 healthFindingsCameFromPublishing = true
                 healthDialog = .findings
+            }
+            // After the alert is up, so it waits behind it.
+            if let checklist {
+                requestLinksChecklist(checklist)
             }
         }
         .onDisappear {
@@ -605,6 +658,21 @@ struct SectionDetailView: View {
                 showAnythingWaiting()
             }
         }
+        // The build's word that it wrote the links checklist offer (#379).
+        // Printed after the date passes, so it follows the #333 finding.
+        .onChange(of: previewRunner.linksChecklistMarkers.count) { _, _ in
+            // The build has said whether it wrote an offer — mid-build, which
+            // is enough: the file is written before the marker. So the held
+            // finding is settled as though the build had finished.
+            settleHeldLinksFinding(from: previewRunner, buildHasFinished: true)
+        }
+        .sheet(item: $linksChecklist, onDismiss: {
+            refreshEditedMarker()
+        }, content: { model in
+            LinksChecklistSheet(model: model, onPublished: {
+                refreshEditedMarker()
+            })
+        })
     }
 
     /// The title of the folder-problem dialog.
@@ -675,6 +743,12 @@ struct SectionDetailView: View {
             healthFindings = next.findings
             healthFindingsCameFromPublishing = next.cameFromPublishing
             healthDialog = .findings
+            return
+        }
+        // The links checklist follows the alert (#379), never over it.
+        if let waiting = pendingLinksChecklist {
+            pendingLinksChecklist = nil
+            presentLinksChecklist(waiting)
         }
     }
 
@@ -786,8 +860,20 @@ struct SectionDetailView: View {
     /// Only when the run actually produced some — a healthy course must never
     /// see a dialog, which is the difference between a warning that gets read
     /// and one that gets dismissed by habit.
-    func showHealthFindings(from runner: ScriptRunner?, cameFromPublishing: Bool = false) {
+    func showHealthFindings(
+        from runner: ScriptRunner?, cameFromPublishing: Bool = false, buildHasFinished: Bool = false
+    ) {
         guard let runner, !runner.healthFindings.isEmpty else {
+            return
+        }
+        // The #333 finding goes to the links checklist when this build wrote
+        // an offer for it (#379); everything else, and the finding itself
+        // when there is no offer, goes in the alert as before.
+        let forTheAlert: [SiteHealthFinding] = routeTheLinksFinding(
+            in: runner.healthFindings, from: runner,
+            cameFromPublishing: cameFromPublishing, buildHasFinished: buildHasFinished
+        )
+        if forTheAlert.isEmpty {
             return
         }
         // Never swap the contents of a dialog that is already up: the title
@@ -801,13 +887,187 @@ struct SectionDetailView: View {
             // Appended, not assigned: three arrivals during one dialog used to
             // lose the middle batch.
             heldHealthFindings.append(
-                (findings: runner.healthFindings, cameFromPublishing: cameFromPublishing)
+                (findings: forTheAlert, cameFromPublishing: cameFromPublishing)
             )
             return
         }
-        healthFindings = runner.healthFindings
+        healthFindings = forTheAlert
         healthFindingsCameFromPublishing = cameFromPublishing
         healthDialog = .findings
+    }
+
+    // MARK: - The links checklist (#379)
+
+    /// The findings that still belong in the alert, after the #333 one has
+    /// gone to the checklist, been held for the build's marker, or stayed.
+    func routeTheLinksFinding(
+        in findings: [SiteHealthFinding], from runner: ScriptRunner,
+        cameFromPublishing: Bool, buildHasFinished: Bool
+    ) -> [SiteHealthFinding] {
+        var forTheAlert: [SiteHealthFinding] = []
+        for finding in findings {
+            if finding.name != LinksChecklistRouting.findingName {
+                forTheAlert.append(finding)
+                continue
+            }
+            let marker: LinksChecklistMarker? = markerForThisSection(in: runner)
+            if let buildId = marker?.buildId, linksChecklistBuildsHandled.contains(buildId) {
+                continue
+            }
+            let offer: LinksChecklistOffer? = LinksChecklistOffer.read(
+                courseDirectory: course.directoryURL, section: sectionNumber
+            )?.offer
+            let route: LinksChecklistRouting.Route = LinksChecklistRouting.route(
+                marker: marker, offer: offer, isKeptForReference: course.isKeptForReference,
+                buildHasFinished: buildHasFinished
+            )
+            switch route {
+            case .alert:
+                // The same finding held earlier goes to the alert once, not
+                // again when it is settled (implementation review, N6).
+                if heldLinksFinding?.finding == finding {
+                    heldLinksFinding = nil
+                }
+                forTheAlert.append(finding)
+            case .waitForTheBuild:
+                heldLinksFinding = (finding: finding, cameFromPublishing: cameFromPublishing)
+            case .checklist:
+                guard let offer, let workspaceURL = workspace.workspaceURL else {
+                    forTheAlert.append(finding)
+                    continue
+                }
+                if let buildId = offer.buildId {
+                    linksChecklistBuildsHandled.insert(buildId)
+                }
+                let answered: LinksChecklistAnswered? = LinksChecklistAnswered.read(
+                    courseDirectory: course.directoryURL, section: sectionNumber
+                )
+                // An offer the teacher has already answered in full is not
+                // asked again (`offeredWhen.onlyWhenSomethingNew`).
+                if !LinksChecklistGate.holdsSomethingNew(offer, answered: answered) {
+                    continue
+                }
+                let model: LinksChecklistSheetModel = LinksChecklistSheetModel(
+                    course: course, sectionNumber: sectionNumber, workspaceURL: workspaceURL,
+                    offer: offer, answered: answered,
+                    occasion: cameFromPublishing ? .afterPublishing : .afterAPreview
+                )
+                if model.rows.isEmpty {
+                    continue
+                }
+                requestLinksChecklist(model)
+            }
+        }
+        return forTheAlert
+    }
+
+    /// The build's last word about this section's offer, if it has said one.
+    func markerForThisSection(in runner: ScriptRunner) -> LinksChecklistMarker? {
+        var found: LinksChecklistMarker?
+        for marker in runner.linksChecklistMarkers where marker.section == sectionNumber {
+            found = marker
+        }
+        return found
+    }
+
+    /// The held finding, now that the build has said whether it wrote an
+    /// offer — or has finished without saying, which means the alert.
+    func settleHeldLinksFinding(from runner: ScriptRunner, buildHasFinished: Bool) {
+        guard let held = heldLinksFinding else {
+            return
+        }
+        heldLinksFinding = nil
+        let forTheAlert: [SiteHealthFinding] = routeTheLinksFinding(
+            in: [held.finding], from: runner,
+            cameFromPublishing: held.cameFromPublishing, buildHasFinished: buildHasFinished
+        )
+        if forTheAlert.isEmpty {
+            return
+        }
+        if healthDialog != nil {
+            heldHealthFindings.append((findings: forTheAlert, cameFromPublishing: held.cameFromPublishing))
+            return
+        }
+        healthFindings = forTheAlert
+        healthFindingsCameFromPublishing = held.cameFromPublishing
+        healthDialog = .findings
+    }
+
+    /// Show it now, or after the alert in front of it.
+    func requestLinksChecklist(_ model: LinksChecklistSheetModel) {
+        if linksChecklist != nil {
+            return
+        }
+        if healthDialog != nil {
+            pendingLinksChecklist = model
+            return
+        }
+        presentLinksChecklist(model)
+    }
+
+    func presentLinksChecklist(_ model: LinksChecklistSheetModel) {
+        if let buildId = model.offer.buildId {
+            linksChecklistBuildsHandled.insert(buildId)
+        }
+        var ticked: Int = 0
+        for row in model.rows where model.ticked.contains(row.place) {
+            ticked += 1
+        }
+        ActivityTrail.note(
+            .linksChecklistOffered,
+            LinksChecklistPublisher.offeredLine(model.rows, ticked: ticked, occasion: model.occasion),
+            course: course.code, section: sectionNumber
+        )
+        linksChecklist = model
+    }
+
+    /// The checklist for a publish this window did not watch, when one is
+    /// waiting: an offer on disk, fresh, holding something the teacher has
+    /// not answered, for a course that is not kept for reference, while
+    /// nothing is publishing the course.
+    func linksChecklistWaiting(occasion: LinksChecklistGate.Occasion) -> LinksChecklistSheetModel? {
+        guard !course.isKeptForReference, let workspaceURL = workspace.workspaceURL else {
+            return nil
+        }
+        if CourseActivity.coursePublishIsRunning(folderPath: workspaceURL.path, courseCode: course.code) {
+            return nil
+        }
+        guard let read = LinksChecklistOffer.read(courseDirectory: course.directoryURL, section: sectionNumber) else {
+            return nil
+        }
+        if let buildId = read.offer.buildId, linksChecklistBuildsHandled.contains(buildId) {
+            return nil
+        }
+        let answered: LinksChecklistAnswered? = LinksChecklistAnswered.read(
+            courseDirectory: course.directoryURL, section: sectionNumber
+        )
+        if !LinksChecklistGate.holdsSomethingNew(read.offer, answered: answered) {
+            return nil
+        }
+        if !LinksChecklistGate.isFresh(
+            writtenAt: read.writtenAt, newestContentChange: BuildFreshness.newestContentDate(course: course)
+        ) {
+            return nil
+        }
+        let model: LinksChecklistSheetModel = LinksChecklistSheetModel(
+            course: course, sectionNumber: sectionNumber, workspaceURL: workspaceURL,
+            offer: read.offer, answered: answered, occasion: occasion
+        )
+        if model.rows.isEmpty {
+            return nil
+        }
+        return model
+    }
+
+    /// Called when the window appears, becomes key, or stops being busy.
+    func offerTheLinksChecklistIfWaiting() {
+        if isBusy || linksChecklist != nil || pendingLinksChecklist != nil || heldLinksFinding != nil {
+            return
+        }
+        guard let model = linksChecklistWaiting(occasion: .onOpening) else {
+            return
+        }
+        requestLinksChecklist(model)
     }
 
     /// Why this section's deploy would not get anywhere, or nil when it
@@ -1090,6 +1350,28 @@ struct SectionDetailView: View {
         if workspace.isBeingCopied(course.code) {
             return
         }
+        // A preview of this section cannot start while this same section is
+        // being deployed by this copy of the app — from this window, another
+        // window, or the assistant with no window (#381, Russell's decision 4
+        // on #378). Asked HERE, first, before any lease is taken or anything
+        // is stopped or started, because every way into a preview comes
+        // through here: the button (whose `.disabled` is only a convenience),
+        // the in-app assistant, and the restart path. Other programs are
+        // refused by their leases below, and a deploy typed at a command line
+        // by `preview.sh` itself.
+        if let refusal = SectionDetailView.refusalWhileThisSectionDeploys(
+            folderPath: workspaceURL.path,
+            courseCode: course.code,
+            displayCode: course.displayCode,
+            sectionNumber: sectionNumber
+        ) {
+            WorkLeaseRegistry.noteDeclinedWhileItsSectionDeploys(
+                courseCode: course.code, sectionNumber: sectionNumber
+            )
+            previewRefusalTitle = "Cannot Preview Yet"
+            previewRefusal = refusal
+            return
+        }
         // One of the moments the teacher ACTS on a reference course, so the
         // lock is re-asserted here: a folder that came back from a backup, or
         // from a second Mac, is not locked until somebody asks. Cheap — a
@@ -1217,7 +1499,8 @@ struct SectionDetailView: View {
             // quickly and the teacher is now looking at the preview. The
             // findings usually arrived long before this — see the onChange on
             // the body, which is what actually gets them on screen.
-            showHealthFindings(from: previewRunner)
+            showHealthFindings(from: previewRunner, buildHasFinished: true)
+            settleHeldLinksFinding(from: previewRunner, buildHasFinished: true)
         }
     }
 
@@ -1307,6 +1590,29 @@ struct SectionDetailView: View {
             unsavedSettingsNotice = nil
             unsavedSettingsNoticeOwner = nil
         }
+    }
+
+    /// Why a preview of this section cannot start now, or nil when nothing in
+    /// this copy of the app is deploying it (GitHub #381).
+    ///
+    /// Static for the reason `refusalForAReferenceCourse` below is: nothing in
+    /// the suite constructs this view, so the rule lives where a test can
+    /// reach it, and `startPreview` asks it first. `displayCode` is what the
+    /// sentence names; `courseCode` is the folder's, which the publish record
+    /// holds.
+    static func refusalWhileThisSectionDeploys(
+        folderPath: String,
+        courseCode: String,
+        displayCode: String,
+        sectionNumber: Int
+    ) -> String? {
+        let isDeploying: Bool = CourseActivity.sectionPublishIsRunning(
+            folderPath: folderPath, courseCode: courseCode, sectionNumber: sectionNumber
+        )
+        if !isDeploying {
+            return nil
+        }
+        return AssistWording.sectionIsBeingDeployed(course: displayCode, section: String(sectionNumber))
     }
 
     /// Why this course is never deployed, or nil when it is an ordinary one.
@@ -1641,7 +1947,7 @@ struct SectionDetailView: View {
             // finding is most likely to be the cause, and moving the call
             // below the early return had quietly dropped it altogether —
             // de-headlining it was the intent, discarding it was not.
-            showHealthFindings(from: deployRunner.legs.first?.runner, cameFromPublishing: true)
+            showHealthFindings(from: deployRunner.legs.first?.runner, cameFromPublishing: true, buildHasFinished: true)
             return said(AssistSiteWorkResult(
                 succeeded: false,
                 message: AssistWording.couldNotBuildBeforeDeploying(
@@ -1654,7 +1960,7 @@ struct SectionDetailView: View {
         // paths above, so a deploy that did not publish is not headlined by a
         // folder warning. Taken from the FIRST leg: every destination publishes
         // the same built site, so a second leg only repeats the findings.
-        showHealthFindings(from: deployRunner.legs.first?.runner, cameFromPublishing: true)
+        showHealthFindings(from: deployRunner.legs.first?.runner, cameFromPublishing: true, buildHasFinished: true)
 
         return said(MultiDestinationDeployRunner.result(
             course: course.code,

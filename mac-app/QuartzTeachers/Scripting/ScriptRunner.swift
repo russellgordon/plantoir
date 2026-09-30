@@ -52,6 +52,19 @@ class ScriptRunner {
     /// one step for minutes, and a bar that does not move reads as a hang.
     var stepDetail: String = ""
 
+    /// What the launcher is waiting for before it sets the folder up again,
+    /// as the status line says it — "Waiting for Revise with Claude to finish
+    /// deploying MPM2D section 2…" — or empty (GitHub #378, decision 3).
+    /// Read from its `PLANTOIR_WAITING_FOR:` lines (`WorkspaceWait`), and
+    /// given back by `PLANTOIR_WAITING_FOR: over`, by the next milestone, and
+    /// by the run ending, so a launcher killed mid-wait never leaves the line
+    /// stuck on a wait that is not happening.
+    var waitingSentence: String = ""
+
+    /// When the current wait began, for the status line's counter. Kept
+    /// when what is waited for changes: the counter is the whole wait.
+    var waitingSince: Date?
+
     /// True when the teacher stopped the task themselves. Ending a task
     /// on purpose makes it exit non-zero, which is not a failure and
     /// must not be reported as one.
@@ -255,6 +268,8 @@ class ScriptRunner {
         wasStoppedByUser = false
         isBetweenPhases = false
         stepDetail = ""
+        waitingSentence = ""
+        waitingSince = nil
 
         let scriptURL: URL = workingDirectory.appendingPathComponent(scriptName)
         if !FileManager.default.fileExists(atPath: scriptURL.path) {
@@ -644,6 +659,12 @@ class ScriptRunner {
     /// 8,000-character window by the time anybody asks.
     private(set) var healthFindings: [SiteHealthFinding] = []
 
+    /// The build's word that it has written (or removed) the links checklist
+    /// offer (#379), collected as it arrives for the reason `healthFindings`
+    /// is. The window acts on THIS, never on the #333 finding alone: the
+    /// finding is announced before the offer can exist.
+    private(set) var linksChecklistMarkers: [LinksChecklistMarker] = []
+
     /// The address the launcher announced for this run's preview — the last
     /// one, when there is more than one — and nil until it has announced one.
     ///
@@ -705,6 +726,7 @@ class ScriptRunner {
             return
         }
         healthFindings = []
+        linksChecklistMarkers = []
         announcedPreviewAddress = nil
         pendingLine = ""
     }
@@ -717,6 +739,7 @@ class ScriptRunner {
         }
         rememberHealthFindings(in: leftover)
         rememberPreviewAnnouncement(in: [leftover])
+        rememberWhatIsWaitedFor(in: [leftover])
     }
 
     private func rememberHealthFindings(in text: String) {
@@ -734,6 +757,12 @@ class ScriptRunner {
         // A launcher that waited for, or refused on, something running in
         // the folder's workspace before remaking it (#94).
         WorkspaceInUseReport.noteOnTheTrail(from: text)
+        // Work left in the workspace by a program that had closed, which the
+        // launcher ended before setting the folder up again (#378).
+        LeftoverWorkReport.noteOnTheTrail(from: text)
+        // A section's Cloudflare project made again because it was not in
+        // the account any more (2026-09-30).
+        CloudflareProjectRemadeReport.noteOnTheTrail(from: text)
         // A preview whose address was held by something else on this Mac,
         // or whose look could not be made (#310).
         PreviewAddressHeldReport.noteOnTheTrail(from: text)
@@ -743,6 +772,9 @@ class ScriptRunner {
         // A How I Teach page the course had listed for the website, kept off
         // it by this build (#209).
         HowITeachKeptOffReport.noteOnTheTrail(from: text)
+        for marker in LinksChecklistMarker.markers(in: text) {
+            linksChecklistMarkers.append(marker)
+        }
         for finding in SiteHealthFinding.findings(in: text) {
             if healthFindings.contains(finding) {
                 continue
@@ -776,6 +808,24 @@ class ScriptRunner {
         pendingLine = carried
         rememberHealthFindings(in: completeLines.joined(separator: "\n"))
         rememberPreviewAnnouncement(in: completeLines)
+        rememberWhatIsWaitedFor(in: completeLines)
+    }
+
+    /// Turns the launcher's `PLANTOIR_WAITING_FOR:` lines into the status
+    /// line (#378). Read line by line, in order, so a wait that changes and
+    /// then ends inside one chunk ends.
+    private func rememberWhatIsWaitedFor(in lines: [String]) {
+        for wait in WorkspaceWait.waits(in: lines) {
+            if wait.isOver {
+                waitingSentence = ""
+                waitingSince = nil
+                continue
+            }
+            if waitingSince == nil {
+                waitingSince = Date()
+            }
+            waitingSentence = wait.statusSentence
+        }
     }
 
     /// Takes the address out of any complete line that announces one; the
@@ -1095,6 +1145,7 @@ class ScriptRunner {
             return
         }
         unscannedOutput += newText
+        let reachedBefore: Int = reachedMilestoneCount
 
         // Take the HIGHEST milestone the new output reveals: a later
         // marker implies the earlier steps, so varying output never
@@ -1115,6 +1166,25 @@ class ScriptRunner {
             unscannedOutput = String(unscannedOutput[matchedEnd...])
             // A count belongs to the step that reported it.
             stepDetail = ""
+        }
+
+        // A later step means any wait is over, even if its "over" line was
+        // lost (#378) — unless the wait began AFTER that step in this same
+        // stretch of output, which is the usual order: the step "Starting
+        // the website builder" is reached, then the launcher finds it must
+        // wait.
+        if reachedMilestoneCount > reachedBefore && !waitingSentence.isEmpty {
+            let marker: String = milestones[reachedMilestoneCount - 1].marker
+            let milestoneAt: Range<String.Index>? = newText.range(of: marker, options: .backwards)
+            let waitAt: Range<String.Index>? = newText.range(of: WorkspaceWait.markerPrefix, options: .backwards)
+            var stepCameLast: Bool = waitAt == nil
+            if let milestoneAt, let waitAt, milestoneAt.lowerBound > waitAt.lowerBound {
+                stepCameLast = true
+            }
+            if stepCameLast {
+                waitingSentence = ""
+                waitingSince = nil
+            }
         }
 
         if let progress = ScriptRunner.uploadProgress(in: newText) {
@@ -1221,6 +1291,12 @@ class ScriptRunner {
     /// culprit — a live "still working… (Ns)" timer counts up so the
     /// step never looks frozen. Mirrors the Windows app's behaviour.
     func milestoneText(asOf now: Date) -> String {
+        // What a launcher is waiting for names itself, with the wait's own
+        // counter, in place of "still working…" (#378, decision 3).
+        if isRunning && !waitingSentence.isEmpty, let since = waitingSince {
+            let seconds: Int = max(0, Int(now.timeIntervalSince(since)))
+            return WorkspaceWait.withCounter(waitingSentence, seconds: seconds)
+        }
         if !stepDetail.isEmpty {
             return "\(currentMilestoneLabel) \(stepDetail)"
         }
@@ -1243,6 +1319,11 @@ class ScriptRunner {
     /// A friendly description of what is happening right now, derived
     /// from markers in the output — used when no milestones are set.
     var friendlyPhase: String {
+        // A run with no milestones shows its phase in the heading instead;
+        // a named wait (#378) is the phase while it lasts.
+        if isRunning && !waitingSentence.isEmpty {
+            return waitingSentence
+        }
         let recentText: String = String(transcript.recentText(maximumCharacters: 4000))
         let phases: [(marker: String, label: String)] = [
             ("Launching Quartz preview", "Starting the preview…"),
@@ -1318,6 +1399,8 @@ class ScriptRunner {
         // failure the buffer was added to prevent, surviving at the end of the
         // run instead of in the middle of it.
         flushPendingLine()
+        waitingSentence = ""
+        waitingSince = nil
         AppLog.output.info("Finished with exit code \(exitCode), transcript \(self.transcript.lines.count) lines")
         lastExitCode = exitCode
         isRunning = false
@@ -1498,6 +1581,13 @@ class ScriptRunner {
         }
         if exitCode == 0 {
             return "Finished"
+        }
+        // Exit 3 means one thing in both launchers and deploy.py: run with
+        // --non-interactive, it reached a question and refused rather than
+        // wait for an answer nobody could give (#378 — an assistant's deploy
+        // from another app, or a publish set for later).
+        if exitCode == 3 {
+            return "Stopped at a question nobody was there to answer (exit 3)"
         }
         return "Failed (exit \(exitCode))"
     }

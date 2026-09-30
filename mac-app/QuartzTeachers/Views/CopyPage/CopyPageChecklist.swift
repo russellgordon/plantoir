@@ -45,9 +45,21 @@ struct CopyPageChecklist: View {
 
     // MARK: - Computed properties
 
-    /// Enough for about twelve rows. The largest linked set in a real course
-    /// is ten, so nothing today scrolls; the cap is here because a sheet that
-    /// grows without limit puts its own buttons off the bottom of the screen.
+    /// The tallest the scroll area holding the rows and the per-page
+    /// sentences may be: about twelve rows. Beyond it, the area scrolls.
+    ///
+    /// **The rule it serves: the sheet is at most 620 pt tall, whatever it
+    /// lists** (`tallestSheet`, pinned by `CopyPageChecklistSizeTests`). The
+    /// arithmetic, so the number is not taken on trust: the smallest screen
+    /// a teacher is likely to meet is a 13-inch MacBook Air set to "Larger
+    /// Text", 1280 × 800 points; less a 24 pt menu bar, a ~52 pt window title bar and a ~70 pt
+    /// Dock, that leaves ≈ 654 pt for a sheet. The checklist state is ≈ 40
+    /// padding + 17 title + 16 + (≈ 34 heading + 8 + 380 + 8 + ≈ 34 "Copies
+    /// start hidden") + 16 + ≈ 22 buttons ≈ 575 pt. A current Air's
+    /// default is 1470 × 956 and has more room; "Larger Text" is the one to
+    /// fit.
+    /// Rejected: a cap worked out from `NSScreen` — a sheet that changes size
+    /// with the display is one no test can pin.
     static var tallestList: CGFloat {
         return 380
     }
@@ -60,10 +72,12 @@ struct CopyPageChecklist: View {
                 pages: plan.pages.count, course: courseName, folder: folderName
             ))
 
-            // An explicit height, never `maxHeight` on a bare `ScrollView`:
-            // the first attempt reserved its cap whether the rows needed it
-            // or not and drew an empty hole where they should have been.
-            ScrollView(.vertical) {
+            // ONE scroll area for the rows AND every sentence that grows with
+            // the number of pages (#365). The rows alone were capped, and the
+            // skip sentences under them — about seventy for a well-linked
+            // lesson — pushed Cancel and Copy off the bottom of the screen.
+            // The heading above and "Copies start hidden" below stay put.
+            CappedScrollArea(cap: CopyPageChecklist.tallestList) {
                 VStack(alignment: .leading, spacing: 2) {
                     row(named: chosenPage, second: CopyPageWording.thePageYouChose,
                         isOn: .constant(true), isLocked: true, identifier: "chosen")
@@ -76,20 +90,37 @@ struct CopyPageChecklist: View {
                             identifier: linked.pageName
                         )
                     }
+                    sentencesThatGrowWithThePages
+                        .padding(.top, 6)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(height: min(
-                CGFloat(candidates.count + 1) * CopyPageChecklist.rowHeight,
-                CopyPageChecklist.tallestList
-            ))
 
+            Text(CopyPageWording.copiesStartHidden)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        // A container element with its own identifier (#353, #366): without
+        // `.contain` SwiftUI applies an identifier on a stack to every element
+        // inside it, so the rows' own identifiers (copyPageLinked-…) never
+        // reach the accessibility tree and a UI test cannot find them.
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("copyPageChecklist")
+    }
+
+    /// Everything under the rows whose length follows the page count: the
+    /// pictures lines, one sentence per skip, the links leading nowhere.
+    /// Inside the capped area, never under it — that was the fault.
+    @ViewBuilder
+    var sentencesThatGrowWithThePages: some View {
+        VStack(alignment: .leading, spacing: 8) {
             if !plan.media.isEmpty {
                 Text(CopyPageWording.willBringPicturesAndFilesInAll(
                     count: plan.mediaToCreate.count,
                     size: ReferenceImportWording.size(plan.totalBytes)
                 ))
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
             if !plan.mediaUnderANewName.isEmpty {
                 Text(CopyPageWording.picturesWillComeInUnderANewName(
@@ -110,19 +141,16 @@ struct CopyPageChecklist: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             }
-            Text(CopyPageWording.copiesStartHidden)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
-        .fixedSize(horizontal: false, vertical: true)
-        .accessibilityIdentifier("copyPageChecklist")
+    }
+
+    /// The most the whole Copy a Page sheet may be, in any state. See
+    /// `tallestList` for the arithmetic.
+    static var tallestSheet: CGFloat {
+        return 620
     }
 
     // MARK: - Functions
-
-    static var rowHeight: CGFloat {
-        return 32
-    }
 
     /// One row. The identifier and the label go on the CONTROL, not on the
     /// label view: an identifier bound to a `Toggle`'s content is merged into

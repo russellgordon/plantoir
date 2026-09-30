@@ -55,6 +55,13 @@ nonisolated enum ActivityTrail {
         case workingFolderRefused = "working folder refused"
         case settingsSaved = "settings saved"
         case settingsCouldNotBeSaved = "settings could not be saved"
+        /// Course Settings held changes that could not be saved because they
+        /// moved where the course publishes and that destination has a
+        /// problem (#373). Written once per visit, on the change into that
+        /// state; carries the course and WHICH check (deploy folder,
+        /// cloudflare account id, additional destination) — never the path
+        /// or the ID.
+        case settingsSaveHeldBack = "settings save held back"
         /// A preview started while Course Settings held changes nobody had
         /// saved, and the teacher was told it uses the saved settings (#265).
         case previewStartedWithUnsavedSettings = "preview started with unsaved settings"
@@ -856,7 +863,38 @@ nonisolated enum ActivityTrail {
         /// refusal only as a run that did not finish. A remake with nothing
         /// running writes nothing. Mac only, permanently: Windows builds
         /// natively and has no workspace.
+        ///
+        /// Since GitHub #378 the lines name WHAT was waited for and who had
+        /// started it ("a deploy of MPM2D section 2 started by Revise with
+        /// Claude"), and no longer say "workspace". The key keeps its old
+        /// name so trails already on disk stay readable.
         case workspaceWasInUse = "workspace was in use"
+        /// A launcher setting a folder up again ended work left running in
+        /// it by a program that had since closed (GitHub #378, decision 2) —
+        /// a deploy a closed session left waiting at a question, a build a
+        /// force-quit app left behind, an orphaned preview. Carries where the
+        /// run was for and each piece of work ended, by kind with its course
+        /// and section; never a command line, a path or a process number.
+        ///
+        /// Written by the app from the launcher's `PLANTOIR_LEFTOVER_STOPPED:`
+        /// line (`LeftoverWorkReport`), in the same two places as
+        /// `workspaceWasInUse`. On the trail because ending somebody's work
+        /// must never be silent: "why did my deploy from Claude not go out?"
+        /// is answered by this line. Mac only, permanently.
+        case leftoverWorkStopped = "left-over work stopped"
+        /// A section's Cloudflare project was made again under the same name,
+        /// because it was not in the Cloudflare account any more — deleted in
+        /// Cloudflare's dashboard, say — and a publish would otherwise have
+        /// failed (2026-09-30). Carries where the publish was for, the
+        /// project's name and the address the website answers at now; never
+        /// the account ID or the token.
+        ///
+        /// Written by the app from the shared `deploy.py`'s
+        /// `PLANTOIR_CLOUDFLARE_REMADE:` line (`CloudflareProjectRemadeReport`),
+        /// in the same two places as `leftoverWorkStopped`. On the trail
+        /// because it changes things a teacher sees weeks later: the address
+        /// can change, and a custom domain went with the deleted project.
+        case cloudflareProjectMadeAgain = "cloudflare project made again"
         /// A preview's address was held by something else on this Mac
         /// (GitHub #310, found in the #204 rehearsal with two macOS accounts
         /// signed in). Carries where the preview was for, the address — a
@@ -985,6 +1023,28 @@ nonisolated enum ActivityTrail {
         /// since — an undo that skips files is a partial undo, and "some came
         /// back and some did not" needs the count on record.
         case startOfTheYearChangeUndone = "start of the year change undone"
+        /// The links checklist was put in front of the teacher (#379).
+        /// Carries how many pages in each group (used by a class, linked from
+        /// other pages, classes) and the occasion: after a preview, after
+        /// publishing, on opening after a publish Plantoir did not watch
+        /// (scheduled, the assistant, outside), or from the menu. #333's alert
+        /// was shown and nobody could tell afterwards whether it had been seen;
+        /// "why did it ask me to publish 40 pages?" is answered by the counts.
+        case linksChecklistOffered = "offered to publish pages that links lead to"
+        /// Pages published from the links checklist (#379). Carries how many
+        /// were published, dated from a class, dated as the first class, kept
+        /// their date, classes published, pages those classes brought, left
+        /// unticked; and the PLACES of the published pages, at most ten then
+        /// "and N more" — names, never anything written on them. It changes
+        /// what students will see and rewrites dates in the teacher's files,
+        /// and "why is this page visible / why did its date change" is asked
+        /// weeks later.
+        case pagesPublishedFromLinksChecklist = "published pages that links led to"
+        /// The teacher left pages hidden that links lead to (#379): Not Now,
+        /// or Publish with some unticked. Carries the counts. When a student
+        /// reports a dead link, the trail shows the teacher was offered it
+        /// and chose.
+        case linksChecklistSetAside = "left pages hidden that links lead to"
         /// Getting a section ready was asked for and NOTHING was written
         /// (#96). Carries where from and the reason: changedSinceShown,
         /// backupFailed, writeFailed, noFirstClass, missingPlanCode, or

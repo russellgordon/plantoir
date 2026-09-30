@@ -1,7 +1,8 @@
 import Foundation
 
 /// A launcher's report that a working folder's workspace was in use when it
-/// needed remaking (GitHub #94), as the launcher printed it.
+/// needed remaking (GitHub #94), as the launcher printed it — and, since
+/// GitHub #378, what it was in use FOR and who had started that.
 ///
 /// Before a launcher removes a folder's workspace to make it again, it looks
 /// at what is running inside it: it waits for a build or a publish, and it
@@ -32,13 +33,30 @@ struct WorkspaceInUseReport: Equatable {
     /// The marker the launchers print. Pinned by the contract's `marker.prefix`.
     nonisolated static let markerPrefix: String = "PLANTOIR_WORKSPACE_IN_USE:"
 
-    /// The three lines, pinned by the contract's `lineWhen…` fields.
+    /// The three lines, pinned by the contract's `lineWhen…` fields. Since
+    /// GitHub #378 they name what was waited for, and say "this folder"
+    /// rather than "workspace".
     nonisolated static let lineWhenItWaited: String =
-        "{place} · waited {seconds} s for something in this working folder to finish before updating its workspace, then went ahead"
+        "{place} · waited {seconds} s for {what} to finish before setting this folder up again, then went ahead"
     nonisolated static let lineWhenAPreviewWasOpen: String =
-        "{place} · stopped before starting — this working folder's workspace needed updating and the preview of {preview} was still open"
+        "{place} · stopped before starting — this folder needed setting up again and the preview of {preview} was still open"
     nonisolated static let lineWhenWorkDidNotFinish: String =
-        "{place} · stopped before starting — this working folder's workspace needed updating and something in it was still being built or published after {seconds} s"
+        "{place} · stopped before starting — this folder needed setting up again and {what} was still going after {seconds} s"
+
+    /// What `{what}` says for each item the marker names, pinned by the
+    /// contract's `whatInTheLines`. "unnamed" is an older launcher's line,
+    /// which named nothing.
+    nonisolated static let whatInTheLines: [String: String] = [
+        "build": "a build of {course} section {section}",
+        "publish": "a deploy of {course} section {section}",
+        "preview": "the preview of {course} section {section}",
+        "setup": "the setting up of a course",
+        "work": "something else in this folder",
+        "unnamed": "something in this folder",
+    ]
+
+    /// Added after `{what}` when who started it is known.
+    nonisolated static let startedBy: String = " started by {origin}"
 
     /// Which of the three things happened.
     let outcome: Outcome
@@ -52,7 +70,38 @@ struct WorkspaceInUseReport: Equatable {
     /// The open preview a refusal names, as `COURSE/SECTION`; empty otherwise.
     let openPreview: String
 
+    /// What a wait or a refusal on other work was for (#378):
+    /// `publish:MPM2D/2`, `build:ICS4U/1`, `preview:ICS4U/1`, `setup` or
+    /// `work`; empty on an older launcher's line.
+    var waitedFor: String = ""
+
+    /// Who started it, by the launcher's word (`claude`, `scheduled`…); empty
+    /// or "-" when it is not known.
+    var origin: String = ""
+
     // MARK: - Computed properties
+
+    /// `{what}` in the lines: the item's words, and who started it when known.
+    nonisolated var what: String {
+        if waitedFor.isEmpty {
+            return WorkspaceInUseReport.whatInTheLines["unnamed"] ?? ""
+        }
+        var kind: String = waitedFor
+        var place: String = ""
+        if let colon = waitedFor.firstIndex(of: ":") {
+            kind = String(waitedFor[waitedFor.startIndex..<colon])
+            place = String(waitedFor[waitedFor.index(after: colon)...])
+        }
+        let template: String = WorkspaceInUseReport.whatInTheLines[kind]
+            ?? WorkspaceInUseReport.whatInTheLines["unnamed"] ?? ""
+        var words: String = WorkspaceWords.filling(template, place: place)
+        if !origin.isEmpty && origin != "-" {
+            words += WorkspaceInUseReport.startedBy.replacingOccurrences(
+                of: "{origin}", with: WorkspaceWords.origin(origin)
+            )
+        }
+        return words
+    }
 
     /// The trail line, in the words `contracts/shared-rules.json` →
     /// `activityTrail.mustRecord."workspace was in use"` pins.
@@ -66,9 +115,13 @@ struct WorkspaceInUseReport: Equatable {
         case .workDidNotFinish:
             sentence = WorkspaceInUseReport.lineWhenWorkDidNotFinish
         }
-        sentence = sentence.replacingOccurrences(of: "{place}", with: place)
+        // "+" stands for the one space a course code may carry (#378 review S1).
+        sentence = sentence.replacingOccurrences(of: "{place}", with: place.replacingOccurrences(of: "+", with: " "))
         sentence = sentence.replacingOccurrences(of: "{seconds}", with: String(seconds))
-        sentence = sentence.replacingOccurrences(of: "{preview}", with: openPreview)
+        sentence = sentence.replacingOccurrences(
+            of: "{preview}", with: openPreview.replacingOccurrences(of: "+", with: " ")
+        )
+        sentence = sentence.replacingOccurrences(of: "{what}", with: what)
         return sentence
     }
 
@@ -90,20 +143,35 @@ struct WorkspaceInUseReport: Equatable {
             for word in payload.split(separator: " ", omittingEmptySubsequences: true) {
                 words.append(String(word))
             }
-            guard words.count == 3 || words.count == 4,
+            // Three words from a launcher before #378; a fourth (the open
+            // preview, or what was waited for) and a fifth (who started it)
+            // since.
+            guard words.count >= 3 && words.count <= 5,
                   let outcome = Outcome(rawValue: words[0]),
                   let seconds = Int(words[1]) else {
                 continue
             }
             var openPreview: String = ""
-            if words.count == 4 {
-                openPreview = words[3]
+            var waitedFor: String = ""
+            var origin: String = ""
+            if words.count >= 4 {
+                if outcome == .aPreviewWasOpen {
+                    openPreview = words[3]
+                } else {
+                    waitedFor = words[3]
+                }
+            }
+            if words.count == 5 {
+                origin = words[4]
             }
             if outcome == .aPreviewWasOpen && openPreview.isEmpty {
                 continue
             }
             found.append(
-                WorkspaceInUseReport(outcome: outcome, seconds: seconds, place: words[2], openPreview: openPreview)
+                WorkspaceInUseReport(
+                    outcome: outcome, seconds: seconds, place: words[2], openPreview: openPreview,
+                    waitedFor: waitedFor, origin: origin
+                )
             )
         }
         return found

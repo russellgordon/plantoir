@@ -15,6 +15,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Nor under a state folder (#154): nothing is posted there to be clicked
     /// (`ScheduledPublishNotice.defaultPoster`).
     func applicationWillFinishLaunching(_ notification: Notification) {
+        // Before any window exists, so before AppKit's first frame save: a
+        // run a test drives puts AppKit's own preference keys back (#361).
+        // HERE and not in `QuartzTeachersApp.init` — see
+        // `AppKitBookkeepingGuard.armIfATestIsDrivingThisRun`.
+        AppKitBookkeepingGuard.armIfATestIsDrivingThisRun()
         if !RealHome.isRedirected {
             UNUserNotificationCenter.current().delegate = self
         }

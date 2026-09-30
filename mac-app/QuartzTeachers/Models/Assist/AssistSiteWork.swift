@@ -157,9 +157,15 @@ final class AssistToolchainWork: AssistSiteWork {
 
         runner = ScriptRunner()
         runner.milestones = TaskMilestones.preview
+        // `--non-interactive` (#378): nobody on this path can answer a
+        // question, and one asked on a terminal nobody reads waits for ever
+        // — inside the folder's workspace, where it held every later preview
+        // back until the Mac was restarted.
         runner.run(
             scriptNamed: "preview.sh",
-            arguments: [course.code, String(sectionNumber), "--build-only"],
+            arguments: MultiDestinationDeployRunner.buildArguments(
+                courseCode: course.code, sectionNumber: sectionNumber, unattended: true
+            ),
             workingDirectory: workspaceURL
         )
         if let problem = runner.launchProblem {
@@ -168,6 +174,14 @@ final class AssistToolchainWork: AssistSiteWork {
         let built: Bool = await runner.waitUntilFinished()
 
         if !built {
+            if runner.lastExitCode == 3 {
+                return AssistSiteWorkResult(
+                    succeeded: false,
+                    message: AssistWording.previewBuildNeedsAnAnswer(
+                        course: course.code, section: String(sectionNumber)
+                    )
+                )
+            }
             return AssistSiteWorkResult(
                 succeeded: false,
                 message: AssistWording.previewDidNotBuild(
@@ -181,7 +195,7 @@ final class AssistToolchainWork: AssistSiteWork {
                 to: AssistWording.rebuiltForACallerWithNoWindow(
                     course: course.code, section: String(sectionNumber)
                 ),
-                from: runner
+                from: runner, courseDirectory: course.directoryURL
             )
         )
     }
@@ -277,6 +291,13 @@ final class AssistToolchainWork: AssistSiteWork {
         // defaults to Netlify because every course written before
         // Cloudflare existed relies on that. Nothing failed; the site
         // simply went to the wrong web host.
+        //
+        // `unattended` (#378): nobody on this path can answer a question —
+        // a site name, a surname, a token — so both legs run with
+        // `--non-interactive` and a question refuses with exit 3, which
+        // reaches the reply as `deployNeedsAnAnswer`. Before, the question
+        // waited for ever on a terminal nobody read, and a session closed
+        // meanwhile left it waiting inside the folder's workspace.
         deployRunner = MultiDestinationDeployRunner()
         await deployRunner.run(
             course: course,
@@ -284,8 +305,17 @@ final class AssistToolchainWork: AssistSiteWork {
             destinations: destinations,
             cloudflareAccountID: AppSettings.shared.cloudflareAccountID,
             workingDirectory: workspaceURL,
-            needsBuild: needsBuild
+            needsBuild: needsBuild,
+            unattended: true
         )
+
+        if deployRunner.legs.first?.buildNeededAnAnswer == true {
+            let message: String = SettingsSaveNotice.addingTheNotice(
+                notice,
+                to: AssistWording.deployNeedsAnAnswer(course: course.code, section: String(sectionNumber))
+            )
+            return AssistSiteWorkResult(succeeded: false, message: message)
+        }
 
         if deployRunner.legs.first?.buildFailed == true {
             // The findings travel even when the build failed: a missing
@@ -295,7 +325,7 @@ final class AssistToolchainWork: AssistSiteWork {
                 course: course.code, section: String(sectionNumber)
             )
             if let runner = deployRunner.legs.first?.runner {
-                message = SiteHealthFinding.appending(to: message, from: runner)
+                message = SiteHealthFinding.appending(to: message, from: runner, courseDirectory: course.directoryURL)
             }
             message = SettingsSaveNotice.addingTheNotice(notice, to: message)
             return AssistSiteWorkResult(succeeded: false, message: message)
@@ -311,7 +341,7 @@ final class AssistToolchainWork: AssistSiteWork {
         // Taken from the FIRST leg: every destination publishes the same built
         // site, so a second leg only repeats the same findings.
         if let runner = deployRunner.legs.first?.runner {
-            message = SiteHealthFinding.appending(to: message, from: runner)
+            message = SiteHealthFinding.appending(to: message, from: runner, courseDirectory: course.directoryURL)
         }
         message = SettingsSaveNotice.addingTheNotice(notice, to: message)
         return AssistSiteWorkResult(

@@ -333,6 +333,14 @@ class SafariWindow:
         osascript('tell application "System Events" to keystroke "n" using command down')
         time.sleep(1.2)
         if not window_is_in_profile(CAPTURE_PROFILE):
+            # Command-N opened an ordinary window. Close it before opening
+            # the profile's one, or it is left behind on every run: six empty
+            # "Personal — Start Page" windows had piled up by 2026-09-27.
+            try:
+                stray = osascript('tell application "Safari" to return id of front window')
+                osascript(f'tell application "Safari" to close window id {stray}')
+            except AppleScriptFailed:
+                pass
             open_profile_window(CAPTURE_PROFILE)
         time.sleep(1.2)
         self.window_id = osascript('tell application "Safari" to return id of front window')
@@ -504,11 +512,3 @@ class SafariWindow:
             raise SystemExit(f"Could not find Safari's window: {result.stderr.strip()}")
         return int(result.stdout.strip())
 
-
-def image_scale(path: Path, width_in_points: int) -> int:
-    """How many pixels the display draws per point, as a whole number."""
-    with Image.open(path) as image:
-        pixels_wide = image.size[0]
-    if width_in_points <= 0:
-        return 1
-    return max(1, round(pixels_wide / width_in_points))

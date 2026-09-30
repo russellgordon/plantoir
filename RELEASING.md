@@ -110,8 +110,34 @@ whether a teacher will notice, and whether both platforms have it.
 **Clear this list when the tag goes up**, in the same commit that moves the
 version line. A list that survives its own release is worse than no list.
 
+Filled 2026-09-30 for v1.4.1 from `GUI-IMPROVEMENTS.md` rows 607–620 and the closed v1.4.1
+milestone — one line per piece. Rows 607 and 608 are not teacher-visible and sit under the hood.
+
+**What a teacher notices** (macOS; the Windows installer is not part of v1.4.1 — its half of
+each is on the milestone "Windows: parity with mac v1.4.0"). "Shared toolchain" marks a change
+in the shared scripts, which a Windows teacher gets with the next Windows release.
+
 | Landed | What a teacher sees | Platforms | Log |
 |---|---|---|---|
+| 2026-09-30 | Links from visible pages into hidden ones become a checklist in the section window: tick the pages to publish, each dated like the class that uses it; a hidden class is offered unticked and brings its own pages (#379). | macOS; shared toolchain | 619 |
+| 2026-09-29 | A preview that has to wait says what it is waiting for; work left behind by a closed Revise with Claude or Codex session no longer blocks previews until the Mac restarts; a deploy asked of Claude or Codex stops at a question and says to deploy once from Plantoir, instead of waiting for ever (#378). | macOS | 618 |
+| 2026-09-29 | A section cannot be previewed while that same section is being deployed — from another window, the assistant or Terminal (#381). | macOS | 610 |
+| 2026-09-29 | Course Settings' Save looks disabled when it is, is no longer held back silently by a destination problem the edit does not touch, and says why when it is held back; an emoji or grade-in-title setting no longer changes on its own (#364; the likely cause of #373, left open for confirmation). | macOS | 611 |
+| 2026-09-29 | Course Settings shows the Class Pages rows only for a course that recorded them (a club), and says "Language and region" where it said "Language / region (Quartz locale)" (#376, #369). | macOS | 612, 614 |
+| 2026-09-30 | With "This is a club" ticked, the New Course panel says Meetings, Club code, Club name and Create Club (#368). | macOS | 617 |
+| 2026-09-30 | Get Ready for the Start of the Year names pages by their titles, adding a folder only when two pages share a title (#362). | macOS | 616 |
+| 2026-09-29 | Copy a Page's checklist and the screen after Copy fit on the screen however many pages are skipped (#365). | macOS | 609 |
+| 2026-09-30 | The details under a preview, a publish or a new course say "website builder", never container or Docker, and the example course's progress bar reaches every step (#382). | macOS | 620 |
+
+**Under the hood** (nothing a teacher sees; listed so the notes can leave them out on purpose):
+
+| Landed | What changed | Platforms | Log |
+|---|---|---|---|
+| 2026-09-29 | Every text field wears one bordered style, pinned by a source scan (#374). | macOS | 613 |
+| 2026-09-30 | The start-of-year sheet's and the stopped-publish band's buttons keep their own accessibility identifiers (#366). | macOS | 615 |
+| 2026-09-30 | Test runs no longer move the teacher's real window frames (#361). | macOS | — |
+| 2026-09-29 | The Debug build's Dock icon wears a BETA ribbon; a Release build is unchanged (#372). | macOS (Debug only) | 607 |
+| 2026-09-29 | plantoir.app's pictures keep their windows' own corners and `build.py --deploy` refuses any that do not; a chemistry picture joins the calculus one (#375); the ICS4U marketing course publishes to a folder (#371). | website | 608 |
 
 ## Warnings the release notes MUST carry
 
@@ -125,6 +151,16 @@ commit that moves the version line.
 
 | Added | The warning | Why it cannot be left out |
 |---|---|---|
+
+**No warnings for v1.4.1 — do NOT pass `--required-warning`.** Rows 609–620 were checked
+against this section's definition (something a teacher must DO, usually before updating), and
+none asks for anything. #379 changes how a finding is shown: a checklist the teacher can
+dismiss with Not Now, which publishes nothing on its own, while scheduled, assistant and
+command-line publishes publish as they did. #378 ends only work whose owner has provably gone,
+never a publish launchd is running, and it asks nothing of the teacher. Both are what a teacher
+gains, and they belong in the notes' body. Marking the release important would take Skip and
+Remind Me Later away from the first update window most teachers will ever see, for nothing
+they must do.
 
 ## The short version
 
@@ -345,6 +381,9 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    from the `containerized-quartz-netlify` Keychain item, the site id from
    `website/site.json`). The Netlify site is NOT connected to GitHub —
    pushing this repository deploys nothing, which is why this step exists.
+   It first reads every picture the pages show a Mac visitor and refuses if
+   any lacks its window's own corners (#375; `website/SCREENSHOTS.md` → "The
+   one rule") — retake that picture, never mask it.
 
 ## The update feed (macOS)
 
@@ -361,8 +400,18 @@ the release side.
   404s whenever a platform lags.
 - **Signed with the `plantoir-macos` key**, the feed AND each download. The key
   lives in this Mac's Keychain (backed up in Russell's Passwords app); Sparkle's
-  `generate_appcast` and `sign_update` read it — the Keychain asks, once for each
-  tool (so twice a cut) — answer **Allow**, not "Always Allow" — and nothing prints it. The public half is `SUPublicEDKey` in
+  `generate_appcast` and `sign_update` read it, and nothing prints it. **Since
+  2026-09-29 the copies of those two tools in the main checkout
+  (`mac-app/Vendor/Sparkle/bin/`) are on the key's access list — "Always
+  Allow", granted by Russell so a cut can run unattended overnight.** The
+  trade-off he accepted: those two programs can now use the key without
+  asking, whoever runs them. So run the feed step from the main checkout. From
+  another checkout or worktree the Keychain may still ask, once each time a
+  tool signs (up to three times with deltas); answer **Allow** there and do not
+  add a second copy to the list. A re-fetched Sparkle (`fetch-sparkle.sh`
+  replacing the tools) asks again, in the main checkout too. To withdraw the
+  grant, remove the two entries under the key's item in Keychain Access →
+  Access Control. The public half is `SUPublicEDKey` in
   `mac-app/project.yml`. A re-serialised feed breaks its signature, and the app
   then refuses it: silently on the daily check.
 - **Built only at a cut, from the EXACT DMG uploaded, and only AFTER the
@@ -403,8 +452,8 @@ the release side.
   - `generate_appcast` rewrites the item of every archive it is given —
     measured: the earlier item's download moved to the NEW release and lost
     its notes, even with `--versions` — so `update_feed.py` puts every earlier
-    item back exactly as it was, signs the feed again with the same key (the
-    Keychain asks once more), and refuses the cut if any earlier item is
+    item back exactly as it was, signs the feed again with the same key (silently
+    from the main checkout; elsewhere the Keychain asks once more), and refuses the cut if any earlier item is
     missing or still differs. `--maximum-versions 0` keeps every release in
     the feed: generate_appcast's default keeps three and dropped the oldest
     from the fourth cut on (measured by the implementation review).
@@ -495,7 +544,7 @@ Spotlight's list.
 | R0 | LOCAL | Record Russell's app: `defaults read /Applications/Plantoir.app/Contents/Info.plist CFBundleShortVersionString` and `CFBundleVersion`, and `codesign -dvvv /Applications/Plantoir.app 2>&1 \| grep CDHash=` — written down, for C3. Also written down: `defaults read ca.russellgordon.Plantoir 2>/dev/null \| grep -c '"\?SU'` (0 on 1.3.1, which has no updater), `mdfind "kMDItemCFBundleIdentifier == 'ca.russellgordon.Plantoir'"` (his copies today), and `DOCKER_HOST=unix://$HOME/.colima/default/docker.sock docker ps --format '{{.Names}} {{.Ports}}'` (the ports his containers hold). Russell creates a standard account of his choosing and writes its short name down here as `<account>` (this run: `plantoir`); C2 and C3 use that name. |
 | R1 | IDENTITY | In Russell's account, on the issue branch: `./publish.sh -Sign --rehearsal-feed https://plantoir.app/updates/rehearsal-204/macos.xml` → build **A** (version `<v>-rehearsal.<build>`, `dist/Plantoir-macOS-REHEARSAL.dmg`; keep a copy as A). Record build, size, SHA-256, the notarization id. **The positive team check, and must-fail (b):** the run passing `check-signatures.sh` is the first. Then, BEFORE R2 (whose `publish.sh` run `rm -rf`s `mac-app/build/`): `ditto mac-app/build/Plantoir.app /tmp/r1b/Plantoir.app`, and with `ID` the identity publish.sh printed: `codesign --force --sign - --options runtime /tmp/r1b/Plantoir.app/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate`; `codesign --force --timestamp --options runtime --sign "$ID" /tmp/r1b/Plantoir.app/Contents/Frameworks/Sparkle.framework`; `codesign --force --timestamp --options runtime --entitlements mac-app/QuartzTeachers/QuartzTeachers.entitlements --sign "$ID" /tmp/r1b/Plantoir.app`; then `mac-app/release/check-signatures.sh /tmp/r1b/Plantoir.app` must exit 1 naming `Autoupdate` twice (WRONG TEAM and NO SECURE TIMESTAMP) and nothing else. Delete `/tmp/r1b` after. |
 | R2 | IDENTITY | One commit later, build **B** the same way. Then `rm -rf mac-app/build` so no Release build is left registered with Launch Services in his account. |
-| R3 | IDENTITY | Twice, A first then B: `python3 website/update_feed.py macos --version <A's or B's own version, the "-rehearsal.<build>" string> --dmg <that DMG> --notes <a short notes file> --rehearsal website/updates/rehearsal-204/macos.xml --download-prefix https://github.com/russellgordon/plantoir/releases/download/v<v>-rehearsal-204/` — B's run with `--required-warning` and a fake warning in its notes, so the feed holds both items and both sections of notes. `--version` must be the rehearsal string or the DMG is refused as "built before the version was raised" (which here only means the wrong string was typed). Both items name the same download address, and only B is uploaded: harmless, since A is the version installed and never offered. The Keychain asks twice each run — **Allow**, not "Always Allow". Never committed (`.gitignore`). |
+| R3 | IDENTITY | Twice, A first then B: `python3 website/update_feed.py macos --version <A's or B's own version, the "-rehearsal.<build>" string> --dmg <that DMG> --notes <a short notes file> --rehearsal website/updates/rehearsal-204/macos.xml --download-prefix https://github.com/russellgordon/plantoir/releases/download/v<v>-rehearsal-204/` — B's run with `--required-warning` and a fake warning in its notes, so the feed holds both items and both sections of notes. `--version` must be the rehearsal string or the DMG is refused as "built before the version was raised" (which here only means the wrong string was typed). Both items name the same download address, and only B is uploaded: harmless, since A is the version installed and never offered. From the main checkout the Keychain does not ask (Always Allow since 2026-09-29, above); from a worktree it asks twice each run — answer **Allow**. Never committed (`.gitignore`). |
 | R4 | OUTWARD | `gh release create v<v>-rehearsal-204 --prerelease --target <the issue branch's commit> -R russellgordon/plantoir` with B's DMG (`Plantoir-macOS-REHEARSAL.dmg`). `--target` keeps the tag off `main`. Then V9. |
 | R5 | OUTWARD | From a worktree at `origin/main`: `python3 website/build.py`, drop the rehearsal feed into `site/updates/rehearsal-204/macos.xml` (not committed), `python3 website/netlify_deploy.py`; `curl` it back, SHA-256 equal. |
 | R6 | LOCAL | Russell, in his account: `sudo mkdir "/Applications/Plantoir Rehearsal"` and `sudo ditto <A>/Plantoir.app "/Applications/Plantoir Rehearsal/Plantoir.app"`. From now until C2, Russell opens Plantoir in his own account only from his Dock — never Spotlight, Launchpad or a notification. Then, logged in as the rehearsal account: open it from THAT path (never by name), let the first run finish (above), and make a scratch working folder `~/rehearsal-work` with the example course (the wizard's EXC2O). |

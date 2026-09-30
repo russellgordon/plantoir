@@ -509,4 +509,41 @@ final class ScheduledDeployFolderProblemTests: XCTestCase {
             "a problem that has been put right must stop being reported"
         )
     }
+
+    // MARK: - The links checklist (#379)
+
+    /// The assistant says the checklist will be offered, instead of reading
+    /// ten pairs aloud — only when the same build wrote the offer, and only
+    /// while the teacher has not already answered it (review N3).
+    func testTheLinksFindingSaysTheChecklistWillBeOfferedWhenTheBuildWroteOne() throws {
+        let finding: String = "PLANTOIR_HEALTH: {\"name\": \"linksIntoHiddenPages\", \"sentence\": \"11 links lead to hidden pages.\", "
+            + "\"detail\": \"Publish the page each one leads to: pairs.\", \"fixable\": false, \"course\": \"ICS4U\", \"section\": 1}"
+        let marker: String = "PLANTOIR_LINKS_CHECKLIST: {\"course\": \"ICS4U\", \"section\": 1, \"buildId\": \"b1\", \"pages\": 1, \"ticked\": 1}"
+        let course: URL = FileManager.default.temporaryDirectory.appendingPathComponent("links-said-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: course) }
+        let offerURL: URL = LinksChecklistOffer.fileURL(courseDirectory: course, section: 1)
+        try FileManager.default.createDirectory(at: offerURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try ("{\"version\": 1, \"course\": \"ICS4U\", \"section\": 1, \"buildId\": \"b1\", \"pages\": "
+             + "[{\"place\": \"Concepts/Worksheet\", \"group\": \"fromAClass\", \"ticked\": true, \"why\": \"dated\", "
+             + "\"date\": \"2026-09-08\"}]}").write(to: offerURL, atomically: true, encoding: .utf8)
+
+        let withOffer: ScriptRunner = ScriptRunner()
+        withOffer.receiveOutput(finding + "\r\n" + marker + "\r\n")
+        let said: String = SiteHealthFinding.appending(to: "Done.", from: withOffer, courseDirectory: course)
+        XCTAssertTrue(said.contains(AssistWording.linksIntoHiddenPagesWillBeOffered(course: "ICS4U", section: "1")), said)
+        XCTAssertFalse(said.contains("pairs"), said)
+
+        // Answered already (Not Now on the same set): no promise of a sheet.
+        try LinksChecklistAnswered(offered: ["Concepts/Worksheet"], leftUnticked: ["Concepts/Worksheet"])
+            .write(courseDirectory: course, section: 1)
+        let afterNotNow: String = SiteHealthFinding.appending(to: "Done.", from: withOffer, courseDirectory: course)
+        XCTAssertFalse(afterNotNow.contains(AssistWording.linksIntoHiddenPagesWillBeOffered(course: "ICS4U", section: "1")),
+                       "It promised a checklist the teacher has already answered: \(afterNotNow)")
+
+        let olderBuilder: ScriptRunner = ScriptRunner()
+        olderBuilder.receiveOutput(finding + "\r\n")
+        let saidBefore: String = SiteHealthFinding.appending(to: "Done.", from: olderBuilder, courseDirectory: course)
+        XCTAssertTrue(saidBefore.contains("pairs"), "With no offer the finding's own words are the honest ones: \(saidBefore)")
+    }
+
 }

@@ -134,7 +134,7 @@ enum StubLaunchers {
         # written after the sleeps would not exist yet to be reaped.
         echo $$ > "\(pidFileURL.path)"
 
-        echo "Starting container if needed"
+        echo "Getting this folder's website builder ready…"
         sleep 1
         echo "Copying shared folders"
         sleep 1

@@ -189,6 +189,33 @@ nonisolated enum AssistWording {
         return "The deploy of \(course) Section \(section) did not finish. " + AssistWording.whereTheOutputIs
     }
 
+    /// A deploy from a caller with no window (an assistant in another app,
+    /// or the in-app assistant with no section window open) stopped at a
+    /// question — a site name, a surname, a token — rather than waiting for
+    /// an answer nobody on this path can give (GitHub #378). Nothing was sent
+    /// to students. The window can answer it, and once it is answered it is
+    /// remembered, so the next deploy from here goes through.
+    static func deployNeedsAnAnswer(course: String, section: String) -> String {
+        return "\(course) Section \(section) needs one answer before it can be deployed from here, so nothing "
+             + "was sent to students. Deploy it once from its window in Plantoir, where the question can be "
+             + "answered; after that it can be deployed from here."
+    }
+
+    /// The same, when a course deploys to more than one place and the
+    /// question came from some of them. `destinations` is already joined
+    /// ("Cloudflare Pages", "Netlify and your folder").
+    static func deployNeedsAnAnswerAt(course: String, section: String, destinations: String) -> String {
+        return "\(course) Section \(section) was not deployed to \(destinations): it needs one answer there "
+             + "that can only be given from its window in Plantoir. Deploy it once from there; after that it "
+             + "can be deployed from here."
+    }
+
+    /// Added after `deployNeedsAnAnswerAt` when the other destinations did
+    /// go out, so the teacher is not left thinking nothing happened.
+    static func deployWentOutTo(destinations: String) -> String {
+        return "It did go out to \(destinations)."
+    }
+
     /// Said only when a course has MORE THAN ONE deploy destination
     /// configured and every one of them succeeded — a course with exactly
     /// one destination (the overwhelming majority) always uses `deployed`
@@ -263,6 +290,20 @@ nonisolated enum AssistWording {
              + "well would spoil both. Try again once that has finished."
     }
 
+    /// Said when a preview of a section was asked for while THIS copy of
+    /// Plantoir is deploying that same section — from any of its windows, or
+    /// by the assistant with no window open (GitHub #381, Russell's decision
+    /// 4 on #378). Shown under "Cannot Preview Yet".
+    ///
+    /// Names the SECTION, unlike `courseIsBeingBuiltElsewhere`, because the
+    /// in-app publish record it comes from knows the section, and the rule
+    /// is about the section. "Deployed" is the word on the button that
+    /// started it. `shared-rules.json` → `previewWhileItsSectionDeploys`.
+    static func sectionIsBeingDeployed(course: String, section: String) -> String {
+        return "\(course) Section \(section) is being deployed right now. "
+             + "Preview it once the deploy has finished."
+    }
+
     // MARK: - Previewing
 
     /// A section window is open, so its own Preview is what runs.
@@ -281,6 +322,13 @@ nonisolated enum AssistWording {
     static func rebuiltForACallerWithNoWindow(course: String, section: String) -> String {
         return "Rebuilt the preview for \(course) Section \(section). Open that section in Plantoir "
              + "to look it over."
+    }
+
+    /// A rebuild for a caller with no window stopped at a question rather
+    /// than waiting for ever (#378) — the course-code check a build asks.
+    static func previewBuildNeedsAnAnswer(course: String, section: String) -> String {
+        return "The preview for \(course) Section \(section) needs one answer before it can be built from "
+             + "here. Build it once from its window in Plantoir, where the question can be answered."
     }
 
     static func previewDidNotBuild(course: String, section: String) -> String {
@@ -1564,6 +1612,15 @@ nonisolated enum AssistWording {
     static func howITeachSaved(course: String) -> String {
         return "Saved the How I Teach page for \(course). It’s in the course folder beside your other "
              + "pages, so you can change it in Obsidian any time. It’s never put on your website."
+    }
+
+    /// The one sentence an assistant says for the #333 finding when the
+    /// build has written a links checklist offer the teacher has not yet
+    /// answered (#379): the section window will offer to publish the pages,
+    /// so the list of pairs is not read out.
+    static func linksIntoHiddenPagesWillBeOffered(course: String, section: String) -> String {
+        return "Some links on pages students can see lead to pages that are still hidden. "
+             + "Plantoir will offer to publish them when you next open \(course) Section \(section)."
     }
 
     /// (T) Asked to publish or hide the page by name. The local window can
