@@ -276,6 +276,7 @@ final class LinksChecklistFollowingTests: XCTestCase {
             XCTAssertNil(row["dependsOn"], "iv-a is meant to be an offer written before #385")
         }
         let offer: LinksChecklistOffer = try LinksChecklistTests.offer(from: rows)
+        XCTAssertEqual(offer.rows.count, rows.count, "A row without dependsOn was not read")
         for row in offer.rows {
             XCTAssertEqual(row.dependsOn, [])
         }
@@ -283,6 +284,7 @@ final class LinksChecklistFollowingTests: XCTestCase {
             course: made.course, sectionNumber: 1, workspaceURL: made.root,
             offer: offer, answered: nil, occasion: .afterAPreview
         )
+        XCTAssertFalse(model.rows.isEmpty)
         XCTAssertEqual(model.going, model.ticked, "With nothing under anything, what goes is what is ticked (#379)")
         for shown in LinksChecklistGate.shownOrder(model.rows) {
             XCTAssertEqual(shown.depth, 0)
