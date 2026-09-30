@@ -2369,10 +2369,10 @@ tell_the_app_what_was_stopped() {
 # changes. "$1" is WORKSPACE_WAITING_FOR. Pinned in contracts/app-rules.json
 # -> previewPorts.whenTheWorkspaceIsInUse.sentences.whileWaitingFor….
 say_what_is_waited_for() {
-  local kind place origin
-  read -r kind place origin <<WAITING
-$1
-WAITING
+  # Split without `read`: every `read` in a launcher is taken for a question
+  # (scripts/test_*_questions.py), and this is not one.
+  local kind="${1%% *}" rest="${1#* }"
+  local place="${rest%% *}" origin="${rest#* }"
   case "$kind" in
     preview)
       echo "⏳ Waiting for the preview of ${place%/*} section ${place#*/} to close before Plantoir sets this folder up again…" ;;
@@ -2386,10 +2386,10 @@ WAITING
 
 # The refusal after ten minutes, naming what was still going when it can.
 say_the_work_did_not_finish() {
-  local kind place origin
-  read -r kind place origin <<WAITING
-$1
-WAITING
+  # Split without `read`: every `read` in a launcher is taken for a question
+  # (scripts/test_*_questions.py), and this is not one.
+  local kind="${1%% *}" rest="${1#* }"
+  local place="${rest%% *}" origin="${rest#* }"
   case "$kind" in
     build|publish|setup)
       echo "❌ After ten minutes, $(workspace_origin_in_words "$origin") was still $(workspace_doing_in_words "$kind" "$place"), so Plantoir stopped rather than interrupt it." ;;
@@ -2402,10 +2402,10 @@ WAITING
 # What the marker's fourth and fifth words say was waited for: the item
 # ("<kind>:<COURSE>/<S>", "setup" or "work") and who started it.
 workspace_waited_for_words() {
-  local kind place origin
-  read -r kind place origin <<WAITING
-$1
-WAITING
+  # Split without `read`: every `read` in a launcher is taken for a question
+  # (scripts/test_*_questions.py), and this is not one.
+  local kind="${1%% *}" rest="${1#* }"
+  local place="${rest%% *}" origin="${rest#* }"
   case "$kind" in
     "") ;;
     setup|work) echo "$kind $origin" ;;
