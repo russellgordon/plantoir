@@ -87,7 +87,7 @@
       {
         "carries": "the launcher, the outcome, and how long it took",
         "event": "task finished",
-        "why": "The outcome distinguishes a failure from a task stopped on purpose and from one backed out of at a question - all three exit non-zero, and only one is a fault."
+        "why": "The outcome distinguishes a failure from a task stopped on purpose and from one backed out of at a question - all three exit non-zero, and only one is a fault. Since #378 a fourth: exit 3, a launcher run with --non-interactive that reached a question and refused rather than wait for an answer nobody could give ('stopped at a question nobody was there to answer (exit 3)'). The headless assistant path (an assistant working from another app, or the in-app assistant with no section window) runs its launchers that way, so a deploy that needs a site name, a surname or a token says so on this line instead of 'failed (exit 3)' — or, before #378, instead of never finishing at all."
       },
       {
         "carries": "which credential was asked for, never the answer",
@@ -484,26 +484,58 @@
         "why": "Added with #156. A publish set for later that finds another program building the course waits up to ten minutes (workLeases.declining.whyTheScheduledPublishWaits). A publish that went out ten minutes late, or not at all, looks from outside exactly like one that misfired; this line says it waited, for whom, and what it then did. A stand-down ALSO writes 'scheduled deploy turned off' (the job is cleared) and leaves the section's courseWasBusy record."
       },
       {
-        "carries": "where the run was for (course and section, or the word setup), and which of three happened: it WAITED for something in the working folder to finish before updating the folder's workspace, and how many seconds; it stopped because a PREVIEW from the folder was still open, and which one; or it stopped because something was still being built or published after the whole wait",
+        "carries": "where the run was for (course and section, or the word setup), and which of three happened: it WAITED for work in the working folder to finish before setting the folder up again, how many seconds, and — since #378 — WHAT it waited for (a build, a deploy or a course being set up, with its course and section) and who had started it (Revise with Claude, a scheduled deploy, another Plantoir window, a command in Terminal…); it stopped because a PREVIEW from the folder was still open, and which one; or it stopped because that work was still going after the whole wait, naming it the same way",
         "event": "workspace was in use",
         "marker": {
           "prefix": "PLANTOIR_WORKSPACE_IN_USE:",
-          "shape": "PLANTOIR_WORKSPACE_IN_USE: <waited|preview|work> <seconds> <course>/<section or the word setup> [<the open preview as course/section>]",
+          "shape": "PLANTOIR_WORKSPACE_IN_USE: <waited|preview|work> <seconds> <course>/<section or the word setup> [<what>] [<origin>] — what is the open preview as course/section for `preview`; for `waited` and `work` it is the item waited for (<build|publish|preview>:<course>/<section>, or the word setup or work) followed by who started it (claude, codex, assistant, window, scheduled, terminal, or - when it is not known). An older launcher's three-word line still reads.",
           "examples": [
             "PLANTOIR_WORKSPACE_IN_USE: waited 14 ICS4U/1",
+            "PLANTOIR_WORKSPACE_IN_USE: waited 14 ICS4U/1 publish:MPM2D/2 claude",
             "PLANTOIR_WORKSPACE_IN_USE: preview 20 ICS4U/2 ICS4U/1",
-            "PLANTOIR_WORKSPACE_IN_USE: work 600 setup"
+            "PLANTOIR_WORKSPACE_IN_USE: work 600 setup build:ICS4U/1 scheduled",
+            "PLANTOIR_WORKSPACE_IN_USE: work 600 setup work terminal"
           ],
           "why": "Printed by the launchers (the function they share in the PREVIEW PORT BLOCK, app-rules.json -> previewPorts.whenTheWorkspaceIsInUse) and read by the APP, which writes the line: ScriptRunner from the console of a run it started, ScheduledDeploy from the log of a publish launchd ran — the same two readers, for the same reason, as pagesDatedByTheBuild's PLANTOIR_DATED line. The console a teacher reads leaves it out (rule 1: it is machinery). Read rather than written by the launcher itself because the app then has a real call site for the event (ActivityTrailWiringTests) and one writer for its words; the cost, stated: a run typed at the command line leaves the console sentence and no trail line."
         },
-        "lineWhenItWaited": "{place} · waited {seconds} s for something in this working folder to finish before updating its workspace, then went ahead",
-        "lineWhenAPreviewWasOpen": "{place} · stopped before starting — this working folder's workspace needed updating and the preview of {preview} was still open",
-        "lineWhenWorkDidNotFinish": "{place} · stopped before starting — this working folder's workspace needed updating and something in it was still being built or published after {seconds} s",
-        "why": "GitHub #94. A launcher that must remake a folder's workspace no longer ends what is running in it: it waits for a build or publish and refuses while a preview is open. Both are new ways for a run to be slow or not to happen, and each arrives later as a different report — 'my publish did not go out last night', 'my preview took ages to start', 'it told me to close a preview I had not opened' (an orphan whose launcher had not quite gone). A refusal the app shows only as a run that did not finish is otherwise invisible. A remake with nothing running writes nothing, as before: a line on every update would bury the one that matters. {place} is the literal word setup for setup.sh, which has no course.",
+        "lineWhenItWaited": "{place} · waited {seconds} s for {what} to finish before setting this folder up again, then went ahead",
+        "lineWhenAPreviewWasOpen": "{place} · stopped before starting — this folder needed setting up again and the preview of {preview} was still open",
+        "lineWhenWorkDidNotFinish": "{place} · stopped before starting — this folder needed setting up again and {what} was still going after {seconds} s",
+        "whatInTheLines": {
+          "build": "a build of {course} section {section}",
+          "publish": "a deploy of {course} section {section}",
+          "preview": "the preview of {course} section {section}",
+          "setup": "the setting up of a course",
+          "work": "something else in this folder",
+          "unnamed": "something in this folder",
+          "startedBy": " started by {origin}",
+          "why": "{what} is the item's words, followed by startedBy with the origin in app-rules.json -> previewPorts.whenTheWorkspaceIsInUse.sentences.origins when the origin is known (not '-'). An older launcher's line names nothing and reads as 'unnamed'."
+        },
+        "why": "GitHub #94, and #378. A launcher that must set a folder up again no longer ends what is running in it while that work's owner is still running: it waits for a build, a deploy or a course being set up, and refuses while a preview is open. Both are ways for a run to be slow or not to happen, and each arrives later as a different report — 'my publish did not go out last night', 'my preview took ages to start', 'it told me to close a preview I had not opened'. A refusal the app shows only as a run that did not finish is otherwise invisible. #378 made the lines NAME what was waited for and who started it, and took 'workspace' out of them (Russell, who wrote the product, did not know what it meant) — a changed behaviour changes its line (rule 5); the event keeps its name, because renaming it would orphan every trail already on disk. A remake with nothing running writes nothing, as before: a line on every update would bury the one that matters. {place} is the literal word setup for setup.sh, which has no course.",
         "appliesOn": [
           "mac"
         ],
         "appliesOnWhy": "PERMANENT, the same case as 'website builder stopped': Windows builds natively and has no workspace to remake (app-rules.json -> previewPorts.whenTheWorkspaceIsInUse.appliesOnWhy)."
+      },
+      {
+        "carries": "where the run was for (course and section, or the word setup), and each piece of work that was ended because the program that started it had closed: a build, a deploy or a preview with its course and section, the setting up of a course, or something unnamed. Never a command line, a path, a process number or a page name.",
+        "event": "left-over work stopped",
+        "marker": {
+          "prefix": "PLANTOIR_LEFTOVER_STOPPED:",
+          "shape": "PLANTOIR_LEFTOVER_STOPPED: <course>/<section or the word setup> <item> [<item>…], each item <build|publish|preview>:<course>/<section>, or the word setup or other",
+          "examples": [
+            "PLANTOIR_LEFTOVER_STOPPED: ICS4U/1 publish:MPM2D/2",
+            "PLANTOIR_LEFTOVER_STOPPED: setup build:ICS4U/1 preview:ICS4U/2 other"
+          ],
+          "why": "Printed by the same function as PLANTOIR_WORKSPACE_IN_USE (remake_the_workspace, in the PREVIEW PORT BLOCK), just before the stop, and read by the app the same way and in the same two places: ScriptRunner from a run it started, ScheduledDeploy from a publish launchd ran. Machinery, so the console leaves it out; the console says app-rules.json -> previewPorts.whenTheWorkspaceIsInUse.sentences.whenLeftoverWorkIsStopped instead. A run typed at the command line leaves that sentence and no trail line, as for 'workspace was in use'."
+        },
+        "line": "{place} · stopped {what}, left running in this folder after the program that started it had closed, before setting the folder up again",
+        "whatInTheLine": "Each item in app-rules.json -> previewPorts.whenTheWorkspaceIsInUse.sentences.leftovers words, joined as that key's `joined` says.",
+        "why": "GitHub #378, decision 2. A Revise with Claude session was closed while a deploy it had started sat at a question nobody could answer; the question stayed inside the folder's workspace, and every preview after it waited ten minutes and refused, until the Mac was restarted. Plantoir now ENDS work whose owner has gone (proved from the live process table: app-rules.json -> previewPorts.whenTheWorkspaceIsInUse.whatCountsAsRunning) and carries on. Ending somebody's work must never be silent: if a teacher later asks why a deploy from Claude did not go out, or why a preview they had left running closed, this line is the answer. An orphaned preview — its launcher gone — was ended silently since #94; it is on this line now too, because 'the trail records what was stopped' is only true if it records everything the remake ends.",
+        "appliesOn": [
+          "mac"
+        ],
+        "appliesOnWhy": "PERMANENT, the same case as 'workspace was in use': Windows builds natively and has no workspace in which work could be left behind."
       },
       {
         "carries": "where the preview was for (course and section), the preview address in question (a number on this Mac, never a path or a name), and which of four happened: a STOPPED workspace's address was being used by something else, so the workspace was set up again on free addresses BEFORE it started; the address a running workspace was about to announce was held by another account on this Mac or by macOS itself, so the workspace was set up again once; the address was STILL held after that, so the preview stopped before building; or the check was NOT made, because the run was pointed at an engine other than the one Plantoir sets up",
@@ -4854,6 +4886,16 @@
         {
           "line": "PLANTOIR_MAPS: {\"course\": \"ICS3U\", \"section\": 1, \"maps\": []}",
           "hidden": true
+        },
+        {
+          "line": "PLANTOIR_WAITING_FOR: publish MPM2D/2 claude",
+          "hidden": true,
+          "why": "#378: what a launcher waits for before setting a folder up again; the app turns it into the status line, and the console says it in words beside it. Mac-only, but hidden by the one rule on both sides."
+        },
+        {
+          "line": "PLANTOIR_LEFTOVER_STOPPED: ICS4U/1 publish:MPM2D/2",
+          "hidden": true,
+          "why": "#378: work ended because its owner had gone, for the trail's 'left-over work stopped'."
         },
         {
           "line": "PLANTOIR_DATED: {\"course\": \"ICS4U\", \"section\": 1, \"pages\": [\"section1/index\"]}",

@@ -240,6 +240,9 @@ final class AssistScenarioTests: XCTestCase {
             try? FileManager.default.removeItem(at: made.root)
         }
 
+        // #378: the headless deploy refuses at a question.
+        made.siteWork.deployMeetsAQuestion = scenario.given["theDeployMeetsAQuestion"] as? Bool ?? false
+
         if windowOpen {
             FakePreview.shared.register(
                 folderPath: made.root.path,
