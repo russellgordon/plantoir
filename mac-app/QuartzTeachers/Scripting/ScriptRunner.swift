@@ -644,6 +644,12 @@ class ScriptRunner {
     /// 8,000-character window by the time anybody asks.
     private(set) var healthFindings: [SiteHealthFinding] = []
 
+    /// The build's word that it has written (or removed) the links checklist
+    /// offer (#379), collected as it arrives for the reason `healthFindings`
+    /// is. The window acts on THIS, never on the #333 finding alone: the
+    /// finding is announced before the offer can exist.
+    private(set) var linksChecklistMarkers: [LinksChecklistMarker] = []
+
     /// The address the launcher announced for this run's preview — the last
     /// one, when there is more than one — and nil until it has announced one.
     ///
@@ -705,6 +711,7 @@ class ScriptRunner {
             return
         }
         healthFindings = []
+        linksChecklistMarkers = []
         announcedPreviewAddress = nil
         pendingLine = ""
     }
@@ -743,6 +750,9 @@ class ScriptRunner {
         // A How I Teach page the course had listed for the website, kept off
         // it by this build (#209).
         HowITeachKeptOffReport.noteOnTheTrail(from: text)
+        for marker in LinksChecklistMarker.markers(in: text) {
+            linksChecklistMarkers.append(marker)
+        }
         for finding in SiteHealthFinding.findings(in: text) {
             if healthFindings.contains(finding) {
                 continue
