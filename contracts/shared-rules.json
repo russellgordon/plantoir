@@ -19026,7 +19026,7 @@
       {
         "course": "ICS.4U",
         "labelCode": "ICS-4U",
-        "why": "Not a code CourseCodeRule allows, but the command-line setup does, and whatCountsAsRunning's case “a publish set for later, course with characters a label cannot hold” uses it."
+        "why": "Not a code CourseCodeRule allows. The command-line setup allowed it before #402, and a course made then, or given a course_config.json by hand, can still carry it; and whatCountsAsRunning's case “a publish set for later, course with characters a label cannot hold” uses it."
       },
       {
         "course": "",
@@ -19481,7 +19481,7 @@
     "knownLimits": [
       "A preview typed in Terminal while ANOTHER program is in the build leg of its deploy (preview.sh --build-only, before its deploy.sh starts) is not refused by the launcher: the build leg cannot be told from the assistant's rebuild (launcherCases, '--build-only is not a deploy'). A program deploying that way holds work leases, but a preview typed in Terminal reads none. A --for-deploy flag on the build leg would close it; it is a launcherFlags change and was not made for this.",
       "The launcher's look is folder-aware for deploy.sh (its working directory) and for a deploy set for later (its label's folder id), but a deploy set before #237 names no folder and counts for every folder holding that course and section.",
-      "A course code with a letter or digit outside A-Z and 0-9 (\"CAFÉ\") is written into a scheduled deploy's label by Swift's isLetter/isNumber as itself and by the launcher as '-', so a deploy set for later of such a course is not recognised by the launcher's label look (it fails open; the leases still refuse a window's preview, and deploy.sh's own row is still recognised by its words). Neither app can make such a code (course-management.json refuses \"CAFÉ\"; labelCodeCases and the mac's walk of the Basic Multilingual Plane pin that every code the apps accept is labelled alike), but the command-line setup can: setup_course.py checks only for a leading dot. Recorded, not fixed here (#388).",
+      "A course code with a letter or digit outside A-Z and 0-9 (\"CAFÉ\") is written into a scheduled deploy's label by Swift's isLetter/isNumber as itself and by the launcher as '-', so a deploy set for later of such a course is not recognised by the launcher's label look (it fails open; the leases still refuse a window's preview, and deploy.sh's own row is still recognised by its words). Neither app can make such a code (course-management.json refuses \"CAFÉ\"; labelCodeCases and the mac's walk of the Basic Multilingual Plane pin that every code the apps accept is labelled alike), and since #402 neither can the command-line setup (course-management.json → courseCode.commandLine). A course made at the command line before #402, or a folder given a course_config.json by hand, can still carry one, and is still read this way (#388).",
       "A deploy run as `bash -x ./deploy.sh C S` — a shell given a flag before the script — is not the PROGRAM by the guard's rule, so its preview is let through (fails open; recorded by #388's plan review, unchanged by the fold). Widening the rule to allow shell flags other than -c would close it; it was not done in #388."
     ],
     "rejected": [
