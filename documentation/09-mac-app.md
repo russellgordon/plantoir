@@ -6963,7 +6963,13 @@ preview wins over the front-page sentence; the trail has both.
 front page in Obsidian, and coming back makes the window key, which offers a
 waiting checklist (#379). `requestLinksChecklist` and `showAnythingWaiting`
 hold it behind the preview alert as they hold it behind the folder dialog
-(plan review, finding 3; `testTheLinksChecklistWaitsBehindThePreviewAlert`).
+(plan review, finding 3; `testTheLinksChecklistWaitsBehindThePreviewAlert`). Folder findings wait
+behind it too (`showHealthFindings`, `settleHeldLinksFinding`): an assistant's
+build can finish while the question is up, and a second alert raised then
+loses one of them. They are shown by `showAnythingWaiting` once it has gone.
+A refusal that arrived while the question was up is not dropped if the
+button's own preview is refused as well: the two are said in one alert, the
+earlier first (`SectionDetailView.joining`).
 
 **Show on Front Page decides again.** `TodaysClassOnTheFrontPage.show` reads the
 page again and re-applies the rule for the day the question was ASKED (an
@@ -6984,19 +6990,38 @@ published later the same day is a new question and the record expires by
 itself. Not in the app's preferences: those are per Mac, and the section's
 other answers live beside it. Escape is Not Today.
 
-**The line keeps the form the teacher wrote** (`sectionIndexPointer.writtenAs`,
-the director's ruling on the plan review). The pointer used to write the bare
-title whatever was there; Russell's own front pages are written
+**The line keeps the form the teacher wrote, as far as the site can draw it**
+(`sectionIndexPointer.writtenAs`). The pointer used to write the bare title
+whatever was there; Russell's own front pages are written
 `![[section1/All Classes/X|X]]`, and a bare name in a two-section course is
-ambiguous in Obsidian. Now a folder path keeps its DEPTH and names where the
-new class actually is — `Thread 4/Day 15` becomes `Thread 5/Day 1` when that
-class is filed in Thread 5, because copying the path as written would name a
-page that does not exist while the app reported success. A display name equal
-to the old class's name follows the class; any other display name, and a
-`#heading`, is dropped (the next class may have no such heading, and an embed
-of a missing heading shows nothing). A typed `.md` stays; the spaces around
-the embed and a Windows line ending stay. This is the pointer's rule, so the
-assistant's publishes write the same form.
+ambiguous in Obsidian. The first version of #397 kept the path and dropped a
+display name that was not the old class's name — and on MPM2DE's page,
+`![[section1/All Classes/Thread 1, Day 0.5|Thread 1, Day 1]]`, it wrote
+`![[section1/All Classes/Thread 1, Day 2]]`. The build rewrites a
+section-path link to its DISPLAY NAME only when it has one
+(`build_site.rewrite_section_wikilinks`), so that line reached the site as a
+page the site does not have, and the front page showed nothing while the app
+reported success (implementation review, finding 1; reproduced 2026-09-30 by
+running the line through the real function). The director's ruling: a link
+that resolves on the site wins over the teacher's form. So now:
+
+- a path holding a `section<N>` folder is written as the class's FULL place
+  inside the course folder, and ALWAYS with `|<the class's name>`, which the
+  build turns into `![[<name>]]` — what the pointer wrote before #397;
+- any other path is written as the class's place from the SITE's root (Quartz
+  reads a path from there): `Thread 4/Day 15` stays `Thread 4/Day 16` in
+  ICS3U 2023, whose classes are filed in `section1/Thread 4/`;
+- places are read against the course folder, never from the last folders of
+  the disk path, which lost the `section1/` anchor one folder deeper and could
+  pick up the course folder's own name (finding 3);
+- a display name equal to the old class's name follows the class; any other,
+  and a `#heading`, is dropped; a typed `.md`, the spaces around the embed and
+  a Windows line ending stay.
+
+`scripts/test_front_page_lines_resolve.py` (in verify.sh) runs every expected
+line of both case lists through the build's rewrite and requires it to name
+the class's place on the site. This is the pointer's rule, so the assistant's
+publishes write the same form.
 
 **The class line is read outside code and `%%` comments** — in the pointer
 and in the build alike (`documentation/05-build-pipeline.md`, #275's
@@ -7040,7 +7065,10 @@ front page; asking at Deploy.
 text is the embed — so the page is not asked about; two contract cases pin it.
 A class line sharing its line with words is not found either. Windows' pointer
 still finds the embed by its heading and is not masked, so on one folder the
-two apps can repoint different lines until the `windows` issue for #397 lands.
+two apps can repoint different lines until the `windows` issue for #397 lands. The write is atomic (`String.write(atomically:)`, as the
+pointer has always written): the file's permissions are kept and any extended
+attributes on the front page are not (implementation review, note 7) — left
+as it is, since no Plantoir feature keeps anything in them.
 
 ## The links checklist (#379)
 
