@@ -1622,18 +1622,25 @@ setup_course.py inside the Docker container", and the diagnostic trio
   teacher's run would carry.
 - **The folder's name for its builder** (`teaching-quartz-<id>`) is no longer
   printed: it is derived from the folder's path, which the trail records.
+- **A folder still holding the old launchers** is harmless during the
+  change: the app replaces a folder's launchers whenever it opens it
+  (`reloadCourses` → `refreshLaunchersIfNeeded`), and an old copy run some
+  other way (an MCP-driven preview in a folder no window has reopened)
+  only makes a bar skip "Starting up…" — the bar takes the HIGHEST marker
+  it has seen, so it never stalls on the missing one.
 
 **Pinned by `scripts/test_launcher_words.py`**, the whole-launcher scan
 #228 and #263 left for later (the first-run block keeps its own Swift test,
 which also asks that the three copies are identical). What it reads as
-teacher-facing: every `echo` and `printf`, wherever it sits on its line;
+teacher-facing: every `echo` and `printf`, wherever it sits on its line
+(after `then`, `;`, `&&`, `||` or a `case` arm's `pattern)` as well);
 every `read -p` prompt; every line of a `cat <<'MSG'` message — with `$( … )`,
 `${ … }` and `$NAME` removed first. What it leaves out: comments and code,
 the `--help` heredocs, `echo "PLANTOIR_…` lines (the app reads and hides
 them), and a line ending `# never shown to a teacher: <why>` — the ONE way to
 keep a word, for lines the app cannot show (a function's answer captured by
-`$( … )`, text piped into a command, the `--image`/`--context` developer
-paths). REJECTED: an allow-list kept in the test, which freezes the list
+`$( … )`, the helper-path `case` arms among them, text piped into a
+command, the `--image`/`--context` developer paths; 38 lines today). REJECTED: an allow-list kept in the test, which freezes the list
 rather than emptying it and which a reader of the launcher never sees. It
 forbids toolchain, Docker, container, Colima, Lima, buildx, BuildKit,
 "virtual machine" and image, whole words, any case; not "script", which
@@ -1641,8 +1648,10 @@ forbids toolchain, Docker, container, Colima, Lima, buildx, BuildKit,
 every launcher marker a bar watches for is PRINTED by a launcher that bar
 reads — the check that would have caught the example course's dead step.
 Must-fails measured 2026-09-30: the old "Starting container if needed" echo
-back in `preview.sh` (1 failure), and `setup.sh`'s new line removed (1
-failure, the example course's bar).
+back in `preview.sh` (1 failure), `setup.sh`'s new line removed (1
+failure, the example course's bar), and "container" put into a `case` arm's
+echo in `workspace_origin_in_words` (1 failure; the scan before the #382 fix
+round passed it).
 
 ## 5. Per-task specifics
 
@@ -1758,7 +1767,8 @@ for.
   course code may hold a space, which `ps` shows as two words, and until #382
   the guard compared one word for the course, so no deploy of such a course
   refused its preview (the known gap #388 named). The trailing space is what
-  keeps section 1 from matching `AP CALC 12`; two `launcherCases` pin both.
+  keeps section 1 from matching `AP CALC 12`, and "begins with" is what keeps
+  CALC from matching AP CALC; three `launcherCases` pin them.
 - a deploy set for later of C/S: any process whose arguments name its script,
   `ca.russellgordon.Plantoir.deploy.<CODE>.section<N>[.<folder id>].sh`
   (`<CODE>` as `ScheduledDeploy.sanitizedCode` writes it, the section bounded
@@ -1805,7 +1815,9 @@ with a pretend `ps` and `lsof`; must-fails measured 2026-09-29: counting
 course without the section, skipping the folder check, dropping the call, and
 dropping this run's family each turn a named case red; and (#382) comparing
 one word for the course, or dropping the space after the section, turns the
-two spaced-course cases red. Checked once against
+spaced-course cases red, and matching the text ANYWHERE in the arguments
+(`index(…) >= 1` for `== 1`) turns "a course that ENDS another's code is
+another course" red (CALC 2 inside `deploy.sh AP CALC 2`). Checked once against
 the real process table too: a `deploy.sh ICS4U 2` sleeping in a scratch
 folder refused `preview.sh ICS4U 2` there with no engine call made, while the
 same deploy in ANOTHER folder, and a `--build-only` run, went on.

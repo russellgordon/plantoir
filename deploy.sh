@@ -1621,10 +1621,10 @@ _helper_paths() {
   local tool
   for tool in "$@"; do
     case "$tool" in
-      colima) echo "bin/colima" ;;
-      limactl) echo "bin/limactl bin/lima share/lima" ;;
-      docker) echo "bin/docker" ;;
-      buildx) echo "cli-plugins/docker-buildx" ;;
+      colima) echo "bin/colima" ;;  # never shown to a teacher: a path its caller captures with $( )
+      limactl) echo "bin/limactl bin/lima share/lima" ;;  # never shown to a teacher: a path its caller captures with $( )
+      docker) echo "bin/docker" ;;  # never shown to a teacher: a path its caller captures with $( )
+      buildx) echo "cli-plugins/docker-buildx" ;;  # never shown to a teacher: a path its caller captures with $( )
     esac
   done
 }
@@ -1634,9 +1634,9 @@ _helper_stamped_paths() {
   local tool
   for tool in "$@"; do
     case "$tool" in
-      colima) echo "bin/colima" ;;
-      limactl) echo "bin/limactl bin/lima" ;;
-      docker) echo "bin/docker" ;;
+      colima) echo "bin/colima" ;;  # never shown to a teacher: a path its caller captures with $( )
+      limactl) echo "bin/limactl bin/lima" ;;  # never shown to a teacher: a path its caller captures with $( )
+      docker) echo "bin/docker" ;;  # never shown to a teacher: a path its caller captures with $( )
     esac
   done
 }
