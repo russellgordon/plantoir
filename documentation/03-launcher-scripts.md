@@ -1357,7 +1357,8 @@ through without a word, while every behaviour test (which pastes the block in
 itself) stayed green. So the PROCESS TABLE BLOCK sits straight after each
 launcher's CONTAINER MOUNT BLOCK, like the other shared blocks that open each
 launcher, and two things stop it drifting later: a text pin on the order, and
-`TheRealPreviewUpToItsGuard`, which runs the REAL `preview.sh` from its first
+`TheRealPreviewUpToItsGuard` (Mac only: its pretend `ps` walks the real table
+with `/bin/ps -o`, which Git Bash's `ps` lacks), which runs the REAL `preview.sh` from its first
 line to just after the guard's call, against a pretend `ps` and `lsof`, a
 scratch HOME and a PATH with no `docker` or `colima` — moving the block into
 the PREVIEW PORT BLOCK makes it print `REACHED` with a deploy of the section
@@ -1891,8 +1892,8 @@ dev alike): the label rule cannot match `É`, so a scheduled publish of
 and `+` is read back as a space, so even a live `deploy.sh C++ 1` reads as
 gone. Work holding `;` or `\` — either of which would shift the places'
 numbers onto OTHER courses' work, measured: a live preview of another course
-declared gone — is answered every piece owned instead (the
-`whatCountsAsRunning` case with `;`, and its must-fail). Recorded in both
+declared gone — is answered every piece owned instead (a
+`whatCountsAsRunning` case for each, and their must-fails). Recorded in both
 contracts' `knownLimits`, not fixed here: the fix is for the command-line
 setup to apply `CourseCodeRule`, drafted as a follow-up issue.
 
