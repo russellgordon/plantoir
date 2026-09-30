@@ -345,13 +345,43 @@ function Test-CarriesLiveReload([string]$root) {
   # whole tree, which is the answer this needs. The bug is entirely in the
   # PowerShell port of that check.
   #
-  # Testing for a MatchInfo instead of a Boolean is the fix: -List stops at
-  # the first match in each file, Select-Object -First 1 stops at the first
-  # file, and $null -ne is an unambiguous test whatever the pipeline count.
+  # The fix then was to test for one MatchInfo instead of a Boolean array.
+  # Since #272 the function returns ONE scalar from a loop that writes
+  # nothing to the pipeline, which keeps the same property: one answer for
+  # the whole tree, whatever the page count.
+  #
+  # WHAT IS LOOKED FOR (#272, from mac #291 and #136): the client's script TAG,
+  # then any run of POSIX-space bytes (space, tab, LF, VT, FF, CR - never .NET's
+  # Unicode \s), then its first statement - contracts/app-rules.json ->
+  # buildFreshness.previewBuild.signature. The bare address matched any page
+  # that MENTIONS it (a networking lesson), so a folder publish of such a
+  # course refused every time. Quartz writes the tag and the client on
+  # DIFFERENT lines, so Select-String (line by line, and case-INsensitive by
+  # default) cannot see it: each page is read WHOLE, as bytes, and matched
+  # case-sensitively. Bytes are widened one to one (ISO-8859-1), so a byte
+  # that is not UTF-8 anywhere before the client changes nothing (case 15).
+  # Every *.html page, hidden (dot) folders included (-Force), front page
+  # first; a page that cannot be opened is PASSED OVER, as every other reader
+  # does - under this script's $ErrorActionPreference = 'Stop' an unguarded
+  # read would throw and fail the publish instead.
   if (-not (Test-Path -LiteralPath $root)) { return $false }
-  $hit = Get-ChildItem -LiteralPath $root -Recurse -File -Filter *.html -ErrorAction SilentlyContinue |
-         Select-String -Pattern "ws://localhost:" -List | Select-Object -First 1
-  return ($null -ne $hit)
+  $signature = [regex]::new(
+    [regex]::Escape('<script type="application/javascript">') + '[ \t\n\x0B\f\r]*' +
+    [regex]::Escape("const socket = new WebSocket('ws://localhost:"),
+    [Text.RegularExpressions.RegexOptions]::CultureInvariant)
+  $latin1 = [Text.Encoding]::GetEncoding(28591)
+  $pages = @()
+  $front = Join-Path $root 'index.html'
+  if (Test-Path -LiteralPath $front -PathType Leaf) { $pages += $front }
+  $pages += @(Get-ChildItem -LiteralPath $root -Recurse -File -Force -ErrorAction SilentlyContinue |
+              Where-Object { $_.Name -clike '*.html' -and $_.FullName -ne $front } |
+              ForEach-Object { $_.FullName })
+  foreach ($page in $pages) {
+    $text = $null
+    try { $text = $latin1.GetString([IO.File]::ReadAllBytes($page)) } catch { continue }
+    if ($signature.IsMatch($text)) { return $true }
+  }
+  return $false
 }
 
 # ======================
