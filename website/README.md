@@ -124,13 +124,14 @@ There are two working folders, and each picture is taken in one of them:
 
 - **`~/Plantoir Marketing`** — the KEPT marketing folder, for every app scene
   new in v1.4.0: ICS3U (sections 1 and 2) and ICS4U (section 1) from their
-  ready-made content, a reference copy of ICS3U, and ICS3U revised to answer
-  to AP Computer Science Principles as well. See "Regenerating every image".
+  ready-made content, a reference copy of ICS3U, and ICS3U and ICS4U revised to
+  answer to AP Computer Science Principles as well. See "Regenerating every image".
 - **`~/Desktop/Teaching`** — the demo folder: ENG2D, MCV4U and SCH3U, whose
   sections are published as the live example sites. The hero, the class-site
   shots, search, the phone and the colour figures come from here, because a
-  visitor can follow those to a real site. ICS3U is never published to a
-  public site: an embedded curriculum page puts its text on the page, and
+  visitor can follow those to a real site. ICS3U and ICS4U are never
+  published to a public site: an embedded curriculum page puts its text on
+  the page, and
   the College Board's words were cleared for Russell's own folder, not for
   the web (ruling Q2).
 
@@ -201,9 +202,10 @@ Written down because each cost an afternoon:
   publish that never happened.
 - **An embedded curriculum page publishes its text.** A class site shows the
   full wording of every expectation a lesson embeds, even with the curriculum
-  folder hidden from the sidebar — which is why ICS3U, whose College Board
-  pages are the College Board's words, is photographed in the in-app preview
-  and never published to a public site.
+  folder hidden from the sidebar — which is why ICS3U and ICS4U, whose
+  College Board pages are the College Board's words, are photographed in the
+  in-app preview and never published to a public site: each publishes to a
+  folder inside the kept folder.
 - **The class site inside the app's preview renders dark even in a light
   capture.** Quartz reads `(prefers-color-scheme: light)` and treats anything
   else as dark, and the embedded web view does not report a light preference.
@@ -278,12 +280,17 @@ missing, then, in the folder only — never the shipped payload:
   curriculum block is neither tagged nor dropped;
 - ICS4U's second curriculum DECLARED (`curriculum_folders` gains
   `College Board Curriculum` after `Curriculum`, what ticking the box writes);
-- `How I Teach.md` (our own words, `shots/marketing/`), and a folder
-  destination (`School Web Space`) so the scheduled publish makes nothing
-  public. The new-course panel writes `deploy_target: netlify` for every
-  course, so `netlify` with no site recorded (`.netlify_sites/`, or a
-  section's older `.netlify_site.json`) is not a choice and is replaced; any
-  other destination, or Netlify once a site is recorded, is left alone;
+- a folder destination for each of the two courses, so nothing they
+  publish — the scheduled publish included — reaches a public site, since
+  their pages print the College Board's words (ruling Q2): ICS3U publishes to
+  `School Web Space`, ICS4U to `School Web Space/ICS4U` (a folder destination
+  writes `<folder>/section<N>` with `rsync --delete`, so one shared folder
+  would let each course overwrite the other's section 1). The new-course
+  panel writes `deploy_target: netlify` for every course, so `netlify` with
+  no site recorded (`.netlify_sites/`, or a section's older
+  `.netlify_site.json`) is not a choice and is replaced; any other
+  destination, or Netlify once a site is recorded, is left alone;
+- `How I Teach.md` for ICS3U (our own words, `shots/marketing/`);
 - ICS3U section 2 moved to a second semester (its dates shifted by whole
   weeks so its first class is in the week of 2027-02-01; section 1 keeps the
   payload's dates), so the start-of-year scene is the week before school
