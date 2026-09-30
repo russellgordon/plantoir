@@ -151,6 +151,36 @@ public static class PageFrontmatter
     }
 
     /// <summary>
+    /// Rewrite a page's <c>title:</c>, taking the old value's continuation
+    /// lines with it and leaving every other line untouched.
+    ///
+    /// Needed when a class is renumbered: the file becomes "Unit 2, Day 4"
+    /// and a title still reading "Unit 2, Day 3" would show the old name on
+    /// the site, in the sidebar, and in every listing — a page whose name and
+    /// title disagree is worse than either being wrong on its own.
+    ///
+    /// A page with no title line is returned unchanged: Quartz falls back to
+    /// the file name, which is already correct after a rename, and inserting a
+    /// key the teacher never had is not this method's business.
+    /// </summary>
+    /// <remarks>
+    /// Until #284 (the mac's #199) this replaced the key's LINE alone, so a
+    /// title below its key, folded, or quoted over two lines was read by the
+    /// site as the new title and the old one JOINED ("Unit 1, Day 2 Unit 1,
+    /// Day 1") while this app read the new one. Pinned by
+    /// <c>file-formats.json → datesAndTitles.writingCases</c>.
+    /// </remarks>
+    public static string SetTitle(string pageText, string title)
+    {
+        var block = Block.Parse(pageText);
+        if (block?.IndexOf("title") is not { } at) return pageText;
+
+        var lines = new List<string>(block.Lines);
+        ReplaceKeyLine(lines, at, "title", "title: " + title, block.Close);
+        return string.Join("\n", lines);
+    }
+
+    /// <summary>
     /// The page text with its date moved to <paramref name="date"/>, keeping
     /// the time of day and UTC offset the page already carried.
     ///
@@ -163,36 +193,20 @@ public static class PageFrontmatter
     /// The time-and-offset to use when the page has no date yet — taken from a
     /// sibling class page, so a course keeps one convention.
     /// </param>
-    /// <summary>
-    /// Rewrite a page's <c>title:</c>, leaving every other line untouched.
-    ///
-    /// Needed when a class is renumbered: the file becomes "Unit 2, Day 4"
-    /// and a title still reading "Unit 2, Day 3" would show the old name on
-    /// the site, in the sidebar, and in every listing — a page whose name and
-    /// title disagree is worse than either being wrong on its own.
-    ///
-    /// A page with no title line is returned unchanged: Quartz falls back to
-    /// the file name, which is already correct after a rename, and inserting a
-    /// key the teacher never had is not this method's business.
-    /// </summary>
-    public static string SetTitle(string pageText, string title)
-    {
-        var block = Block.Parse(pageText);
-        if (block?.RawValue("title") is null) return pageText;
-
-        string[] lines = pageText.Split('\n');
-        for (int i = block.Open + 1; i < block.Close && i < lines.Length; i++)
-        {
-            string bare = lines[i].TrimEnd('\r');
-            // Top level only: an indented title: belongs to some other mapping.
-            if (!bare.StartsWith("title:", StringComparison.Ordinal)) continue;
-            lines[i] = "title: " + title + (lines[i].EndsWith('\r') ? "\r" : "");
-            return string.Join("\n", lines);
-        }
-        return pageText;
-    }
-
-    public static (string Text, bool Changed) SetCreated(
+    /// <remarks>
+    /// <para>The key's continuation lines go with it (#284), and a quoted
+    /// date's time is read INSIDE its quotes, so <c>created: "…" # moved</c>
+    /// does not become a date ending in <c>"</c> — which Quartz cannot read and
+    /// silently replaces with today.</para>
+    /// <para>A missing key goes at the top of the block, and only into a block
+    /// with a column-0 level for it (#308, the mac's #186): <c>created:</c>
+    /// written above <c>  a: 1</c> makes a block the build cannot read, and
+    /// since #246 the build hides such a page — so a re-date of a published
+    /// class HID it. Declined, the outcome is
+    /// <see cref="FrontmatterWriteOutcome.NoRoomForAKey"/> and the page keeps
+    /// no date, which is what it had.</para>
+    /// </remarks>
+    public static CreatedEdit SetCreated(
         string pageText, string key, DateOnly date, string fallbackTail = "T07:00:00.000-0400")
     {
         var block = Block.Parse(pageText);
@@ -201,39 +215,181 @@ public static class PageFrontmatter
         string tail = TimeAndOffset(existing) ?? fallbackTail;
         string value = stamp + tail;
 
-        if (string.Equals(existing.Trim(), value, StringComparison.Ordinal)) return (pageText, false);
+        if (string.Equals(existing.Trim(), value, StringComparison.Ordinal))
+            return new CreatedEdit(pageText, FrontmatterWriteOutcome.AlreadyRight);
 
         string newline = DominantNewline(pageText);
         string line = key + ": " + value;
 
         if (block is null)
-            return ("---" + newline + line + newline + "---" + newline + pageText, true);
+            return new CreatedEdit("---" + newline + line + newline + "---" + newline + pageText,
+                FrontmatterWriteOutcome.Written);
 
         var lines = new List<string>(block.Lines);
         if (block.IndexOf(key) is { } at)
-            lines[at] = ReplaceRawValue(lines[at], value);
-        else
-            lines.Insert(block.FirstBodyLine, line);
-        return (block.Rebuild(lines, newline), true);
+        {
+            ReplaceKeyLine(lines, at, key, line, block.Close);
+            return new CreatedEdit(string.Join("\n", lines), FrontmatterWriteOutcome.Written);
+        }
+        if (PageVisibilityReader.PlaceForANewTopLevelKey(lines, block.Open, block.Close) is not { } place)
+            return new CreatedEdit(pageText, FrontmatterWriteOutcome.NoRoomForAKey);
+        lines.Insert(place, line);
+        return new CreatedEdit(block.Rebuild(lines, newline), FrontmatterWriteOutcome.Written);
     }
 
-    /// <summary>Everything after the calendar date in an ISO timestamp, or null.</summary>
+    /// <summary>
+    /// Everything after the calendar date in an ISO timestamp, or null. Read
+    /// from the value's SCALAR text — inside its quotes, or up to a
+    /// <c> #</c> note — so neither a closing quote nor a note ends up in the
+    /// new date.
+    /// </summary>
     private static string? TimeAndOffset(string raw)
     {
-        string value = raw.Trim().Trim('"', '\'');
+        string value = ScalarText(raw);
         if (value.Length < 10) return null;
         for (int i = 0; i < 10; i++)
             if (i is 4 or 7 ? value[i] != '-' : !char.IsDigit(value[i])) return null;
         return value[10..];
     }
 
-    private static string ReplaceRawValue(string line, string value)
+    /// <summary>A raw value's text: inside its quotes if quoted, else up to a <c> #</c> note.</summary>
+    internal static string ScalarText(string raw)
     {
-        string carriageReturn = line.EndsWith('\r') ? "\r" : "";
-        string body = line.TrimEnd('\r');
-        int colon = body.IndexOf(':');
-        if (colon < 0) return line;
-        return body[..(colon + 1)] + " " + value + carriageReturn;
+        string trimmed = raw.Trim(' ', '\t');
+        if (trimmed.Length == 0) return trimmed;
+        char first = trimmed[0];
+        if (first is '"' or '\'')
+        {
+            int closing = trimmed.IndexOf(first, 1);
+            return closing < 0 ? trimmed[1..] : trimmed[1..closing];
+        }
+        int comment = trimmed.IndexOf(" #", StringComparison.Ordinal);
+        return comment < 0 ? trimmed : trimmed[..comment].Trim(' ', '\t');
+    }
+
+    /// <summary>
+    /// Replace the key's line at <paramref name="index"/> with
+    /// <paramref name="newLine"/>, removing the lines its OLD value ran onto,
+    /// and keep the replaced line's own <c>\r</c>. Returns how many lines were
+    /// taken. The one helper every date and title writer goes through — the
+    /// title and date writers here, and <c>SectionAdder</c>'s section copy and
+    /// scaffold (#284; the mac's <c>PageFrontmatter.replacingKeyLine</c>).
+    /// </summary>
+    /// <remarks>
+    /// Which lines are the value: <see cref="ContinuationLines"/>, asked with
+    /// "the value was empty" BEFORE the rewrite (afterwards it always has one);
+    /// or, when the key's line opens a <c>"</c>, <c>'</c>, <c>[</c> or <c>{</c>
+    /// it does not close, every line until it closes AT ANY INDENT — PyYAML
+    /// reads <c>title: "Unit 1,</c> / <c>Day 1"</c> as one title, and leaving
+    /// <c>Day 1"</c> behind made the page unreadable to the build. Whichever
+    /// reaches further wins. Removed bottom-up so no index still to come moves.
+    /// </remarks>
+    internal static int ReplaceKeyLine(List<string> lines, int index, string key, string newLine, int closeIndex)
+    {
+        bool wasEmpty = ValueIsEmpty(lines[index], key);
+        var taken = ContinuationLines(lines, index, closeIndex, wasEmpty);
+        string bare = PageVisibilityReader.TrimCarriageReturn(lines[index]);
+        string valueText = PageVisibilityReader.ValuePart(key, bare) ?? "";
+        int untilClosed = LinesUntilOpenValueCloses(valueText, index, lines, closeIndex);
+        if (untilClosed > taken.Count)
+            taken = Enumerable.Range(index + 1, untilClosed).ToList();
+
+        lines[index] = newLine + (lines[index].EndsWith('\r') ? "\r" : "");
+        for (int position = taken.Count - 1; position >= 0; position--)
+            lines.RemoveAt(taken[position]);
+        return taken.Count;
+    }
+
+    /// <summary>
+    /// How many lines below the key a value that OPENS a quote or a flow
+    /// collection and does not close it runs on for, or 0 when it closes on
+    /// its own line (or never closes, when nothing is taken). <c>"</c> honours
+    /// <c>\"</c>; <c>'</c> a doubled <c>''</c>.
+    /// </summary>
+    internal static int LinesUntilOpenValueCloses(string valueText, int keyIndex, IReadOnlyList<string> lines, int closeIndex)
+    {
+        string trimmed = valueText.Trim(' ', '\t');
+        if (trimmed.Length == 0 || trimmed[0] is not ('"' or '\'' or '[' or '{')) return 0;
+        var scanner = new OpenValueScanner();
+        if (scanner.ReadAndSayIfClosed(trimmed) || scanner.EndsWithAClosedSingleQuote()) return 0;
+        for (int position = keyIndex + 1; position < closeIndex && position < lines.Count; position++)
+        {
+            string line = PageVisibilityReader.TrimCarriageReturn(lines[position]);
+            if (scanner.ReadAndSayIfClosed("\n" + line) || scanner.EndsWithAClosedSingleQuote())
+                return position - keyIndex;
+        }
+        return 0;
+    }
+
+    /// <summary>
+    /// Reads a value character by character and says when an opening quote or
+    /// bracket has closed. A port of the mac's <c>OpenValueScanner</c>, kept
+    /// state for state so the two cannot disagree about where a value ends.
+    /// </summary>
+    private sealed class OpenValueScanner
+    {
+        private char? openQuote;
+        private int depth;
+        private bool started;
+        private bool singleQuoteMayClose;
+        private bool escaping;
+
+        public bool ReadAndSayIfClosed(string text)
+        {
+            foreach (char character in text)
+            {
+                if (singleQuoteMayClose)
+                {
+                    singleQuoteMayClose = false;
+                    if (character == '\'') continue;   // doubled: a quote character, still inside
+                    openQuote = null;
+                    if (depth == 0) return true;
+                    if (ClosesOrOpensOutsideQuotes(character)) return true;
+                    continue;
+                }
+                if (!started)
+                {
+                    started = true;
+                    if (character is '"' or '\'') openQuote = character;
+                    else if (character is '[' or '{') depth = 1;
+                    continue;
+                }
+                if (openQuote is { } quote)
+                {
+                    if (quote == '"')
+                    {
+                        if (escaping) escaping = false;
+                        else if (character == '\\') escaping = true;
+                        else if (character == '"')
+                        {
+                            openQuote = null;
+                            if (depth == 0) return true;
+                        }
+                    }
+                    else if (character == '\'')
+                    {
+                        singleQuoteMayClose = true;
+                    }
+                    continue;
+                }
+                if (ClosesOrOpensOutsideQuotes(character)) return true;
+            }
+            return false;
+        }
+
+        public bool EndsWithAClosedSingleQuote() => singleQuoteMayClose && depth == 0;
+
+        private bool ClosesOrOpensOutsideQuotes(char character)
+        {
+            if (character is '"' or '\'') openQuote = character;
+            else if (character is '[' or '{') depth++;
+            else if (character is ']' or '}')
+            {
+                depth--;
+                if (depth == 0) return true;
+            }
+            return false;
+        }
     }
 
     /// <summary>
@@ -353,7 +509,14 @@ public static class PageFrontmatter
         }
         else
         {
-            lines.Insert(fences.Open + 1, line);
+            // Only into a block with a column-0 level for a key (#308, the
+            // mac's #186): above `  false` the new line folds into the string
+            // "false false" and the page stays PUBLISHED while the teacher is
+            // told it was hidden. Declined, nothing is written and the caller
+            // names the page.
+            if (PageVisibilityReader.PlaceForANewTopLevelKey(lines, fences.Open, fences.Close) is not { } place)
+                return (pageText, new DraftEdit(key, before, draft, Changed: false, NoRoomForAKey: true));
+            lines.Insert(place, line);
         }
 
         // Last first, so the earlier indices stay put.
@@ -643,10 +806,44 @@ public static class PageFrontmatter
 /// What one draft edit did, in terms the confirmation panel can put into a
 /// sentence: which key, what it was, what it became.
 /// </summary>
-public readonly record struct DraftEdit(string Key, bool? Before, bool After, bool Changed)
+public readonly record struct DraftEdit(string Key, bool? Before, bool After, bool Changed, bool NoRoomForAKey = false)
 {
+    /// <summary>What the write did, in the three words the contract uses.</summary>
+    public FrontmatterWriteOutcome Outcome => NoRoomForAKey
+        ? FrontmatterWriteOutcome.NoRoomForAKey
+        : Changed ? FrontmatterWriteOutcome.Written : FrontmatterWriteOutcome.AlreadyRight;
+
     /// <summary>Plain words for a teacher, in the app's voice.</summary>
     public string Describe(string pageTitle) => Changed
         ? After ? $"Hide “{pageTitle}”" : $"Publish “{pageTitle}”"
         : After ? $"“{pageTitle}” is already hidden" : $"“{pageTitle}” is already published";
+}
+
+/// <summary>
+/// What a frontmatter write did: <c>written</c>, <c>alreadyRight</c>, or
+/// <c>noRoomForAKey</c> — a missing key the block has no column-0 level for,
+/// so nothing was written (#308; the mac's <c>FrontmatterWriteOutcome</c>).
+/// </summary>
+public enum FrontmatterWriteOutcome { Written, AlreadyRight, NoRoomForAKey }
+
+/// <summary>A date write: the text, and what it did. Deconstructs to (Text, Changed) for the callers that only ask that.</summary>
+public readonly struct CreatedEdit
+{
+    public CreatedEdit(string text, FrontmatterWriteOutcome outcome)
+    {
+        Text = text;
+        Outcome = outcome;
+    }
+
+    public string Text { get; }
+
+    public FrontmatterWriteOutcome Outcome { get; }
+
+    public bool Changed => Outcome == FrontmatterWriteOutcome.Written;
+
+    public void Deconstruct(out string text, out bool changed)
+    {
+        text = Text;
+        changed = Changed;
+    }
 }
