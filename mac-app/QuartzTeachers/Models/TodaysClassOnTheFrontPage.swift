@@ -285,7 +285,8 @@ enum TodaysClassOnTheFrontPage {
             forSection: offer.sectionNumber
         )
         guard let result = SectionIndexPointer.repointing(
-            before, at: page, classTitles: classTitles, createdTail: tail
+            before, at: page, classTitles: classTitles, createdTail: tail,
+            courseDirectory: course.directoryURL
         ) else {
             return .noLongerOffered
         }
@@ -334,6 +335,15 @@ enum TodaysClassOnTheFrontPage {
         case .couldNotSave:
             return (.frontPageLeftAsItWas, leftAsItWasLine(reason: "could not be saved", offer: offer))
         }
+    }
+
+    /// Not Today: remembers it for this section, the day asked and the
+    /// class offered, and returns the trail line. A record that could not be
+    /// written costs the question once more at the next press, nothing else.
+    static func answerNotToday(_ offer: Offer, courseDirectory: URL) -> String {
+        let record: NotToday = NotToday(day: offer.day.text, classTitle: offer.classTitle)
+        try? record.write(courseDirectory: courseDirectory, section: offer.sectionNumber)
+        return notTodayTrailLine(offer: offer)
     }
 
     static func notTodayTrailLine(offer: Offer) -> String {

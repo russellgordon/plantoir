@@ -1228,7 +1228,7 @@ final class ClassPlanningContractTests: XCTestCase {
         XCTAssertNotNil(noEmbed["windows"] as? String)
 
         let cases: [[String: Any]] = try ClassPlanningContractTests.cases(in: "sectionIndexPointer")
-        XCTAssertGreaterThanOrEqual(cases.count, 20)
+        XCTAssertGreaterThanOrEqual(cases.count, 27)
         let writtenAs: [String: Any] = try XCTUnwrap(section["writtenAs"] as? [String: Any])
         XCTAssertNotNil(writtenAs["rule"] as? String)
         for testCase in cases {
@@ -1257,7 +1257,8 @@ final class ClassPlanningContractTests: XCTestCase {
                 pathWithinSection: "All Classes/\(pointAt).md"
             )
             let result: SectionIndexPointer.Result? = SectionIndexPointer.repointing(
-                body, at: page, classTitles: classTitles, createdTail: "T07:00:00.000-0400"
+                body, at: page, classTitles: classTitles, createdTail: "T07:00:00.000-0400",
+                courseDirectory: URL(fileURLWithPath: "/courses/CLUB")
             )
             let expected: String? = testCase["expectBody"] as? String
             XCTAssertEqual(result?.text, expected, name)
@@ -1311,7 +1312,8 @@ final class ClassPlanningContractTests: XCTestCase {
                 pathWithinSection: "All Classes/\(pointAt).md"
             )
             let result: SectionIndexPointer.Result? = SectionIndexPointer.repointing(
-                indexText, at: page, classTitles: classTitles, createdTail: "T07:00:00.000-0400"
+                indexText, at: page, classTitles: classTitles, createdTail: "T07:00:00.000-0400",
+                courseDirectory: URL(fileURLWithPath: "/courses/TEST")
             )
             let textAfter: String = result?.text ?? indexText
             let createdAfter: String? = PageFrontmatter.rawValue(forKey: "created", in: textAfter)

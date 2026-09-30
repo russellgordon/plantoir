@@ -3362,8 +3362,8 @@
     "note": "Which line of a section's front page (`sectionN/index.md`) is repointed when a newer class page becomes visible (#267). The front page opens by transcluding ONE class page — the newest one students can see — under a heading the course chose when it was created: “# Most Recent Class” for a course, “# Most Recent Meeting” for a club (`course_config.json` → `front_page_heading`), and whatever the teacher typed in a course made by hand (CODING's is “## Most Recent Meeting”, an h2). The embed is FOUND BY WHICH PAGE IT NAMES — the first line that transcludes one of the section's class pages — never by the heading. The heading is written once, at creation, and is never read or rewritten by repointing: that is why a hand-worded front page keeps working, and why an existing course keeps its heading. `indexBody` is the page BELOW its frontmatter; these `cases` carry no dates; the frontmatter's `created:`, which follows the class the embed names, is `dateCases` (#275). `expectBody: null` means the page is left exactly as it is. Which page is newest (date, then the course's own numbering) is also out of scope: `pointAt` names it. A case may give `pointAtPath`, where the class it points at lives inside the course folder (default `section1/All Classes/<pointAt>.md`), for the cases where the line names a folder (`writtenAs`).",
     "found": "The first line, anywhere in the page BELOW its frontmatter and OUTSIDE code and `%%` comments (`shared-rules.json` → `readingALink.whatIsCode`, `whatIsAComment` — the one mask every link reader uses), whose text, trimmed of spaces, tabs and a Windows carriage return, is `![[…]]` and whose target — before any `|` display name or `#` heading, after any folder path, and without a `.md` the teacher typed — is one of the section's class-page titles (case-insensitive). THAT line, by its position, is rewritten as `writtenAs` says; every other byte is left alone, including another copy of the same line inside a comment (#397: until then the mac replaced every copy of the line's text, and a class line parked in a comment or a fence was read as the page's embed).",
     "writtenAs": {
-      "rule": "The new line keeps the FORM the teacher wrote (#397, director's ruling on the plan review, 2026-09-30). A folder path before the page name keeps its DEPTH, and its folders are the last ones of the path to where the class it now names actually is (so `section1/All Classes/X` stays `section1/All Classes/Y`, and `Thread 4/Day 15` becomes `Thread 5/Day 1` when that class is filed in Thread 5); a path deeper than the class's own location is dropped. A display name equal to the old class's name (case-insensitive) becomes the new class's name; any other display name, and any `#heading` or `#^block`, is dropped. A `.md` the teacher typed is kept. The spaces around the embed on its line, and a carriage return at its end, are kept.",
-      "why": "A bare name in a course with two sections is ambiguous in Obsidian, and Russell's own front pages were written with the section's path; rewriting them bare every morning undid how he writes them. A path copied as written would name a page that does not exist when the next class is filed in another folder — the front page would show nothing while the app reported it had moved. A heading or an alias of the teacher's own may not fit the next class (it may have no heading of that name, and an embed of a missing heading shows nothing), so it is dropped rather than guessed at."
+      "rule": "The new line keeps the FORM the teacher wrote as far as the SITE can still draw it (#397; the director's ruling on the implementation review, 2026-09-30, which supersedes the plan-review ruling where they differ: a link that resolves on the site wins over the teacher's form). A path that holds a `section<N>` folder is written as the class's FULL path inside the course folder (`section1/All Classes/Unit 2/Y`) and ALWAYS with `|<the class's name>` — the build turns a section path into its display name (`build_site.rewrite_section_wikilinks`), and without one it leaves a target the site does not have. Any other path is written as the class's full path from the SITE's root — its place inside the section folder, or inside the course folder for a class outside it (`Thread 4/Day 15` stays `Thread 4/Day 16` for a class in `section1/Thread 4/`; it becomes `All Classes/Thread 4/Day 16` for one in `section1/All Classes/Thread 4/`, because Quartz reads a path from the site's root). A display name equal to the old class's name (case-insensitive) becomes the new class's name; any other display name, and any `#heading` or `#^block`, is dropped — except that a section path always carries the new name. A `.md` the teacher typed is kept. The spaces around the embed on its line, and a carriage return at its end, are kept. `scripts/test_front_page_lines_resolve.py` runs every expected line of both case lists through the build's `rewrite_section_wikilinks` and requires it to name the class's place on the site.",
+      "why": "A bare name in a course with two sections is ambiguous in Obsidian, and Russell's own front pages are written with the section's path (`![[section1/All Classes/X|X]]`, and MPM2DE's `![[section1/All Classes/Thread 1, Day 0.5|Thread 1, Day 1]]`, whose display name is not the file's). The first version kept a section path and dropped a display name that was not the old class's name, and the build then left `![[section1/All Classes/Y]]` on the site — a target that does not exist there, so the front page showed nothing while the app said it had moved (implementation review, finding 1). A path's depth kept from the end lost its `section1/` anchor for a class filed one folder deeper, and read from the disk path it could pick up the course folder's own name (finding 3). A heading or an alias of the teacher's own may not fit the next class (it may have no heading of that name, and an embed of a missing heading shows nothing), so it is dropped rather than guessed at."
     },
     "neverFoundBy": "The heading text. A front page headed anything, at any level, or with no heading at all, is repointed the same way; a transclusion of a page that is NOT a class page (Help Sessions, Key Links) is never replaced, whatever heading it sits under.",
     "whenNoClassIsTransclusion": {
@@ -3539,10 +3539,10 @@
           "Day 16"
         ],
         "pointAt": "Day 16",
-        "pointAtPath": "section1/All Classes/Thread 4/Day 16.md",
+        "pointAtPath": "section1/Thread 4/Day 16.md",
         "indexBody": "## Most Recent Class\n\n![[Thread 4/Day 15]]\n",
         "expectBody": "## Most Recent Class\n\n![[Thread 4/Day 16]]\n",
-        "why": "Russell's ICS3U 2023 shape."
+        "why": "Russell's ICS3U 2023 shape: classes filed in `section1/Thread 4/`, so `Thread 4/Day 16` is the class's place from the site's root."
       },
       {
         "name": "the next class is in another folder: the path names where it is",
@@ -3551,10 +3551,10 @@
           "Day 1"
         ],
         "pointAt": "Day 1",
-        "pointAtPath": "section1/All Classes/Thread 5/Day 1.md",
+        "pointAtPath": "section1/Thread 5/Day 1.md",
         "indexBody": "## Most Recent Class\n\n![[Thread 4/Day 15]]\n",
         "expectBody": "## Most Recent Class\n\n![[Thread 5/Day 1]]\n",
-        "why": "The path's DEPTH is kept and its folders are read from where the class is; copying “Thread 4/” would name a page that does not exist."
+        "why": "The path names where the class is from the site's root; copying “Thread 4/” would name a page that does not exist."
       },
       {
         "name": "one heading of a class: the heading is dropped",
@@ -3597,6 +3597,85 @@
         "indexBody": "# Most Recent Class\n\n  ![[Unit 1, Day 1]]  \n",
         "expectBody": "# Most Recent Class\n\n  ![[Unit 1, Day 2]]  \n",
         "why": "Only the embed itself is rewritten; the spaces around it on its line are the teacher's."
+      },
+      {
+        "name": "a section path with a display name of the teacher's own: the new class's name is written",
+        "classTitles": [
+          "Unit 1, Day 1",
+          "Unit 1, Day 2"
+        ],
+        "pointAt": "Unit 1, Day 2",
+        "indexBody": "# Most Recent Class\n\n![[section1/All Classes/Unit 1, Day 1|This week]]\n",
+        "expectBody": "# Most Recent Class\n\n![[section1/All Classes/Unit 1, Day 2|Unit 1, Day 2]]\n",
+        "why": "The build rewrites a section path to its display name; “This week” would become a target the site does not have (implementation review, finding 1)."
+      },
+      {
+        "name": "a section path with no display name gains the class's name",
+        "classTitles": [
+          "Unit 1, Day 1",
+          "Unit 1, Day 2"
+        ],
+        "pointAt": "Unit 1, Day 2",
+        "indexBody": "# Most Recent Class\n\n![[section1/All Classes/Unit 1, Day 1]]\n",
+        "expectBody": "# Most Recent Class\n\n![[section1/All Classes/Unit 1, Day 2|Unit 1, Day 2]]\n",
+        "why": "Without a display name the build leaves the section path in place, and the site has no such page."
+      },
+      {
+        "name": "a section path to one heading: the heading is dropped and the name written",
+        "classTitles": [
+          "Unit 1, Day 1",
+          "Unit 1, Day 2"
+        ],
+        "pointAt": "Unit 1, Day 2",
+        "indexBody": "![[section1/All Classes/Unit 1, Day 1#Agenda]]\n",
+        "expectBody": "![[section1/All Classes/Unit 1, Day 2|Unit 1, Day 2]]\n"
+      },
+      {
+        "name": "MPM2DE's shape: a section path whose display name is not the file's",
+        "classTitles": [
+          "Thread 1, Day 0.5",
+          "Thread 1, Day 1",
+          "Thread 1, Day 2"
+        ],
+        "pointAt": "Thread 1, Day 2",
+        "indexBody": "# Most Recent Class\n\n![[section1/All Classes/Thread 1, Day 0.5|Thread 1, Day 1]]\n",
+        "expectBody": "# Most Recent Class\n\n![[section1/All Classes/Thread 1, Day 2|Thread 1, Day 2]]\n",
+        "why": "Russell's MPM2DE-2025 section 1 front page. The first #397 version wrote `![[section1/All Classes/Thread 1, Day 2]]`, which the build does not rewrite and the site cannot draw."
+      },
+      {
+        "name": "a section path, and the next class filed one folder deeper",
+        "classTitles": [
+          "Unit 1, Day 1",
+          "Unit 2, Day 1"
+        ],
+        "pointAt": "Unit 2, Day 1",
+        "pointAtPath": "section1/All Classes/Unit 2/Unit 2, Day 1.md",
+        "indexBody": "![[section1/All Classes/Unit 1, Day 1|Unit 1, Day 1]]\n",
+        "expectBody": "![[section1/All Classes/Unit 2/Unit 2, Day 1|Unit 2, Day 1]]\n",
+        "why": "The full path inside the course folder, so the `section1/` anchor is kept (implementation review, finding 3)."
+      },
+      {
+        "name": "a section path, and the next class outside the section's folder",
+        "classTitles": [
+          "Unit 1, Day 1",
+          "Unit 1, Day 2"
+        ],
+        "pointAt": "Unit 1, Day 2",
+        "pointAtPath": "All Classes/Unit 1, Day 2.md",
+        "indexBody": "![[section1/All Classes/Unit 1, Day 1|Unit 1, Day 1]]\n",
+        "expectBody": "![[All Classes/Unit 1, Day 2|Unit 1, Day 2]]\n",
+        "why": "Its place inside the course folder, never a piece of the disk path (which picked up the course folder's own name)."
+      },
+      {
+        "name": "a folder path, and the next class outside the section's folder",
+        "classTitles": [
+          "Unit 1, Day 1",
+          "Unit 1, Day 2"
+        ],
+        "pointAt": "Unit 1, Day 2",
+        "pointAtPath": "All Classes/Unit 1, Day 2.md",
+        "indexBody": "![[All Classes/Unit 1, Day 1]]\n",
+        "expectBody": "![[All Classes/Unit 1, Day 2]]\n"
       }
     ],
     "dateCases": {
@@ -4418,10 +4497,10 @@
           "shows": "Day 15"
         },
         "expectAfterYes": {
-          "body": "## Most Recent Class\n\n![[Thread 4/Day 16]]\n",
+          "body": "## Most Recent Class\n\n![[All Classes/Thread 4/Day 16]]\n",
           "createdDay": "2026-09-30"
         },
-        "why": "Russell's ICS3U 2023 shape. The folder path stays."
+        "why": "The class lives in `section1/All Classes/Thread 4/`, and Quartz reads a path from the site's root, so the line names it from there (`sectionIndexPointer.writtenAs`). Where the classes ARE filed in `section1/Thread 4/` — Russell's ICS3U 2023 — the line stays `Thread 4/…` (the pointer's own case)."
       },
       {
         "name": "today's class is in the next folder: the path names where it actually is",
@@ -4446,7 +4525,7 @@
           "shows": "Day 15"
         },
         "expectAfterYes": {
-          "body": "## Most Recent Class\n\n![[Thread 5/Day 1]]\n",
+          "body": "## Most Recent Class\n\n![[All Classes/Thread 5/Day 1]]\n",
           "createdDay": "2026-09-30"
         },
         "why": "The path keeps its DEPTH, and its folders are the ones today's class is in. Copying “Thread 4/” as written would name a page that does not exist, and the front page would show nothing while the app reported it had moved."
@@ -5199,6 +5278,58 @@
         "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\nToday: ![[Unit 2, Day 4]]\n",
         "expectAsk": null,
         "why": "The pointer's `found` rule reads whole lines; changing it is outside this piece (0 of the 89 front pages in support/ are written this way)."
+      },
+      {
+        "name": "MPM2DE's front page: a section path whose display name is not the file's",
+        "today": "2026-09-30",
+        "unitWord": "Thread",
+        "classes": [
+          {
+            "title": "Thread 1, Day 0.5",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Thread 1, Day 1",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": true
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n![[section1/All Classes/Thread 1, Day 0.5|Thread 1, Day 1]]\n\n%%\nA note.\n%%\n\n![[Key Links]]\n",
+        "expectAsk": {
+          "show": "Thread 1, Day 1",
+          "shows": "Thread 1, Day 0.5"
+        },
+        "expectAfterYes": {
+          "body": "# Most Recent Class\n\n![[section1/All Classes/Thread 1, Day 1|Thread 1, Day 1]]\n\n%%\nA note.\n%%\n\n![[Key Links]]\n",
+          "createdDay": "2026-09-30"
+        },
+        "why": "Russell's MPM2DE-2025 shape (implementation review, finding 1): the display name reads like today's class while the file is yesterday's. The line keeps its section path and carries the new class's name, which is what the build turns it into."
+      },
+      {
+        "name": "a section path with no display name",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": true
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n![[section1/All Classes/Unit 2, Day 4]]\n",
+        "expectAsk": {
+          "show": "Unit 2, Day 5",
+          "shows": "Unit 2, Day 4"
+        },
+        "expectAfterYes": {
+          "body": "# Most Recent Class\n\n![[section1/All Classes/Unit 2, Day 5|Unit 2, Day 5]]\n",
+          "createdDay": "2026-09-30"
+        }
       }
     ]
   },

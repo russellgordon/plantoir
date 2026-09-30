@@ -30,7 +30,7 @@ final class TodaysClassOnTheFrontPageTests: XCTestCase {
     func testEveryCaseAsksAsTheContractSays() throws {
         let section: [String: Any] = try TodaysClassOnTheFrontPageTests.contractSection()
         let cases: [[String: Any]] = try XCTUnwrap(section["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 40, "the contract lost question cases")
+        XCTAssertGreaterThanOrEqual(cases.count, 42, "the contract lost question cases")
 
         var yesRuns: Int = 0
         for testCase in cases {
@@ -194,6 +194,55 @@ final class TodaysClassOnTheFrontPageTests: XCTestCase {
         try TodaysClassOnTheFrontPage.NotToday(day: offer.day.text, classTitle: "Unit 2, Day 4")
             .write(courseDirectory: course.directoryURL, section: 1)
         XCTAssertNotNil(TodaysClassOnTheFrontPage.offer(forSection: 1, in: course, today: today))
+    }
+
+    /// Implementation review, finding 2: the answer SAVES Not Today, and the
+    /// window's answer goes through the function that does.
+    func testNotTodayIsSavedByTheAnswer() throws {
+        let course: Course = try makeCourse(from: TodaysClassOnTheFrontPageTests.ordinaryMorning())
+        let today: CalendarDay = try XCTUnwrap(CalendarDay(text: "2026-09-30"))
+        let offer: TodaysClassOnTheFrontPage.Offer = try XCTUnwrap(
+            TodaysClassOnTheFrontPage.offer(forSection: 1, in: course, today: today)
+        )
+        let line: String = TodaysClassOnTheFrontPage.answerNotToday(offer, courseDirectory: course.directoryURL)
+        XCTAssertEqual(line, TodaysClassOnTheFrontPage.notTodayTrailLine(offer: offer))
+        XCTAssertEqual(
+            TodaysClassOnTheFrontPage.NotToday.read(courseDirectory: course.directoryURL, section: 1),
+            TodaysClassOnTheFrontPage.NotToday(day: "2026-09-30", classTitle: "Unit 2, Day 5")
+        )
+        XCTAssertNil(TodaysClassOnTheFrontPage.offer(forSection: 1, in: course, today: today), "asked again after Not Today")
+
+        let answer: String = try TodaysClassOnTheFrontPageTests.body(
+            of: "func answerTodaysClass(", in: try TodaysClassOnTheFrontPageTests.sectionView()
+        )
+        XCTAssertTrue(answer.contains("TodaysClassOnTheFrontPage.answerNotToday(offer, courseDirectory: course.directoryURL)"))
+        XCTAssertTrue(answer.contains(".frontPageLeftAsItWas"))
+    }
+
+    // MARK: - What waits behind the question
+
+    /// Implementation review, note 4: a refusal held behind the question is
+    /// not dropped when the button's own preview is refused too.
+    func testTwoRefusalsAreBothSaid() throws {
+        let earlier: SectionDetailView.PreviewAlert = .refusal(title: "Cannot Preview Yet", sentence: "First.")
+        let later: SectionDetailView.PreviewAlert = .refusal(title: "The Preview Did Not Appear", sentence: "Second.")
+        XCTAssertEqual(
+            SectionDetailView.joining(earlier, then: later),
+            .refusal(title: "The Preview Did Not Appear", sentence: "First.\n\nSecond.")
+        )
+        XCTAssertEqual(SectionDetailView.joining(later, then: later), later)
+        let after: String = try TodaysClassOnTheFrontPageTests.body(
+            of: "func afterThePreviewAlert()", in: try TodaysClassOnTheFrontPageTests.sectionView()
+        )
+        XCTAssertTrue(after.contains("SectionDetailView.joining(held, then: previewAlert)"))
+    }
+
+    /// Implementation review, note 5: folder findings wait behind the
+    /// question as they wait behind the folder dialog, and are shown after it.
+    func testFolderFindingsWaitBehindThePreviewAlert() throws {
+        let view: String = TodaysClassOnTheFrontPageTests.codeOnly(try TodaysClassOnTheFrontPageTests.sectionView())
+        XCTAssertEqual(view.components(separatedBy: "if healthDialog != nil || previewAlertIsUp {").count - 1, 3,
+                       "findings (twice) and the links checklist are held behind the preview alert")
     }
 
     // MARK: - A front page that must not be written
