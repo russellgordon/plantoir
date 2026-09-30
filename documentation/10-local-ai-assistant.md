@@ -3845,7 +3845,9 @@ leases from running work, so an idle MCP server holds none.
 against stand-in launchers that write down their words and exit 3 (MF-6), and
 the window's runner without the flag; the contract case is `assist-cases.json`
 → `scenarios` → "deploy with no section window open, which meets a question".
-Windows owes the same for `plantoir-mcp.exe` (the `windows` issue from #378);
+Windows did the same for `plantoir-mcp.exe` in #391 (2026-09-30:
+`AssistWorkspace.Deploy`/`RebuildPreview` pass the flag to every leg and read
+`LaunchOutcome.ExitCode`; the in-app assistant reaches it through that server);
 `deploy.py`'s header records its twin, a `python.exe` waiting 45 minutes at the
 site-name prompt.
 

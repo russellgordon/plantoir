@@ -17,6 +17,60 @@ happens. This page is not a status report and should not be read as one.
 
 ---
 
+## Preview and publish mechanics that match the mac (bundle 4, 2026-09-30)
+
+One place for what changed on the preview and publish path in bundle 4, so a
+reader of the code finds the reasons. Hardware for every number: Intel Core
+i5-8365U, 16 GB, Samsung 980 SSD, Windows 11 Pro 25H2 build 26200.
+
+- **The address (#278).** `ScriptRunner.CapturePreviewAddress` reads COMPLETE
+  lines only: the unfinished tail waits for the next piece, colour codes come out
+  per line, the carry is flushed when the run ends, and nothing is read back off
+  the end of the transcript. Chunk-wise parsing (the old code) takes the wrong
+  port when a piece ends after `:8`, `:81` or `:810` — the must-fail reproduced
+  `:810`. The wait never starts from the lease's port.
+- **The wait (#233).** `PreviewReachability.NextStep` decides each tick; the
+  view only acts. The run is never bounded (a first build here: server line at
+  43.6 s); the QUIET after `Started a Quartz server` is (45 s, restarted by
+  output). Server line to site answering, measured: 0.60 s first build, 0.40 s
+  and 0.38 s warm. No announced address when the server starts: give up at once.
+  Giving up stops the run the Stop way (so the trail's `task finished` line says
+  "stopped by the teacher" right after the `preview did not appear` line that
+  explains it — accepted rather than adding a third stop path), then the alert.
+  Only a connection REFUSED by this PC is `theSiteNeverAnswered`; a timeout or
+  anything else is `plantoirCouldNotTell`. There is no builder to ask, so no
+  first verdict. Sentences say "your PC" for "your Mac" (proposed to the mac).
+- **Freshness (#272).** `.build-started` beside `public\` is written natively,
+  so one clock stamps it and the Save. `BuiltForPreview` reads bytes; the
+  `SearchOption.AllDirectories` overload does not skip Hidden items (a default
+  `EnumerationOptions` does — the must-fail proved it once the test gave the
+  dot folder the Hidden attribute, which NTFS does not do by itself).
+- **Two windows (#272).** Measured by reading and then by test before writing:
+  Ctrl+N opens a second window on the same folder and each `WorkspaceViewModel`
+  loads its own `CourseConfiguration`, so the whole-file `Write` lost the other
+  window's Save exactly as on the mac. `Write` now merges per top-level key and
+  returns what it kept or replaced; `WorkspaceViewModel.OtherCopiesReread`
+  re-reads every other unchanged copy; Revert reads the file. Still owed on
+  #272: Preview Again and its four sentences, and the two new trail events.
+- **Windowless work (#391, #386).** `AssistWorkspace` runs every leg
+  `--non-interactive`; `LaunchOutcome.ExitCode` 3 becomes the contract's
+  sentences. The window refuses a preview while `CourseActivity.IsPublishingSection`
+  (this process's own Deploys, any window); the in-app assistant asks the same
+  record. On Windows the in-app assistant's DEPLOY runs in plantoir-mcp.exe, a
+  separate process, so it is the work leases (#289) that refuse a window's
+  preview of it — not the in-process record — and the contract's window case for
+  that deployer is skipped by name in `PreviewWhileDeployingTests`.
+- **The '— Edited' rule 2 (#358).** C#, the wrapper (`--rule 2`, and the rule
+  written into its sentinel so an old wrapper's value is recorded as rule 1) and
+  the stamp moved together. Found on the way: `section_fingerprint.py` could not
+  import `how_i_teach` under the bundled EMBEDDABLE Python (its `._pth` replaces
+  `sys.path`), so every scheduled publish recorded no fingerprint; it now adds
+  its own folder, as `build_site.py` does.
+- **One folder, one id (#307).** A case variant gives the same id (`3566e628`
+  both ways) and compares equal; NTFS does not normalise Unicode, so an NFD
+  spelling of an NFC-named folder is another (nonexistent) folder — ids
+  `b7e56301` / `bbdbaf32` — and there is no second spelling to disagree about.
+
 ## The solution
 
 | Project | Role |
