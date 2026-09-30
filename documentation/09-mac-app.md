@@ -8177,8 +8177,8 @@ Cancel") and the stopped-publish band (`stoppedPublishNotice` swallowed
 come from a computed property (`buttons`), so a scan for "an identifier on a
 stack whose body holds an identified control" never sees them in the same
 place. Hence a NAMED list rather than a discovered one:
-`ContainerIdentifierTripwireTests` (gated) holds the seven containers known to
-hold identified controls (`copyPageChecklist`, given `.contain` by #365, among them) and fails any whose `.accessibilityIdentifier(…)` is
+`ContainerIdentifierTripwireTests` (gated) holds the eight containers known to
+hold identified controls (`copyPageChecklist`, given `.contain` by #365, and `linksChecklistSheet`, #379, among them) and fails any whose `.accessibilityIdentifier(…)` is
 not IMMEDIATELY preceded by `.accessibilityElement(children: .contain)` —
 order-aware, because `.contain` placed after the identifier compiles and does
 nothing — and fails a name no product file uses any more. Add a container to

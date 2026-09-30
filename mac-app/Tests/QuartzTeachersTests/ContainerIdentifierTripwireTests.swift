@@ -31,6 +31,7 @@ final class ContainerIdentifierTripwireTests: XCTestCase {
         "settingsSaveNotice",
         "copyPageResult",
         "copyPageChecklist",
+        "linksChecklistSheet",
     ]
 
     // MARK: - Functions
