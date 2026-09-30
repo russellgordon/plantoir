@@ -1298,6 +1298,16 @@ MCP server with claude or codex above it, then the Plantoir app ("another
 Plantoir window"), then claude or codex running the launcher directly, and
 otherwise "a command in Terminal".
 
+**Two readers of the process table in preview.sh, for now.** #381's guard
+(a preview refused while its section is being deployed) has its own reader,
+outside the PREVIEW PORT BLOCK, that recognises `deploy.sh C S` and a
+scheduled run of C/S; this one lives inside the block, because setup.sh and
+deploy.sh need it too. They were written the same night on separate branches
+and were not merged into one helper then; the scheduled-label rule (course
+sanitized, `section<N>` followed by a dot) is the part that must stay the
+same in both, and folding the guard's reader into `the_owners_of_the_work`
+is the follow-up.
+
 **Two fail-safes, and they point different ways.** A process table that cannot
 be read counts as every owner RUNNING (a wait and a refusal are recoverable;
 an ended publish is not). The launcher guard of #381 (a preview refused while
