@@ -551,9 +551,9 @@
           ],
           "why": "Printed by preview.sh (the look before a start is in the shared PREVIEW PORT BLOCK, switched on by WORKSPACE_WILL_SERVE, which only preview.sh sets; the look before the announcement is preview.sh's own - app-rules.json -> previewPorts.whenAnotherAccountHasTheAddress) and read by the APP, which writes the line: ScriptRunner from the console of a run it started. Written the way 'workspace was in use' is, and for the same reason: one writer for the event's words and a real call site (ActivityTrailWiringTests). A scheduled publish never prints it - deploy.sh never serves - so ScheduledDeploy does not read it. The console a teacher reads leaves it out (rule 1: it is machinery). The cost, stated: a preview run typed at the command line leaves the console sentence and no trail line."
         },
-        "lineWhenRemadeBeforeStarting": "{place} · something else on this Mac was using preview address {address} while this working folder's workspace was stopped, so it was set up again on free addresses before starting",
-        "lineWhenRemade": "{place} · another account on this Mac, or macOS itself, was using preview address {address}, so this working folder's workspace was set up again on free addresses",
-        "lineWhenRefused": "{place} · the preview stopped before building — another account on this Mac, or macOS itself, was still using its address {address} after this working folder's workspace was set up again on free addresses",
+        "lineWhenRemadeBeforeStarting": "{place} · something else on this Mac was using preview address {address} while this working folder's website builder was stopped, so it was set up again on free addresses before starting",
+        "lineWhenRemade": "{place} · another account on this Mac, or macOS itself, was using preview address {address}, so this working folder's website builder was set up again on free addresses",
+        "lineWhenRefused": "{place} · the preview stopped before building — another account on this Mac, or macOS itself, was still using its address {address} after this working folder's website builder was set up again on free addresses",
         "lineWhenUnchecked": "{place} · did not check whether another account on this Mac was using preview address {address}: this run was pointed at a website builder Plantoir did not set up",
         "why": "GitHub #310, found in the #204 rehearsal. Two macOS accounts on one Mac each ran Plantoir; the second was handed an address the first held, its builder's forward failed without a word, and its Preview opened the other person's site. Every one of the four outcomes arrives later as a report that reads like something else: a two-minute preview for no reason ('Plantoir got slow'), a preview that would not start ('Preview doesn't work' - #225's story again), or a wrong site. Its OWN event rather than a launcher line under 'workspace was in use' (the plan's first proposal): that event is written by the app from its own marker and says 'a remake with nothing running writes nothing', so a launcher-written line there would have given one event two writers and falsified a sentence nobody was told to change; nor under 'preview did not appear', because three of the four outcomes are previews that DID appear. The address is carried because it is the one thing that tells two accounts' reports apart when both reach support. before-start covers any listener, this account's own programs included, since a stopped workspace listens on nothing itself; the other three are proven to be another account's or the system's (the kernel shows more listeners on the address than this account owns). remade and before-start are printed only AFTER the rebuild succeeded: when #94 refuses the remake, or the remove is refused, the existing refusal line is what the trail gets - never a claim of a rebuild that did not happen (the #310 implementation review). unchecked is written once per preview, and only when DOCKER_HOST names an engine other than Colima - a developer's setting the app never makes - so a check that silently stopped happening cannot pass for one that found nothing. {place} is course/section.",
         "appliesOn": [
@@ -14690,6 +14690,7 @@
       "qwen",
       "wrangler",
       "python",
+      "workspace",
       "toolchains",
       "dockers",
       "containers",
@@ -14699,9 +14700,10 @@
       "gpus",
       "llamas",
       "wranglers",
-      "pythons"
+      "pythons",
+      "workspaces"
     ],
-    "matching": "Whole word and case-insensitive: “description” does not contain “script”. A plural is a different word to a whole-word match, so the plurals are LISTED (“scripts”, “containers”, …) rather than inferred — data both platforms read, not a matcher rule each must reimplement (#369 implementation review, N5; measured 2026-09-30 over all of the mac app: zero hits for any of them). Comments are not labels and are skipped.",
+    "matching": "Whole word and case-insensitive: “description” does not contain “script”. A plural is a different word to a whole-word match, so the plurals are LISTED (“scripts”, “containers”, …) rather than inferred — data both platforms read, not a matcher rule each must reimplement (#369 implementation review, N5; measured 2026-09-30 over all of the mac app: zero hits for any of them). Comments are not labels and are skipped, and so is code interpolated into a label (Swift's `\\(…)`): the sidebar's “No course or club matches “\\(workspace.filterText)”.” names a variable, not the machinery (found when “workspace” joined the list, 2026-09-30).",
     "scope": "On the mac: every string literal passed straight to a call that puts words on screen, in QuartzTeachers/Views — Text, Picker, Toggle, Button, LabeledContent, TextField, SecureField, Label, DisclosureGroup, ExampleCaption, FormSectionHeader, Section, .help, .navigationTitle, .alert, .confirmationDialog. Wording held in a named key is pinned by that key's own contract instead.",
     "exceptions": [
       {
@@ -14709,7 +14711,7 @@
         "why": "It credits Jacky Zhao's Quartz and asks the reader to sponsor him: naming it is the point. On the mac it is a LocalizedStringKey constant rather than a label literal, so the scan never reaches it; a platform whose scan does reach it exempts it by this entry."
       }
     ],
-    "why": "CLAUDE.md rule 1: the GUI never mentions the machinery. Until #369 that rule was enforced only by word lists inside individual features' tests, and no test scanned the labels in the views, which is how “Quartz locale” shipped from v1.1.0 to v1.4.0. Measured on 2026-09-29 with this list and this scope: exactly two hits, both fixed in #369. “terminal” is deliberately NOT on the list — “New Terminal at Folder” is a real macOS action a teacher uses."
+    "why": "CLAUDE.md rule 1: the GUI never mentions the machinery. Until #369 that rule was enforced only by word lists inside individual features' tests, and no test scanned the labels in the views, which is how “Quartz locale” shipped from v1.1.0 to v1.4.0. Measured on 2026-09-29 with this list and this scope: exactly two hits, both fixed in #369. “terminal” is deliberately NOT on the list — “New Terminal at Folder” is a real macOS action a teacher uses. “workspace” was added 2026-09-30 (v1.4.1 release sweep): Russell said the word meant nothing to him, and the launchers say “website builder” since #378 and #382; zero label hits when it was added."
   },
   "savingSettings": {
     "rule": "A Save writes only the settings THIS window changed since it last read or wrote the course's settings file. Every other setting keeps the value the file has now. Compared per TOP-LEVEL key of course_config.json, never inside a list. After a Save, every other window's copy of that course that has nothing unsaved reads the file again; a copy with unsaved changes is left alone, and its own Save follows the same rule.",

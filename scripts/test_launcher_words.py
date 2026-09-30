@@ -66,6 +66,9 @@ FORBIDDEN_WORDS = (
     "docker", "container", "containers",
     "colima", "lima", "buildx", "buildkit",
     "virtual machine", "disk image", "image", "images",
+    # Russell, v1.4.1: "workspace" meant nothing to him; the launchers say
+    # "website builder" (#378, #382).
+    "workspace", "workspaces",
 )
 
 EXEMPTION = "# never shown to a teacher:"
