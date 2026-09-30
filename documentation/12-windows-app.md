@@ -1538,8 +1538,8 @@ line), and since the fix round a per-section key is named by ONE helper,
 `documentation/08-course-config-reference.md` → "A writer must find the BLOCK".
 `AssistWorkspace.BodyAfterFrontmatter` is still hand-rolled (it trims and
 accepts `...`); the #188 rule is what it should agree with if it is touched.
-Four finders, two unified here, three on the mac. Check which one you
-are looking at before "tidying" any of them.
+Only `BodyAfterFrontmatter` is still its own finder here (the mac keeps
+several). Check which one you are looking at before "tidying" any of them.
 
 A third fault was shared with the mac and **was fixed here first, on
 2026-09-19; the mac followed the same day.**
