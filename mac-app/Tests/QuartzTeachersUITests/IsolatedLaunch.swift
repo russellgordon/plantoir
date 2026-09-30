@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 import Darwin
 
@@ -24,6 +25,23 @@ import Darwin
 struct IsolatedLaunch {
 
     // MARK: - Stored properties
+
+    /// The preferences key AppKit saves the main window's frame under. SwiftUI
+    /// names the window from the group's id (`WindowGroup(id: "main")`), so
+    /// it is `main-AppWindow-1`; before the group had an id it was a long
+    /// `SwiftUI.ModifiedContent<…>-1-AppWindow-1`, and the marketing captures
+    /// kept passing that dead name for months (#361). ONE constant, read by
+    /// every launch and by the captures, so the next rename cannot leave one
+    /// of them stale.
+    static let mainWindowFrameKey: String = "NSWindow Frame main-AppWindow-1"
+
+    /// The main window every isolated launch opens at, in AppKit's frame
+    /// format (the window, then the screen it is on) — so a test sees the
+    /// same size whatever frame the teacher last saved.
+    static func mainWindowFrameValue(width: Int, height: Int) -> String {
+        let screen: CGRect = NSScreen.main?.frame ?? CGRect(x: 0, y: 0, width: 1512, height: 982)
+        return "40 60 \(width) \(height) \(Int(screen.minX)) \(Int(screen.minY)) \(Int(screen.width)) \(Int(screen.height)) "
+    }
 
     /// The app, already launched.
     let application: XCUIApplication
@@ -98,7 +116,15 @@ struct IsolatedLaunch {
             .appendingPathComponent("plantoir-state-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: stateDirectory, withIntermediateDirectories: true)
 
-        var arguments: [String] = ["--state-dir", stateDirectory.path, "-ApplePersistenceIgnoreState", "YES"]
+        // The frame goes in the ARGUMENT domain, which outranks the saved one
+        // for reading and is never written: every launch opens at 1100×720
+        // whatever the teacher's window was left at (#361 — the rollover test
+        // met a main window big enough to cover the assistant). What stops the
+        // app WRITING the real frame is the product's AppKitBookkeepingGuard.
+        var arguments: [String] = [
+            "--state-dir", stateDirectory.path, "-ApplePersistenceIgnoreState", "YES",
+            "-" + IsolatedLaunch.mainWindowFrameKey, IsolatedLaunch.mainWindowFrameValue(width: 1100, height: 720),
+        ]
         var modelChoiceNote: String? = nil
         if linkRealAssistantWeights {
             try linkWeights(into: modelsFolder(inHome: stateDirectory))
