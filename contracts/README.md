@@ -1326,6 +1326,8 @@ lines are fields of the existing `build declined, course busy elsewhere`),
 and `shared-rules.json` holds **forty-four** rule sets (dev's forty-three plus
 this one).
 
+**Re-taken 2026-09-29 with bundle C** ([#364](https://github.com/russellgordon/plantoir/issues/364), #373, #374, #376, #369), counted at its merge into `dev` (365fbede): **273** lists (268 on dev plus five): `shared-rules.json` → `savingSettings.whatEnablesSave.freshOpenCases` (8), `.perSectionEditCases` (7), `.heldBackCases` (7), `userFacingLabelWords.exceptions` (1) and `wizard.clubToggle.settingsRows.shownWhenCases` (8). `activityTrail.mustRecord` **112** (`settings save held back`); **forty-seven** rule sets (`courseSettingsWording`, `userFacingLabelWords` and, later, #379's `linksChecklist`).
+
 **Re-taken 2026-09-29 with [#378](https://github.com/russellgordon/plantoir/issues/378)**
 (piece A: work left behind is stopped, the wait is named), counted on this
 branch after merging `origin/dev` 365fbede (#381 and bundle C), which read
@@ -1389,11 +1391,13 @@ Then look for a reader of each path in `windows-app/Plantoir.Tests/**`,
 `scripts/*.py` (which `PythonToolchainTests` discovers and runs inside `dotnet
 test`) and `windows-app/*.ps1` — and **check every miss by hand**, because a
 grep for two key names agrees with itself too easily in a large file, in both
-directions. The table below is the hand-checked half: it names **140** of the
-**265** lists (re-counted with the walker 2026-09-27, duplicate rows removed).
+directions. The table below is the hand-checked half: it names **152** of the
+**277** lists (140 of 265 at v1.4.0, re-counted with the walker 2026-09-27,
+duplicate rows removed; plus #381's three, #379's four and bundle C's five,
+2026-09-30).
 The "102 have a reader here" at the top of this section is the last figure
 DERIVED by hand, when there were 128 lists; it has not been re-derived since,
-and 265 − 140 is not it, because some unread lists are named only in the dated
+and 277 − 152 is not it, because some unread lists are named only in the dated
 entries above rather than in this table. Re-derive it; do not subtract.
 
 | List | Cases | Where it stands |
@@ -1421,6 +1425,9 @@ entries above rather than in this table. Re-derive it; do not subtract.
 | `class-planning.json` → `datingPagesAClassBrings.publishedBeforeIsRecorded.cases` | 2 | **Run on the mac, owed by Windows** — the assistant's date moves skip a page the section's published-pages record lists (Q5 of #379). Mac: `AssistToolRunnerTests`. A request, not damage, until Windows' assistant reads the record |
 | `shared-rules.json` → `linksChecklist.buildCases` | 3 | **Run, and inherited.** `scripts/test_links_checklist.py` → `OfferFileTests`: an unattended build publishes nothing (every page byte-compared), an empty offer removes the file, a reference course gets none. #379 |
 | `shared-rules.json` → `linksChecklist.publishCases` | 5 | **Run on the mac, owed by Windows.** `LinksChecklistTests` lays each case out and presses Publish or Not Now through `LinksChecklistPublisher` / `LinksChecklistSheetModel`. Windows owes the sheet, so these are unrun there until it has one — the `windows` issue from #379 |
+| `shared-rules.json` → `savingSettings.whatEnablesSave.freshOpenCases`, `.perSectionEditCases`, `.heldBackCases` | 8 + 7 + 7 | **Owed**, the `windows` issue #387: ADD a reader, then MATCH. Mac: `SaveEnablesTests`. Nothing reddens on pull. |
+| `shared-rules.json` → `wizard.clubToggle.settingsRows.shownWhenCases` | 8 | **Owed**, #387 (with #274's locked rows). Mac: `ClubFillTests`. No Windows reader of `settingsRows` yet. |
+| `shared-rules.json` → `userFacingLabelWords.exceptions` | 1 | **Owed**, #387 (run `forbidden` over your labels; the About credit is the exception). Mac: `UserFacingLabelWordsTests`. |
 | `app-rules.json` → `publishedFreshness.filesCountedUnderRule2.cases`, `.stampRuleCases.cases` | 8 + 6 | **Half run, half owed.** `scripts/test_section_fingerprint.py` runs `filesCountedUnderRule2` through the Python rule, and `PythonToolchainTests` discovers it; the C# half — rule 2, the stamp's `fingerprintRule`, the wrapper's `--rule 2` — is the `windows` MUST issue from #330, which also wires `stampRuleCases`. Until then Windows is unaffected: `section_fingerprint.py` still defaults to rule 1. |
 | `app-rules.json` → `builderWarmUp.startsWhen.cases`, `.turn.cases`, `.sequences.cases` | 8 + 7 + 2 | **Exempt, by construction** — `builderWarmUp.appliesOn: ["mac"]`, permanently: Windows carries its runtime and builds natively, so there is no builder to get ready and no launcher building one. `turn` and `sequences` are run on the mac by `scripts/test_getting_ready_turn.py` against the real bash block; it SKIPS OFF macOS, as the other launcher tests do (`ON_A_MAC`): on a Windows machine with Git Bash the block's BSD `stat` and macOS process ids would be misread (bundle B review S2). `startsWhen` is `BuilderWarmUpTests`. |
 | `shared-rules.json` → `startOfYear.cases`, `.rejected` | 15 + 12 (the fifteenth, #362, v1.4.1: pages named by title) | **Owed**, the `windows` issue from [#96](https://github.com/russellgordon/plantoir/issues/96). AUTHORED, arrived 2026-09-26. Unrun rather than red there: nothing reads the key yet. `startOfYear.howToRunACase` defines each page `kind` so the harness can be built from the contract alone; the mac runs every case through the real MCP pair (`StartOfYearTests.testStartOfYearAsTheContractSays`). `rejected` is prose with fields. |
