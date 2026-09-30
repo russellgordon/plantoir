@@ -2886,8 +2886,8 @@ public sealed class AssistWorkspace
         }
 
         string said =
-            $"Made room for {plan.Added.Count} class{(plan.Added.Count == 1 ? "" : "es")} at {UnitWordFor(plan.CourseCode)} " +
-            $"{plan.Unit}, Day {plan.AtDay}. Renamed {plan.Renames.Count}, moved {plan.Moves.Count} onto " +
+            AssistWording.MadeRoom(plan.Added.Count, UnitWordFor(plan.CourseCode), plan.Unit, plan.AtDay) +
+            $" Renamed {plan.Renames.Count}, moved {plan.Moves.Count} onto " +
             $"later class days, and updated {plan.LinksToRewrite} link" +
             $"{(plan.LinksToRewrite == 1 ? "" : "s")}. The new pages are unpublished until you write them. " +
             "Look the section over in Plantoir before you deploy it.";

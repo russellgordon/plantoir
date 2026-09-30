@@ -61,15 +61,35 @@ public class ActivityTrailWiringTests
             .ToList();
 
     /// <summary>
-    /// The lines that could be a call: not a comment, not the enum's
-    /// <c>KeyFor</c> arm (<c>Event.X =&gt; "…"</c>), which is declaration.
+    /// Product source with every comment and string literal taken out, so a
+    /// name mentioned in a comment, a doc line or a string is not mistaken for
+    /// a call (bundle 1 review: <c>_ = "ActivityTrail.Event.X";</c> kept the
+    /// first version of this scan green).
     /// </summary>
-    private static List<string> CallableLines(IEnumerable<string> files) =>
-        files.SelectMany(File.ReadAllLines)
-            .Select(line => line.Trim())
-            .Where(line => !line.StartsWith("//"))
-            .Where(line => !Regex.IsMatch(line, @"^Event\.\w+\s*=>"))
-            .ToList();
+    private static string Code(IEnumerable<string> files)
+    {
+        string all = string.Join("\n", files.Select(File.ReadAllText));
+        all = Regex.Replace(all, @"/\*.*?\*/", " ", RegexOptions.Singleline);
+        all = Regex.Replace(all, @"@""(?:""""|[^""])*""", "\"\"");
+        all = Regex.Replace(all, @"""(?:\\.|[^""\\\n])*""", "\"\"");
+        all = Regex.Replace(all, @"'(?:\\.|[^'\\\n])'", "' '");
+        all = Regex.Replace(all, @"//[^\n]*", "");
+        return all;
+    }
+
+    /// <summary>
+    /// The shapes that record an event: the event as <c>Note(</c>'s first
+    /// argument (qualified or not, on the same line or the next), or the value
+    /// a switch arm hands on to a <c>Note</c> call (<c>=&gt; ActivityTrail.Event.X</c>,
+    /// how <c>ScheduledPublishOutcome</c> picks its event). <c>KeyFor</c>'s
+    /// arms have the event on the LEFT of <c>=&gt;</c> and so do not count.
+    /// </summary>
+    private static bool IsRecorded(string code, ActivityTrail.Event ev)
+    {
+        string name = @"(?:Plantoir\.Core\.Scripting\.)?(?:ActivityTrail\.)?Event\." + ev + @"\b";
+        return Regex.IsMatch(code, @"\bNote\(\s*" + name)
+            || Regex.IsMatch(code, @"=>\s*" + name + @"\s*[,;}]");
+    }
 
     [Fact]
     public void EveryDeclaredEventIsReferencedSomewhereInProductCode()
@@ -77,12 +97,12 @@ public class ActivityTrailWiringTests
         var files = ProductFiles();
         Assert.True(files.Count > 100,
             $"Only {files.Count} product source files were found under {ProductSourceRoot}; the scan below would pass vacuously.");
-        var lines = CallableLines(files);
+        string code = Code(files);
 
         var unreferenced = Enum.GetValues<ActivityTrail.Event>()
             .Where(ev => !(RecordedThroughAHelper.TryGetValue(ev, out var helper)
-                ? lines.Any(line => line.Contains(helper, StringComparison.Ordinal))
-                : lines.Any(line => Regex.IsMatch(line, @"\bEvent\." + ev + @"\b"))))
+                ? Regex.IsMatch(code, Regex.Escape(helper))
+                : IsRecorded(code, ev)))
             .Select(ev => $"{ev} (\"{ActivityTrail.KeyFor(ev)}\")")
             .ToList();
 

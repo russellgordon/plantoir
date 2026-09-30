@@ -79,7 +79,7 @@ public sealed class InsertPlan
         if (Moves.Count > 0)
         {
             lines.Add("");
-            lines.Add($"Moved to later class days — {Moves.Count}:");
+            lines.Add(AssistWording.MovedToLaterDays(Moves.Count));
             foreach (var move in Moves.Take(MostShown))
             {
                 string fromText = move.From.HasValue ? DateText.Iso(move.From.Value) : "no date";
