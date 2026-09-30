@@ -60,7 +60,7 @@ public sealed class ReDatePlan
     public string Describe(int mostListed = 15)
     {
         var lines = new List<string>();
-        lines.Add($"{CourseCode} Section {SectionNumber}: re-dating onto the class dates on file.");
+        lines.Add(AssistWording.ReDatingOntoTheDatesOnFile(CourseCode, SectionNumber.ToString()));
         lines.Add("");
 
         if (ChangesNothing)
@@ -114,7 +114,7 @@ public sealed class ReDatePlan
                 case ReDateReason.AClass:
                     if (move.Unpublishes)
                     {
-                        lines.Add($"“{move.Title}” moves to {move.To:yyyy-MM-dd} and becomes a draft because it has no class date.");
+                        lines.Add(AssistWording.MovesAndBecomesADraft(move.Title, $"{move.To:yyyy-MM-dd}"));
                     }
                     else
                     {

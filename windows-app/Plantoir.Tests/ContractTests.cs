@@ -64,6 +64,15 @@ public class ContractTests
         Assert.Equal(wording["rolloverCouldNotStartANewWebsite"]!.ToString(),
                      AssistWording.RolloverCouldNotStartANewWebsite(".netlify_sites/section1.json"));
 
+        // The class-planning sentences hoisted on 2026-09-30, with the
+        // generator's own examples.
+        Assert.Equal(wording["madeRoom"]!.ToString(), AssistWording.MadeRoom(1, "Unit", 3, 4));
+        Assert.Equal(wording["movedToLaterDays"]!.ToString(), AssistWording.MovedToLaterDays(3));
+        Assert.Equal(wording["movesAndBecomesADraft"]!.ToString(), AssistWording.MovesAndBecomesADraft("{page}", "2026-12-15"));
+        Assert.Equal(wording["publishedTheClassOn"]!.ToString(), AssistWording.PublishedTheClassOn("2026-09-14"));
+        Assert.Equal(wording["reDatingOntoTheDatesOnFile"]!.ToString(), AssistWording.ReDatingOntoTheDatesOnFile("{course}", "{section}"));
+        Assert.Equal(wording["theNextWouldFallOn"]!.ToString(), AssistWording.TheNextWouldFallOn("2026-09-14", "Monday"));
+
         // ---- The walk: the file is the list.
         var keys = wording.Select(pair => pair.Key).ToList();
         var here = keys.Where(key => WordingMember(key) is not null).ToList();
@@ -122,12 +131,12 @@ public class ContractTests
     {
         ["DeployedToMultipleDestinations"] =
             "this app's own sentence for a deploy to more than one destination; the mac says " +
-            "wording.deployed and adds wording.deployWentOutTo, owed on #165",
+            "wording.deployed and adds wording.deployWentOutTo, owed on #400",
         ["DeployPartiallySucceeded"] =
             "this app's own sentence for a deploy that reached some destinations; the mac's shape is " +
-            "wording.deployWentOutTo, owed on #165",
+            "wording.deployWentOutTo, owed on #400",
         ["DeployToMultipleDestinationsDidNotFinish"] =
-            "this app's own sentence for a deploy that reached none of several destinations; owed on #165",
+            "this app's own sentence for a deploy that reached none of several destinations; owed on #400",
     };
 
     /// <summary>The public static member a wording key names, or null.</summary>
