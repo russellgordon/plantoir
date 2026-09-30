@@ -849,7 +849,7 @@ struct SidebarView: View {
             .padding(.trailing, 5)
 
             TextField("Filter", text: $workspace.filterText)
-                .textFieldStyle(.roundedBorder)
+                .borderedTextField()
                 .controlSize(.small)
                 .accessibilityIdentifier("courseFilterField")
         }

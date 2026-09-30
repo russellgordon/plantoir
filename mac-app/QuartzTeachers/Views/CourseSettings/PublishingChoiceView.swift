@@ -268,7 +268,7 @@ private struct CloudflareDetailFields: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             TextField("Cloudflare Account ID", text: $cloudflareAccountID)
-                .textFieldStyle(.roundedBorder)
+                .borderedTextField()
                 .accessibilityIdentifier("cloudflareAccountField")
 
             // The grey caption that used to sit here repeated the
@@ -358,7 +358,7 @@ private struct LocalFolderDetailFields: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 TextField("Folder", text: $path)
-                    .textFieldStyle(.roundedBorder)
+                    .borderedTextField()
                     .accessibilityIdentifier(fieldIdentifier)
                 Button("Choose…") {
                     chooseDeployFolder()

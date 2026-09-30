@@ -736,7 +736,7 @@ not starting with `/`, BEFORE it looks for the folder: the app's own current
 folder is `/`, so `Users/Shared` used to pass the check and then be published
 into `<working folder>/Users/Shared`. `Choose…` always yields a full path, so
 only a typed one reaches this. Every caller goes through the one function —
-the settings form and the wizard (Save is blocked), every leg of a
+the settings form and the wizard (Save is blocked when the edit moves the destination, #373 — `savingSettings.whatEnablesSave`), every leg of a
 multi-destination deploy, and a scheduled deploy — so a course that already
 SAVED a partial path is refused at Deploy rather than published somewhere
 else; no migration. `DeployCommand.arguments` also hands the launcher the
