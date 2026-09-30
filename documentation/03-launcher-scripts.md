@@ -1305,10 +1305,10 @@ scheduled run of C/S; this one lives inside the block, because setup.sh and
 deploy.sh need it too. They were written the same night on separate branches
 and were not merged into one helper then; the scheduled-label rule (course
 sanitized, `section<N>` followed by a dot) is the part that must stay the
-same in both — and already is not quite: #378's fix round reads a course
-code with a space whole, #381's guard still reads two words. Folding them
-into one helper is [#388](https://github.com/russellgordon/plantoir/issues/388)
-(v1.4.2).
+same in both. They now read a course code with a space the same way — whole,
+as the text the arguments of `deploy.sh` begin with — since #382 folded that
+one part of #388 into the guard; folding the two readers into one helper is
+still [#388](https://github.com/russellgordon/plantoir/issues/388) (v1.4.2).
 
 **Two fail-safes, and they point different ways.** A process table that cannot
 be read counts as every owner RUNNING (a wait and a refusal are recoverable;
@@ -1589,6 +1589,70 @@ contract case: a shared case Windows cannot implement becomes a named gap
 nobody can ever close. The one thing that side does owe is the new
 `failureExplanations` case.
 
+### What the console says about the website builder (GitHub #382)
+
+Everything a launcher prints reaches the app's console, where a teacher
+reads it, so none of it names the machinery (CLAUDE.md rule 1): the words
+are "website builder" and "this folder's website builder", never container,
+Docker or image. Until #382 the lines around this lifecycle said "Binding
+host courses to container", "Container teaching-quartz-… is already running
+with correct mount", "Creating new container named …", "Running
+setup_course.py inside the Docker container", and the diagnostic trio
+"🔌 Docker context", "🧭 Host detected by Docker", "🖼️ Using image".
+
+- **One progress marker where there were two.** `preview.sh` printed
+  "Starting container if needed" and `deploy.sh` "Ensuring container is
+  running"; both now print `🚀 Getting this folder's website builder ready…`,
+  and so does `setup.sh`, which printed neither. The marker
+  (`TaskMilestones`, generated into `contracts/app-rules.json` →
+  `milestones`) is that sentence less its emoji and ellipsis. `setup.sh`
+  gained the line because the example course's bar watched setup.sh for
+  "Starting container if needed", a line only preview.sh printed — its step 3
+  had never been reachable. It had to be a phrase no earlier line contains:
+  "Starting the website builder" is already the first-run block's line for
+  starting the engine, and a marker matched early moves the bar early. The two
+  old strings stay in `markerOrigins.knownDivergence.macOnlyLauncherMarkers`
+  so nothing on Windows reaches for them.
+- **The diagnostic trio.** "Docker context" and "Host detected by Docker"
+  were dropped, with the two `docker info` calls behind them; "Using image"
+  became `🧰 Website builder version: src-<hash>` — the part of the name that
+  changes with the recipe, which is what a problem report needs. REJECTED:
+  keeping the context line in plain words ("a website builder this Mac
+  already had"), which is still the machinery, and a debug flag, which no
+  teacher's run would carry.
+- **The folder's name for its builder** (`teaching-quartz-<id>`) is no longer
+  printed: it is derived from the folder's path, which the trail records.
+- **A folder still holding the old launchers** is harmless during the
+  change: the app replaces a folder's launchers whenever it opens it
+  (`reloadCourses` → `refreshLaunchersIfNeeded`), and an old copy run some
+  other way (an MCP-driven preview in a folder no window has reopened)
+  only makes a bar skip "Starting up…" — the bar takes the HIGHEST marker
+  it has seen, so it never stalls on the missing one.
+
+**Pinned by `scripts/test_launcher_words.py`**, the whole-launcher scan
+#228 and #263 left for later (the first-run block keeps its own Swift test,
+which also asks that the three copies are identical). What it reads as
+teacher-facing: every `echo` and `printf`, wherever it sits on its line
+(after `then`, `;`, `&&`, `||` or a `case` arm's `pattern)` as well);
+every `read -p` prompt; every line of a `cat <<'MSG'` message — with `$( … )`,
+`${ … }` and `$NAME` removed first. What it leaves out: comments and code,
+the `--help` heredocs, `echo "PLANTOIR_…` lines (the app reads and hides
+them), and a line ending `# never shown to a teacher: <why>` — the ONE way to
+keep a word, for lines the app cannot show (a function's answer captured by
+`$( … )`, the helper-path `case` arms among them, text piped into a
+command, the `--image`/`--context` developer paths; 38 lines today). REJECTED: an allow-list kept in the test, which freezes the list
+rather than emptying it and which a reader of the launcher never sees. It
+forbids toolchain, Docker, container, Colima, Lima, buildx, BuildKit,
+"virtual machine" and image, whole words, any case; not "script", which
+`deploy.sh` rightly uses for a preview's live-reload code. It also asks that
+every launcher marker a bar watches for is PRINTED by a launcher that bar
+reads — the check that would have caught the example course's dead step.
+Must-fails measured 2026-09-30: the old "Starting container if needed" echo
+back in `preview.sh` (1 failure), `setup.sh`'s new line removed (1
+failure, the example course's bar), and "container" put into a `case` arm's
+echo in `workspace_origin_in_words` (1 failure; the scan before the #382 fix
+round passed it).
+
 ## 5. Per-task specifics
 
 ### `setup.sh`
@@ -1697,7 +1761,14 @@ for.
   asked of `lsof -a -p <pid> -d cwd`, because this year's and last year's
   folders can hold the same course. One whose folder `lsof` cannot answer for
   still counts: a deploy of this very section is proved, only its folder is
-  not.
+  not. The course and section are matched as the text the arguments of
+  `deploy.sh` BEGIN with, one space between words and a space after the
+  section ("AP CALC 2 "), the way `the_owners_of_the_work` reads them: a
+  course code may hold a space, which `ps` shows as two words, and until #382
+  the guard compared one word for the course, so no deploy of such a course
+  refused its preview (the known gap #388 named). The trailing space is what
+  keeps section 1 from matching `AP CALC 12`, and "begins with" is what keeps
+  CALC from matching AP CALC; three `launcherCases` pin them.
 - a deploy set for later of C/S: any process whose arguments name its script,
   `ca.russellgordon.Plantoir.deploy.<CODE>.section<N>[.<folder id>].sh`
   (`<CODE>` as `ScheduledDeploy.sanitizedCode` writes it, the section bounded
@@ -1742,7 +1813,11 @@ panel (`FailureExplainer.sectionIsBeingDeployedExplanation`).
 with a pretend `ps` and `lsof`; must-fails measured 2026-09-29: counting
 `--build-only` as a deploy, refusing on an unreadable table, matching the
 course without the section, skipping the folder check, dropping the call, and
-dropping this run's family each turn a named case red. Checked once against
+dropping this run's family each turn a named case red; and (#382) comparing
+one word for the course, or dropping the space after the section, turns the
+spaced-course cases red, and matching the text ANYWHERE in the arguments
+(`index(…) >= 1` for `== 1`) turns "a course that ENDS another's code is
+another course" red (CALC 2 inside `deploy.sh AP CALC 2`). Checked once against
 the real process table too: a `deploy.sh ICS4U 2` sleeping in a scratch
 folder refused `preview.sh ICS4U 2` there with no engine call made, while the
 same deploy in ANOTHER folder, and a `--build-only` run, went on.

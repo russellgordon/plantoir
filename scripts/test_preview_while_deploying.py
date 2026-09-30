@@ -246,7 +246,7 @@ class TheCallSite(unittest.TestCase):
         self.assertGreater(call, 0)
         for first_change in ('link_course_build_output "$COURSE"', "# -------------------- Stop mode",
                              "ensure_container_runtime\n", "# >>> PREVIEW PORT BLOCK >>>",
-                             'echo "🚀 Starting container if needed..."'):
+                             'echo "🚀 Getting this folder\'s website builder ready…"'):
             place = text.find(first_change)
             self.assertGreater(place, 0, first_change)
             self.assertLess(call, place, f"the guard must run before {first_change!r}")
