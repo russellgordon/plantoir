@@ -7741,12 +7741,22 @@ def build_section_site(
             import socket
 
             def _port_is_free(candidate: int) -> bool:
-                try:
-                    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
-                        probe.bind(("", candidate))
-                    return True
-                except OSError:
-                    return False
+                # BOTH the wildcard and loopback, because the native Quartz
+                # binds 127.0.0.1 (fetch-runtime.ps1's patch) and Windows lets
+                # a wildcard bind sit beside another socket's specific
+                # 127.0.0.1 listener: measured 2026-09-30 (GitHub #319,
+                # Windows 11 25H2 build 26200), a bind to ("", 8471)
+                # SUCCEEDED while a 127.0.0.1:8471 listener was up, so this
+                # probe alone called a taken port free. The loopback bind
+                # fails there (WSAEADDRINUSE); the wildcard one still catches
+                # a 0.0.0.0 listener (135, measured) and a SYSTEM one (445).
+                for address in ("", "127.0.0.1"):
+                    try:
+                        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+                            probe.bind((address, candidate))
+                    except OSError:
+                        return False
+                return True
 
             candidate = first_free_preview_port(port, _port_is_free)
             if candidate != port:
