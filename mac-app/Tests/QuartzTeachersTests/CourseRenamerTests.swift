@@ -123,6 +123,31 @@ final class CourseRenamerTests: XCTestCase {
         }
     }
 
+    /// A course whose OLD code is outside the rule can be renamed to one
+    /// inside it (#402).
+    ///
+    /// The command-line setup lets such a course through with a note that
+    /// says "rename the course in Plantoir" — a course made at the command
+    /// line before #402 could be called "C++". That sentence is only true if
+    /// the rename accepts any old code and asks the rule of the NEW one only.
+    func testACourseWithACodeOutsideTheRuleCanBeRenamedIntoIt() throws {
+        let buildsRoot: URL = coursesURL.deletingLastPathComponent().appendingPathComponent("builds")
+        BuildOutputLocation.buildsRootOverride = buildsRoot
+        defer { BuildOutputLocation.buildsRootOverride = nil }
+        let course: Course = try makeCourse(code: "C++")
+        XCTAssertNotNil(CourseCodeRule.problem("C++", existingCodes: []), "the old code is outside the rule")
+
+        let outcome: CourseRenamer.Outcome = try CourseRenamer.rename(
+            course, to: "CPP", coursesDirectoryURL: coursesURL, existingCodes: ["C++"],
+            runner: SilentLaunchControl()
+        )
+
+        XCTAssertEqual(outcome.newCode, "CPP")
+        let movedConfigURL: URL = coursesURL.appendingPathComponent("CPP/course_config.json")
+        XCTAssertEqual(try CourseConfiguration(contentsOf: movedConfigURL).courseCode, "CPP")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: coursesURL.appendingPathComponent("C++").path))
+    }
+
     // MARK: - What the teacher is told
 
     /// Nothing at all, in the ordinary case. A teacher who has just watched
