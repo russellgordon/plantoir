@@ -115,6 +115,18 @@ public static class AssistWording
     public static string CourseIsBusy(string course) =>
         $"{course} is busy in Plantoir — a preview or a deploy is running. Wait for that to finish, then ask again.";
 
+    /// <summary>
+    /// What the WINDOW says when Preview or Deploy is declined because another
+    /// program on this computer is building, publishing or previewing the
+    /// course (#289, mac #156). An assistant is told <see cref="CourseIsBusy"/>
+    /// instead: on Windows both assistants are <c>plantoir-mcp</c>, the process
+    /// talking to the program whose course is busy.
+    /// </summary>
+    public static string CourseIsBeingBuiltElsewhere(string course) =>
+        $"{course} is being previewed or published somewhere else on this computer right now — by an assistant " +
+        "working from another app, another copy of Plantoir, or a deploy set for later. Both would build the same " +
+        "pages in the same place, so doing it here as well would spoil both. Try again once that has finished.";
+
     // MARK: - Previewing
 
     public static string PreviewIsRebuilding(string course, string section) =>

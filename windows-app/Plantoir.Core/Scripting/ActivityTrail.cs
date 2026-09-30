@@ -205,6 +205,34 @@ public static class ActivityTrail
         /// has nowhere to look.
         /// </remarks>
         ScheduledPublishFinished,
+        /// <summary>
+        /// A build was declined because ANOTHER program on this computer holds
+        /// the course's build, publish or preview lease (#289, mac #156).
+        /// Carries the course, the section, what was asked for, what the other
+        /// holds and its process id — never anything written on a page.
+        /// </summary>
+        BuildDeclinedCourseBusyElsewhere,
+        /// <summary>
+        /// A publish set for later found the course being built or published
+        /// elsewhere and waited for it (#289). Carries how long, for whom, and
+        /// whether it then went ahead or stood down — a publish that went out
+        /// ten minutes late looks, from outside, exactly like one that misfired.
+        /// </summary>
+        ScheduledPublishWaitedForTheCourse,
+        /// <summary>
+        /// A deploy the teacher set to happen on its own was turned off by
+        /// something other than them asking: the course or the section was
+        /// removed (#239), the day it was set for had gone by, the course was
+        /// still busy after the wait, or it could not deploy the way the course
+        /// is set now. Carries the course, the section and WHICH.
+        /// </summary>
+        ScheduledDeployTurnedOff,
+        /// <summary>
+        /// A publish set for later read the course's settings when it ran
+        /// (#347, mac #323) and found them different from what the teacher was
+        /// told, or stood down over them. Written only when something differs.
+        /// </summary>
+        ScheduledPublishReadTheCoursesSettings,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -253,6 +281,10 @@ public static class ActivityTrail
         Event.ScheduledPublishNeededAnAnswer => "scheduled publish needed an answer",
         Event.ScheduledPublishDidNotFinish => "scheduled publish did not finish",
         Event.ScheduledPublishFinished => "scheduled publish finished",
+        Event.BuildDeclinedCourseBusyElsewhere => "build declined, course busy elsewhere",
+        Event.ScheduledPublishWaitedForTheCourse => "scheduled publish waited for the course",
+        Event.ScheduledDeployTurnedOff => "scheduled deploy turned off",
+        Event.ScheduledPublishReadTheCoursesSettings => "scheduled publish read the course's settings",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 
