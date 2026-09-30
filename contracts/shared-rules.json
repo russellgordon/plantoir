@@ -786,15 +786,15 @@
       },
       {
         "event": "offered to publish pages that links lead to",
-        "carries": "the course and section; how many pages in each group (used by a class students can see, linked from other pages, classes); how many are listed under another page (#385); and how many would be published as offered - rows that GO, so a row under a row that is not going does not count although its own tick is on (#385); the occasion: after a preview, after publishing, on opening after a publish Plantoir did not watch (scheduled, the assistant, outside), or from the menu. Never a page's name.",
+        "carries": "the course and section; how many pages in each group (used by a class students can see, linked from other pages, classes); how many are listed under another page (#385); and how many would be published as offered - rows SHOWN ticked: rows that GO and, since #398, rows a ticked class brings (none at opening, since no class starts ticked), so a row under a row that is not going does not count although its own tick is on (#385); the occasion: after a preview, after publishing, on opening after a publish Plantoir did not watch (scheduled, the assistant, outside), or from the menu. Never a page's name.",
         "line": "{course}/{section} · offered to publish pages that links lead to {occasion} — {N} used by a class, {N} linked from other pages, {N} classes; {N} listed under another page; {N} ticked",
         "why": "Added with #379. #333's alert was shown and nobody could tell afterwards whether it had been seen; 'why did it ask me to publish 40 pages?' is answered by the occasion and the counts. #385 changed what 'ticked' counts: 'why did it only publish 3 when 5 were ticked?' is answered by the line."
       },
       {
         "event": "published pages that links led to",
-        "carries": "the course and section; how many pages were published, how many dated from a class, dated as the first class, kept their date; how many classes were published and how many pages they brought; how many were left unticked (their own tick off) and how many were left with the page they come under (#385: own tick on, but nothing they come under was published); the PLACES of the published pages, at most ten then 'and N more' - names in the course folder, never anything written on a page (the pagesDatedByTheBuild precedent). A page the writer declined is recorded by 'page settings left as they were' (#186), not here.",
-        "line": "{course}/{section} · published pages that links led to — {N pages} ({N} dated from a class, {N} dated as the first class, {N} kept their date), {N classes} bringing {N} more, {N} left unticked, {N} left with the page they come under: {places}",
-        "why": "Added with #379. It changes what students will see and rewrites dates in the teacher's own files; 'why is this page visible?' and 'why did its date change?' are asked weeks later."
+        "carries": "the course and section; how many pages were published, how many dated from a class, dated as the first class, kept their date; how many classes were published and how many pages they brought, and how many of those were rows of the list written ONLY because a ticked class brought them - own tick off, or on but nothing they come under went; a row that went on its own tick is not counted (#398: shown coming with a class); how many were left unticked (their own tick off) and how many were left with the page they come under (#385: own tick on, but nothing they come under was published); the PLACES of the published pages, at most ten then 'and N more' - names in the course folder, never anything written on a page (the pagesDatedByTheBuild precedent). A page the writer declined is recorded by 'page settings left as they were' (#186), not here.",
+        "line": "{course}/{section} · published pages that links led to — {N pages} ({N} dated from a class, {N} dated as the first class, {N} kept their date), {N classes} bringing {N} more ({N} of them on the list), {N} left unticked, {N} left with the page they come under: {places}",
+        "why": "Added with #379. It changes what students will see and rewrites dates in the teacher's own files; 'why is this page visible?' and 'why did its date change?' are asked weeks later. #398 added the rows a class brought: 'I unticked it and it was published' is answered by that count, which the places alone cannot tell apart from a row the teacher ticked."
       },
       {
         "event": "left pages hidden that links lead to",
@@ -4807,14 +4807,14 @@
       "class": "Classes not yet published: hidden class pages such a link lands on (Russell's decision 1)."
     },
     "ticking": "class-planning.json -> datingPagesAClassBrings.fromTheLinksChecklist.ticking. Classes start unticked; a page only a hidden class links directly starts unticked; everything else starts ticked. A row's tick is its OWN: a row reached only through other offered rows (`dependsOn`) keeps the tick it starts with, and goes only with one of those rows (followingARow) (#385).",
-    "whatAClassBrings": "A class ticked in the sheet is published the way the assistant's publish of that class would publish it (followingLinks.publishing, bothRoutesAgree): the pages it links to, transitively, stopping at other classes, each hidden one dated by that class (datingPagesAClassBrings; published-before pages keep theirs). The class's own date is untouched. Where a page is both a row and brought by a ticked class, the CLASS's date wins - it comes with that class (director's ruling F2). The sheet says how many pages a ticked class brings in one line under its row (the cut the director allowed instead of locked rows). A class published here does NOT repoint the section's front page: the front page keeps following the rule it follows today (director's ruling F1), and the sheet says so in one sentence, only when a class row is present (wording.frontPageStaysPut).",
+    "whatAClassBrings": "A class ticked in the sheet is published the way the assistant's publish of that class would publish it (followingLinks.publishing, bothRoutesAgree): the pages it links to, transitively, stopping at other classes, each hidden one dated by that class (datingPagesAClassBrings; published-before pages keep theirs). The class's own date is untouched. Where a page is both a row and brought by a ticked class, the CLASS's date wins - it comes with that class (director's ruling F2). The class row still says how many pages a ticked class brings, rows and pages that are not rows alike (wording.comesWith - which counts pages; it is not wording.comesWithAClass), and since #398 each ROW it brings is shown ticked and disabled as coming with it (comingWithAClass). A class published here does NOT repoint the section's front page: the front page keeps following the rule it follows today (director's ruling F1), and the sheet says so in one sentence, only when a class row is present (wording.frontPageStaysPut).",
     "followingARow": {
-      "rule": "#385. A row whose `dependsOn` is not empty (file-formats.json -> linksChecklistOffer.rowKeys.dependsOn) is reached only through those offered rows: no page students can see links it. It GOES - is shown ticked and is published by Publish - when its OWN tick is on AND at least one row in its `dependsOn` goes. A row with no `dependsOn` goes when its own tick is on. Worked out as the LEAST fixed point: start with nothing going and add rows until no more can be added, so pages that link only each other go only through a row that goes, never through each other. Its second line says it is linked from `dependsOn[0]` and goes when that page goes (wording.linkedFromRow / linkedFromSeveralRows) - never 'only': a hidden class may link it too (firstUsedIn), which `dependsOn` leaves out by design. A row with `dependsOn` that does not go is LOCKED: shown unticked and disabled, its own tick kept but not shown, and never written. It is LISTED UNDER `dependsOn[0]` - after that row, inside that row's group, indented (the indent is presentation; the mac caps it at three levels) - and not in its own group's list; its group, date and why are unchanged. A dependsOn place that is not a row of the sheet is not a parent. Class rows are never parents and never have `dependsOn`. The Publish button counts rows that go, and is disabled when none does. Rows a ticked class brings are published by that class whatever their own row shows (whatAClassBrings) - see knownLimit.",
+      "rule": "#385. A row whose `dependsOn` is not empty (file-formats.json -> linksChecklistOffer.rowKeys.dependsOn) is reached only through those offered rows: no page students can see links it. It GOES - is shown ticked and is published by Publish - when its OWN tick is on AND at least one row in its `dependsOn` goes. A row with no `dependsOn` goes when its own tick is on. Worked out as the LEAST fixed point: start with nothing going and add rows until no more can be added, so pages that link only each other go only through a row that goes, never through each other. Its second line says it is linked from `dependsOn[0]` and goes when that page goes (wording.linkedFromRow / linkedFromSeveralRows) - never 'only': a hidden class may link it too (firstUsedIn), which `dependsOn` leaves out by design. A row with `dependsOn` that does not go is LOCKED: shown unticked and disabled, its own tick kept but not shown, and never written. It is LISTED UNDER `dependsOn[0]` - after that row, inside that row's group, indented (the indent is presentation; the mac caps it at three levels) - and not in its own group's list; its group, date and why are unchanged. A dependsOn place that is not a row of the sheet is not a parent. Class rows are never parents and never have `dependsOn`. The Publish button counts rows SHOWN ticked - those that go and, since #398, those a ticked class brings (comingWithAClass) - and is disabled when none is. A row a ticked class brings is shown coming with that class, which wins over this rule's locking (comingWithAClass, #398).",
       "whyItsOwnTickIsKept": "Copying the parent's tick into the rows under it was measured and rejected (rejected: 'Copying a row's tick'): all 44 rows the 39 payloads put under another row start unticked on their own account, because a later class uses them first. Kept ticks are the Copy a Page lock inverted: there a row is locked TICKED while something that shows it is going; here it is locked UNTICKED while nothing it comes under is going. Untick a hub and tick it again, and the pages under it come back as they were.",
       "answered": "The answered file's leftUnticked (file-formats.json -> linksChecklistAnswered) holds only rows whose OWN tick was off and that were not written. A row left only because the row it comes under was left is NOT remembered as unticked, so the next time that row is ticked it comes with it.",
       "reRead": "When the sheet OPENS, rows are checked against the pages as they are now. A row whose page is now visible is dropped (as before) and the rows under it are FREED - their dependsOn becomes [] - because a page students can see now links them. A row whose page has gone is dropped, and so is its place in other rows' dependsOn; a row left with no dependsOn it could go with is DROPPED too (it could only be published with nothing linking it), repeated until nothing more drops. At PUBLISH the rows are checked again but nothing is freed: a row the sheet showed locked is never published because its parent was made visible while the sheet was open (plan-review finding 2); what goes is worked out from the rows as shown, less any page that has gone since.",
       "measured": "2026-09-30, over the 39 payloads, each laid out as an APPROXIMATE Get Ready (Unit 1, Day 1 visible with the pages it links, Key Links and its pages, folder indexes and curriculum pages; everything else hidden) - an emulation, not Get Ready itself: 2,463 offered rows; 44 depend on another row, in 9 payloads (SNC1W 24, MCR3U 7, SCH4U 3, ADA1O 2, SBI3U 2, SBI4U 2, SCH3U 2, MCV4U 1, SNC2D 1); 18 have two or more parents; 21 are listed under a row of the other group; the deepest chain is 2; ADA1O has two pages that link only each other. All 44 sit under a row that starts unticked and start unticked themselves, so straight after Get Ready this changes the LAYOUT of the sheet, not what a default press publishes. The behaviour change bites in the ordinary authoring case - a hidden hub with hidden worksheets behind it - which the payloads do not contain.",
-      "knownLimit": "Two, recorded and not closed here. (1) N2: a row that a TICKED class brings is published with that class (whatAClassBrings), whatever its own row shows - including a row under an unticked row, which is shown locked and unticked although the class will publish it. The counts are honest (it is not 'left hidden'); the checkbox is not. GitHub #398 ('Links checklist: show the rows a ticked class brings as coming with it (N2)'). (2) A row that goes only through a page the writer then DECLINES (no room for a key - noRoomForAKey, #186) is still published, with nothing students can see linking it: `going` is worked out before the writer runs. The teacher is told the page was declined, not that the row under it went without it. Rare (a page the writer cannot add a key to); not handled (director's ruling on the implementation review, note 2).",
+      "knownLimit": "One, recorded and not closed here. (N2, which was (1) here, is closed by #398, v1.4.2: comingWithAClass.) A row that goes only through a page the writer then DECLINES (no room for a key - noRoomForAKey, #186) is still published, with nothing students can see linking it: `going` is worked out before the writer runs. The teacher is told the page was declined, not that the row under it went without it. Rare (a page the writer cannot add a key to); not handled (director's ruling on the implementation review, note 2).",
       "howTheCasesRun": "PURE: no course is laid out. `rows` are the sheet's rows in order, each {place, group, ticked (its own starting tick), dependsOn}. `steps` are applied in order, each {\"tick\": place} or {\"untick\": place}, the way the sheet's checkbox applies them (the mac: LinksChecklistGate.toggled, which the checkbox calls). After the steps, `expectGoing` is exactly the set of places that go and `expectLocked` exactly the set shown locked; `expectShown`, when given, is the order and depth the sheet lists the rows in, as [place, depth] pairs across the groups in the sheet's group order. Run on the mac by LinksChecklistFollowingTests; owed by Windows.",
       "cases": [
         {
@@ -5207,6 +5207,497 @@
         }
       ]
     },
+    "comingWithAClass": {
+      "rule": "#398 (v1.4.2). A row that a TICKED class brings - one the class's publish would change because it links it (whatAClassBrings: the class publish's own plan, transitively, stopping at classes; never `firstUsedIn`) - is shown TICKED and DISABLED while that class is ticked, and its second line starts with wording.comesWithAClass naming the class, followed only by the plain linked-from part (wording.linkedFrom / linkedFromSeveral from `linkedFrom`): never the date line (the class's date wins, whatAClassBrings / ruling F2), never wording.firstUsedIn (it IS going now), never wording.linkedFromRow (the class has overruled 'goes when that page goes'). Precedence per row: coming with a ticked class, then followingARow's going and locked, then its own tick. A row coming with a class is never LOCKED. Its OWN tick is kept, never written by the class, and a tick or untick on it while it comes with a class is IGNORED (its checkbox is disabled; the mac: LinksChecklistGate.toggled, which the checkbox and the pure cases both call): untick the class and the row is back to exactly what its own tick and followingARow say. Where two ticked classes bring one row, the FIRST class in the sheet's order is named. A class row is never brought. The Publish button counts rows SHOWN ticked - those that go and those coming with a ticked class - and the offered trail line's 'ticked' counts the same. What is published does not change: a ticked class always published these rows (#379); this makes the sheet say so.",
+      "whatEachClassBrings": "Worked out ONCE, when the sheet opens: every class row's title goes through the publish planner together (the mac: AssistPublishPlanner.planPublishing(titles:), the call Publish makes for the ticked classes), and the pages it would change BECAUSE THEY ARE LINKED are shared out among the classes by each class's own reach. Exact, not an approximation: the reach of several classes is the union of each one's (the walk stops at every class and seeds every starting page as seen), and whether a reached page changes is decided page by page, so a class's share is what that class's own plan would change. So a page already visible, a page that cannot be read and a page the writer would decline (noRoomForAKey, #186) are not brought, here or at Publish. Rows are matched to the plan's pages in COMPOSED Unicode form (a file name is bytes; the build may have read it the other way). Nothing is re-planned per tick: ticking works over what was worked out at opening.",
+      "atPublish": "Publish passes the rows it SHOWED coming with a class. One of them that is not written after all - its class or its page changed while the sheet was open - is named with wording.pageChangedSince, like a row that went. What it leaves behind follows its OWN tick, like any other row: own tick off - it is remembered as unticked in the answered file and counted as left unticked (a teacher's own untick of a brought row is remembered like any other untick, and Not Now does the same); own tick on - it is left with the page it comes under, if it has one, and not remembered. So the sheet never forgets or invents an untick because a class happened to be ticked (#398 implementation review, note 6). A row written only because a ticked class brought it (its own tick off, or on but nothing it comes under went) is counted on the published trail line as '({N} of them on the list)'; a row that went on its own tick is not, even when a class also brings it.",
+      "measured": "2026-09-30, over the 39 payloads laid out as an APPROXIMATE Get Ready (followingARow.measured's emulation), with the reach a ticked class's publish follows: 2,463 offered rows, 39 class rows (one per payload, the last class, which links the exam page), and 1,900 of the 2,463 rows (77%) are brought by that one class - 1,886 were shown UNTICKED and published anyway, 41 shown LOCKED (#385) and published anyway, and 14 shown ticked with a date they would not get. 1,896 of the 1,900 are NOT `firstUsedIn` that class: they are reached through other pages, so a rule keyed on firstUsedIn misses almost all of them.",
+      "knownLimit": "Recorded, not closed. (1) What a class brings is worked out when the sheet OPENS; Publish re-plans the class from the pages as they are then. A link added to a ticked class while the sheet is open brings a row the sheet showed with its own tick (it is published: the class must bring what it links when it is written, or it publishes a dead link); a link removed, or the class or row made visible, means a row shown coming with it is not written - that one is NAMED (atPublish; iv-l for the class, iv-n for the row). (2) A row under a brought row that is NOT itself brought - the writer declines it (noRoomForAKey), or the build's link reader and the app's disagree about one link - stays locked under a row shown ticked, its second line saying it goes when that page goes, which is then false on screen; the row is correctly not published. Rare; not handled (plan review, note 11).",
+      "howTheCasesRun": "PURE, like followingARow.howTheCasesRun: no course is laid out. `rows` are the sheet's rows in order, each {place, group, ticked (its own starting tick), dependsOn}. `brings` maps a class row's place to the places its publish would bring (whatEachClassBrings), given as data. `steps` are applied in order, each {\"tick\": place} or {\"untick\": place}, the way the checkbox applies them: a step on a row that comes with a ticked class at that moment is IGNORED. After the steps: `expectGoing` is exactly the set that goes (followingARow), `expectLocked` exactly the set shown locked, `expectComesWith` exactly the rows coming with a ticked class as {place: the class named}, and `expectShownTicked` exactly the rows shown ticked. Run on the mac by LinksChecklistComingWithTests; owed by Windows.",
+      "cases": [
+        {
+          "name": "1. an ordinary row a ticked class brings is shown ticked, coming with it",
+          "rows": [
+            {
+              "place": "W",
+              "group": "fromAClass",
+              "ticked": false,
+              "dependsOn": []
+            },
+            {
+              "place": "K",
+              "group": "class",
+              "ticked": false,
+              "dependsOn": []
+            }
+          ],
+          "brings": {
+            "K": [
+              "W"
+            ]
+          },
+          "steps": [
+            {
+              "tick": "K"
+            }
+          ],
+          "expectGoing": [
+            "K"
+          ],
+          "expectLocked": [],
+          "expectComesWith": {
+            "W": "K"
+          },
+          "expectShownTicked": [
+            "K",
+            "W"
+          ]
+        },
+        {
+          "name": "2. untick the class and the row is back to its own tick",
+          "rows": [
+            {
+              "place": "W",
+              "group": "fromAClass",
+              "ticked": false,
+              "dependsOn": []
+            },
+            {
+              "place": "K",
+              "group": "class",
+              "ticked": false,
+              "dependsOn": []
+            }
+          ],
+          "brings": {
+            "K": [
+              "W"
+            ]
+          },
+          "steps": [
+            {
+              "tick": "K"
+            },
+            {
+              "untick": "K"
+            }
+          ],
+          "expectGoing": [],
+          "expectLocked": [],
+          "expectComesWith": {},
+          "expectShownTicked": []
+        },
+        {
+          "name": "3. a row under an unticked row, brought by a ticked class, is not locked",
+          "rows": [
+            {
+              "place": "H",
+              "group": "notReachedByAClass",
+              "ticked": false,
+              "dependsOn": []
+            },
+            {
+              "place": "W",
+              "group": "notReachedByAClass",
+              "ticked": false,
+              "dependsOn": [
+                "H"
+              ]
+            },
+            {
+              "place": "K",
+              "group": "class",
+              "ticked": false,
+              "dependsOn": []
+            }
+          ],
+          "brings": {
+            "K": [
+              "W"
+            ]
+          },
+          "steps": [
+            {
+              "tick": "K"
+            }
+          ],
+          "expectGoing": [
+            "K"
+          ],
+          "expectLocked": [],
+          "expectComesWith": {
+            "W": "K"
+          },
+          "expectShownTicked": [
+            "K",
+            "W"
+          ]
+        },
+        {
+          "name": "3b. untick the class and that row is locked again",
+          "rows": [
+            {
+              "place": "H",
+              "group": "notReachedByAClass",
+              "ticked": false,
+              "dependsOn": []
+            },
+            {
+              "place": "W",
+              "group": "notReachedByAClass",
+              "ticked": false,
+              "dependsOn": [
+                "H"
+              ]
+            },
+            {
+              "place": "K",
+              "group": "class",
+              "ticked": false,
+              "dependsOn": []
+            }
+          ],
+          "brings": {
+            "K": [
+              "W"
+            ]
+          },
+          "steps": [
+            {
+              "tick": "K"
+            },
+            {
+              "untick": "K"
+            }
+          ],
+          "expectGoing": [],
+          "expectLocked": [
+            "W"
+          ],
+          "expectComesWith": {},
+          "expectShownTicked": []
+        },
+        {
+          "name": "4. a row whose own tick is on is still shown as coming with the class (the class's date wins)",
+          "rows": [
+            {
+              "place": "W",
+              "group": "fromAClass",
+              "ticked": true,
+              "dependsOn": []
+            },
+            {
+              "place": "K",
+              "group": "class",
+              "ticked": false,
+              "dependsOn": []
+            }
+          ],
+          "brings": {
+            "K": [
+              "W"
+            ]
+          },
+          "steps": [
+            {
+              "tick": "K"
+            }
+          ],
+          "expectGoing": [
+            "K",
+            "W"
+          ],
+          "expectLocked": [],
+          "expectComesWith": {
+            "W": "K"
+          },
+          "expectShownTicked": [
+            "K",
+            "W"
+          ]
+        },
+        {
+          "name": "4b. untick the class and that row keeps its own tick",
+          "rows": [
+            {
+              "place": "W",
+              "group": "fromAClass",
+              "ticked": true,
+              "dependsOn": []
+            },
+            {
+              "place": "K",
+              "group": "class",
+              "ticked": false,
+              "dependsOn": []
+            }
+          ],
+          "brings": {
+            "K": [
+              "W"
+            ]
+          },
+          "steps": [
+            {
+              "tick": "K"
+            },
+            {
+              "untick": "K"
+            }
+          ],
+          "expectGoing": [
+            "W"
+          ],
+          "expectLocked": [],
+          "expectComesWith": {},
+          "expectShownTicked": [
+            "W"
+          ]
+        },
+        {
+          "name": "5. two ticked classes bring a row: it names the FIRST in the sheet's order, whichever was ticked last",
+          "rows": [
+            {
+              "place": "W",
+              "group": "fromAClass",
+              "ticked": false,
+              "dependsOn": []
+            },
+            {
+              "place": "K1",
+              "group": "class",
+              "ticked": false,
+              "dependsOn": []
+            },
+            {
+              "place": "K2",
+              "group": "class",
+              "ticked": false,
+              "dependsOn": []
+            }
+          ],
+          "brings": {
+            "K1": [
+              "W"
+            ],
+            "K2": [
+              "W"
+            ]
+          },
+          "steps": [
+            {
+              "tick": "K1"
+            },
+            {
+              "tick": "K2"
+            }
+          ],
+          "expectGoing": [
+            "K1",
+            "K2"
+          ],
+          "expectLocked": [],
+          "expectComesWith": {
+            "W": "K1"
+          },
+          "expectShownTicked": [
+            "K1",
+            "K2",
+            "W"
+          ]
+        },
+        {
+          "name": "6. an unticked class brings nothing",
+          "rows": [
+            {
+              "place": "W",
+              "group": "fromAClass",
+              "ticked": false,
+              "dependsOn": []
+            },
+            {
+              "place": "K",
+              "group": "class",
+              "ticked": false,
+              "dependsOn": []
+            }
+          ],
+          "brings": {
+            "K": [
+              "W"
+            ]
+          },
+          "steps": [],
+          "expectGoing": [],
+          "expectLocked": [],
+          "expectComesWith": {},
+          "expectShownTicked": []
+        },
+        {
+          "name": "7. a brought row brings the row under it too; nothing their own ticks say changes that",
+          "rows": [
+            {
+              "place": "H",
+              "group": "notReachedByAClass",
+              "ticked": false,
+              "dependsOn": []
+            },
+            {
+              "place": "W",
+              "group": "notReachedByAClass",
+              "ticked": true,
+              "dependsOn": [
+                "H"
+              ]
+            },
+            {
+              "place": "K",
+              "group": "class",
+              "ticked": false,
+              "dependsOn": []
+            }
+          ],
+          "brings": {
+            "K": [
+              "H",
+              "W"
+            ]
+          },
+          "steps": [
+            {
+              "tick": "K"
+            }
+          ],
+          "expectGoing": [
+            "K"
+          ],
+          "expectLocked": [],
+          "expectComesWith": {
+            "H": "K",
+            "W": "K"
+          },
+          "expectShownTicked": [
+            "H",
+            "K",
+            "W"
+          ]
+        },
+        {
+          "name": "8. an untick on a row that comes with a class is ignored: its own tick is still on afterwards",
+          "rows": [
+            {
+              "place": "W",
+              "group": "fromAClass",
+              "ticked": true,
+              "dependsOn": []
+            },
+            {
+              "place": "K",
+              "group": "class",
+              "ticked": false,
+              "dependsOn": []
+            }
+          ],
+          "brings": {
+            "K": [
+              "W"
+            ]
+          },
+          "steps": [
+            {
+              "tick": "K"
+            },
+            {
+              "untick": "W"
+            },
+            {
+              "untick": "K"
+            }
+          ],
+          "expectGoing": [
+            "W"
+          ],
+          "expectLocked": [],
+          "expectComesWith": {},
+          "expectShownTicked": [
+            "W"
+          ]
+        },
+        {
+          "name": "9. a tick on a row that comes with a class is ignored too: its own tick is still off afterwards",
+          "rows": [
+            {
+              "place": "W",
+              "group": "fromAClass",
+              "ticked": false,
+              "dependsOn": []
+            },
+            {
+              "place": "K",
+              "group": "class",
+              "ticked": false,
+              "dependsOn": []
+            }
+          ],
+          "brings": {
+            "K": [
+              "W"
+            ]
+          },
+          "steps": [
+            {
+              "tick": "K"
+            },
+            {
+              "tick": "W"
+            },
+            {
+              "untick": "K"
+            }
+          ],
+          "expectGoing": [],
+          "expectLocked": [],
+          "expectComesWith": {},
+          "expectShownTicked": []
+        },
+        {
+          "name": "10. a class row is never brought, even if another class's plan names it",
+          "rows": [
+            {
+              "place": "K1",
+              "group": "class",
+              "ticked": false,
+              "dependsOn": []
+            },
+            {
+              "place": "K2",
+              "group": "class",
+              "ticked": false,
+              "dependsOn": []
+            }
+          ],
+          "brings": {
+            "K1": [
+              "K2"
+            ]
+          },
+          "steps": [
+            {
+              "tick": "K1"
+            }
+          ],
+          "expectGoing": [
+            "K1"
+          ],
+          "expectLocked": [],
+          "expectComesWith": {},
+          "expectShownTicked": [
+            "K1"
+          ]
+        }
+      ],
+      "shownState": "What goes, what comes with a ticked class and what is shown ticked are worked out ONCE per change of the ticks, for the whole sheet - never per row per redraw. Each is a pass over every row; the mac worked them out on every access at first and one redraw of a 461-row sheet took 11.8 s in Debug on an Apple M4 Pro (0.031 s once cached; LinksChecklistComingWithTests pins a 0.5 s ceiling). Presentation, not a rule a case can carry; stated so a port does not repeat it."
+    },
     "naming": {
       "rule": "#385's page-naming notes. The sheet names pages the way #362's start-of-year plan does (startOfYear.planShows), with the same builder rather than a second rule: every page in a second line is wording `{name}` - its title (front matter title, else file name, else the folder for a folder's own index page), followed by its folder within the course when ANOTHER PAGE IN THE SECTION has the same title (not only another row). A row's own title is the same title, unquoted, and wording.rowInFolder when it is shared. Never the file name when the page has a title, never a path, never .md.",
       "howTheCaseRuns": "Laid out in section 1 of a fresh course, the keys as startOfYear.howToRunACase defines them (class, page, folderIndex, `visible`, `links`, `folder`, `shownAs`) - a `folderIndex` is written with NO title. `offer` is the rows as the build would write them; the runner fills `title` with the file name (the last part of the place, as the build's title_of does for a page with no title) and `linkedFrom` from the case. The sheet opens on it. `expectRowTitles` maps a place to what its row is called: {\"wording\": \"rowInFolder\", \"page\", \"folder\"} or {\"plain\": text}; each must also DIFFER from the row's `title` when the page's title does. Every row's second line must contain each of `expectSecondLinesContain` ({\"wording\": \"pageName\", \"page\"}: startOfYear.wording.pageName) and none of `expectSecondLinesNeverContain`. `expectRowTitles` may be absent. `expectSecondLines` maps a place to the parts its second line must contain, each {\"wording\": key, \"name\": page title} rendered with that key and {name} = startOfYear.wording.pageName (a class's title is its page name). `thenWithout` removes that row from the offer and opens the sheet again: `expectRowTitlesThen` must still hold - the title is shared across the SECTION, so it stays shared with a row gone. Run on the mac by LinksChecklistFollowingTests; owed by Windows.",
@@ -5475,6 +5966,7 @@
       "linkedFromSeveral": "linked from {name} and {count} more",
       "linkedFromRow": "linked from {name} — it goes when that page goes",
       "linkedFromSeveralRows": "linked from {name} and {count} more hidden {pages} — it goes when one of them goes",
+      "comesWithAClass": "comes with {name} — it goes when that class goes",
       "rowInFolder": "{page} (in {folder})",
       "frontPageStaysPut": "Publishing a class here does not change which class the front page shows.",
       "nothingChangesUntilYouDeploy": "Nothing changes for students until you deploy.",
@@ -5499,7 +5991,7 @@
       "Offering the checklist after every build: after Get Ready that is a sheet of ~56 pages on every preview. Offered once per answered set, plus the menu item.",
       "fixable: true on the finding: the flag means 'a repair button exists' to anyone porting the alert by flag; the checklist is a separate path, and SiteHealthRepair.canRepair must not start offering one.",
       "Changing the assistant's reach to two steps - knownDifference.",
-      "Locked 'comes with' rows under a ticked class - one summary line instead (wording.comesWith), the cut the director allowed for time.",
+      "(Reversed by #398, v1.4.2: the rows a ticked class brings are now shown ticked and disabled, coming with it, where they stand - comingWithAClass.) Locked 'comes with' rows under a ticked class - one summary line instead (wording.comesWith), the cut the director allowed for time.",
       "Copying a row's tick into the rows under it (tick a page and the pages under it tick too) - #385. Measured over the 39 payloads after an approximate Get Ready: every one of the 44 rows that come under another row starts unticked because a later class uses it first, and SNC1W's Final Examination has 10 of them under it; ticking the exam would publish ten pages of later units. It also forgets an untick the teacher made by hand (followingARow.whyItsOwnTickIsKept).",
       "'A row goes when a row it comes under is TICKED' - #385. Wrong for a chain (the middle row is ticked but not going) and for pages that link only each other (two hidden pages would publish each other with nothing students can see linking either). A row goes only when a row it comes under GOES, worked out from nothing upwards (followingARow.rule).",
       "Naming only the NEARER rows in dependsOn - #385. A page linked by a near row that is left and a farther row that goes would be left hidden while a published page links it: a new dead link nobody chose. The full list decides whether it goes; only the first decides where it is shown.",
@@ -5507,7 +5999,14 @@
       "Listing a row under EVERY row it comes under - two checkboxes for one page. It is listed under the nearest, and its second line says how many more there are (wording.linkedFromSeveralRows).",
       "Leaving a row in its own group with only a sentence saying what it comes under - #385 asks for 'listed under', and 21 of the 44 measured would sit two headings away from the row that decides them.",
       "Changing the build's `title` to the name the sheet shows - #385's page-naming notes. title_of also feeds class detection and sort keys in the build; the app re-reads every row with its own reader anyway and names it the way #362 does (startOfYear.planShows).",
-      "Showing the rows a ticked class brings as 'coming with it', locked (the N2 limit) - not #385's; left to its own GitHub issue (followingARow.knownLimit)."
+      "(Done by #398, v1.4.2 - comingWithAClass.) Showing the rows a ticked class brings as 'coming with it', locked (the N2 limit) - not #385's; left to its own GitHub issue (followingARow.knownLimit).",
+      "Letting the teacher untick a row a ticked class brings and publishing the class without it - #398. That changes what is published, and the published class would link a hidden page: the dead link followingLinks.publishing exists to prevent. It would also make the checklist's publish of a class differ from the assistant's (bothRoutesAgree). Only Russell could choose it.",
+      "Working out what a class brings from `firstUsedIn` - #398. Measured: 1,896 of the 1,900 rows the payloads' class rows bring are reached through other pages (comingWithAClass.measured).",
+      "A second walk in the sheet (the link reach on its own, as the class row's count used to be) instead of the publisher's own plan - #398. Two rules for one set; the old count already disagreed at the edges (pages the writer declines, and the class found by title as the publisher finds it).",
+      "One planner call per class row when the sheet opens - #398 plan review, S6. Each call reads every page in the reach and runs the writer on it; a section mid-year can offer twenty classes behind one visible overview. One call for all of them, shared out by each class's reach, gives the same answer (comingWithAClass.whatEachClassBrings).",
+      "Copying the class's tick into the rows it brings - #398. Unticking the class would then publish or forget them wrongly: the reason followingARow.whyItsOwnTickIsKept gives.",
+      "Dropping the class row's 'brings N more pages with it' once the rows say 'comes with' - #398. It also counts pages that are not rows (most of the pages a payload's exam-day class reaches), which appear nowhere else.",
+      "Listing the rows a ticked class brings UNDER the class row (#385's nesting) - #398. The class group is last; moving up to 81 rows under it on one tick would reorder the whole sheet. The rows stay where they are and the second line names the class."
     ],
     "buildCases": [
       {
@@ -6649,9 +7148,618 @@
           "Concepts/Worksheet"
         ],
         "expectRememberedUnticked": []
+      },
+      {
+        "name": "iv-j. a row under an unticked page that a ticked class brings is shown coming with it, and published with it (#398)",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "date": "2026-09-08",
+            "links": [
+              "How Marks Work"
+            ]
+          },
+          {
+            "title": "Unit 3, Day 1",
+            "kind": "class",
+            "visible": false,
+            "date": "2026-10-20",
+            "links": [
+              "Worksheet"
+            ]
+          },
+          {
+            "title": "How Marks Work",
+            "kind": "page",
+            "visible": true,
+            "date": "2026-09-08",
+            "links": [
+              "Hub",
+              "Unit 3, Day 1"
+            ]
+          },
+          {
+            "title": "Hub",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01",
+            "links": [
+              "Worksheet"
+            ]
+          },
+          {
+            "title": "Worksheet",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          }
+        ],
+        "offer": [
+          {
+            "place": "Concepts/Hub",
+            "group": "fromAClass",
+            "ticked": true,
+            "step": 2,
+            "claimedBy": "section1/All Classes/Unit 1, Day 1",
+            "date": "2026-09-08",
+            "why": "dated",
+            "firstUsedIn": null,
+            "dependsOn": []
+          },
+          {
+            "place": "Concepts/Worksheet",
+            "group": "notReachedByAClass",
+            "ticked": false,
+            "step": null,
+            "claimedBy": null,
+            "date": "2026-09-08",
+            "why": "datedAsTheFirstClass",
+            "firstUsedIn": "section1/All Classes/Unit 3, Day 1",
+            "dependsOn": [
+              "Concepts/Hub"
+            ]
+          },
+          {
+            "place": "section1/All Classes/Unit 3, Day 1",
+            "group": "class",
+            "ticked": false,
+            "step": null,
+            "claimedBy": null,
+            "date": null,
+            "why": "classNeverDated",
+            "firstUsedIn": null,
+            "dependsOn": []
+          }
+        ],
+        "tick": [
+          "section1/All Classes/Unit 3, Day 1"
+        ],
+        "expectLocked": [],
+        "expectComesWith": {
+          "Concepts/Worksheet": "section1/All Classes/Unit 3, Day 1"
+        },
+        "expectPublishCount": 2,
+        "expectSecondLines": {
+          "Concepts/Worksheet": [
+            {
+              "wording": "comesWithAClass",
+              "name": "Unit 3, Day 1"
+            }
+          ]
+        },
+        "expectSecondLinesLack": {
+          "Concepts/Worksheet": [
+            {
+              "wording": "firstUsedIn",
+              "name": "Unit 3, Day 1"
+            },
+            {
+              "wording": "linkedFromRow",
+              "name": "Hub"
+            }
+          ]
+        },
+        "expect": {
+          "Unit 3, Day 1": {
+            "visible": true,
+            "date": "2026-10-20"
+          },
+          "Worksheet": {
+            "visible": true,
+            "date": "2026-10-20"
+          },
+          "Hub": {
+            "visible": false,
+            "date": "2026-02-01"
+          }
+        },
+        "expectLeftHidden": [
+          "Concepts/Hub"
+        ],
+        "expectLeftWithTheirPage": [],
+        "expectRememberedUnticked": [
+          "Concepts/Hub"
+        ],
+        "expectChangedSince": [],
+        "expectCameWithAClass": 1
+      },
+      {
+        "name": "iv-k. a row a ticked class brings THROUGH another page, ticked on its own, is shown coming with the class and takes the class's date (#398)",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "date": "2026-09-08",
+            "links": [
+              "How Marks Work"
+            ]
+          },
+          {
+            "title": "How Marks Work",
+            "kind": "page",
+            "visible": true,
+            "date": "2026-09-08",
+            "links": [
+              "Worksheet",
+              "Unit 2, Day 5"
+            ]
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "kind": "class",
+            "visible": false,
+            "date": "2026-10-20",
+            "links": [
+              "Class Notes"
+            ]
+          },
+          {
+            "title": "Class Notes",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01",
+            "links": [
+              "Worksheet"
+            ]
+          },
+          {
+            "title": "Worksheet",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          }
+        ],
+        "offer": [
+          {
+            "place": "Concepts/Worksheet",
+            "group": "fromAClass",
+            "ticked": true,
+            "step": 2,
+            "claimedBy": "section1/All Classes/Unit 1, Day 1",
+            "date": "2026-09-08",
+            "why": "dated",
+            "firstUsedIn": null,
+            "dependsOn": []
+          },
+          {
+            "place": "section1/All Classes/Unit 2, Day 5",
+            "group": "class",
+            "ticked": false,
+            "step": null,
+            "claimedBy": null,
+            "date": null,
+            "why": "classNeverDated",
+            "firstUsedIn": null,
+            "dependsOn": []
+          }
+        ],
+        "tick": [
+          "Concepts/Worksheet",
+          "section1/All Classes/Unit 2, Day 5"
+        ],
+        "expectLocked": [],
+        "expectComesWith": {
+          "Concepts/Worksheet": "section1/All Classes/Unit 2, Day 5"
+        },
+        "expectPublishCount": 2,
+        "expectSecondLines": {
+          "Concepts/Worksheet": [
+            {
+              "wording": "comesWithAClass",
+              "name": "Unit 2, Day 5"
+            }
+          ]
+        },
+        "expectSecondLinesLack": {
+          "Concepts/Worksheet": [
+            {
+              "wording": "datedLike",
+              "name": "Unit 1, Day 1"
+            }
+          ]
+        },
+        "expect": {
+          "Unit 2, Day 5": {
+            "visible": true,
+            "date": "2026-10-20"
+          },
+          "Class Notes": {
+            "visible": true,
+            "date": "2026-10-20"
+          },
+          "Worksheet": {
+            "visible": true,
+            "date": "2026-10-20"
+          }
+        },
+        "expectLeftHidden": [],
+        "expectLeftWithTheirPage": [],
+        "expectRememberedUnticked": [],
+        "expectChangedSince": [],
+        "expectCameWithAClass": 0
+      },
+      {
+        "name": "iv-l. the class is made visible WHILE the sheet is open: the row shown coming with it is not published and is named as changed; its own untick is remembered like any other (#398, plan review S7, implementation review note 6)",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "date": "2026-09-08",
+            "links": [
+              "How Marks Work"
+            ]
+          },
+          {
+            "title": "Unit 3, Day 1",
+            "kind": "class",
+            "visible": false,
+            "date": "2026-10-20",
+            "links": [
+              "Worksheet"
+            ]
+          },
+          {
+            "title": "How Marks Work",
+            "kind": "page",
+            "visible": true,
+            "date": "2026-09-08",
+            "links": [
+              "Hub",
+              "Unit 3, Day 1"
+            ]
+          },
+          {
+            "title": "Hub",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01",
+            "links": [
+              "Worksheet"
+            ]
+          },
+          {
+            "title": "Worksheet",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          }
+        ],
+        "offer": [
+          {
+            "place": "Concepts/Hub",
+            "group": "fromAClass",
+            "ticked": true,
+            "step": 2,
+            "claimedBy": "section1/All Classes/Unit 1, Day 1",
+            "date": "2026-09-08",
+            "why": "dated",
+            "firstUsedIn": null,
+            "dependsOn": []
+          },
+          {
+            "place": "Concepts/Worksheet",
+            "group": "notReachedByAClass",
+            "ticked": false,
+            "step": null,
+            "claimedBy": null,
+            "date": "2026-09-08",
+            "why": "datedAsTheFirstClass",
+            "firstUsedIn": "section1/All Classes/Unit 3, Day 1",
+            "dependsOn": [
+              "Concepts/Hub"
+            ]
+          },
+          {
+            "place": "section1/All Classes/Unit 3, Day 1",
+            "group": "class",
+            "ticked": false,
+            "step": null,
+            "claimedBy": null,
+            "date": null,
+            "why": "classNeverDated",
+            "firstUsedIn": null,
+            "dependsOn": []
+          }
+        ],
+        "tick": [
+          "section1/All Classes/Unit 3, Day 1",
+          "Concepts/Hub"
+        ],
+        "madeVisibleAfterOpening": [
+          "Unit 3, Day 1"
+        ],
+        "expectLocked": [],
+        "expectComesWith": {
+          "Concepts/Worksheet": "section1/All Classes/Unit 3, Day 1"
+        },
+        "expectPublishCount": 3,
+        "expect": {
+          "Hub": {
+            "visible": true,
+            "date": "2026-09-08"
+          },
+          "Worksheet": {
+            "visible": false,
+            "date": "2026-02-01"
+          },
+          "Unit 3, Day 1": {
+            "visible": true,
+            "date": "2026-10-20"
+          }
+        },
+        "expectLeftHidden": [
+          "Concepts/Worksheet"
+        ],
+        "expectLeftWithTheirPage": [],
+        "expectRememberedUnticked": [
+          "Concepts/Worksheet"
+        ],
+        "expectChangedSince": [
+          "Unit 3, Day 1",
+          "Worksheet"
+        ],
+        "expectCameWithAClass": 0
+      },
+      {
+        "name": "iv-m. a row under an unticked page, its OWN tick on, that a ticked class brings is published with the class and counted as came with it (#398, implementation review finding 3)",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "date": "2026-09-08",
+            "links": [
+              "How Marks Work"
+            ]
+          },
+          {
+            "title": "Unit 3, Day 1",
+            "kind": "class",
+            "visible": false,
+            "date": "2026-10-20",
+            "links": [
+              "Worksheet"
+            ]
+          },
+          {
+            "title": "How Marks Work",
+            "kind": "page",
+            "visible": true,
+            "date": "2026-09-08",
+            "links": [
+              "Hub",
+              "Unit 3, Day 1"
+            ]
+          },
+          {
+            "title": "Hub",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01",
+            "links": [
+              "Worksheet"
+            ]
+          },
+          {
+            "title": "Worksheet",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          }
+        ],
+        "offer": [
+          {
+            "place": "Concepts/Hub",
+            "group": "fromAClass",
+            "ticked": true,
+            "step": 2,
+            "claimedBy": "section1/All Classes/Unit 1, Day 1",
+            "date": "2026-09-08",
+            "why": "dated",
+            "firstUsedIn": null,
+            "dependsOn": []
+          },
+          {
+            "place": "Concepts/Worksheet",
+            "group": "notReachedByAClass",
+            "ticked": false,
+            "step": null,
+            "claimedBy": null,
+            "date": "2026-09-08",
+            "why": "datedAsTheFirstClass",
+            "firstUsedIn": "section1/All Classes/Unit 3, Day 1",
+            "dependsOn": [
+              "Concepts/Hub"
+            ]
+          },
+          {
+            "place": "section1/All Classes/Unit 3, Day 1",
+            "group": "class",
+            "ticked": false,
+            "step": null,
+            "claimedBy": null,
+            "date": null,
+            "why": "classNeverDated",
+            "firstUsedIn": null,
+            "dependsOn": []
+          }
+        ],
+        "tick": [
+          "section1/All Classes/Unit 3, Day 1",
+          "Concepts/Worksheet"
+        ],
+        "expectLocked": [],
+        "expectComesWith": {
+          "Concepts/Worksheet": "section1/All Classes/Unit 3, Day 1"
+        },
+        "expectPublishCount": 2,
+        "expect": {
+          "Unit 3, Day 1": {
+            "visible": true,
+            "date": "2026-10-20"
+          },
+          "Worksheet": {
+            "visible": true,
+            "date": "2026-10-20"
+          },
+          "Hub": {
+            "visible": false,
+            "date": "2026-02-01"
+          }
+        },
+        "expectLeftHidden": [
+          "Concepts/Hub"
+        ],
+        "expectLeftWithTheirPage": [],
+        "expectRememberedUnticked": [
+          "Concepts/Hub"
+        ],
+        "expectChangedSince": [],
+        "expectCameWithAClass": 1
+      },
+      {
+        "name": "iv-n. a row shown coming with a class is made visible WHILE the sheet is open: it is named as changed, not dropped silently (#398, implementation review note 4)",
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "date": "2026-09-08",
+            "links": [
+              "How Marks Work"
+            ]
+          },
+          {
+            "title": "Unit 3, Day 1",
+            "kind": "class",
+            "visible": false,
+            "date": "2026-10-20",
+            "links": [
+              "Worksheet"
+            ]
+          },
+          {
+            "title": "How Marks Work",
+            "kind": "page",
+            "visible": true,
+            "date": "2026-09-08",
+            "links": [
+              "Hub",
+              "Unit 3, Day 1"
+            ]
+          },
+          {
+            "title": "Hub",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01",
+            "links": [
+              "Worksheet"
+            ]
+          },
+          {
+            "title": "Worksheet",
+            "kind": "page",
+            "visible": false,
+            "date": "2026-02-01"
+          }
+        ],
+        "offer": [
+          {
+            "place": "Concepts/Hub",
+            "group": "fromAClass",
+            "ticked": true,
+            "step": 2,
+            "claimedBy": "section1/All Classes/Unit 1, Day 1",
+            "date": "2026-09-08",
+            "why": "dated",
+            "firstUsedIn": null,
+            "dependsOn": []
+          },
+          {
+            "place": "Concepts/Worksheet",
+            "group": "notReachedByAClass",
+            "ticked": false,
+            "step": null,
+            "claimedBy": null,
+            "date": "2026-09-08",
+            "why": "datedAsTheFirstClass",
+            "firstUsedIn": "section1/All Classes/Unit 3, Day 1",
+            "dependsOn": [
+              "Concepts/Hub"
+            ]
+          },
+          {
+            "place": "section1/All Classes/Unit 3, Day 1",
+            "group": "class",
+            "ticked": false,
+            "step": null,
+            "claimedBy": null,
+            "date": null,
+            "why": "classNeverDated",
+            "firstUsedIn": null,
+            "dependsOn": []
+          }
+        ],
+        "tick": [
+          "section1/All Classes/Unit 3, Day 1"
+        ],
+        "madeVisibleAfterOpening": [
+          "Worksheet"
+        ],
+        "expectLocked": [],
+        "expectComesWith": {
+          "Concepts/Worksheet": "section1/All Classes/Unit 3, Day 1"
+        },
+        "expectPublishCount": 2,
+        "expect": {
+          "Unit 3, Day 1": {
+            "visible": true,
+            "date": "2026-10-20"
+          },
+          "Hub": {
+            "visible": false,
+            "date": "2026-02-01"
+          }
+        },
+        "expectLeftHidden": [
+          "Concepts/Hub"
+        ],
+        "expectLeftWithTheirPage": [],
+        "expectRememberedUnticked": [
+          "Concepts/Hub"
+        ],
+        "expectChangedSince": [
+          "Worksheet"
+        ],
+        "expectCameWithAClass": 0
       }
     ],
-    "howThePublishCasesRun": "Run by the mac through LinksChecklistPublisher and LinksChecklistSheetModel on a laid-out course (LinksChecklistTests); owed by Windows. `pages` are laid out in section 1: a `class` in the class folder with publish/created, a `page` in Concepts with publishForSection1/createdSection1 (a course-level page). `offer` is the rows the build would have written (the file's other keys are filled in by the runner). `tick` lists the places ticked when Publish is pressed; `expect` maps a page's title to its visibility and date afterwards; `expectFrontPageUnchanged` means the section's front page is byte for byte as it was (ruling F1). `expectLeftHidden` lists every place the press left hidden, of both kinds - the set-aside line's count - which never includes a page a ticked class brought (implementation review, S1). Since #385 it is two lists: `expectRememberedUnticked`, the rows whose OWN tick was off, which is exactly the answered file's leftUnticked and the published line's 'left unticked' (when absent, it equals expectLeftHidden - true of every case before #385); and `expectLeftWithTheirPage`, rows whose own tick was on but that did not go because nothing they come under went (followingARow). `madeVisibleSince` pages are made visible after the offer and before the sheet opens; `expectOffered` is the rows the sheet then shows. Cases from iv-e on run THROUGH THE SHEET: `deletedSince` pages are removed and `madeVisibleSince` pages made visible before it opens; `tick` sets the rows' own ticks exactly; `madeVisibleAfterOpening` pages are made visible after it opened and before Publish; then Publish is pressed. `expectLocked` is exactly the rows shown locked before Publish, and `expectPublishCount` the number the Publish button names (0: wording.publishNothingTicked). Every offer row names `dependsOn`. For v: `answer` notNow with `untick` unticked, then the same offer must not be offered again, and the offer with `thenOfferAlso` added must be, starting `expectStartsUnticked` unticked."
+    "howThePublishCasesRun": "Run by the mac through LinksChecklistPublisher and LinksChecklistSheetModel on a laid-out course (LinksChecklistTests); owed by Windows. `pages` are laid out in section 1: a `class` in the class folder with publish/created, a `page` in Concepts with publishForSection1/createdSection1 (a course-level page). `offer` is the rows the build would have written (the file's other keys are filled in by the runner). `tick` lists the places ticked when Publish is pressed; `expect` maps a page's title to its visibility and date afterwards; `expectFrontPageUnchanged` means the section's front page is byte for byte as it was (ruling F1). `expectLeftHidden` lists every place the press left hidden, of both kinds - the set-aside line's count - which never includes a page a ticked class WROTE (implementation review, S1). Since #385 it is two lists: `expectRememberedUnticked`, the rows whose OWN tick was off, which is exactly the answered file's leftUnticked and the published line's 'left unticked' (when absent, it equals expectLeftHidden - true of every case before #385); and `expectLeftWithTheirPage`, rows whose own tick was on but that did not go because nothing they come under went (followingARow). `madeVisibleSince` pages are made visible after the offer and before the sheet opens; `expectOffered` is the rows the sheet then shows. Cases from iv-e on run THROUGH THE SHEET: `deletedSince` pages are removed and `madeVisibleSince` pages made visible before it opens; `tick` sets the rows' own ticks exactly; `madeVisibleAfterOpening` pages are made visible after it opened and before Publish; then Publish is pressed. `expectLocked` is exactly the rows shown locked before Publish, and `expectPublishCount` the number the Publish button names (0: wording.publishNothingTicked). Every offer row names `dependsOn`. `expectPublishCount` counts rows SHOWN ticked (comingWithAClass). From iv-j on (#398): `expectComesWith` is exactly the rows shown coming with a ticked class before Publish, as {place: the class's place} (absent: none); `expectSecondLines` / `expectSecondLinesLack` give, per place, parts {wording, name} the row's second line must / must not contain (wording: comesWithAClass, firstUsedIn, linkedFromRow or datedLike; name: a page's title, filled as wording.fill says); `expectChangedSince` is exactly the pages named with wording.pageChangedSince after Publish, by title; `expectCameWithAClass` is the published trail line's '({N} of them on the list)'. The offers of iv-j to iv-n are what the build's _links_checklist_offer writes for their pages. For v: `answer` notNow with `untick` unticked, then the same offer must not be offered again, and the offer with `thenOfferAlso` added must be, starting `expectStartsUnticked` unticked."
   },
   "unreadablePageSettings": {
     "note": "What the build does with a page whose settings block it cannot read (#246). The words a teacher reads are siteHealth.checks[pageSettingsUnreadable]; these are the cases, run by scripts/test_unreadable_page_settings.py through the real build_site.process_frontmatter and by scripts/check_visibility_against_the_site.py down the rest of the chain to the site.",
