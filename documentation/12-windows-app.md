@@ -445,6 +445,17 @@ test (a four-line guard; doc 09 → "The first-publish path"), and the same
 guard here would make the same test possible. Optional, and not an issue: if
 Russell wants it, it becomes one.
 
+**AppKit's frame autosave under test (mac #361, v1.4.1) — worth KNOWING,
+nothing owed.** On the mac, AppKit and SwiftUI save window frames and
+split-view positions straight into the app's real preferences whatever store
+the app picks, so the unit gate and UI runs were moving the teacher's real
+main window; a run a test drives now puts those keys back the moment they
+change (`AppKitBookkeepingGuard`, doc 09 → "AppKit's own bookkeeping is put
+back"). Windows has no analogue: WinUI has no frame autosave, the main window
+sizes itself from `App.Settings`, and the assistant's placements live in
+`AppSettings.AssistWindowPlacements` — all inside the folder `--state-dir`
+moves. No issue, and nothing to mirror.
+
 ## Reading a test run: the exit code cannot tell you what happened
 
 `dotnet test` exits 1 when a test fails. It also exits 1 when the test HOST

@@ -6839,7 +6839,8 @@ in `NewSiteDialogUITests`). The one exception is the marketing captures
 (`MarketingScreenshotTests`, `AssistantTreeDump`), which drive the REAL
 toolchain — a real preview, real helper programs on the PATH — and so do not
 take a state folder at all: they still write the real trail, run by
-`website/shots/capture.py`, by hand, rarely. Windows documents the same edge
+`website/shots/capture.py`, by hand, rarely — but not his window frames, since
+#361 (below). Windows documents the same edge
 for its own `--state-dir` (doc 12).
 
 ### What was wrong
@@ -6935,16 +6936,81 @@ Then the negative half: every real item unchanged, polled the same 10 s. It
 skips when another Plantoir is running — that copy's writes could not be told
 apart from a leak — and never quits the teacher's copy to make room.
 
-**The residual it tolerates, by name:** AppKit and SwiftUI write their own
-bookkeeping — `NSWindow Frame …`, `NSSplitView Subview Frames …`, open/save
-panel keys — straight to `UserDefaults.standard`, whatever the app does. So a
-UI test can still move where the teacher's main window next opens. The allowed
-prefixes are `StateDirectoryUITests.realPreferenceKeysAppKitOwns`; any other
-real key that changes is red. `-ApplePersistenceIgnoreState YES` (passed by
-`IsolatedLaunch`) keeps the app from restoring the teacher's windows.
-The real domain's key NAMES were read around each UI run on 2026-09-26 (75
-before and after, none added or removed); values of AppKit's keys may still
-change, which is why they are allowed by prefix rather than listed.
+**AppKit's own bookkeeping is put back (#361, v1.4.1).** AppKit and SwiftUI
+write their window frames, split-view positions and open/save panel folders
+straight to `UserDefaults.standard` — the app's REAL domain, the one the
+teacher's copy reads — whatever store the app picks, and no public API points
+those writes elsewhere. Until v1.4.1 the test tolerated them by prefix, and
+they cost something: the unit gate's `InAppUserInterfaceTests` `setFrame`
+left the teacher's main window at 1100×720 on every run (the host IS
+`ca.russellgordon.Plantoir`), a UI run on 2026-09-27 moved it again and the
+rollover test met a window that covered the assistant.
+
+Now **a run a test drives puts each of those keys back the moment it
+changes.** `AppKitBookkeepingGuard` (in `PlantoirDefaults.swift`, the
+preferences seam) copies the keys matching `PlantoirDefaults.appKitOwnedKeyPrefixes`
+from the PERSISTENT domain at `applicationWillFinishLaunching` — before any
+window exists, so before AppKit's first write; never from
+`dictionaryRepresentation`, which would take `IsolatedLaunch`'s argument-domain
+frame for the saved one — and on every `UserDefaults.didChangeNotification`
+compares again and writes back what changed (a key added since is removed); a
+last pass runs at `willTerminate`. Only those prefixes: the teacher's own
+settings are never touched. **Armed** by `PlantoirDefaults.guardsAppKitBookkeeping`,
+a pure function, when XCTest is loaded (the unit host), under a UI test
+(`UITEST_WORKSPACE`, which the marketing captures set too) or with
+`--state-dir` — and never otherwise, which `AppKitBookkeepingGuardTests` pins
+(no flags must be false; armed for a teacher, every window move would be undone
+the moment it was saved, silently). **Armed ONLY from
+`applicationWillFinishLaunching`, never `QuartzTeachersApp.init`:**
+`RealHome.isInsideTestBundle` is a `static let`, and a first read at `init`,
+before XCTest is loaded in the unit host, could freeze it false for the whole
+process and point the unit suite at the real home.
+
+**Step 0, measured (2026-09-30, hosted unit suite):** AppKit's frame save
+posts `didChangeNotification` in-process — `setFrame` on the host's main window
+posted it twice and the guard made one repair —
+`AppKitBookkeepingGuardTests.testResizingTheHostsMainWindowLeavesTheRealFrameAsItWas`,
+gated, which asserts both that the guard ACTED (`repairsMade` grew) and that
+the saved value is the one from before. So the window-notification fallback
+the plan held in reserve was not needed, and every prefix is covered while the
+app runs, not only at quit. `StateDirectoryUITests` therefore tolerates
+NOTHING: it resizes the main window (asserting the size changed — a positive
+control), samples the real `NSWindow Frame main-AppWindow-1` for the whole ten
+seconds while the app still runs (never "until it matches": `cfprefsd` flushes
+the file lazily, so an early read matches trivially), then quits and compares
+every real key. With the guard unarmed it is red at the mid-run check (14
+samples of `1592 35 1022 662 …`); armed, green. `IsolatedLaunch` also passes
+`-NSWindow Frame main-AppWindow-1 "40 60 1100 720 …"` in the argument domain,
+so every isolated launch opens at the same size whatever the teacher left
+(`IsolatedLaunch.mainWindowFrameKey`, the one constant the marketing captures
+read too — theirs had been the dead
+`NSWindow Frame SwiftUI.ModifiedContent<…>-1-AppWindow-1` name from before the
+window group had an id). `-ApplePersistenceIgnoreState YES` stays: saved
+application state is a second path for frames.
+
+**Its honest limit.** The domain is shared by every copy of Plantoir running
+as the same user. A frame, split-view or open-panel change the teacher's own
+`/Applications` copy saves WHILE a test app runs is put back too, at the test
+app's next write — only AppKit's keys, only during that overlap. And copies
+built before #361 (another worktree's unit gate) still write the key
+unguarded until they carry it.
+
+**REJECTED:** a distinct suite or an "application domain" launch argument (none
+exists, and no public API retargets `standardUserDefaults`, which is what
+AppKit writes through — `PlantoirDefaults` already moves OUR writes);
+`setFrameAutosaveName` per state folder or "" (SwiftUI names the window itself
+and replaced a name set from `WindowAccessor`, measured `bf157cc4`; and it
+covers frames only); a volatile or argument-domain frame alone (read layers,
+never where writes go — the argument frame is kept for determinism only);
+restoring the key from the test runner (sandboxed, read-only on `/`, and a
+tearDown never runs after a crash); a separate bundle identifier for test
+launches (removes the whole class, but changes TCC grants, notification
+permission and Sparkle's defaults, and needs a second app target — too big for
+a point release); swizzling `NSWindow.saveFrame(usingName:)` (private call
+path, Objective-C runtime tricks in code a student should be able to read);
+and tolerating it (it moved his window, and the unit gate moved it every run).
+Windows has no analogue — WinUI has no frame autosave, and its placements live
+in `AppSettings`, which `--state-dir` moves (doc 12).
 
 ### The assistant's weights under a state folder
 
@@ -7102,7 +7168,9 @@ teacher's app) restoring a full-screen window. Checked 2026-09-25 after the
 full-screen probe: there is no `Saved Application State` folder for
 `ca.russellgordon.Plantoir`, the saved main-window frame
 (`NSWindow Frame main-AppWindow-1`) is 1100×720 — the size
-`InAppUserInterfaceTests` sets — and no full-screen key is stored.
+`InAppUserInterfaceTests` sets — and no full-screen key is stored. (Since #361,
+v1.4.1, the unit gate no longer leaves that size behind: the host puts AppKit's
+keys back — "AppKit's own bookkeeping is put back", above.)
 
 **Rejected, with the numbers:**
 
