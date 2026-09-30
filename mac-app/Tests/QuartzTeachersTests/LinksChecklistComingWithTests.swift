@@ -4,7 +4,7 @@ import XCTest
 /// #398: a row a TICKED class brings is shown ticked and disabled, "comes
 /// with …", until the class is unticked. Run from
 /// `contracts/shared-rules.json` → `linksChecklist.comingWithAClass`, never
-/// retyped; the publish cases iv-j to iv-l run through the sheet in
+/// retyped; the publish cases iv-j to iv-n run through the sheet in
 /// `LinksChecklistFollowingTests`, beside the runner they share.
 @MainActor
 final class LinksChecklistComingWithTests: XCTestCase {
