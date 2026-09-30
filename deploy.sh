@@ -334,7 +334,11 @@ say_this_folder_cannot_be_reached() {
 # the_launchers_running PLACES [NAME] [ID]
 #   PLACES  the places asked about, ";"-joined (an awk -v value cannot hold a
 #           newline), each "<course> <section>" with "+" for a space in the
-#           course (a code cannot hold a "+"). The course may be empty.
+#           course (CourseCodeRule refuses a "+"; the command-line setup
+#           does not, and a course like "C++" is then misread — see
+#           whatCountsAsRunning.knownLimits). The course may be empty. The
+#           caller answers work holding ";" or "\" itself: either would
+#           shift the places' numbers (the_owners_of_the_work).
 #   NAME/ID a website builder by its name and its id: a `docker exec` aimed
 #           at it is reported too. Left out, none is.
 # Prints one record per line, every field one word:
@@ -3117,8 +3121,8 @@ WORKSPACE_LEFTOVERS=""
 # waited only on 2 would read that as "every owner gone" (#388).
 #
 # A course code may carry one space ("AP CALC", CourseCodeRule), so the
-# course in "$1" is written with "+" for the space (a code cannot hold a
-# "+"), and the_launchers_running compares a launcher's arguments as the text
+# course in "$1" is written with "+" for the space (CourseCodeRule refuses
+# a "+"; the command-line setup does not — knownLimits), and the_launchers_running compares a launcher's arguments as the text
 # that follows the launcher's name — "AP CALC 1 …" begins with "AP CALC 1 " — never word by
 # word (#378 review S1: word by word, a live preview of AP CALC read as
 # course AP, section CALC, and was stopped as left over).
