@@ -345,6 +345,9 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    from the `containerized-quartz-netlify` Keychain item, the site id from
    `website/site.json`). The Netlify site is NOT connected to GitHub —
    pushing this repository deploys nothing, which is why this step exists.
+   It first reads every picture the pages show a Mac visitor and refuses if
+   any lacks its window's own corners (#375; `website/SCREENSHOTS.md` → "The
+   one rule") — retake that picture, never mask it.
 
 ## The update feed (macOS)
 
