@@ -2559,6 +2559,11 @@ reaches it ([03](03-launcher-scripts.md) → "A section being deployed cannot
 be previewed (#381)"), and the panel shows the launcher's own sentence
 (`FailureExplainer.sectionIsBeingDeployedExplanation`). The button's
 `.disabled` is unchanged: a convenience, not the rule.
+The in-app assistant's own preview (`AssistToolRunner.bringThePreviewUpToDate`) asks the same record first,
+before it opens a window, stops a preview or runs a no-window `--build-only`
+rebuild, and answers `wording.sectionIsBeingDeployed` — otherwise the window
+would refuse while the conversation said the preview was on its way (#381's
+review, S1; `WorkLeaseDecliningTests`).
 `PreviewWhileDeployingTests` pins the rule, the order in `startPreview` and the
 sentences.
 

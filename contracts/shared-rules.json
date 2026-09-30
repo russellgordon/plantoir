@@ -16061,7 +16061,8 @@
     "layers": {
       "window": "The one function every preview a window starts goes through (mac: SectionDetailView.startPreview; the button, the in-app assistant and the restart path all call it) asks, FIRST, before any lease is taken or anything is stopped or started, whether THIS copy of the app is deploying that section (mac: CourseActivity.sectionPublishIsRunning, the record the window's Deploy and the assistant's windowless deploy both write). It shows sentences.window under the title 'Cannot Preview Yet' and writes the trail line.",
       "launcher": "preview.sh, on a serving run only, before it changes anything, reads the LIVE process table for a deploy of the same course and section working in the same folder: deploy.sh C S (not --reset-token, --logout or --help; --diagnose deploys), or a deploy set for later of C/S (its script's name, ca.russellgordon.Plantoir.deploy.<CODE>.section<N>[.<folder id>].sh, <CODE> written as ScheduledDeploy.sanitizedCode writes it). It prints sentences.launcher, writes the trail line, and exits 1. The cases are launcherCases.",
-      "lease": "Another program on this Mac that is deploying (a deploy set for later, an outside assistant, another copy of the app) holds build and publish work leases for the COURSE; the window's existing take-then-check (workLeases) refuses with wording.courseIsBeingBuiltElsewhere. Unchanged by this rule and course-wide, which is wider than it."
+      "lease": "Another program on this Mac that is deploying (a deploy set for later, an outside assistant, another copy of the app) holds build and publish work leases for the COURSE; the window's existing take-then-check (workLeases) refuses with wording.courseIsBeingBuiltElsewhere. Unchanged by this rule and course-wide, which is wider than it.",
+      "assistant": "The in-app assistant's (and the MCP server's own) preview, before it opens a window, stops a preview or runs a --build-only rebuild (mac: AssistToolRunner.bringThePreviewUpToDate), asks the same in-process publish record and answers wording.sectionIsBeingDeployed, with the same trail line as the window."
     },
     "sentences": {
       "window": "wording.sectionIsBeingDeployed",
@@ -16146,6 +16147,15 @@
         "expect": "allowed",
         "layer": "window",
         "why": "Decision 4 names the same section, and previewing section 1 while section 2 deploys from the same app works today. Widening it would take a working flow away."
+      },
+      {
+        "name": "the in-app assistant asks for the preview of a section this app is deploying",
+        "deployer": "sameWindow",
+        "previewFrom": "inAppAssistant",
+        "section": "same",
+        "expect": "refused",
+        "layer": "assistant",
+        "why": "#381's review, S1. The assistant's preview (AssistToolRunner.bringThePreviewUpToDate) asks the same publish record FIRST, before a window is opened, a preview stopped or a no-window --build-only rebuild run, and answers wording.sectionIsBeingDeployed; otherwise the window would refuse while the conversation said the preview was on its way."
       },
       {
         "name": "another section of the same course deploying in another program",
@@ -16437,11 +16447,61 @@
         "expect": "allowed"
       },
       {
-        "name": "this run's own shell naming a deploy is not a deploy",
-        "parentArgs": "bash -c ./deploy.sh ICS4U 2 && ./preview.sh ICS4U 2",
+        "name": "this run's own ancestors never count",
+        "parentArgs": "/bin/bash ./deploy.sh ICS4U 2",
         "processes": [],
         "expect": "allowed",
-        "why": "A shell that ran the deploy and then this preview carries both commands' words; the deploy itself has finished."
+        "why": "Whatever started this preview is not a deploy running beside it, whatever its words say."
+      },
+      {
+        "name": "a process whose text merely mentions deploy.sh is not a deploy",
+        "processes": [
+          [
+            700,
+            1,
+            "node /usr/local/bin/claude -p run ./deploy.sh ICS4U 2 now"
+          ],
+          [
+            701,
+            1,
+            "/bin/zsh -c ./deploy.sh ICS4U 2 && echo done"
+          ]
+        ],
+        "cwd": {
+          "700": "here",
+          "701": "here"
+        },
+        "expect": "allowed",
+        "why": "deploy.sh must be the program (the first word, or the script a shell was handed). A prompt that names it, or a shell wrapper whose own child is the deploy, does not count; the child does. #381's review, N3."
+      },
+      {
+        "name": "a folder path with spaces still names the program",
+        "processes": [
+          [
+            700,
+            600,
+            "/bin/bash /Users/t/My Courses/deploy.sh ICS4U 2 --non-interactive"
+          ]
+        ],
+        "cwd": {
+          "700": "here"
+        },
+        "expect": "refused"
+      },
+      {
+        "name": "only deploy.sh's own arguments are read for help",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./deploy.sh ICS4U 2 --to-folder /Users/t/Sites/help"
+          ]
+        ],
+        "cwd": {
+          "700": "here"
+        },
+        "expect": "refused",
+        "why": "A word elsewhere on the line is not a flag of deploy.sh."
       },
       {
         "name": "nothing else running",

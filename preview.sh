@@ -725,11 +725,22 @@ a_deploy_is_running_for() {
           sub(/[ \t]$/, "", rest)
           if (rest == ".sh" || rest == "." folder ".sh") { print "scheduled " pid; continue }
         }
-        if (args[pid] ~ /[ \t](--reset-token|--logout|--help|-h)([ \t]|$)/) continue
+        # deploy.sh must be the PROGRAM: the first word, or the script a
+        # shell was handed (a path with spaces splits into several words,
+        # none of them a flag). A process whose text merely MENTIONS it — a
+        # `claude -p` prompt, a `bash -c` wrapper, whose own child is the
+        # deploy and is counted — does not count. Only the arguments of
+        # deploy.sh itself are read for the flags that deploy nothing.
+        # (No apostrophes in here: this program sits in single quotes.)
         n = split(args[pid], word, /[ \t]+/)
         for (w = 1; w + 2 <= n; w++) {
+          if (w > 1 && (word[1] !~ /(^|\/)(ba|z|da|k)?sh$/ || word[w] ~ /^-/)) break
           if (word[w] ~ /(^|\/)deploy\.sh$/ && toupper(word[w + 1]) == toupper(course) && word[w + 2] == section) {
-            print "deploy " pid
+            deploys = 1
+            for (f = w + 3; f <= n; f++) {
+              if (word[f] ~ /^(--reset-token|--logout|--help|-h)$/) deploys = 0
+            }
+            if (deploys) print "deploy " pid
             break
           }
         }

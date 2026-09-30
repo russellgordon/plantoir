@@ -1513,8 +1513,11 @@ for.
 **What counts as a deploy of C/S**, read from the LIVE process table (`ps
 -Ao pid=,ppid=,args=`), never from a remembered process id or a lease file:
 
-- `deploy.sh C S …` — except `--reset-token`, `--logout` and `--help`, which
-  deploy nothing; `--diagnose` DOES deploy (it prints more while it
+- `deploy.sh C S …` as the PROGRAM (the first word, or the script a shell was
+  handed — a process whose text merely mentions it, such as a `claude -p`
+  prompt or a `bash -c` wrapper, does not count; the wrapper's child does) —
+  except when its own arguments carry `--reset-token`, `--logout` or `--help`,
+  which deploy nothing; `--diagnose` DOES deploy (it prints more while it
   uploads). Only one working in THIS folder counts: its working directory is
   asked of `lsof -a -p <pid> -d cwd`, because this year's and last year's
   folders can hold the same course. One whose folder `lsof` cannot answer for
