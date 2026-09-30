@@ -219,6 +219,20 @@ public static class ActivityTrail
         PageSettingsLeftAsTheyWere,
         ClassCopyNotMade,
         WordForAUnitRenamed,
+        /// <summary>
+        /// A preview never appeared (#233 / mac #225, #278 / mac #235): its
+        /// server started and it then said nothing for the contract's 45 s,
+        /// or no address was ever announced — or, from preview.ps1, every
+        /// address was taken (#286). Carries the course, the section, how long
+        /// it was quiet and which of the things was true.
+        /// </summary>
+        PreviewDidNotAppear,
+        /// <summary>
+        /// deploy.py made a section's Cloudflare Pages project again because it
+        /// was gone from the account (#395). Carries the project and the
+        /// address the site answers at now — the address can change.
+        /// </summary>
+        CloudflareProjectMadeAgain,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -272,6 +286,8 @@ public static class ActivityTrail
         Event.PageSettingsLeftAsTheyWere => "page settings left as they were",
         Event.ClassCopyNotMade => "class copy not made",
         Event.WordForAUnitRenamed => "word for a unit renamed",
+        Event.PreviewDidNotAppear => "preview did not appear",
+        Event.CloudflareProjectMadeAgain => "cloudflare project made again",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 

@@ -904,7 +904,7 @@ public sealed partial class SectionDetailView : UserControl
                 new[] { _course.Code, _sectionNumber.ToString(), "--port", _lease.Port.ToString() },
                 workspacePath);
             RefreshChrome();
-            await WaitForPreviewServer(_lease.Port);
+            await WaitForPreviewServer();
         }
         catch (Exception ex)
         {
@@ -1027,7 +1027,7 @@ public sealed partial class SectionDetailView : UserControl
                 new[] { _course.Code, _sectionNumber.ToString(), "--port", _lease.Port.ToString() },
                 workspacePath);
             RefreshChrome();
-            await WaitForPreviewServer(_lease.Port);
+            await WaitForPreviewServer();
         }
         catch (Exception ex)
         {
@@ -1036,75 +1036,114 @@ public sealed partial class SectionDetailView : UserControl
     }
 
     /// <summary>
-    /// Phase 1: never trust the port until THIS run announces its launch —
-    /// a stale server from a previous preview answers first. Phase 2: poll
-    /// until HTTP 200. Ten minutes total, because a first-ever build pulls
-    /// the image and installs dependencies.
+    /// Wait for THIS run's preview to answer, and give up honestly when it
+    /// cannot (#233 / mac #225, #278 / mac #235). The rules are
+    /// <see cref="PreviewReachability.NextStep"/>'s; this loop only acts:
+    ///
+    /// <para>The address is the one the launcher ANNOUNCED — never a port
+    /// guessed from the lease (the old start value was the port inside the
+    /// builder, wrong for every folder after the first). Nothing is polled
+    /// until "Launching Quartz preview" is printed, because a stale server
+    /// from a previous preview can answer first.</para>
+    ///
+    /// <para>The QUIET is bounded, not the run: a first build takes minutes on
+    /// this PC too. When the wait gives up, the run is STOPPED the way the
+    /// Stop button stops it — so nothing serves a site nobody can see, the
+    /// section stops saying it is building, and the port goes back — then the
+    /// trail gets <c>preview did not appear</c> and the teacher gets the
+    /// contract's sentence. A preview the teacher stopped meanwhile gets
+    /// neither.</para>
     /// </summary>
-    private async Task WaitForPreviewServer(int containerPort)
+    private async Task WaitForPreviewServer()
     {
         _serverWait?.Cancel();
         var cancel = new CancellationTokenSource();
         _serverWait = cancel;
-        Uri serverUrl = new($"http://127.0.0.1:{containerPort}/");
-        const int budgetSeconds = 600;
-        int elapsed = 0;
+        DateTime? serverStartedAt = null;
+        bool launched = false;
+        Exception? lastAttempt = null;
 
         try
         {
-            while (elapsed < budgetSeconds)
-            {
-                if (cancel.IsCancellationRequested) return;
-                if (!_previewRunner.IsRunning && _previewRunner.LastExitCode is not null)
-                {
-                    AbandonWait();
-                    return;
-                }
-                if (_previewRunner.PreviewAddress is { } announced) serverUrl = announced;
-                if (_previewRunner.Transcript.DisplayText.Contains("Launching Quartz preview")) break;
-                await Task.Delay(1000);
-                elapsed++;
-            }
-
             using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
-            while (elapsed < budgetSeconds)
+            while (true)
             {
                 if (cancel.IsCancellationRequested) return;
-                if (!_previewRunner.IsRunning && _previewRunner.LastExitCode is not null)
+                bool runIsOver = _previewRunner.WasStoppedByUser ||
+                                 (!_previewRunner.IsRunning && _previewRunner.LastExitCode is not null);
+                string shown = _previewRunner.Transcript.DisplayText;
+                if (serverStartedAt is null && shown.Contains(PreviewReachability.ServerStartedLine, StringComparison.Ordinal))
+                    serverStartedAt = DateTime.UtcNow;
+                launched = launched || shown.Contains("Launching Quartz preview", StringComparison.Ordinal);
+                Uri? announced = _previewRunner.PreviewAddress;
+
+                var step = PreviewReachability.NextStep(runIsOver, announced, serverStartedAt,
+                                                        _previewRunner.LastOutputAt, DateTime.UtcNow);
+                switch (step)
                 {
-                    AbandonWait();
-                    return;
-                }
-                try
-                {
-                    var response = await client.GetAsync(serverUrl);
-                    if (response.IsSuccessStatusCode)
-                    {
-                        // The site is up, so the build is over: the assistant
-                        // may build again from here on, while this preview
-                        // stays on screen for the teacher to read.
-                        _isWaitingForServer = false;
-                        ReleaseBuildClaim();
-                        _previewUrl = serverUrl;
-                        LoadIfNeeded(serverUrl);
-                        RefreshChrome();
+                    case PreviewReachability.Step.LeaveIt:
+                        if (!_previewRunner.WasStoppedByUser) AbandonWait();
                         return;
-                    }
+                    case PreviewReachability.Step.GiveUpNoAddress:
+                    case PreviewReachability.Step.GiveUpSilence:
+                        await GiveUpOnThePreview(cancel, step, PreviewReachability.VerdictFrom(lastAttempt), serverStartedAt);
+                        return;
+                    case PreviewReachability.Step.TryTheAddress when launched && announced is not null:
+                        try
+                        {
+                            var response = await client.GetAsync(announced);
+                            if (cancel.IsCancellationRequested) return;
+                            if (response.IsSuccessStatusCode)
+                            {
+                                // The site is up, so the build is over: the assistant
+                                // may build again from here on, while this preview
+                                // stays on screen for the teacher to read.
+                                _isWaitingForServer = false;
+                                ReleaseBuildClaim();
+                                _previewUrl = announced;
+                                LoadIfNeeded(announced);
+                                RefreshChrome();
+                                return;
+                            }
+                            lastAttempt = null;
+                        }
+                        catch (Exception attempt) { lastAttempt = attempt; }
+                        break;
                 }
-                catch { }
                 await Task.Delay(1000);
-                elapsed++;
             }
-            // The server never answered. The build is over either way, so the
-            // claim must not outlive it.
-            _isWaitingForServer = false;
-            ReleaseBuildClaim();
-            RefreshChrome();
         }
         finally
         {
             if (_serverWait == cancel) _serverWait = null;
         }
+    }
+
+    /// <summary>
+    /// The honest ending: stop the run, record why, tell the teacher — in
+    /// that order, and only while this wait is still the current one.
+    /// Stopping first means the alert never sits over a run still serving.
+    /// </summary>
+    private async Task GiveUpOnThePreview(CancellationTokenSource thisWait, PreviewReachability.Step why,
+                                          PreviewReachability.Verdict verdict, DateTime? serverStartedAt)
+    {
+        // The teacher can press Stop while this wait was deciding; a preview
+        // they ended themselves is not one that "did not appear".
+        if (thisWait.IsCancellationRequested || _previewRunner.WasStoppedByUser) return;
+        if (why == PreviewReachability.Step.GiveUpNoAddress) verdict = PreviewReachability.Verdict.PlantoirCouldNotTell;
+        DateTime quietSince = serverStartedAt is { } started && started > _previewRunner.LastOutputAt
+            ? started : _previewRunner.LastOutputAt;
+        int quietSeconds = (int)Math.Max(0, (DateTime.UtcNow - quietSince).TotalSeconds);
+        ActivityTrail.Note(ActivityTrail.Event.PreviewDidNotAppear,
+                           PreviewReachability.TrailLine(why, verdict, quietSeconds), _course.Code, _sectionNumber);
+        await StopPreviewAsync();
+        var dialog = new ContentDialog
+        {
+            Title = PreviewReachability.AlertTitle,
+            Content = PreviewReachability.Sentence(verdict),
+            CloseButtonText = "OK",
+        };
+        await ShowDialogSafelyAsync(dialog);
     }
 
     /// <summary>Interface updates must never yank the teacher back from a page they navigated to.</summary>
