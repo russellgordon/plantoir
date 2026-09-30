@@ -67,7 +67,8 @@
     <Content Include="..\..\preview.bat" Link="Toolchain\preview.bat" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\deploy.bat" Link="Toolchain\deploy.bat" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\patches\**" Link="Toolchain\patches\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="..\..\scripts\**" Link="Toolchain\scripts\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <!-- __pycache__ excluded: running the shared Python tests writes .pyc files there, and packing them gave PRI249 warnings (bundle 1). -->
+    <Content Include="..\..\scripts\**" Exclude="..\..\scripts\**\__pycache__\**" Link="Toolchain\scripts\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\support\**" Link="Toolchain\support\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\contracts\**" Link="Toolchain\contracts\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

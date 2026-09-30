@@ -286,6 +286,32 @@ public static class AssistWording
         "It may still try to publish, and it has no way to ask what the new website should be " +
         "called — turn it off from the section's menu.";
 
+    // MARK: - Class planning (hoisted 2026-09-30, #157)
+    //
+    // Sentences this app already said inline, word for word as the contract
+    // has them, moved here under their contract key so the walker compares
+    // them. Nothing a teacher reads changed. Dates are handed in already
+    // formatted, exactly as the call sites formatted them before.
+
+    public const string EveryDateIsSpokenFor =
+        "Every recorded date is spoken for, so another class cannot be dated until more dates are recorded.";
+
+    public static string MadeRoom(int added, string unitWord, int unit, int day) =>
+        $"Made room for {added} class{(added == 1 ? "" : "es")} at {unitWord} {unit}, Day {day}.";
+
+    public static string MovedToLaterDays(int moved) => $"Moved to later class days — {moved}:";
+
+    public static string MovesAndBecomesADraft(string page, string day) =>
+        $"“{page}” moves to {day} and becomes a draft because it has no class date.";
+
+    public static string PublishedTheClassOn(string day) => $"Published the class on {day}.";
+
+    public static string ReDatingOntoTheDatesOnFile(string course, string section) =>
+        $"{course} Section {section}: re-dating onto the class dates on file.";
+
+    public static string TheNextWouldFallOn(string day, string dayName) =>
+        $"The next class would fall on {day} ({dayName}).";
+
     // MARK: - Shared fragments
 
     public const string WhereTheOutputIs = "The output is in that section's window in Plantoir.";

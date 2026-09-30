@@ -839,12 +839,12 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             lines.Add($"{where} has {existingClasses.Count} class {(existingClasses.Count == 1 ? "page" : "pages")} across {remembered.Dates.Count} recorded dates ({spare} spare).");
             if (spare == 0)
             {
-                lines.Add("Every recorded date is spoken for, so another class cannot be dated until more dates are recorded.");
+                lines.Add(AssistWording.EveryDateIsSpokenFor);
             }
             else if (existingClasses.Count < remembered.Dates.Count)
             {
                 var next = remembered.Dates[existingClasses.Count];
-                lines.Add($"The next class would fall on {DateText.Iso(next)} ({next:dddd}).");
+                lines.Add(AssistWording.TheNextWouldFallOn(DateText.Iso(next), $"{next:dddd}"));
             }
 
             string origin = $"Where they came from: {remembered.Source}.";
@@ -1708,7 +1708,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             // class on tomorrow", which is not a date anybody can check
             // against their timetable a week later.
             return result.Succeeded
-                ? Answering($"Published the class on {DateText.Iso(day)}.",
+                ? Answering(AssistWording.PublishedTheClassOn(DateText.Iso(day)),
                             text.ToString())
                 : Answering(text.ToString());
         }
