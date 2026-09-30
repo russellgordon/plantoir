@@ -60,7 +60,12 @@ public sealed class TranscriptBuilder
     /// this builder.</para>
     /// </summary>
     private static bool CarriesTheHealthMarker(string line) =>
-        line.Contains(Plantoir.Core.Models.SiteHealthFinding.Marker, StringComparison.Ordinal);
+        line.Contains(Plantoir.Core.Models.SiteHealthFinding.Marker, StringComparison.Ordinal)
+        // PLANTOIR_DATED: (#279) is hidden the same way and for the same
+        // reason: a JSON line a teacher would otherwise read, with the build's
+        // plain sentence printed beside it. The report is read from the RAW
+        // text by ScriptRunner before this builder sees it.
+        || Plantoir.Core.Models.PagesDatedByTheBuild.IsMarkerLine(line);
 
     /// <summary>Monotonic counter bumped on every append — cheap change detection.</summary>
     public long Version => _version;

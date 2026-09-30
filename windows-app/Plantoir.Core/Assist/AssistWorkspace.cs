@@ -1658,8 +1658,7 @@ public sealed class AssistWorkspace
         {
             string path = PagePaths.ResolveInside(_folder, index.RelativePath);
             string text = File.ReadAllText(path);
-            if (SectionIndex.WithMostRecent(text, index.ToClass) is not { } withEmbed) return;
-            var (withDate, _) = PageFrontmatter.SetCreated(withEmbed, "created", index.ToDate, tail);
+            if (SectionIndex.PointedAndDated(text, index.ToClass, index.ToDate, tail) is not { } withDate) return;
             Save(path, withDate);
         }
         catch { /* the front page falling behind must not fail the publish */ }

@@ -129,6 +129,21 @@ public static class SectionIndex
         return string.Join("\n", rebuilt);
     }
 
+    /// <summary>
+    /// What the pointer writes: the front page repointed at
+    /// <paramref name="className"/> (<see cref="WithMostRecent"/>) and given
+    /// that class's date. Null when the page has no Most Recent Class heading,
+    /// so it is left exactly as it was. Pulled out of
+    /// <c>AssistWorkspace.ApplyIndexChange</c> so that
+    /// <c>class-planning.json</c> → <c>sectionIndexPointer.dateCases</c> can be
+    /// run against the transform the app really applies (#279).
+    /// </summary>
+    public static string? PointedAndDated(string indexText, string className, DateOnly date, string tail)
+    {
+        if (WithMostRecent(indexText, className) is not { } withEmbed) return null;
+        return Plantoir.Core.Models.PageFrontmatter.SetCreated(withEmbed, "created", date, tail).Text;
+    }
+
     private static int? FindHeadingLine(string[] lines)
     {
         for (int i = 0; i < lines.Length; i++)
