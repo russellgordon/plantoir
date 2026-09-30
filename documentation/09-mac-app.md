@@ -534,8 +534,10 @@ happily — a preview that can start and that no stop is aimed at.
 
 **One note serves both a preview and a deploy deliberately.** They never run at
 once for a section: a deploy stops a running preview and waits for it before
-noting anything of its own, and the Preview button is disabled while a deploy
-runs. A third folder would be a second name for the same one.
+noting anything of its own, and a preview of a section cannot start while that
+section deploys — the button is disabled, and since #381 `startPreview()`
+itself refuses (below, "A preview of the section this app is deploying"). A
+third folder would be a second name for the same one.
 
 It is guarded by a source scan rather than by a behavioural test, and that is
 the honest limit: no real `SectionDetailView` ever mounts in a unit test —
