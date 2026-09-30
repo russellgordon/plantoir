@@ -459,9 +459,6 @@ class ATeacherAlreadyBittenGetsOutOfIt(unittest.TestCase):
                              "A teacher who answered this once must not be asked again.")
 
 
-# Deliberately NOT gated on bash: this one reads JSON and deploy.sh as text.
-# A live check on whether the contract and this file have come apart should not
-# quietly disappear on a machine that merely lacks a usable shell.
 @unittest.skipUnless(HAS_BASH, "no bash here that can run a program")
 class ACourseCodeWithASpaceReachesDeployPyWhole(unittest.TestCase):
     """#378 review N1: a course code may carry one space ("AP CALC",
@@ -485,7 +482,11 @@ class ACourseCodeWithASpaceReachesDeployPyWhole(unittest.TestCase):
                 '#!/bin/bash\nfor a in "$@"; do echo "$a"; done > "' + scratch + '/words"\n', encoding="utf-8")
             (bin_folder / "python3").chmod(0o755)
             program = "\n".join([
-                'docker() { while [ "$1" != "-lc" ]; do shift; done; shift; sh -c "$1"; }',
+                # Stands in for docker: every `-e NAME=value` pair is passed on,
+                # so the script sees TARGET and takes the Cloudflare branch.
+                'docker() { local envs=(); while [ "$1" != "-lc" ]; do '
+                'if [ "$1" = "-e" ]; then envs+=("$2"); shift; fi; shift; done; shift; '
+                'env "${envs[@]}" sh -c "$1"; }',
                 '_EXEC_TTY="-i"; CONTAINER_NAME="teaching-quartz-0000abcd"',
                 'COURSE_CODE="AP CALC"; SECTION_NUM="1"; TARGET="' + target + '"',
                 'NON_INTERACTIVE="false"; DIAGNOSE=""; TEAM_SLUG=""; CF_ACCOUNT=""; HOST_TZ_OFFSET=""',
@@ -504,8 +505,16 @@ class ACourseCodeWithASpaceReachesDeployPyWhole(unittest.TestCase):
                 self.assertIn("--course", words, words)
                 self.assertEqual(words[words.index("--course") + 1], "AP CALC", words)
                 self.assertEqual(words[words.index("--section") + 1], "1", words)
+                if target == "cloudflare":
+                    self.assertIn("--target", words, "the Cloudflare line was not the one run")
+                    self.assertEqual(words[words.index("--target") + 1], "cloudflare", words)
+                else:
+                    self.assertNotIn("--target", words, words)
 
 
+# Deliberately NOT gated on bash: this one reads JSON and deploy.sh as text.
+# A live check on whether the contract and this file have come apart should not
+# quietly disappear on a machine that merely lacks a usable shell.
 class EveryQuestionTheContractNamesIsDrivenHere(unittest.TestCase):
     """The four above are the four the contract names — asserted, not assumed.
 
