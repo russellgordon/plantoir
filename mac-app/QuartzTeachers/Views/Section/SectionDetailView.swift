@@ -1318,6 +1318,28 @@ struct SectionDetailView: View {
         if workspace.isBeingCopied(course.code) {
             return
         }
+        // A preview of this section cannot start while this same section is
+        // being deployed by this copy of the app — from this window, another
+        // window, or the assistant with no window (#381, Russell's decision 4
+        // on #378). Asked HERE, first, before any lease is taken or anything
+        // is stopped or started, because every way into a preview comes
+        // through here: the button (whose `.disabled` is only a convenience),
+        // the in-app assistant, and the restart path. Other programs are
+        // refused by their leases below, and a deploy typed at a command line
+        // by `preview.sh` itself.
+        if let refusal = SectionDetailView.refusalWhileThisSectionDeploys(
+            folderPath: workspaceURL.path,
+            courseCode: course.code,
+            displayCode: course.displayCode,
+            sectionNumber: sectionNumber
+        ) {
+            WorkLeaseRegistry.noteDeclinedWhileItsSectionDeploys(
+                courseCode: course.code, sectionNumber: sectionNumber
+            )
+            previewRefusalTitle = "Cannot Preview Yet"
+            previewRefusal = refusal
+            return
+        }
         // One of the moments the teacher ACTS on a reference course, so the
         // lock is re-asserted here: a folder that came back from a backup, or
         // from a second Mac, is not locked until somebody asks. Cheap — a
@@ -1536,6 +1558,29 @@ struct SectionDetailView: View {
             unsavedSettingsNotice = nil
             unsavedSettingsNoticeOwner = nil
         }
+    }
+
+    /// Why a preview of this section cannot start now, or nil when nothing in
+    /// this copy of the app is deploying it (GitHub #381).
+    ///
+    /// Static for the reason `refusalForAReferenceCourse` below is: nothing in
+    /// the suite constructs this view, so the rule lives where a test can
+    /// reach it, and `startPreview` asks it first. `displayCode` is what the
+    /// sentence names; `courseCode` is the folder's, which the publish record
+    /// holds.
+    static func refusalWhileThisSectionDeploys(
+        folderPath: String,
+        courseCode: String,
+        displayCode: String,
+        sectionNumber: Int
+    ) -> String? {
+        let isDeploying: Bool = CourseActivity.sectionPublishIsRunning(
+            folderPath: folderPath, courseCode: courseCode, sectionNumber: sectionNumber
+        )
+        if !isDeploying {
+            return nil
+        }
+        return AssistWording.sectionIsBeingDeployed(course: displayCode, section: String(sectionNumber))
     }
 
     /// Why this course is never deployed, or nil when it is an ordinary one.

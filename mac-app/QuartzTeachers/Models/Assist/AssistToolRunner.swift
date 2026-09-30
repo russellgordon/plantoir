@@ -2135,6 +2135,24 @@ final class AssistToolRunner {
            CourseActivity.courseIsBeingCopied(folderPath: folder.path, courseCode: course.code) {
             return AssistWording.courseIsBeingCopied(course: course.code)
         }
+        // A preview of a section cannot start while this copy of Plantoir is
+        // deploying that same section (#381). Asked here, before a window is
+        // opened, a preview stopped or a no-window rebuild run, for the same
+        // reason as the copy check above: the window's own Preview refuses, so
+        // going on would stop the teacher's preview, start nothing, and tell
+        // the conversation a preview is on its way (#381's review, S1). Covers
+        // both paths below — the window's and the `--build-only` rebuild's.
+        if let folder = workspace.workspaceURL,
+           CourseActivity.sectionPublishIsRunning(
+               folderPath: folder.path, courseCode: course.code, sectionNumber: sectionNumber
+           ) {
+            WorkLeaseRegistry.noteDeclinedWhileItsSectionDeploys(
+                courseCode: course.code, sectionNumber: sectionNumber
+            )
+            return AssistWording.sectionIsBeingDeployed(
+                course: course.code, section: String(sectionNumber)
+            )
+        }
         // FIRST, before a window is opened or a preview stopped (#156): a
         // build another program is running, or a preview it is showing, is
         // not this conversation's to end.

@@ -649,6 +649,34 @@ final class WorkLeaseDecliningTests: XCTestCase {
         XCTAssertEqual(siteWork.deploys, 0)
     }
 
+    /// The in-app assistant asked for the preview of a section THIS app is
+    /// deploying (#381's review, S1): refused with the section's sentence,
+    /// before a window is opened, a preview stopped or a rebuild run — the
+    /// window's own Preview refuses, so going on would tell the conversation
+    /// a preview is on its way while none is. MUST FAIL without the check in
+    /// `bringThePreviewUpToDate`.
+    func testTheInAppAssistantsPreviewIsRefusedWhileThisAppDeploysTheSection() async throws {
+        let folder: URL = try XCTUnwrap(workspace.workspaceURL)
+        CourseActivity.beginPublish(folderPath: folder.path, courseCode: "ICS3U", sectionNumber: 1)
+        let local: AssistToolRunner = runner(surface: .local)
+        let rebuilt: AssistToolOutcome = await local.run(call: call("rebuild_preview", ["course": "ICS3U", "section": 1]))
+        XCTAssertEqual(rebuilt.detail, AssistWording.sectionIsBeingDeployed(course: "ICS3U", section: "1"))
+        XCTAssertEqual(siteWork.previewRebuilds, 0, "No rebuild may run.")
+        XCTAssertTrue(trailText().contains(WorkLeaseRegistry.lineWhenItsSectionIsBeingDeployed), trailText())
+        CourseActivity.endPublish(folderPath: folder.path, courseCode: "ICS3U", sectionNumber: 1)
+    }
+
+    /// The control: another section of the course deploying does not hold
+    /// the assistant's preview back (the rule names the same section).
+    func testTheInAppAssistantsPreviewOfAnotherSectionStillRebuilds() async throws {
+        let folder: URL = try XCTUnwrap(workspace.workspaceURL)
+        CourseActivity.beginPublish(folderPath: folder.path, courseCode: "ICS3U", sectionNumber: 2)
+        let local: AssistToolRunner = runner(surface: .local)
+        let rebuilt: AssistToolOutcome = await local.run(call: call("rebuild_preview", ["course": "ICS3U", "section": 1]))
+        XCTAssertNotEqual(rebuilt.detail, AssistWording.sectionIsBeingDeployed(course: "ICS3U", section: "1"))
+        CourseActivity.endPublish(folderPath: folder.path, courseCode: "ICS3U", sectionNumber: 2)
+    }
+
     /// The controls: an assist lease, a lease for another course and a
     /// lease whose owner is gone decline nothing — without these, declining
     /// everything would pass every test above.
