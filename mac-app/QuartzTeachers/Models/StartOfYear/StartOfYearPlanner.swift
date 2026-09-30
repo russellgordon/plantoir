@@ -80,6 +80,127 @@ nonisolated struct StartOfYearDanglingSource {
     let hiddenTargets: [String]
 }
 
+/// How the start-of-year plan, its sheet and its undo name a page (#362).
+///
+/// **By its title**, the app's one naming rule (`AssistSectionPage.displayTitle`,
+/// `AssistSectionGraph.displayName(forPageAt:in:)`): the front matter title,
+/// else the file name as written, else — for a folder's own `index.md` — the
+/// folder. The assistant, the publish plan and the re-date planner already
+/// name pages that way. Only the "(in folder)" suffix is this sheet's own, and
+/// it is added ONLY when another page in the section has the same title — a
+/// teacher reading "“Notes” — nothing links to it" while another "Notes"
+/// stays cannot otherwise tell which one goes. Before #362 every page line
+/// carried `(courses/ICS3U/Warm-Ups/Predict the Output.md)`: the working
+/// folder's layout and the `.md` the product otherwise keeps out of sight.
+nonisolated enum StartOfYearPageNaming {
+
+    // MARK: - Functions
+
+    /// How two titles are compared: trimmed, in one Unicode form (a file name
+    /// on disk is often NFD while the same words typed as a title are NFC),
+    /// ignoring case. **Not** `AssistSectionGraph.normalized`, which drops
+    /// everything up to the last "/" — right for a LINK target, wrong for a
+    /// title: "Input/Output" and "Output" would count as one title.
+    static func titleKey(_ title: String) -> String {
+        return title.trimmingCharacters(in: .whitespaces).precomposedStringWithCanonicalMapping.lowercased()
+    }
+
+    /// The title keys held by more than one of these titles.
+    static func titlesHeldByMoreThanOne(_ titles: [String]) -> Set<String> {
+        var seen: Set<String> = []
+        var shared: Set<String> = []
+        for title in titles {
+            let key: String = titleKey(title)
+            if seen.contains(key) {
+                shared.insert(key)
+            } else {
+                seen.insert(key)
+            }
+        }
+        return shared
+    }
+
+    /// The folder a page is in, within the course: its segments joined with
+    /// "/" ("Warm-Ups", "section1/Resources"), or the course code for a page
+    /// at the top of the course folder. Never the working folder, never
+    /// `courses/`.
+    ///
+    /// Worked out from the URLs' components, compared in one Unicode form —
+    /// NOT by dropping a `courses/<CODE>/` prefix from `relativePath`, which
+    /// passes on a test folder and fails the day the working folder's name is
+    /// stored decomposed on disk and typed composed (file names are bytes).
+    static func folder(of fileURL: URL, courseDirectoryURL: URL, courseCode: String) -> String {
+        let parent: [String] = fileURL.deletingLastPathComponent().standardizedFileURL.pathComponents
+        let course: [String] = courseDirectoryURL.standardizedFileURL.pathComponents
+        var within: [String] = []
+        var isInside: Bool = parent.count >= course.count
+        if isInside {
+            var index: Int = 0
+            while index < course.count {
+                if parent[index].precomposedStringWithCanonicalMapping
+                    != course[index].precomposedStringWithCanonicalMapping {
+                    isInside = false
+                    break
+                }
+                index += 1
+            }
+        }
+        if !isInside {
+            // Outside the course folder (a symlinked section, say): the
+            // folder's own name is the most a teacher would recognise.
+            return fileURL.deletingLastPathComponent().lastPathComponent
+        }
+        var index: Int = course.count
+        while index < parent.count {
+            within.append(parent[index])
+            index += 1
+        }
+        if within.isEmpty {
+            return courseCode
+        }
+        return within.joined(separator: "/")
+    }
+
+    /// A page as the plan names it: `pageName`, or `pageNameInFolder` when its
+    /// title is one of `sharedTitles`.
+    static func name(title: String, fileURL: URL, sharedTitles: Set<String>,
+                     courseDirectoryURL: URL, courseCode: String) -> String {
+        if sharedTitles.contains(titleKey(title)) {
+            return StartOfYearWording.pageNameInFolder(
+                page: title,
+                folder: folder(of: fileURL, courseDirectoryURL: courseDirectoryURL, courseCode: courseCode)
+            )
+        }
+        return StartOfYearWording.pageName(page: title)
+    }
+
+    /// The undo sheet's lists: each file by its title (read from the file as
+    /// it is now; the file name when it cannot be read), with its folder when
+    /// another file IN THE SAME LIST has the same title. The undo holds files,
+    /// not the section's graph, so the list is what there is to compare with.
+    static func names(ofFilesAt urls: [URL], courseDirectoryURL: URL, courseCode: String) -> [String] {
+        var titles: [String] = []
+        for url in urls {
+            if let text = try? String(contentsOf: url, encoding: .utf8) {
+                titles.append(AssistSectionGraph.displayName(forPageAt: url, in: text))
+            } else {
+                titles.append(AssistSectionGraph.displayName(forPageAt: url, in: ""))
+            }
+        }
+        let shared: Set<String> = titlesHeldByMoreThanOne(titles)
+        var names: [String] = []
+        var index: Int = 0
+        while index < urls.count {
+            names.append(name(
+                title: titles[index], fileURL: urls[index], sharedTitles: shared,
+                courseDirectoryURL: courseDirectoryURL, courseCode: courseCode
+            ))
+            index += 1
+        }
+        return names
+    }
+}
+
 /// Why a section cannot be got ready.
 enum StartOfYearProblem: Error, Equatable {
     case noFirstClass(course: String, section: Int, noun: ClassNoun)
@@ -150,6 +271,15 @@ struct StartOfYearPlan {
     /// Guards staleness, not intent: it proves a write matches a plan that was
     /// MADE, never that a person read it.
     let fingerprint: String
+
+    /// The title keys (`StartOfYearPageNaming.titleKey`) that more than one
+    /// page of the SECTION has — every page the graph read, not only the
+    /// pages in a list, so a page going into draft whose twin stays is still
+    /// told apart from it (#362).
+    let sharedTitles: Set<String>
+
+    /// The course's folder, which a page's folder is said within.
+    let courseDirectoryURL: URL
 
     // MARK: - Computed properties
 
@@ -232,6 +362,21 @@ struct StartOfYearPlan {
         return false
     }
 
+    /// A page as the plan names it (#362): by its title, and by its folder
+    /// within the course only when another page in the section shares it.
+    func name(of page: AssistSectionPage) -> String {
+        return StartOfYearPageNaming.name(
+            title: page.displayTitle, fileURL: page.fileURL, sharedTitles: sharedTitles,
+            courseDirectoryURL: courseDirectoryURL, courseCode: courseCode
+        )
+    }
+
+    /// One line of a draft list, without its bullet — the sheet and
+    /// `describe()` both build it here, so the two cannot disagree.
+    func line(for draft: StartOfYearDraft, first: String) -> String {
+        return StartOfYearWording.draftLine(name: name(of: draft.page), reason: draft.reason.sentence(first: first))
+    }
+
     /// The whole plan in plain text, for an outside assistant to show a
     /// teacher. NOT truncated: a client agreeing to hide 170 pages must be
     /// able to see all 170. The plan code is on a line of its own, always in the
@@ -262,7 +407,7 @@ struct StartOfYearPlan {
                     classes: StartOfYearWording.counted(classChanges.count, noun: noun)
                 ) + ":")
                 for draft in classChanges {
-                    lines.append("• “\(draft.page.displayTitle)” — \(draft.reason.sentence(first: first))")
+                    lines.append("• " + line(for: draft, first: first))
                 }
             }
             let pageChanges: [StartOfYearDraft] = draftsThatChange(pageDrafts)
@@ -270,8 +415,7 @@ struct StartOfYearPlan {
                 lines.append("")
                 lines.append(StartOfYearWording.pagesHeading(pages: StartOfYearWording.pages(pageChanges.count)) + ":")
                 for draft in pageChanges {
-                    lines.append("• “\(draft.page.displayTitle)” (\(draft.page.relativePath)) — "
-                                 + draft.reason.sentence(first: first))
+                    lines.append("• " + line(for: draft, first: first))
                 }
             }
         }
@@ -307,7 +451,7 @@ struct StartOfYearPlan {
             for source in danglingSources {
                 let count: Int = source.hiddenTargets.count
                 lines.append("• " + StartOfYearWording.linksLeftLine(
-                    page: source.page.displayTitle,
+                    name: name(of: source.page),
                     links: count == 1 ? "1 link" : "\(count) links"
                 ))
             }
@@ -608,6 +752,11 @@ enum StartOfYearPlanner {
             return first.page.relativePath < second.page.relativePath
         }
 
+        var allShownTitles: [String] = []
+        for page in graph.pages {
+            allShownTitles.append(page.displayTitle)
+        }
+
         var alreadyTaught: [AssistSectionPage] = []
         for draft in classDrafts where draft.page.isVisibleToStudents {
             if let date = draft.page.date, date < today {
@@ -628,10 +777,15 @@ enum StartOfYearPlanner {
             danglingSources: danglingSources,
             alreadyTaught: alreadyTaught,
             scheduledDeploy: scheduledDeploy,
+            // The code hashes each change's PATH, not the words the plan
+            // uses for it, so naming pages by title (#362) did not change it:
+            // a code issued before still matches the same plan after.
             fingerprint: fingerprint(
                 course: course.code, section: sectionNumber,
                 first: firstClass.title, changes: publishPlan.changes
-            )
+            ),
+            sharedTitles: StartOfYearPageNaming.titlesHeldByMoreThanOne(allShownTitles),
+            courseDirectoryURL: course.directoryURL
         ))
     }
 

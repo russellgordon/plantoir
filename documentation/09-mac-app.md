@@ -6503,12 +6503,50 @@ ready for the start of the year"; the contract is `shared-rules.json` →
 anything is written: the intro; the warnings (classes dated before today that
 are going into draft; this folder's scheduled deploy for the section, which
 would put the change in front of students; a first class that is itself in
-draft); every class and every other page going into draft, each with its
-reason, in disclosure groups; what stays; the links left on pages students will
+draft); every class and every other page going into draft, each by its
+title with its reason, in disclosure groups; what stays; the links left on pages students will
 see that will lead to hidden pages, grouped by page with a count; the sentence
 that publishing a class by hand after this leaves it with dead links (issue
 #333); and that the undo ends when Plantoir quits. Go is disabled when there is
 nothing to do.
+
+**Pages are named by title, never by path (#362, v1.4.1).** Until v1.4.1 the
+pages list printed `“Predict the Output” (courses/ICS3U/Warm-Ups/Predict the
+Output.md)`, and the undo sheet printed the bare path with no title at all —
+the working folder's layout and the `.md` the product otherwise hides. Now a
+page is `“{title}”` (`startOfYear.wording.pageName`), and ONLY when another page
+in the section has the same title does it become `“Notes” (in Zeta)`
+(`pageNameInFolder`: the folder within the course, "/"-joined, or the course
+code for a page at the top of the course folder). The title is the app's one
+naming rule — `AssistSectionPage.displayTitle`: front matter title, else the
+file name as written, else the folder for an `index.md` — which the assistant,
+the publish plan and the re-date planner already use; the "(in …)" suffix is
+this sheet's alone, so do not copy it into the assistant's replies without
+deciding to. One builder, `StartOfYearPlan.line(for:first:)` (`draftLine`),
+serves both disclosure lists AND the MCP plan text (`describe()`), and the
+links-left list takes the same name. "Shares a title" is decided across EVERY
+page the section's graph read, not within the list shown — a "Notes" going into
+draft whose twin STAYS is exactly the case a teacher could not otherwise tell
+apart (the contract case "a page is named by its title, and by its folder only
+when another page shares the title" keeps its twin for that reason). Titles
+are compared trimmed, precomposed and case-folded, and NOT with the graph's
+`normalized`, which is for link targets and would make "Input/Output" and
+"Output" one title. The folder comes from the URLs' components compared in one
+Unicode form, not from string-dropping `courses/<CODE>/` off `relativePath`
+(file names are bytes: an NFD working folder would defeat the prefix). The
+undo holds files rather than the graph, so its lists name each file from what
+it says now and decide "shared" within the list (`StartOfYearPageNaming.names`).
+Measured over the 39 payloads: the only title more than one page shares is
+`_DUPLICATE ME`, always `publish: false`, so it never reaches a plan — the
+suffix costs nothing on a fresh course. **The plan code is unchanged**: it
+hashes each change's path, not the words. REJECTED: dropping only `.md` (still
+the folder layout); the folder always (noise on every line of a 90-page list);
+deciding "shared" within the list shown (misleads when the twin stays); a
+separate rule for the MCP text; a humanised file name (would disagree with the
+reasons' own names, which use `displayTitle`). Pinned by
+`StartOfYearNamingTests` (the undo names, the Unicode and "Input/Output"
+comparisons, and a source scan that neither the sheet nor the planner
+interpolates a `relativePath` into a line).
 
 **Go** (`StartOfYearPreparation.carryOut`), in order: re-plan from disk and,
 if the plan differs from the one on screen, write nothing and show the new one
