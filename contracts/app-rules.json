@@ -3537,7 +3537,7 @@
           "afterAnUpdate" : "♻️  Plantoir has been updated, so it is setting this folder up again to use the update…",
           "forBuiltWebsitesOutside" : "♻️  Setting this folder up again so built websites can be kept outside your course folder…",
           "forSeveralPreviews" : "♻️  Setting this folder up again so several previews can run at once…",
-          "retiringTheOldSharedOne" : "♻️  Setting aside what an older Plantoir used for every folder…",
+          "retiringTheOldSharedOne" : "♻️  Clearing away the website builder that older versions of Plantoir shared between folders…",
           "why" : "The lines a launcher prints just before it sets a folder up again, for the reasons a teacher meets most (an update above all: that is how #378 was met). They replaced 'Your workspace was built from an older version; rebuilding it so the update takes effect…', 'Rebuilding your workspace so …' and 'Retiring the old shared workspace container…' — Russell, who wrote the product, did not know what 'workspace' meant (#378's decisions), and 'container' is a rule-1 word. Checked by scripts/test_port_blocks.py in every launcher that says them. The other lines about this folder's workspace (hostBlockClash.saysWhenAStartIsRefused, the second-spelling lines, and the rarer remake reasons that still say 'container') are GitHub #378's piece B / its follow-up issue, not these keys."
         },
         "whenLeftoverWorkIsStopped" : "🧹 Stopped {what}, left running after the program that started it had closed. Your pages were not touched.",

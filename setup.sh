@@ -2542,7 +2542,7 @@ retire_legacy_container() {
   if [ "$WORKSPACE_IS_RUNNING" != "nothing" ] || [ -n "$WORKSPACE_LEFTOVERS" ]; then
     return 0
   fi
-  echo "♻️  Setting aside what an older Plantoir used for every folder…"
+  echo "♻️  Clearing away the website builder that older versions of Plantoir shared between folders…"
   docker stop "$id" >/dev/null 2>&1 || true
   docker rm "$id" >/dev/null 2>&1 || true
 }
@@ -2607,13 +2607,13 @@ if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
   # Container exists. Check its current /teaching/courses mount.
   CURRENT_MOUNT_SRC=$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/teaching/courses"}}{{.Source}}{{end}}{{end}}' "$CONTAINER_NAME" 2>/dev/null || echo "")
   if [[ -z "$CURRENT_MOUNT_SRC" ]]; then
-    echo "🧯 Existing container has no /teaching/courses mount; recreating with correct mount…"
+    echo "♻️  Plantoir cannot find your courses from this folder's website builder, so it is setting the folder up again…"
     remake_the_workspace
   elif [[ "$CURRENT_MOUNT_SRC" != "$HOST_COURSES" ]]; then
-    echo "🔀 Detected different working directory:"
-    echo "   • Existing mount: $CURRENT_MOUNT_SRC"
-    echo "   • Desired mount:  $HOST_COURSES"
-    echo "♻️  Recreating container '$CONTAINER_NAME' to point at the new folder…"
+    echo "🔀 This folder's website builder was set up for a folder somewhere else:"
+    echo "   • Set up for:  $CURRENT_MOUNT_SRC"
+    echo "   • This folder: $HOST_COURSES"
+    echo "♻️  Setting it up again for this folder…"
     remake_the_workspace
   elif ! container_has_builds_mount; then
     # Built websites moved out of the working folder, which needs a second
@@ -2634,12 +2634,12 @@ if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
     if docker ps --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
       # If courses/ was freshly created, refresh to ensure a clean, writable mount
       if [[ "$CREATED_COURSES_DIR" == "true" ]]; then
-        echo "🔁 'courses/' was created just now; refreshing container to ensure a clean, writable mount…"
+        echo "🔁 'courses/' was created just now, so Plantoir is setting this folder up again to be sure it can save there…"
         remake_the_workspace
       else
         # Probe writability; if not writable, recreate
         if ! probe_container_write; then
-          echo "🛑 Mounted 'courses/' is not writable from the container — recreating it…"
+          echo "🛑 The website builder could not save into 'courses/', so Plantoir is setting this folder up again…"
           remake_the_workspace
         else
           echo "✅ Container $CONTAINER_NAME is already running with correct, writable mount."
@@ -2650,7 +2650,7 @@ if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
       start_the_existing_workspace
       # After start, probe writability just in case
       if ! probe_container_write; then
-        echo "🛑 Mounted 'courses/' is not writable from the container after start — recreating it…"
+        echo "🛑 The website builder could not save into 'courses/' after it started, so Plantoir is setting this folder up again…"
         remake_the_workspace
       fi
     fi
