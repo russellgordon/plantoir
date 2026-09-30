@@ -548,19 +548,27 @@ separately from the reader:
   count — the old arithmetic, pointed at the lenient finder, left `…-0400e`
   on the new date and made a Windows-line-ending page lose its frontmatter
   entirely. The cases are `contracts/course-management.json` →
-  `sectionNumbers.addingKeysToAPage`; Windows' `FrontmatterLines` is still
-  strict and owes the same change (the `windows` issue from #175).
-  `CourseRestorer`'s
-  is strict on Windows and, since the mac's `PageFrontmatter.block` was
-  loosened for the reason above, lenient on the mac — so a restore reaches
+  `sectionNumbers.addingKeysToAPage`; Windows' `SectionAdder.FrontmatterLines`
+  and `ExtendFrontmatter` made the same change on 2026-09-30 (#282, bundle 2:
+  shared finder, splice by line index, each new line taking the ending of the
+  line it follows, inserted after the last key's whole value), and
+  `SectionAdderContractTests` runs the eight cases as bytes. `CourseRestorer`'s
+  finder was strict on Windows and, since the mac's `PageFrontmatter.block` was
+  loosened for the reason above, lenient on the mac — so a restore reached
   different pages on the two platforms, which is
   [issue #177](https://github.com/russellgordon/plantoir/issues/177). Russell
-  decided it on 2026-09-19: the restore uses the SHARED finder, on both
-  platforms. The mac's has since #140; since #182 (2026-09-25) it also carries
-  and drops each key WITH the lines it owns (below), and Windows owes both in
-  one change (the `windows` issue from #182). The trap to avoid is reading
-  "one fence finder" and making the MAC strict, which puts the second-block bug
-  straight back.
+  decided it on 2026-09-19 (and again 2026-09-25): the restore uses the SHARED
+  finder, on both platforms. The mac's has since #140; since #182 (2026-09-25)
+  it also carries and drops each key WITH the lines it owns (below). Windows
+  took both on 2026-09-30 (#177/#308, bundle 2): `CourseRestorer
+  .FrontmatterBounds` is gone, `SettingPerSectionKeys` walks
+  `PageVisibilityReader.LinesOwnedByKey`, and `SectionRestoreTests` runs
+  `backups.restoringOneSectionsKeys`. One small difference, Windows' on
+  purpose: blank lines before the opening fence are KEPT by Windows' restore,
+  where the mac's `settingPerSectionKeys` starts its rebuilt page at the fence
+  and drops them (harmless to the build; told to the mac). The trap to avoid
+  is reading "one fence finder" and making the MAC strict, which puts the
+  second-block bug straight back.
 
 * **A writer must take a value's CONTINUATION lines with the key.**
   Replacing a key's line alone orphans the indented line below it onto the new
@@ -699,8 +707,9 @@ separately from the reader:
   measured on a real page; they are named here rather than coded for.
   [Issue #188](https://github.com/russellgordon/plantoir/issues/188).
 
-  **Windows fixed all of this — everything above except the indented-dashes
-  shape, which it owes with #188 — on 2026-09-19** — `PageVisibilityReader
+  **Windows fixed all of this on 2026-09-19 — and the indented-dashes shape
+  on 2026-09-30 (#308, bundle 2: `IsFence` for the close, `IsOpeningFence`
+  for the open)** — `PageVisibilityReader
   .ReadScalar` for the reading, `PageFrontmatter.ContinuationLines` for the
   sweep, used by both of `SetDraft`'s branches; tests in
   `PageVisibilityReadingTests` →
@@ -864,9 +873,13 @@ separately from the reader:
     `atBuildTime.writingCases`.
     [Issue #186](https://github.com/russellgordon/plantoir/issues/186).
 
-  All three were pre-existing and all three are shared with Windows (which
-  inserts at `open + 1` too, and owes #182 and #186 with #188 — one `windows`
-  issue). The first two are not reached by the fixed reader or writer at all
+  All three were pre-existing and all three were shared with Windows, which
+  took #182, #186 and #188 together on 2026-09-30 (#308, bundle 2):
+  `PageVisibilityReader.PlaceForANewTopLevelKey` / `NamesATopLevelKey`, and
+  `SetDraft` / `SetCreated` answer `FrontmatterWriteOutcome.NoRoomForAKey`.
+  **Windows' callers do not yet NAME the declined pages** (the four
+  `pagesWhose…` wording keys stay ledgered on #308): a declined page is left
+  exactly as it was, which is the safe half; the sentence is what is owed. The first two are not reached by the fixed reader or writer at all
   — neither calls `setting`. The rule above is now kept by every one of them.
 
   **The same rule for the DATE and TITLE writers (#199, 2026-09-25, mac).**
@@ -920,9 +933,12 @@ separately from the reader:
   date either, so nothing a teacher could see is lost); duplicate keys — the writer and `rawValue` take the
   FIRST `created:`, PyYAML keeps the LAST (measured) — is a separate
   disagreement; and the time of a folded or below-key date is not read, so the
-  rewrite uses the fallback `T07:00:00.000-0400`, which is harmless. Windows'
-  `SetTitle`/`SetCreated` still replace one line (the `windows` issue from
-  #199).
+  rewrite uses the fallback `T07:00:00.000-0400`, which is harmless. Windows
+  matched it on 2026-09-30 (#284, bundle 2): one `PageFrontmatter.ReplaceKeyLine`
+  for `SetTitle`, `SetCreated` and `SectionAdder`'s copy and scaffold, with
+  `LinesUntilOpenValueCloses` (a port of the mac's `OpenValueScanner`) and
+  `ScalarText`; `FileFormatContractTests.TheDateAndTitleWritingCasesAreFollowed`
+  runs all 16 cases as bytes.
 
 * **A `#` inside quotes is not a comment**, wherever a writer looks for one.
   Windows' `ReplaceValue` split the line at the first `#` on it, so hiding a

@@ -185,6 +185,40 @@ Grep for callers and you will find none — that is the expected answer, and it
 is written here so nobody concludes they have missed a wiring step or deletes
 the types as dead code.
 
+## Parity run, bundle 2: frontmatter and page writers (2026-09-30)
+
+Branch `issue/bundle2-writers` (on top of bundle 1). Every writer of a page's
+frontmatter now finds the block the way the build does and takes a key's whole
+value with it; every link reader and rewriter shares one definition of code.
+
+- **Dates are Gregorian whatever the PC's region** (#144): `DateText`, taken
+  from the cloud branch `claude/nifty-mendel-q8ixto` (cherry-picked, not
+  re-derived).
+- **One fence rule, asymmetric** (#308/#188): the closing fence is column-0
+  dashes only; the opening may be indented. **One `ReplaceKeyLine`** (#284) for
+  `SetTitle`, `SetCreated` and the section copy and scaffold. **No key goes
+  where the block has no column-0 place for it** (#186): `SetDraft` and
+  `SetCreated` answer `NoRoomForAKey`. *Not yet*: the plan, re-date and
+  make-room callers naming the declined pages (four wording keys still ledgered
+  on #308).
+- **Adding a section** (#282) finds `----`, a blank line before the fence and a
+  trailing space, splices by line, keeps CR LF, and records `section added`.
+- **Restoring a section** (#177/#182) uses the shared finder, carries each key
+  WITH its lines, and counts and says the pages it had no room on.
+- **Duplicating a class** (#200): a forced-hidden copy can be published again
+  (B), the guard asks what the insertion created (A), the refusal admits other
+  classes may have moved (C); the plan card warns the undo will not help (#346).
+- **Renaming the word for a unit** (#158): Course Settings → Rename…, the whole
+  feature, off the UI thread. The sheet is compiled, not driven.
+- **Links** (#339/#318/#338): `MarkdownCode` (0 disagreements with
+  `markdown_code.py` over 12,490 pages), escaped pipes, angle-bracket links in a
+  folder rename.
+- **The unreadable front page gets its own card** (#300).
+
+Contract lists run here for the first time: `datesAndTitles.writingCases` (16),
+`sectionNumbers.addingKeysToAPage` (8), `backups.restoringOneSectionsKeys` (6),
+`readingALink.cases` (52), `renamingTheUnitWord.cases` + `.linkCases` (7 + 6).
+
 ## Parity run, bundle 1: red means something again (2026-09-30)
 
 The suite pulled on 2026-09-30 (dev `0d040a81`) was **61 failed, 1486 passed**,
